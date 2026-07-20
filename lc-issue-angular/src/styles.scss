@@ -1,0 +1,102 @@
+/* ── Global styles ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+/* ── Formly field overrides ──────────────────────────────────── */
+formly-form .form-control {
+  font-size: 13px;
+  border: 1.5px solid #94a3b8;
+  border-radius: 6px;
+  transition: border-color .15s, box-shadow .15s;
+}
+formly-form .form-control:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px #eef2ff;
+}
+
+/* Optional fields — orange dashed */
+formly-form .field-optional .form-control {
+  border-style: dashed;
+  border-color: #f97316;
+  background: #fff7ed;
+}
+formly-form .field-optional .form-control:focus {
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px #fff7ed;
+}
+formly-form .field-optional .form-control::placeholder {
+  color: #fb923c;
+  font-style: italic;
+}
+
+/* Section labels */
+.section-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid #f1f5f9;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0f172a;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+  }
+}
+
+/* Web component host spacing */
+balance-component,
+charge-component,
+payment-component {
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn-lc-primary {
+  background: #0f172a;
+  color: #fff;
+  border: none;
+  padding: 9px 22px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+
+  &:hover:not(:disabled) { background: #1e293b; }
+  &:disabled { background: #94a3b8; cursor: not-allowed; }
+}
+
+.btn-lc-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1.5px solid #e2e8f0;
+  padding: 9px 22px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+
+  &:hover { background: #e2e8f0; }
+}

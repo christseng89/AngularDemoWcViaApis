@@ -1,0 +1,136 @@
+<div class="lc-payment-container">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <h1 class="page-title">LC Payment Journal</h1>
+    <p class="page-subtitle">Web Component Demo — CITF-correct Letter of Credit accounting entries</p>
+  </div>
+
+  <!-- Main Tab Bar: Import / Export -->
+  <ul class="nav nav-tabs main-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'import'"
+        (click)="setMainTab('import')"
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'import'">
+        <span class="tab-icon">&#x2B07;</span> Import LC
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'export'"
+        (click)="setMainTab('export')"
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'export'">
+        <span class="tab-icon">&#x2B06;</span> Export LC
+      </button>
+    </li>
+  </ul>
+
+  <!-- ─── IMPORT LC SECTION ──────────────────────────────────────────────── -->
+  <div class="tab-content" *ngIf="activeTab === 'import'">
+
+    <div class="section-header">
+      <h2 class="section-title">Import LC Operations</h2>
+      <p class="section-desc">Accounting journal entries for import letter of credit transactions.</p>
+    </div>
+
+    <!-- Import Sub-tabs -->
+    <ul class="nav nav-tabs sub-tabs" role="tablist">
+      <li class="nav-item" *ngFor="let tab of importTabs" role="presentation">
+        <button
+          class="nav-link sub-link"
+          [class.active]="importTab === tab.id"
+          (click)="setImportTab(tab.id)"
+          type="button"
+          role="tab">
+          {{ tab.label }}
+        </button>
+      </li>
+    </ul>
+
+    <!-- Import Sub-tab Content -->
+    <div class="component-wrapper">
+
+      <!-- A1: LC Issue -->
+      <div *ngIf="importTab === 'issue'">
+        <lc-issue-payment></lc-issue-payment>
+      </div>
+
+      <!-- A2: Settlement -->
+      <div *ngIf="importTab === 'settlement'">
+        <lc-import-settlement></lc-import-settlement>
+      </div>
+
+      <!-- A3: Sight Payment (IBL) -->
+      <div *ngIf="importTab === 'sight-payment'">
+        <lc-sight-payment></lc-sight-payment>
+      </div>
+
+      <!-- A4: Sight Settlement (IBL → Customer) -->
+      <div *ngIf="importTab === 'sight-settlement'">
+        <lc-sight-settlement></lc-sight-settlement>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── EXPORT LC SECTION ──────────────────────────────────────────────── -->
+  <div class="tab-content" *ngIf="activeTab === 'export'">
+
+    <div class="section-header">
+      <h2 class="section-title">Export LC Operations</h2>
+      <p class="section-desc">Accounting journal entries for export letter of credit transactions.</p>
+    </div>
+
+    <!-- Export Sub-tabs -->
+    <ul class="nav nav-tabs sub-tabs" role="tablist">
+      <li class="nav-item" *ngFor="let tab of exportTabs" role="presentation">
+        <button
+          class="nav-link sub-link"
+          [class.active]="exportTab === tab.id"
+          (click)="setExportTab(tab.id)"
+          type="button"
+          role="tab">
+          {{ tab.label }}
+        </button>
+      </li>
+    </ul>
+
+    <!-- Export Sub-tab Content -->
+    <div class="component-wrapper">
+
+      <!-- B1: Advise -->
+      <div *ngIf="exportTab === 'advise'">
+        <lc-export-advise></lc-export-advise>
+      </div>
+
+      <!-- B2: Confirmed -->
+      <div *ngIf="exportTab === 'confirmed'">
+        <lc-export-confirmed></lc-export-confirmed>
+      </div>
+
+      <!-- B3: Negotiation -->
+      <div *ngIf="exportTab === 'nego'">
+        <lc-export-nego></lc-export-nego>
+      </div>
+
+      <!-- B4: Settlement -->
+      <div *ngIf="exportTab === 'settlement'">
+        <lc-export-settlement></lc-export-settlement>
+      </div>
+
+      <!-- B5: On Collection (without EBL) -->
+      <div *ngIf="exportTab === 'collection'">
+        <lc-export-collection></lc-export-collection>
+      </div>
+
+    </div>
+  </div>
+
+</div>
