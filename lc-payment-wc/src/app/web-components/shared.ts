@@ -116,6 +116,7 @@ class ApiServiceClass {
     lcCurrency: string;
     marginRate: number;
     commRate: number;
+    tolerancePct: number;
     applicantId: string;
     beneficiaryCountry: string;
   }): Promise<JournalResult> {
@@ -162,6 +163,7 @@ class ApiServiceClass {
     lcCurrency: string;
     confRate: number;
     tenorDays: number;
+    tolerancePct: number;
   }): Promise<JournalResult> {
     return this.post('/export/confirmed/calc', body as Record<string, unknown>);
   }

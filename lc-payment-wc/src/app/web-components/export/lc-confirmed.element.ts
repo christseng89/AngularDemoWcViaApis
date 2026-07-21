@@ -35,6 +35,7 @@ export class LcExportConfirmedElement extends HTMLElement {
     lcCurrency:  'USD',
     confRate:    0.2,
     tenorDays:   90,
+    tolerancePct: 0,
   };
   private _result: JournalResult | null = null;
   private _loading = false; private _error: string | null = null; private _reqId = 0;
@@ -88,6 +89,7 @@ export class LcExportConfirmedElement extends HTMLElement {
             <input type="number" id="tenorDays" value="${f.tenorDays}" min="1" step="1"/>
             <span class="hint">→ ${quartersPreview} quarter(s) of 90 days</span>
           </label>
+          <label>Tolerance (%) <input type="number" id="tolerancePct" value="${f.tolerancePct}" min="0" step="0.5"/></label>
         </div>
         <button class="btn" type="submit" ${this._loading ? 'disabled' : ''}>${this._loading ? 'Calculating…' : 'Calculate Confirming Commission'}</button>
       </form>
@@ -98,8 +100,9 @@ export class LcExportConfirmedElement extends HTMLElement {
           <div class="sum-title">Confirming Commission Summary</div>
           <div class="sum-grid">
             <span class="sl">LC Amount</span><span class="sv">${f.lcCurrency} ${fmt(Number(s['lcAmount']), f.lcCurrency)}</span>
+            <span class="sl">LC Balance (Amt × (1+Tol ${s['tolerancePct']}%))</span><span class="sv">${f.lcCurrency} ${fmt(Number(s['lcBalance']), f.lcCurrency)}</span>
             <span class="sl">Tenor / Quarters</span><span class="sv">${s['tenorDays']} days = ${s['quarters']} qtr(s)</span>
-            <span class="sl">Confirming Rate</span><span class="sv">${f.confRate}% per quarter</span>
+            <span class="sl">Confirming Rate</span><span class="sv">${f.confRate}% per quarter (of LC Balance)</span>
             <span class="sl">FX Rate</span><span class="sv">${f.lcCurrency}/TWD = ${s['fxRate']}</span>
             <span class="sl">Raw Commission</span><span class="sv">TWD ${fmt(Number(s['rawTwd']), 'TWD')}</span>
             <span class="sl">Min Applied?</span><span class="sv">${s['minimumApplied'] ? 'Yes (min TWD 1,000)' : 'No'}</span>
@@ -127,6 +130,7 @@ export class LcExportConfirmedElement extends HTMLElement {
       });
     bs('applicantId', 'applicantId'); bn('lcAmount', 'lcAmount');
     bs('lcCurrency', 'lcCurrency');   bn('confRate', 'confRate'); bn('tenorDays', 'tenorDays');
+    bn('tolerancePct', 'tolerancePct');
 
     for (const c of this._charges) {
       (this._shadow.getElementById(`charge-ccy-${c.id}`) as HTMLSelectElement | null)

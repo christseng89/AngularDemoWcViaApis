@@ -30,7 +30,7 @@ const STYLES = `
 
 export class LcIssueElement extends HTMLElement {
   private _form = {
-    lcAmount: 100000, lcCurrency: 'USD', marginRate: 10, commRate: 0.25,
+    lcAmount: 100000, lcCurrency: 'USD', marginRate: 10, commRate: 0.25, tolerancePct: 0,
     applicantId: 'C-001', beneficiaryCountry: 'US',
   };
   private _result: JournalResult | null = null;
@@ -85,6 +85,7 @@ export class LcIssueElement extends HTMLElement {
           </label>
           <label>Margin Rate (%) <input type="number" id="marginRate" value="${f.marginRate}" min="0" max="100" step="0.5"/></label>
           <label>Commission Rate (%) <input type="number" id="commRate" value="${f.commRate}" min="0" step="0.01"/></label>
+          <label>Tolerance (%) <input type="number" id="tolerancePct" value="${f.tolerancePct}" min="0" step="0.5"/></label>
           <label>Beneficiary Country
             <select id="beneficiaryCountry">${COUNTRIES.map(c =>
               `<option value="${c}" ${c === f.beneficiaryCountry ? 'selected' : ''}>${c}</option>`).join('')}
@@ -101,7 +102,8 @@ export class LcIssueElement extends HTMLElement {
           <div class="sum-grid">
             <span class="sl">LC Amount</span><span class="sv">${f.lcCurrency} ${fmt(Number(s['lcAmount']), f.lcCurrency)}</span>
             <span class="sl">Margin (${s['marginRate']}%) — ${f.lcCurrency}</span><span class="sv">${f.lcCurrency} ${fmt(Number(s['marginLcAmt']), f.lcCurrency)} ≈ TWD ${fmt(Number(s['marginTwd']), 'TWD')}</span>
-            <span class="sl">Commission (${s['commRate']}%)</span><span class="sv">TWD ${fmt(Number(s['commTwd']), 'TWD')}</span>
+            <span class="sl">LC Balance (Amt × (1+Tol ${s['tolerancePct']}%))</span><span class="sv">${f.lcCurrency} ${fmt(Number(s['lcBalance']), f.lcCurrency)}</span>
+            <span class="sl">Commission (${s['commRate']}% of LC Balance)</span><span class="sv">TWD ${fmt(Number(s['commTwd']), 'TWD')}</span>
             <span class="sl">SWIFT Fee</span><span class="sv">TWD ${fmt(Number(s['swiftTwd']), 'TWD')}</span>
             <hr class="sep"/>
             <span class="sl total-lbl">Total Dr CA (TWD equiv.)</span><span class="sv total-val">TWD ${fmt(Number(s['totalDrCaTwd']), 'TWD')}</span>
@@ -124,7 +126,8 @@ export class LcIssueElement extends HTMLElement {
     const bn = (id: string, k: keyof typeof f) => (this._shadow.getElementById(id) as HTMLInputElement | null)
       ?.addEventListener('change', e => { (f as Record<string, unknown>)[k] = Number((e.target as HTMLInputElement).value); });
     bs('applicantId', 'applicantId'); bn('lcAmount', 'lcAmount'); bs('lcCurrency', 'lcCurrency');
-    bn('marginRate', 'marginRate'); bn('commRate', 'commRate'); bs('beneficiaryCountry', 'beneficiaryCountry');
+    bn('marginRate', 'marginRate'); bn('commRate', 'commRate'); bn('tolerancePct', 'tolerancePct');
+    bs('beneficiaryCountry', 'beneficiaryCountry');
 
     // Charge currency change → re-call server with new selections to update journal entries
     for (const c of this._charges) {

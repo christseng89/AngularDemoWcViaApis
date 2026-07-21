@@ -85,6 +85,7 @@ app.post('/api/import/issue/calc', (req, res) => {
       lcCurrency,
       marginRate      = 10,
       commRate        = 0.25,
+      tolerancePct    = 0,
       applicantId,
       beneficiaryCountry,
       chargeSelections = {},
@@ -100,8 +101,9 @@ app.post('/api/import/issue/calc', (req, res) => {
     const marginLcAmt = round(lcAmount * (marginRate / 100), dp(lcCurrency));
     const marginTwd   = round(marginLcAmt * r, 0);
 
-    // ── Commission ── always income in TWD
-    const rawCommTwd = round(lcAmount * r * (commRate / 100), 0);
+    // ── Commission ── based on LC Balance = LC Amount × (1 + Tolerance%), always income in TWD
+    const lcBalance  = round(lcAmount * (1 + tolerancePct / 100), dp(lcCurrency));
+    const rawCommTwd = round(lcBalance * r * (commRate / 100), 0);
     const commTwd    = Math.max(rawCommTwd, MIN_COMM);
 
     // ── SWIFT ── always TWD
@@ -180,6 +182,8 @@ app.post('/api/import/issue/calc', (req, res) => {
         marginLcAmt,   // foreign ccy amount
         marginTwd,     // TWD equivalent for display
         commRate,
+        tolerancePct,
+        lcBalance,     // LC Amount × (1 + Tolerance%) — commission base
         commTwd,
         swiftTwd,
         totalDrCaTwd,
@@ -480,15 +484,21 @@ app.post('/api/export/advise/calc', (req, res) => {
 // chargeSelections: { comm: 'TWD'|lcCcy }
 app.post('/api/export/confirmed/calc', (req, res) => {
   try {
-    const { lcAmount, lcCurrency, confRate = 0.2, tenorDays = 90, beneficiaryId, chargeSelections = {} } = req.body;
+    const {
+      lcAmount, lcCurrency, confRate = 0.2, tenorDays = 90, tolerancePct = 0,
+      beneficiaryId, chargeSelections = {},
+    } = req.body;
 
     if (!lcAmount || !lcCurrency) {
       return res.status(400).json({ error: 'lcAmount and lcCurrency are required' });
     }
 
-    const r           = rate(lcCurrency, 'TWD');
-    const quarters    = Math.ceil(tenorDays / 90);
-    const rawTwd      = round(lcAmount * r * (confRate / 100) * quarters, 0);
+    const r        = rate(lcCurrency, 'TWD');
+    const quarters = Math.ceil(tenorDays / 90);
+
+    // Commission is based on LC Balance = LC Amount × (1 + Tolerance%)
+    const lcBalance   = round(lcAmount * (1 + tolerancePct / 100), dp(lcCurrency));
+    const rawTwd      = round(lcBalance * r * (confRate / 100) * quarters, 0);
     const confCommTwd = Math.max(rawTwd, MIN_COMM);
 
     // Beneficiary pays in TWD or foreign ccy
@@ -509,7 +519,8 @@ app.post('/api/export/confirmed/calc', (req, res) => {
     res.json({
       entries,
       summary: {
-        lcAmount, lcCurrency, confRate, tenorDays, quarters, rawTwd, confCommTwd,
+        lcAmount, lcCurrency, confRate, tenorDays, quarters,
+        tolerancePct, lcBalance, rawTwd, confCommTwd,
         minimumApplied: rawTwd < MIN_COMM,
         fxRate: r,
       },
