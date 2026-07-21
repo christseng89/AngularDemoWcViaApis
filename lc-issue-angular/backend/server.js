@@ -91,7 +91,7 @@ function getRate(from, to) {
 function calcCharge(charge, ctx) {
   const {
     lcAmount, lcCurrency = 'USD',
-    marginRate = 0, commRate = 0.25,
+    marginRate = 0, commRate = 0.25, tolerancePct = 0,
     applicantId, beneficiaryCountry,
   } = ctx;
 
@@ -135,13 +135,15 @@ function calcCharge(charge, ctx) {
       const appInfo = APPLICANTS[applicantId];
       const spr  = appInfo ? appInfo.spread / 100 : 0;              // e.g. 0.05% → 0.0005
       const eff  = base + spr;
-      const cLC  = lcAmount * eff;
+      const tol  = (parseFloat(tolerancePct) || 0) / 100;           // e.g. 5 → 0.05
+      const balFcy = lcAmount * (1 + tol);                          // LC Balance = LC Amount × (1 + tolerance%)
+      const cLC  = balFcy * eff;
       const lcTwd = getRate(lcCurrency, 'TWD');
       const raw  = round(cLC * lcTwd, 2);
 
       minApplied = raw < MIN_COMM;
       twdAmt     = Math.max(raw, MIN_COMM);
-      detail = { base, spr, eff, cLC, lcCcy: lcCurrency, lcAmt: lcAmount, lcTwd, raw, MIN_COMM };
+      detail = { base, spr, eff, cLC, lcCcy: lcCurrency, lcAmt: lcAmount, tol, balFcy, lcTwd, raw, MIN_COMM };
 
       if (payCcy === 'TWD') {
         payAmt = twdAmt;
@@ -231,6 +233,7 @@ app.get('/api/applicant/:id', (req, res) => {
  *   lcCurrency:         string,   // USD | EUR | JPY | GBP
  *   marginRate:         number,   // margin %
  *   commRate:           number,   // commission base %
+ *   tolerancePct:       number,   // tolerance % — commission base = LC Balance = lcAmount × (1 + tolerancePct%)
  *   applicantId:        string,
  *   beneficiaryCountry: string,   // ISO country code
  *   charges: [
@@ -247,7 +250,7 @@ app.get('/api/applicant/:id', (req, res) => {
  */
 app.post('/api/charges/calc', (req, res) => {
   const {
-    lcAmount, lcCurrency, marginRate, commRate,
+    lcAmount, lcCurrency, marginRate, commRate, tolerancePct,
     applicantId, beneficiaryCountry, charges,
   } = req.body;
 
@@ -255,7 +258,7 @@ app.post('/api/charges/calc', (req, res) => {
     return res.status(400).json({ error: '`charges` must be an array' });
   }
 
-  const ctx = { lcAmount, lcCurrency, marginRate, commRate, applicantId, beneficiaryCountry };
+  const ctx = { lcAmount, lcCurrency, marginRate, commRate, tolerancePct, applicantId, beneficiaryCountry };
   const rows = charges.map(c => calcCharge(c, ctx));
 
   res.json({ rows, rates: RATES, at: new Date().toISOString() });

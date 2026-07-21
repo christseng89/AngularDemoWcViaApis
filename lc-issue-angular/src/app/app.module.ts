@@ -6,9 +6,10 @@ import { FormlyBootstrapModule } from '@ngx-formly/bootstrap';
 
 import { AppComponent }      from './app.component';
 import { LcIssueComponent }  from './features/lc-issue/lc-issue.component';
+import { FormlySectionWrapperComponent } from './shared/formly/section-wrapper.component';
 
 @NgModule({
-  declarations: [AppComponent, LcIssueComponent],
+  declarations: [AppComponent, LcIssueComponent, FormlySectionWrapperComponent],
   imports: [
     BrowserModule,
     ReactiveFormsModule,
@@ -16,6 +17,9 @@ import { LcIssueComponent }  from './features/lc-issue/lc-issue.component';
       validationMessages: [
         { name: 'required', message: '此欄位必填' },
         { name: 'min',      message: (err, f) => `最小值為 ${f.props?.['min']}` },
+      ],
+      wrappers: [
+        { name: 'section', component: FormlySectionWrapperComponent },
       ],
     }),
     FormlyBootstrapModule,

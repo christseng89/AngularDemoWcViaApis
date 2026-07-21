@@ -57,6 +57,7 @@ export interface CalcRequest {
   lcCurrency: string;
   marginRate: number;
   commRate: number;
+  tolerancePct: number;
   applicantId: string;
   beneficiaryCountry: string;
   charges: ChargeInput[];

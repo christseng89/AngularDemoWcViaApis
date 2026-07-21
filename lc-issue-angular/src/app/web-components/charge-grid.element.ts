@@ -13,6 +13,7 @@
  *   lc-currency         USD | EUR | JPY | GBP
  *   margin-rate         Margin %
  *   comm-rate           Commission base %
+ *   tolerance-pct       Tolerance % (LC Balance = lc-amount × (1 + tolerance-pct%)); commission base
  *   applicant-id        Customer ID
  *   beneficiary-country ISO country code
  */
@@ -75,7 +76,7 @@ function pct(v: number): string {
 
 class ChargeGridEl extends HTMLElement {
   static get observedAttributes() {
-    return ['lc-amount', 'lc-currency', 'margin-rate', 'comm-rate', 'applicant-id', 'beneficiary-country'];
+    return ['lc-amount', 'lc-currency', 'margin-rate', 'comm-rate', 'tolerance-pct', 'applicant-id', 'beneficiary-country'];
   }
 
   private _rows: ChargeRow[] = [
@@ -166,6 +167,7 @@ class ChargeGridEl extends HTMLElement {
         lcCurrency:         lcCcy,
         marginRate:         parseFloat(this.getAttribute('margin-rate') ?? '0') || 0,
         commRate:           parseFloat(this.getAttribute('comm-rate')   ?? '0.25') || 0.25,
+        tolerancePct:       parseFloat(this.getAttribute('tolerance-pct') ?? '0') || 0,
         applicantId:        this.getAttribute('applicant-id') ?? '',
         beneficiaryCountry: this.getAttribute('beneficiary-country') ?? '',
         charges: this._rows.map(r => ({
@@ -289,7 +291,7 @@ class ChargeGridEl extends HTMLElement {
               + (row.minPayCcy != null ? ` = ${fmtC(row.minPayCcy, pc)} 已套用` : '已套用') + `</span>`;
         }
         return `${pct(d['base'] as number)}${spr ? `<br><span style="color:#d97706">${spr}</span>` : ''}
-          <br><strong style="color:#2563eb">Eff:${pct(d['eff'] as number)}</strong>
+          <br><strong style="color:#2563eb">Eff:${pct(d['eff'] as number)}</strong> × ${fmtC(d['balFcy'] as number, d['lcCcy'] as string)} <span class="hint">(LC Balance)</span>
           <br>${d['lcCcy']}/TWD=${fmtN(d['lcTwd'] as number, 4)}
           ${minLine}`;
       }
