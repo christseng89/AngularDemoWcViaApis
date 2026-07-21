@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LC Payment Web Components — Standalone Demo (no Angular)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 32px auto; padding: 0 20px 60px; background: #f8fafc; color: #1e3a5f; }
+    h1 { font-size: 20px; }
+    p.sub { color: #64748b; font-size: 13px; }
+    #status { font-family: Consolas, monospace; font-size: 13px; padding: 10px 14px; border-radius: 8px; margin: 16px 0; white-space: pre-wrap; }
+    #status.ok   { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    #status.fail { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+    h2.group { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin: 32px 0 10px; }
+    details { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 10px; }
+    details[open] { border-color: #bfdbfe; }
+    summary { cursor: pointer; padding: 12px 16px; font-size: 13px; font-weight: 700; color: #1e3a5f; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::before { content: '▸ '; color: #1d4ed8; }
+    details[open] summary::before { content: '▾ '; }
+    details > div { padding: 0 16px 16px; }
+    section.plain { margin: 28px 0; }
+    section.plain h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #1d4ed8; border-bottom: 1px solid #dbeafe; padding-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <h1>LC Payment Web Components</h1>
+  <p class="sub">
+    Plain HTML page. No Angular, no zone.js, no bundler — just one
+    <code>&lt;script src="lc-payment-wc.js"&gt;</code> tag and native custom tags below.
+    All 9 business scenarios (A1–A4, B1–B5), same as the Angular app at :4200.
+  </p>
+
+  <div id="status">checking…</div>
+
+  <h2 class="group">Import LC — A1 – A4</h2>
+  <details open>
+    <summary>A1 — Import LC Issue (&lt;lc-issue-payment&gt;)</summary>
+    <div><lc-issue-payment></lc-issue-payment></div>
+  </details>
+  <details>
+    <summary>A2 — Import LC Settlement (&lt;lc-import-settlement&gt;)</summary>
+    <div><lc-import-settlement></lc-import-settlement></div>
+  </details>
+  <details>
+    <summary>A3 — Import LC Sight Payment (&lt;lc-sight-payment&gt;)</summary>
+    <div><lc-sight-payment></lc-sight-payment></div>
+  </details>
+  <details>
+    <summary>A4 — Import LC Sight Settlement (&lt;lc-sight-settlement&gt;)</summary>
+    <div><lc-sight-settlement></lc-sight-settlement></div>
+  </details>
+
+  <h2 class="group">Export LC — B1 – B5</h2>
+  <details>
+    <summary>B1 — Export LC Advise (&lt;lc-export-advise&gt;)</summary>
+    <div><lc-export-advise></lc-export-advise></div>
+  </details>
+  <details>
+    <summary>B2 — Export LC Confirmed (&lt;lc-export-confirmed&gt;)</summary>
+    <div><lc-export-confirmed></lc-export-confirmed></div>
+  </details>
+  <details>
+    <summary>B3 — Export LC Negotiation (&lt;lc-export-nego&gt;)</summary>
+    <div><lc-export-nego></lc-export-nego></div>
+  </details>
+  <details>
+    <summary>B4 — Export LC Settlement (&lt;lc-export-settlement&gt;)</summary>
+    <div><lc-export-settlement></lc-export-settlement></div>
+  </details>
+  <details>
+    <summary>B5 — Export LC On Collection (&lt;lc-export-collection&gt;)</summary>
+    <div><lc-export-collection></lc-export-collection></div>
+  </details>
+
+  <section class="plain">
+    <h2>&lt;journal-entry&gt; — driven by a JSON attribute</h2>
+    <journal-entry id="sample-journal"></journal-entry>
+  </section>
+
+  <script src="./lc-payment-wc.js"></script>
+  <script>
+    // Feed the journal-entry widget some sample data via its `entries` attribute
+    document.getElementById('sample-journal').setAttribute('entries', JSON.stringify([
+      { leg: 'Dr', account: '014-20-11001', accountType: 'CA', ccy: 'USD', amount: 100000, amountTwd: 3250000, description: 'Import LC margin' },
+      { leg: 'Cr', account: 'MARGIN-USD',   accountType: 'Margin', ccy: 'USD', amount: 100000, amountTwd: 3250000, description: 'Margin pledged' },
+    ]));
+
+    // Prove this page loaded zero Angular and every custom element registered successfully.
+    (async () => {
+      const tags = [
+        'lc-issue-payment', 'lc-import-settlement', 'lc-sight-payment', 'lc-sight-settlement',
+        'lc-export-advise', 'lc-export-confirmed', 'lc-export-nego', 'lc-export-settlement', 'lc-export-collection',
+        'journal-entry',
+      ];
+      await Promise.all(tags.map(t => customElements.whenDefined(t)));
+      const hasAngular = !!(window.ng || window.Zone || document.querySelector('script[src*="angular"]'));
+      const el = document.getElementById('status');
+      if (hasAngular) {
+        el.className = 'fail';
+        el.textContent = '✘ Unexpected: Angular/Zone.js detected on this page.';
+      } else {
+        el.className = 'ok';
+        el.textContent =
+          `✔ ${tags.length}/${tags.length} custom elements registered (A1–A4, B1–B5, journal-entry)\n` +
+          `✔ window.ng / window.Zone are undefined — zero Angular runtime loaded`;
+      }
+    })();
+  </script>
+</body>
+</html>

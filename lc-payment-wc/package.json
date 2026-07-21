@@ -6,7 +6,9 @@
     "ng": "ng",
     "start": "ng serve --open",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "build:wc": "node scripts/build-wc.mjs",
+    "watch:wc": "node scripts/build-wc.mjs --watch"
   },
   "dependencies": {
     "@angular/animations": "^17.3.0",
@@ -26,6 +28,7 @@
     "@angular-devkit/build-angular": "^17.3.0",
     "@angular/cli": "^17.3.0",
     "@angular/compiler-cli": "^17.3.0",
+    "esbuild": "^0.20.1",
     "typescript": "~5.4.0"
   }
 }

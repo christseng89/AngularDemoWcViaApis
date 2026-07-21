@@ -1,9 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve the standalone Web Components bundle (npm run build:wc) so the
+// framework-free demo at /demo can call /api on the same origin.
+app.use('/demo', express.static(path.join(__dirname, '..', 'dist', 'wc')));
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const RATES = {
