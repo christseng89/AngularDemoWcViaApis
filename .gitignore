@@ -1,5 +1,5 @@
 node_modules/
 .angular/
-lc-issue/
+/lc-issue/
 dist/
 ~*.docx

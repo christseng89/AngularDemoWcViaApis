@@ -69,7 +69,18 @@ export interface CalcResponse {
   at: string;
 }
 
+/** Any field the server chooses to default — not a fixed shape, so new keys need no frontend change */
+export type FormDefaults = Record<string, unknown>;
+
 export const ApiService = {
+  /** Fetch server-authoritative default values for initializing the LC Issue form */
+  async getDefaults(): Promise<FormDefaults> {
+    const res = await fetch('/api/config/defaults');
+    if (!res.ok) throw new Error('Failed to fetch form defaults');
+    const { at, ...defaults } = await res.json() as Record<string, unknown>;
+    return defaults;
+  },
+
   /**
    * Send all charge rows to the backend for calculation.
    * The server computes twdAmt, payAmt, detail etc. and returns the full results.

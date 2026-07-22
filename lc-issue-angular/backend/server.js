@@ -4,6 +4,7 @@
  * All financial calculations run HERE, not in the browser.
  *
  * Endpoints:
+ *   GET  /api/config/defaults     — return server-authoritative default form values
  *   GET  /api/fx/rates            — return all FX rates (for Payment Grid display)
  *   GET  /api/fx/rate/:from/:to   — return single rate
  *   GET  /api/applicant/:id       — return applicant spread info
@@ -200,7 +201,22 @@ function calcCharge(charge, ctx) {
   }
 }
 
+// Server-authoritative default field values for the LC Issue form.
+// In production: derive from branch/product policy config rather than hardcoding.
+const DEFAULTS = {
+  lcCurrency:   'USD',
+  lcAmount: 100,
+  tolerancePct: 15,
+  commissionPct: 0.25,
+  marginPct:    0,
+};
+
 // ── Routes ────────────────────────────────────────────────────────────────────
+
+/** Return server-authoritative default values for initializing the LC Issue form */
+app.get('/api/config/defaults', (req, res) => {
+  res.json({ ...DEFAULTS, at: new Date().toISOString() });
+});
 
 /** Return all known FX rates (used by Payment Grid for TWD equiv display) */
 app.get('/api/fx/rates', (req, res) => {
@@ -370,6 +386,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ LC Charge Server listening on http://localhost:${PORT}`);
   console.log(`   Endpoints:`);
+  console.log(`     GET  /api/config/defaults`);
   console.log(`     GET  /api/fx/rates`);
   console.log(`     GET  /api/fx/rate/:from/:to`);
   console.log(`     GET  /api/applicant/:id`);

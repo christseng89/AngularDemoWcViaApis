@@ -1,0 +1,75 @@
+<div class="lc-page">
+
+  <!-- Header -->
+  <div class="lc-header">
+    <h1>📋 LC Issue 開狀作業</h1>
+    <p>Angular 17 + Formly · Balance / Charge Grid / Payment Grid Web Components Demo</p>
+  </div>
+
+  <div class="lc-body">
+
+    <!-- ① Input Fields (Formly) — section header/wrapper is now rendered by the
+         'section' Formly wrapper, driven from lc-issue.component.ts -->
+    <form [formGroup]="form">
+      <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
+    </form>
+
+    <!-- ② Balance Web Component -->
+    <section class="lc-section">
+      <div class="section-header" style="--num-bg:#1d4ed8">
+        <span class="num" style="background:#1d4ed8">2</span> LC Balance（自動計算）
+      </div>
+      <!-- Attrs bound via _push() on form.valueChanges -->
+      <balance-component
+        id="wc-balance"
+        tolerance-pct="5"
+        lc-currency="USD">
+      </balance-component>
+    </section>
+
+    <!-- ③ Charge Grid Web Component — table matching v3 HTML layout -->
+    <section class="lc-section">
+      <div class="section-header">
+        <span class="num" style="background:#15803d">3</span> 費用計算 Charge Grid
+      </div>
+      <!--
+        All attributes set via _push() on form.valueChanges:
+          lc-amount, lc-currency, margin-rate, comm-rate, applicant-id, beneficiary-country
+        payCcy is an inline dropdown inside the grid table (no separate Formly field needed).
+      -->
+      <charge-grid id="wc-cgrid"></charge-grid>
+    </section>
+
+    <!-- ④ Payment Grid Web Component — charges grouped by payCcy -->
+    <section class="lc-section">
+      <div class="section-header">
+        <span class="num" style="background:#b45309">4</span> 付款彙整 Payment Grid
+      </div>
+      <payment-grid id="wc-pgrid"></payment-grid>
+    </section>
+
+    <!-- Status hint (updated by PaymentGrid) -->
+    <div id="submit-hint" class="submit-hint"></div>
+
+    <!-- Actions -->
+    <div class="lc-actions">
+      <button
+        id="lc-submit"
+        class="btn-lc-primary"
+        [disabled]="!isReady || isSubmitting || !form.valid"
+        (click)="submit()">
+        <span *ngIf="!isSubmitting">🏦 提交開狀申請</span>
+        <span *ngIf="isSubmitting">⏳ 送出中…</span>
+      </button>
+      <button class="btn-lc-secondary" (click)="reset()">↺ 重設</button>
+      <span *ngIf="!form.valid" class="text-muted small ms-2">⚠ 請完整填寫必填欄位</span>
+    </div>
+
+    <!-- Toast -->
+    <div class="lc-toast" *ngIf="toastMsg"
+         [style.background]="toastOk ? '#15803d' : '#dc2626'">
+      {{ toastMsg }}
+    </div>
+
+  </div>
+</div>
