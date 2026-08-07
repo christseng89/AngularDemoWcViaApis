@@ -30,6 +30,17 @@
         <span class="tab-icon">&#x2B06;</span> Export LC
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'payment-component'"
+        (click)="setMainTab('payment-component')"
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'payment-component'">
+        <span class="tab-icon">&#x1F517;</span> Payment Component Simulator
+      </button>
+    </li>
   </ul>
 
   <!-- ─── IMPORT LC SECTION ──────────────────────────────────────────────── -->
@@ -131,6 +142,24 @@
       </div>
 
     </div>
+  </div>
+
+  <!-- ─── PAYMENT COMPONENT SIMULATOR SECTION ──────────────────────────────── -->
+  <div class="tab-content" *ngIf="activeTab === 'payment-component'">
+
+    <div class="section-header">
+      <h2 class="section-title">Payment Component Business Case Simulator</h2>
+      <p class="section-desc">
+        Live against microservices/payment-component — 15 confirmed-user
+        functions (IPLC/EPLC/IMCO/EXCO/GTEE/IWGT), RPFM's 4 partial-integration
+        functions, and 4 confirmed non-user modules, all traced to source.
+      </p>
+    </div>
+
+    <div class="component-wrapper">
+      <app-business-case-runner></app-business-case-runner>
+    </div>
+
   </div>
 
 </div>

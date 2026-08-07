@@ -5,10 +5,13 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --open",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "build:wc": "node scripts/build-wc.mjs",
-    "watch:wc": "node scripts/build-wc.mjs --watch"
+    "watch:wc": "node scripts/build-wc.mjs --watch",
+    "dev:all": "concurrently -n microservice,backend,angular -c blue,green,magenta \"npm run dev --prefix microservices/payment-component\" \"npm start --prefix backend\" \"ng serve\""
   },
   "dependencies": {
     "@angular/animations": "^17.3.0",
@@ -19,7 +22,10 @@
     "@angular/platform-browser": "^17.3.0",
     "@angular/platform-browser-dynamic": "^17.3.0",
     "@angular/router": "^17.3.0",
+    "@ngx-formly/bootstrap": "^6.3.12",
+    "@ngx-formly/core": "^6.3.12",
     "bootstrap": "^5.3.0",
+    "decimal.js": "^10.6.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.6.0",
     "zone.js": "~0.14.0"
@@ -28,7 +34,12 @@
     "@angular-devkit/build-angular": "^17.3.0",
     "@angular/cli": "^17.3.0",
     "@angular/compiler-cli": "^17.3.0",
+    "@types/jest": "^29.5.14",
+    "concurrently": "^10.0.4",
     "esbuild": "^0.20.1",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-preset-angular": "^14.6.2",
     "typescript": "~5.4.0"
   }
 }

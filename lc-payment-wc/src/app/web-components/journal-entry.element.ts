@@ -1,4 +1,4 @@
-import { DrCrEntry, fmt } from './shared';
+import { DrCrEntry, fmt, escapeHtml } from './shared';
 
 const ACCOUNT_TYPE_COLORS: Record<string, string> = {
   CA:     '#2563eb',
@@ -48,7 +48,7 @@ export class JournalEntryElement extends HTMLElement {
       font-size:11px;
       font-weight:600;
       letter-spacing:0.03em;
-    ">${t}</span>`;
+    ">${escapeHtml(t)}</span>`;
   }
 
   private _draw(): void {
@@ -74,13 +74,13 @@ export class JournalEntryElement extends HTMLElement {
       const legColor = e.leg === 'Dr' ? '#1d4ed8' : '#15803d';
       return `
         <tr style="background:${rowBg};">
-          <td style="font-weight:700;color:${legColor};padding:7px 10px;white-space:nowrap;">${e.leg}</td>
-          <td style="padding:7px 10px;font-size:13px;">${e.account}</td>
+          <td style="font-weight:700;color:${legColor};padding:7px 10px;white-space:nowrap;">${escapeHtml(e.leg)}</td>
+          <td style="padding:7px 10px;font-size:13px;">${escapeHtml(e.account)}</td>
           <td style="padding:7px 10px;">${this._typeBadge(e.accountType)}</td>
-          <td style="padding:7px 10px;font-weight:600;color:#374151;">${e.ccy}</td>
+          <td style="padding:7px 10px;font-weight:600;color:#374151;">${escapeHtml(e.ccy)}</td>
           <td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:13px;">${fmt(e.amount, e.ccy)}</td>
           <td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:13px;">${fmt(e.amountTwd, 'TWD')}</td>
-          <td style="padding:7px 10px;font-size:12px;color:#6b7280;">${e.description}</td>
+          <td style="padding:7px 10px;font-size:12px;color:#6b7280;">${escapeHtml(e.description)}</td>
         </tr>
       `;
     }).join('');

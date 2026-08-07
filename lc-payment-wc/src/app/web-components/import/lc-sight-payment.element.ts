@@ -1,14 +1,12 @@
 import {
-  JournalResult, fmt,
+  JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS,
+  CUSTOMERS, CCYS,
 } from '../shared';
 
 // A3 — Import LC Sight Payment (IBL Lodgement)
 // IBL = Bill Amount − Margin (net bank exposure).
 // Margin Pledge Dr'd to fund Nostro. Dr CA for corr charges (customer's chosen ccy).
-
-const CCY_OPTIONS = ['USD', 'EUR', 'JPY', 'GBP'];
 
 const STYLES = `
   :host{display:block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
@@ -82,7 +80,7 @@ export class LcSightPaymentElement extends HTMLElement {
           </label>
           <label>Bill Amount <input type="number" id="billAmount" value="${f.billAmount}" min="0.01" step="any" required/></label>
           <label>Bill Currency
-            <select id="billCurrency">${CCY_OPTIONS.map(c =>
+            <select id="billCurrency">${CCYS.map(c =>
               `<option value="${c}" ${c === f.billCurrency ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
           </label>
@@ -91,7 +89,7 @@ export class LcSightPaymentElement extends HTMLElement {
           </label>
           <label>Corr Bank Charges <input type="number" id="corrBankCharges" value="${f.corrBankCharges}" min="0" step="any"/></label>
           <label>Corr Charges CCY
-            <select id="corrBankChargesCcy">${CCY_OPTIONS.map(c =>
+            <select id="corrBankChargesCcy">${CCYS.map(c =>
               `<option value="${c}" ${c === f.corrBankChargesCcy ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
           </label>
@@ -99,7 +97,7 @@ export class LcSightPaymentElement extends HTMLElement {
         <button class="btn" type="submit" ${this._loading ? 'disabled' : ''}>${this._loading ? 'Calculating…' : 'Calculate IBL Lodgement'}</button>
       </form>
       ${this._loading ? '<div class="spinner">Fetching from server…</div>' : ''}
-      ${this._error   ? `<div class="err">⚠ ${this._error}</div>` : ''}
+      ${this._error   ? `<div class="err">⚠ ${escapeHtml(this._error)}</div>` : ''}
       ${s ? `<div class="result-section">
         <div class="sum-card">
           <div class="sum-title">IBL Lodgement Summary</div>
@@ -114,7 +112,7 @@ export class LcSightPaymentElement extends HTMLElement {
           </div>
         </div>
         ${renderChargeSection({ charges: this._charges, rates, appId: f.applicantId, payAccts: this._payAccts })}
-        <journal-entry entries="${JSON.stringify(this._result!.entries).replace(/"/g, '&quot;')}"></journal-entry>
+        <journal-entry entries="${escapeHtml(JSON.stringify(this._result!.entries))}"></journal-entry>
       </div>` : ''}
     </div>`;
 

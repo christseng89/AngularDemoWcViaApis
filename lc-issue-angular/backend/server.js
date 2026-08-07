@@ -209,6 +209,7 @@ const DEFAULTS = {
   tolerancePct: 15,
   commissionPct: 0.25,
   marginPct:    0,
+  applicantId:  'C-001',
 };
 
 // ── Routes ────────────────────────────────────────────────────────────────────

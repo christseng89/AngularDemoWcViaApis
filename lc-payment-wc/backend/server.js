@@ -11,13 +11,28 @@ app.use(express.json());
 app.use('/demo', express.static(path.join(__dirname, '..', 'dist', 'wc')));
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const RATES = {
-  'USD/TWD': 32.50,
-  'EUR/TWD': 35.20,
-  'JPY/TWD': 0.218,
-  'GBP/TWD': 41.20,
-  'TWD/TWD': 1.00,
-};
+//
+// CURRENCIES / RATES are fake/demo data (data/currencies.json, data/fx-rates.json)
+// — not traced from a real rate feed or currency master. The real baseline concept
+// this models is the STAN "Currency Master" function group (X/EE_SYS/FUNCGRP/
+// grp_G49082300152.xml, InquireCurrency F05030701358) — a generic framework CRUD
+// screen (JSP screen/STD/Std_Currency_Edit.jsp) with no bespoke field list to
+// trace a response shape from, so this endpoint's shape is invented for the demo,
+// same category as the pre-existing fake rate table it now replaces.
+const CURRENCIES = require('./data/currencies.json');
+const RATES = require('./data/fx-rates.json');
+const DECIMALS = Object.fromEntries(CURRENCIES.map((c) => [c.code, c.decimals]));
+
+// Guard: every currency in currencies.json must have a TWD rate in fx-rates.json
+// (RPFM-style "ensure all currency being used has an exchange rate captured") —
+// fail fast at startup rather than let a dropdown silently offer a currency the
+// calculators/FX bridge can't actually rate.
+for (const c of CURRENCIES) {
+  if (c.code === 'TWD') continue;
+  if (!(`${c.code}/TWD` in RATES) && !(`TWD/${c.code}` in RATES)) {
+    throw new Error(`data/fx-rates.json is missing a TWD rate for currency "${c.code}" (present in data/currencies.json) — every currency offered must have an exchange rate captured.`);
+  }
+}
 
 const MIN_COMM        = 1000;  // TWD — general minimum (A1 commission)
 const MIN_NEGO        = 800;   // TWD — B3 negotiation fee minimum
@@ -35,7 +50,7 @@ function rate(ccy, target) {
 }
 
 function dp(ccy) {
-  return (ccy === 'JPY' || ccy === 'TWD') ? 0 : 2;
+  return DECIMALS[ccy] ?? 2;
 }
 
 function round(n, d) {
@@ -71,6 +86,12 @@ app.get('/api/health', (_req, res) => {
 // ─── FX Rates ────────────────────────────────────────────────────────────────
 app.get('/api/fx/rates', (_req, res) => {
   res.json({ entries: [], summary: {}, rates: currentRates(), at: new Date().toISOString() });
+});
+
+// ─── Currencies ("Get Currency API") ──────────────────────────────────────────
+// Fake/demo data (data/currencies.json) — see the doc comment above CURRENCIES.
+app.get('/api/currencies', (_req, res) => {
+  res.json({ currencies: CURRENCIES, at: new Date().toISOString() });
 });
 
 // ─── A1. Import LC Issue ──────────────────────────────────────────────────────
@@ -853,6 +874,7 @@ app.listen(PORT, () => {
   console.log('Endpoints:');
   console.log('  GET  /api/health');
   console.log('  GET  /api/fx/rates');
+  console.log('  GET  /api/currencies');
   console.log('  POST /api/import/issue/calc          — A1 (chargeSelections: margin/comm/swift)');
   console.log('  POST /api/import/settlement/calc     — A2 (marginHeld in billCcy, chargeSelections: net)');
   console.log('  POST /api/import/sight-payment/calc  — A3 (bank-internal)');

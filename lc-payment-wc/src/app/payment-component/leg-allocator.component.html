@@ -1,0 +1,125 @@
+<div class="allocator">
+  <div class="allocator-header">
+    <h6 class="section-label">{{ label }} Legs</h6>
+    <div class="total-box">
+      <label>
+        Total Amount (protected)
+        <input
+          type="number"
+          min="0"
+          step="any"
+          [ngModel]="toNum(totalAmount)"
+          (ngModelChange)="onTotalChange($event)" />
+      </label>
+      <label>
+        Transaction Currency
+        <select [ngModel]="transactionCurrency" (ngModelChange)="onCurrencyChange($event)">
+          <option *ngFor="let c of currencies$ | async" [value]="c">{{ c }}</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="row-grid-header">
+    <span>Account Type</span>
+    <span>RTGS</span>
+    <span>Account No</span>
+    <span>%</span>
+    <span>Amount (Tx Ccy)</span>
+    <span>Leg Currency</span>
+    <span>Rate</span>
+    <span>Account Ccy Equiv.</span>
+    <span>Exchange A/C No.</span>
+    <span>Deal No.</span>
+    <span></span>
+  </div>
+
+  <div class="row-grid" *ngFor="let row of rows; trackBy: trackById" [class.remainder]="row.isRemainder">
+    <select [ngModel]="row.accountType" (ngModelChange)="onAccountTypeChange(row, $event)">
+      <option *ngFor="let t of accountTypeOptions" [value]="t">{{ t }}</option>
+    </select>
+
+    <label
+      class="rtgs-toggle"
+      *ngIf="row.accountType === 'NOSTRO'; else noRtgs"
+      title="RTGS routing (v1.3.0: modeled as a flag on NOSTRO, not its own account type — see payment-component.types.ts). Only meaningful for originModule RPFM.">
+      <input type="checkbox" [(ngModel)]="row.rtgsIndicator" (ngModelChange)="onFieldChange()" />
+      RTGS
+    </label>
+    <ng-template #noRtgs><span class="muted">—</span></ng-template>
+
+    <input type="text" [(ngModel)]="row.accountNo" (ngModelChange)="onFieldChange()" placeholder="Account No" />
+
+    <input
+      type="number" min="0" max="100" step="any"
+      [ngModel]="toNum(row.pct)"
+      (ngModelChange)="onPctInput(row, $event)"
+      [title]="row.isRemainder ? 'Remainder — editing it fixes this row and opens a new remainder for what\'s left' : ''" />
+
+    <input
+      type="number" min="0" step="any"
+      [ngModel]="toNum(row.amountTxCcy)"
+      (ngModelChange)="onAmountInput(row, $event)"
+      [title]="row.isRemainder ? 'Remainder — editing it fixes this row and opens a new remainder for what\'s left' : ''" />
+
+    <select [ngModel]="row.currency" (ngModelChange)="onRowCurrencyChange(row, $event)">
+      <option *ngFor="let c of currencies$ | async" [value]="c">{{ c }}</option>
+    </select>
+
+    <input
+      type="number" min="0" step="any"
+      *ngIf="needsRate(row); else noRate"
+      [ngModel]="toNum(row.rate)"
+      (ngModelChange)="onRateInput(row, $event)"
+      title="Auto-filled from GET /api/fx/rates when the currency changed — still freely editable." />
+    <ng-template #noRate><span class="muted">—</span></ng-template>
+
+    <span class="computed" *ngIf="needsRate(row); else sameCcy">{{ row.currency }} {{ accountCcyAmount(row) }}</span>
+    <ng-template #sameCcy><span class="muted">—</span></ng-template>
+
+    <input
+      type="text"
+      *ngIf="needsRate(row); else noExchangeAc"
+      [(ngModel)]="row.exchangeAccountNo"
+      placeholder="Exchange A/C"
+      (ngModelChange)="onFieldChange()"
+      title="Defaults to 'FX Exchange {TrxCcy}' (Other Ccy site) — drives the FX Pair table below, but is never sent to the microservice; CPYT_DR/CR_EXNG_AC in source is likewise never read into a posting, just recorded for back-office reconciliation." />
+    <ng-template #noExchangeAc><span class="muted">—</span></ng-template>
+
+    <input
+      type="text"
+      *ngIf="needsRate(row); else noDeal"
+      [(ngModel)]="row.dealNumber"
+      placeholder="Deal No."
+      title="Reference only — CPYT_DR/CR_DEAL in source is never read into any amount/account calculation, just a free-text reference." />
+    <ng-template #noDeal><span class="muted">—</span></ng-template>
+
+    <button type="button" class="remove-btn" *ngIf="rows.length > 1" (click)="removeRow(row)" title="Remove row">✕</button>
+  </div>
+
+  <div class="allocator-footer">
+    <button type="button" class="split-btn" (click)="addRow()">+ Split remainder into another leg</button>
+    <span class="total-pct" [class.over]="isOverAllocated">Total allocated: {{ totalPct }}%</span>
+  </div>
+  <p class="allocator-hint" *ngIf="isSplit">
+    The row marked <em>remainder</em> auto-tracks 100% − every other row — editing any row (including it) fixes that row and reflows the leftover into a new remainder, so this side always totals exactly {{ totalAmount }} {{ transactionCurrency }}.
+  </p>
+  <p class="allocator-error" *ngIf="isOverAllocated">⚠ Over-allocated — these rows add up to more than 100%. Reduce one of them.</p>
+
+  <div class="fx-pair-section" *ngIf="fxPairs.length">
+    <h6 class="section-label">{{ label }} FX Conversion Pair <span class="new-badge">new — not in baseline source</span></h6>
+    <p class="fx-pair-hint">
+      SSSS_Payment{{ label }}.js posts one entry per leg only — {{ side === 'DEBIT' ? 'Debit' : 'Credit' }} totals by
+      currency wouldn't otherwise balance. Computed here, independently of the {{ side === 'DEBIT' ? 'Credit' : 'Debit' }}
+      side, purely for display — not sent to the microservice.
+    </p>
+    <table class="fx-pair-table">
+      <thead><tr><th>Dr/Cr</th><th>Account</th><th>Currency</th><th>Amount</th><th>Site</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let p of fxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
+          <td>{{ p.drCr }}</td><td>{{ p.account }}</td><td>{{ p.currency }}</td><td>{{ p.amount }}</td><td>{{ p.site }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

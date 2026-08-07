@@ -1,0 +1,12 @@
+[
+  { "code": "USD", "name": "US Dollar", "decimals": 2 },
+  { "code": "EUR", "name": "Euro", "decimals": 2 },
+  { "code": "JPY", "name": "Japanese Yen", "decimals": 0 },
+  { "code": "GBP", "name": "British Pound", "decimals": 2 },
+  { "code": "TWD", "name": "New Taiwan Dollar", "decimals": 0 },
+  { "code": "IDR", "name": "Indonesian Rupiah", "decimals": 0 },
+  { "code": "CNY", "name": "Chinese Yuan", "decimals": 2 },
+  { "code": "HKD", "name": "Hong Kong Dollar", "decimals": 2 },
+  { "code": "SGD", "name": "Singapore Dollar", "decimals": 2 },
+  { "code": "AUD", "name": "Australian Dollar", "decimals": 2 }
+]

@@ -3,5 +3,10 @@
     "target": "http://localhost:3001",
     "secure": false,
     "changeOrigin": true
+  },
+  "/payment-component": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
   }
 }

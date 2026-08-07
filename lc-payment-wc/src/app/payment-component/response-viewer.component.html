@@ -1,0 +1,78 @@
+<div class="response-viewer" *ngIf="classification">
+  <div class="classification-row" [class.related]="classification.paymentComponentRelated">
+    <div class="badge-main">
+      <span class="badge" [class.on]="classification.paymentComponentRelated">
+        paymentComponentRelated = {{ classification.paymentComponentRelated }}
+      </span>
+    </div>
+    <div class="xor-terms">
+      <span class="term" [class.on]="classification.customerXor">customerXor: {{ classification.customerXor }}</span>
+      <span class="term" [class.on]="classification.nostroXor">nostroXor: {{ classification.nostroXor }}</span>
+      <span class="term" [class.on]="classification.vostroXor">vostroXor: {{ classification.vostroXor }}</span>
+    </div>
+    <div class="types-row">
+      <span>Debit types: {{ classification.debitTypes.join(', ') }}</span>
+      <span>Credit types: {{ classification.creditTypes.join(', ') }}</span>
+    </div>
+  </div>
+
+  <div class="balance-row" *ngIf="balance">
+    <span [class.imbalanced]="!balance.balanced">
+      Debit total {{ balance.debitTotal }} — Credit total {{ balance.creditTotal }} — difference {{ balance.difference }}
+      ({{ balance.balanced ? 'balanced' : 'NOT balanced' }})
+    </span>
+  </div>
+
+  <div class="instruction-id" *ngIf="instructionId">instructionId: {{ instructionId }}</div>
+
+  <ng-container *ngIf="accountEntries">
+    <div class="entries-section" *ngIf="settlementEntries.length">
+      <h6 class="section-label">Settlement Vouchers</h6>
+      <table class="entries-table">
+        <thead><tr><th>Dr/Cr</th><th>GL Account</th><th>Currency</th><th>Amount</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let e of settlementEntries" [class.dr]="e.drCrIndicator === 'D'" [class.cr]="e.drCrIndicator === 'C'">
+            <td>{{ e.drCrIndicator }}</td><td>{{ e.glAccount }}</td><td>{{ e.currency }}</td><td>{{ e.amount }}</td><td>{{ e.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="entries-section" *ngIf="chargeEntries.length">
+      <h6 class="section-label">Charge Voucher</h6>
+      <table class="entries-table">
+        <thead><tr><th>Dr/Cr</th><th>GL Account</th><th>Currency</th><th>Amount</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let e of chargeEntries" [class.dr]="e.drCrIndicator === 'D'" [class.cr]="e.drCrIndicator === 'C'">
+            <td>{{ e.drCrIndicator }}</td><td>{{ e.glAccount }}</td><td>{{ e.currency }}</td><td>{{ e.amount }}</td><td>{{ e.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="entries-section" *ngIf="liabilityEntries.length">
+      <h6 class="section-label">Liability Voucher</h6>
+      <table class="entries-table">
+        <thead><tr><th>Dr/Cr</th><th>GL Account</th><th>Currency</th><th>Amount</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let e of liabilityEntries" [class.dr]="e.drCrIndicator === 'D'" [class.cr]="e.drCrIndicator === 'C'">
+            <td>{{ e.drCrIndicator }}</td><td>{{ e.glAccount }}</td><td>{{ e.currency }}</td><td>{{ e.amount }}</td><td>{{ e.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
+  <div class="entries-section" *ngIf="swiftMessages && swiftMessages.length">
+    <h6 class="section-label">SWIFT / ISO 20022 Messages</h6>
+    <table class="entries-table">
+      <thead><tr><th>Type</th><th>Status</th><th>Correspondent BIC</th><th>Settlement Ccy</th><th>Settlement Amt</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let m of swiftMessages">
+          <td>{{ m.messageType }}</td><td>{{ m.status }}</td><td>{{ m.correspondentBic || '—' }}</td>
+          <td>{{ m.settlementCurrency || '—' }}</td><td>{{ m.settlementAmount || '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

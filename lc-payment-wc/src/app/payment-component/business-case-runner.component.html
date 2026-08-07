@@ -1,0 +1,115 @@
+<div class="runner-container">
+
+  <p class="intro-text">
+    Pick a real Confirm-button function below. PASS cases call the live
+    Payment Component microservice as you type (mirroring the original
+    onChange recalculation) and let you Confirm for real. GAP (RPFM) cases
+    preview classification only — no voucher-assembly routine exists in
+    source, so there's no Confirm action. N/A cases are confirmed non-users —
+    shown as a citation, not a form. Each side's legs can be split across
+    multiple accounts/currencies by percentage or amount, Mixed-Payment-LC
+    style.
+  </p>
+
+  <ul class="nav nav-pills module-pills" role="tablist">
+    <li class="nav-item" *ngFor="let g of moduleGroups">
+      <button
+        type="button"
+        class="nav-link"
+        [class.active]="selectedModule === g.module"
+        (click)="selectModule(g.module)">
+        {{ g.moduleLabel }}
+      </button>
+    </li>
+  </ul>
+
+  <div class="case-picker">
+    <button
+      type="button"
+      class="case-btn"
+      *ngFor="let c of casesForSelectedModule"
+      [class.active]="selectedCase?.id === c.id"
+      [class.pass]="c.verdict === 'PASS'"
+      [class.gap]="c.verdict === 'GAP'"
+      [class.na]="c.verdict === 'N_A'"
+      (click)="selectCase(c)">
+      <span class="verdict-badge">{{ c.verdict }}</span>
+      {{ c.functionLabel }}
+    </button>
+  </div>
+
+  <div class="case-detail" *ngIf="selectedCase as sc">
+    <div class="citation-bar">
+      <span class="citation">{{ sc.citation }}</span>
+      <p class="note">{{ sc.note }}</p>
+    </div>
+
+    <!-- N/A: static explanation card only, no form, no API call -->
+    <div class="na-card" *ngIf="sc.verdict === 'N_A'">
+      <h5>Confirmed Non-User</h5>
+      <p>{{ sc.moduleStats }}</p>
+    </div>
+
+    <!-- PASS / GAP: live form -->
+    <ng-container *ngIf="sc.verdict !== 'N_A'">
+      <form [formGroup]="form">
+        <formly-form [model]="model" [fields]="headerFields" [options]="options" [form]="form"></formly-form>
+      </form>
+
+      <app-leg-allocator
+        side="DEBIT"
+        [accountTypeOptions]="debitDefaults.accountTypeOptions"
+        [defaultAccountType]="debitDefaults.accountType"
+        [defaultRtgsIndicator]="debitDefaults.rtgsIndicator"
+        [defaultAccountNo]="debitDefaults.accountNo"
+        [initialTotalAmount]="debitDefaults.totalAmount"
+        [initialCurrency]="debitDefaults.currency"
+        (legsChange)="onDebitLegsChange($event)"
+        (validChange)="onDebitValidChange($event)">
+      </app-leg-allocator>
+
+      <app-leg-allocator
+        side="CREDIT"
+        [accountTypeOptions]="creditDefaults.accountTypeOptions"
+        [defaultAccountType]="creditDefaults.accountType"
+        [defaultRtgsIndicator]="creditDefaults.rtgsIndicator"
+        [defaultAccountNo]="creditDefaults.accountNo"
+        [initialTotalAmount]="creditDefaults.totalAmount"
+        [initialCurrency]="creditDefaults.currency"
+        (legsChange)="onCreditLegsChange($event)"
+        (validChange)="onCreditValidChange($event)">
+      </app-leg-allocator>
+
+      <form [formGroup]="form">
+        <formly-form [model]="model" [fields]="tailFields" [options]="options" [form]="form"></formly-form>
+      </form>
+
+      <div class="action-row" *ngIf="sc.verdict === 'PASS'">
+        <button type="button" class="btn btn-confirm" [disabled]="confirmLoading" (click)="onConfirm()">
+          {{ confirmLoading ? 'Confirming…' : 'Confirm (persists — real POST, dryRun:false)' }}
+        </button>
+        <span class="confirm-error" *ngIf="confirmError">⚠ {{ confirmError }}</span>
+      </div>
+
+      <div class="preview-status">
+        <span *ngIf="previewLoading" class="spinner">Recalculating…</span>
+        <span *ngIf="previewError" class="err">⚠ {{ previewError }}</span>
+        <span *ngIf="previewIncomplete && !previewError && !previewLoading" class="incomplete">Fill in every required field (account no, rate, etc.) to see a live preview.</span>
+      </div>
+
+      <app-response-viewer
+        *ngIf="result"
+        [classification]="result.classification"
+        [balance]="result.balance"
+        [accountEntries]="result.accountEntries"
+        [swiftMessages]="result.swiftMessages"
+        [instructionId]="result.instructionId">
+      </app-response-viewer>
+      <div class="confirmed-badge" *ngIf="result?.confirmed && !result?.replay">✓ Confirmed — new instruction persisted to the microservice's store</div>
+      <div class="confirmed-badge replay-badge" *ngIf="result?.confirmed && result?.replay">
+        ↺ Idempotent replay (HTTP 200) — this Main Ref + Sequence was already confirmed earlier. The server returned that <em>original</em> result unchanged, per FSD §6.1 — it did NOT recompute from what's currently in the form above. Change Main Ref or Sequence to confirm a new instruction.
+      </div>
+    </ng-container>
+  </div>
+
+</div>

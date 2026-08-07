@@ -3,15 +3,16 @@ import { CommonModule } from '@angular/common';
 
 // Register all LC Payment web components as a side-effect
 import '../../web-components/index';
+import { BusinessCaseRunnerComponent } from '../../payment-component/business-case-runner.component';
 
 type ImportTab = 'issue' | 'settlement' | 'sight-payment' | 'sight-settlement';
 type ExportTab = 'advise' | 'confirmed' | 'nego' | 'settlement' | 'collection';
-type MainTab   = 'import' | 'export';
+type MainTab   = 'import' | 'export' | 'payment-component';
 
 @Component({
   selector: 'app-lc-payment',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, BusinessCaseRunnerComponent],
   templateUrl: './lc-payment.component.html',
   styleUrls: ['./lc-payment.component.scss'],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],

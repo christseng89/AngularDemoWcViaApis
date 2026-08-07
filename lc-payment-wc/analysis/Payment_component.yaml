@@ -1,0 +1,883 @@
+openapi: 3.0.3
+info:
+  title: Payment Component Service API
+  description: >
+    Cross-module payment settlement microservice extracted from the Trade
+    Finance baseline system's shared PaymentDebit/PaymentCredit Data
+    Objects. Consumed by IPLC, EPLC, IMCO, EXCO, GTEE, IWGT (and, after
+    remediation, RPFM/PYMT/REIM/CFNC/SBLC) via a single atomic
+    POST /payment-instructions call that classifies, posts, and confirms
+    the debit/credit legs of a trade finance transaction in one request —
+    mirroring how every verified ConfirmBusinessCall equivalent invokes
+    this logic today: once, with the full leg set already assembled, not
+    as a sequence of incremental resource-building calls. Also triggers
+    downstream Account Entry (GL) and SWIFT/ISO 20022 message generation,
+    returned embedded in the same response.
+  version: "1.0.0"
+servers:
+  - url: https://api.bank.example/payment-component/v1
+tags:
+  - name: PaymentInstructions
+  - name: AccountEntries
+  - name: SwiftMessages
+  - name: Routing
+ 
+paths:
+  /payment-instructions:
+    post:
+      tags: [PaymentInstructions]
+      summary: Create and confirm a payment instruction in one atomic call
+      description: >
+        Single entry point replacing the header-create / per-leg-add /
+        classify-preview / confirm sequence of an earlier draft design.
+        Callers (IPLC/EPLC/IMCO/EXCO/GTEE/IWGT ConfirmBusinessCall
+        equivalents) submit the complete header plus the fully assembled
+        debitLegs[] and creditLegs[] arrays in one request. The service
+        performs, synchronously, within this single request: (1) Dr/Cr
+        balance validation, (2) Payment Component Identification Rule
+        Rev. 2 classification (Dr_has(t)/Cr_has(t) across all legs, §2.3),
+        (3) voucher description code assembly per leg
+        (SYF_*_CAL_PAYMENT_AC_DESC / SYM_IMCO_SetPaymentVchDesc
+        equivalent), (4) Account Entry generation for the settlement,
+        charge, and liability voucher streams (SYT_CHG_VOUCHER /
+        SYT_LIAB_VOUCHER equivalent) — unconditional, independent of the
+        classification result, and (5) SWIFT/ISO 20022 message record
+        creation when a credit leg's payAdviceMsgType/payCoverMsgType
+        resolves to a non-None value (routing resolved via the
+        /payment-routing equivalent of getPaymentRouting() first). All
+        five results are returned embedded in the single response body —
+        no follow-up call is required to retrieve them.
+ 
+ 
+        Idempotent on the natural key (originModule, mainRef, sequence):
+        a resubmission that matches an existing payment instruction
+        returns the existing result (200) without re-triggering GL/SWIFT
+        output; a new natural key creates a new instruction (201).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInstructionConfirmRequest'
+      responses:
+        '201':
+          description: Created and confirmed (new natural key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInstruction'
+        '200':
+          description: Already confirmed — existing result returned for a repeated (originModule, mainRef, sequence)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInstruction'
+        '400':
+          description: Request validation failed (e.g. missing required leg fields)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Business validation failed (e.g. legs unbalanced, missing mandatory account type)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [PaymentInstructions]
+      summary: Search confirmed payment instructions by origin module and reference
+      description: >
+        Read-only inquiry/audit lookup — not part of the confirm flow
+        itself (§6.1).
+      parameters:
+        - in: query
+          name: originModule
+          schema:
+            $ref: '#/components/schemas/OriginModule'
+        - in: query
+          name: mainRef
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PaymentInstruction' }
+ 
+  /payment-instructions/{instructionId}:
+    get:
+      tags: [PaymentInstructions]
+      summary: Retrieve a confirmed payment instruction (header + legs + classification + outputs)
+      description: >
+        Read-only inquiry/audit lookup — not part of the confirm flow
+        itself (§6.1).
+      parameters:
+        - $ref: '#/components/parameters/InstructionId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentInstruction' }
+        '404': { $ref: '#/components/responses/NotFound' }
+ 
+  /payment-instructions/{instructionId}/account-entries:
+    get:
+      tags: [AccountEntries]
+      summary: List Account Entry (GL voucher) lines produced for this instruction
+      description: >
+        Same entries already returned embedded in the POST /payment-instructions
+        response's accountEntries[] — this endpoint exists for later
+        reconciliation/reprint access, not as a step of the confirm flow.
+      parameters: [ { $ref: '#/components/parameters/InstructionId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AccountEntry' }
+ 
+  /payment-instructions/{instructionId}/swift-messages:
+    get:
+      tags: [SwiftMessages]
+      summary: List SWIFT/ISO 20022 messages generated for this instruction, with current transmission status
+      description: >
+        Message records are created synchronously during POST
+        /payment-instructions and returned embedded in swiftMessages[];
+        this endpoint is for polling status after that point, since
+        actual transmission to the SWIFT network is asynchronous
+        (status transitions PENDING -> GENERATED -> TRANSMITTED/FAILED).
+      parameters: [ { $ref: '#/components/parameters/InstructionId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SwiftMessage' }
+ 
+  /payment-routing:
+    get:
+      tags: [Routing]
+      summary: Correspondent-bank routing and country-block lookup
+      description: Equivalent of getPaymentRouting() / SYST_PaymentRouting.jsp.
+      parameters:
+        - in: query
+          name: mtType
+          required: true
+          schema: { type: string, enum: [MT103, MT202] }
+        - in: query
+          name: accountBankBic
+          required: true
+          schema: { type: string }
+        - in: query
+          name: trxCcy
+          required: true
+          schema: { type: string }
+        - in: query
+          name: blockCheck
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentRoutingResult' }
+ 
+components:
+  parameters:
+    InstructionId:
+      name: instructionId
+      in: path
+      required: true
+      schema: { type: string }
+ 
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+ 
+  schemas:
+    OriginModule:
+      type: string
+      enum: [IPLC, EPLC, IMCO, EXCO, PYMT, GTEE, RPFM, CFNC, SBLC, REIM, IWGT]
+ 
+    AccountType:
+      type: string
+      description: >
+        Source: CPYT_DR_AC_TYPE / CPYT_CR_AC_TYPE. These 5 values are
+        verified in use across IPLC/EPLC/IMCO/EXCO. A 6th value, RTGS,
+        exists in source (SSSS_PaymentCredit.js:1396,1413,1443) but is
+        scoped exclusively to SYS_MODULE_NAME=="RPFM" — out of current
+        scope, not included here.
+      enum: [CUSTOMER, NOSTRO, VOSTRO, SUSPENSE, INTERNAL]
+ 
+    AccountCategory:
+      type: string
+      readOnly: true
+      description: >
+        Server-derived grouping of AccountType. CUSTOMER -> [CUSTOMER];
+        NOSTRO_FAMILY -> [NOSTRO, VOSTRO]; INTERNAL_SUSPENSE ->
+        [SUSPENSE, INTERNAL]. These three buckets are never mixed in any
+        conditional branch found in SSSS_PaymentDebit.js /
+        SSSS_PaymentCredit.js — verified across every occurrence of
+        NOSTRO/VOSTRO and SUSPENSE/INTERNAL in both files.
+      enum: [CUSTOMER, NOSTRO_FAMILY, INTERNAL_SUSPENSE]
+ 
+    PaymentInstructionConfirmRequest:
+      type: object
+      description: >
+        Single input body for POST /payment-instructions — header fields
+        plus the complete debitLegs[]/creditLegs[] arrays, submitted in
+        one call (§5.4, §6.1). Replaces the earlier draft's separate
+        header-create request followed by individual per-leg add calls.
+      required: [originModule, mainRef, unitCode, debitLegs, creditLegs]
+      properties:
+        originModule: { $ref: '#/components/schemas/OriginModule' }
+        mainRef: { type: string, description: "Source CPYT_C_REF / C_MAIN_REF" }
+        sequence: { type: integer, description: "CPYT_I_SEQUENCE — combined with originModule+mainRef as the idempotency natural key" }
+        unitCode: { type: string }
+        tenorType: { type: string, description: "CPYT_C_TENOR_TYPE" }
+        tenorStartDate: { type: string, format: date }
+        maturityDate: { type: string, format: date }
+        debitLegs:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PaymentLegInput' }
+        creditLegs:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PaymentLegInput' }
+ 
+    PaymentInstruction:
+      type: object
+      description: >
+        Output of POST /payment-instructions and GET .../{instructionId}.
+        Embeds every result of the confirm flow (§5.4) in one object —
+        legs (enriched with server-derived fields), classification, and
+        the two downstream outputs — so no follow-up call is needed to
+        assemble a complete picture of what was confirmed.
+      properties:
+        instructionId: { type: string }
+        sequence: { type: integer, description: "CPYT_I_SEQUENCE" }
+        originModule: { $ref: '#/components/schemas/OriginModule' }
+        mainRef: { type: string }
+        tenorType: { type: string }
+        tenorDays: { type: integer }
+        maturityDate: { type: string, format: date }
+        unpaidAmountTxCcy: { type: number }
+        unpaidFlag: { type: boolean }
+        debitLegs:
+          type: array
+          items: { $ref: '#/components/schemas/PaymentLeg' }
+        creditLegs:
+          type: array
+          items: { $ref: '#/components/schemas/PaymentLeg' }
+        classification:
+          allOf: [ { $ref: '#/components/schemas/ClassificationResult' } ]
+          readOnly: true
+        accountEntries:
+          type: array
+          readOnly: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        swiftMessages:
+          type: array
+          readOnly: true
+          items: { $ref: '#/components/schemas/SwiftMessage' }
+ 
+    PaymentLegInput:
+      type: object
+      required: [accountNo, accountType, currency, amountTxCcy]
+      properties:
+        accountNo: { type: string, description: "CPYT_DR_AC / CPYT_CR_AC" }
+        accountType: { $ref: '#/components/schemas/AccountType' }
+        partyId: { type: string, description: "CPYT_DR_ID / CPYT_CR_ID" }
+        partyName: { type: string }
+        currency: { type: string, description: "CPYT_DR_CCY / CPYT_CR_CCY" }
+        amountAccountCcy: { type: number, description: "CPYT_DR_AMT_DRCCY / CPYT_CR_AMT_CRCCY" }
+        amountTxCcy: { type: number, description: "CPYT_DR_AMT_TXCCY / CPYT_CR_AMT_TXCCY" }
+        exchangeRate: { type: number, description: "CPYT_DR_RATE / equivalent" }
+        valueDate: { type: string, format: date, description: "CPYT_DR_VAL_DATE / CPYT_CR_VAL_DATE" }
+        sdaFlag: { type: string, description: "CPYT_C_SDA_FLAG (Sight/Usance/D-P/D-A)" }
+        payAdviceMsgType:
+          type: string
+          enum: [MT103, PACS008, None]
+          description: >
+            CPYT_PAY_ADV_MSG (credit legs only). Scope rule (Section 4.2.3):
+            Payment Component covers SWIFT Category 1 (MT1xx) + Category 2
+            (MT2xx) + pacs.008.*/pacs.009.* — MT103/PACS008 are the only
+            Category-1/pacs.008 values currently selectable in this DO's
+            dropdown, but any other MT1xx value encountered elsewhere is
+            in-scope by the same rule. Source field also allows MT400/MT756
+            (Category 4/7) — those are out of scope and owned by the main
+            transaction (IPLC/EPLC/IMCO/EXCO), never accepted here.
+        payCoverMsgType:
+          type: string
+          enum: [MT202, MT202COV, PACS009COV, None]
+          description: >
+            CPYT_PAY_COV_MSG (credit legs only). All current values are
+            Category 2 (MT2xx) / pacs.009.* — in scope per Section 4.2.3.
+            MT200 (also Category 2) is separately handled today by
+            SYF_PYMT_ProcessMT200.js and is in-scope by the same category
+            rule if/when integrated with PaymentDebit/PaymentCredit.
+ 
+    PaymentLeg:
+      allOf:
+        - { $ref: '#/components/schemas/PaymentLegInput' }
+        - type: object
+          properties:
+            legId: { type: string, readOnly: true }
+            legSide: { type: string, enum: [DEBIT, CREDIT], readOnly: true }
+            accountDesc:
+              type: string
+              readOnly: true
+              description: "CPYT_DR_AC_DESC / CPYT_CR_AC_DESC — voucher description code, {MODULE}{FuncCode}NULLNULLNULL{TypeChar}"
+            accountCategory:
+              allOf: [ { $ref: '#/components/schemas/AccountCategory' } ]
+              readOnly: true
+ 
+    ClassificationResult:
+      type: object
+      description: >
+        Rev. 2 — CUSTOMER/NOSTRO/VOSTRO evaluated as three fully
+        independent terms (superseded a merged NOSTRO+VOSTRO version
+        that incorrectly excluded genuine Nostro-vs-Vostro postings).
+        Read-only, embedded in PaymentInstruction.classification. Does
+        not gate account entry generation — all legs post as Account
+        Entries regardless of paymentComponentRelated.
+      properties:
+        instructionId: { type: string }
+        debitTypes:
+          type: array
+          items: { $ref: '#/components/schemas/AccountType' }
+          description: "Distinct accountType values across all debit legs (Dr_has(t) support set)"
+        creditTypes:
+          type: array
+          items: { $ref: '#/components/schemas/AccountType' }
+          description: "Distinct accountType values across all credit legs (Cr_has(t) support set)"
+        customerXor:
+          type: boolean
+          description: "Dr_has(CUSTOMER) XOR Cr_has(CUSTOMER)"
+        nostroXor:
+          type: boolean
+          description: "Dr_has(NOSTRO) XOR Cr_has(NOSTRO)"
+        vostroXor:
+          type: boolean
+          description: "Dr_has(VOSTRO) XOR Cr_has(VOSTRO)"
+        paymentComponentRelated:
+          type: boolean
+          description: "customerXor OR nostroXor OR vostroXor"
+ 
+    AccountEntry:
+      type: object
+      description: >
+        One GL posting line — derived from the vch_*.xml ENTRY template
+        plus the Charge/Liability/Settlement voucher streams. Generated
+        unconditionally for every debit and credit leg regardless of
+        ClassificationResult.paymentComponentRelated.
+      properties:
+        entryId: { type: string }
+        instructionId: { type: string }
+        voucherType: { type: string, enum: [SETTLEMENT, CHARGE, LIABILITY] }
+        custId: { type: string, description: "C_CUST_ID" }
+        description: { type: string, description: "C_TRX_DESC / C_VOUCHER_DESC" }
+        drCrIndicator: { type: string, enum: [D, C], description: "C_DBT_CRDT" }
+        glAccount: { type: string, description: "C_GL" }
+        subLedger: { type: string, description: "C_SL" }
+        currency: { type: string, description: "C_CURRENCY" }
+        amount: { type: number, description: "N_AMT" }
+        bookingDate: { type: string, format: date, description: "D_BOOKING_DATE" }
+        valueDate: { type: string, format: date, description: "D_VALUE_DATE" }
+        transactionCode: { type: string, description: "C_TRANS_CODE" }
+        exchangeRate1: { type: number }
+        exchangeRate2: { type: number }
+        referenceNumber: { type: string, description: "C_REF_NUMBER" }
+ 
+    SwiftMessage:
+      type: object
+      properties:
+        messageId: { type: string }
+        instructionId: { type: string }
+        legId: { type: string }
+        messageType:
+          type: string
+          enum: [MT103, MT202, MT202COV, PACS008, PACS009, PACS009COV]
+          description: >
+            All values are SWIFT Category 1/2 or pacs.008.*/pacs.009.* —
+            the Payment Component's in-scope message families (Section
+            4.2.3). MT200 is Category 2 and in-scope by the same rule,
+            but is not currently produced through this endpoint (handled
+            separately by SYF_PYMT_ProcessMT200.js) — add to this enum
+            if/when that flow is integrated.
+        status: { type: string, enum: [PENDING, GENERATED, TRANSMITTED, FAILED] }
+        correspondentBic: { type: string }
+        settlementCurrency: { type: string, description: "field 32A / CPYT_CR_CCY" }
+        settlementAmount: { type: number, description: "field 32A / CPYT_CR_AMT_CRCCY" }
+        instructedAmount: { type: number, description: "field 33B" }
+        valueDate: { type: string, format: date }
+        uetr: { type: string, description: "UETR_GPI_121 — SWIFT gpi tracking reference" }
+        serviceTypeId: { type: string, description: "SERVICE_TYPE_ID_GPI_111" }
+        isGpiMember: { type: boolean, description: "IS_GPI_MEMBER" }
+ 
+    PaymentRoutingResult:
+      type: object
+      properties:
+        routingBic: { type: string }
+        countryCode: { type: string }
+        blockStatus: { type: string, description: "gPR_blockStatus — sanctions/country block result" }
+        noteInterface: { type: string }
+ 
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+--- 
+openapi: 3.0.3
+info:
+  title: Payment Component Service API
+  description: >
+    Cross-module payment settlement microservice extracted from the Trade
+    Finance baseline system's shared PaymentDebit/PaymentCredit Data
+    Objects. Consumed by IPLC, EPLC, IMCO, EXCO, GTEE, IWGT (and, after
+    remediation, RPFM/PYMT/REIM/CFNC/SBLC) via a single atomic
+    POST /payment-instructions call that classifies, posts, and confirms
+    the debit/credit legs of a trade finance transaction in one request —
+    mirroring how every verified ConfirmBusinessCall equivalent invokes
+    this logic today: once, with the full leg set already assembled, not
+    as a sequence of incremental resource-building calls. Also triggers
+    downstream Account Entry (GL) and SWIFT/ISO 20022 message generation,
+    returned embedded in the same response.
+  version: "1.0.0"
+servers:
+  - url: https://api.bank.example/payment-component/v1
+tags:
+  - name: PaymentInstructions
+  - name: AccountEntries
+  - name: SwiftMessages
+  - name: Routing
+ 
+paths:
+  /payment-instructions:
+    post:
+      tags: [PaymentInstructions]
+      summary: Create and confirm a payment instruction in one atomic call
+      description: >
+        Single entry point replacing the header-create / per-leg-add /
+        classify-preview / confirm sequence of an earlier draft design.
+        Callers (IPLC/EPLC/IMCO/EXCO/GTEE/IWGT ConfirmBusinessCall
+        equivalents) submit the complete header plus the fully assembled
+        debitLegs[] and creditLegs[] arrays in one request. The service
+        performs, synchronously, within this single request: (1) Dr/Cr
+        balance validation, (2) Payment Component Identification Rule
+        Rev. 2 classification (Dr_has(t)/Cr_has(t) across all legs, §2.3),
+        (3) voucher description code assembly per leg
+        (SYF_*_CAL_PAYMENT_AC_DESC / SYM_IMCO_SetPaymentVchDesc
+        equivalent), (4) Account Entry generation for the settlement,
+        charge, and liability voucher streams (SYT_CHG_VOUCHER /
+        SYT_LIAB_VOUCHER equivalent) — unconditional, independent of the
+        classification result, and (5) SWIFT/ISO 20022 message record
+        creation when a credit leg's payAdviceMsgType/payCoverMsgType
+        resolves to a non-None value (routing resolved via the
+        /payment-routing equivalent of getPaymentRouting() first). All
+        five results are returned embedded in the single response body —
+        no follow-up call is required to retrieve them.
+ 
+ 
+        Idempotent on the natural key (originModule, mainRef, sequence):
+        a resubmission that matches an existing payment instruction
+        returns the existing result (200) without re-triggering GL/SWIFT
+        output; a new natural key creates a new instruction (201).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInstructionConfirmRequest'
+      responses:
+        '201':
+          description: Created and confirmed (new natural key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInstruction'
+        '200':
+          description: Already confirmed — existing result returned for a repeated (originModule, mainRef, sequence)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInstruction'
+        '400':
+          description: Request validation failed (e.g. missing required leg fields)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Business validation failed (e.g. legs unbalanced, missing mandatory account type)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [PaymentInstructions]
+      summary: Search confirmed payment instructions by origin module and reference
+      description: >
+        Read-only inquiry/audit lookup — not part of the confirm flow
+        itself (§6.1).
+      parameters:
+        - in: query
+          name: originModule
+          schema:
+            $ref: '#/components/schemas/OriginModule'
+        - in: query
+          name: mainRef
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PaymentInstruction' }
+ 
+  /payment-instructions/{instructionId}:
+    get:
+      tags: [PaymentInstructions]
+      summary: Retrieve a confirmed payment instruction (header + legs + classification + outputs)
+      description: >
+        Read-only inquiry/audit lookup — not part of the confirm flow
+        itself (§6.1).
+      parameters:
+        - $ref: '#/components/parameters/InstructionId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentInstruction' }
+        '404': { $ref: '#/components/responses/NotFound' }
+ 
+  /payment-instructions/{instructionId}/account-entries:
+    get:
+      tags: [AccountEntries]
+      summary: List Account Entry (GL voucher) lines produced for this instruction
+      description: >
+        Same entries already returned embedded in the POST /payment-instructions
+        response's accountEntries[] — this endpoint exists for later
+        reconciliation/reprint access, not as a step of the confirm flow.
+      parameters: [ { $ref: '#/components/parameters/InstructionId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AccountEntry' }
+ 
+  /payment-instructions/{instructionId}/swift-messages:
+    get:
+      tags: [SwiftMessages]
+      summary: List SWIFT/ISO 20022 messages generated for this instruction, with current transmission status
+      description: >
+        Message records are created synchronously during POST
+        /payment-instructions and returned embedded in swiftMessages[];
+        this endpoint is for polling status after that point, since
+        actual transmission to the SWIFT network is asynchronous
+        (status transitions PENDING -> GENERATED -> TRANSMITTED/FAILED).
+      parameters: [ { $ref: '#/components/parameters/InstructionId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SwiftMessage' }
+ 
+  /payment-routing:
+    get:
+      tags: [Routing]
+      summary: Correspondent-bank routing and country-block lookup
+      description: Equivalent of getPaymentRouting() / SYST_PaymentRouting.jsp.
+      parameters:
+        - in: query
+          name: mtType
+          required: true
+          schema: { type: string, enum: [MT103, MT202] }
+        - in: query
+          name: accountBankBic
+          required: true
+          schema: { type: string }
+        - in: query
+          name: trxCcy
+          required: true
+          schema: { type: string }
+        - in: query
+          name: blockCheck
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentRoutingResult' }
+ 
+components:
+  parameters:
+    InstructionId:
+      name: instructionId
+      in: path
+      required: true
+      schema: { type: string }
+ 
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+ 
+  schemas:
+    OriginModule:
+      type: string
+      enum: [IPLC, EPLC, IMCO, EXCO, PYMT, GTEE, RPFM, CFNC, SBLC, REIM, IWGT]
+ 
+    AccountType:
+      type: string
+      description: >
+        Source: CPYT_DR_AC_TYPE / CPYT_CR_AC_TYPE. These 5 values are
+        verified in use across IPLC/EPLC/IMCO/EXCO. A 6th value, RTGS,
+        exists in source (SSSS_PaymentCredit.js:1396,1413,1443) but is
+        scoped exclusively to SYS_MODULE_NAME=="RPFM" — out of current
+        scope, not included here.
+      enum: [CUSTOMER, NOSTRO, VOSTRO, SUSPENSE, INTERNAL]
+ 
+    AccountCategory:
+      type: string
+      readOnly: true
+      description: >
+        Server-derived grouping of AccountType. CUSTOMER -> [CUSTOMER];
+        NOSTRO_FAMILY -> [NOSTRO, VOSTRO]; INTERNAL_SUSPENSE ->
+        [SUSPENSE, INTERNAL]. These three buckets are never mixed in any
+        conditional branch found in SSSS_PaymentDebit.js /
+        SSSS_PaymentCredit.js — verified across every occurrence of
+        NOSTRO/VOSTRO and SUSPENSE/INTERNAL in both files.
+      enum: [CUSTOMER, NOSTRO_FAMILY, INTERNAL_SUSPENSE]
+ 
+    PaymentInstructionConfirmRequest:
+      type: object
+      description: >
+        Single input body for POST /payment-instructions — header fields
+        plus the complete debitLegs[]/creditLegs[] arrays, submitted in
+        one call (§5.4, §6.1). Replaces the earlier draft's separate
+        header-create request followed by individual per-leg add calls.
+      required: [originModule, mainRef, unitCode, debitLegs, creditLegs]
+      properties:
+        originModule: { $ref: '#/components/schemas/OriginModule' }
+        mainRef: { type: string, description: "Source CPYT_C_REF / C_MAIN_REF" }
+        sequence: { type: integer, description: "CPYT_I_SEQUENCE — combined with originModule+mainRef as the idempotency natural key" }
+        unitCode: { type: string }
+        tenorType: { type: string, description: "CPYT_C_TENOR_TYPE" }
+        tenorStartDate: { type: string, format: date }
+        maturityDate: { type: string, format: date }
+        debitLegs:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PaymentLegInput' }
+        creditLegs:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PaymentLegInput' }
+ 
+    PaymentInstruction:
+      type: object
+      description: >
+        Output of POST /payment-instructions and GET .../{instructionId}.
+        Embeds every result of the confirm flow (§5.4) in one object —
+        legs (enriched with server-derived fields), classification, and
+        the two downstream outputs — so no follow-up call is needed to
+        assemble a complete picture of what was confirmed.
+      properties:
+        instructionId: { type: string }
+        sequence: { type: integer, description: "CPYT_I_SEQUENCE" }
+        originModule: { $ref: '#/components/schemas/OriginModule' }
+        mainRef: { type: string }
+        tenorType: { type: string }
+        tenorDays: { type: integer }
+        maturityDate: { type: string, format: date }
+        unpaidAmountTxCcy: { type: number }
+        unpaidFlag: { type: boolean }
+        debitLegs:
+          type: array
+          items: { $ref: '#/components/schemas/PaymentLeg' }
+        creditLegs:
+          type: array
+          items: { $ref: '#/components/schemas/PaymentLeg' }
+        classification:
+          allOf: [ { $ref: '#/components/schemas/ClassificationResult' } ]
+          readOnly: true
+        accountEntries:
+          type: array
+          readOnly: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        swiftMessages:
+          type: array
+          readOnly: true
+          items: { $ref: '#/components/schemas/SwiftMessage' }
+ 
+    PaymentLegInput:
+      type: object
+      required: [accountNo, accountType, currency, amountTxCcy]
+      properties:
+        accountNo: { type: string, description: "CPYT_DR_AC / CPYT_CR_AC" }
+        accountType: { $ref: '#/components/schemas/AccountType' }
+        partyId: { type: string, description: "CPYT_DR_ID / CPYT_CR_ID" }
+        partyName: { type: string }
+        currency: { type: string, description: "CPYT_DR_CCY / CPYT_CR_CCY" }
+        amountAccountCcy: { type: number, description: "CPYT_DR_AMT_DRCCY / CPYT_CR_AMT_CRCCY" }
+        amountTxCcy: { type: number, description: "CPYT_DR_AMT_TXCCY / CPYT_CR_AMT_TXCCY" }
+        exchangeRate: { type: number, description: "CPYT_DR_RATE / equivalent" }
+        valueDate: { type: string, format: date, description: "CPYT_DR_VAL_DATE / CPYT_CR_VAL_DATE" }
+        sdaFlag: { type: string, description: "CPYT_C_SDA_FLAG (Sight/Usance/D-P/D-A)" }
+        payAdviceMsgType:
+          type: string
+          enum: [MT103, PACS008, None]
+          description: >
+            CPYT_PAY_ADV_MSG (credit legs only). Scope rule (Section 4.2.3):
+            Payment Component covers SWIFT Category 1 (MT1xx) + Category 2
+            (MT2xx) + pacs.008.*/pacs.009.* — MT103/PACS008 are the only
+            Category-1/pacs.008 values currently selectable in this DO's
+            dropdown, but any other MT1xx value encountered elsewhere is
+            in-scope by the same rule. Source field also allows MT400/MT756
+            (Category 4/7) — those are out of scope and owned by the main
+            transaction (IPLC/EPLC/IMCO/EXCO), never accepted here.
+        payCoverMsgType:
+          type: string
+          enum: [MT202, MT202COV, PACS009COV, None]
+          description: >
+            CPYT_PAY_COV_MSG (credit legs only). All current values are
+            Category 2 (MT2xx) / pacs.009.* — in scope per Section 4.2.3.
+            MT200 (also Category 2) is separately handled today by
+            SYF_PYMT_ProcessMT200.js and is in-scope by the same category
+            rule if/when integrated with PaymentDebit/PaymentCredit.
+ 
+    PaymentLeg:
+      allOf:
+        - { $ref: '#/components/schemas/PaymentLegInput' }
+        - type: object
+          properties:
+            legId: { type: string, readOnly: true }
+            legSide: { type: string, enum: [DEBIT, CREDIT], readOnly: true }
+            accountDesc:
+              type: string
+              readOnly: true
+              description: "CPYT_DR_AC_DESC / CPYT_CR_AC_DESC — voucher description code, {MODULE}{FuncCode}NULLNULLNULL{TypeChar}"
+            accountCategory:
+              allOf: [ { $ref: '#/components/schemas/AccountCategory' } ]
+              readOnly: true
+ 
+    ClassificationResult:
+      type: object
+      description: >
+        Rev. 2 — CUSTOMER/NOSTRO/VOSTRO evaluated as three fully
+        independent terms (superseded a merged NOSTRO+VOSTRO version
+        that incorrectly excluded genuine Nostro-vs-Vostro postings).
+        Read-only, embedded in PaymentInstruction.classification. Does
+        not gate account entry generation — all legs post as Account
+        Entries regardless of paymentComponentRelated.
+      properties:
+        instructionId: { type: string }
+        debitTypes:
+          type: array
+          items: { $ref: '#/components/schemas/AccountType' }
+          description: "Distinct accountType values across all debit legs (Dr_has(t) support set)"
+        creditTypes:
+          type: array
+          items: { $ref: '#/components/schemas/AccountType' }
+          description: "Distinct accountType values across all credit legs (Cr_has(t) support set)"
+        customerXor:
+          type: boolean
+          description: "Dr_has(CUSTOMER) XOR Cr_has(CUSTOMER)"
+        nostroXor:
+          type: boolean
+          description: "Dr_has(NOSTRO) XOR Cr_has(NOSTRO)"
+        vostroXor:
+          type: boolean
+          description: "Dr_has(VOSTRO) XOR Cr_has(VOSTRO)"
+        paymentComponentRelated:
+          type: boolean
+          description: "customerXor OR nostroXor OR vostroXor"
+ 
+    AccountEntry:
+      type: object
+      description: >
+        One GL posting line — derived from the vch_*.xml ENTRY template
+        plus the Charge/Liability/Settlement voucher streams. Generated
+        unconditionally for every debit and credit leg regardless of
+        ClassificationResult.paymentComponentRelated.
+      properties:
+        entryId: { type: string }
+        instructionId: { type: string }
+        voucherType: { type: string, enum: [SETTLEMENT, CHARGE, LIABILITY] }
+        custId: { type: string, description: "C_CUST_ID" }
+        description: { type: string, description: "C_TRX_DESC / C_VOUCHER_DESC" }
+        drCrIndicator: { type: string, enum: [D, C], description: "C_DBT_CRDT" }
+        glAccount: { type: string, description: "C_GL" }
+        subLedger: { type: string, description: "C_SL" }
+        currency: { type: string, description: "C_CURRENCY" }
+        amount: { type: number, description: "N_AMT" }
+        bookingDate: { type: string, format: date, description: "D_BOOKING_DATE" }
+        valueDate: { type: string, format: date, description: "D_VALUE_DATE" }
+        transactionCode: { type: string, description: "C_TRANS_CODE" }
+        exchangeRate1: { type: number }
+        exchangeRate2: { type: number }
+        referenceNumber: { type: string, description: "C_REF_NUMBER" }
+ 
+    SwiftMessage:
+      type: object
+      properties:
+        messageId: { type: string }
+        instructionId: { type: string }
+        legId: { type: string }
+        messageType:
+          type: string
+          enum: [MT103, MT202, MT202COV, PACS008, PACS009, PACS009COV]
+          description: >
+            All values are SWIFT Category 1/2 or pacs.008.*/pacs.009.* —
+            the Payment Component's in-scope message families (Section
+            4.2.3). MT200 is Category 2 and in-scope by the same rule,
+            but is not currently produced through this endpoint (handled
+            separately by SYF_PYMT_ProcessMT200.js) — add to this enum
+            if/when that flow is integrated.
+        status: { type: string, enum: [PENDING, GENERATED, TRANSMITTED, FAILED] }
+        correspondentBic: { type: string }
+        settlementCurrency: { type: string, description: "field 32A / CPYT_CR_CCY" }
+        settlementAmount: { type: number, description: "field 32A / CPYT_CR_AMT_CRCCY" }
+        instructedAmount: { type: number, description: "field 33B" }
+        valueDate: { type: string, format: date }
+        uetr: { type: string, description: "UETR_GPI_121 — SWIFT gpi tracking reference" }
+        serviceTypeId: { type: string, description: "SERVICE_TYPE_ID_GPI_111" }
+        isGpiMember: { type: boolean, description: "IS_GPI_MEMBER" }
+ 
+    PaymentRoutingResult:
+      type: object
+      properties:
+        routingBic: { type: string }
+        countryCode: { type: string }
+        blockStatus: { type: string, description: "gPR_blockStatus — sanctions/country block result" }
+        noteInterface: { type: string }
+ 
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+ 

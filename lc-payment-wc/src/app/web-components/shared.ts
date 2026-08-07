@@ -32,9 +32,40 @@ export function fmt(amount: number, ccy: string): string {
   }).format(amount);
 }
 
+/**
+ * Escapes a value for safe interpolation into an innerHTML template string —
+ * either as HTML body content or inside a double-quoted attribute value.
+ * These web components build their markup via template literals assigned to
+ * .innerHTML rather than the DOM API, so nothing here is escaped by default
+ * the way Angular's own template binding would be. Not exploitable today
+ * (server-derived text like DrCrEntry.account/.description is currently
+ * constrained by fixed dropdowns/mock data — see shared.ts's CUSTOMERS/
+ * DDA_ACCTS), but the pattern repeats across every *.element.ts file and
+ * would become a real stored/reflected-XSS vector the moment a free-text
+ * field (remarks, custom applicant name, etc.) is added — apply this
+ * wherever server- or user-derived text is interpolated into innerHTML.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── Currency list ────────────────────────────────────────────────────────────
 
-export const CCYS = ['USD', 'EUR', 'JPY', 'GBP', 'TWD'] as const;
+/**
+ * Kept in sync with backend/data/currencies.json (the "Get Currency API" —
+ * see currency.service.ts). These vanilla Custom Elements render their
+ * `<select>` synchronously at construction time rather than via an async
+ * fetch (unlike the Angular Payment Component Simulator, which calls
+ * GET /api/currencies live) — not worth an async-render refactor for a fixed
+ * demo currency list, but this array must stay identical to that JSON file's
+ * codes or the two currency dropdowns in this app would silently drift apart.
+ */
+export const CCYS = ['USD', 'EUR', 'JPY', 'GBP', 'TWD', 'IDR', 'CNY', 'HKD', 'SGD', 'AUD'] as const;
 
 // ─── Customer DDA Account Database ───────────────────────────────────────────
 // Used by collection grids to let the bank officer choose which account to debit.
@@ -391,8 +422,7 @@ export function renderPaymentDetails(o: PayDetailsOpts): string {
     ? 'Select the beneficiary account to credit the payment proceeds.'
     : 'Select the customer DDA account to debit upon confirmation.';
 
-  const CCY_OPTS  = ['TWD', 'USD', 'EUR', 'JPY', 'GBP'];
-  const ccySel    = CCY_OPTS.map(c =>
+  const ccySel    = CCYS.map(c =>
     `<option value="${c}" ${c === payCcy ? 'selected' : ''}>${c}</option>`
   ).join('');
 
