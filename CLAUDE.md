@@ -168,7 +168,10 @@ v1.7.0/v1.7.1 also covers per-currency handling of `suspenseBridge` entries agai
 same-currency Payment Legs — `debitEntries`/`debitLegs` genuinely NET (subtraction, can reach zero);
 `creditEntries`/`creditLegs` only ever COMBINE by addition (same polarity as the always-credit
 Suspense bridge leg, so they can never cancel — confirmed by accounting review: "Credit Suspense
-EUR 100 and a real Credit Leg EUR 100 is Credit EUR 200, not zero").)
+EUR 100 and a real Credit Leg EUR 100 is Credit EUR 200, not zero"). v1.7.2 additionally reorders
+the generated FX Exchange pair to read as one adjacent Dr/Cr block in debitLegs/creditLegs — Normal
+Debit(s) → FX Debit → FX Credit → Normal Credit(s) → Suspense Credit — an accounting-review best
+practice, not a correctness change.)
 
 **Known deliberate deviations from legacy source** (see the microservice README for full detail before
 touching this logic):

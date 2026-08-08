@@ -86,6 +86,38 @@
   margin: 0 0 6px;
 }
 
+.settlement-table {
+  // Fixed layout so every <tbody> group's columns share the exact same widths — an auto layout
+  // recomputes column widths per row's content and can drift a pixel or two between groups with
+  // very different text lengths (e.g. a short "FX Debit Leg Pair" group vs a long description).
+  // Fixed layout needs explicit column widths (the <colgroup> below) or it just splits evenly,
+  // which would badly under-size Dr/Cr and over-size Currency relative to Description.
+  table-layout: fixed;
+
+  .col-drcr { width: 6%; }
+  .col-gl-account { width: 22%; }
+  .col-currency { width: 10%; }
+  .col-amount { width: 14%; }
+  .col-description { width: 48%; }
+
+  td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.settlement-group-header td {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 4px 8px;
+}
+
 .entries-table {
   width: 100%;
   border-collapse: collapse;

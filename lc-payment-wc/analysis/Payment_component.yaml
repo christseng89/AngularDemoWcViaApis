@@ -105,7 +105,57 @@ info:
     payment-instructions-post.yaml's own v1.7.1 changelog entry for the
     full rationale and worked example; kept in lockstep here per this
     file's own scope note above.
-  version: "1.7.1"
+
+
+    v1.7.2 changelog (accounting-review best practice, 2026-08-09): the
+    generated FX Exchange pair now reads as one adjacent Dr/Cr block —
+    Normal Debit(s) -> FX Debit -> FX Credit -> Normal Credit(s) ->
+    Suspense Credit — see payment-instructions-post.yaml's own v1.7.2
+    changelog entry for the full rationale; kept in lockstep here per
+    this file's own scope note above.
+
+
+    v1.7.3 (client-only, this service and contract UNCHANGED — SUPERSEDED
+    by v1.7.4, kept here for the record): briefly attempted to combine a
+    foreign-currency Suspense bucket with any same-currency real Payment
+    Leg before converting it for the Business Case Simulator's client-side
+    seed formula — reverted; see v1.7.4 below.
+
+
+    v1.7.4 changelog (correctness fix, 2026-08-09, client-only — this
+    service and contract are UNCHANGED): reverts v1.7.3. The combined
+    seed broke aggregate V8 (the check this service actually enforces) in
+    exactly the scenario it targeted — a caller's own leg-amount trx-
+    equivalent and this service's combined-magnitude trx-equivalent are
+    independently rounded via different rate directions and do not
+    exactly cancel. The seed formula stays gross-only, converting each
+    Suspense entry alone, per entry (not bucket-summed) — see
+    payment-instructions-post.yaml's own v1.7.4 changelog entry for the
+    full counter-example; kept in lockstep here per this file's own scope
+    note above.
+
+
+    v1.7.5 changelog (correctness fix, 2026-08-09, client-only — this
+    service and contract are UNCHANGED): the Simulator's seed formula
+    now accumulates in Decimal end-to-end (one final rounding pass)
+    instead of summing already-rounded values as plain IEEE-754
+    doubles, which could drift a ULP off the exact decimal sum — see
+    payment-instructions-post.yaml's own v1.7.5 changelog entry for the
+    reproducible counter-example; kept in lockstep here per this file's
+    own scope note above.
+
+
+    v1.8.0 changelog (correctness fix + response-shape change, 2026-08-09,
+    SERVER-side — domain/suspenseBridge.ts only, request contract
+    unchanged): a foreign-currency Suspense bucket that also has a
+    matching real Payment Leg now generates TWO independent, self-
+    balancing FX Exchange pairs (one Suspense-suffixed, one plain) instead
+    of one combined pair — closes the per-currency display gap v1.7.3/
+    v1.7.4/v1.7.5 left as "real but unfixable at the seed level," from the
+    server side instead — see payment-instructions-post.yaml's own v1.8.0
+    changelog entry for the full derivation and worked example; kept in
+    lockstep here per this file's own scope note above.
+  version: "1.8.0"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -516,14 +566,18 @@ components:
         the caller is still responsible for increasing its own debit
         total by the same transaction-currency-equivalent amount before
         submitting ("Debit Leg #1 = Total + Σ debitEntries" — the seeding
-        step the Business Case Simulator does client-side, unaffected by
-        this v1.4.0 change), or step 1 will return 409 LEGS_UNBALANCED.
-        creditEntries, by contrast, are meant to be paired with a
-        caller-side REDUCTION of an existing credit leg by the same
-        amount ("Credit Leg #1 = Total - Σ creditEntries"), which is what
-        makes that side self-cancelling in the caller's own total — again
-        not something this service verifies or performs, only something
-        the resulting request must already reflect for step 1 to pass.
+        step the Business Case Simulator does client-side), or step 1
+        will return 409 LEGS_UNBALANCED. creditEntries, by contrast, are
+        meant to be paired with a caller-side REDUCTION of an existing
+        credit leg by the same amount ("Credit Leg #1 = Total - Σ
+        creditEntries"), which is what makes that side self-cancelling in
+        the caller's own total — again not something this service
+        verifies or performs, only something the resulting request must
+        already reflect for step 1 to pass. IMPORTANT (v1.7.4): each
+        Suspense entry must still convert ALONE, never combined with a
+        matching real leg's own amount — see payment-instructions-post.yaml's
+        own SuspenseBridge description for the full counter-example; kept
+        in lockstep here per this file's own scope note above.
 
 
         Every generated bridge leg is an ORDINARY Settlement leg (§6.1)
@@ -535,18 +589,22 @@ components:
         SourceComponent's description).
 
 
-        v1.7.0/v1.7.1: when a foreign-currency entry's currency matches a
-        real Payment Leg submitted on the SAME side (debitEntries against
-        debitLegs, creditEntries against creditLegs — independent per
-        side), that leg affects the FX Exchange pair for that currency —
-        debitLegs genuinely NET against Suspense (opposite polarity from
-        the always-credit bridge leg; can net to zero), creditLegs only
-        ever COMBINE by addition (same polarity — never cancels; "Credit
-        Suspense EUR 100 + a real Credit Leg EUR 100 is Credit EUR 200, not
-        zero"). See payment-instructions-post.yaml's own v1.7.0/v1.7.1
-        changelog entries for the full algebra. The Suspense leg(s)
-        themselves are unaffected either way — still always posted gross,
-        per entry, always credit-direction.
+        v1.7.0/v1.7.1 (SUPERSEDED by v1.8.0): first attempt combined a
+        foreign-currency Suspense bucket with any matching real Payment Leg
+        into ONE netted/combined FX Exchange pair — aggregate-V8-safe but
+        not guaranteed to balance BY CURRENCY.
+
+
+        v1.8.0: generates up to TWO independent, self-balancing FX Exchange
+        pairs per foreign-currency bucket instead — one Suspense-suffixed
+        (`FX Exchange {ccy} - Suspense`, always CREDIT-anchored, sized to
+        the bucket's own bridge legs' amountTxCcy reused verbatim) and one
+        plain (`FX Exchange {ccy}`, direction matches the list, sized to
+        the matching real legs' own amountTxCcy reused verbatim, skipped
+        when no real leg exists). See payment-instructions-post.yaml's own
+        v1.8.0 changelog entry for the full derivation and worked example.
+        The Suspense leg(s) themselves are unaffected by any of this —
+        still always posted gross, per entry, always credit-direction.
       properties:
         debitEntries:
           type: array

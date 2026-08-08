@@ -28,10 +28,14 @@
   <ng-container *ngIf="accountEntries">
     <div class="entries-section" *ngIf="settlementEntries.length">
       <h6 class="section-label">Settlement Vouchers</h6>
-      <table class="entries-table">
+      <table class="entries-table settlement-table">
+        <colgroup>
+          <col class="col-drcr" /><col class="col-gl-account" /><col class="col-currency" /><col class="col-amount" /><col class="col-description" />
+        </colgroup>
         <thead><tr><th>Dr/Cr</th><th>GL Account</th><th>Currency</th><th>Amount</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr *ngFor="let e of settlementEntries" [class.dr]="e.drCrIndicator === 'D'" [class.cr]="e.drCrIndicator === 'C'">
+        <tbody *ngFor="let section of groupedSettlementEntries">
+          <tr class="settlement-group-header"><td colspan="5">{{ section.label }}</td></tr>
+          <tr *ngFor="let e of section.entries" [class.dr]="e.drCrIndicator === 'D'" [class.cr]="e.drCrIndicator === 'C'">
             <td>{{ e.drCrIndicator }}</td><td>{{ e.glAccount }}</td><td>{{ e.currency }}</td><td>{{ e.amount }}</td><td>{{ e.description }}</td>
           </tr>
         </tbody>

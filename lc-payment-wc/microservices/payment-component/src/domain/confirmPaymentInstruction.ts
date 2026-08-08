@@ -82,12 +82,25 @@ export function confirmPaymentInstruction(
   // currency = debitLegs[0].currency, per payment-instructions-post.yaml's SuspenseEntry
   // doc comment; the `!` reflects debitLegs' zod-enforced minItems:1, not a `?? []`
   // fallback for a condition that can't reach this line. v1.7.0: also passes the
-  // caller's own debitLegs/creditLegs through — expandSuspenseBridge nets each
+  // caller's own debitLegs/creditLegs through — expandSuspenseBridge nets/combines each
   // foreign-currency Suspense bucket against same-currency legs on the matching side.
   const transactionCurrency = request.debitLegs[0]!.currency;
   const bridge = expandSuspenseBridge(request.suspenseBridge, transactionCurrency, request.debitLegs, request.creditLegs);
+
+  // v1.7.1 ordering: the FX Exchange pair should read as one adjacent Dr/Cr block in the
+  // Settlement Vouchers table (accounting-review best practice — lets a reviewer confirm
+  // the conversion/rate/per-currency balance at a glance, without hunting for the matching
+  // leg elsewhere). Bridge legs never land on debit except FX-pair legs (every Suspense
+  // leg is credit-direction, unconditionally — see suspenseBridge.ts), so bridge.debit is
+  // pure FX and already lands last simply by being appended after the caller's own
+  // debitLegs. bridge.credit mixes FX-pair legs (accountType INTERNAL) with Suspense legs
+  // (accountType SUSPENSE) — split them so the FX ones lead (immediately following the FX
+  // debit leg above) and the Suspense ones trail, after the caller's own creditLegs:
+  //   Normal Debits -> FX Debit -> FX Credit -> Normal Credits -> Suspense Credit
+  const bridgeFxCredit = bridge.credit.filter((l) => l.accountType === 'INTERNAL');
+  const bridgeSuspenseCredit = bridge.credit.filter((l) => l.accountType !== 'INTERNAL');
   const debitLegsInput = [...request.debitLegs, ...bridge.debit];
-  const creditLegsInput = [...request.creditLegs, ...bridge.credit];
+  const creditLegsInput = [...bridgeFxCredit, ...request.creditLegs, ...bridgeSuspenseCredit];
 
   // Step 1 (§3): Dr/Cr balance validation (V8) — throws BusinessValidationError (409) on failure.
   const tolerance = options.balanceTolerance ?? (request.originModule === 'RPFM' ? RPFM_BALANCE_TOLERANCE : 0);

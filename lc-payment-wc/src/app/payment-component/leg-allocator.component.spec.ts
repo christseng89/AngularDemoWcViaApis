@@ -82,6 +82,50 @@ describe('LegAllocatorComponent', () => {
       const sum = fixedRow!.amountTxCcy.plus(remainderRow!.amountTxCcy);
       expect(sum.toNumber()).toBe(0.35);
     });
+
+    it('with TWO independently-fixed rows — one same-currency-different-account, one foreign-currency — the remainder is Total - SUM(Trx Equivalent) - Other Trx Amount, exact to the cent (both terms Decimal-summed, one final rounding pass — not two separately-rounded subtractions)', () => {
+      const { comp } = makeComponent({ crossRate: 2 });
+      comp.ngOnInit(); // rows[0]: 100% remainder, USD, total=10000
+
+      // "Add Row" freezes the CURRENT remainder as fixed without creating a new one (nothing left
+      // over yet) — the documented "manual multi-row control" escape hatch (see addRow's own tests)
+      // that lets a SECOND row be fixed afterward without fixRow's swap-fallback promoting rows[0]
+      // back to remainder out from under it.
+      comp.addRow(); // rows[0] fixed @ 100% / 10000.00, no remainder anywhere
+
+      // Row 1: "Other Trx Amount (Same Currency, different account)" — same currency as the
+      // transaction (USD), a genuinely different account, fixed directly via onAmountInput.
+      comp.onAmountInput(comp.rows[0]!, 333.33);
+      expect(comp.rows).toHaveLength(2);
+      const otherSameCcyRow = comp.rows[0]!;
+      const remainderAfterRow0 = comp.rows[1]!;
+      expect(remainderAfterRow0.isRemainder).toBe(true);
+      expect(remainderAfterRow0.amountTxCcy.toNumber()).toBe(9666.67); // 10000 - 333.33
+
+      // Freeze THIS remainder too, so fixing the next (foreign-currency) row doesn't swap
+      // otherSameCcyRow back to remainder.
+      comp.addRow(); // rows[1] fixed @ its current 9666.67, still no remainder anywhere
+
+      // Row 2 (the just-frozen rows[1]): "SUM(Trx Equivalent)" — foreign currency, amount typed
+      // in its OWN currency ("this leg pays EUR 250"), converted via onAccountAmountInput.
+      const foreignRow = comp.rows[1]!;
+      comp.onRowCurrencyChange(foreignRow, 'EUR');
+      comp.onAccountAmountInput(foreignRow, 250); // amountTxCcy = money(250 / rate) = money(250/2) = 125.00
+      expect(foreignRow.amountTxCcy.toNumber()).toBe(125);
+
+      expect(comp.rows).toHaveLength(3);
+      const finalRemainder = comp.rows[2]!;
+      expect(finalRemainder.isRemainder).toBe(true);
+      expect(finalRemainder.currency).toBe('USD');
+      // Total(10000) - SUM(Trx Equivalent)(125.00) - Other Trx Amount(333.33) = 9541.67, exactly.
+      expect(finalRemainder.amountTxCcy.toNumber()).toBe(9541.67);
+
+      // otherSameCcyRow's own fixed value must be untouched by fixing the foreign row afterward.
+      expect(otherSameCcyRow.amountTxCcy.toNumber()).toBe(333.33);
+
+      const total = otherSameCcyRow.amountTxCcy.plus(foreignRow.amountTxCcy).plus(finalRemainder.amountTxCcy);
+      expect(total.toNumber()).toBe(10000);
+    });
   });
 
   describe('row array stability (regression: *ngFor DOM-relocation/focus-loss bug)', () => {
@@ -178,6 +222,31 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows[0]!.pct.toNumber()).toBe(40);
       expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(800);
       expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(1200);
+    });
+
+    it('regression (B-Tree driver XOR): a SAME-currency row driven by a directly-typed Amount (onAmountInput) keeps that amount EXACT — not rescaled by its derived % — when the total later changes for an unrelated reason', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit(); // total = 10000, USD
+      comp.onAmountInput(comp.rows[0]!, 500); // user types "USD 500" directly — Amount-driven, pct(5%) is DERIVED, not the source of truth
+      const fixedRow = comp.rows.find((r) => !r.isRemainder)!;
+      expect(fixedRow.driver).toBe('amount');
+
+      comp.onTotalChange(20000); // e.g. a Suspense entry reseeds the total — totally unrelated to this row
+
+      expect(fixedRow.amountTxCcy.toNumber()).toBe(500); // unchanged — NOT rescaled to 5% of 20000 (=1000)
+      const remainderRow = comp.rows.find((r) => r.isRemainder)!;
+      expect(remainderRow.amountTxCcy.toNumber()).toBe(19500); // EXACT: 20000 - 500
+    });
+
+    it('a Percentage-driven row (onPctInput) still rescales normally — the XOR default, unaffected by the amount-driven fix above', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 5); // Percentage-driven — 5% is the source of truth
+      expect(comp.rows[0]!.driver).toBe('pct');
+
+      comp.onTotalChange(20000);
+
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(1000); // DOES rescale: 5% of 20000
     });
 
     it('regression: a fixed foreign-currency row keeps its own-currency amount EXACT — not rescaled by % — when the seeded total later changes for an unrelated reason (e.g. a Suspense entry)', () => {

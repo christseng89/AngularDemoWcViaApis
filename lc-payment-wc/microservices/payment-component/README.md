@@ -1,7 +1,7 @@
 # Payment Component Service (Node.js / TypeScript)
 
 Implements `POST /payment-instructions` from `payment-instructions-post.yaml`
-v1.7.1, following the Confirm flow specified in
+v1.8.0, following the Confirm flow specified in
 `PaymentComponent-Microservice-FSD-zh.docx` §5.4 and every formula traced in
 `Payment_Component_Calculation_Validation.docx` (§3, §4, §5, §6.1, §7), plus
 the v1.4.0 `suspenseBridge` addition and its v1.5.0 `sourceComponent`
@@ -45,7 +45,7 @@ Server listens on `PORT` (default 3000), all routes mounted under
 | `src/domain/accountEntries.ts` | §6.1 | Settlement voucher stream (§6.2/§6.3 removed v1.6.0 — see below) |
 | `src/domain/swiftMessages.ts` | §7 | SWIFT cross-field validation + message generation |
 | `src/domain/confirmPaymentInstruction.ts` | §5.4 (all 5 steps) | Orchestrator, in source-verified execution order |
-| `src/domain/suspenseBridge.ts` | — (v1.4.0, not legacy-traced) | Charge Component ↔ Payment Component accounting bridge, incl. v1.7.0 per-currency netting — see below |
+| `src/domain/suspenseBridge.ts` | — (v1.4.0, not legacy-traced) | Charge Component ↔ Payment Component accounting bridge, incl. v1.8.0 per-source FX Exchange pairs (superseding v1.7.0/v1.7.1's combined netting/combining) — see below |
 | `src/store/paymentInstructionStore.ts` | FSD §6.1 | Idempotency store — **in-memory, swap for a real DB before production** |
 | `src/routes/paymentInstructions.ts`, `src/app.ts`, `src/server.ts` | — | HTTP wiring |
 | `test/regression.ts` | Calc/Validation §13 | Re-runs the 6 FSD-verified scenarios (§2.3.2, §2.3.3, §6.5) through the actual code, plus one real HTTP round trip |
@@ -71,7 +71,7 @@ fields — existed here through v1.5.0; removed v1.6.0 along with §6.2/§6.3
 generation itself. See "Balance/Charge Component ↔ Payment Component bridge"
 below for the current design.)
 
-## Balance/Charge Component ↔ Payment Component bridge (`suspenseBridge`, v1.4.0 / v1.5.0 / v1.7.0 / v1.7.1)
+## Balance/Charge Component ↔ Payment Component bridge (`suspenseBridge`, v1.4.0 / v1.5.0 / v1.7.0-v1.8.0)
 
 Not part of the legacy trace — the legacy screens never had these components live in the same
 request path, so there's no §-section to cite here. An external Charge Component posts
@@ -136,19 +136,112 @@ This algorithm previously existed only client-side, inside the Business Case Sim
 (v1.4.0) so the balancing algorithm has exactly one implementation instead of one per future
 caller. The Simulator still owns the "Leg #1 total adjustment" step above (a UI %-split/defaults
 concern, not part of the balancing algorithm itself) and sends raw entries via `suspenseBridge`
-instead of pre-computing the bridge/FX-pair legs itself. That client-side seed formula is
-**unaffected by v1.7.0/v1.7.1** — netting/combining only restructures which side of the ledger the
-server's own generated legs land on for a given currency and how large the FX pair is; it never
-changes how much, in aggregate transaction-currency terms, those legs are worth (the FX pair's two
-legs always net to zero against each other in transaction-currency terms, regardless of how they're
-sized or directed — this holds for both the debit-side Net_C and the credit-side Combined_C), so the
-existing gross-buffer seed formula (`Debit Leg #1 = Total + Σ debitEntries`, converting each entry
-at its own gross amount) remains correct without modification. The client-side leg-allocator gained
-one related UI change in v1.7.0 though: a foreign-currency row's amount can now be entered directly
-in that row's own currency (`Account Ccy Equiv.`, `onAccountAmountInput` in
-`leg-allocator.component.ts`) — needed so a user can literally type "this leg pays EUR 20" for the
-netting formula above to compare against, rather than only being able to type a transaction-currency
-amount and let the account-currency figure fall out of a rate multiplication.
+instead of pre-computing the bridge/FX-pair legs itself. The client-side leg-allocator gained one
+related UI change in v1.7.0: a foreign-currency row's amount can now be entered directly in that
+row's own currency (`Account Ccy Equiv.`, `onAccountAmountInput` in `leg-allocator.component.ts`)
+— needed so a user can literally type "this leg pays EUR 20" for the netting formula above to
+compare against, rather than only being able to type a transaction-currency amount and let the
+account-currency figure fall out of a rate multiplication.
+
+**v1.7.3 (reverted by v1.7.4 below) — a real per-currency display gap exists, but is NOT fixable
+by changing the client seed.** When a real Payment Leg exists in the SAME foreign currency as a
+Suspense entry, summing settlement legs by their own displayed currency (not the transaction-
+currency-pooled V8 aggregate) can show a genuine one-minor-unit gap: a EUR 100 Suspense entry
+alongside a real EUR 100 leg converges to 216.62 + 108.31 = 324.93 if you naively add the leg's own
+client-computed trx-equivalent to the Suspense leg's own trx-equivalent, vs. this service's actual
+combined FX-pair conversion of `round(300 × rate) = 324.92` — a one-cent gap between two
+independently-rounded representations of overlapping exposure, via two DIFFERENT rate directions
+(the leg-allocator's own rate, from `onAccountAmountInput`'s division, vs. this service's
+`crossRate`, from `resolveCrossRate`'s multiplication — not exact 6dp reciprocals of each other).
+v1.7.3 briefly tried making the Simulator's seed formula mirror this service's own
+`Net_C`/`Combined_C` combined-then-converted magnitude to close that gap. **This broke aggregate
+V8 instead of fixing anything** — proved end-to-end: with the combined seed, the same EUR 100
+Suspense + EUR 100 leg scenario produces a request where `Σ creditLegs.amountTxCcy` exceeds
+`Σ debitLegs.amountTxCcy` by exactly 0.01, i.e. a real 409 `LEGS_UNBALANCED` in precisely the
+scenario the fix targeted. **v1.7.4 reverts to the gross-only seed** (`Debit/Credit Leg #1 = Total ±
+Σ entries`, each Suspense entry converted alone, blind to any live leg in the same currency) — this
+is what this service itself already produces and accepts, because the generated FX Exchange pair's
+two legs always carry the identical trx-equivalent on opposite sides and cancel out of aggregate V8
+unconditionally, regardless of how that value was computed; the caller's own seed only ever needs
+to offset the Suspense entries' OWN independently-rounded trx-equivalents, never a live leg's.
+v1.7.4 also converts PER ENTRY rather than per currency-bucket, to mirror this service's own
+`buildSuspenseBridgeLeg` exactly (a currency bucket with more than one entry could otherwise
+disagree from this service's own per-entry sum by a minor unit). The per-currency display gap is
+real but out of scope for a *seed-formula* fix specifically — closing it turned out not to need
+unifying every leg/entry onto one shared rate direction after all; see v1.8.0 below for how it
+actually gets closed, entirely server-side. This service's own domain logic (`suspenseBridge.ts`)
+and this file's OAS contract are unchanged by either v1.7.3 or v1.7.4 — both were entirely Simulator
+(client) changes.
+
+**v1.7.5 — the seed formula's own summation could drift a binary-float ULP.** v1.7.4's per-entry
+conversion summed each entry's already-rounded trx-equivalent as a plain JS number
+(`total += trxEquivalent`). Summing multiple already-rounded decimal values as IEEE-754 doubles can
+land one ULP off the canonical decimal sum even when every individual addend was correctly rounded —
+reproduced: two entries independently rounding to 20330.42 and 13562.34 summed to a displayed total
+of `"-33441.95999999999"` instead of the exact `"-33441.96"`. Fixed by accumulating in `Decimal.js`
+end-to-end (both the per-entry conversion and the running total) and performing exactly one rounding
+pass, in `Decimal`, immediately before the final Number/string conversion. No formula changed from
+v1.7.4 — only the arithmetic representation used to compute it.
+
+**v1.8.0 — the per-currency display gap closed, from the SERVER side, with a response-shape
+change.** v1.7.3/v1.7.4/v1.7.5 established that the gap (leg-alone trx-equivalent vs. combined-then-
+converted trx-equivalent disagreeing by a minor unit) could not be fixed by changing the *caller's*
+seed formula without breaking aggregate V8. The actual fix turned out to live entirely in
+`domain/suspenseBridge.ts`: instead of ONE FX Exchange pair per foreign-currency bucket, sized to a
+netted/combined magnitude (`Net_C`/`Combined_C`, v1.7.0/v1.7.1), this service now generates up to
+TWO independent, individually self-balancing pairs per bucket:
+
+- a **Suspense pair** (`FX Exchange {ccy} - Suspense` / `FX Exchange {transactionCurrency} -
+  Suspense` — new naming, suffixed even when no real leg coexists in that currency, so every
+  Suspense-driven FX line is unambiguously self-descriptive on its own), sized to the SUM of the
+  bucket's own Suspense bridge legs' already-rounded `amountTxCcy`, reused **verbatim** — always
+  CREDIT-anchored, since the Suspense bridge leg is always credit-direction regardless of list.
+- a **real-leg pair** (`FX Exchange {ccy}` / `FX Exchange {transactionCurrency}` — the plain,
+  pre-v1.7.0 names, unchanged), sized to the SUM of the matching real legs' already-submitted
+  `amountTxCcy`, reused **verbatim** — direction matches the list (a `debitEntries` bucket's
+  matching `debitLegs` are debit-direction; `creditEntries`/`creditLegs` are credit-direction).
+  Skipped entirely when no real leg exists in that currency (the common case).
+
+Because each pair reuses an already-on-the-wire amount instead of re-deriving anything from a
+combined magnitude, every currency now balances exactly — simultaneously with aggregate V8, which
+was already guaranteed either way since both legs of every pair carry the identical `amountTxCcy`.
+Confirmed against the exact scenario that exposed the gap: `CUST-ACC USD 10000`; `NOSTRO-ACC EUR
+100` (`amountTxCcy 108.31`); `Suspense Credit EUR 200`; `NOSTRO-ACC2 USD 9675.07` (the caller's own
+gross-only seed, unchanged since v1.7.4) — EUR debit `300` = EUR credit `300`, USD debit `10000` =
+USD credit `10000`, aggregate `10324.93` = `10324.93`.
+
+No netting/combining step — and therefore no `debitEntries`-vs-`creditEntries` asymmetry — is
+needed anymore; each source (a real leg, or a currency's Suspense entries) is self-balancing on its
+own, and balance is additive. One behavioral change worth flagging: the "exact cancellation" special
+case (a real leg exactly matching gross Suspense in that currency) no longer skips the FX pair
+entirely the way `Net_C = 0` did pre-v1.8.0 — both pairs still generate independently and still net
+to the same zero incremental effect on the transaction currency once summed, just as four legs
+instead of zero. This is a genuine **response-shape change** (more legs generated for a bucket with
+both a Suspense entry and a matching real leg; new `- Suspense`-suffixed account names) — the
+*request* contract (`SuspenseBridge`, `PaymentLegInput`, etc.) is entirely unchanged.
+
+### Settlement leg ordering (v1.7.2)
+
+**Accounting-review best practice, not a correctness fix.** `debitLegs`/`creditLegs` (and therefore
+the response's SETTLEMENT `accountEntries`, and the Settlement Vouchers table in the Simulator UI)
+now order the generated FX Exchange pair as one adjacent Dr/Cr block:
+
+```text
+Normal Debit(s) -> FX Debit (last debit) -> FX Credit (first credit) -> Normal Credit(s) -> Suspense Credit
+```
+
+Reading debit and credit as one continuous table (which is how the Settlement Vouchers UI renders
+them — all debits, then all credits), the FX Debit leg and its matching FX Credit leg land next to
+each other, so a reviewer can confirm the conversion amount, rate, and per-currency balance at a
+glance instead of hunting across the table for the matching leg. Implementation
+(`confirmPaymentInstruction.ts`): bridge legs never land on debit except FX-pair legs (every
+Suspense leg is credit-direction, unconditionally), so `bridge.debit` is pure FX and already lands
+last simply by being appended after the caller's own `debitLegs`. `bridge.credit` mixes FX-pair legs
+(`accountType: 'INTERNAL'`) with Suspense legs (`accountType: 'SUSPENSE'`) — these are split so the
+FX ones are prepended *before* the caller's own `creditLegs`, and the Suspense ones are appended
+*after* them. Purely an ordering change — no leg is added, removed, or has its own field values
+changed; V8 balance validation, classification, and voucher description assembly are all
+order-independent and unaffected (verified before implementing this).
 
 ### `sourceComponent` / `balanceModule` (v1.5.0) and the removal of §6.2/§6.3 (v1.6.0)
 

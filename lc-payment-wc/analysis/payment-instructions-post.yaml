@@ -155,7 +155,141 @@ info:
     domain/suspenseBridge.ts's doc comments
     (lc-payment-wc/microservices/payment-component) for the full worked
     example and per-currency algebra.
-  version: "1.7.1"
+
+
+    v1.7.2 changelog (accounting-review best practice, 2026-08-09): the
+    generated FX Exchange pair now reads as one adjacent Dr/Cr block in
+    debitLegs/creditLegs (and therefore in the response's SETTLEMENT
+    accountEntries) — Normal Debit(s) -> FX Debit (last debit) -> FX
+    Credit (first credit) -> Normal Credit(s) -> Suspense Credit (last
+    credit) — instead of the FX Exchange credit leg trailing after both
+    the caller's own credit legs AND the Suspense leg. Lets a reviewer
+    confirm the conversion/rate/per-currency balance at a glance instead
+    of hunting across the table for the matching leg. Purely an ordering
+    change within debitLegs/creditLegs — no leg is added, removed, or has
+    its own field values changed; aggregate/per-currency balance (V8) is
+    unaffected (order-independent), as is classification and voucher
+    description assembly (see domain/confirmPaymentInstruction.ts for the
+    reordering).
+
+
+    v1.7.3 (client-only, this service and contract UNCHANGED — SUPERSEDED
+    by v1.7.4 below, kept here for the record): attempted to make the
+    Business Case Simulator's client-side "Debit/Credit Leg #1 = Total ±
+    Σ entries" seed formula mirror this service's own Net_C/Combined_C
+    per-currency math (combine a Suspense bucket's gross amount with any
+    same-currency real Payment Leg before converting, once), reasoning
+    that summing settlement legs by their own displayed Currency — not
+    just the transaction-currency-pooled aggregate — should also balance.
+    That combining turned out to be WRONG: it breaks the check this
+    service actually enforces (V8, aggregate — see BalanceValidation
+    below), because a foreign-currency leg's own client-computed
+    trx-equivalent (from the Simulator's leg-allocator, one rate
+    direction) and this service's combined-magnitude trx-equivalent (a
+    DIFFERENT, independently-6dp-rounded rate direction — not an exact
+    reciprocal of the first) do not exactly cancel the way the seed
+    formula assumed. See v1.7.4 below for the correction and the concrete
+    counter-example.
+
+
+    v1.7.4 changelog (correctness fix, 2026-08-09, client-only — this
+    service's own domain/suspenseBridge.ts and this contract are
+    UNCHANGED): reverts v1.7.3. Proved by a full end-to-end trace (a real
+    EUR 100 Payment Leg, client trx-equivalent 108.31, alongside a
+    Suspense Credit EUR 200, this service's own trx-equivalent 216.62,
+    combined into an FX Exchange pair at trx-equivalent 324.92) that
+    v1.7.3's combined-magnitude seed produces a total that satisfies a
+    PER-CURRENCY balance check but FAILS aggregate V8 by exactly one
+    minor unit (10324.93 vs 10324.92) — i.e. v1.7.3 would have caused a
+    real 409 LEGS_UNBALANCED in precisely the scenario it targeted. The
+    pre-v1.7.3 gross-only seed (converting each Suspense entry's own
+    amount alone, blind to any live leg in the same currency) is what
+    this service itself already produces and accepts: the FX Exchange
+    pair's two generated legs always carry the identical trx-equivalent
+    on opposite sides (cancels out of the aggregate V8 sum
+    unconditionally, regardless of how that value is computed), so the
+    caller's own seed only ever needs to offset the Suspense entries'
+    OWN independently-rounded trx-equivalents — never a live leg's. v1.7.4
+    additionally converts PER ENTRY rather than per currency-bucket, to
+    mirror this service's own buildSuspenseBridgeLeg exactly (each entry
+    rounds independently; a currency with more than one entry could
+    otherwise disagree from this service's own sum by a minor unit). The
+    per-currency display gap v1.7.3 was chasing is real but NOT fixable
+    at the seed level without breaking V8. (SUPERSEDED by v1.8.0 below:
+    "not fixable without breaking V8" turned out to be true only for a
+    seed-level/client-side fix specifically — v1.8.0 fixes the SAME gap
+    from the SERVER side instead, with no client change at all.)
+
+
+    v1.7.5 changelog (correctness fix, 2026-08-09, client-only — this
+    service and contract are UNCHANGED): the Business Case Simulator's
+    seed formula (v1.7.4 above) summed each Suspense entry's own,
+    already-rounded trx-equivalent as a plain IEEE-754 double
+    (`total += trxEquivalent`). Summing multiple already-rounded decimal
+    values as binary doubles can land one ULP off the canonical decimal
+    sum even though every individual addend was correctly rounded —
+    confirmed reproducible: two entries independently rounding to
+    20330.42 and 13562.34 summed to a display value of
+    "-33441.95999999999" instead of the exact "-33441.96". Fixed by
+    accumulating in Decimal end-to-end (both the per-entry conversion AND
+    the running total) and performing exactly one rounding pass, in
+    Decimal, immediately before the final Number/string conversion —
+    never chaining multiple binary-float additions of already-rounded
+    values. No formula changed, only the arithmetic representation used
+    to compute it.
+
+
+    v1.8.0 changelog (correctness fix + response-shape change, 2026-08-09,
+    SERVER-side — domain/suspenseBridge.ts only; the request contract is
+    UNCHANGED, the RESPONSE's generated leg count/naming for a
+    foreign-currency bucket changes): closes the per-currency display gap
+    v1.7.3/v1.7.4/v1.7.5 documented as real-but-unfixable-at-the-seed-level,
+    from the SERVER side instead. Previously, one COMBINED FX Exchange pair
+    was generated per foreign-currency bucket, sized to a netted/combined
+    magnitude (Net_C for debitEntries, Combined_C for creditEntries — see
+    the superseded v1.7.0/v1.7.1 changelog entries above) — this always
+    satisfied aggregate V8 but was not guaranteed to balance BY CURRENCY,
+    because "combine then convert once" does not necessarily agree, to the
+    minor unit, with a real leg's own already-rounded amountTxCcy (computed
+    independently by the caller, via a potentially different rate
+    direction). v1.8.0 instead generates up to TWO INDEPENDENT, individually
+    self-balancing FX Exchange pairs per foreign-currency bucket:
+      - a Suspense pair (`FX Exchange {ccy} - Suspense` /
+        `FX Exchange {transactionCurrency} - Suspense` — NEW naming,
+        suffixed even when no real leg coexists in that currency, so every
+        Suspense-driven FX line is unambiguously self-descriptive), sized
+        to the SUM of that bucket's own Suspense bridge legs' already-
+        rounded amountTxCcy, reused VERBATIM (never re-derived) — always
+        CREDIT-anchored, since the Suspense bridge leg is always
+        credit-direction regardless of list.
+      - a real-leg pair (`FX Exchange {ccy}` / `FX Exchange
+        {transactionCurrency}` — unchanged names), sized to the SUM of the
+        caller's own matching-currency legs' already-submitted amountTxCcy,
+        reused VERBATIM — direction matches the list (debitEntries'
+        matching debitLegs are debit-direction; creditEntries' matching
+        creditLegs are credit-direction). Skipped entirely when no real leg
+        exists in that currency (the common case, and byte-for-byte
+        pre-v1.7.0 behavior for the Suspense pair alone in that case).
+    Because each pair reuses an already-computed, already-on-the-wire
+    amount instead of re-deriving anything from a combined magnitude, every
+    currency now balances exactly and simultaneously with aggregate V8
+    (which was already guaranteed either way, since both legs of every pair
+    always carry the identical amountTxCcy) — confirmed end-to-end against
+    the exact scenario that exposed the gap (CUST-ACC USD 10000; NOSTRO-ACC
+    EUR 100, amountTxCcy 108.31; Suspense Credit EUR 200; NOSTRO-ACC2 USD
+    9675.07 — the caller's OWN gross-only seed, unchanged since v1.7.4):
+    EUR debit 300 = EUR credit 300, USD debit 10000 = USD credit 10000,
+    aggregate 10324.93 = 10324.93. No netting/combining step — and
+    therefore no debitEntries-vs-creditEntries asymmetry — is needed
+    anymore; each source is self-balancing on its own, and balance is
+    additive. The "exact cancellation" special case (a real leg exactly
+    matching gross Suspense, previously skipping the FX pair entirely) no
+    longer skips anything — both pairs still generate independently, and
+    still net to the same zero incremental effect on the transaction
+    currency once summed, just as four legs instead of zero. The Suspense
+    leg(s) themselves, and the caller's own submitted leg amounts, are
+    unaffected by any of this.
+  version: "1.8.0"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -424,32 +558,43 @@ components:
         for them.
 
 
-        v1.7.0/v1.7.1 (see the top-level changelog entries for the full
-        algebra and the v1.7.1 correctness fix): when a foreign-currency
-        entry's currency matches a real Payment Leg submitted on the SAME
-        side (debitEntries against debitLegs, creditEntries against
+        v1.7.0/v1.7.1 (SUPERSEDED by v1.8.0 below, kept for the record —
+        see the top-level changelog entries for the full algebra): first
+        attempt at making a foreign-currency entry's FX Exchange pair
+        account for a real Payment Leg submitted in the same currency, by
+        combining them into ONE pair sized to a netted/combined magnitude.
+        Correctly aggregate-V8-safe, but not guaranteed to balance BY
+        CURRENCY — see v1.8.0.
+
+
+        v1.8.0 (see the top-level changelog entry for the full derivation
+        and worked counter-example): when a foreign-currency entry's
+        currency matches a real Payment Leg submitted on the SAME side
+        (debitEntries against debitLegs, creditEntries against
         creditLegs — computed independently per side, never cross-side),
-        that leg affects how the FX Exchange pair for that currency is
-        sized — but debitEntries and creditEntries combine with their
-        matching legs DIFFERENTLY, because the always-credit Suspense
-        bridge leg has OPPOSITE polarity from a debit leg but the SAME
-        polarity as a credit leg:
-          - debitEntries genuinely NET against debitLegs (Net = leg amount
-            − gross Suspense in that currency) — can net to exactly zero,
-            meaning no FX conversion at all when a real leg exactly matches
-            gross Suspense.
-          - creditEntries COMBINE with creditLegs by addition (Combined =
-            leg amount + gross Suspense) — same-currency Suspense Credit
-            and a real Credit Leg do NOT offset each other ("Credit
-            Suspense EUR 100 and a real Credit Leg EUR 100 is a Credit EUR
-            200 position, not zero"); the FX pair is sized to the full
-            combined amount, always Debit(foreign currency)/Credit
-            (transaction currency).
-        Either way, the FX Exchange pair is generated ONCE per currency
-        bucket rather than once per entry, and the Suspense leg(s)
-        themselves still always post gross, always credit. With no
-        matching-currency leg on the matching side (the common case),
-        behavior is unchanged from pre-v1.7.0 for BOTH lists.
+        this service now generates up to TWO INDEPENDENT, individually
+        self-balancing FX Exchange pairs for that currency bucket instead
+        of combining into one:
+          - a Suspense pair (`FX Exchange {ccy} - Suspense` /
+            `FX Exchange {transactionCurrency} - Suspense`), sized to the
+            SUM of the bucket's own Suspense bridge legs' already-rounded
+            amountTxCcy, reused verbatim — always CREDIT-anchored (the
+            bridge leg's own fixed direction, regardless of list).
+          - a real-leg pair (`FX Exchange {ccy}` / `FX Exchange
+            {transactionCurrency}` — the plain, pre-v1.7.0 names), sized to
+            the SUM of the matching real legs' already-submitted
+            amountTxCcy, reused verbatim — direction matches the list
+            (debitEntries/debitLegs are debit-direction; creditEntries/
+            creditLegs are credit-direction). Skipped entirely when no
+            real leg exists in that currency.
+        Because each pair reuses an already-on-the-wire amount rather than
+        re-deriving anything from a combined magnitude, every currency
+        balances exactly, simultaneously with aggregate V8. No
+        netting/combining step is needed anymore, so there is no
+        debitEntries-vs-creditEntries asymmetry either: a real leg exactly
+        matching gross Suspense no longer skips the FX pair (as v1.7.0's
+        Net_C=0 case did) — both pairs still generate independently, net
+        to the same zero incremental effect once summed.
 
 
         This service does NOT adjust any of the caller's own
@@ -460,14 +605,23 @@ components:
         the caller is still responsible for increasing its own debit
         total by the same transaction-currency-equivalent amount before
         submitting (the "Debit Leg #1 = Total + Σ debitEntries" seeding
-        step the Business Case Simulator does client-side, unaffected by
-        this v1.4.0 change), or step 1 will return 409 LEGS_UNBALANCED.
-        creditEntries, by contrast, are meant to be paired with a
-        caller-side REDUCTION of an existing credit leg by the same
-        amount ("Credit Leg #1 = Total - Σ creditEntries"), which is what
-        makes that side self-cancelling in the caller's own total — again
-        not something this service verifies or performs, only something
-        the resulting request must already reflect for step 1 to pass.
+        step the Business Case Simulator does client-side), or step 1
+        will return 409 LEGS_UNBALANCED. creditEntries, by contrast, are
+        meant to be paired with a caller-side REDUCTION of an existing
+        credit leg by the same amount ("Credit Leg #1 = Total - Σ
+        creditEntries"), which is what makes that side self-cancelling in
+        the caller's own total — again not something this service
+        verifies or performs, only something the resulting request must
+        already reflect for step 1 to pass. IMPORTANT (v1.7.4, still true
+        under v1.8.0): when a foreign-currency entry's currency also
+        matches a real Payment Leg the caller submits on the same side,
+        the caller's seed formula above must still convert each Suspense
+        entry ALONE (never combined with the matching leg's own amount) —
+        combining them, as v1.7.3 briefly attempted, breaks step 1's
+        actual aggregate check instead of fixing anything. v1.8.0 (see the
+        top-level changelog entry) separately closes the per-currency
+        display gap this was chasing, entirely server-side — no change to
+        what the caller's own seed formula must do.
 
 
         Every generated bridge leg is an ORDINARY Settlement leg (§6.1)

@@ -38,6 +38,22 @@ interface Row {
    * rather than snapping back to 100.
    */
   isRemainder: boolean;
+  /**
+   * B-Tree allocation driver (XOR — Percentage-driven vs Amount-driven,
+   * never both): whichever field the user most recently typed into for
+   * THIS row is authoritative; the other field is derived from it and must
+   * never silently overwrite what the user actually typed. 'pct' means
+   * amountTxCcy is free to rescale whenever the total changes (onTotalChange
+   * recomputes it from pct); 'amount' means amountTxCcy — whether the user
+   * typed it directly (onAmountInput) or via the row's own currency
+   * (onAccountAmountInput) — stays FIXED across a total change, and only
+   * pct is refreshed for display. Defaults to 'pct' for a freshly-created
+   * remainder row (its % — "whatever's left" — is what defines it; the
+   * remainder's own amount is always recomputed via exact subtraction in
+   * ensureRemainderRow() regardless of this flag, so the default is mostly
+   * inert until the row is fixed by a genuine user edit).
+   */
+  driver: 'pct' | 'amount';
 }
 
 let rowIdCounter = 0;
@@ -65,13 +81,20 @@ function clampPct(value: Decimal.Value): Decimal {
  * Payment Amount = Transaction Amount × Payment Percentage ÷ 100) for one
  * side (Debit or Credit) of a Payment Component business case.
  *
- * A protected total + transaction currency anchors every row's amount. Every
- * row is editable by % or by amount (kept in sync); exactly one row is always
- * the auto-computed remainder (100% − every fixed row), so the side's rows
- * always sum to exactly 100% of the total by construction. Editing any row
- * (including the remainder) fixes it at that value and reflows the leftover
- * into a (possibly new) remainder row — "add another column" from the user's
- * spec. A row's currency may differ from the transaction currency; when it
+ * A protected total + transaction currency anchors every row's amount.
+ * B-Tree allocation rule, per row (see Row.driver): Percentage-driven XOR
+ * Amount-driven — never both at once. Typing a % makes that row
+ * Percentage-driven (its amount is derived and free to rescale whenever the
+ * total changes); typing an amount (in either the transaction currency via
+ * onAmountInput, or the row's own currency via onAccountAmountInput) makes
+ * it Amount-driven (that figure is authoritative and stays fixed across a
+ * total change — only its derived % is refreshed). Exactly one row is
+ * always the auto-computed remainder (100% − every fixed row), so the
+ * side's rows always sum to exactly 100% of the total by construction.
+ * Editing any row (including the remainder) fixes it at that value and
+ * reflows the leftover into a (possibly new) remainder row — "add another
+ * column" from the user's spec. A row's currency may differ from the
+ * transaction currency; when it
  * does, an exchange rate becomes editable, and the row's amount can be
  * entered EITHER in the transaction currency (Amount (Tx Ccy)) OR directly in
  * the row's own currency (Account Ccy Equiv. — onAccountAmountInput), each
@@ -186,6 +209,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       exchangeAccountNo: '',
       dealNumber: '',
       isRemainder,
+      driver: 'pct',
     };
   }
 
@@ -223,21 +247,29 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Regression fix: a foreign-currency row's own amount (edited via
-   * onAccountAmountInput) MUST stay exactly what the user typed — e.g. a
-   * literal "EUR 40" leg used for Suspense netting comparisons — even when
-   * this method fires again later because the SEEDED total moved for an
-   * unrelated reason (a Suspense entry changed, re-seeding
-   * business-case-runner's debitDefaults().totalAmount, which reaches this
-   * component via ngOnChanges -> onTotalChange). Non-remainder foreign rows
-   * are excluded from the %-rescale below (the pre-existing behavior, still
-   * correct and intended for same-currency rows — see the passing 'rescales
-   * every row amount to match its existing percentage' test); only their pct
-   * is refreshed against the new total, for display.
+   * B-Tree allocation rule (Percentage-driven XOR Amount-driven — see Row.driver):
+   * a row's amount-driven amount (typed via onAmountInput OR
+   * onAccountAmountInput — either is "Amount" as far as this XOR is
+   * concerned, regardless of which currency it was typed in) MUST stay
+   * exactly what the user typed, even when this method fires again later
+   * because the SEEDED total moved for an unrelated reason (a Suspense
+   * entry changed, re-seeding business-case-runner's
+   * debitDefaults().totalAmount, which reaches this component via
+   * ngOnChanges -> onTotalChange). Regression this generalizes: an earlier
+   * fix protected only FOREIGN-currency amount-driven rows (via a
+   * needsRate() proxy for "was edited via onAccountAmountInput"), missing
+   * the identical risk for a SAME-currency row the user drove via
+   * onAmountInput directly — that row's typed amount would silently drift
+   * whenever the total re-seeded, exactly like the foreign-row bug. The
+   * explicit driver flag covers both uniformly. Percentage-driven
+   * (non-remainder) rows are still rescaled by their existing % — the
+   * pre-existing, correct behavior for that side of the XOR (see the
+   * passing 'rescales every row amount to match its existing percentage'
+   * test); amount-driven rows only get their pct refreshed, for display.
    *
    * The remainder row is NOT rescaled by its own stale % either — that would
-   * implicitly assume every OTHER row (including now-fixed foreign ones)
-   * scales proportionally too, which is exactly what this fix prevents,
+   * implicitly assume every OTHER row (including now-fixed amount-driven
+   * ones) scales proportionally too, which is exactly what this fix prevents,
    * producing a double-rounded/wrong remainder (verified against a
    * regression test: total 10000->10110 with a fixed EUR-40 row rescaled the
    * USD remainder to 10065.52 via %, not the exact 10066 = 10110-44).
@@ -249,7 +281,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     this.totalAmount = new Decimal(value || 0);
     for (const row of this.rows) {
       if (row.isRemainder) continue; // recomputed exactly by ensureRemainderRow() below
-      if (this.needsRate(row)) {
+      if (row.driver === 'amount') {
         row.pct = this.totalAmount.greaterThan(0)
           ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
           : new Decimal(0);
@@ -359,12 +391,14 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   onPctInput(row: Row, pct: number): void {
+    row.driver = 'pct';
     row.pct = clampPct(pct);
     row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100));
     this.fixRow(row);
   }
 
   onAmountInput(row: Row, amount: number): void {
+    row.driver = 'amount';
     row.amountTxCcy = money(Decimal.max(new Decimal(amount || 0), 0));
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
     this.fixRow(row);
@@ -385,6 +419,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
    * never 0 there in practice, but guard anyway rather than divide by zero.
    */
   onAccountAmountInput(row: Row, accountAmount: number): void {
+    row.driver = 'amount';
     const amount = Decimal.max(new Decimal(accountAmount || 0), 0);
     row.amountTxCcy = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate)) : new Decimal(0);
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);

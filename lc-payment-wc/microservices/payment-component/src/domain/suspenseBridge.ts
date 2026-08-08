@@ -12,40 +12,48 @@
  * legs so the settlement voucher balances BY CURRENCY, not just in
  * transaction-currency aggregate.
  *
- * v1.7.0 — per-currency handling against the caller's own submitted legs, NOT
- * legacy-traced (no baseline equivalent; this repo's own feature request).
- * When a Suspense entry's currency differs from the transaction currency AND
- * the caller ALSO submitted real Payment Legs in that same currency (on the
- * SAME side — debitEntries against debitLegs, creditEntries against
- * creditLegs, computed fully independently), the caller's own leg combines
- * with gross Suspense to size the FX Exchange pair. The two sides combine
- * DIFFERENTLY, and this is a deliberate accounting distinction, not an
- * inconsistency:
+ * v1.7.0/v1.7.1 (SUPERSEDED by v1.8.0 below, kept here for the record): when
+ * a Suspense entry's currency differed from the transaction currency AND the
+ * caller ALSO submitted real Payment Legs in that same currency, those tried
+ * combining into ONE consolidated FX Exchange pair (Net_C for debitEntries,
+ * Combined_C for creditEntries). That combined pair is always
+ * aggregate-V8-safe but is NOT guaranteed to balance BY CURRENCY once a real
+ * leg's own already-rounded amountTxCcy (computed by the caller, via
+ * whatever rate direction ITS OWN leg-entry UI used) disagrees — by a minor
+ * unit — from `round(combinedMagnitude × thisSuspenseEntry'sCrossRate)`. Two
+ * different rate resolutions (the caller's own leg-level rate vs this
+ * bucket's Suspense crossRate) are not guaranteed to be exact reciprocals at
+ * 6dp, so "combine then convert once" can drift a cent from what the
+ * caller's own leg already committed to on the wire.
  *
- *   - debitLegs are debit-direction; the Suspense bridge leg is always
- *     credit-direction — OPPOSITE polarity, so they genuinely NET
- *     (Net_C = legs − grossSuspense; can fall to exactly zero, meaning no FX
- *     conversion at all when a real leg exactly matches gross Suspense in
- *     that currency).
- *   - creditLegs are credit-direction; the Suspense bridge leg is ALSO
- *     credit-direction — SAME polarity, so they can never offset each other
- *     by subtraction: "Credit Suspense EUR 100 and a real Credit Leg EUR 100
- *     do NOT cancel — the EUR position is Credit EUR 200," per confirmed
- *     accounting review. They COMBINE (Combined_C = legs + grossSuspense),
- *     and the resulting FX Exchange pair is sized to that full combined
- *     amount, ALWAYS Debit(foreign currency)/Credit(transaction currency) —
- *     there is no sign to flip, Combined_C is never negative — and is
- *     skipped only in the degenerate case where both are exactly zero.
- *
- * The Suspense leg itself always still posts at the full GROSS amount
- * (unchanged from pre-v1.7.0) and always lands on credit, regardless of
- * side — netting/combining only ever sizes the accompanying FX Exchange
- * pair, never the Suspense leg itself, and never flips its direction. When
- * there is no matching-currency leg on the matching side (the common case,
- * and the entire pre-v1.7.0 behavior for both lists), every foreign-currency
- * bucket behaves byte-for-byte like pre-v1.7.0: Combined_C degenerates to
- * grossSuspense either way (0 + grossSuspense for credit-list, or
- * grossSuspense − 0 for debit-list).
+ * v1.8.0 — per-SOURCE FX pairs, not a per-currency combined one. For each
+ * foreign-currency bucket, up to TWO independent FX Exchange pairs are now
+ * generated instead of one:
+ *   - a Suspense pair (`FX Exchange {ccy} - Suspense` / `FX Exchange
+ *     {transactionCurrency} - Suspense`), sized to the SUM of this bucket's
+ *     own Suspense bridge legs' OWN already-rounded amountTxCcy (reused
+ *     verbatim, never re-derived) — always CREDIT-anchored, since the
+ *     Suspense bridge leg is always credit-direction regardless of list.
+ *   - a real-leg pair (`FX Exchange {ccy}` / `FX Exchange
+ *     {transactionCurrency}`, unchanged names from pre-v1.7.0), sized to the
+ *     SUM of the caller's own matching-currency legs' OWN already-submitted
+ *     amountTxCcy (reused verbatim, never re-derived) — direction matches
+ *     `side` (debitEntries' matching debitLegs are debit-direction;
+ *     creditEntries' matching creditLegs are credit-direction). Skipped
+ *     entirely when no real leg exists in that currency (the common case,
+ *     and byte-for-byte pre-v1.7.0 behavior otherwise).
+ * Because EACH pair reuses an already-computed, already-on-the-wire amount
+ * instead of re-deriving anything from a combined magnitude, every currency
+ * — including the transaction currency, once every bucket's contributions
+ * are summed — balances exactly, simultaneously with aggregate V8 (which
+ * was already guaranteed either way, since both legs of every pair always
+ * carry the identical amountTxCcy). No netting/combining step, and
+ * therefore no debitEntries-vs-creditEntries asymmetry, is needed anymore —
+ * each source (a real leg, or the Suspense entries in a currency) is
+ * self-balancing on its own, and balance is additive: two independently
+ * self-balancing pairs sum to a still-balanced whole. The Suspense leg(s)
+ * themselves are unaffected by any of this — always posted gross, per
+ * entry, always credit-direction, exactly as pre-v1.7.0.
  *
  * Ported 1:1 (pre-v1.7.0 baseline) from the algorithm previously implemented
  * client-side in
@@ -65,9 +73,8 @@ import Decimal from 'decimal.js';
  * One entry -> one Suspense leg (accountType SUSPENSE), landing on accountNo
  * 'Suspense - Debit' or 'Suspense - Credit' per which list it came from.
  * Always posted at the entry's own GROSS amount, and ALWAYS lands on the
- * CREDIT side — regardless of which list it came from, and unaffected by
- * v1.7.0 netting/combining — mirroring the original client-side
- * implementation's documented balance derivation:
+ * CREDIT side — regardless of which list it came from — mirroring the
+ * original client-side implementation's documented balance derivation:
  *
  *   Σ Debit  = (Total + SD)                                          = Total + SD
  *   Σ Credit = (Total - SC) + SD [bridge for SD] + SC [bridge for SC] = Total + SD
@@ -83,13 +90,7 @@ import Decimal from 'decimal.js';
  * service does not resolve FX rates itself, same posture as
  * PaymentLegInput's own rate fields) and the transaction-currency-equivalent
  * amount is rounded to `minorUnitsForCurrency(transactionCurrency)` decimal
- * places (money.ts) — NOT a fixed precision. This must match whatever
- * rounding the caller used for its own "Total ± Σ entries" pre-adjustment
- * (see this module's top doc comment) exactly, or the two independently-
- * computed values for "the same" FX-equivalent amount can disagree by a
- * minor unit and fail the balance check below — this is why
- * CurrencyService.decimals() (lc-payment-wc's Simulator) and
- * minorUnitsForCurrency() here must stay in agreement per currency.
+ * places (money.ts) — NOT a fixed precision.
  */
 export function buildSuspenseBridgeLeg(
   accountNo: 'Suspense - Debit' | 'Suspense - Credit',
@@ -131,76 +132,82 @@ export function buildSuspenseBridgeLeg(
 }
 
 /**
- * The consolidated FX Exchange pair for ONE foreign currency bucket (v1.7.0
- * — replaces the pre-v1.7.0 per-entry buildFxExchangePairLegs, which sized
- * the pair to a single bridge leg's own gross amount; this sizes it to the
- * bucket's combined/net amount instead, and is called once per currency,
- * not once per entry — see expandSuspenseBridge for how that amount is
- * computed per side). Mirrors leg-allocator.component.ts's own fxPairs
- * concept: a same-currency-as-C "Other Ccy site" entry (account
- * `FX Exchange {transactionCurrency}`, amount = magnitude) and an
- * opposite-direction, transaction-currency "Trx Ccy site" entry (account
- * `FX Exchange {currency}`, amount = the Trx Equivalent of magnitude).
+ * ONE self-balancing FX Exchange pair for a single source (either "this
+ * bucket's Suspense entries, combined" or "this bucket's matching real
+ * legs, combined") in ONE foreign currency (v1.8.0 — see this file's top
+ * doc comment for why a pair is now built per SOURCE rather than per
+ * currency-bucket-combined-magnitude). Mirrors leg-allocator.component.ts's
+ * own fxPairs concept: a same-currency-as-C "Other Ccy site" entry (account
+ * `FX Exchange {transactionCurrency}{accountSuffix}`, amount = ownCcyAmount)
+ * and an opposite-direction, transaction-currency "Trx Ccy site" entry
+ * (account `FX Exchange {currency}{accountSuffix}`, amount = trxCcyAmount).
  *
- * `otherCcySiteIsCredit` is decided entirely by the CALLER (expandSuspenseBridge)
- * — this function has no side-specific logic of its own:
- *   - DEBIT-list, Net_C > 0 (a real debit leg's own currency-C exposure
- *     exceeds gross Suspense): otherCcySiteIsCredit = true — the excess
- *     needs fresh FX funding, same side as the bridge leg it extends.
- *   - DEBIT-list, Net_C < 0 (no/lesser matching leg): otherCcySiteIsCredit =
- *     false — same as pre-v1.7.0, cancels part of the bridge leg's own
- *     exposure.
- *   - CREDIT-list (Combined_C = legs + grossSuspense, always ≥ 0 — same
- *     polarity as the bridge leg, so they only ever combine, never net):
- *     otherCcySiteIsCredit = false, UNCONDITIONALLY — the combined credit
- *     exposure always needs a matching debit-side FX leg, regardless of
- *     magnitude.
+ * `trxCcyAmount` is the source's OWN already-rounded transaction-currency
+ * total, reused VERBATIM — this function never multiplies by a rate itself.
+ * That is precisely what guarantees the pair agrees, to the minor unit,
+ * with whatever the source already posted (a Suspense bridge leg's own
+ * amountTxCcy, or a caller-submitted leg's own amountTxCcy) — there is only
+ * ever ONE rounding of "the same" amount, not two independently-rounded
+ * representations of overlapping exposure.
  *
- * Returns { debit: [], credit: [] } when magnitude is exactly zero (nothing
- * to convert).
+ * `sourceDirection` is the Dr/Cr direction of the thing this pair
+ * represents (a debitLegs entry -> DEBIT; a Suspense bridge leg -> always
+ * CREDIT, regardless of list — see buildSuspenseBridgeLeg). The "Other Ccy
+ * site" leg is the OPPOSITE direction (cancels the source's own currency
+ * exposure in `currency`); the "Trx Ccy site" leg is the SAME direction
+ * (represents that exposure in `transactionCurrency` terms).
+ *
+ * Returns { debit: [], credit: [] } when ownCcyAmount is exactly zero
+ * (nothing to convert — e.g. no matching real leg in this currency).
  */
-export function buildNetFxExchangePairLegs(
+export function buildFxPair(
   currency: string,
   transactionCurrency: string,
-  magnitude: Decimal,
-  otherCcySiteIsCredit: boolean,
+  ownCcyAmount: Decimal,
+  trxCcyAmount: Decimal,
+  sourceDirection: LegSide,
   rateStr: string,
+  accountSuffix: string,
 ): { debit: PaymentLegInput[]; credit: PaymentLegInput[] } {
-  if (magnitude.isZero()) return { debit: [], credit: [] };
+  if (ownCcyAmount.isZero()) return { debit: [], credit: [] };
 
-  const rate = parseExchangeRate(rateStr);
-  const absMagnitude = magnitude.abs();
-  const trxEquivalent = formatMonetaryAmount(absMagnitude.times(rate), minorUnitsForCurrency(transactionCurrency));
-  const otherCcyAmount = formatMonetaryAmount(absMagnitude, minorUnitsForCurrency(currency));
+  const otherCcyAmount = formatMonetaryAmount(ownCcyAmount, minorUnitsForCurrency(currency));
+  const trxEquivalent = formatMonetaryAmount(trxCcyAmount, minorUnitsForCurrency(transactionCurrency));
 
   const otherCcySiteLeg: PaymentLegInput = {
-    accountNo: `FX Exchange ${transactionCurrency}`,
+    accountNo: `FX Exchange ${transactionCurrency}${accountSuffix}`,
     accountType: 'INTERNAL',
     currency,
     amountTxCcy: trxEquivalent,
     amountAccountCcy: otherCcyAmount,
   };
   const trxCcySiteLeg: PaymentLegInput = {
-    accountNo: `FX Exchange ${currency}`,
+    accountNo: `FX Exchange ${currency}${accountSuffix}`,
     accountType: 'INTERNAL',
     currency: transactionCurrency,
     amountTxCcy: trxEquivalent,
   };
 
-  if (otherCcySiteIsCredit) {
-    otherCcySiteLeg.crBuyRate = rateStr;
-    trxCcySiteLeg.drBuyRate = rateStr;
-    return { debit: [trxCcySiteLeg], credit: [otherCcySiteLeg] };
+  if (sourceDirection === 'CREDIT') {
+    otherCcySiteLeg.drBuyRate = rateStr;
+    trxCcySiteLeg.crBuyRate = rateStr;
+    return { debit: [otherCcySiteLeg], credit: [trxCcySiteLeg] };
   }
-  otherCcySiteLeg.drBuyRate = rateStr;
-  trxCcySiteLeg.crBuyRate = rateStr;
-  return { debit: [otherCcySiteLeg], credit: [trxCcySiteLeg] };
+  otherCcySiteLeg.crBuyRate = rateStr;
+  trxCcySiteLeg.drBuyRate = rateStr;
+  return { debit: [trxCcySiteLeg], credit: [otherCcySiteLeg] };
 }
 
-/** Sums a currency-C bucket's real legs using each leg's OWN-currency amount (amountAccountCcy — falls back to amountTxCcy when absent, e.g. a raw API caller that omitted it), NOT amountTxCcy directly (which is always transaction-currency-denominated regardless of the leg's own currency — see PaymentLegInput.amountTxCcy). This is what makes "Debit Leg = EUR 20" in the netting formula mean a genuinely EUR-denominated 20, not 20 units of the transaction currency. */
+/** Sums a currency-C bucket's real legs using each leg's OWN-currency amount (amountAccountCcy — falls back to amountTxCcy when absent, e.g. a raw API caller that omitted it), NOT amountTxCcy directly (which is always transaction-currency-denominated regardless of the leg's own currency — see PaymentLegInput.amountTxCcy). This is what makes "Debit Leg = EUR 20" mean a genuinely EUR-denominated 20, not 20 units of the transaction currency. */
 function sumLegsInCurrency(legs: readonly PaymentLegInput[], currency: string): Decimal {
   const matching = legs.filter((l) => l.currency === currency);
   return sumMonetaryAmounts(matching.map((l) => l.amountAccountCcy ?? l.amountTxCcy));
+}
+
+/** Sums a currency-C bucket's real legs using each leg's OWN already-submitted amountTxCcy — reused verbatim by buildFxPair's real-leg pair, never re-derived from a rate, so the pair always agrees exactly with whatever the caller actually put on the wire for that leg. */
+function sumLegsTrxCcy(legs: readonly PaymentLegInput[], currency: string): Decimal {
+  const matching = legs.filter((l) => l.currency === currency);
+  return sumMonetaryAmounts(matching.map((l) => l.amountTxCcy));
 }
 
 function groupByCurrency(entries: readonly SuspenseEntry[]): Map<string, SuspenseEntry[]> {
@@ -228,28 +235,17 @@ function resolveBucketRate(currency: string, bucket: readonly SuspenseEntry[]): 
 /**
  * Every entry in both debitEntries/creditEntries, turned into its own gross
  * Suspense leg (see buildSuspenseBridgeLeg — always credit, regardless of
- * list), grouped by currency for the purpose of computing ONE consolidated
- * FX Exchange pair per foreign currency (v1.7.0 — see this file's top doc
- * comment for why debitEntries/debitLegs genuinely NET while
- * creditEntries/creditLegs only ever COMBINE). `debitLegs`/`creditLegs` are
- * the CALLER's own submitted legs (pre-bridge-expansion) — used only to
- * compute each foreign currency's combining amount; never modified.
+ * list), grouped by currency. For each foreign-currency bucket, up to two
+ * independent, self-balancing FX Exchange pairs are added (v1.8.0 — see
+ * this file's top doc comment): one for the bucket's own Suspense entries,
+ * one for the caller's own matching-currency real legs (skipped if none
+ * exist). Entries whose currency equals transactionCurrency are unaffected
+ * (case 1 — folds directly into the caller's own Leg #1 seed, no FX pair,
+ * always credit): each becomes its own credit leg, exactly as pre-v1.7.0.
  *
- * Entries whose currency equals transactionCurrency are unaffected by this
- * (case 1 of the feature spec — folds directly into the caller's own Leg #1
- * seed, no FX pair, always credit): each becomes its own credit leg, exactly
- * as pre-v1.7.0.
- *
- * For a foreign-currency bucket, currency C:
- *   L_C = Σ debitLegs/creditLegs (currency === C) own-currency amount
- *   S_C = Σ this bucket's entries' gross amount
- *   DEBIT-list:  Net_C = L_C − S_C (opposite polarity — genuine netting;
- *                FX pair skipped entirely when Net_C is exactly zero)
- *   CREDIT-list: Combined_C = L_C + S_C (same polarity — never nets to
- *                zero unless BOTH are zero)
- * Every entry in the bucket still posts its own gross, always-credit
- * Suspense leg; ONE consolidated FX Exchange pair is added for the bucket,
- * sized to the applicable amount above.
+ * `debitLegs`/`creditLegs` are the CALLER's own submitted legs
+ * (pre-bridge-expansion) — read only to size the real-leg FX pair; never
+ * modified.
  */
 export function expandSuspenseBridge(
   bridge: SuspenseBridge | undefined,
@@ -275,29 +271,44 @@ export function expandSuspenseBridge(
     for (const [currency, bucket] of groupByCurrency(entries)) {
       // Every bridge leg lands on credit, unconditionally, for every currency and
       // every side — see this file's top doc comment / buildSuspenseBridgeLeg.
+      const bucketSuspenseLegs: PaymentLegInput[] = [];
       for (const entry of bucket) {
         const leg = buildSuspenseBridgeLeg(accountNo, entry, transactionCurrency);
-        if (leg) credit.push(leg);
+        if (leg) {
+          credit.push(leg);
+          bucketSuspenseLegs.push(leg);
+        }
       }
 
       if (currency === transactionCurrency) continue; // case 1 — no FX pair, ever.
 
-      const grossSuspense = sumMonetaryAmounts(bucket.map((e) => e.amount));
-      const legsInCurrency = sumLegsInCurrency(sideLegs, currency);
-
-      // DEBIT: opposite polarity from the (always-credit) bridge leg -> genuine
-      // netting, magnitude/direction both driven by the sign of Net_C.
-      // CREDIT: same polarity as the bridge leg -> can only ever combine, never
-      // cancel (see this file's top doc comment) -> magnitude = L_C + S_C,
-      // always Debit(foreign)/Credit(trx), no sign to consider.
-      const magnitude = side === 'DEBIT' ? legsInCurrency.minus(grossSuspense) : legsInCurrency.plus(grossSuspense);
-      const otherCcySiteIsCredit = side === 'DEBIT' && magnitude.greaterThan(0);
-
-      if (magnitude.isZero()) continue;
       const rate = resolveBucketRate(currency, bucket);
-      const pair = buildNetFxExchangePairLegs(currency, transactionCurrency, magnitude, otherCcySiteIsCredit, rate);
-      debit.push(...pair.debit);
-      credit.push(...pair.credit);
+
+      // Suspense's own pair — always CREDIT-anchored (the bridge leg's own fixed
+      // direction), regardless of which list it came from. Sized to reuse the
+      // bucket's own bridge legs' already-rounded amountTxCcy, summed — never
+      // re-derived — so it always agrees exactly with what was just posted above.
+      // Always suffixed " - Suspense" — even when no matching real leg coexists in this
+      // currency (the common case) — so every Suspense-driven FX line is unambiguously
+      // self-descriptive, not just when it happens to need disambiguating from a real leg's
+      // own pair. A deliberate v1.8.0 naming change from the plain "FX Exchange {ccy}" this
+      // pair carried pre-v1.8.0 when no leg coexisted.
+      const grossSuspense = sumMonetaryAmounts(bucket.map((e) => e.amount));
+      const suspenseTrxEq = sumMonetaryAmounts(bucketSuspenseLegs.map((l) => l.amountTxCcy));
+      const suspensePair = buildFxPair(currency, transactionCurrency, grossSuspense, suspenseTrxEq, 'CREDIT', rate, ' - Suspense');
+      debit.push(...suspensePair.debit);
+      credit.push(...suspensePair.credit);
+
+      // The caller's own matching real legs' pair — direction matches `side`.
+      // Sized to reuse those legs' own already-submitted amountTxCcy, summed —
+      // never re-derived — so it agrees exactly with whatever the caller put on
+      // the wire, regardless of how many legs share the currency or what rate
+      // each individually used. Skipped when no real leg exists in this currency.
+      const legsOwnCcy = sumLegsInCurrency(sideLegs, currency);
+      const legsTrxCcy = sumLegsTrxCcy(sideLegs, currency);
+      const legPair = buildFxPair(currency, transactionCurrency, legsOwnCcy, legsTrxCcy, side, rate, '');
+      debit.push(...legPair.debit);
+      credit.push(...legPair.credit);
     }
   }
 

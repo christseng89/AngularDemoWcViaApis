@@ -1,6 +1,7 @@
 import { fakeAsync, tick } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { BusinessCaseRunnerComponent } from './business-case-runner.component';
+import { LegAllocatorComponent } from './leg-allocator.component';
 import { MODULE_GROUPS } from './business-case-registry';
 import { PaymentComponentApiError, type PaymentComponentApiService } from './payment-component-api.service';
 import type { CurrencyService } from './currency.service';
@@ -206,6 +207,150 @@ describe('BusinessCaseRunnerComponent', () => {
       const { comp } = makeComponent();
       comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '0' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '0' })] }));
       expect(comp.debitDefaults.totalAmount).toBe('0');
+    });
+
+    describe('v1.7.4: the seed formula stays gross-only, deliberately blind to any live leg in the same currency', () => {
+      it('a live leg in the SAME foreign currency as a Suspense entry has NO effect on the seed (v1.7.3 tried combining with it; reverted — see suspenseAdjustment()\'s doc comment)', () => {
+        const { comp } = makeComponent({ crossRate: 2 });
+        comp.selectCase(passConfig());
+        comp.suspenseCreditEntries = [entry('100', 'EUR')];
+        comp.creditLegs = [creditLeg({ currency: 'EUR', amountTxCcy: '92', amountAccountCcy: '80' })];
+
+        // Unaffected by creditLegs — only the Suspense entry's own gross amount converts: 1000 - round(100*2,2) = 800.
+        expect(comp.creditDefaults.totalAmount).toBe('800');
+      });
+
+      it('DEBIT side: same — a live leg in the matching currency has no effect on the seed', () => {
+        const { comp } = makeComponent({ crossRate: 2 });
+        comp.selectCase(passConfig());
+        comp.suspenseDebitEntries = [entry('100', 'EUR')];
+        comp.debitLegs = [debitLeg({ currency: 'USD' }), debitLeg({ currency: 'EUR', amountTxCcy: '92', amountAccountCcy: '180' })];
+
+        expect(comp.debitDefaults.totalAmount).toBe('1200'); // 1000 + round(100*2,2) = 1200
+      });
+
+      it('multiple Suspense entries in the SAME foreign currency are converted and summed PER ENTRY, mirroring buildSuspenseBridgeLeg exactly (not bucket-summed-then-rounded-once)', () => {
+        const { comp } = makeComponent({ crossRate: 2 });
+        comp.selectCase(passConfig());
+        comp.suspenseCreditEntries = [entry('60', 'EUR'), entry('40', 'EUR')];
+
+        expect(comp.creditDefaults.totalAmount).toBe('800'); // round(60*2)+round(40*2) = 120+80 = 200; 1000-200=800 — identical to the single-100-entry case here since the rate is clean
+      });
+
+      it('summing multiple already-rounded per-entry trx-equivalents stays exact — no binary-float ULP drift (would otherwise show as e.g. "-33441.95999999999" instead of "-33441.96")', () => {
+        // Reproduces a real plain-JS-number summation drift: round(6799.47*2.99,2)=20330.42 and
+        // round(4535.90*2.99,2)=13562.34 individually, but 20330.42+13562.34 computed as IEEE-754
+        // doubles (via `total += trxEquivalent` on a plain number, as this method did before it was
+        // rewritten to accumulate via Decimal) lands one ULP off — String()'d as "33441.95999999999"
+        // rather than "33441.96". suspenseAdjustment()/sideDefaults() now stay in Decimal until one
+        // final rounding pass, so this must come out exact.
+        const { comp } = makeComponent({ crossRate: 2.99 });
+        comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '450.8' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '450.8' })] }));
+        comp.suspenseCreditEntries = [entry('6799.47', 'EUR'), entry('4535.90', 'EUR')];
+
+        expect(comp.creditDefaults.totalAmount).toBe('-33441.96');
+      });
+
+      it('DEBIT side: same ULP-drift check, addition direction (would otherwise show as e.g. "38611.979999999996" instead of "38611.98") — the SAME suspenseAdjustment()/sideDefaults() code path handles both sides, no separate DEBIT formula to independently verify', () => {
+        // round(6157.18*4.21,2)=25921.73 and round(2864.82*4.21,2)=12062.29 individually; summed as
+        // plain IEEE-754 doubles (DEBIT adds, unlike CREDIT's subtraction above) this specific pair
+        // lands one ULP off the exact decimal sum — a different failure instance of the identical bug,
+        // confirming the DEBIT direction needed the same Decimal-accumulation fix as CREDIT.
+        const { comp } = makeComponent({ crossRate: 4.21 });
+        comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '629.36' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '629.36' })] }));
+        comp.suspenseDebitEntries = [entry('6157.18', 'EUR'), entry('2864.82', 'EUR')];
+
+        expect(comp.debitDefaults.totalAmount).toBe('38611.98');
+      });
+
+      it("end-to-end with the REAL reciprocal FX-rate convention (EUR/TWD=35.20, USD/TWD=32.50): CUST-ACC2 seeds to 9783.38, and the reported 9675.07 (seed - a live EUR leg's own 108.31) is exactly what the server accepts — genuinely balances aggregate V8", () => {
+        const mockApi = { confirm: jest.fn(), classify: jest.fn() } as unknown as PaymentComponentApiService;
+        const mockCurrency = { options: jest.fn(() => of([])), decimals: jest.fn(() => of({})) } as unknown as CurrencyService;
+        const mockFx = {
+          rates: jest.fn(() => of({})),
+          crossRate: jest.fn((_rates: unknown, from: string, to: string) => {
+            if (from === to) return 1;
+            const twd = (ccy: string) => (ccy === 'USD' ? 32.5 : ccy === 'EUR' ? 35.2 : null);
+            const f = twd(from);
+            const t = twd(to);
+            return f === null || t === null ? null : f / t;
+          }),
+        } as unknown as FxRateService;
+        const comp = new BusinessCaseRunnerComponent(mockApi, mockCurrency, mockFx);
+
+        comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '10000' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '10000' })] }));
+        comp.suspenseCreditEntries = [entry('200', 'EUR')]; // gross Suspense Credit, converted alone
+        comp.creditLegs = [creditLeg({ currency: 'EUR', amountTxCcy: '108.31', amountAccountCcy: '100' })]; // a live EUR leg present — must NOT affect the seed
+
+        // round(200 * 35.20/32.50, 2dp) = round(216.6154, 2dp) = 216.62; seeded = 10000 - 216.62 = 9783.38.
+        expect(comp.creditDefaults.totalAmount).toBe('9783.38');
+        // The leg-allocator's own remainder = seed - the live leg's own fixed 108.31 = 9675.07 — this
+        // IS the correct, server-accepted figure (see the end-to-end test below for the full proof).
+      });
+
+      it('END-TO-END with a REAL <app-leg-allocator> wired up exactly like the template does (creditDefaults.totalAmount -> [initialTotalAmount], legsChange -> onCreditLegsChange): typing "this leg pays EUR 100" via Account Ccy Equiv. settles the USD remainder row at 9675.07 and the full leg set balances aggregate V8 exactly', () => {
+        const mockApi = { confirm: jest.fn(), classify: jest.fn() } as unknown as PaymentComponentApiService;
+        const mockCurrency = {
+          codes: jest.fn(() => of(['USD', 'EUR'])),
+          options: jest.fn(() => of([])),
+          decimals: jest.fn(() => of({})),
+        } as unknown as CurrencyService;
+        const mockFx = {
+          rates: jest.fn(() => of({ 'USD/TWD': 32.5, 'EUR/TWD': 35.2 })),
+          crossRate: jest.fn((_rates: unknown, from: string, to: string) => {
+            if (from === to) return 1;
+            const twd = (ccy: string) => (ccy === 'USD' ? 32.5 : ccy === 'EUR' ? 35.2 : null);
+            const f = twd(from);
+            const t = twd(to);
+            return f === null || t === null ? null : f / t;
+          }),
+        } as unknown as FxRateService;
+
+        const runner = new BusinessCaseRunnerComponent(mockApi, mockCurrency, mockFx);
+        runner.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '10000' }), leg({ side: 'CREDIT', defaultAccountNo: 'NOSTRO-ACC2', defaultAmountTxCcy: '10000' })] }));
+        runner.suspenseCreditEntries = [entry('200', 'EUR')]; // Credit Suspense EUR 200
+
+        const allocator = new LegAllocatorComponent(mockFx, mockCurrency);
+        allocator.side = 'CREDIT';
+        allocator.accountTypeOptions = ['CUSTOMER', 'NOSTRO', 'VOSTRO', 'SUSPENSE', 'INTERNAL'];
+        allocator.defaultAccountType = 'NOSTRO';
+        allocator.defaultAccountNo = 'NOSTRO-ACC2';
+        allocator.caseKey = 'case-1';
+        allocator.initialTotalAmount = runner.creditDefaults.totalAmount;
+        allocator.initialCurrency = runner.transactionCurrency;
+        allocator.legsChange.subscribe((legs) => runner.onCreditLegsChange(legs));
+
+        allocator.ngOnInit(); // single 100% NOSTRO-ACC2 row, seeded gross-only: 10000 - round(200*1.083077,2) = 9783.38
+        expect(runner.creditLegs).toEqual([{ accountNo: 'NOSTRO-ACC2', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '9783.38' }]);
+
+        // User drives the ONLY row directly in EUR ("this leg pays EUR 100" — "if input with amount for
+        // credit side"). Fixing the sole row auto-spawns a fresh transaction-currency remainder row.
+        const eurRow = allocator.rows[0]!;
+        allocator.onRowCurrencyChange(eurRow, 'EUR');
+        allocator.onAccountAmountInput(eurRow, 100);
+        expect(allocator.rows).toHaveLength(2);
+        const usdRemainderRow = allocator.rows[1]!;
+        expect(usdRemainderRow.currency).toBe('USD');
+        expect(usdRemainderRow.isRemainder).toBe(true);
+        expect(eurRow.amountTxCcy.toNumber()).toBe(108.31); // fixed, amount-driven — never recomputed via rate again
+        expect(usdRemainderRow.amountTxCcy.toNumber()).toBe(9675.07); // seed(9783.38) - 108.31 — matches the server's own figure
+
+        // The seed is deliberately blind to the live EUR leg (v1.7.4) — re-reading creditDefaults after
+        // legsChange must NOT move the total (this is what v1.7.3 got wrong: it recomputed here and, in
+        // this exact scenario, produced a total that broke aggregate V8 instead of preserving it).
+        expect(runner.creditDefaults.totalAmount).toBe('9783.38');
+
+        // Full aggregate V8 check, replicating the server's own leg generation exactly:
+        //  - Suspense Credit leg (own entry, independently rounded): round(200 * 1.083077, 2) = 216.62
+        //  - FX Exchange pair (Combined_C = live leg's own EUR 100 + gross Suspense 200 = 300,
+        //    converted ONCE): round(300 * 1.083077, 2) = 324.92 — the SAME value lands on both the
+        //    debit-side and credit-side FX leg, so it cancels out of the aggregate check unconditionally.
+        const suspenseLegTrxEq = 216.62;
+        const fxPairTrxEq = 324.92;
+        const totalDebit = 10000 /* CUST-ACC */ + fxPairTrxEq;
+        const totalCredit = runner.creditLegs.reduce((sum, l) => sum + Number(l.amountTxCcy), 0) + suspenseLegTrxEq + fxPairTrxEq;
+        expect(totalCredit).toBe(totalDebit); // exact equality — this is what balanceValidation.ts (V8) actually enforces
+      });
     });
   });
 

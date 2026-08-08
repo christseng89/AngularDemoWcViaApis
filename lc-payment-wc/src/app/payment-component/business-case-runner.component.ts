@@ -98,7 +98,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
 
   /**
    * CurrencyService.decimals() — currency-native minor-unit places (JPY=0,
-   * USD=2, etc.), used by suspenseEntryTrxEquivalent() below so a
+   * USD=2, etc.), used by suspenseAdjustment() below so a
    * cross-currency Suspense entry's FX-equivalent is rounded the SAME way
    * this component computes it and the way the microservice's own
    * minorUnitsForCurrency() (domain/suspenseBridge.ts) rounds it server-side
@@ -172,33 +172,78 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   }
 
   /**
-   * NOT FSD-sourced — converts one Suspense entry's amount into "Trx
-   * Equivalent": amount × resolveCrossRate(entry, trxCurrency). For a
-   * same-currency entry this is the exact original amount, unrounded (no
-   * conversion occurred) — matching domain/suspenseBridge.ts's own
-   * pass-through for the same case. For a cross-currency entry the product
-   * is rounded to decimalsFor(trxCurrency) places (ROUND_HALF_UP, via
-   * decimal.js — matching money.ts's own convention) IMMEDIATELY, per entry
-   * — not deferred to a single rounding of the summed total — because the
-   * server independently rounds each entry's own bridge leg the same way
-   * before summing; rounding this component's total only once at the end
-   * (sum-then-round) can disagree with the server's per-entry round-then-sum
-   * for a multi-entry list, even when both use the same target precision.
-   * Returns 0 for a blank/zero/incomplete entry (no amount or no currency
-   * yet).
+   * v1.7.4 — REVERTS v1.7.3's attempt to combine a foreign-currency Suspense
+   * bucket with any matching-currency real Payment Leg before converting.
+   * That combining logic was based on a misdiagnosis: it targeted a genuine
+   * PER-CURRENCY display gap (summing settlement legs by their own shown
+   * Currency column can be off by a minor unit — confirmed: a real EUR 100
+   * leg's own client-computed trx-equivalent, 108.31 via division by the
+   * leg-allocator's own rate, does not exactly equal "the combined FX pair's
+   * trx-equivalent minus the Suspense leg's own trx-equivalent" once both
+   * rates are independently resolved and rounded to 6dp — 0.923295 and
+   * 1.083077 are NOT exact reciprocals). But fixing THAT by seeding this
+   * side's total against a Combined_C-converted magnitude instead breaks
+   * the check the server actually ENFORCES: aggregate V8
+   * (Σ debitLegs[].amountTxCcy === Σ creditLegs[].amountTxCcy, exact,
+   * request-blocking on mismatch — balanceValidation.ts). Proved by a full
+   * end-to-end trace with a real Payment Leg (EUR 100, client trx-equivalent
+   * 108.31) alongside a Suspense Credit EUR 200 (server trx-equivalent
+   * 216.62) and their combined FX pair (trx-equivalent 324.92 — cancels
+   * itself out of V8 regardless, always): the v1.7.3 seed produced a
+   * remainder that satisfied the per-currency USD check (9675.08) but
+   * FAILED aggregate V8 by exactly 0.01 (10324.93 credit vs 10324.92 debit)
+   * — i.e. v1.7.3 would have caused a real 409 LEGS_UNBALANCED in exactly
+   * the scenario it was meant to fix. The pre-v1.7.3 gross-only seed
+   * (9675.07) is what the server itself already produces and accepts — it
+   * satisfies aggregate V8 exactly, because the FX pair's two generated
+   * legs always carry the identical trx-equivalent value on opposite sides
+   * (cancels out of the aggregate sum unconditionally), so this side's own
+   * total only ever needs to offset the Suspense entries' OWN independently
+   * rounded trx-equivalents — never a live leg's. The per-currency display
+   * gap this was chasing is a real, but SEPARATE and not seed-fixable,
+   * artifact of the leg-allocator's own per-row FX rate (from
+   * onAccountAmountInput, division) not being an exact 6dp reciprocal of
+   * the Suspense bridge's own crossRate (from resolveCrossRate,
+   * multiplication) — eliminating it would mean making every foreign-
+   * currency leg and every Suspense entry in the same currency resolve to
+   * one shared, single-direction rate, a materially bigger change than a
+   * seed-formula fix and out of scope here.
+   *
+   * Converts PER ENTRY (not per currency-bucket) to mirror
+   * domain/suspenseBridge.ts's buildSuspenseBridgeLeg exactly, which rounds
+   * each entry's own trx-equivalent independently — summing bucket-first
+   * then rounding once could disagree from the server's per-entry sum by a
+   * minor unit when a currency has more than one entry.
+   *
+   * Accumulates via Decimal, not a plain JS number: each entry's
+   * trxEquivalent is already rounded to `scale` places (money.ts/
+   * suspenseBridge.ts's own convention), but SUMMING already-rounded
+   * decimal values as IEEE-754 doubles can still land one ULP off the
+   * canonical decimal sum (e.g. 100.1 + 100.2 → 200.29999999999998, not
+   * 200.3) — invisible most of the time, but exactly the kind of thing
+   * that turns into a real 0.01 display/wire mismatch once String()'d.
+   * Staying in Decimal until sideDefaults() does its own final rounding
+   * avoids ever converting an intermediate (unrounded-relative-to-the-
+   * running-total) value to a binary double.
    */
-  private suspenseEntryTrxEquivalent(entry: SuspenseEntry, trxCurrency: string): number {
-    const amount = Number(entry.amount) || 0;
-    if (amount === 0 || !entry.currency) return 0;
-    if (entry.currency === trxCurrency) return amount;
-    const rate = this.resolveCrossRate(entry, trxCurrency);
-    const scale = this.decimalsFor(trxCurrency);
-    return new Decimal(amount).times(rate).toDecimalPlaces(scale, Decimal.ROUND_HALF_UP).toNumber();
-  }
+  private suspenseAdjustment(side: 'DEBIT' | 'CREDIT', entries: readonly SuspenseEntry[], trxCurrency: string): Decimal {
+    let total = new Decimal(0);
+    for (const entry of entries) {
+      const amount = Number(entry.amount) || 0;
+      if (amount === 0 || !entry.currency) continue; // blank/incomplete row — matches buildSuspenseBridgeEntries()'s own skip
 
-  /** Sum of suspenseEntryTrxEquivalent() across every entry in a Suspense Debit/Credit list — each entry may be in a different currency, all converted into the same trxCurrency before summing. */
-  private suspenseEntriesTrxEquivalent(entries: readonly SuspenseEntry[], trxCurrency: string): number {
-    return entries.reduce((sum, entry) => sum + this.suspenseEntryTrxEquivalent(entry, trxCurrency), 0);
+      let trxEquivalent: Decimal;
+      if (entry.currency === trxCurrency) {
+        // Mirrors buildSuspenseBridgeLeg's same-currency pass-through: no conversion, no rounding.
+        trxEquivalent = new Decimal(amount);
+      } else {
+        const rate = this.resolveCrossRate(entry, trxCurrency);
+        const scale = this.decimalsFor(trxCurrency);
+        trxEquivalent = new Decimal(amount).times(rate).toDecimalPlaces(scale, Decimal.ROUND_HALF_UP);
+      }
+      total = side === 'DEBIT' ? total.plus(trxEquivalent) : total.minus(trxEquivalent);
+    }
+    return total;
   }
 
   /**
@@ -207,15 +252,14 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    * (Leg #1); any further %-split the user does inside the allocator is
    * unaffected by this (per the user's own framing: "Debit Leg #1 / Credit
    * Leg #1 才做 % 控制"). The case's own Total Amount (baseTotalAmount
-   * above) is NEVER itself modified — only this derived, adjusted value is:
+   * above) is NEVER itself modified — only this derived, adjusted value is.
+   * See suspenseAdjustment() above: "Total ± Σ Suspense entries, each
+   * converted independently at its own crossRate" — deliberately blind to
+   * any live leg in the same currency (v1.7.4; see that method's doc
+   * comment for why combining with a live leg, tried in v1.7.3, broke
+   * aggregate V8 instead of fixing anything).
    *
-   *   Debit Leg #1  = Total Amount + Σ Suspense Debit entries  (Trx Equivalent)
-   *   Credit Leg #1 = Total Amount - Σ Suspense Credit entries (Trx Equivalent)
-   *
-   * See suspenseBridgeLegs() below for the matching entries that keep this
-   * balanced.
-   *
-   * The "Trx Equivalent" conversion target MUST be `this.transactionCurrency`
+   * The conversion/comparison target MUST be `this.transactionCurrency`
    * (the LIVE getter, derived from the actual first debit leg) — NOT this
    * side's own registry-default `currency` below. Regression: those two used
    * to diverge whenever the user changed the debit leg's own currency after
@@ -236,12 +280,15 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
 
     const adjustment =
       side === 'DEBIT'
-        ? this.suspenseEntriesTrxEquivalent(this.suspenseDebitEntries, trxCurrency)
-        : -this.suspenseEntriesTrxEquivalent(this.suspenseCreditEntries, trxCurrency);
-    const totalAmount = baseTotalAmount + adjustment;
+        ? this.suspenseAdjustment('DEBIT', this.suspenseDebitEntries, trxCurrency)
+        : this.suspenseAdjustment('CREDIT', this.suspenseCreditEntries, trxCurrency);
+    // Decimal end-to-end, one final rounding pass (matching leg-allocator's own money()/
+    // ensureRemainderRow convention) — see suspenseAdjustment()'s doc comment for why summing
+    // already-rounded plain-number trxEquivalents risked a binary-float ULP drift here.
+    const totalAmount = new Decimal(baseTotalAmount).plus(adjustment).toDecimalPlaces(this.decimalsFor(trxCurrency), Decimal.ROUND_HALF_UP);
 
     return {
-      totalAmount: totalAmount ? String(totalAmount) : '0',
+      totalAmount: totalAmount.isZero() ? '0' : String(totalAmount.toNumber()),
       currency,
       accountType: legs[0]?.defaultAccountType ?? ('CUSTOMER' as AccountType),
       rtgsIndicator: legs[0]?.defaultRtgsIndicator ?? false,
@@ -281,7 +328,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
       if (amount === 0 || !entry.currency) continue; // blank/incomplete row — not ready to send yet
       const wireEntry: SuspenseBridgeEntry = { amount: entry.amount, currency: entry.currency, sourceComponent: entry.sourceComponent };
       if (entry.currency !== trxCurrency) {
-        // Same resolveCrossRate() as suspenseEntryTrxEquivalent() above — this component's own
+        // Same resolveCrossRate() as suspenseAdjustment() above — this component's own
         // Leg #1 seeding and the rate actually sent on the wire must always agree.
         wireEntry.crossRate = this.resolveCrossRate(entry, trxCurrency).toFixed(6);
       }

@@ -192,7 +192,7 @@ describe('confirmPaymentInstruction', () => {
       expect(result.instruction.creditLegs.some((l) => l.accountNo === 'Suspense - Credit' && l.amountTxCcy === '10')).toBe(true);
     });
 
-    it('a cross-currency entry adds its FX Exchange pair legs and stays balanced', () => {
+    it('a cross-currency entry with no matching leg adds its Suspense-suffixed FX Exchange pair legs and stays balanced (v1.8.0 — always suffixed, even with no leg to disambiguate from)', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
@@ -202,8 +202,8 @@ describe('confirmPaymentInstruction', () => {
         }),
         { sourceFunctionCode: 'PayAccept' },
       );
-      expect(result.instruction.creditLegs.some((l) => l.accountNo === 'FX Exchange EUR')).toBe(true);
-      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange USD')).toBe(true);
+      expect(result.instruction.creditLegs.some((l) => l.accountNo === 'FX Exchange EUR - Suspense')).toBe(true);
+      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange USD - Suspense')).toBe(true);
     });
 
     it('propagates RequestValidationError when a cross-currency entry has no crossRate, before the balance check ever runs', () => {
@@ -223,10 +223,7 @@ describe('confirmPaymentInstruction', () => {
       expect(result.instruction.creditLegs).toHaveLength(1);
     });
 
-    it('v1.7.0 netting end-to-end: a real EUR debit leg (20) alongside a EUR Suspense Debit entry (17) balances via the NET-sized FX pair, not the gross amount', () => {
-      // Net = 20 (EUR leg's own amountAccountCcy) - 17 (gross Suspense) = 3; trxEq at 1.1 = 3.3.
-      // Debit aggregate: 100 (Leg#1) + 18 (EUR leg's own amountTxCcy) + 3.3 (server Trx-Ccy-site) = 121.3
-      // Credit aggregate: 99.3 (caller-adjusted) + 18.7 (bridge, gross trxEq) + 3.3 (server Other-Ccy-site) = 121.3
+    it('v1.8.0 per-source pairs: a real EUR debit leg (20) alongside a EUR Suspense Debit entry (17) each get their OWN independent FX pair — the leg pair reuses the leg\'s own amountTxCcy verbatim, the Suspense pair reuses the bridge leg\'s own amountTxCcy verbatim', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
@@ -241,12 +238,18 @@ describe('confirmPaymentInstruction', () => {
         { sourceFunctionCode: 'PayAccept' },
       );
       const bridgeLeg = result.instruction.creditLegs.find((l) => l.accountNo === 'Suspense - Debit');
-      expect(bridgeLeg?.amountAccountCcy).toBe('17'); // gross, unaffected by netting
-      const fxCredit = result.instruction.creditLegs.find((l) => l.accountNo === 'FX Exchange USD');
-      expect(fxCredit?.amountAccountCcy).toBe('3'); // FX pair sized to the NET, not the gross 17
+      expect(bridgeLeg?.amountAccountCcy).toBe('17'); // gross, unaffected by the leg pair
+      const suspenseFxOtherCcy = result.instruction.debitLegs.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
+      expect(suspenseFxOtherCcy?.amountAccountCcy).toBe('17'); // Suspense pair sized to gross Suspense alone
+      const legFxTrxCcy = result.instruction.debitLegs.find((l) => l.accountNo === 'FX Exchange EUR');
+      expect(legFxTrxCcy?.amountTxCcy).toBe('18'); // leg pair reuses the leg's own amountTxCcy verbatim (not re-derived from 20)
+
+      // Full aggregate V8 (submitted legs + all generated legs) balances exactly.
+      const sum = (legs: { amountTxCcy: string }[]) => legs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
+      expect(Math.round(sum(result.instruction.debitLegs) * 100)).toBe(Math.round(sum(result.instruction.creditLegs) * 100));
     });
 
-    it('v1.7.0 netting end-to-end: a real EUR debit leg (17) exactly matching gross Suspense (17) needs no FX pair at all', () => {
+    it('v1.8.0 per-source pairs: a real EUR debit leg (17) exactly matching gross Suspense (17) no longer skips the FX pairs — BOTH still generate independently, netting to the same zero incremental effect once summed', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
@@ -260,21 +263,51 @@ describe('confirmPaymentInstruction', () => {
         }),
         { sourceFunctionCode: 'PayAccept' },
       );
-      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange EUR')).toBe(false);
-      expect(result.instruction.creditLegs.some((l) => l.accountNo === 'FX Exchange USD')).toBe(false);
+      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange EUR')).toBe(true); // leg pair — DOES generate now (v1.8.0)
+      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange USD - Suspense')).toBe(true); // Suspense pair's Other-Ccy-site — DOES generate now (CREDIT-anchored, so Other-Ccy-site lands on debit)
       expect(result.instruction.creditLegs.some((l) => l.accountNo === 'Suspense - Debit')).toBe(true);
+      const sum = (legs: { amountTxCcy: string }[]) => legs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
+      expect(Math.round(sum(result.instruction.debitLegs) * 100)).toBe(Math.round(sum(result.instruction.creditLegs) * 100));
     });
 
-    it('v1.7.0 CREDIT-side end-to-end (reviewer-confirmed worked example): a real EUR credit leg (100) alongside a EUR Suspense Credit entry (100, gross) COMBINE — they do NOT net to zero — the FX pair is sized to their sum (200), not skipped', () => {
-      // Trx Amount USD 10,000; Credit Suspense EUR 100; real Credit Leg NOSTRO-ACC EUR 100 (amountTxCcy=108.31 at rate 0.923295, matching amountAccountCcy=100).
-      // Combined = 100 (leg) + 100 (gross suspense) = 200; trxEq at 1.0831 = 216.62.
-      // Credit aggregate: 108.31 (EUR leg) + 9783.38 (USD remainder) + 108.31 (bridge, gross trxEq) + 216.62 (server Trx-Ccy-site) = 10216.62
-      // Debit aggregate: 10000 (Leg#1) + 216.62 (server Other-Ccy-site) = 10216.62
+    it('v1.8.0 CREDIT-side per-source pairs (reviewer-confirmed worked example): a real EUR credit leg (100) alongside a EUR Suspense Credit entry (100, gross) each get their OWN independent FX pair — reusing each source\'s own already-computed amountTxCcy verbatim', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
           mainRef: 'REF-SB-NET-CREDIT-1',
           debitLegs: [{ accountNo: 'CUST-ACC2', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '10000' }],
+          creditLegs: [
+            { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '108.31', amountAccountCcy: '100' },
+            { accountNo: 'NOSTRO-ACC2', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '9783.38' },
+          ],
+          suspenseBridge: { creditEntries: [{ amount: '100', currency: 'EUR', crossRate: '1.0831' }] },
+        }),
+        { sourceFunctionCode: 'PayAccept' },
+      );
+      const bridgeLeg = result.instruction.creditLegs.find((l) => l.accountNo === 'Suspense - Credit');
+      expect(bridgeLeg?.amountAccountCcy).toBe('100'); // gross — unaffected by the leg pair
+      const suspenseFxOtherCcy = result.instruction.debitLegs.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
+      expect(suspenseFxOtherCcy?.amountAccountCcy).toBe('100'); // Suspense pair sized to gross Suspense alone
+      const suspenseFxTrxCcy = result.instruction.creditLegs.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
+      expect(suspenseFxTrxCcy?.amountTxCcy).toBe('108.31'); // the bridge leg's OWN amountTxCcy, reused verbatim
+      const legFxTrxCcy = result.instruction.creditLegs.find((l) => l.accountNo === 'FX Exchange EUR');
+      expect(legFxTrxCcy?.amountTxCcy).toBe('108.31'); // NOSTRO-ACC's OWN amountTxCcy, reused verbatim — NOT re-derived as (100+100)*rate
+
+      // Full aggregate V8 balances exactly — including per-currency: EUR own-currency (Debit 100+100
+      // from both Other-Ccy-sites = Credit 100+100 from NOSTRO-ACC + Suspense-Credit) AND USD
+      // own-currency (Debit 10000 = Credit 108.31+108.31+9783.38).
+      const sum = (legs: { amountTxCcy: string }[]) => legs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
+      expect(Math.round(sum(result.instruction.debitLegs) * 100)).toBe(Math.round(sum(result.instruction.creditLegs) * 100));
+      const usdCredit = result.instruction.creditLegs.filter((l) => l.currency === 'USD').reduce((s, l) => s + Number(l.amountTxCcy), 0);
+      expect(Math.round(usdCredit * 100)).toBe(1000000); // 10000.00 in cents — matches the sole USD debit (CUST-ACC2)
+    });
+
+    it('v1.7.1 ordering (accounting-review best practice) still holds with v1.8.0\'s two FX pairs: Normal Debit -> FX Debit(s) -> FX Credit(s) -> Normal Credit -> Suspense Credit', () => {
+      const result = confirmPaymentInstruction(
+        store,
+        request({
+          mainRef: 'REF-SB-ORDER-1',
+          debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '10000' }],
           creditLegs: [
             { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '108.31', amountAccountCcy: '100' },
             { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '9783.38' },
@@ -283,12 +316,21 @@ describe('confirmPaymentInstruction', () => {
         }),
         { sourceFunctionCode: 'PayAccept' },
       );
-      const bridgeLeg = result.instruction.creditLegs.find((l) => l.accountNo === 'Suspense - Credit');
-      expect(bridgeLeg?.amountAccountCcy).toBe('100'); // gross — never netted/reduced
-      const fxOtherCcy = result.instruction.debitLegs.find((l) => l.accountNo === 'FX Exchange USD');
-      expect(fxOtherCcy?.amountAccountCcy).toBe('200'); // COMBINED (100+100), not net-to-zero
-      const fxTrxCcy = result.instruction.creditLegs.find((l) => l.accountNo === 'FX Exchange EUR');
-      expect(fxTrxCcy?.amountTxCcy).toBe('216.62');
+
+      // Debit side: [normal debit(s)..., FX Debit(s) last — both the Suspense pair's and the leg
+      // pair's Other-Ccy-site legs land here, in that order (Suspense pair built first per bucket)]
+      expect(result.instruction.debitLegs.map((l) => l.accountNo)).toEqual(['CUST-ACC', 'FX Exchange USD - Suspense', 'FX Exchange USD']);
+
+      // Credit side: [FX Credit(s) first, normal credit(s)..., Suspense Credit last] — FX Credit
+      // (index 0) immediately follows the last FX Debit when the two arrays are read as one
+      // continuous Settlement Vouchers table.
+      expect(result.instruction.creditLegs.map((l) => l.accountNo)).toEqual([
+        'FX Exchange EUR - Suspense',
+        'FX Exchange EUR',
+        'NOSTRO-ACC',
+        'NOSTRO-ACC',
+        'Suspense - Credit',
+      ]);
     });
   });
 
