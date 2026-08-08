@@ -73,29 +73,35 @@ npm run test:coverage # jest --coverage
 ```
 
 Jest + `jest-preset-angular` (a separate config from `microservices/payment-component`'s
-own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). Current
-coverage (142 tests, 10 suites):
+own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 196 tests,
+12 suites; `jest.config.js` enforces a **90% floor** (`coverageThreshold`) across
+statements/branches/functions/lines for everything `collectCoverageFrom` tracks — `npm test`
+fails the build if a change drops coverage below it. Current numbers:
 
 | Metric | Coverage |
 |---|---|
-| Statements | 100% |
-| Functions | 100% |
+| Statements | 99.8% |
+| Functions | 99.3% |
 | Lines | 100% |
-| Branches | 96.93% |
+| Branches | 97.67% |
 
 **Covered:** `leg-allocator.component.ts` (incl. RTGS-indicator threading, the
-30/70-split rounding regression, `*ngFor` row-array stability), `business-case-request.ts`
-(request mapping for all 6 `LiabilitySpec` kinds), `business-case-fields.ts` (Formly
-field-group construction), `fx-rate.service.ts` / `currency.service.ts` /
-`payment-component-api.service.ts` (all via `HttpClientTestingModule`),
+30/70-split rounding regression, `*ngFor` row-array stability), `suspense-entries.component.ts`
+(the Suspense Debit/Credit repeater), `business-case-runner.component.ts` (the Formly/RxJS
+orchestration component itself — direct instantiation + mocked services, same pattern as
+leg-allocator, no TestBed needed; covers the Suspense/FX bridge-leg calculations, the real
+debounced preview pipeline via `fakeAsync`/`tick`, and the onConfirm/runPreview API wiring),
+`business-case-request.ts` (request mapping for all 6 `LiabilitySpec` kinds),
+`business-case-fields.ts` (Formly field-group construction), `fx-rate.service.ts` /
+`currency.service.ts` / `payment-component-api.service.ts` (all via `HttpClientTestingModule`),
 `response-viewer.component.ts`, `web-components/shared.ts`, `business-case-registry.ts`
 (data invariants), `payment-component.types.ts` (runtime const-object regression guards).
 
-**Not yet covered — a separate follow-up:** `business-case-runner.component.ts` (the
-Formly/RxJS orchestration component) and the 9 vanilla Custom Elements under
-`web-components/import|export/` need TestBed/DOM-level rendering tests, which this
-first pass deliberately didn't take on; both are excluded from `collectCoverageFrom`
-in `jest.config.js` rather than silently dragging the coverage numbers down.
+**Not yet covered — a separate follow-up:** the 9 vanilla Custom Elements under
+`web-components/import|export/` and every component's own `.html` template need
+TestBed/DOM-level rendering tests, which this project deliberately hasn't taken on; excluded
+from `collectCoverageFrom` in `jest.config.js` rather than silently dragging the coverage
+numbers down.
 
 ## Source layout
 
@@ -107,9 +113,12 @@ in `jest.config.js` rather than silently dragging the coverage numbers down.
 - `src/app/payment-component/` — the Payment Component Simulator:
   `business-case-registry.ts` (all 23 simulated business cases, each cited to
   source), `leg-allocator.component.ts` (the %/amount/currency split grid,
-  decimal.js-backed), `payment-component-api.service.ts` /
+  decimal.js-backed), `suspense-entries.component.ts` (the Suspense
+  Debit/Credit repeater — NOT FSD-sourced, see below), `payment-component-api.service.ts` /
   `fx-rate.service.ts` (the two backend clients), `business-case-runner.
-  component.ts` (ties it together).
+  component.ts` (ties it together, including the Suspense/Charge-Component
+  accounting bridge — see that file's `suspenseBridgeLeg()`/
+  `fxExchangePairLegs()` doc comments).
 - `backend/server.js` — mock calculation API for the legacy tabs, plus
   `GET /api/fx/rates` (a small fixed USD/EUR/JPY/GBP/TWD table).
 - `microservices/payment-component/` — the real Payment Component
@@ -117,3 +126,36 @@ in `jest.config.js` rather than silently dragging the coverage numbers down.
   with its own `package.json`, `jest.config.js`, and `README.md` (nested here
   rather than at the repo root).
 - `docs/` — bilingual (EN/zh-TW) user manuals.
+
+## Suspense Debit / Suspense Credit — the Charge Component accounting bridge
+
+**NOT FSD/OAS-sourced** — a Simulator-only extension, requested and validated independently
+of the traced source, modeling the accounting bridge between an external "Charge Component"
+(which books `Dr Suspense - Debit` / `Dr Suspense - Credit` against `Cr Commission` accounts)
+and this Payment Component. Under **Unit Code**, each PASS case gets two `<app-suspense-entries>`
+repeaters (`suspense-entries.component.ts`) — Suspense Debit and Suspense Credit, each an
+optional list of `{amount, currency}` entries (multiple entries allowed per side, e.g. several
+Charge-Component commission lines in different currencies).
+
+```
+Debit Leg #1  = Total Amount + Σ Suspense Debit entries  (Trx Equivalent)
+Credit Leg #1 = Total Amount − Σ Suspense Credit entries (Trx Equivalent)
+```
+
+Every non-zero entry also becomes its own **real** `Cr Suspense - Debit` / `Cr Suspense - Credit`
+leg — both land on the **credit** side (not one Dr/one Cr), which is what keeps the instruction
+balanced with no extra logic: the Suspense Credit terms always cancel themselves out (self-pattern
+for "pay less"), while Suspense Debit is the one term that changes the instruction's net size
+(the "collect more" case). When an entry's own currency differs from the transaction currency, a
+matching **FX Exchange** pair (`fxExchangePairLegs()`) is added too, so the voucher balances **by
+each individual currency**, not just in transaction-currency-equivalent terms — see
+`business-case-runner.component.ts`'s `suspenseBridgeLeg()`/`fxExchangePairLegs()`/
+`suspenseBridgeLegs()` doc comments for the full worked derivation. These are ordinary
+`PaymentLegInput` entries sent through the normal `debitLegs`/`creditLegs` arrays — no backend
+changes were needed for this feature (`accountType: 'SUSPENSE'` and `'INTERNAL'` already existed
+in the OAS).
+
+This is a **different, separate mechanism** from the microservice's own
+`suspensePassThrough` opt-in (see `microservices/payment-component/README.md`) — that one
+predates this design, was never wired into `routes/paymentInstructions.ts`'s HTTP layer, and the
+Simulator does not use it.

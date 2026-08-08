@@ -1,0 +1,21 @@
+<div class="suspense-entries">
+  <div class="suspense-entries-header">
+    <span class="suspense-label">{{ label }}</span>
+    <button type="button" class="add-btn" (click)="addRow()">+ Add {{ label }} Entry</button>
+  </div>
+
+  <div class="suspense-row" *ngFor="let row of rows; trackBy: trackById">
+    <input
+      type="number" min="0" step="any"
+      [(ngModel)]="row.amount"
+      (ngModelChange)="onFieldChange()"
+      placeholder="Amount" />
+    <select [(ngModel)]="row.currency" (ngModelChange)="onFieldChange()">
+      <option value="" disabled>Currency</option>
+      <option *ngFor="let c of currencies$ | async" [value]="c">{{ c }}</option>
+    </select>
+    <button type="button" class="remove-btn" (click)="removeRow(row)" title="Remove entry">✕</button>
+  </div>
+
+  <p class="suspense-empty-hint" *ngIf="!rows.length">No {{ label }} entries — optional.</p>
+</div>

@@ -91,6 +91,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   @Input({ required: true }) defaultAccountNo!: string;
   @Input({ required: true }) initialTotalAmount!: string;
   @Input({ required: true }) initialCurrency!: string;
+  /** When false, hides the "Total Amount (protected)" input so it isn't shown a second time next to a caller's own Total Amount summary (e.g. business-case-runner's Unit-Code-row display). The Transaction Currency select stays visible either way — this only suppresses the amount input, not currency editing. Purely a display toggle: totalAmount/onTotalChange still work exactly as before, still seeded from initialTotalAmount. */
+  @Input() showTotalAmount = true;
 
   @Output() legsChange = new EventEmitter<PaymentLegInput[]>();
   /** True once every row has an account number and (when split) a valid rate — parent gates preview calls on this. */

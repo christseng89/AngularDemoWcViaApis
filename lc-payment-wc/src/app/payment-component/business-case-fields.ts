@@ -175,12 +175,15 @@ function chargeFields(config: BusinessCaseConfig, currencyOptions: CurrencyOptio
 
 /**
  * Formly fields for a business case's non-leg inputs, split into two slices
- * so the two <app-leg-allocator> grids (percentage/amount/currency split —
- * see business-case-runner.component) can render between them: header first,
- * then Debit/Credit legs, then Liability/Charge Voucher context. Both slices
- * bind to the same shared model/form. GAP cases (RPFM) only ever hit
- * /payment-instructions/classify, which takes just the two leg arrays — no
- * header/liability/charge fields apply, so both return [].
+ * so <app-business-case-runner>'s Transaction Currency/Total Amount summary
+ * and the two <app-suspense-entries> repeaters (plain template markup, not
+ * Formly — see business-case-runner.component.ts's suspenseDebitEntries/
+ * suspenseCreditEntries) can render BETWEEN the unitCode/mainRef/sequence
+ * row and the two <app-leg-allocator> grids (percentage/amount/currency
+ * split), which in turn render before the Liability/Charge Voucher context.
+ * Both slices bind to the same shared model/form. GAP cases (RPFM) only ever
+ * hit /payment-instructions/classify, which takes just the two leg arrays —
+ * no header/liability/charge fields apply, so both return [].
  *
  * currencyOptions is threaded in from business-case-runner.component (which
  * holds the CurrencyService) rather than fetched here — this module stays a

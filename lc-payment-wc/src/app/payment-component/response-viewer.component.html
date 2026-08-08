@@ -38,6 +38,40 @@
       </table>
     </div>
 
+    <div class="entries-section fx-pair-section" *ngIf="debitFxPairs.length">
+      <h6 class="section-label">Debit FX Conversion Pair <span class="new-badge">new — not in baseline source</span></h6>
+      <p class="fx-pair-hint">
+        SSSS_PaymentDebit.js posts one entry per leg only — Debit totals by currency wouldn't
+        otherwise balance. Computed independently of the Credit side, purely for display — not
+        sent to the microservice.
+      </p>
+      <table class="fx-pair-table">
+        <thead><tr><th>Dr/Cr</th><th>Account</th><th>Currency</th><th>Amount</th><th>Site</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let p of debitFxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
+            <td>{{ p.drCr }}</td><td>{{ p.account }}</td><td>{{ p.currency }}</td><td>{{ p.amount }}</td><td>{{ p.site }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="entries-section fx-pair-section" *ngIf="creditFxPairs.length">
+      <h6 class="section-label">Credit FX Conversion Pair <span class="new-badge">new — not in baseline source</span></h6>
+      <p class="fx-pair-hint">
+        SSSS_PaymentCredit.js posts one entry per leg only — Credit totals by currency wouldn't
+        otherwise balance. Computed independently of the Debit side, purely for display — not
+        sent to the microservice.
+      </p>
+      <table class="fx-pair-table">
+        <thead><tr><th>Dr/Cr</th><th>Account</th><th>Currency</th><th>Amount</th><th>Site</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let p of creditFxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
+            <td>{{ p.drCr }}</td><td>{{ p.account }}</td><td>{{ p.currency }}</td><td>{{ p.amount }}</td><td>{{ p.site }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="entries-section" *ngIf="chargeEntries.length">
       <h6 class="section-label">Charge Voucher</h6>
       <table class="entries-table">

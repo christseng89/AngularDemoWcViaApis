@@ -2,7 +2,7 @@
   <div class="allocator-header">
     <h6 class="section-label">{{ label }} Legs</h6>
     <div class="total-box">
-      <label>
+      <label *ngIf="showTotalAmount">
         Total Amount (protected)
         <input
           type="number"
@@ -106,20 +106,9 @@
   </p>
   <p class="allocator-error" *ngIf="isOverAllocated">⚠ Over-allocated — these rows add up to more than 100%. Reduce one of them.</p>
 
-  <div class="fx-pair-section" *ngIf="fxPairs.length">
-    <h6 class="section-label">{{ label }} FX Conversion Pair <span class="new-badge">new — not in baseline source</span></h6>
-    <p class="fx-pair-hint">
-      SSSS_Payment{{ label }}.js posts one entry per leg only — {{ side === 'DEBIT' ? 'Debit' : 'Credit' }} totals by
-      currency wouldn't otherwise balance. Computed here, independently of the {{ side === 'DEBIT' ? 'Credit' : 'Debit' }}
-      side, purely for display — not sent to the microservice.
-    </p>
-    <table class="fx-pair-table">
-      <thead><tr><th>Dr/Cr</th><th>Account</th><th>Currency</th><th>Amount</th><th>Site</th></tr></thead>
-      <tbody>
-        <tr *ngFor="let p of fxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
-          <td>{{ p.drCr }}</td><td>{{ p.account }}</td><td>{{ p.currency }}</td><td>{{ p.amount }}</td><td>{{ p.site }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <!-- fxPairs (getter, in the .ts) is still computed here from this side's own rows — its DISPLAY
+       moved to <app-response-viewer>'s "{Debit/Credit} FX Conversion Pair" sections (right after
+       Settlement Vouchers) so it reads next to the settlement postings it explains, not mid-form.
+       See business-case-runner.component.html's [debitFxPairs]/[creditFxPairs] bindings. -->
 </div>
+

@@ -36,4 +36,10 @@ describe('ResponseViewerComponent', () => {
     comp.accountEntries = [];
     expect(comp.settlementEntries).toEqual([]);
   });
+
+  it('debitFxPairs/creditFxPairs default to [] until the parent binds them', () => {
+    const comp = new ResponseViewerComponent();
+    expect(comp.debitFxPairs).toEqual([]);
+    expect(comp.creditFxPairs).toEqual([]);
+  });
 });

@@ -56,7 +56,25 @@
         <formly-form [model]="model" [fields]="headerFields" [options]="options" [form]="form"></formly-form>
       </form>
 
+      <div class="header-summary">
+        <span><strong>Transaction Currency:</strong> {{ transactionCurrency }}</span>
+        <span><strong>Total Amount:</strong> {{ baseTotalAmount }}</span>
+      </div>
+
+      <app-suspense-entries
+        label="Suspense Debit"
+        [defaultCurrency]="transactionCurrency"
+        (entriesChange)="onSuspenseDebitEntriesChange($event)">
+      </app-suspense-entries>
+
+      <app-suspense-entries
+        label="Suspense Credit"
+        [defaultCurrency]="transactionCurrency"
+        (entriesChange)="onSuspenseCreditEntriesChange($event)">
+      </app-suspense-entries>
+
       <app-leg-allocator
+        #debitAllocator
         side="DEBIT"
         [accountTypeOptions]="debitDefaults.accountTypeOptions"
         [defaultAccountType]="debitDefaults.accountType"
@@ -64,11 +82,13 @@
         [defaultAccountNo]="debitDefaults.accountNo"
         [initialTotalAmount]="debitDefaults.totalAmount"
         [initialCurrency]="debitDefaults.currency"
+        [showTotalAmount]="false"
         (legsChange)="onDebitLegsChange($event)"
         (validChange)="onDebitValidChange($event)">
       </app-leg-allocator>
 
       <app-leg-allocator
+        #creditAllocator
         side="CREDIT"
         [accountTypeOptions]="creditDefaults.accountTypeOptions"
         [defaultAccountType]="creditDefaults.accountType"
@@ -76,6 +96,7 @@
         [defaultAccountNo]="creditDefaults.accountNo"
         [initialTotalAmount]="creditDefaults.totalAmount"
         [initialCurrency]="creditDefaults.currency"
+        [showTotalAmount]="false"
         (legsChange)="onCreditLegsChange($event)"
         (validChange)="onCreditValidChange($event)">
       </app-leg-allocator>
@@ -103,7 +124,9 @@
         [balance]="result.balance"
         [accountEntries]="result.accountEntries"
         [swiftMessages]="result.swiftMessages"
-        [instructionId]="result.instructionId">
+        [instructionId]="result.instructionId"
+        [debitFxPairs]="debitAllocator.fxPairs"
+        [creditFxPairs]="creditAllocator.fxPairs">
       </app-response-viewer>
       <div class="confirmed-badge" *ngIf="result?.confirmed && !result?.replay">✓ Confirmed — new instruction persisted to the microservice's store</div>
       <div class="confirmed-badge replay-badge" *ngIf="result?.confirmed && result?.replay">
