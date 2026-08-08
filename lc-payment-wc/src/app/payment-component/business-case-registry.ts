@@ -57,8 +57,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Calls the Payment Component voucher-description routine directly inside ConfirmBusinessCall.',
     sourceFunctionCode: 'PayAccept',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '10000'), leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '10000')],
-    liability: { kind: 'IPLC_PAY_ACCEPT', sourceFunctionCode: 'PayAccept' },
-    charge: true,
   },
   {
     id: 'iplc-pay-accept-discount',
@@ -69,8 +67,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Default legs reproduce test/regression.ts §13.1 scenario 2 (DISCNT_FLG=YES, STL_FLG≠By Loan) exactly.',
     sourceFunctionCode: 'PayAcceptWithDiscount',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'EUR', '100'), leg('CREDIT', 'INTERNAL', 'INTERNAL-ACC', 'EUR', '100')],
-    liability: { kind: 'IPLC_PAY_ACCEPT', sourceFunctionCode: 'PayAcceptWithDiscount' },
-    charge: true,
   },
   {
     id: 'iplc-payment-at-maturity',
@@ -81,8 +77,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Default legs reproduce regression scenario 3 (STL_FLG≠By Loan default) — expected false; flip Cr to NOSTRO/VOSTRO to see it flip true.',
     sourceFunctionCode: 'PaymentAtMaturity',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'EUR', '100'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC-2', 'EUR', '100')],
-    liability: { kind: 'IPLC_MATURITY' },
-    charge: true,
   },
   {
     id: 'eplc-pay-accept',
@@ -96,8 +90,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
       { label: 'EPLC03NULLNULLNULL (sight leg)', value: 'EPLC03NULLNULLNULL' },
     ],
     legs: [leg('DEBIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '5000'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC', 'USD', '5000')],
-    liability: { kind: 'EPLC', sourceFunctionCode: 'PayAccept' },
-    charge: true,
   },
   {
     id: 'eplc-pay-at-maturity',
@@ -108,8 +100,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Calls the Payment Component voucher-description routine directly inside ConfirmBusinessCall.',
     sourceFunctionCode: 'PayAtMaturity',
     legs: [leg('DEBIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '5000'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC', 'USD', '5000')],
-    liability: { kind: 'EPLC', sourceFunctionCode: 'PayAtMaturity' },
-    charge: true,
   },
   {
     id: 'eplc-discount',
@@ -117,10 +107,9 @@ const PASS_CASES: BusinessCaseConfig[] = [
     functionLabel: 'Discount',
     verdict: 'PASS',
     citation: 'SYF_EPLC_EPLC_Discount.js:48 → SYF_EPLC_CAL_PAYMENT_AC_DESC():265',
-    note: 'No Liability Voucher for this function — accountEntries.ts explicitly excludes Discount from the EPLC liability set.',
+    note: 'No Liability Voucher for this function per source — FSD arr_Func_Manag3 excludes Discount from the EPLC liability set (§6.3.2).',
     sourceFunctionCode: 'Discount',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '4800'), leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '4800')],
-    charge: true,
   },
   {
     id: 'exco-payment',
@@ -131,7 +120,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Default legs are the exact values verified end-to-end in test/regression.ts\'s HTTP smoke test.',
     sourceFunctionCode: 'Payment',
     legs: [leg('DEBIT', 'NOSTRO', 'NOSTRO-ACC', 'EUR', '100.00'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC', 'EUR', '100.00')],
-    charge: true,
   },
   {
     id: 'exco-discount',
@@ -142,7 +130,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'EXCO never produces a Liability Voucher entry (§6.3.6 — confirmed by absence in source).',
     sourceFunctionCode: 'Discount',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'EUR', '4800'), leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'EUR', '4800')],
-    charge: true,
   },
   {
     id: 'exco-process400',
@@ -153,7 +140,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'EXCO never produces a Liability Voucher entry (§6.3.6).',
     sourceFunctionCode: 'Process400',
     legs: [leg('DEBIT', 'NOSTRO', 'NOSTRO-ACC', 'EUR', '100'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC', 'EUR', '100')],
-    charge: true,
   },
   {
     id: 'exco-settlement-at-maturity',
@@ -167,7 +153,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
       { label: 'EXCO01NULLNULLNULL (sight leg)', value: 'EXCO01NULLNULLNULL' },
     ],
     legs: [leg('DEBIT', 'NOSTRO', 'NOSTRO-ACC', 'EUR', '100'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC', 'EUR', '100')],
-    charge: true,
   },
   {
     id: 'imco-pre-payment',
@@ -178,7 +163,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Correctly produces no Liability Voucher (IMCO Pre-Payment/Payment D/P are liability-free per source).',
     sourceFunctionCode: 'PrePayment',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '8000'), leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '8000')],
-    charge: true,
   },
   {
     id: 'imco-payment-dp',
@@ -189,7 +173,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Correctly produces no Liability Voucher.',
     sourceFunctionCode: 'PaymentDP',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '8000'), leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '8000')],
-    charge: true,
   },
   {
     id: 'imco-settlement-da',
@@ -200,8 +183,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'The one IMCO function with a Liability Voucher (§6.3.3).',
     sourceFunctionCode: 'SettlementDA',
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '8000'), leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '8000')],
-    liability: { kind: 'IMCO_SETTLEMENT_DA' },
-    charge: true,
   },
   {
     id: 'gtee-outward-claim-settlement',
@@ -212,8 +193,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Only 1 of ~55 non-CE GTEE Confirm functions touches PaymentDebit/PaymentCredit — this is it.',
     sourceFunctionCode: 'OutwardClaimSettlement',
     legs: [leg('DEBIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '20000'), leg('CREDIT', 'VOSTRO', 'VOSTRO-ACC', 'USD', '20000')],
-    liability: { kind: 'GTEE' },
-    charge: true,
   },
   {
     id: 'iwgt-settle-inward-claim',
@@ -224,8 +203,6 @@ const PASS_CASES: BusinessCaseConfig[] = [
     note: 'Liability entries only generated when MTHD_OF_ISS = "Issue" — try "Advice" to see the panel return 0 entries.',
     sourceFunctionCode: 'SettleInwardClaim',
     legs: [leg('DEBIT', 'VOSTRO', 'VOSTRO-ACC', 'USD', '15000'), leg('CREDIT', 'CUSTOMER', 'CUST-ACC', 'USD', '15000')],
-    liability: { kind: 'IWGT' },
-    charge: true,
   },
 ];
 

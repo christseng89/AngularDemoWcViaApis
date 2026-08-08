@@ -1,6 +1,6 @@
 /**
  * TypeScript types mirroring microservices/payment-component/src/types.ts
- * (payment-instructions-post.yaml v1.3.0). Duplicated here rather than
+ * (payment-instructions-post.yaml v1.6.0). Duplicated here rather than
  * imported cross-project — lc-payment-wc/backend doesn't import the
  * microservice either; these two Node projects stay independently deployable.
  */
@@ -78,75 +78,55 @@ export interface PaymentLeg extends PaymentLegInput {
   accountCategory: AccountCategory;
 }
 
-/** Charge/Liability voucher context extensions — see business-case.model.ts for per-function shapes. */
-export interface ChargeVoucherContext {
-  isSettleCharges: boolean;
-  localChgCustPayTotalAmt: string;
-  foreignChgCustPayTotalAmt: string;
-  localPayVatTotalAmt: string;
-  chargeAccountNo?: string;
+/** Wire shape for SuspenseBridgeEntry.sourceComponent — added v1.5.0. Pure provenance/audit metadata, see SuspenseBridgeEntry's own doc comment. */
+export const SUSPENSE_SOURCE_COMPONENTS = ['BALANCE', 'CHARGE'] as const;
+export type SourceComponent = (typeof SUSPENSE_SOURCE_COMPONENTS)[number];
+
+/** Wire shape for SuspenseBridgeEntry.balanceModule — added v1.5.0. Only meaningful when sourceComponent is 'BALANCE'. */
+export const BALANCE_MODULES = ['IBL', 'EBL'] as const;
+export type BalanceModule = (typeof BALANCE_MODULES)[number];
+
+/**
+ * Wire shape for one raw suspense-bridge amount (v1.4.0) — see
+ * SuspenseBridge below. Distinct from suspense-entries.component.ts's own
+ * `SuspenseEntry` (amount + currency only, no crossRate): that one is the
+ * UI-editable row shape; this one is what actually goes on the wire, with
+ * the crossRate business-case-runner.component.ts resolves before sending.
+ */
+export interface SuspenseBridgeEntry {
+  amount: MonetaryAmount;
   currency: string;
-  custId?: string;
-  bookingDate?: string;
+  /** Required when currency differs from the request's transaction currency (debitLegs[0].currency); ignored otherwise. */
+  crossRate?: ExchangeRate;
+  /**
+   * Added v1.5.0. Which upstream component already booked the OTHER leg of
+   * this entry on its own books — pure provenance/audit metadata. The
+   * server never generates a Charge/Liability Voucher entry at all (§6.2/
+   * §6.3 generation was removed entirely v1.6.0 — see
+   * microservices/payment-component/src/domain/confirmPaymentInstruction.ts's
+   * doc comment for the full architecture decision), so this field has no
+   * server-side validation or processing consequence; it exists purely for
+   * the caller's own audit trail.
+   */
+  sourceComponent?: SourceComponent;
+  /** Added v1.5.0. Only meaningful when sourceComponent is 'BALANCE'. */
+  balanceModule?: BalanceModule;
 }
 
-export type LiabilityVoucherContext =
-  | {
-      module: 'IPLC';
-      sourceFunctionCode: 'PayAccept' | 'PayAcceptWithDiscount';
-      stlAmt: string;
-      acptAmt?: string;
-      sdaFlagIsSight?: boolean;
-      assetAcno: string;
-      liabAcno: string;
-      tempAssetAcno?: string;
-      tempLiabAcno?: string;
-      currency: string;
-    }
-  | {
-      module: 'IPLC';
-      sourceFunctionCode: 'PaymentAtMaturity';
-      stlAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-    }
-  | {
-      module: 'EPLC';
-      sourceFunctionCode: 'PayAccept' | 'PayAtMaturity' | 'SettlePartial';
-      stlAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-      replicateEplcVoucherDescDefect?: boolean;
-    }
-  | {
-      module: 'IMCO';
-      sourceFunctionCode: 'SettlementDA';
-      billAmtFmDrwe: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-    }
-  | {
-      module: 'GTEE';
-      sourceFunctionCode: 'OutwardClaimSettlement';
-      clmTrxCcyAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-    }
-  | {
-      module: 'IWGT';
-      sourceFunctionCode: 'SettleInwardClaim';
-      clmTrxCcyAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-      methodOfIssuance: 'Issue' | 'Advice';
-    }
-  | { module: 'EXCO' }
-  | { module: 'NONE' };
+/**
+ * Balance/Charge Component <-> Payment Component accounting bridge — added
+ * v1.4.0 (Charge Component), extended v1.5.0 (Balance Component). See
+ * microservices/payment-component/src/domain/suspenseBridge.ts and
+ * payment-instructions-post.yaml's SuspenseBridge schema for the full
+ * contract, including what the server does and does NOT adjust on the
+ * caller's behalf (this project's own debitLegs/creditLegs above still need
+ * the matching pre-adjustment — see business-case-runner.component.ts's
+ * sideDefaults()).
+ */
+export interface SuspenseBridge {
+  debitEntries?: SuspenseBridgeEntry[];
+  creditEntries?: SuspenseBridgeEntry[];
+}
 
 export interface PaymentInstructionConfirmRequest {
   originModule: OriginModule;
@@ -159,11 +139,13 @@ export interface PaymentInstructionConfirmRequest {
   payInstrFlag?: PayInstrFlag;
   debitLegs: PaymentLegInput[];
   creditLegs: PaymentLegInput[];
-  // Extension fields (see microservices/payment-component/src/routes/paymentInstructions.ts RequestExtensions)
+  /** Added v1.4.0 — see SuspenseBridge's doc comment above. */
+  suspenseBridge?: SuspenseBridge;
+  // Extension fields (see microservices/payment-component/src/routes/paymentInstructions.ts RequestExtensions).
+  // chargeContext/liabilityContext existed here through v1.5.0; removed v1.6.0 along with §6.2/§6.3
+  // Account Entry generation itself — see SuspenseBridge's doc comment above.
   sourceFunctionCode?: string;
   voucherCodePrefixOverride?: string;
-  chargeContext?: ChargeVoucherContext;
-  liabilityContext?: LiabilityVoucherContext;
   dryRun?: boolean;
 }
 

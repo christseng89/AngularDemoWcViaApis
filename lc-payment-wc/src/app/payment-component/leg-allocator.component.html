@@ -58,9 +58,13 @@
 
     <input
       type="number" min="0" step="any"
+      *ngIf="!needsRate(row); else txCcyComputed"
       [ngModel]="toNum(row.amountTxCcy)"
       (ngModelChange)="onAmountInput(row, $event)"
       [title]="row.isRemainder ? 'Remainder — editing it fixes this row and opens a new remainder for what\'s left' : ''" />
+    <ng-template #txCcyComputed>
+      <span class="computed" title="Derived from the Account Ccy Equiv. amount ÷ rate — edit that field, or the % column, instead.">{{ toNum(row.amountTxCcy) }}</span>
+    </ng-template>
 
     <select [ngModel]="row.currency" (ngModelChange)="onRowCurrencyChange(row, $event)">
       <option *ngFor="let c of currencies$ | async" [value]="c">{{ c }}</option>
@@ -74,7 +78,12 @@
       title="Auto-filled from GET /api/fx/rates when the currency changed — still freely editable." />
     <ng-template #noRate><span class="muted">—</span></ng-template>
 
-    <span class="computed" *ngIf="needsRate(row); else sameCcy">{{ row.currency }} {{ accountCcyAmount(row) }}</span>
+    <input
+      type="number" min="0" step="any"
+      *ngIf="needsRate(row); else sameCcy"
+      [ngModel]="accountCcyAmount(row)"
+      (ngModelChange)="onAccountAmountInput(row, $event)"
+      [title]="'Amount in this row\'s own currency (' + row.currency + ') — the figure Suspense netting compares against. Amount (Tx Ccy) is derived from this ÷ rate.'" />
     <ng-template #sameCcy><span class="muted">—</span></ng-template>
 
     <input

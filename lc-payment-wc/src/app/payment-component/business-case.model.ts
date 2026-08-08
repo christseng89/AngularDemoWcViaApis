@@ -15,19 +15,6 @@ export interface LegSpec {
   defaultAmountTxCcy: string;
 }
 
-/**
- * The 6 real LiabilityVoucherContext shapes (accountEntries.ts). Each `kind`
- * maps to one fixed Formly field set (business-case-fields.ts) and one fixed
- * mapper (business-case-request.ts) — written once per kind, not per function.
- */
-export type LiabilitySpec =
-  | { kind: 'IPLC_PAY_ACCEPT'; sourceFunctionCode: 'PayAccept' | 'PayAcceptWithDiscount' }
-  | { kind: 'IPLC_MATURITY' }
-  | { kind: 'EPLC'; sourceFunctionCode: 'PayAccept' | 'PayAtMaturity' }
-  | { kind: 'IMCO_SETTLEMENT_DA' }
-  | { kind: 'GTEE' }
-  | { kind: 'IWGT' };
-
 export interface BusinessCaseConfig {
   id: string;
   module: OriginModule;
@@ -44,9 +31,6 @@ export interface BusinessCaseConfig {
   dualPrefixOptions?: { label: string; value: string }[];
 
   legs: LegSpec[];
-  liability?: LiabilitySpec;
-  /** Charge Voucher context has one shape for every module (ChargeVoucherContext) — offering it is just a boolean. */
-  charge?: boolean;
 
   // N_A only:
   moduleStats?: string;

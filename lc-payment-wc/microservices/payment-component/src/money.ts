@@ -79,6 +79,42 @@ export function sumMonetaryAmounts(values: readonly string[]): Decimal {
 }
 
 /**
+ * Minor-unit decimal places per currency — mirrors
+ * lc-payment-wc/backend/data/currencies.json (the "Get Currency API" demo
+ * data the Angular Simulator's CurrencyService.decimals() reads), duplicated
+ * here because this microservice is an independently-deployable Node project
+ * with no currency-master data source of its own. Falls back to 2 for any
+ * currency not in this table — matches that backend's own dp(ccy) fallback
+ * and ISO 4217's default minor-unit count for most real currencies.
+ *
+ * Used wherever this service computes (rather than passes through verbatim)
+ * a monetary amount that needs currency-correct rounding — e.g.
+ * domain/suspenseBridge.ts's cross-currency FX-equivalent conversion. Must
+ * stay in agreement with the Simulator's own CurrencyService.decimals() for
+ * the same currency, or a client-computed amount and this service's
+ * independently-computed amount for "the same" quantity can round to
+ * different values and break the exact-equality Dr/Cr balance check
+ * (domain/balanceValidation.ts) by a minor unit. Keep in sync with
+ * backend/data/currencies.json if that table changes.
+ */
+const CURRENCY_MINOR_UNITS: Readonly<Record<string, number>> = {
+  USD: 2,
+  EUR: 2,
+  JPY: 0,
+  GBP: 2,
+  TWD: 0,
+  IDR: 0,
+  CNY: 2,
+  HKD: 2,
+  SGD: 2,
+  AUD: 2,
+};
+
+export function minorUnitsForCurrency(currency: string): number {
+  return CURRENCY_MINOR_UNITS[currency] ?? 2;
+}
+
+/**
  * §8.2 of Payment_Component_Calculation_Validation.docx:
  *   CPYT_DR_AMT_DRCCY = CPYT_DR_AMT_TXCCY × CPYT_DR_BUY_RATE   (debit)
  *   CPYT_CR_AMT_CRCCY = CPYT_CR_AMT_TXCCY × CPYT_CR_BUY_RATE   (credit, symmetric)

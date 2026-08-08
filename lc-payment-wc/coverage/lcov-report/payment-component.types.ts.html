@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -302,25 +302,7 @@
 <a name='L237'></a><a href='#L237'>237</a>
 <a name='L238'></a><a href='#L238'>238</a>
 <a name='L239'></a><a href='#L239'>239</a>
-<a name='L240'></a><a href='#L240'>240</a>
-<a name='L241'></a><a href='#L241'>241</a>
-<a name='L242'></a><a href='#L242'>242</a>
-<a name='L243'></a><a href='#L243'>243</a>
-<a name='L244'></a><a href='#L244'>244</a>
-<a name='L245'></a><a href='#L245'>245</a>
-<a name='L246'></a><a href='#L246'>246</a>
-<a name='L247'></a><a href='#L247'>247</a>
-<a name='L248'></a><a href='#L248'>248</a>
-<a name='L249'></a><a href='#L249'>249</a>
-<a name='L250'></a><a href='#L250'>250</a>
-<a name='L251'></a><a href='#L251'>251</a>
-<a name='L252'></a><a href='#L252'>252</a>
-<a name='L253'></a><a href='#L253'>253</a>
-<a name='L254'></a><a href='#L254'>254</a>
-<a name='L255'></a><a href='#L255'>255</a>
-<a name='L256'></a><a href='#L256'>256</a>
-<a name='L257'></a><a href='#L257'>257</a>
-<a name='L258'></a><a href='#L258'>258</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L240'></a><a href='#L240'>240</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -401,29 +383,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -579,7 +543,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * TypeScript types mirroring microservices/payment-component/src/types.ts
- * (payment-instructions-post.yaml v1.3.0). Duplicated here rather than
+ * (payment-instructions-post.yaml v1.6.0). Duplicated here rather than
  * imported cross-project — lc-payment-wc/backend doesn't import the
  * microservice either; these two Node projects stay independently deployable.
  */
@@ -657,75 +621,55 @@ export interface PaymentLeg extends PaymentLegInput {
   accountCategory: AccountCategory;
 }
 &nbsp;
-/** Charge/Liability voucher context extensions — see business-case.model.ts for per-function shapes. */
-export interface ChargeVoucherContext {
-  isSettleCharges: boolean;
-  localChgCustPayTotalAmt: string;
-  foreignChgCustPayTotalAmt: string;
-  localPayVatTotalAmt: string;
-  chargeAccountNo?: string;
+/** Wire shape for SuspenseBridgeEntry.sourceComponent — added v1.5.0. Pure provenance/audit metadata, see SuspenseBridgeEntry's own doc comment. */
+export const SUSPENSE_SOURCE_COMPONENTS = ['BALANCE', 'CHARGE'] as const;
+export type SourceComponent = (typeof SUSPENSE_SOURCE_COMPONENTS)[number];
+&nbsp;
+/** Wire shape for SuspenseBridgeEntry.balanceModule — added v1.5.0. Only meaningful when sourceComponent is 'BALANCE'. */
+export const BALANCE_MODULES = ['IBL', 'EBL'] as const;
+export type BalanceModule = (typeof BALANCE_MODULES)[number];
+&nbsp;
+/**
+ * Wire shape for one raw suspense-bridge amount (v1.4.0) — see
+ * SuspenseBridge below. Distinct from suspense-entries.component.ts's own
+ * `SuspenseEntry` (amount + currency only, no crossRate): that one is the
+ * UI-editable row shape; this one is what actually goes on the wire, with
+ * the crossRate business-case-runner.component.ts resolves before sending.
+ */
+export interface SuspenseBridgeEntry {
+  amount: MonetaryAmount;
   currency: string;
-  custId?: string;
-  bookingDate?: string;
+  /** Required when currency differs from the request's transaction currency (debitLegs[0].currency); ignored otherwise. */
+  crossRate?: ExchangeRate;
+  /**
+   * Added v1.5.0. Which upstream component already booked the OTHER leg of
+   * this entry on its own books — pure provenance/audit metadata. The
+   * server never generates a Charge/Liability Voucher entry at all (§6.2/
+   * §6.3 generation was removed entirely v1.6.0 — see
+   * microservices/payment-component/src/domain/confirmPaymentInstruction.ts's
+   * doc comment for the full architecture decision), so this field has no
+   * server-side validation or processing consequence; it exists purely for
+   * the caller's own audit trail.
+   */
+  sourceComponent?: SourceComponent;
+  /** Added v1.5.0. Only meaningful when sourceComponent is 'BALANCE'. */
+  balanceModule?: BalanceModule;
 }
 &nbsp;
-export type LiabilityVoucherContext =
-  | {
-      module: 'IPLC';
-      sourceFunctionCode: 'PayAccept' | 'PayAcceptWithDiscount';
-      stlAmt: string;
-      acptAmt?: string;
-      sdaFlagIsSight?: boolean;
-      assetAcno: string;
-      liabAcno: string;
-      tempAssetAcno?: string;
-      tempLiabAcno?: string;
-      currency: string;
-    }
-  | {
-      module: 'IPLC';
-      sourceFunctionCode: 'PaymentAtMaturity';
-      stlAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-    }
-  | {
-      module: 'EPLC';
-      sourceFunctionCode: 'PayAccept' | 'PayAtMaturity' | 'SettlePartial';
-      stlAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-      replicateEplcVoucherDescDefect?: boolean;
-    }
-  | {
-      module: 'IMCO';
-      sourceFunctionCode: 'SettlementDA';
-      billAmtFmDrwe: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-    }
-  | {
-      module: 'GTEE';
-      sourceFunctionCode: 'OutwardClaimSettlement';
-      clmTrxCcyAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-    }
-  | {
-      module: 'IWGT';
-      sourceFunctionCode: 'SettleInwardClaim';
-      clmTrxCcyAmt: string;
-      assetAcno: string;
-      liabAcno: string;
-      currency: string;
-      methodOfIssuance: 'Issue' | 'Advice';
-    }
-  | { module: 'EXCO' }
-  | { module: 'NONE' };
+/**
+ * Balance/Charge Component &lt;-&gt; Payment Component accounting bridge — added
+ * v1.4.0 (Charge Component), extended v1.5.0 (Balance Component). See
+ * microservices/payment-component/src/domain/suspenseBridge.ts and
+ * payment-instructions-post.yaml's SuspenseBridge schema for the full
+ * contract, including what the server does and does NOT adjust on the
+ * caller's behalf (this project's own debitLegs/creditLegs above still need
+ * the matching pre-adjustment — see business-case-runner.component.ts's
+ * sideDefaults()).
+ */
+export interface SuspenseBridge {
+  debitEntries?: SuspenseBridgeEntry[];
+  creditEntries?: SuspenseBridgeEntry[];
+}
 &nbsp;
 export interface PaymentInstructionConfirmRequest {
   originModule: OriginModule;
@@ -738,11 +682,13 @@ export interface PaymentInstructionConfirmRequest {
   payInstrFlag?: PayInstrFlag;
   debitLegs: PaymentLegInput[];
   creditLegs: PaymentLegInput[];
-  // Extension fields (see microservices/payment-component/src/routes/paymentInstructions.ts RequestExtensions)
+  /** Added v1.4.0 — see SuspenseBridge's doc comment above. */
+  suspenseBridge?: SuspenseBridge;
+  // Extension fields (see microservices/payment-component/src/routes/paymentInstructions.ts RequestExtensions).
+  // chargeContext/liabilityContext existed here through v1.5.0; removed v1.6.0 along with §6.2/§6.3
+  // Account Entry generation itself — see SuspenseBridge's doc comment above.
   sourceFunctionCode?: string;
   voucherCodePrefixOverride?: string;
-  chargeContext?: ChargeVoucherContext;
-  liabilityContext?: LiabilityVoucherContext;
   dryRun?: boolean;
 }
 &nbsp;
@@ -841,7 +787,7 @@ export interface ClassifyPreviewResult {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-08T09:11:33.069Z
+                at 2026-08-08T17:53:26.926Z
             </div>
         <script src="prettify.js"></script>
         <script>

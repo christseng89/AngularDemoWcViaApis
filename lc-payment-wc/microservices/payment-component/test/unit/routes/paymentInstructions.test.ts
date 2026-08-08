@@ -54,24 +54,46 @@ describe('POST /payment-instructions', () => {
     expect(res.body.code).toBe('LEGS_UNBALANCED');
   });
 
-  it('accepts chargeContext/liabilityContext extension fields alongside the strict OAS body', async () => {
+  it('expands suspenseBridge into a Suspense - Debit leg and returns 201 when the caller pre-adjusted its own debit total', async () => {
     const app = createApp();
     const res = await request(app)
       .post(`${API_BASE_PATH}/payment-instructions`)
       .send({
         ...validBody,
-        mainRef: 'REF-EXT',
-        chargeContext: {
-          isSettleCharges: false,
-          localChgCustPayTotalAmt: '5',
-          foreignChgCustPayTotalAmt: '0',
-          localPayVatTotalAmt: '0',
-          chargeAccountNo: 'CHG-1',
-          currency: 'USD',
+        mainRef: 'REF-ROUTE-SB',
+        debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '110' }],
+        suspenseBridge: { debitEntries: [{ amount: '10', currency: 'USD' }] },
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.creditLegs.some((l: { accountNo: string }) => l.accountNo === 'Suspense - Debit')).toBe(true);
+  });
+
+  it('returns 409 when a suspenseBridge entry is submitted without the caller pre-adjusting its own leg totals', async () => {
+    const app = createApp();
+    const res = await request(app)
+      .post(`${API_BASE_PATH}/payment-instructions`)
+      .send({
+        ...validBody,
+        mainRef: 'REF-ROUTE-SB-UNBAL',
+        suspenseBridge: { debitEntries: [{ amount: '10', currency: 'USD' }] },
+      });
+    expect(res.status).toBe(409);
+  });
+
+  it('a sourceComponent-tagged suspenseBridge entry (no chargeContext/liabilityContext exist to conflict with) produces only a SETTLEMENT entry', async () => {
+    const app = createApp();
+    const res = await request(app)
+      .post(`${API_BASE_PATH}/payment-instructions`)
+      .send({
+        ...validBody,
+        mainRef: 'REF-ROUTE-SB-TAGGED',
+        debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '110' }],
+        suspenseBridge: {
+          debitEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' }],
         },
       });
     expect(res.status).toBe(201);
-    expect(res.body.accountEntries.some((e: { voucherType: string }) => e.voucherType === 'CHARGE')).toBe(true);
+    expect(res.body.accountEntries.every((e: { voucherType: string }) => e.voucherType === 'SETTLEMENT')).toBe(true);
   });
 });
 

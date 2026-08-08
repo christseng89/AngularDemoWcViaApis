@@ -31,10 +31,20 @@
 
 .suspense-row {
   display: grid;
-  grid-template-columns: 1fr 120px 32px;
+  // Amount, Currency, Charge/Liability flag, Remove button — all fixed widths
+  // (not 1fr on Amount) so the 4th column (added alongside the Charge/Liability
+  // dropdown) gets enough room for "Liability" instead of being squeezed to
+  // its auto-sized minimum by Amount claiming all the leftover space.
+  grid-template-columns: 120px 90px 110px 32px;
   gap: 8px;
   align-items: center;
   margin-bottom: 6px;
+}
+
+.suspense-row input,
+.suspense-row select {
+  width: 100%;
+  min-width: 0;
 }
 
 .remove-btn {

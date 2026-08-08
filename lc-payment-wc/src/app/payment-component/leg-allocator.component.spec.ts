@@ -23,6 +23,7 @@ function makeComponent(overrides: Partial<{ crossRate: number | null }> = {}) {
   comp.defaultAccountNo = 'CUST-ACC';
   comp.initialTotalAmount = '10000';
   comp.initialCurrency = 'USD';
+  comp.caseKey = 'case-1';
 
   const emittedLegs: PaymentLegInput[][] = [];
   const emittedValid: boolean[] = [];
@@ -177,6 +178,35 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows[0]!.pct.toNumber()).toBe(40);
       expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(800);
       expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(1200);
+    });
+
+    it('regression: a fixed foreign-currency row keeps its own-currency amount EXACT — not rescaled by % — when the seeded total later changes for an unrelated reason (e.g. a Suspense entry)', () => {
+      const { comp } = makeComponent({ crossRate: 1 }); // rate=1 so accountCcyAmount === amountTxCcy, isolating this test from FX-conversion arithmetic
+      comp.ngOnInit(); // total = 10000, USD
+      comp.onPctInput(comp.rows[0]!, 99.56); // rows[0]=99.56% fixed, rows[1]=0.44% remainder appears
+
+      const eurRow = comp.rows.find((r) => r.isRemainder)!;
+      comp.onRowCurrencyChange(eurRow, 'EUR');
+      comp.onAccountAmountInput(eurRow, 40); // user types "EUR 40" — rows[0] (USD) is promoted back to remainder
+
+      comp.onTotalChange(10110); // e.g. a Suspense Debit entry reseeds the total from 10000 to 10110
+
+      expect(comp.accountCcyAmount(eurRow)).toBe(40); // unchanged — NOT rescaled to a stale-%-based drift
+      const usdRow = comp.rows.find((r) => r.currency === 'USD')!;
+      expect(usdRow.amountTxCcy.toNumber()).toBe(10070); // EXACT: 10110 - 40 (EUR row's own amountTxCcy), not a %-rescale
+    });
+
+    it('a foreign-currency row\'s pct is refreshed to 0 (not NaN/Infinity) when the new total is 0', () => {
+      const { comp } = makeComponent({ crossRate: 1.5 });
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 99.56);
+      const eurRow = comp.rows.find((r) => r.isRemainder)!;
+      comp.onRowCurrencyChange(eurRow, 'EUR');
+      comp.onAccountAmountInput(eurRow, 40);
+
+      comp.onTotalChange(0);
+
+      expect(eurRow.pct.toNumber()).toBe(0);
     });
   });
 
@@ -373,21 +403,21 @@ describe('LegAllocatorComponent', () => {
       const rowIdBefore = comp.rows[0]!.id;
 
       comp.ngOnChanges({
-        initialTotalAmount: new SimpleChange(undefined, '10000', true),
-        initialCurrency: new SimpleChange(undefined, 'USD', true),
+        caseKey: new SimpleChange(undefined, 'case-1', true),
       });
 
       expect(comp.rows[0]!.id).toBe(rowIdBefore);
     });
 
-    it('resets on a later change to initialTotalAmount (parent switched business cases)', () => {
+    it('resets on a later change to caseKey (parent switched business cases)', () => {
       const { comp } = makeComponent();
       comp.ngOnInit();
       const rowIdBefore = comp.rows[0]!.id;
       comp.initialTotalAmount = '5000';
+      comp.caseKey = 'case-2';
 
       comp.ngOnChanges({
-        initialTotalAmount: new SimpleChange('10000', '5000', false),
+        caseKey: new SimpleChange('case-1', 'case-2', false),
       });
 
       expect(comp.rows[0]!.id).not.toBe(rowIdBefore);
@@ -404,6 +434,54 @@ describe('LegAllocatorComponent', () => {
       });
 
       expect(comp.rows[0]!.id).toBe(rowIdBefore);
+    });
+
+    it('treats a blank/invalid same-case initialTotalAmount as 0 (not NaN) when rescaling', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.initialTotalAmount = '';
+
+      comp.ngOnChanges({
+        initialTotalAmount: new SimpleChange('10000', '', false),
+      });
+
+      expect(comp.totalAmount.toNumber()).toBe(0);
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(0);
+    });
+
+    it('regression: a same-case initialTotalAmount change (e.g. a Suspense entry reseed) rescales the existing split in place instead of reset()ing it — must not revert an in-progress per-row currency edit', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 40); // rows[0]=40% fixed, rows[1]=60% remainder
+      comp.onRowCurrencyChange(comp.rows[1]!, 'EUR'); // user gives the second leg its own currency
+      const rowIdsBefore = comp.rows.map((r) => r.id);
+      comp.initialTotalAmount = '12000'; // e.g. Suspense entries changed the live seed total
+
+      comp.ngOnChanges({
+        initialTotalAmount: new SimpleChange('10000', '12000', false),
+      });
+
+      expect(comp.rows.map((r) => r.id)).toEqual(rowIdsBefore); // no reset — same rows
+      expect(comp.rows[0]!.pct.toNumber()).toBe(40);
+      expect(comp.rows[1]!.currency).toBe('EUR'); // the user's currency edit survives
+      expect(comp.totalAmount.toNumber()).toBe(12000);
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(4800); // rescaled to the new total, same %
+    });
+
+    it('regression: a same-case initialCurrency change resyncs non-diverged rows without reset()ing the split', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 40); // rows[0]=40% fixed, rows[1]=60% remainder, both USD
+      const rowIdsBefore = comp.rows.map((r) => r.id);
+      comp.initialCurrency = 'GBP';
+
+      comp.ngOnChanges({
+        initialCurrency: new SimpleChange('USD', 'GBP', false),
+      });
+
+      expect(comp.rows.map((r) => r.id)).toEqual(rowIdsBefore); // no reset — same rows
+      expect(comp.rows[0]!.currency).toBe('GBP');
+      expect(comp.rows[1]!.currency).toBe('GBP');
     });
   });
 
@@ -466,6 +544,144 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows).toHaveLength(2);
       expect(comp.rows[1]!.isRemainder).toBe(true);
       expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(6000);
+    });
+  });
+
+  describe('onAccountAmountInput', () => {
+    it('derives amountTxCcy by dividing the typed account-currency amount by the row rate', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(1.5);
+
+      comp.onAccountAmountInput(comp.rows[0]!, 30); // EUR 30 / 1.5 = USD 20
+
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(20);
+      expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(30);
+    });
+
+    it('derives pct from the resulting amountTxCcy against the total', () => {
+      const { comp } = makeComponent(); // total = 10000
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(2);
+
+      comp.onAccountAmountInput(comp.rows[0]!, 5000); // EUR 5000 / 2 = USD 2500 = 25%
+
+      expect(comp.rows[0]!.pct.toNumber()).toBe(25);
+    });
+
+    it('sets pct to 0 (not NaN/Infinity) when totalAmount is 0', () => {
+      const { comp } = makeComponent();
+      comp.initialTotalAmount = '0';
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(1.5);
+
+      comp.onAccountAmountInput(comp.rows[0]!, 30);
+
+      expect(comp.rows[0]!.pct.toNumber()).toBe(0);
+    });
+
+    it('clamps a negative typed account amount to 0', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(1.5);
+
+      comp.onAccountAmountInput(comp.rows[0]!, -30);
+
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(0);
+    });
+
+    it('treats a falsy typed account amount (0) as 0, not NaN', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(1.5);
+
+      comp.onAccountAmountInput(comp.rows[0]!, 0);
+
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(0);
+    });
+
+    it('treats a zero rate as amountTxCcy 0 rather than dividing by zero', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(0);
+
+      comp.onAccountAmountInput(comp.rows[0]!, 30);
+
+      expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(0);
+    });
+
+    it('creates a remainder row for the leftover, same as onAmountInput', () => {
+      const { comp } = makeComponent(); // total = 10000
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'EUR';
+      comp.rows[0]!.rate = new Decimal(1);
+
+      comp.onAccountAmountInput(comp.rows[0]!, 4000);
+
+      expect(comp.rows).toHaveLength(2);
+      expect(comp.rows[1]!.isRemainder).toBe(true);
+      expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(6000);
+    });
+  });
+
+  describe('emit — transaction-currency leg ordering (regression)', () => {
+    it('a transaction-currency-matching leg is always emitted FIRST, even when the user recolors the SOLE row to a foreign currency directly (instead of splitting off a new row first)', () => {
+      const { comp, emittedLegs } = makeComponent({ crossRate: 1 });
+      comp.ngOnInit(); // rows[0] = sole 100% row, USD (this.transactionCurrency stays 'USD' — onRowCurrencyChange never touches it)
+
+      // User recolors the ONLY existing row to EUR directly (Leg Currency dropdown on that
+      // row), rather than adding a second row for the foreign leg. Per the row-array-stability
+      // invariant, this row keeps array position 0 for the rest of its life.
+      comp.onRowCurrencyChange(comp.rows[0]!, 'EUR');
+      comp.onAccountAmountInput(comp.rows[0]!, 100); // types "EUR 100" — this has no OTHER row to
+      // promote as remainder yet, so ensureRemainderRow() appends a FRESH USD row at index 1.
+
+      expect(comp.rows[0]!.currency).toBe('EUR'); // internal array order is untouched — EUR is still rows[0]
+      expect(comp.rows[1]!.currency).toBe('USD');
+
+      const emitted = emittedLegs[emittedLegs.length - 1]!;
+      // The EMITTED order must NOT mirror internal array order here: server-side
+      // (confirmPaymentInstruction.ts) defines "transaction currency" as debitLegs[0].currency —
+      // if EUR were emitted first, the server would treat EUR as the transaction currency and
+      // Suspense netting/FX decisions downstream would be silently wrong.
+      expect(emitted[0]!.currency).toBe('USD');
+      expect(emitted[1]!.currency).toBe('EUR');
+    });
+
+    it('a same-currency leg stays first when the transaction currency has no foreign row at all', () => {
+      const { comp, emittedLegs } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 40); // both rows stay USD — no reordering should occur
+
+      const emitted = emittedLegs[emittedLegs.length - 1]!;
+      expect(emitted.map((l) => l.currency)).toEqual(['USD', 'USD']);
+    });
+
+    it('regression, full pipeline: after the SOLE row is recolored to EUR and a Suspense-driven total reseed follows, the transaction-currency leg both stays first AND lands on the exact netted amount', () => {
+      const { comp, emittedLegs } = makeComponent({ crossRate: 1 }); // rate=1 isolates the ordering/exact-subtraction fix from FX-conversion arithmetic (covered elsewhere)
+      comp.ngOnInit(); // total = 10000, USD
+
+      comp.onRowCurrencyChange(comp.rows[0]!, 'EUR');
+      comp.onAccountAmountInput(comp.rows[0]!, 100); // "EUR 100" — creates a fresh USD remainder row at index 1
+
+      // Suspense Debit = EUR 100 (gross) reseeds the total: 10000 + 100 (rate=1) = 10100
+      comp.initialTotalAmount = '10100';
+      comp.ngOnChanges({ initialTotalAmount: new SimpleChange('10000', '10100', false) });
+
+      const eurRow = comp.rows.find((r) => r.currency === 'EUR')!;
+      const usdRow = comp.rows.find((r) => r.currency === 'USD')!;
+      expect(comp.accountCcyAmount(eurRow)).toBe(100); // EUR leg unchanged — matches gross Suspense exactly (Net = 0)
+      expect(usdRow.amountTxCcy.toNumber()).toBe(10000); // EXACT: 10100 - 100, not a %-rescale artifact
+
+      const emitted = emittedLegs[emittedLegs.length - 1]!;
+      expect(emitted[0]!).toMatchObject({ currency: 'USD', amountTxCcy: '10000.00' });
+      expect(emitted[1]!).toMatchObject({ currency: 'EUR', amountAccountCcy: '100.00' });
     });
   });
 

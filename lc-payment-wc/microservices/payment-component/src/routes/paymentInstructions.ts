@@ -1,11 +1,11 @@
 /**
- * Express routes for payment-instructions-post.yaml v1.3.0's PaymentInstructions
+ * Express routes for payment-instructions-post.yaml v1.6.0's PaymentInstructions
  * tag: POST /payment-instructions plus the read-only GET endpoints (§6.2 of
  * the FSD — audit/reconciliation only, not part of the confirm flow itself).
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { validateConfirmRequest, validateClassifyRequest } from '../validation/requestSchema';
-import { confirmPaymentInstruction, type ConfirmPaymentInstructionOptions } from '../domain/confirmPaymentInstruction';
+import { confirmPaymentInstruction } from '../domain/confirmPaymentInstruction';
 import { previewClassification } from '../domain/classifyPreview';
 import type { PaymentInstructionStore } from '../store/paymentInstructionStore';
 import { NotFoundError } from '../errors';
@@ -14,15 +14,15 @@ import { ORIGIN_MODULES } from '../types';
 
 /**
  * Extension fields accepted alongside the strict OAS body but NOT validated
- * as part of paymentInstructionConfirmRequestSchema — see the doc comments in
- * domain/voucherDescription.ts and domain/accountEntries.ts for why these are
- * currently required out-of-band rather than being formal OAS properties.
+ * as part of paymentInstructionConfirmRequestSchema — see domain/voucherDescription.ts's
+ * doc comment for why sourceFunctionCode is currently required out-of-band
+ * rather than being a formal OAS property. (chargeContext/liabilityContext
+ * were here through v1.5.0; removed v1.6.0 along with §6.2/§6.3 generation —
+ * see domain/confirmPaymentInstruction.ts's doc comment.)
  */
 interface RequestExtensions {
   sourceFunctionCode?: string;
   voucherCodePrefixOverride?: string;
-  chargeContext?: ConfirmPaymentInstructionOptions['chargeContext'];
-  liabilityContext?: ConfirmPaymentInstructionOptions['liabilityContext'];
   /** Preview mode — see ConfirmPaymentInstructionOptions.dryRun. Never persisted, always HTTP 200. */
   dryRun?: boolean;
 }
@@ -45,8 +45,6 @@ export function createPaymentInstructionsRouter(store: PaymentInstructionStore):
       const result = confirmPaymentInstruction(store, body, {
         sourceFunctionCode: ext.sourceFunctionCode,
         voucherCodePrefixOverride: ext.voucherCodePrefixOverride,
-        chargeContext: ext.chargeContext,
-        liabilityContext: ext.liabilityContext,
         dryRun: ext.dryRun,
       });
 

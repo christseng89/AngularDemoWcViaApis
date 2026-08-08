@@ -59,4 +59,35 @@ describe('CurrencyService', () => {
       ]);
     });
   });
+
+  describe('decimals()', () => {
+    it('maps each currency code to its own decimals field', async () => {
+      const promise = firstValueFrom(service.decimals());
+      httpMock.expectOne('/api/currencies').flush({
+        currencies: [
+          { code: 'USD', decimals: 2 },
+          { code: 'JPY', decimals: 0 },
+        ],
+      });
+
+      expect(await promise).toEqual({ USD: 2, JPY: 0 });
+    });
+
+    it('falls back to 2 for a currency with no decimals field', async () => {
+      const promise = firstValueFrom(service.decimals());
+      httpMock.expectOne('/api/currencies').flush({ currencies: [{ code: 'USD' }] });
+
+      expect(await promise).toEqual({ USD: 2 });
+    });
+
+    it('shares the same cached HTTP response as codes() — no second request', async () => {
+      const first = firstValueFrom(service.codes());
+      httpMock.expectOne('/api/currencies').flush({ currencies: [{ code: 'USD', decimals: 2 }] });
+      await first;
+
+      const second = await firstValueFrom(service.decimals());
+      httpMock.expectNone('/api/currencies');
+      expect(second).toEqual({ USD: 2 });
+    });
+  });
 });

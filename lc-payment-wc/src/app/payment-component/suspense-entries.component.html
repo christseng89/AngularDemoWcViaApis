@@ -14,6 +14,10 @@
       <option value="" disabled>Currency</option>
       <option *ngFor="let c of currencies$ | async" [value]="c">{{ c }}</option>
     </select>
+    <select [(ngModel)]="row.sourceComponent" (ngModelChange)="onFieldChange()" title="Which upstream component already booked the other leg of this entry">
+      <option value="CHARGE">Charge</option>
+      <option value="BALANCE">Liability</option>
+    </select>
     <button type="button" class="remove-btn" (click)="removeRow(row)" title="Remove entry">✕</button>
   </div>
 

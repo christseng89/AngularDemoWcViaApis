@@ -88,6 +88,65 @@ describe('validateConfirmRequest', () => {
       expect((err as RequestValidationError).message).toContain('(root)');
     }
   });
+
+  it('accepts a valid suspenseBridge with debit/credit entries', () => {
+    const result = validateConfirmRequest({
+      ...validConfirmBody,
+      suspenseBridge: {
+        debitEntries: [{ amount: '10', currency: 'USD' }],
+        creditEntries: [{ amount: '5', currency: 'EUR', crossRate: '1.1' }],
+      },
+    });
+    expect(result.suspenseBridge?.debitEntries).toHaveLength(1);
+  });
+
+  it('suspenseBridge is optional and undefined when omitted', () => {
+    const result = validateConfirmRequest(validConfirmBody);
+    expect(result.suspenseBridge).toBeUndefined();
+  });
+
+  it('throws for a suspenseBridge entry with a malformed MonetaryAmount', () => {
+    const body = { ...validConfirmBody, suspenseBridge: { debitEntries: [{ amount: 'nope', currency: 'USD' }] } };
+    expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+  });
+
+  it('throws for a suspenseBridge entry with a malformed crossRate', () => {
+    const body = { ...validConfirmBody, suspenseBridge: { debitEntries: [{ amount: '10', currency: 'EUR', crossRate: 'bad' }] } };
+    expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+  });
+
+  it('accepts a suspenseBridge entry with sourceComponent BALANCE and balanceModule IBL/EBL (v1.5.0)', () => {
+    const result = validateConfirmRequest({
+      ...validConfirmBody,
+      suspenseBridge: {
+        debitEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' }],
+        creditEntries: [{ amount: '5', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'EBL' }],
+      },
+    });
+    expect(result.suspenseBridge?.debitEntries?.[0]?.sourceComponent).toBe('BALANCE');
+    expect(result.suspenseBridge?.creditEntries?.[0]?.balanceModule).toBe('EBL');
+  });
+
+  it('accepts a suspenseBridge entry with sourceComponent CHARGE and no balanceModule', () => {
+    const result = validateConfirmRequest({
+      ...validConfirmBody,
+      suspenseBridge: { debitEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'CHARGE' }] },
+    });
+    expect(result.suspenseBridge?.debitEntries?.[0]?.sourceComponent).toBe('CHARGE');
+  });
+
+  it('throws for an invalid sourceComponent enum value', () => {
+    const body = { ...validConfirmBody, suspenseBridge: { debitEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'BOGUS' }] } };
+    expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+  });
+
+  it('throws for an invalid balanceModule enum value', () => {
+    const body = {
+      ...validConfirmBody,
+      suspenseBridge: { debitEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'BOGUS' }] },
+    };
+    expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+  });
 });
 
 describe('validateClassifyRequest', () => {

@@ -44,7 +44,118 @@ info:
     TypeChar 'R', not NOSTRO's 'N' — see the AccountType description
     below). This is a service-level modeling decision, not a claim about
     the literal source field value.
-  version: "1.3.0"
+
+
+    v1.4.0 changelog (Charge Component integration, 2026-08-08): added
+    the optional suspenseBridge request field (SuspenseBridge /
+    SuspenseEntry schemas below). NOT traced from legacy source — a new
+    accounting bridge for a modeling gap the legacy screens never had to
+    solve, because the Charge Component and Payment Component were never
+    both live in the same request path there. An external Charge
+    Component posts Dr Suspense - Debit / Dr Suspense - Credit against Cr
+    Commission accounts; this service now generates the offsetting
+    Cr Suspense - Debit / Cr Suspense - Credit legs (plus FX Exchange
+    pair legs for any entry whose currency differs from the instruction's
+    transaction currency, so the settlement voucher stays balanced BY
+    CURRENCY, not just in aggregate) from a caller-supplied list of raw
+    entries, rather than requiring every caller to reimplement the
+    self-offsetting arithmetic itself. Previously existed only as a
+    client-side computation inside the Business Case Simulator
+    (lc-payment-wc/src/app/payment-component/); moved server-side so the
+    validated algorithm has exactly one implementation. The instruction's
+    "transaction currency" is defined as debitLegs[0].currency, matching
+    the convention the Simulator already used for its own Total Amount
+    display. Like PaymentLegInput's own rate fields, this service does
+    not resolve FX rates itself — SuspenseEntry.crossRate must be
+    supplied by the caller when the entry's currency differs from the
+    transaction currency.
+
+
+    v1.5.0 changelog (architecture decision, 2026-08-08, NOT legacy-traced):
+    added SuspenseEntry.sourceComponent ('BALANCE' | 'CHARGE') and
+    .balanceModule ('IBL' | 'EBL'). A Balance Component or Charge Component
+    that bridges through Suspense books ITS OWN leg on its own books (e.g.
+    Balance Component: "Dr IBL / Cr Suspense"); this service then only books
+    its own offsetting leg (e.g. "Dr Suspense / Cr Nostro") as an ORDINARY
+    Settlement leg (§6.1) — it must never additionally run §6.2 Charge
+    Voucher or §6.3 Liability Voucher generation for that same leg, since the
+    upstream component already posted it; doing so would double-book the
+    same money. sourceComponent/balanceModule are therefore pure
+    provenance/audit metadata, not a trigger for extra Account Entry
+    generation. To make this enforceable rather than just documented: a
+    request whose suspenseBridge contains a sourceComponent:'BALANCE' entry
+    MUST NOT also supply liabilityContext, and one with a
+    sourceComponent:'CHARGE' entry MUST NOT also supply chargeContext — both
+    are rejected with 409 SUSPENSE_CONTEXT_CONFLICT (a new Error.code value;
+    liabilityContext/chargeContext remain valid, unconflicted, for callers
+    that don't route through a Balance/Charge Component bridge at all).
+
+
+    v1.6.0 changelog (architecture decision, 2026-08-08, NOT legacy-traced):
+    removed the §6.2 Charge Voucher and §6.3 Liability Voucher generation
+    paths (chargeContext/liabilityContext) from this service entirely, along
+    with the v1.5.0 SUSPENSE_CONTEXT_CONFLICT rule that guarded against them
+    coexisting with a suspenseBridge entry — with the legacy path gone
+    outright, there is nothing left for it to conflict with. This service now
+    only ever produces SETTLEMENT Account Entries (§6.1); a Balance or Charge
+    Component that bridges through Suspense is expected to book its own
+    Liability/Charge leg independently, on its own books, per the v1.5.0
+    rationale above (which still holds — only the enforcement mechanism
+    changed, from "reject the conflicting combination" to "the conflicting
+    combination no longer exists as an option"). SuspenseEntry.sourceComponent
+    ('BALANCE' | 'CHARGE') and .balanceModule ('IBL' | 'EBL') are UNCHANGED —
+    still accepted, still pure provenance/audit metadata describing which
+    upstream component owns the other leg, now with no server-side validation
+    consequence at all (previously they gated the conflict check; that
+    check itself is gone). Any caller that genuinely still needs a §6.2/§6.3
+    posting independent of a Suspense bridge must be handled outside this
+    service.
+
+
+    v1.7.0 changelog (feature request, 2026-08-08, NOT legacy-traced):
+    per-currency handling for suspenseBridge against the caller's own
+    debitLegs/creditLegs. When a debitEntries (or creditEntries) entry's
+    currency differs from the transaction currency AND the SAME request
+    also submits a real Payment Leg on the SAME side in that same currency,
+    that leg now combines with gross Suspense to size the FX Exchange pair,
+    instead of the Suspense amount alone. The Suspense bridge leg(s)
+    themselves are UNCHANGED — always posted at the entry's own full GROSS
+    amount, per-entry, ALWAYS credit regardless of list; only the
+    accompanying FX Exchange pair is resized/consolidated (one pair per
+    currency bucket, not one per entry). When no same-currency leg is
+    submitted on the matching side (the common case, and the ENTIRE
+    behavior pre-v1.7.0), every foreign-currency bucket behaves
+    byte-for-byte as before. Aggregate (transaction-currency, V8) balance
+    is unaffected either way — only per-currency balance changes; the
+    caller-side "Total ± Σ entries" pre-adjustment described below is
+    unchanged by this feature.
+
+
+    v1.7.1 changelog (correctness fix, 2026-08-09, confirmed by trade-finance
+    accounting review against a worked example): v1.7.0's initial
+    implementation treated debitEntries/debitLegs and creditEntries/
+    creditLegs symmetrically — computing a single "Net = leg amount −
+    Suspense amount" for both, and flipping the Suspense bridge leg's own
+    Dr/Cr direction for creditEntries when that net was positive. This was
+    WRONG for the credit side: the Suspense bridge leg is unconditionally
+    CREDIT-direction regardless of list (see SuspenseBridge's description
+    below), and a real creditLegs entry is ALSO credit-direction — SAME
+    polarity, so "Credit Suspense EUR 100 and a real Credit Leg EUR 100 do
+    NOT cancel each other; the EUR position is Credit EUR 200" (confirmed
+    reviewer language). debitEntries/debitLegs remain correct as
+    originally implemented: a debit leg is OPPOSITE polarity from the
+    (always-credit) bridge leg, so those genuinely net via subtraction,
+    including to exactly zero. The fix: creditEntries now COMBINE with
+    same-currency creditLegs via addition (Combined = legs + gross
+    Suspense, always ≥ 0, never nets to zero unless both are zero), the FX
+    Exchange pair is sized to that combined amount with a FIXED direction
+    (Debit the foreign currency, Credit the transaction currency — no sign
+    to flip), and the Suspense bridge leg's own direction is credit,
+    unconditionally, for both lists — never flips. See
+    domain/suspenseBridge.ts's doc comments
+    (lc-payment-wc/microservices/payment-component) for the full worked
+    example and per-currency algebra.
+  version: "1.7.1"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -60,8 +171,12 @@ paths:
         classify-preview / confirm sequence of an earlier draft design.
         Callers (IPLC/EPLC/IMCO/EXCO/GTEE/IWGT ConfirmBusinessCall
         equivalents) submit the complete header plus the fully assembled
-        debitLegs[] and creditLegs[] arrays in one request. The service
-        performs, synchronously, within this single request: (1) Dr/Cr
+        debitLegs[] and creditLegs[] arrays in one request. If
+        suspenseBridge is present, its entries are expanded into
+        additional debit/credit legs FIRST (v1.4.0 — see suspenseBridge's
+        own description), before any of the five steps below run, so the
+        balance check in step (1) already sees the bridge's legs. The
+        service performs, synchronously, within this single request: (1) Dr/Cr
         balance validation, (2) Payment Component Identification Rule
         Rev. 2 classification (Dr_has(t)/Cr_has(t) across all legs),
         (3) voucher description code assembly per leg
@@ -227,6 +342,157 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+        suspenseBridge:
+          allOf: [ { $ref: '#/components/schemas/SuspenseBridge' } ]
+          description: >
+            Added v1.4.0. Optional Balance/Charge Component <-> Payment
+            Component accounting bridge — see SuspenseBridge's own
+            description. Omit entirely for callers that don't integrate
+            with a Balance or Charge Component; debitLegs/creditLegs above
+            are unaffected either way.
+
+    SourceComponent:
+      type: string
+      enum: [BALANCE, CHARGE]
+      description: >
+        Added v1.5.0 — NOT legacy-traced. Identifies which upstream
+        component already booked the OTHER leg of a SuspenseEntry on its
+        own books. Pure provenance/audit metadata — this service only ever
+        produces SETTLEMENT Account Entries (§6.2 Charge Voucher / §6.3
+        Liability Voucher generation were removed entirely v1.6.0), so this
+        field has no server-side validation or processing consequence; it
+        exists purely for the caller's own audit trail.
+
+    BalanceModule:
+      type: string
+      enum: [IBL, EBL]
+      description: >
+        Added v1.5.0. Only meaningful when the owning SuspenseEntry's
+        sourceComponent is 'BALANCE' — which Balance Component sub-module
+        booked the other leg (IBL = Import Bill Liability, EBL = Export Bill
+        Liability). Purely descriptive; not cross-validated against
+        originModule.
+
+    SuspenseEntry:
+      type: object
+      required: [amount, currency]
+      description: >
+        Added v1.4.0. One raw amount to bridge through Suspense — e.g. one
+        Charge Component commission line, or one Balance Component
+        liability leg — in its own currency. A SuspenseBridge list may hold
+        several of these (one per upstream line item); each becomes its own
+        bridge leg, not merged into a single combined leg, so a
+        mixed-currency set of entries stays itemized in the resulting
+        Settlement Vouchers.
+      properties:
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        currency: { type: string }
+        crossRate:
+          allOf: [ { $ref: '#/components/schemas/ExchangeRate' } ]
+          description: >
+            Required when currency differs from the instruction's
+            transaction currency (debitLegs[0].currency); ignored
+            otherwise. The rate converting this entry's own currency INTO
+            the transaction currency. This service does not resolve FX
+            rates itself — same posture as PaymentLegInput's own rate
+            fields — so the caller must supply an already-resolved rate.
+        sourceComponent:
+          allOf: [ { $ref: '#/components/schemas/SourceComponent' } ]
+          description: "Added v1.5.0. See SourceComponent's own description."
+        balanceModule:
+          allOf: [ { $ref: '#/components/schemas/BalanceModule' } ]
+          description: "Added v1.5.0. Only meaningful when sourceComponent is 'BALANCE'."
+
+    SuspenseBridge:
+      type: object
+      description: >
+        Added v1.4.0 — NOT part of the legacy trace (see the v1.4.0
+        changelog entry above for why). An external Balance or Charge
+        Component posts Dr Suspense - Debit / Dr Suspense - Credit against
+        its own contra account (e.g. Cr IBL/EBL, Cr Commission) for a
+        transaction; submitting the matching raw amounts here makes this
+        service generate the offsetting Cr Suspense - Debit /
+        Cr Suspense - Credit legs — always posted at the entry's own full
+        GROSS amount, per entry, and ALWAYS credit-direction regardless of
+        which list (debitEntries or creditEntries) they came from — plus FX
+        Exchange pair legs for any entry whose currency differs from the
+        transaction currency (so Dr = Cr holds BY CURRENCY, not just in
+        transaction-currency aggregate). All generated legs are appended
+        to debitLegs/creditLegs before step 1 (balance validation) and
+        therefore also appear in the response's SETTLEMENT accountEntries
+        like any other submitted leg — no separate response field is added
+        for them.
+
+
+        v1.7.0/v1.7.1 (see the top-level changelog entries for the full
+        algebra and the v1.7.1 correctness fix): when a foreign-currency
+        entry's currency matches a real Payment Leg submitted on the SAME
+        side (debitEntries against debitLegs, creditEntries against
+        creditLegs — computed independently per side, never cross-side),
+        that leg affects how the FX Exchange pair for that currency is
+        sized — but debitEntries and creditEntries combine with their
+        matching legs DIFFERENTLY, because the always-credit Suspense
+        bridge leg has OPPOSITE polarity from a debit leg but the SAME
+        polarity as a credit leg:
+          - debitEntries genuinely NET against debitLegs (Net = leg amount
+            − gross Suspense in that currency) — can net to exactly zero,
+            meaning no FX conversion at all when a real leg exactly matches
+            gross Suspense.
+          - creditEntries COMBINE with creditLegs by addition (Combined =
+            leg amount + gross Suspense) — same-currency Suspense Credit
+            and a real Credit Leg do NOT offset each other ("Credit
+            Suspense EUR 100 and a real Credit Leg EUR 100 is a Credit EUR
+            200 position, not zero"); the FX pair is sized to the full
+            combined amount, always Debit(foreign currency)/Credit
+            (transaction currency).
+        Either way, the FX Exchange pair is generated ONCE per currency
+        bucket rather than once per entry, and the Suspense leg(s)
+        themselves still always post gross, always credit. With no
+        matching-currency leg on the matching side (the common case),
+        behavior is unchanged from pre-v1.7.0 for BOTH lists.
+
+
+        This service does NOT adjust any of the caller's own
+        debitLegs/creditLegs amounts — it only ADDS the bridge/FX-pair
+        legs above. Because both debitEntries and creditEntries land
+        entirely on the credit side, debitEntries additions by
+        themselves make the submitted debitLegs/creditLegs unbalanced —
+        the caller is still responsible for increasing its own debit
+        total by the same transaction-currency-equivalent amount before
+        submitting (the "Debit Leg #1 = Total + Σ debitEntries" seeding
+        step the Business Case Simulator does client-side, unaffected by
+        this v1.4.0 change), or step 1 will return 409 LEGS_UNBALANCED.
+        creditEntries, by contrast, are meant to be paired with a
+        caller-side REDUCTION of an existing credit leg by the same
+        amount ("Credit Leg #1 = Total - Σ creditEntries"), which is what
+        makes that side self-cancelling in the caller's own total — again
+        not something this service verifies or performs, only something
+        the resulting request must already reflect for step 1 to pass.
+
+
+        Every generated bridge leg is an ORDINARY Settlement leg (§6.1)
+        regardless of any entry's sourceComponent tag — this service never
+        generates a Charge or Liability Voucher entry at all (§6.2/§6.3
+        generation was removed entirely v1.6.0), on the premise that the
+        upstream Balance/Charge Component that tagged an entry already
+        booked the corresponding leg on its own books (see
+        SourceComponent's description).
+      properties:
+        debitEntries:
+          type: array
+          items: { $ref: '#/components/schemas/SuspenseEntry' }
+          description: >
+            The "collect more" case (buyer pays more). See this schema's
+            top-level description for the caller-side debit-total
+            adjustment step 1 (balance validation) still requires.
+        creditEntries:
+          type: array
+          items: { $ref: '#/components/schemas/SuspenseEntry' }
+          description: >
+            The "pay less" case (money redirected into Suspense instead
+            of paid out). See this schema's top-level description for the
+            caller-side credit-total adjustment step 1 (balance
+            validation) still requires.
 
     PaymentInstruction:
       type: object

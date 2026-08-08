@@ -76,6 +76,7 @@
       <app-leg-allocator
         #debitAllocator
         side="DEBIT"
+        [caseKey]="sc.id"
         [accountTypeOptions]="debitDefaults.accountTypeOptions"
         [defaultAccountType]="debitDefaults.accountType"
         [defaultRtgsIndicator]="debitDefaults.rtgsIndicator"
@@ -90,6 +91,7 @@
       <app-leg-allocator
         #creditAllocator
         side="CREDIT"
+        [caseKey]="sc.id"
         [accountTypeOptions]="creditDefaults.accountTypeOptions"
         [defaultAccountType]="creditDefaults.accountType"
         [defaultRtgsIndicator]="creditDefaults.rtgsIndicator"
@@ -100,10 +102,6 @@
         (legsChange)="onCreditLegsChange($event)"
         (validChange)="onCreditValidChange($event)">
       </app-leg-allocator>
-
-      <form [formGroup]="form">
-        <formly-form [model]="model" [fields]="tailFields" [options]="options" [form]="form"></formly-form>
-      </form>
 
       <div class="action-row" *ngIf="sc.verdict === 'PASS'">
         <button type="button" class="btn btn-confirm" [disabled]="confirmLoading" (click)="onConfirm()">
@@ -125,8 +123,8 @@
         [accountEntries]="result.accountEntries"
         [swiftMessages]="result.swiftMessages"
         [instructionId]="result.instructionId"
-        [debitFxPairs]="debitAllocator.fxPairs"
-        [creditFxPairs]="creditAllocator.fxPairs">
+        [debitFxPairs]="filterFxPairsNettedBySuspense(debitAllocator.fxPairs, suspenseDebitEntries)"
+        [creditFxPairs]="filterFxPairsNettedBySuspense(creditAllocator.fxPairs, suspenseCreditEntries)">
       </app-response-viewer>
       <div class="confirmed-badge" *ngIf="result?.confirmed && !result?.replay">✓ Confirmed — new instruction persisted to the microservice's store</div>
       <div class="confirmed-badge replay-badge" *ngIf="result?.confirmed && result?.replay">

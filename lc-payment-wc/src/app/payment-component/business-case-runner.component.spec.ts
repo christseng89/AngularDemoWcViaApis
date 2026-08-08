@@ -1,5 +1,5 @@
 import { fakeAsync, tick } from '@angular/core/testing';
-import { of, throwError, Subject } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { BusinessCaseRunnerComponent } from './business-case-runner.component';
 import { MODULE_GROUPS } from './business-case-registry';
 import { PaymentComponentApiError, type PaymentComponentApiService } from './payment-component-api.service';
@@ -8,6 +8,7 @@ import type { FxRateService } from './fx-rate.service';
 import type { BusinessCaseConfig, LegSpec } from './business-case.model';
 import type { PaymentLegInput } from './payment-component.types';
 import type { SuspenseEntry } from './suspense-entries.component';
+import type { FxPairEntry } from './leg-allocator.component';
 
 function leg(overrides: Partial<LegSpec> = {}): LegSpec {
   return {
@@ -72,11 +73,11 @@ function debitLeg(overrides: Partial<PaymentLegInput> = {}): PaymentLegInput {
 function creditLeg(overrides: Partial<PaymentLegInput> = {}): PaymentLegInput {
   return { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '1000', ...overrides };
 }
-function entry(amount: string, currency: string): SuspenseEntry {
-  return { amount, currency };
+function entry(amount: string, currency: string, sourceComponent: SuspenseEntry['sourceComponent'] = 'CHARGE'): SuspenseEntry {
+  return { amount, currency, sourceComponent };
 }
 
-function makeComponent(overrides: { crossRate?: number | null } = {}) {
+function makeComponent(overrides: { crossRate?: number | null; decimals?: Record<string, number> } = {}) {
   const mockApi = {
     confirm: jest.fn(),
     classify: jest.fn(),
@@ -89,6 +90,7 @@ function makeComponent(overrides: { crossRate?: number | null } = {}) {
         { label: 'EUR', value: 'EUR' },
       ]),
     ),
+    decimals: jest.fn(() => of(overrides.decimals ?? {})),
   } as unknown as CurrencyService;
 
   const mockFx = {
@@ -191,6 +193,13 @@ describe('BusinessCaseRunnerComponent', () => {
       comp.selectCase(passConfig());
       comp.suspenseDebitEntries = [entry('', 'USD'), entry('0', 'USD'), entry('50', '')];
       expect(comp.debitDefaults.totalAmount).toBe('1000');
+    });
+
+    it('falls back to a 1:1 crossRate for the Leg #1 seeding total when the pair is unknown (null)', () => {
+      const { comp } = makeComponent({ crossRate: null });
+      comp.selectCase(passConfig());
+      comp.suspenseDebitEntries = [entry('100', 'EUR')];
+      expect(comp.debitDefaults.totalAmount).toBe('1100'); // 1000 + 100 * 1 (fallback rate)
     });
 
     it('totalAmount falls back to "0" (string) when the net result is exactly 0', () => {
@@ -300,28 +309,6 @@ describe('BusinessCaseRunnerComponent', () => {
     });
   });
 
-  describe('constructor — CurrencyService.options() arriving after a case is already selected', () => {
-    it('rebuilds tailFields (now with real currency options) once the delayed emission arrives', () => {
-      const optionsSubject = new Subject<{ label: string; value: string }[]>();
-      const mockApi = { confirm: jest.fn(), classify: jest.fn() } as unknown as PaymentComponentApiService;
-      const mockCurrency = { options: jest.fn(() => optionsSubject.asObservable()) } as unknown as CurrencyService;
-      const mockFx = { rates: jest.fn(() => of({})), crossRate: jest.fn(() => 1) } as unknown as FxRateService;
-
-      const comp = new BusinessCaseRunnerComponent(mockApi, mockCurrency, mockFx);
-      // A case with `charge: true` so buildTailFields' output visibly differs once real
-      // currencyOptions are available (its 'currency' select needs non-empty options).
-      comp.selectCase(passConfig({ charge: true }));
-      const beforeOptions = comp.tailFields.find((f) => f.key === 'charge')?.fieldGroup?.find((f) => f.key === 'currency');
-      expect(beforeOptions?.props?.options).toEqual([]); // no currencyOptions yet
-
-      optionsSubject.next([{ label: 'USD', value: 'USD' }]); // arrives late — constructor's `if (this.selectedCase)` branch
-
-      const afterOptions = comp.tailFields.find((f) => f.key === 'charge')?.fieldGroup?.find((f) => f.key === 'currency');
-      expect(afterOptions?.props?.options).toEqual([{ label: 'USD', value: 'USD' }]);
-      comp.ngOnDestroy();
-    });
-  });
-
   describe('onConfirm', () => {
     it('is a no-op when no case is selected', () => {
       const { comp, mockApi } = makeComponent();
@@ -404,8 +391,8 @@ describe('BusinessCaseRunnerComponent', () => {
       expect(comp.confirmError).toBe('just a string');
     });
 
-    describe('Suspense bridge legs actually sent on Confirm', () => {
-      it('a same-currency Suspense Debit entry adds exactly one extra Cr "Suspense - Debit" leg, no FX pair', () => {
+    describe('suspenseBridge request field sent on Confirm (v1.4.0 — balancing algorithm moved server-side)', () => {
+      it('debitLegs/creditLegs sent are exactly what the allocator emitted — no bridge legs merged in client-side any more', () => {
         const { comp, mockApi } = makeComponent();
         (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
         comp.selectCase(passConfig());
@@ -418,67 +405,93 @@ describe('BusinessCaseRunnerComponent', () => {
 
         const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
         expect(request.debitLegs).toEqual([debitLeg()]);
-        expect(request.creditLegs).toEqual([
-          creditLeg(),
-          { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '150.00' },
-        ]);
+        expect(request.creditLegs).toEqual([creditLeg()]);
       });
 
-      it('a same-currency Suspense Credit entry adds exactly one extra Cr "Suspense - Credit" leg', () => {
+      it('regression: transactionCurrency tracks the LIVE debit leg currency, not the case registry default — a Suspense entry matching the user-overridden leg currency is never treated as cross-currency', () => {
+        // The registry default for passConfig() is USD, but the user has changed the debit
+        // leg's own currency to EUR in the allocator (e.g. via its "Transaction Currency"
+        // dropdown) — this must be reflected everywhere, not just displayed.
+        const { comp, mockApi } = makeComponent({ crossRate: 1.5 }); // would wrongly apply if misclassified as cross-currency
+        (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
+        comp.selectCase(passConfig());
+        comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+        comp.onDebitLegsChange([debitLeg({ currency: 'EUR' })]);
+        comp.onCreditLegsChange([creditLeg({ currency: 'EUR' })]);
+
+        expect(comp.transactionCurrency).toBe('EUR');
+
+        comp.suspenseDebitEntries = [entry('10', 'EUR')];
+        comp.onConfirm();
+
+        const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
+        // No crossRate, no FX conversion — same currency as the live debit leg.
+        expect(request.suspenseBridge).toEqual({ debitEntries: [{ amount: '10', currency: 'EUR', sourceComponent: 'CHARGE' }] });
+        // debitLegs/creditLegs are untouched — still exactly what the allocator emitted.
+        expect(request.debitLegs).toEqual([debitLeg({ currency: 'EUR' })]);
+        expect(request.creditLegs).toEqual([creditLeg({ currency: 'EUR' })]);
+      });
+
+      it('regression: sideDefaults() converts against the LIVE transaction currency (not the stale registry default), so its own seeded Leg #1 total never disagrees with what gets sent on the wire for the same entry', () => {
+        // Bug: sideDefaults() used to convert Suspense entries against this SIDE's own
+        // registry-default currency (always 'USD' for passConfig()), while
+        // buildSuspenseBridgeEntries()/transactionCurrency already used the LIVE debit leg
+        // currency. Once the user changed the debit leg to EUR, the two disagreed about
+        // whether a same-currency EUR Suspense entry needed FX conversion at all — Leg #1 got
+        // seeded with a spurious ~1.5x markup that the wire payload never carried, so the
+        // client's own total didn't match what it actually sent (a real 409 LEGS_UNBALANCED).
+        const { comp } = makeComponent({ crossRate: 1.5 }); // would wrongly apply if sideDefaults used the stale USD default
+        comp.selectCase(passConfig()); // registry default currency USD, baseTotalAmount 1000
+        comp.onDebitLegsChange([debitLeg({ currency: 'EUR' })]); // live debit leg now EUR
+        comp.onCreditLegsChange([creditLeg({ currency: 'EUR' })]);
+        comp.suspenseDebitEntries = [entry('10', 'EUR')]; // same currency as the LIVE debit leg
+
+        // No FX markup — same currency as transactionCurrency (EUR), so this must be exact: 1000 + 10.
+        expect(comp.debitDefaults.totalAmount).toBe('1010');
+      });
+
+      it('a same-currency Suspense Debit entry becomes one raw debitEntries item, no crossRate', () => {
         const { comp, mockApi } = makeComponent();
         (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
         comp.selectCase(passConfig());
         comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
-        comp.onDebitLegsChange([debitLeg()]);
-        comp.onCreditLegsChange([creditLeg()]);
+        comp.suspenseDebitEntries = [entry('150', 'USD')];
+
+        comp.onConfirm();
+
+        const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
+        expect(request.suspenseBridge).toEqual({ debitEntries: [{ amount: '150', currency: 'USD', sourceComponent: 'CHARGE' }] });
+      });
+
+      it('a same-currency Suspense Credit entry becomes one raw creditEntries item', () => {
+        const { comp, mockApi } = makeComponent();
+        (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
+        comp.selectCase(passConfig());
+        comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
         comp.suspenseCreditEntries = [entry('80', 'USD')];
 
         comp.onConfirm();
 
         const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
-        expect(request.creditLegs).toEqual([
-          creditLeg(),
-          { accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '80.00' },
-        ]);
+        expect(request.suspenseBridge).toEqual({ creditEntries: [{ amount: '80', currency: 'USD', sourceComponent: 'CHARGE' }] });
       });
 
-      it('a cross-currency Suspense entry adds the bridge leg plus a self-balancing FX Exchange pair (one Dr, one Cr)', () => {
+      it('a cross-currency Suspense entry resolves and attaches crossRate (6dp)', () => {
         const { comp, mockApi } = makeComponent({ crossRate: 1.5 }); // 1 EUR = 1.5 USD
         (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
         comp.selectCase(passConfig()); // trx currency USD
         comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
-        comp.onDebitLegsChange([debitLeg()]);
-        comp.onCreditLegsChange([creditLeg()]);
-        comp.suspenseDebitEntries = [entry('100', 'EUR')]; // 100 EUR -> 150 USD equivalent
+        comp.suspenseDebitEntries = [entry('100', 'EUR')];
 
         comp.onConfirm();
 
         const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
-        // Debit side: original + the "Other Ccy site" FX pair leg (Dr, EUR)
-        expect(request.debitLegs).toEqual([
-          debitLeg(),
-          { accountNo: 'FX Exchange USD', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '150.00', amountAccountCcy: '100.00', drBuyRate: '1.500000' },
-        ]);
-        // Credit side: original + the bridge leg (Cr, EUR) + the "Trx Ccy site" FX pair leg (Cr, USD)
-        expect(request.creditLegs).toEqual([
-          creditLeg(),
-          { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '150.00', amountAccountCcy: '100.00', crBuyRate: '1.500000' },
-          { accountNo: 'FX Exchange EUR', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '150.00', crBuyRate: '1.500000' },
-        ]);
-
-        // Per-currency balance check across just the three new entries (the real point of
-        // fxExchangePairLegs()): EUR nets to zero — Cr EUR 100 (the bridge leg's real EUR
-        // exposure, amountAccountCcy) exactly cancels Dr EUR 100 (the Other-Ccy-site leg's).
-        const eurCredit = Number(request.creditLegs[1].amountAccountCcy);
-        const eurDebit = Number(request.debitLegs[1].amountAccountCcy);
-        expect(eurCredit).toBe(eurDebit);
-        // And the pair's own two entries net to zero in transaction-currency terms too
-        // (same 150 USD-equivalent, opposite sides) — so it can't disturb the aggregate
-        // V8 balance sideDefaults() already established (verified separately above).
-        expect(Number(request.debitLegs[1].amountTxCcy)).toBe(Number(request.creditLegs[2].amountTxCcy));
+        expect(request.suspenseBridge).toEqual({
+          debitEntries: [{ amount: '100', currency: 'EUR', sourceComponent: 'CHARGE', crossRate: '1.500000' }],
+        });
       });
 
-      it('omits crBuyRate/drBuyRate when crossRate is unknown (null) for the pair', () => {
+      it('falls back to a 1:1 crossRate when the pair is unknown (null) — never blocks the request', () => {
         const { comp, mockApi } = makeComponent({ crossRate: null });
         (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
         comp.selectCase(passConfig());
@@ -488,13 +501,12 @@ describe('BusinessCaseRunnerComponent', () => {
         comp.onConfirm();
 
         const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
-        const bridgeLeg = request.creditLegs.find((l: PaymentLegInput) => l.accountNo === 'Suspense - Debit');
-        expect(bridgeLeg.crBuyRate).toBeUndefined();
-        // Falls back to a 1:1 rate for the Trx Equivalent itself (still balances at face value).
-        expect(bridgeLeg.amountTxCcy).toBe('100.00');
+        expect(request.suspenseBridge).toEqual({
+          debitEntries: [{ amount: '100', currency: 'EUR', sourceComponent: 'CHARGE', crossRate: '1.000000' }],
+        });
       });
 
-      it('multiple entries on the same side each become their own bridge leg', () => {
+      it('multiple entries on the same side each become their own itemized entry', () => {
         const { comp, mockApi } = makeComponent();
         (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
         comp.selectCase(passConfig());
@@ -504,12 +516,26 @@ describe('BusinessCaseRunnerComponent', () => {
         comp.onConfirm();
 
         const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
-        const bridgeLegs = request.creditLegs.filter((l: PaymentLegInput) => l.accountNo === 'Suspense - Debit');
-        expect(bridgeLegs).toHaveLength(2);
-        expect(bridgeLegs.map((l: PaymentLegInput) => l.amountTxCcy).sort()).toEqual(['10.00', '20.00']);
+        expect(request.suspenseBridge.debitEntries).toEqual([
+          { amount: '10', currency: 'USD', sourceComponent: 'CHARGE' },
+          { amount: '20', currency: 'USD', sourceComponent: 'CHARGE' },
+        ]);
       });
 
-      it('a blank/zero entry contributes no bridge leg at all', () => {
+      it('a Liability-tagged entry (BALANCE) is sent through as sourceComponent: BALANCE', () => {
+        const { comp, mockApi } = makeComponent();
+        (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
+        comp.selectCase(passConfig());
+        comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+        comp.suspenseDebitEntries = [entry('150', 'USD', 'BALANCE')];
+
+        comp.onConfirm();
+
+        const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
+        expect(request.suspenseBridge).toEqual({ debitEntries: [{ amount: '150', currency: 'USD', sourceComponent: 'BALANCE' }] });
+      });
+
+      it('a blank/zero entry on either side is dropped, and suspenseBridge is omitted entirely when nothing remains', () => {
         const { comp, mockApi } = makeComponent();
         (mockApi.confirm as jest.Mock).mockReturnValue(of({ instruction: { classification: {}, accountEntries: [], swiftMessages: [], instructionId: 'i' }, created: true }));
         comp.selectCase(passConfig());
@@ -520,32 +546,8 @@ describe('BusinessCaseRunnerComponent', () => {
         comp.onConfirm();
 
         const [request] = (mockApi.confirm as jest.Mock).mock.calls[0];
-        expect(request.debitLegs).toEqual([]);
-        expect(request.creditLegs).toEqual([]);
+        expect(request.suspenseBridge).toBeUndefined();
       });
-    });
-  });
-
-  describe('fxExchangePairLegs (private — direct invocation for its own defensive fallback)', () => {
-    it('falls back to amountTxCcy for the Other-Ccy-site amount when the input leg has no amountAccountCcy of its own', () => {
-      // suspenseBridgeLeg() (the only real caller) always sets amountAccountCcy for a
-      // cross-currency leg, so this fallback never fires via onConfirm() — it only
-      // guards fxExchangePairLegs()'s own general PaymentLegInput parameter type against
-      // a leg built some other way, without one.
-      const { comp } = makeComponent({ crossRate: 1.5 });
-      comp.selectCase(passConfig()); // trx currency USD
-      const legWithoutAccountCcy: PaymentLegInput = { accountNo: 'X', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '150.00' };
-
-      const pair = (comp as any).fxExchangePairLegs(legWithoutAccountCcy);
-
-      expect(pair.debit[0].amountAccountCcy).toBe('150.00'); // fell back to amountTxCcy, not undefined
-    });
-
-    it('returns { debit: [], credit: [] } when the leg is already in the transaction currency', () => {
-      const { comp } = makeComponent();
-      comp.selectCase(passConfig()); // trx currency USD
-      const sameCurrencyLeg: PaymentLegInput = { accountNo: 'X', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '100.00' };
-      expect((comp as any).fxExchangePairLegs(sameCurrencyLeg)).toEqual({ debit: [], credit: [] });
     });
   });
 
@@ -647,6 +649,43 @@ describe('BusinessCaseRunnerComponent', () => {
 
       expect(comp.result).toBeNull();
       expect(comp.previewError).toBe('classify failed');
+    });
+  });
+
+  describe('filterFxPairsNettedBySuspense', () => {
+    function eurTrxPair(): FxPairEntry[] {
+      return [
+        { drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 10.83, site: 'Trx Ccy' },
+        { drCr: 'C', account: 'FX Exchange USD', currency: 'EUR', amount: 10, site: 'Other Ccy' },
+      ];
+    }
+
+    it('suppresses BOTH entries of a pair whose row currency has a matching Suspense entry (net=0 case reported by the reviewer)', () => {
+      const { comp } = makeComponent();
+      const result = comp.filterFxPairsNettedBySuspense(eurTrxPair(), [entry('10', 'EUR')]);
+      expect(result).toEqual([]);
+    });
+
+    it('leaves a currency with NO matching Suspense entry untouched (pre-v1.7.0 behavior)', () => {
+      const { comp } = makeComponent();
+      const result = comp.filterFxPairsNettedBySuspense(eurTrxPair(), [entry('10', 'JPY')]);
+      expect(result).toEqual(eurTrxPair());
+    });
+
+    it('leaves the pair untouched when there are no Suspense entries at all', () => {
+      const { comp } = makeComponent();
+      const result = comp.filterFxPairsNettedBySuspense(eurTrxPair(), []);
+      expect(result).toEqual(eurTrxPair());
+    });
+
+    it('only suppresses the matching currency\'s pair, leaving an unrelated currency\'s pair visible', () => {
+      const { comp } = makeComponent();
+      const jpyPair: FxPairEntry[] = [
+        { drCr: 'D', account: 'FX Exchange JPY', currency: 'USD', amount: 90, site: 'Trx Ccy' },
+        { drCr: 'C', account: 'FX Exchange USD', currency: 'JPY', amount: 9000, site: 'Other Ccy' },
+      ];
+      const result = comp.filterFxPairsNettedBySuspense([...eurTrxPair(), ...jpyPair], [entry('10', 'EUR')]);
+      expect(result).toEqual(jpyPair);
     });
   });
 

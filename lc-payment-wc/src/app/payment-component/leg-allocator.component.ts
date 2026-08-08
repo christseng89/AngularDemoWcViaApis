@@ -72,9 +72,13 @@ function clampPct(value: Decimal.Value): Decimal {
  * (including the remainder) fixes it at that value and reflows the leftover
  * into a (possibly new) remainder row — "add another column" from the user's
  * spec. A row's currency may differ from the transaction currency; when it
- * does, an exchange rate becomes editable and the settlement-currency
- * equivalent is shown (amountAccountCcy = amountTxCcy × rate, mirroring
- * money.ts's convertTxCcyToAccountCcy).
+ * does, an exchange rate becomes editable, and the row's amount can be
+ * entered EITHER in the transaction currency (Amount (Tx Ccy)) OR directly in
+ * the row's own currency (Account Ccy Equiv. — onAccountAmountInput), each
+ * deriving the other via amountAccountCcy = amountTxCcy × rate (mirroring
+ * money.ts's convertTxCcyToAccountCcy) — only one of the two is editable at a
+ * time per row (whichever the template shows as an <input> vs. a computed
+ * <span>), so there's exactly one source of truth for a given edit.
  */
 @Component({
   selector: 'app-leg-allocator',
@@ -91,6 +95,27 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   @Input({ required: true }) defaultAccountNo!: string;
   @Input({ required: true }) initialTotalAmount!: string;
   @Input({ required: true }) initialCurrency!: string;
+  /**
+   * Stable identity of the business case currently seeding this allocator
+   * (business-case-runner.component.html passes `selectedCase?.id`) — the
+   * ONLY signal ngOnChanges treats as "a genuinely new case was selected,
+   * hard-reset back to a single 100% row." Regression this guards against:
+   * `initialTotalAmount`/`initialCurrency` are themselves DERIVED, live
+   * values (business-case-runner's sideDefaults() reconverts Suspense entries
+   * against the live transaction currency, which is itself sourced from this
+   * component's own emitted legs — see that getter's doc comment) — so they
+   * legitimately change value on the SAME case too, e.g. whenever the user
+   * edits a row's own currency (onRowCurrencyChange) and that changes what
+   * the live transaction currency resolves to. Treating every such change as
+   * "new case" (the old logic, inferred from defaultAccountType/
+   * defaultRtgsIndicator alone) reset() the whole side back to one row on
+   * every currency edit — silently reverting the very edit the user just
+   * made. Only a caseKey change reset()s now; a same-case
+   * initialTotalAmount/initialCurrency change instead rescales/resyncs in
+   * place (see ngOnChanges below), preserving the user's split and any
+   * per-row currency divergence.
+   */
+  @Input({ required: true }) caseKey!: string;
   /** When false, hides the "Total Amount (protected)" input so it isn't shown a second time next to a caller's own Total Amount summary (e.g. business-case-runner's Unit-Code-row display). The Transaction Currency select stays visible either way — this only suppresses the amount input, not currency editing. Purely a display toggle: totalAmount/onTotalChange still work exactly as before, still seeded from initialTotalAmount. */
   @Input() showTotalAmount = true;
 
@@ -114,20 +139,22 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    // A fresh business case was selected (new defaults) — rebuild from scratch.
-    const relevantInputChanged = !!(
-      changes['initialTotalAmount'] ||
-      changes['initialCurrency'] ||
-      changes['defaultAccountType'] ||
-      changes['defaultRtgsIndicator']
-    );
-    if (!relevantInputChanged) return;
+    if (changes['caseKey']) {
+      // ngOnInit's reset() already ran for the very first binding — only re-reset on a LATER
+      // change (the parent switched to a genuinely different business case).
+      if (!changes['caseKey'].firstChange) this.reset();
+      return;
+    }
 
-    // ngOnInit's reset() already ran for the very first binding — only re-reset on a LATER change
-    // (i.e. the parent switched to a different business case and pushed new defaults into this instance).
-    const isFirstBinding = changes['initialTotalAmount']?.firstChange && changes['initialCurrency']?.firstChange;
-    if (!isFirstBinding) {
-      this.reset();
+    // Same case — initialTotalAmount/initialCurrency still moved (a live reseed: Suspense
+    // entries changed, or the transaction currency the seed was converted against did). Rescale/
+    // resync the EXISTING rows in place rather than reset()ing — see caseKey's doc comment above
+    // for why a hard reset here silently reverts the user's own split/currency edits.
+    if (changes['initialTotalAmount']) {
+      this.onTotalChange(Number(this.initialTotalAmount) || 0);
+    }
+    if (changes['initialCurrency']) {
+      this.onCurrencyChange(this.initialCurrency);
     }
   }
 
@@ -195,13 +222,42 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     return money(row.amountTxCcy.times(row.rate)).toNumber();
   }
 
+  /**
+   * Regression fix: a foreign-currency row's own amount (edited via
+   * onAccountAmountInput) MUST stay exactly what the user typed — e.g. a
+   * literal "EUR 40" leg used for Suspense netting comparisons — even when
+   * this method fires again later because the SEEDED total moved for an
+   * unrelated reason (a Suspense entry changed, re-seeding
+   * business-case-runner's debitDefaults().totalAmount, which reaches this
+   * component via ngOnChanges -> onTotalChange). Non-remainder foreign rows
+   * are excluded from the %-rescale below (the pre-existing behavior, still
+   * correct and intended for same-currency rows — see the passing 'rescales
+   * every row amount to match its existing percentage' test); only their pct
+   * is refreshed against the new total, for display.
+   *
+   * The remainder row is NOT rescaled by its own stale % either — that would
+   * implicitly assume every OTHER row (including now-fixed foreign ones)
+   * scales proportionally too, which is exactly what this fix prevents,
+   * producing a double-rounded/wrong remainder (verified against a
+   * regression test: total 10000->10110 with a fixed EUR-40 row rescaled the
+   * USD remainder to 10065.52 via %, not the exact 10066 = 10110-44).
+   * ensureRemainderRow() instead recomputes it EXACTLY as
+   * totalAmount − Σ(every other row's now-correct amount), matching how a
+   * fresh remainder is always computed elsewhere in this component.
+   */
   onTotalChange(value: number): void {
     this.totalAmount = new Decimal(value || 0);
-    // Rescale every row's amount to match its existing %, keep % fixed.
     for (const row of this.rows) {
-      row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100));
+      if (row.isRemainder) continue; // recomputed exactly by ensureRemainderRow() below
+      if (this.needsRate(row)) {
+        row.pct = this.totalAmount.greaterThan(0)
+          ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+          : new Decimal(0);
+      } else {
+        row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100));
+      }
     }
-    this.emit();
+    this.ensureRemainderRow();
   }
 
   onCurrencyChange(value: string): void {
@@ -314,6 +370,27 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     this.fixRow(row);
   }
 
+  /**
+   * NOT FSD-sourced — lets the user type a foreign-currency row's amount
+   * directly in ITS OWN currency (the "Account Ccy Equiv." column, editable
+   * only when needsRate(row)), per explicit user request for the Suspense
+   * netting feature: "Debit Leg = EUR 20" means the leg genuinely posts
+   * EUR 20, not "20 units of the transaction currency settling into an EUR
+   * account." amountTxCcy — which the wire/%-split math/V8 balance check all
+   * still treat as the transaction-currency figure (see the Row.amountTxCcy
+   * field doc comment) — is derived from this input by dividing back through
+   * the row's own rate: amountTxCcy = accountAmount ÷ rate. For a
+   * same-currency row (rate always 1 there) this would be a no-op; the
+   * template only renders this input when needsRate(row) is true, so rate is
+   * never 0 there in practice, but guard anyway rather than divide by zero.
+   */
+  onAccountAmountInput(row: Row, accountAmount: number): void {
+    const amount = Decimal.max(new Decimal(accountAmount || 0), 0);
+    row.amountTxCcy = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate)) : new Decimal(0);
+    row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
+    this.fixRow(row);
+  }
+
   onFieldChange(): void {
     this.emit();
   }
@@ -414,6 +491,25 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     this.emit();
   }
 
+  /**
+   * Regression fix: the wire/server convention (payment-instructions-post.yaml,
+   * confirmPaymentInstruction.ts) defines "the transaction currency" as
+   * `debitLegs[0].currency` — a v1.4.0 baseline decision, not something this
+   * component controls. That definition is fragile against row INSERTION
+   * order: `this.rows` (and therefore the emitted array) keeps whichever row
+   * was created first at index 0 regardless of `isRemainder` — so if the
+   * user recolors that very first row's own currency directly (Leg Currency
+   * dropdown on a single 100% row) INSTEAD of splitting off a new row for the
+   * foreign currency, the foreign-currency row ends up at index 0 while the
+   * shared Transaction Currency (this.transactionCurrency, tracked
+   * separately, only moved by the shared dropdown/onCurrencyChange) is
+   * unchanged — silently making the SERVER treat the wrong currency as
+   * canonical for every FX/netting decision downstream. Sorting a
+   * transactionCurrency-matching leg to the front (stable — every other
+   * leg's relative order is preserved) keeps `legs[0].currency` aligned with
+   * what the UI actually displays as "Transaction Currency", independent of
+   * which row the user happened to edit first.
+   */
   private emit(): void {
     const legs: PaymentLegInput[] = this.rows
       .filter((r) => r.pct.greaterThan(0))
@@ -433,6 +529,11 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
           else leg.crBuyRate = r.rate.toFixed(6);
         }
         return leg;
+      })
+      .sort((a, b) => {
+        const aMatch = a.currency === this.transactionCurrency;
+        const bMatch = b.currency === this.transactionCurrency;
+        return aMatch === bMatch ? 0 : aMatch ? -1 : 1;
       });
     this.legsChange.emit(legs);
     const valid =

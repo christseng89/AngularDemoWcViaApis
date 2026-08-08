@@ -73,17 +73,27 @@ npm run test:coverage # jest --coverage
 ```
 
 Jest + `jest-preset-angular` (a separate config from `microservices/payment-component`'s
-own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 196 tests,
+own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 197 tests,
 12 suites; `jest.config.js` enforces a **90% floor** (`coverageThreshold`) across
 statements/branches/functions/lines for everything `collectCoverageFrom` tracks — `npm test`
 fails the build if a change drops coverage below it. Current numbers:
+
+> **⚠ Run each project's tests from its own directory.** `npm test` from this
+> (`lc-payment-wc/`) root only compiles `src/**`. But because the microservice lives
+> under `microservices/payment-component/`, running the *microservice's* `npm test`
+> from the wrong working directory (or otherwise letting the two `tsconfig`s cross)
+> pulls `microservices/payment-component/test/**` into this project's stricter
+> `tsconfig.spec.json` (which sets `noPropertyAccessFromIndexSignature`) — that fails
+> `routes/paymentInstructions.ts` with TS4111 errors in 2 suites even though nothing
+> is actually broken. Always `cd` into `microservices/payment-component` before running
+> its Jest commands (below), and don't mix the two `node_modules`/configs.
 
 | Metric | Coverage |
 |---|---|
 | Statements | 99.8% |
 | Functions | 99.3% |
 | Lines | 100% |
-| Branches | 97.67% |
+| Branches | 97.72% |
 
 **Covered:** `leg-allocator.component.ts` (incl. RTGS-indicator threading, the
 30/70-split rounding regression, `*ngFor` row-array stability), `suspense-entries.component.ts`
@@ -103,6 +113,25 @@ TestBed/DOM-level rendering tests, which this project deliberately hasn't taken 
 from `collectCoverageFrom` in `jest.config.js` rather than silently dragging the coverage
 numbers down.
 
+### Payment Component microservice (backend) tests
+
+`microservices/payment-component/` has its own independent Jest setup (its own
+`jest.config.js`, `node_modules`, and `tsconfig`) — it is **not** run by this project's
+`npm test` and isn't part of the 196-test/90%-floor numbers above. Run it from inside
+that directory:
+
+```bash
+cd microservices/payment-component
+npm install
+npm run typecheck        # tsc --noEmit — checks src/ and test/
+npm test                 # Jest unit suite (test/unit/), gated at 90% branches/functions/lines/statements
+npm run test:coverage    # same as `npm test`; explicit alias
+npm run test:regression  # FSD-verified test vectors (§13) + an end-to-end HTTP smoke test
+```
+
+See `microservices/payment-component/README.md`'s "Running" section for what each
+command covers in more detail.
+
 ## Source layout
 
 - `src/app/features/lc-payment/` — the app shell: three top-level tabs
@@ -116,9 +145,10 @@ numbers down.
   decimal.js-backed), `suspense-entries.component.ts` (the Suspense
   Debit/Credit repeater — NOT FSD-sourced, see below), `payment-component-api.service.ts` /
   `fx-rate.service.ts` (the two backend clients), `business-case-runner.
-  component.ts` (ties it together, including the Suspense/Charge-Component
-  accounting bridge — see that file's `suspenseBridgeLeg()`/
-  `fxExchangePairLegs()` doc comments).
+  component.ts` (ties it together, including building the v1.4.0
+  `suspenseBridge` request field — see that file's `buildSuspenseBridge()`
+  doc comment; the actual balancing algorithm itself now lives server-side,
+  see below).
 - `backend/server.js` — mock calculation API for the legacy tabs, plus
   `GET /api/fx/rates` (a small fixed USD/EUR/JPY/GBP/TWD table).
 - `microservices/payment-component/` — the real Payment Component
@@ -129,33 +159,36 @@ numbers down.
 
 ## Suspense Debit / Suspense Credit — the Charge Component accounting bridge
 
-**NOT FSD/OAS-sourced** — a Simulator-only extension, requested and validated independently
-of the traced source, modeling the accounting bridge between an external "Charge Component"
-(which books `Dr Suspense - Debit` / `Dr Suspense - Credit` against `Cr Commission` accounts)
-and this Payment Component. Under **Unit Code**, each PASS case gets two `<app-suspense-entries>`
-repeaters (`suspense-entries.component.ts`) — Suspense Debit and Suspense Credit, each an
-optional list of `{amount, currency}` entries (multiple entries allowed per side, e.g. several
-Charge-Component commission lines in different currencies).
+**NOT FSD-sourced** (no legacy §-section covers it — the legacy screens never had both
+components live in the same request path) but, as of **v1.4.0, a formal part of the OAS
+contract** (`payment-instructions-post.yaml`'s `SuspenseBridge`/`SuspenseEntry` schemas). Models
+the accounting bridge between an external "Charge Component" (which books `Dr Suspense - Debit` /
+`Dr Suspense - Credit` against `Cr Commission` accounts) and this Payment Component. Under **Unit
+Code**, each PASS case gets two `<app-suspense-entries>` repeaters (`suspense-entries.component.ts`)
+— Suspense Debit and Suspense Credit, each an optional list of `{amount, currency}` entries
+(multiple entries allowed per side, e.g. several Charge-Component commission lines in different
+currencies).
 
 ```
 Debit Leg #1  = Total Amount + Σ Suspense Debit entries  (Trx Equivalent)
 Credit Leg #1 = Total Amount − Σ Suspense Credit entries (Trx Equivalent)
 ```
 
-Every non-zero entry also becomes its own **real** `Cr Suspense - Debit` / `Cr Suspense - Credit`
-leg — both land on the **credit** side (not one Dr/one Cr), which is what keeps the instruction
-balanced with no extra logic: the Suspense Credit terms always cancel themselves out (self-pattern
-for "pay less"), while Suspense Debit is the one term that changes the instruction's net size
-(the "collect more" case). When an entry's own currency differs from the transaction currency, a
-matching **FX Exchange** pair (`fxExchangePairLegs()`) is added too, so the voucher balances **by
-each individual currency**, not just in transaction-currency-equivalent terms — see
-`business-case-runner.component.ts`'s `suspenseBridgeLeg()`/`fxExchangePairLegs()`/
-`suspenseBridgeLegs()` doc comments for the full worked derivation. These are ordinary
-`PaymentLegInput` entries sent through the normal `debitLegs`/`creditLegs` arrays — no backend
-changes were needed for this feature (`accountType: 'SUSPENSE'` and `'INTERNAL'` already existed
-in the OAS).
+The Leg #1 seeding above is still a Simulator-only UI concern (`sideDefaults()` in
+`business-case-runner.component.ts`) — it feeds `<app-leg-allocator>`'s starting total before any
+%-split happens. The actual **balancing algorithm** — turning each Suspense entry into its own
+`Cr Suspense - Debit` / `Cr Suspense - Credit` leg (both land on the credit side, which is what
+keeps the instruction balanced with no further caller-side logic) plus a matching **FX Exchange**
+pair leg when an entry's own currency differs from the transaction currency (so the voucher
+balances **by each individual currency**, not just in transaction-currency-equivalent terms) — was
+**moved server-side in v1.4.0** (`microservices/payment-component/src/domain/suspenseBridge.ts`,
+ported 1:1 from this component's former `suspenseBridgeLeg()`/`fxExchangePairLegs()`/
+`suspenseBridgeLegs()` methods, now removed). This component's own job today is just building the
+raw `suspenseBridge: { debitEntries, creditEntries }` request field — see `buildSuspenseBridge()`'s
+doc comment for the full picture, including what the server does and does not adjust on the
+caller's behalf.
 
-This is a **different, separate mechanism** from the microservice's own
-`suspensePassThrough` opt-in (see `microservices/payment-component/README.md`) — that one
-predates this design, was never wired into `routes/paymentInstructions.ts`'s HTTP layer, and the
-Simulator does not use it.
+This superseded the microservice's earlier, orphaned `suspensePassThrough` opt-in (see
+`microservices/payment-component/README.md`'s "verify a would-be extension point is actually
+wired" note) — that one predated this design, was never wired into
+`routes/paymentInstructions.ts`'s HTTP layer, and was removed rather than kept.

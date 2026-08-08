@@ -4,18 +4,19 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyModule, FormlyFieldConfig, FormlyFormOptions } from '@ngx-formly/core';
 import { Subject, Subscription, merge, of } from 'rxjs';
 import { debounceTime, switchMap, catchError, tap, map } from 'rxjs/operators';
+import Decimal from 'decimal.js';
 
 import { ResponseViewerComponent } from './response-viewer.component';
-import { LegAllocatorComponent } from './leg-allocator.component';
+import { LegAllocatorComponent, type FxPairEntry } from './leg-allocator.component';
 import { SuspenseEntriesComponent, type SuspenseEntry } from './suspense-entries.component';
 import { MODULE_GROUPS } from './business-case-registry';
-import { buildHeaderFields, buildTailFields } from './business-case-fields';
+import { buildHeaderFields } from './business-case-fields';
 import { buildConfirmRequest } from './business-case-request';
 import { PaymentComponentApiService, PaymentComponentApiError } from './payment-component-api.service';
-import { CurrencyService, type CurrencyOption } from './currency.service';
+import { CurrencyService } from './currency.service';
 import { FxRateService } from './fx-rate.service';
 import type { BusinessCaseConfig, ModuleGroup } from './business-case.model';
-import type { AccountEntry, AccountType, ClassificationResult, PaymentLegInput, SwiftMessage } from './payment-component.types';
+import type { AccountEntry, AccountType, ClassificationResult, PaymentLegInput, SuspenseBridge, SuspenseBridgeEntry, SwiftMessage } from './payment-component.types';
 
 interface DisplayResult {
   classification: ClassificationResult;
@@ -50,7 +51,6 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   form = new FormGroup({});
   model: Record<string, any> = {};
   headerFields: FormlyFieldConfig[] = [];
-  tailFields: FormlyFieldConfig[] = [];
   options: FormlyFormOptions = {};
 
   debitLegs: PaymentLegInput[] = [];
@@ -85,18 +85,6 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   private readonly legsChanged$ = new Subject<void>();
 
   /**
-   * "Get Currency API" options, threaded into every Formly 'currency' select
-   * field (business-case-fields.ts) as a plain array — NOT an Observable.
-   * Formly's `props.options` accepts an Observable in principle, but doing so
-   * here broke expression re-evaluation for the whole enclosing fieldGroup
-   * (`hide` on the Liability/Charge panels silently stopped reacting to their
-   * own checkbox — confirmed live: field.model updated correctly, but
-   * field.hide stayed stuck true). Resolving once here and rebuilding
-   * tailFields when it arrives avoids Formly ever seeing an Observable prop.
-   */
-  private currencyOptions: CurrencyOption[] = [];
-
-  /**
    * GET /api/fx/rates, cached once (FxRateService itself shareReplay(1)s the
    * HTTP call — see that service's doc comment). Used synchronously inside
    * the sideDefaults() getters below to convert Suspense Debit/Credit into
@@ -108,16 +96,31 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    */
   private fxRates: Record<string, number> = {};
 
+  /**
+   * CurrencyService.decimals() — currency-native minor-unit places (JPY=0,
+   * USD=2, etc.), used by suspenseEntryTrxEquivalent() below so a
+   * cross-currency Suspense entry's FX-equivalent is rounded the SAME way
+   * this component computes it and the way the microservice's own
+   * minorUnitsForCurrency() (domain/suspenseBridge.ts) rounds it server-side
+   * — two independent roundings of "the same" computed amount that disagree
+   * even by one minor unit fail the server's exact-equality balance check
+   * (409 LEGS_UNBALANCED). Starts as {} before the first emission resolves;
+   * decimalsFor() falls back to 2 in that window, same as the service's own
+   * fallback for an unknown currency.
+   */
+  private currencyDecimals: Record<string, number> = {};
+
   constructor(private readonly api: PaymentComponentApiService, currency: CurrencyService, private readonly fx: FxRateService) {
-    currency.options().subscribe((opts) => {
-      this.currencyOptions = opts;
-      if (this.selectedCase) {
-        this.tailFields = buildTailFields(this.selectedCase, this.currencyOptions);
-      }
+    currency.decimals().subscribe((decimals) => {
+      this.currencyDecimals = decimals;
     });
     fx.rates().subscribe((rates) => {
       this.fxRates = rates;
     });
+  }
+
+  private decimalsFor(currency: string): number {
+    return this.currencyDecimals[currency] ?? 2;
   }
 
   get casesForSelectedModule(): BusinessCaseConfig[] {
@@ -127,14 +130,28 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   /**
    * Shown once, right under the Unit Code row (business-case-runner.component.html) —
    * NOT repeated inside either <app-leg-allocator> (see that component's
-   * showTotalAmount input). Derived from the selected case's DEBIT-side leg
-   * defaults; by construction every case in the registry already has
-   * sum(debit defaults) === sum(credit defaults) (V8 requires it), so either
-   * side would give the same figure — DEBIT is picked arbitrarily as the
+   * showTotalAmount input).
+   *
+   * Prefers the LIVE first debit leg's own currency (this.debitLegs[0].currency)
+   * over the case's static registry default, matching the microservice's own
+   * definition of "transaction currency" exactly (confirmPaymentInstruction.ts:
+   * `request.debitLegs[0]!.currency` — see payment-instructions-post.yaml's
+   * SuspenseEntry doc comment). This matters because <app-leg-allocator> lets
+   * the user change a debit leg's own currency (its "Transaction Currency"
+   * dropdown / a row's own currency select) independently of this component —
+   * falling back to the registry default here after that edit would silently
+   * disagree with what the server actually treats as the transaction currency,
+   * misclassifying a Suspense entry in that SAME (now-changed) currency as
+   * cross-currency and applying an FX conversion that shouldn't happen (a real
+   * bug: a same-currency Suspense entry generating a fractional balance
+   * mismatch). Falls back to the registry default only before the allocator
+   * has emitted anything yet (initial render, no case, etc.) — by construction
+   * every case in the registry already has sum(debit defaults) === sum(credit
+   * defaults) (V8 requires it) at that point, so DEBIT is a safe arbitrary
    * canonical source.
    */
   get transactionCurrency(): string {
-    return this.selectedCase?.legs.find((l) => l.side === 'DEBIT')?.defaultCurrency ?? 'USD';
+    return this.debitLegs[0]?.currency ?? this.selectedCase?.legs.find((l) => l.side === 'DEBIT')?.defaultCurrency ?? 'USD';
   }
   get baseTotalAmount(): number {
     const debitLegs = this.selectedCase?.legs.filter((l) => l.side === 'DEBIT') ?? [];
@@ -142,21 +159,41 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   }
 
   /**
+   * NOT FSD-sourced — resolves the SAME crossRate value that ends up on the
+   * wire (buildSuspenseBridgeEntries() below sends `rate.toFixed(6)`) so this
+   * component's own Leg #1 seeding computation and the request it actually
+   * sends never disagree about which rate was used for "the same" entry.
+   * Both call sites already guard on entry.currency !== trxCurrency before
+   * calling this — no same-currency short-circuit needed here.
+   */
+  private resolveCrossRate(entry: SuspenseEntry, trxCurrency: string): number {
+    const rate = this.fx.crossRate(this.fxRates, entry.currency, trxCurrency) ?? 1;
+    return Number(rate.toFixed(6));
+  }
+
+  /**
    * NOT FSD-sourced — converts one Suspense entry's amount into "Trx
-   * Equivalent": amount × crossRate(entry.currency -> trxCurrency), using
-   * the same FxRateService/table <app-leg-allocator> itself uses for its own
-   * rows. Falls back to a 1:1 rate when the pair isn't in the demo's rate
-   * table (or hasn't loaded yet) rather than blocking — same "leave it
-   * editable, don't silently guess a real rate" spirit as
-   * leg-allocator.component.ts's applyFxRate(), just without a manual
-   * override field of its own here. Returns 0 for a blank/zero/incomplete
-   * entry (no amount or no currency yet).
+   * Equivalent": amount × resolveCrossRate(entry, trxCurrency). For a
+   * same-currency entry this is the exact original amount, unrounded (no
+   * conversion occurred) — matching domain/suspenseBridge.ts's own
+   * pass-through for the same case. For a cross-currency entry the product
+   * is rounded to decimalsFor(trxCurrency) places (ROUND_HALF_UP, via
+   * decimal.js — matching money.ts's own convention) IMMEDIATELY, per entry
+   * — not deferred to a single rounding of the summed total — because the
+   * server independently rounds each entry's own bridge leg the same way
+   * before summing; rounding this component's total only once at the end
+   * (sum-then-round) can disagree with the server's per-entry round-then-sum
+   * for a multi-entry list, even when both use the same target precision.
+   * Returns 0 for a blank/zero/incomplete entry (no amount or no currency
+   * yet).
    */
   private suspenseEntryTrxEquivalent(entry: SuspenseEntry, trxCurrency: string): number {
     const amount = Number(entry.amount) || 0;
     if (amount === 0 || !entry.currency) return 0;
-    const rate = this.fx.crossRate(this.fxRates, entry.currency, trxCurrency) ?? 1;
-    return amount * rate;
+    if (entry.currency === trxCurrency) return amount;
+    const rate = this.resolveCrossRate(entry, trxCurrency);
+    const scale = this.decimalsFor(trxCurrency);
+    return new Decimal(amount).times(rate).toDecimalPlaces(scale, Decimal.ROUND_HALF_UP).toNumber();
   }
 
   /** Sum of suspenseEntryTrxEquivalent() across every entry in a Suspense Debit/Credit list — each entry may be in a different currency, all converted into the same trxCurrency before summing. */
@@ -177,16 +214,30 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    *
    * See suspenseBridgeLegs() below for the matching entries that keep this
    * balanced.
+   *
+   * The "Trx Equivalent" conversion target MUST be `this.transactionCurrency`
+   * (the LIVE getter, derived from the actual first debit leg) — NOT this
+   * side's own registry-default `currency` below. Regression: those two used
+   * to diverge whenever the user changed the debit leg's own currency after
+   * a Suspense entry was already in EUR — sideDefaults() kept converting
+   * against the stale registry default (e.g. USD) while
+   * buildSuspenseBridgeEntries() (and the server) had already moved on to
+   * the live currency, so the client's own seeded Leg #1 amount silently
+   * disagreed with what actually got sent on the wire for "the same" entry,
+   * producing a real (if small) 409 LEGS_UNBALANCED. `currency` below is
+   * still the right value for the row's own SEEDED currency label
+   * (`initialCurrency`) — only the conversion target changes.
    */
   private sideDefaults(side: 'DEBIT' | 'CREDIT') {
     const legs = this.selectedCase?.legs.filter((l) => l.side === side) ?? [];
     const baseTotalAmount = legs.reduce((sum, l) => sum + (Number(l.defaultAmountTxCcy) || 0), 0);
     const currency = legs[0]?.defaultCurrency ?? 'USD';
+    const trxCurrency = this.transactionCurrency;
 
     const adjustment =
       side === 'DEBIT'
-        ? this.suspenseEntriesTrxEquivalent(this.suspenseDebitEntries, currency)
-        : -this.suspenseEntriesTrxEquivalent(this.suspenseCreditEntries, currency);
+        ? this.suspenseEntriesTrxEquivalent(this.suspenseDebitEntries, trxCurrency)
+        : -this.suspenseEntriesTrxEquivalent(this.suspenseCreditEntries, trxCurrency);
     const totalAmount = baseTotalAmount + adjustment;
 
     return {
@@ -207,158 +258,82 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   }
 
   /**
-   * NOT FSD-sourced — the Charge Component / Payment Component accounting
-   * bridge: an external "Charge Component" books
-   * Dr Suspense - Debit / Dr Suspense - Credit against Cr Commission
-   * accounts; this Payment Component posts the offsetting
-   * Cr Suspense - Debit / Cr Suspense - Credit so the two components'
-   * Suspense entries net to zero once combined. Both land on the CREDIT
-   * side here — NOT one Dr / one Cr — which is what keeps this instruction
-   * itself balanced without any extra logic:
-   *
-   *   Σ Debit  = (Total + SD)                                    = Total + SD
-   *   Σ Credit = (Total - SC) + SD [[bridge for SD]] + SC [[bridge for SC]] = Total + SD
-   *
-   * The SC term always cancels itself out (its own Leg #1 subtraction and
-   * its own bridge entry are both on the credit side); the SD term is the
-   * only one that changes the instruction's net size, deliberately — it's
-   * the "collect more" case (買方/buyer), while SC's self-cancelling
-   * pattern is the "pay less" case (賣方/seller): money redirected into
-   * Suspense instead of paid out, not a change in total size. Each side may
-   * hold multiple entries (suspenseDebitEntries/suspenseCreditEntries) —
-   * every non-zero entry becomes its OWN Cr Suspense - Debit/Credit leg
-   * (same account per side, one line per entry — see suspenseBridgeLegs()),
-   * not merged into a single combined leg, so a mixed-currency set of
-   * Charge-Component commission lines stays itemized. Returns null for a
-   * blank/zero/incomplete entry (no amount or no currency yet).
-   *
-   * This alone only balances in TRANSACTION-CURRENCY-equivalent terms (what
-   * V8 / domain/balanceValidation.ts checks — Σ amountTxCcy). When the
-   * Suspense entry's own currency differs from the transaction currency,
-   * fxExchangePairLegs() below adds the matching FX Exchange pair so the
-   * settlement voucher also balances BY EACH CURRENCY, not just in
-   * aggregate — see that method's doc comment.
+   * v1.4.0 — the Charge Component / Payment Component accounting bridge's
+   * balancing algorithm (bridge legs + FX Exchange pair legs) now lives
+   * server-side (microservices/payment-component/src/domain/suspenseBridge.ts,
+   * ported 1:1 from this component's own former suspenseBridgeLeg()/
+   * fxExchangePairLegs()/suspenseBridgeLegs()). This component's remaining
+   * job is just building the wire-level SuspenseBridge request field: one
+   * raw {amount, currency, crossRate?} entry per non-blank/non-zero row,
+   * resolving crossRate the same way sideDefaults()/applyFxRate() do
+   * elsewhere in this file (GET /api/fx/rates via FxRateService, falling
+   * back to a 1:1 rate rather than blocking when the pair isn't in the
+   * demo's table). See PaymentInstructionConfirmRequest.suspenseBridge's
+   * doc comment (payment-component.types.ts) for what the SERVER does and
+   * does NOT adjust — sideDefaults() above still owns the caller-side
+   * "Total ± Σ entries" pre-adjustment the server relies on.
    */
-  private suspenseBridgeLeg(accountNo: 'Suspense - Debit' | 'Suspense - Credit', entry: SuspenseEntry): PaymentLegInput | null {
+  private buildSuspenseBridgeEntries(entries: readonly SuspenseEntry[]): SuspenseBridgeEntry[] {
     const trxCurrency = this.transactionCurrency;
-    const trxEquivalent = this.suspenseEntryTrxEquivalent(entry, trxCurrency);
-    if (trxEquivalent === 0) return null;
-
-    // suspenseEntryTrxEquivalent() already returned 0 (and we'd have bailed above) for a
-    // blank entry.currency or an entry.amount that parses to 0/NaN — so both are guaranteed
-    // well-formed from here on; no `|| fallback` needed for either.
-    const ownCurrency = entry.currency;
-    const leg: PaymentLegInput = {
-      accountNo,
-      accountType: 'SUSPENSE',
-      currency: ownCurrency,
-      amountTxCcy: trxEquivalent.toFixed(2),
-    };
-    if (ownCurrency !== trxCurrency) {
-      leg.amountAccountCcy = Number(entry.amount).toFixed(2);
-      const rate = this.fx.crossRate(this.fxRates, ownCurrency, trxCurrency);
-      if (rate !== null) leg.crBuyRate = rate.toFixed(6);
-    }
-    return leg;
-  }
-
-  /**
-   * Mirrors leg-allocator.component.ts's own fxPairs concept (Trx-Ccy-site +
-   * Other-Ccy-site) for a bridge leg whose own currency differs from the
-   * transaction currency — except these are actually SENT to the
-   * microservice (leg-allocator's fxPairs stays display-only, for its
-   * regular rows — a pre-existing, repo-wide gap this does NOT fix for
-   * those rows, only for the Suspense bridge legs here).
-   *
-   * Same-direction "Trx Ccy site" entry (account `FX Exchange {bridge's own
-   * currency}`, in the transaction currency, amount = the Trx Equivalent)
-   * lands on the SAME (credit) side as the bridge leg — both bridge legs are
-   * always credit, see suspenseBridgeLeg()'s doc comment. Opposite-direction
-   * "Other Ccy site" entry (account `FX Exchange {transaction currency}`, in
-   * the bridge's own currency, amount = the raw Suspense amount) lands on
-   * the debit side. Together with the bridge leg itself, all three net to
-   * zero in the bridge's own currency (the bridge leg's own amount is
-   * exactly cancelled by the Other-Ccy-site entry), while the pair's two
-   * entries net to zero in transaction-currency terms too (same amount,
-   * opposite sides) — so this can never disturb the transaction-currency
-   * balance suspenseBridgeLeg() already establishes; it only adds
-   * genuine per-currency balance on top of it. accountType 'INTERNAL'
-   * (classification.ts already excludes INTERNAL from every XOR term, same
-   * as SUSPENSE, so this can't accidentally flip paymentComponentRelated).
-   * Returns { debit: [], credit: [] } when the bridge leg's currency
-   * already equals the transaction currency — nothing to convert.
-   */
-  private fxExchangePairLegs(bridgeLeg: PaymentLegInput): { debit: PaymentLegInput[]; credit: PaymentLegInput[] } {
-    const trxCurrency = this.transactionCurrency;
-    if (bridgeLeg.currency === trxCurrency) return { debit: [], credit: [] };
-
-    const trxEquivalent = bridgeLeg.amountTxCcy;
-    const rawAmount = bridgeLeg.amountAccountCcy ?? bridgeLeg.amountTxCcy;
-    const rate = this.fx.crossRate(this.fxRates, bridgeLeg.currency, trxCurrency);
-
-    const trxCcySiteLeg: PaymentLegInput = {
-      accountNo: `FX Exchange ${bridgeLeg.currency}`,
-      accountType: 'INTERNAL',
-      currency: trxCurrency,
-      amountTxCcy: trxEquivalent,
-    };
-    const otherCcySiteLeg: PaymentLegInput = {
-      accountNo: `FX Exchange ${trxCurrency}`,
-      accountType: 'INTERNAL',
-      currency: bridgeLeg.currency,
-      amountTxCcy: trxEquivalent,
-      amountAccountCcy: rawAmount,
-    };
-    if (rate !== null) {
-      trxCcySiteLeg.crBuyRate = rate.toFixed(6); // same side as the bridge leg (credit)
-      otherCcySiteLeg.drBuyRate = rate.toFixed(6); // opposite side (debit)
-    }
-
-    return { debit: [otherCcySiteLeg], credit: [trxCcySiteLeg] };
-  }
-
-  /**
-   * Every Suspense entry (both sides' lists), turned into its own bridge
-   * leg (all land on CREDIT — see suspenseBridgeLeg() doc comment) plus its
-   * FX Exchange pair when its own currency differs from the transaction
-   * currency. This — not this.debitLegs/this.creditLegs directly — is what
-   * actually gets appended at request-build time; see buildLegsForRequest().
-   */
-  private suspenseBridgeLegs(): { debit: PaymentLegInput[]; credit: PaymentLegInput[] } {
-    const debit: PaymentLegInput[] = [];
-    const credit: PaymentLegInput[] = [];
-
-    const lists: readonly ['Suspense - Debit' | 'Suspense - Credit', readonly SuspenseEntry[]][] = [
-      ['Suspense - Debit', this.suspenseDebitEntries],
-      ['Suspense - Credit', this.suspenseCreditEntries],
-    ];
-    for (const [accountNo, entries] of lists) {
-      for (const entry of entries) {
-        const bridgeLeg = this.suspenseBridgeLeg(accountNo, entry);
-        if (!bridgeLeg) continue;
-        credit.push(bridgeLeg); // every bridge leg lands on CREDIT — see suspenseBridgeLeg() doc comment
-        const pair = this.fxExchangePairLegs(bridgeLeg);
-        debit.push(...pair.debit);
-        credit.push(...pair.credit);
+    const result: SuspenseBridgeEntry[] = [];
+    for (const entry of entries) {
+      const amount = Number(entry.amount) || 0;
+      if (amount === 0 || !entry.currency) continue; // blank/incomplete row — not ready to send yet
+      const wireEntry: SuspenseBridgeEntry = { amount: entry.amount, currency: entry.currency, sourceComponent: entry.sourceComponent };
+      if (entry.currency !== trxCurrency) {
+        // Same resolveCrossRate() as suspenseEntryTrxEquivalent() above — this component's own
+        // Leg #1 seeding and the rate actually sent on the wire must always agree.
+        wireEntry.crossRate = this.resolveCrossRate(entry, trxCurrency).toFixed(6);
       }
+      result.push(wireEntry);
     }
-
-    return { debit, credit };
+    return result;
   }
 
   /**
-   * debitLegs/creditLegs as emitted by <app-leg-allocator>, plus the
-   * Suspense bridge (+ FX Exchange pair) legs above — this is what actually
-   * goes out in a request. this.debitLegs/this.creditLegs themselves stay
-   * exactly what the allocator emitted (debitValid/creditValid gating is
-   * purely about the allocator's own rows, unaffected by the bridge).
+   * v1.7.0 fix — the "Debit/Credit FX Conversion Pair" panel
+   * (leg-allocator.component.ts's fxPairs getter) is a NAIVE, suspense-
+   * unaware calculation: for any row whose own currency differs from the
+   * transaction currency, it unconditionally shows "this row's full amount
+   * needs converting" — correct for its documented purpose (SSSS_PaymentDebit.js
+   * posts one entry per leg only, so a foreign-currency leg's own currency
+   * would otherwise never balance) ONLY when nothing else offsets that
+   * currency. Since v1.7.0, a Suspense entry in the SAME currency (on the
+   * SAME side) may already net that exposure down to zero — or to some
+   * smaller/differently-directed amount — server-side
+   * (domain/suspenseBridge.ts's buildNetFxExchangePairLegs); the SETTLEMENT
+   * VOUCHERS table (this component's own `result.accountEntries`) already
+   * reflects whatever the server actually did (no extra legs at all when
+   * net=0, or real "FX Exchange ..." SETTLEMENT entries when net≠0).
+   * Showing the leg-allocator's OWN unconditional per-row conversion
+   * ALONGSIDE that is therefore either redundant (net≠0 — the real
+   * conversion is already visible in Settlement Vouchers) or actively wrong
+   * (net=0 — implies a conversion that never happened). Rather than
+   * re-deriving the server's net amount here too (a second independent
+   * implementation of the same math — exactly the class of bug this
+   * session keeps finding), this simply SUPPRESSES the naive pair for any
+   * currency that has at least one Suspense entry on the matching side —
+   * the server's own response is the one authoritative source for what
+   * happens to that currency. A foreign-currency leg with NO suspense
+   * entry in its currency is untouched: the panel still shows the naive
+   * conversion for it, exactly as before v1.7.0.
    */
-  private buildLegsForRequest(): { debitLegs: PaymentLegInput[]; creditLegs: PaymentLegInput[] } {
-    const bridge = this.suspenseBridgeLegs();
-    return {
-      debitLegs: [...this.debitLegs, ...bridge.debit],
-      creditLegs: [...this.creditLegs, ...bridge.credit],
-    };
+  filterFxPairsNettedBySuspense(pairs: readonly FxPairEntry[], suspenseEntries: readonly SuspenseEntry[]): FxPairEntry[] {
+    const suspenseCurrencies = new Set(suspenseEntries.map((e) => e.currency));
+    const rowCurrencyOf = (p: FxPairEntry): string => (p.site === 'Other Ccy' ? p.currency : p.account.replace('FX Exchange ', ''));
+    return pairs.filter((p) => !suspenseCurrencies.has(rowCurrencyOf(p)));
+  }
+
+  /** Returns undefined (field omitted entirely) when neither list has any complete entry. */
+  private buildSuspenseBridge(): SuspenseBridge | undefined {
+    const debitEntries = this.buildSuspenseBridgeEntries(this.suspenseDebitEntries);
+    const creditEntries = this.buildSuspenseBridgeEntries(this.suspenseCreditEntries);
+    if (debitEntries.length === 0 && creditEntries.length === 0) return undefined;
+
+    const bridge: SuspenseBridge = {};
+    if (debitEntries.length > 0) bridge.debitEntries = debitEntries;
+    if (creditEntries.length > 0) bridge.creditEntries = creditEntries;
+    return bridge;
   }
 
   onDebitLegsChange(legs: PaymentLegInput[]): void {
@@ -407,7 +382,6 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.model = {};
     this.form = new FormGroup({});
     this.headerFields = businessCase ? buildHeaderFields(businessCase) : [];
-    this.tailFields = businessCase ? buildTailFields(businessCase, this.currencyOptions) : [];
 
     if (businessCase && businessCase.verdict !== 'N_A') {
       // Formly field edits AND leg-allocator edits both trigger the same debounced recompute.
@@ -424,8 +398,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     if (!this.selectedCase || this.selectedCase.verdict !== 'PASS') return;
     this.confirmLoading = true;
     this.confirmError = null;
-    const { debitLegs, creditLegs } = this.buildLegsForRequest();
-    const request = buildConfirmRequest(this.selectedCase, this.model, debitLegs, creditLegs);
+    const request = buildConfirmRequest(this.selectedCase, this.model, this.debitLegs, this.creditLegs, this.buildSuspenseBridge());
     this.api.confirm(request, false).subscribe({
       next: ({ instruction, created }) => {
         this.result = {
@@ -463,8 +436,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.previewLoading = true;
 
     if (config.verdict === 'PASS') {
-      const { debitLegs, creditLegs } = this.buildLegsForRequest();
-      const request = buildConfirmRequest(config, this.model, debitLegs, creditLegs);
+      const request = buildConfirmRequest(config, this.model, this.debitLegs, this.creditLegs, this.buildSuspenseBridge());
       if (!request.mainRef || !request.unitCode) {
         this.result = null;
         this.previewIncomplete = true;
@@ -494,11 +466,12 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
       );
     }
 
-    // GAP (RPFM) — classify-only preview, never a Confirm action. No header/suspense
-    // fields render for GAP cases (buildSuspenseFields returns [] for non-PASS), so
-    // buildLegsForRequest() is a no-op augmentation here — kept for consistency.
-    const gapLegs = this.buildLegsForRequest();
-    return this.api.classify(gapLegs.debitLegs, gapLegs.creditLegs).pipe(
+    // GAP (RPFM) — classify-only preview, never a Confirm action. POST
+    // /payment-instructions/classify has no suspenseBridge field in its own
+    // request schema (only PaymentInstructionConfirmRequest — the real
+    // Confirm body — does, v1.4.0); any Suspense entries the user has
+    // entered are simply not part of a GAP-case preview.
+    return this.api.classify(this.debitLegs, this.creditLegs).pipe(
       tap((res) => {
         this.result = {
           classification: res.classification,

@@ -6,6 +6,7 @@ import {
   formatExchangeRate,
   sumMonetaryAmounts,
   convertTxCcyToAccountCcy,
+  minorUnitsForCurrency,
   InvalidMonetaryAmountError,
   InvalidExchangeRateError,
   MONETARY_AMOUNT_PATTERN,
@@ -133,6 +134,24 @@ describe('money', () => {
     it('multiplies amount by rate', () => {
       const result = convertTxCcyToAccountCcy(new Decimal('100'), new Decimal('1.5'));
       expect(result.toFixed()).toBe('150');
+    });
+  });
+
+  describe('minorUnitsForCurrency', () => {
+    it('returns 0 for JPY/TWD/IDR', () => {
+      expect(minorUnitsForCurrency('JPY')).toBe(0);
+      expect(minorUnitsForCurrency('TWD')).toBe(0);
+      expect(minorUnitsForCurrency('IDR')).toBe(0);
+    });
+
+    it('returns 2 for USD/EUR/GBP/CNY/HKD/SGD/AUD', () => {
+      expect(minorUnitsForCurrency('USD')).toBe(2);
+      expect(minorUnitsForCurrency('EUR')).toBe(2);
+      expect(minorUnitsForCurrency('AUD')).toBe(2);
+    });
+
+    it('falls back to 2 for a currency not in the table', () => {
+      expect(minorUnitsForCurrency('XYZ')).toBe(2);
     });
   });
 });

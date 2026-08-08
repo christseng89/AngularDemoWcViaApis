@@ -151,24 +151,27 @@ binary floats) + zod (request validation). Implements `POST /payment-component/v
 | `src/domain/balanceValidation.ts` | §3, V8 | Dr/Cr balance check |
 | `src/domain/classification.ts` | §4 | Payment Component Identification Rule (Rev. 2) |
 | `src/domain/voucherDescription.ts` | §5 | Per-leg `accountDesc` assembly |
-| `src/domain/accountEntries.ts` | §6 | Settlement / Charge / Liability voucher streams |
+| `src/domain/accountEntries.ts` | §6.1 | Settlement voucher stream (§6.2/§6.3 removed v1.6.0) |
 | `src/domain/swiftMessages.ts` | §7 | SWIFT cross-field validation + message generation |
 | `src/domain/confirmPaymentInstruction.ts` | §5.4 | Orchestrator, in source-verified execution order |
 | `src/store/paymentInstructionStore.ts` | FSD §6.1 | Idempotency store — **in-memory, swap for a real DB before production** |
 
-**Three request fields have no home in the official OAS** and are accepted as optional top-level JSON
-extensions instead of invented OAS properties (`RequestExtensions` in `routes/paymentInstructions.ts`):
-`sourceFunctionCode` (resolves the voucher-description prefix — `originModule` alone is ambiguous),
-`chargeContext` (charge-grid amounts that depend on on-screen widget aggregation, not portable server logic),
-and `liabilityContext` (module-specific screen fields the 6 per-module Liability Voucher formulas need). See
-each domain module's doc comment and `analysis/Payment_Mapping_Functions.docx` §10 /
-`Payment_Component_Calculation_Validation.docx` §12 before changing this contract.
+**One request field has no home in the official OAS** and is accepted as an optional top-level JSON
+extension instead of an invented OAS property (`RequestExtensions` in `routes/paymentInstructions.ts`):
+`sourceFunctionCode` (resolves the voucher-description prefix — `originModule` alone is ambiguous). See
+`voucherDescription.ts`'s doc comment and `analysis/Payment_Mapping_Functions.docx` §10 before changing
+this contract. (`chargeContext`/`liabilityContext` — the §6.2/§6.3 legacy extension fields — existed here
+through v1.5.0; removed v1.6.0 along with §6.2/§6.3 Account Entry generation itself. A Balance/Charge
+Component that bridges through Suspense now books its own Liability/Charge leg on its own books — see
+the microservice README's "Balance/Charge Component ↔ Payment Component bridge" section, which as of
+v1.7.0/v1.7.1 also covers per-currency handling of `suspenseBridge` entries against the caller's own
+same-currency Payment Legs — `debitEntries`/`debitLegs` genuinely NET (subtraction, can reach zero);
+`creditEntries`/`creditLegs` only ever COMBINE by addition (same polarity as the always-credit
+Suspense bridge leg, so they can never cancel — confirmed by accounting review: "Credit Suspense
+EUR 100 and a real Credit Leg EUR 100 is Credit EUR 200, not zero").)
 
 **Known deliberate deviations from legacy source** (see the microservice README for full detail before
 touching this logic):
-- EPLC Liability Voucher credit-leg description: source has a `.valuee` typo that silently no-ops the credit
-  leg's description; this service defaults to *correct* behavior. Pass
-  `replicateEplcVoucherDescDefect: true` only if byte-for-byte legacy parity is explicitly required.
 - RTGS is **not** a standalone `AccountType` (v1.3.0 design decision) — it's `accountType: 'NOSTRO'` +
   `rtgsIndicator: true`, still resolving to its own voucher-description TypeChar (`'R'`).
 - `balanceValidation.ts` implements V8 (exact equality between `Σ debitLegs[].amountTxCcy` and

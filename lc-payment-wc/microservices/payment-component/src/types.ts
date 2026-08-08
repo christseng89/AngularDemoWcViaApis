@@ -1,5 +1,5 @@
 /**
- * TypeScript types mirroring every schema in payment-instructions-post.yaml v1.3.0
+ * TypeScript types mirroring every schema in payment-instructions-post.yaml v1.4.0
  * (Payment Component Service API — POST /payment-instructions).
  *
  * MonetaryAmount and ExchangeRate are OAS `type: string` with a decimal-string
@@ -110,6 +110,44 @@ export interface PaymentLeg extends PaymentLegInput {
   accountCategory: AccountCategory;
 }
 
+/** OAS: components.schemas.SourceComponent — added v1.5.0. See SuspenseEntry.sourceComponent below. */
+export const SUSPENSE_SOURCE_COMPONENTS = ['BALANCE', 'CHARGE'] as const;
+export type SourceComponent = (typeof SUSPENSE_SOURCE_COMPONENTS)[number];
+
+/** OAS: components.schemas.BalanceModule — added v1.5.0. Only meaningful when sourceComponent is 'BALANCE'. */
+export const BALANCE_MODULES = ['IBL', 'EBL'] as const;
+export type BalanceModule = (typeof BALANCE_MODULES)[number];
+
+/**
+ * OAS: components.schemas.SuspenseEntry — added v1.4.0. See SuspenseBridge's
+ * doc comment on PaymentInstructionConfirmRequest.suspenseBridge below.
+ */
+export interface SuspenseEntry {
+  amount: MonetaryAmount;
+  currency: string;
+  /** Required when currency differs from the instruction's transaction currency (debitLegs[0].currency); ignored otherwise. Caller-resolved — this service does not look up FX rates itself. */
+  crossRate?: ExchangeRate;
+  /**
+   * Added v1.5.0. Pure provenance/audit metadata identifying which upstream
+   * component already booked the OTHER leg of this Suspense entry on its own
+   * books — does NOT trigger any additional Charge/Liability Voucher
+   * generation here (see confirmPaymentInstruction.ts's doc comment for why
+   * that would double-book the same money), and has no server-side
+   * validation consequence (the v1.5.0 SUSPENSE_CONTEXT_CONFLICT check this
+   * once drove was removed v1.6.0 along with chargeContext/liabilityContext
+   * themselves).
+   */
+  sourceComponent?: SourceComponent;
+  /** Added v1.5.0. Only meaningful when sourceComponent is 'BALANCE' — which Balance Component sub-module booked the other leg (e.g. IBL = Import Bill Liability, EBL = Export Bill Liability). Purely descriptive; not validated against originModule. */
+  balanceModule?: BalanceModule;
+}
+
+/** OAS: components.schemas.SuspenseBridge — added v1.4.0. */
+export interface SuspenseBridge {
+  debitEntries?: SuspenseEntry[];
+  creditEntries?: SuspenseEntry[];
+}
+
 /** OAS: components.schemas.PaymentInstructionConfirmRequest */
 export interface PaymentInstructionConfirmRequest {
   originModule: OriginModule;
@@ -122,6 +160,14 @@ export interface PaymentInstructionConfirmRequest {
   payInstrFlag?: PayInstrFlag;
   debitLegs: PaymentLegInput[];
   creditLegs: PaymentLegInput[];
+  /**
+   * Added v1.4.0 — Charge Component <-> Payment Component accounting
+   * bridge. NOT part of the legacy trace. See domain/suspenseBridge.ts for
+   * the expansion algorithm and payment-instructions-post.yaml's
+   * SuspenseBridge schema for the full contract, including what this
+   * service does and does NOT adjust on the caller's behalf.
+   */
+  suspenseBridge?: SuspenseBridge;
 }
 
 /** OAS: components.schemas.ClassificationResult */

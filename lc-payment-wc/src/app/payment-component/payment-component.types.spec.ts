@@ -14,6 +14,8 @@ import {
   DR_CR_INDICATORS,
   SWIFT_MESSAGE_TYPES,
   SWIFT_MESSAGE_STATUSES,
+  SUSPENSE_SOURCE_COMPONENTS,
+  BALANCE_MODULES,
 } from './payment-component.types';
 
 describe('payment-component.types wire-format enums', () => {
@@ -48,5 +50,10 @@ describe('payment-component.types wire-format enums', () => {
   it('SWIFT_MESSAGE_TYPES / SWIFT_MESSAGE_STATUSES match the OAS enums', () => {
     expect(SWIFT_MESSAGE_TYPES).toEqual(['MT103', 'MT202', 'MT202COV', 'PACS008', 'PACS009', 'PACS009COV']);
     expect(SWIFT_MESSAGE_STATUSES).toEqual(['PENDING', 'GENERATED', 'TRANSMITTED', 'FAILED']);
+  });
+
+  it('SUSPENSE_SOURCE_COMPONENTS / BALANCE_MODULES match the OAS SourceComponent/BalanceModule enums (v1.5.0)', () => {
+    expect(SUSPENSE_SOURCE_COMPONENTS).toEqual(['BALANCE', 'CHARGE']);
+    expect(BALANCE_MODULES).toEqual(['IBL', 'EBL']);
   });
 });

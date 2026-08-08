@@ -23,14 +23,15 @@ describe('SuspenseEntriesComponent', () => {
     expect(emitted).toEqual([]);
   });
 
-  it('addRow() appends a blank row and emits the current entries list', () => {
+  it('addRow() appends a blank row (sourceComponent defaulted to CHARGE) and emits the current entries list', () => {
     const { comp, emitted } = makeComponent();
     comp.addRow();
 
     expect(comp.rows).toHaveLength(1);
     expect(comp.rows[0]!.amount).toBe('');
     expect(comp.rows[0]!.currency).toBe('');
-    expect(emitted[emitted.length - 1]).toEqual([{ amount: '', currency: '' }]);
+    expect(comp.rows[0]!.sourceComponent).toBe('CHARGE');
+    expect(emitted[emitted.length - 1]).toEqual([{ amount: '', currency: '', sourceComponent: 'CHARGE' }]);
   });
 
   it('addRow() seeds the new row\'s currency from defaultCurrency when set', () => {
@@ -40,7 +41,7 @@ describe('SuspenseEntriesComponent', () => {
 
     expect(comp.rows[0]!.currency).toBe('EUR');
     expect(comp.rows[0]!.amount).toBe('');
-    expect(emitted[emitted.length - 1]).toEqual([{ amount: '', currency: 'EUR' }]);
+    expect(emitted[emitted.length - 1]).toEqual([{ amount: '', currency: 'EUR', sourceComponent: 'CHARGE' }]);
   });
 
   it('addRow() does not retroactively change an existing row when defaultCurrency changes afterwards', () => {
@@ -61,7 +62,7 @@ describe('SuspenseEntriesComponent', () => {
     expect(comp.rows[0]!.id).not.toBe(comp.rows[1]!.id);
   });
 
-  it('onFieldChange() re-emits the current amount+currency for every row, in order', () => {
+  it('onFieldChange() re-emits the current amount+currency+sourceComponent for every row, in order', () => {
     const { comp, emitted } = makeComponent();
     comp.addRow();
     comp.addRow();
@@ -69,12 +70,38 @@ describe('SuspenseEntriesComponent', () => {
     comp.rows[0]!.currency = 'EUR';
     comp.rows[1]!.amount = '250';
     comp.rows[1]!.currency = 'JPY';
+    comp.rows[1]!.sourceComponent = 'BALANCE';
     comp.onFieldChange();
 
     expect(emitted[emitted.length - 1]).toEqual([
-      { amount: '100', currency: 'EUR' },
-      { amount: '250', currency: 'JPY' },
+      { amount: '100', currency: 'EUR', sourceComponent: 'CHARGE' },
+      { amount: '250', currency: 'JPY', sourceComponent: 'BALANCE' },
     ]);
+  });
+
+  it('changing the dropdown from Charge to Liability (BALANCE) is reflected on the next emit', () => {
+    const { comp, emitted } = makeComponent();
+    comp.addRow();
+    expect(comp.rows[0]!.sourceComponent).toBe('CHARGE'); // default
+
+    comp.rows[0]!.sourceComponent = 'BALANCE';
+    comp.onFieldChange();
+
+    expect(emitted[emitted.length - 1]![0]!.sourceComponent).toBe('BALANCE');
+  });
+
+  it('normalizes a real JS number (as NumberValueAccessor writes for input[type=number]) back to a string on emit', () => {
+    // Regression test: <input type="number" [(ngModel)]="row.amount"> in the template goes
+    // through Angular's NumberValueAccessor, which assigns an actual `number` to row.amount at
+    // runtime despite the SuspenseEntry/Row type declaring `amount: string` — a direct test-level
+    // assignment like this reproduces that without needing TestBed/DOM rendering.
+    const { comp, emitted } = makeComponent();
+    comp.addRow();
+    (comp.rows[0] as unknown as { amount: number }).amount = 10;
+    comp.onFieldChange();
+
+    expect(emitted[emitted.length - 1]).toEqual([{ amount: '10', currency: '', sourceComponent: 'CHARGE' }]);
+    expect(typeof emitted[emitted.length - 1]![0]!.amount).toBe('string');
   });
 
   it('removeRow() drops only the targeted row and re-emits the remainder', () => {
@@ -89,7 +116,7 @@ describe('SuspenseEntriesComponent', () => {
 
     expect(comp.rows).toHaveLength(1);
     expect(comp.rows[0]!.id).toBe(second!.id);
-    expect(emitted[emitted.length - 1]).toEqual([{ amount: '20', currency: '' }]);
+    expect(emitted[emitted.length - 1]).toEqual([{ amount: '20', currency: '', sourceComponent: 'CHARGE' }]);
   });
 
   it('removeRow() on the last row leaves an empty list (not an error)', () => {
