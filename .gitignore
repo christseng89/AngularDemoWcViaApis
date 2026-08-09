@@ -3,3 +3,4 @@ node_modules/
 /lc-issue/
 dist/
 ~*.docx
+/scratchpad_out*.md
