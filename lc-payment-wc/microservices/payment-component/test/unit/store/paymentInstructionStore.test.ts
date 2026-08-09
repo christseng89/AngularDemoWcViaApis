@@ -37,6 +37,22 @@ describe('createInMemoryPaymentInstructionStore', () => {
     expect(store.find('IPLC', 'REF-1', 1)).toBe(instr);
   });
 
+  it('findFingerprint() returns the fingerprint saved alongside the instruction (C-2)', () => {
+    const store = createInMemoryPaymentInstructionStore();
+    const instr = instruction({ instructionId: 'id-fp', originModule: 'IPLC', mainRef: 'REF-FP', sequence: 1 });
+    store.save(instr, 'abc123');
+    expect(store.findFingerprint('IPLC', 'REF-FP', 1)).toBe('abc123');
+  });
+
+  it('findFingerprint() is undefined for an unknown key, and for an instruction saved without one', () => {
+    const store = createInMemoryPaymentInstructionStore();
+    expect(store.findFingerprint('IPLC', 'NOPE', 9)).toBeUndefined();
+    const instr = instruction({ instructionId: 'id-nofp', originModule: 'IPLC', mainRef: 'REF-NOFP', sequence: 1 });
+    store.save(instr); // no fingerprint
+    expect(store.find('IPLC', 'REF-NOFP', 1)).toBe(instr);
+    expect(store.findFingerprint('IPLC', 'REF-NOFP', 1)).toBeUndefined();
+  });
+
   it('findById() returns the saved instruction by instructionId', () => {
     const store = createInMemoryPaymentInstructionStore();
     const instr = instruction({ instructionId: 'id-abc' });

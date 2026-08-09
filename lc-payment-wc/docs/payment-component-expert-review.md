@@ -52,6 +52,55 @@ payload → idempotent replay (current behaviour). Different payload → reject 
 IDEMPOTENCY_KEY_CONFLICT`. This is the standard idempotency contract (cf. Stripe `Idempotency-Key`
 semantics) and matches the FSD's own "unique constraint" note.
 
+**Persistence & OAS placement — system common transaction fields (系統交易共同欄位), reviewer-confirmed:**
+The idempotency control is **not a business-contract concern**, so the **OAS stays unchanged** (the
+`409` + `{code, message}` shape already exists; only the endpoint / `409` *description* should be
+refreshed to mention `IDEMPOTENCY_KEY_CONFLICT`). The natural-key uniqueness and the request
+fingerprint — `request_hash`, plus optionally a `request_snapshot` (the canonical request JSON) so a
+conflict can be *diagnosed* ("what differed?"), since a bare 64-char hash cannot — are
+**system-controlled columns that belong to the bank's common transaction field group (共同交易欄位)**:
+the standard field set the core framework already stamps on every transaction, alongside
+Maker/Checker (4-eyes), Status (PENDING/RELEASED), Edition (版次, reference-only), Unit Code, the
+transaction references, and timestamps. They are **never part of the API request/response body** —
+the Payment DB simply carries them as control columns; the Payment Component *reads* the natural key
+from these common fields but does not own or expose them. The current implementation is already
+consistent with this: the fingerprint lives at the **store layer** (`save(instruction, fingerprint)`),
+never on the `PaymentInstruction` (OAS) type.
+
+**Agreed idempotency-field design (from the earlier Reference/Event model discussion — recorded here
+so it is NOT lost, since that separate RDD note was reverted):**
+
+- **Idempotency key = (`originModule`, `bankContractRef`, `eventSeq`).** Primary reference =
+  the **bank-internal contract number (行内合约号)**, NOT the customer LC number — customer LC numbers
+  are not globally unique, so they cannot key idempotency.
+- **`eventSeq` = Event Time**, tied to the TF event (LC Issue = `00`, Amendment = `01`, Document
+  Arrival = `02`, …). It is a zero-padded **string** (`^\d{2,3}$`), NOT an integer — it is an event
+  code, not a running counter.
+- **`edition` (版次)** — reference-only; **never** part of the key (changing `edition` alone is the
+  SAME instruction, so it replays, not conflicts).
+- **`customerRef`** (typed: `LC | IB | COLLECTION | GUARANTEE | …`) — the customer LC / document
+  number, carried for **audit + SWIFT field 21 (related reference)**; not in the key.
+- **`eventType`** enum includes **`REVERSAL`**, giving a post-RELEASE correction a legal event to book
+  (a corrected amount is a new reversal/adjustment event, not a re-POST of the same key).
+- **Lifecycle:** mutable while **PENDING** (an update = delete-old + create-new); immutable only after
+  **RELEASE (4-eyes / maker-checker)**. This service confirms the already-RELEASED instruction; the
+  PENDING drafting loop and the 4-eyes release live **upstream** (consistent with FSD §6.1's
+  "既有的已確認結果" wording).
+- **Rollout = additive / backward-compatible:** keep today's `mainRef` / `sequence` as legacy aliases
+  derived from the new block (`mainRef ≙ bankContractRef`, `sequence ≙ eventSeq`) so the 15 existing
+  consumers do not break; old data may be migrated (this is a new microservice, no history baggage).
+
+All of the above (`bankContractRef`, `eventSeq`, `edition`, `customerRef`, `eventType`, Maker/Checker,
+Status) are **common transaction fields, system-controlled** — the OAS carries only the business
+payload; these controls sit in the common-field group / Payment DB.
+
+Production landing (also resolves **H-1** atomicity): `UNIQUE(origin_module, main_ref, sequence)`
++ atomic upsert (`INSERT ... ON CONFLICT`) comparing `request_hash` → same payload = 200 replay,
+different payload = 409 `IDEMPOTENCY_KEY_CONFLICT`.
+
+**Status: implemented** (payload-aware fingerprint at the store layer; 245 tests, 100% coverage).
+The in-memory `Map` still needs the DB landing above for cross-instance / atomic behaviour (H-1).
+
 ---
 
 ## 3. High
@@ -65,6 +114,17 @@ which point two concurrent identical Confirms can both miss `find()` and both `s
 double-booking the GL/SWIFT output. The fix belongs with C-2: the persistent store must do an
 **atomic upsert against a UNIQUE(origin_module, main_ref, sequence) constraint**, and the
 generation of GL/SWIFT side-effects must key off "did I win the insert", not "did find() miss".
+
+**Resolved together with C-2 — one mechanism, not two (reviewer-confirmed).** H-1 (concurrency
+atomicity) and C-2 (payload-content check) are *distinct* failure modes, and C-2's implemented
+code-level check does **not** by itself remove the race — two concurrent *identical* requests can
+still both miss `find()` and both `save()`. But the **same production landing** closes both at once:
+`UNIQUE(origin_module, main_ref, sequence)` + atomic upsert (`INSERT ... ON CONFLICT`) gives H-1
+atomicity, and comparing `request_hash` in the `ON CONFLICT` branch gives C-2 (same → 200 replay,
+different → 409). So there is **no separate H-1 work item** — it is closed by the DB landing already
+described under C-2. In the current in-memory, single-threaded, synchronous `find→save` demo the race
+is not triggerable, so there is nothing to change in today's code; H-1 lands exactly when the
+persistent/multi-instance store is built for C-2.
 
 ### H-2. Submitted leg amounts are not validated against the currency's minor units
 **Files:** `validation/requestSchema.ts:22-24, 40`, `money.ts:113-115`

@@ -20,24 +20,38 @@ function naturalKey(originModule: OriginModule, mainRef: string, sequence: numbe
 export interface PaymentInstructionStore {
   find(originModule: OriginModule, mainRef: string, sequence: number): PaymentInstruction | undefined;
   findById(instructionId: string): PaymentInstruction | undefined;
-  save(instruction: PaymentInstruction): void;
+  /**
+   * The request payload fingerprint stored alongside the instruction at its
+   * natural key (C-2 idempotency-conflict detection — see
+   * domain/confirmPaymentInstruction.ts). undefined when no instruction exists
+   * for that key, or when one was saved without a fingerprint.
+   */
+  findFingerprint(originModule: OriginModule, mainRef: string, sequence: number): string | undefined;
+  /** `fingerprint` (C-2): an opaque canonical hash of the request that produced this instruction. */
+  save(instruction: PaymentInstruction, fingerprint?: string): void;
   search(filter: { originModule?: OriginModule; mainRef?: string }): PaymentInstruction[];
 }
 
 export function createInMemoryPaymentInstructionStore(): PaymentInstructionStore {
   const byNaturalKey = new Map<string, PaymentInstruction>();
   const byId = new Map<string, PaymentInstruction>();
+  const fingerprintByNaturalKey = new Map<string, string>();
 
   return {
     find(originModule, mainRef, sequence) {
       return byNaturalKey.get(naturalKey(originModule, mainRef, sequence));
     },
+    findFingerprint(originModule, mainRef, sequence) {
+      return fingerprintByNaturalKey.get(naturalKey(originModule, mainRef, sequence));
+    },
     findById(instructionId) {
       return byId.get(instructionId);
     },
-    save(instruction) {
-      byNaturalKey.set(naturalKey(instruction.originModule, instruction.mainRef, instruction.sequence), instruction);
+    save(instruction, fingerprint) {
+      const key = naturalKey(instruction.originModule, instruction.mainRef, instruction.sequence);
+      byNaturalKey.set(key, instruction);
       byId.set(instruction.instructionId, instruction);
+      if (fingerprint !== undefined) fingerprintByNaturalKey.set(key, fingerprint);
     },
     search(filter) {
       return Array.from(byId.values()).filter((pi) => {

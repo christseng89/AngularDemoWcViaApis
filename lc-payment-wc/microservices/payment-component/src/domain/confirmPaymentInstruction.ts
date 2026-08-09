@@ -22,7 +22,7 @@
  * a combination that no longer needs to exist.)
  */
 import Decimal from 'decimal.js';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import type { PaymentInstruction } from '../types';
 import type { ValidatedConfirmRequest } from '../validation/requestSchema';
 import { validateDrCrBalance, RPFM_BALANCE_TOLERANCE } from './balanceValidation';
@@ -31,7 +31,37 @@ import { enrichLegs, resolveVoucherCodePrefix } from './voucherDescription';
 import { buildSettlementEntries } from './accountEntries';
 import { expandSuspenseBridge } from './suspenseBridge';
 import { validateSwiftCrossField, buildSwiftMessages } from './swiftMessages';
+import { BusinessValidationError } from '../errors';
 import type { PaymentInstructionStore } from '../store/paymentInstructionStore';
+
+/**
+ * Order-independent canonical JSON of a value: object keys sorted, undefined
+ * keys dropped (so an absent optional field and an explicit `undefined` hash
+ * identically); ARRAY order is preserved (leg order is significant). Used only
+ * to derive a stable idempotency fingerprint — never sent on the wire.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(',')}}`;
+}
+
+/**
+ * C-2 idempotency fingerprint: a canonical hash of the request PAYLOAD (the
+ * validated OAS body). Two confirms sharing a natural key
+ * (originModule, mainRef, sequence) but carrying different payloads must NOT
+ * silently replay the first result — they hash differently, so the caller gets
+ * a 409 IDEMPOTENCY_KEY_CONFLICT instead of a misleading 200 (see
+ * confirmPaymentInstruction below). An identical resend hashes identically and
+ * replays as before.
+ */
+function requestFingerprint(request: ValidatedConfirmRequest): string {
+  return createHash('sha256').update(stableStringify(request)).digest('hex');
+}
 
 export interface ConfirmPaymentInstructionOptions {
   /**
@@ -67,12 +97,36 @@ export function confirmPaymentInstruction(
   request: ValidatedConfirmRequest,
   options: ConfirmPaymentInstructionOptions,
 ): ConfirmResult {
+  // C-2: fingerprint of THIS request's payload — used both to detect an
+  // idempotency-key conflict below and, on a genuine create, stored alongside
+  // the instruction for the next call to compare against. Computed once.
+  const fingerprint = requestFingerprint(request);
+
   // Step 0 (FSD §6.1): idempotent replay — return the existing result without
   // re-running any of steps 1-5, so GL/SWIFT output is never re-triggered.
   // Skipped entirely in dryRun mode (see ConfirmPaymentInstructionOptions.dryRun).
   if (!options.dryRun) {
     const existing = store.find(request.originModule, request.mainRef, request.sequence);
     if (existing) {
+      // C-2: only replay when the payload is byte-for-byte the same one that
+      // produced `existing`. A DIFFERENT payload on the same natural key (an
+      // operator re-submitting corrected amounts under the same sequence, or two
+      // genuinely different transactions colliding on the key) must NOT silently
+      // return the stale result as HTTP 200 — that hides the discrepancy. Reject
+      // with 409 IDEMPOTENCY_KEY_CONFLICT so the caller learns the key is taken
+      // by different content. (A prior instruction saved WITHOUT a fingerprint —
+      // priorFingerprint undefined — falls through to a plain replay, preserving
+      // legacy behaviour.)
+      const priorFingerprint = store.findFingerprint(request.originModule, request.mainRef, request.sequence);
+      if (priorFingerprint !== undefined && priorFingerprint !== fingerprint) {
+        throw new BusinessValidationError(
+          'IDEMPOTENCY_KEY_CONFLICT',
+          `A payment instruction already exists for (originModule=${request.originModule}, ` +
+            `mainRef=${request.mainRef}, sequence=${request.sequence}) with a DIFFERENT request payload. ` +
+            'The idempotency key is already taken by different content — refusing to return the earlier ' +
+            'result. Resend the identical payload to replay it, or use a new sequence for a corrected/new instruction.',
+        );
+      }
       return { instruction: existing, created: false };
     }
   }
@@ -154,6 +208,6 @@ export function confirmPaymentInstruction(
     return { instruction, created: false };
   }
 
-  store.save(instruction);
+  store.save(instruction, fingerprint);
   return { instruction, created: true };
 }

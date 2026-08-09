@@ -28,6 +28,20 @@ describe('POST /payment-instructions', () => {
     expect(second.body.instructionId).toBe(first.body.instructionId);
   });
 
+  it('returns 409 IDEMPOTENCY_KEY_CONFLICT when the same natural key is re-sent with a DIFFERENT payload (C-2)', async () => {
+    const app = createApp();
+    const first = await request(app).post(`${API_BASE_PATH}/payment-instructions`).send(validBody);
+    expect(first.status).toBe(201);
+    const conflicting = {
+      ...validBody,
+      debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '250' }],
+      creditLegs: [{ accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '250' }],
+    };
+    const res = await request(app).post(`${API_BASE_PATH}/payment-instructions`).send(conflicting);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('IDEMPOTENCY_KEY_CONFLICT');
+  });
+
   it('dryRun:true always returns 200, even for a brand-new natural key', async () => {
     const app = createApp();
     const res = await request(app)

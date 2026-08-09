@@ -39,11 +39,65 @@ describe('confirmPaymentInstruction', () => {
     expect(second.instruction.instructionId).toBe(first.instruction.instructionId);
   });
 
-  it('idempotent replay returns the ORIGINAL result even if the request body has since changed', () => {
+  it('C-2: a DIFFERENT payload on the same natural key is rejected with IDEMPOTENCY_KEY_CONFLICT, not silently replayed', () => {
     const first = confirmPaymentInstruction(store, request(), { sourceFunctionCode: 'PayAccept' });
-    const changed = request({ debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '999' }] });
-    const second = confirmPaymentInstruction(store, changed, { sourceFunctionCode: 'PayAccept' });
-    expect(second.instruction.debitLegs[0]!.amountTxCcy).toBe(first.instruction.debitLegs[0]!.amountTxCcy);
+    // Same natural key (IPLC/REF-1/1) but different (still-balanced) amounts.
+    const changed = request({
+      debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '999' }],
+      creditLegs: [{ accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '999' }],
+    });
+    try {
+      confirmPaymentInstruction(store, changed, { sourceFunctionCode: 'PayAccept' });
+      fail('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(BusinessValidationError);
+      expect((err as BusinessValidationError).code).toBe('IDEMPOTENCY_KEY_CONFLICT');
+      expect((err as BusinessValidationError).httpStatus).toBe(409);
+    }
+    // The originally-stored instruction is untouched.
+    expect(store.find('IPLC', 'REF-1', 1)!.instructionId).toBe(first.instruction.instructionId);
+  });
+
+  it('C-2: an identical resend still replays; an explicitly-undefined optional field hashes the same as an absent one (canonical)', () => {
+    const first = confirmPaymentInstruction(store, request(), { sourceFunctionCode: 'PayAccept' });
+    // Same content as request() (which omits these optionals), but with them present-but-undefined.
+    const resend = request({ payInstrFlag: undefined, maturityDate: undefined, tenorType: undefined });
+    const second = confirmPaymentInstruction(store, resend, { sourceFunctionCode: 'PayAccept' });
+    expect(second.created).toBe(false);
+    expect(second.instruction.instructionId).toBe(first.instruction.instructionId);
+  });
+
+  it('C-2: an instruction saved WITHOUT a fingerprint (legacy/persisted record) replays rather than conflicting', () => {
+    // Seed the store DIRECTLY (no confirm) so there is no stored fingerprint for this key.
+    const legacy = {
+      instructionId: 'legacy-id',
+      sequence: 1,
+      originModule: 'IPLC',
+      mainRef: 'REF-LEGACY',
+      debitLegs: [],
+      creditLegs: [],
+      classification: {
+        instructionId: 'legacy-id',
+        debitTypes: [],
+        creditTypes: [],
+        customerXor: false,
+        nostroXor: false,
+        vostroXor: false,
+        paymentComponentRelated: false,
+      },
+      accountEntries: [],
+      swiftMessages: [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    store.save(legacy); // no fingerprint
+    const differentBody = request({
+      mainRef: 'REF-LEGACY',
+      debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '777' }],
+      creditLegs: [{ accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '777' }],
+    });
+    const replayed = confirmPaymentInstruction(store, differentBody, { sourceFunctionCode: 'PayAccept' });
+    expect(replayed.created).toBe(false);
+    expect(replayed.instruction.instructionId).toBe('legacy-id');
   });
 
   describe('dryRun', () => {

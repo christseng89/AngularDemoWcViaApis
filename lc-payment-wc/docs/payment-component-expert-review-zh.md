@@ -28,6 +28,25 @@
 
 **建议：** 命中自然键时，对规范化的请求报文做哈希/比对。报文相同 → 幂等重放（现有行为）；报文不同 → 以 `409 IDEMPOTENCY_KEY_CONFLICT` 拒绝。这是标准的幂等契约（参考 Stripe `Idempotency-Key` 语义），也与 FSD 自己的"唯一约束"注记一致。
 
+**持久化与 OAS 定位——系統交易共同欄位（reviewer-confirmed）：**
+幂等控制**不属于业务契约**，所以 **OAS 不改**（`409` + `{code, message}` 形状本就存在；只需把端点 / `409` 的**描述**补上 `IDEMPOTENCY_KEY_CONFLICT`）。自然键唯一性与请求指纹——`request_hash`，以及可选的 `request_snapshot`（规范化请求 JSON，供冲突时**诊断**"到底差在哪"，因为光凭 64 位 hash 看不出来）——都是**系统控制的栏位，归属银行的「共同交易欄位」群**：核心框架本就戳记在每笔交易上的标准栏位集，与 经办/覆核（4-eyes）、狀態（PENDING/RELEASED）、Edition（版次，供参考）、單位別、各类交易参考号、时间戳同级。它们**从不进 API 请求/响应体**——Payment DB 以控制列的形式承载；Payment Component 只**读**这些共同栏位里的自然键，不拥有、不暴露它们。现有实现已经符合这一点：指纹在**存储层**（`save(instruction, fingerprint)`），从不放进 `PaymentInstruction`（OAS）类型。
+
+**早先设计已 AGREED 的幂等栏位（源自先前"参考/事件模型"讨论——记录于此以免遗忘，因为那份独立 RDD 已被还原）：**
+
+- **幂等键 = (`originModule`, `bankContractRef`, `eventSeq`)。** 主参考 = **行内合约号**，**不用**客户 LC 号——客户 LC 号非全局唯一，不能做幂等键。
+- **`eventSeq` = Event Time**，关联 TF 事件（LC Issue = `00`、Amendment = `01`、Document Arrival = `02`…）。是**零填充字符串**（`^\d{2,3}$`），**不是整数**——它是事件代码，不是递增计数器。
+- **`edition`（版次）**——供参考；**绝不**进键（只改 edition 视为同一笔，重放而非冲突）。
+- **`customerRef`**（带类型：`LC | IB | COLLECTION | GUARANTEE | …`）——客户 LC/单据号，供**审计 + SWIFT field 21（相关参考）**；不进键。
+- **`eventType`** 枚举含 **`REVERSAL`**，为定稿后更正提供合法落点（更正金额是一个新的冲正/调整事件，而非拿原键重发）。
+- **生命周期：** PENDING 期可变（更新 = 删旧建新）；经 **RELEASE（4-eyes / maker-checker）** 后不可变。本服务过账**已 RELEASE** 的定稿指令；PENDING 草稿与 4-eyes 在**上游**（对齐 FSD §6.1"既有的已確認結果"）。
+- **落地方式 = 加法式 / 向后兼容：** 保留现有 `mainRef` / `sequence` 作为由新区块派生的 legacy 别名（`mainRef ≙ bankContractRef`、`sequence ≙ eventSeq`），不破坏现有 15 个消费方；旧资料可迁移（新微服务、无历史包袱）。
+
+以上（`bankContractRef`、`eventSeq`、`edition`、`customerRef`、`eventType`、经办/覆核、状态）**都是共同交易欄位、由系统控制**——OAS 只承载业务 payload；这些控制项落在共同栏位群 / Payment DB。
+
+生产落地（同时解决 **H-1** 原子性）：`UNIQUE(origin_module, main_ref, sequence)` + 原子 upsert（`INSERT ... ON CONFLICT`）比对 `request_hash` → 报文相同 = 200 重放，报文不同 = 409 `IDEMPOTENCY_KEY_CONFLICT`。
+
+**状态：已实现**（存储层的报文感知指纹；245 测试、100% 覆盖）。内存 `Map` 仍需按上面的 DB 落地以获得跨实例 / 原子行为（H-1）。
+
 ---
 
 ## 3. 高（High）
@@ -36,6 +55,8 @@
 **文件：** `store/paymentInstructionStore.ts:38-41`、`confirmPaymentInstruction.ts:73-78, 157`
 
 `find()` 之后再 `save()` 是典型的 check-then-act。单线程 Node 在**单实例内**掩盖了它，但生产注记已经承认这里必须换成共享存储——届时两个并发的相同 Confirm 会同时 `find()` 未命中并同时 `save()`，把总账/SWIFT 输出重复入账。修复应与 C-2 一并进行：持久化存储必须对 **UNIQUE(origin_module, main_ref, sequence) 约束做原子 upsert**，并且 GL/SWIFT 副作用的生成要以"我是否赢得了这次插入"为准，而不是"find() 是否未命中"。
+
+**与 C-2 同一步解决——一个机制、非两个（reviewer-confirmed）。** H-1（并发原子性）与 C-2（报文内容检查）是**两种不同**故障；C-2 现有的代码级检查**本身不能**消除竞态——两个并发且**相同**的请求仍可能都 miss `find()`、都 `save()`。但**同一个生产落地**一次关掉两者：`UNIQUE(origin_module, main_ref, sequence)` + 原子 upsert（`INSERT ... ON CONFLICT`）给出 H-1 原子性；在 `ON CONFLICT` 分支比对 `request_hash` 给出 C-2（相同 → 200 重放，不同 → 409）。因此**不需要单独排一次 H-1**——它由 C-2 已描述的 DB 落地一并关闭。在现有内存、单线程、同步 `find→save` 的 demo 里竞态不可触发，今天代码无处可改；H-1 恰好在为 C-2 建持久化/多实例存储时一并落地。
 
 ### H-2. 提交的腿金额未按币种小数位校验
 **文件：** `validation/requestSchema.ts:22-24, 40`、`money.ts:113-115`
