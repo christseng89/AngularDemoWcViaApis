@@ -63,5 +63,13 @@ export function validateDrCrBalance(
   return { debitTotal, creditTotal, difference };
 }
 
-/** RPFM tolerance constant, per Debit_Chk_Total_Pct()/CHK_Total_Pct() (SSSS_Payment*.js). */
+/**
+ * The legacy RPFM ±0.01 tolerance value, per Debit_Chk_Total_Pct()/CHK_Total_Pct()
+ * (SSSS_Payment*.js). RETAINED FOR REFERENCE ONLY — as of M-7 it is NO LONGER
+ * applied automatically: the Confirm flow now requires EXACT Dr = Cr balance for
+ * every originModule, RPFM included (that ±0.01 was a screen-level percentage-split
+ * slack, not a GL-posting rule; a genuine rounding residual belongs on an explicit
+ * rounding-difference leg, not a tolerance). Still available as an explicit
+ * per-call `balanceTolerance` override if a specific integration ever needs it.
+ */
 export const RPFM_BALANCE_TOLERANCE = new Decimal('0.01');

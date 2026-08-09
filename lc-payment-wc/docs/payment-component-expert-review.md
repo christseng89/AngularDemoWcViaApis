@@ -220,6 +220,21 @@ can exceed 0.01 (false reject); conversely a genuine 0.01 posting error passes s
 accept). Best practice ties tolerance to the number of conversion legs (e.g. `n_fx_legs × half
 a minor unit`) rather than a blanket constant.
 
+**Status: implemented — resolved by removing the tolerance entirely (reviewer-confirmed).** Rather
+than scaling the tolerance to the FX-leg count, the Confirm flow now requires **EXACT Dr = Cr for
+every originModule, RPFM included** (`options.balanceTolerance ?? 0`). A GL voucher must balance
+exactly; the legacy ±0.01 was a screen-level percentage-split slack (`Debit_Chk_Total_Pct` /
+`CHK_Total_Pct`), never a posting rule, and the FSD's own verified scenario (§13.2) already balances
+to 0. `RPFM_BALANCE_TOLERANCE` is retained for reference only and is no longer applied automatically;
+`balanceTolerance` remains a deliberate per-call escape hatch.
+
+**Follow-up (open) — rounding-difference leg.** With exact balance enforced, any flow that can
+legitimately produce a sub-minor-unit rounding residual (e.g. multi-leg FX splits) must **book that
+residual to an explicit rounding-difference GL account as a real leg**, so the voucher balances
+exactly *and* the residual is accounted for and auditable — never swept under a tolerance. This
+generation step is not yet implemented; it is the correct home for any genuine rounding remainder now
+that the ±0.01 pass is gone.
+
 ### M-8. No transport-layer security controls on the service
 **File:** `app.ts`
 

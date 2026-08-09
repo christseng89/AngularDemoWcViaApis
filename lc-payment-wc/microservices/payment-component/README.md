@@ -354,6 +354,27 @@ The original screens checked each side independently against a shared
 `CPYT_*_TTL_AMT_TTLCCY` field. The single-POST `PaymentInstructionConfirmRequest`
 has no such field — only the two leg arrays. `domain/balanceValidation.ts`
 therefore implements **V8** (exact equality between `Σ debitLegs[].amountTxCcy`
-and `Σ creditLegs[].amountTxCcy`, with an optional tolerance), which
+and `Σ creditLegs[].amountTxCcy`), which
 Calculation & Validation §13.2 verified against a real FSD scenario
 (§2.3.3: 800,020 == 800,000 + 20) rather than a hypothetical.
+
+**Exact for every module (M-7, 2026-08).** The Confirm flow now requires EXACT Dr = Cr for **every**
+`originModule`, RPFM included — the legacy RPFM ±0.01 auto-tolerance was removed (it was a
+screen-level percentage-split slack, not a GL-posting rule). `RPFM_BALANCE_TOLERANCE` is retained
+for reference only and no longer applied; `options.balanceTolerance` remains a deliberate per-call
+escape hatch (defaults to 0). A genuine rounding residual should be posted to an explicit
+rounding-difference leg, not tolerated (follow-up).
+
+## Hardening review changes (2026-08)
+
+Post-review fixes; each is unit-tested and keeps the suite at 100% coverage (**261 tests**,
+`npm test`).
+
+| Ref | File(s) | Change |
+|---|---|---|
+| **C-2** | `domain/confirmPaymentInstruction.ts`, `store/paymentInstructionStore.ts` | Payload-aware idempotency: a repeat on the same natural key with a **different** request payload now returns **409 `IDEMPOTENCY_KEY_CONFLICT`** instead of silently replaying the original; an identical resend still replays (200). A canonical SHA-256 fingerprint of the request is stored alongside the instruction (`findFingerprint`); it is a system/control field, not part of the OAS body. (H-1 — the concurrency race — is closed by the same production DB landing: `UNIQUE(...)` + atomic upsert comparing the fingerprint.) |
+| **H-2** | `validation/requestSchema.ts`, `money.ts` | Submitted amounts are validated against the currency's minor units (Currency-API `decimals`): `amountTxCcy` vs the transaction currency, `amountAccountCcy` vs the leg currency, and each Suspense entry vs its own currency. Over-precision (e.g. `JPY 100.50`, `EUR 1.234`) → 400. A currency absent from the master is skipped (source-of-truth). |
+| **H-3** | `domain/swiftMessages.ts`, `types.ts`, OAS `SwiftMessage` | 32A (settled, leg/account currency) and 33B (instructed, transaction currency) are no longer forced equal — they differ for a cross-currency payment (new `instructedCurrency` field carries 33B's currency); same-currency payments are unchanged. A gpi **UETR** (v4 UUID) is now populated on every message, shared by a leg's advice + its cover. (`serviceTypeId`/`isGpiMember` left as a config-driven follow-up.) |
+| **M-1** | `validation/requestSchema.ts`, `money.ts` | Strictly-negative caller amounts (legs + Suspense entries) → 400. Direction is expressed by the Dr/Cr side; the only ledger "negative" is the FX Exchange (兌換) Dr/Cr side-swap, which the server generates on the opposite side with a positive amount, after validation. |
+| **M-2** | `validation/requestSchema.ts`, `money.ts` | ExchangeRate must be **> 0**: zero is rejected (400); negative was already blocked by the ExchangeRate pattern (no leading sign). Applies to every rate field and Suspense `crossRate`. |
+| **M-7** | `domain/confirmPaymentInstruction.ts`, `domain/balanceValidation.ts` | RPFM's automatic ±0.01 tolerance removed — exact Dr = Cr for all modules (see the V8 section above). |

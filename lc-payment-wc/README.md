@@ -73,7 +73,7 @@ npm run test:coverage # jest --coverage
 ```
 
 Jest + `jest-preset-angular` (a separate config from `microservices/payment-component`'s
-own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 197 tests,
+own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 216 tests,
 12 suites; `jest.config.js` enforces a **90% floor** (`coverageThreshold`) across
 statements/branches/functions/lines for everything `collectCoverageFrom` tracks — `npm test`
 fails the build if a change drops coverage below it. Current numbers:
@@ -106,6 +106,14 @@ debounced preview pipeline via `fakeAsync`/`tick`, and the onConfirm/runPreview 
 `currency.service.ts` / `payment-component-api.service.ts` (all via `HttpClientTestingModule`),
 `response-viewer.component.ts`, `web-components/shared.ts`, `business-case-registry.ts`
 (data invariants), `payment-component.types.ts` (runtime const-object regression guards).
+
+**Client-side amount-precision guard (H-3 hardening, 2026-08).** The Simulator now validates
+amount decimal places against the Currency API's per-currency `decimals` at input time — the header
+**Total Amount** and each **Suspense Debit/Credit** entry (`business-case-runner.component.ts`'s
+`amountScaleErrors`), and every **leg-allocator** amount (`leg-allocator.component.ts` emits
+`scaleErrorsChange`, aggregated by the runner). An over-precise amount (e.g. `USD 100.123`) shows an
+inline error, blocks the live preview, and disables Confirm — matching the server's own currency
+scale check so a bad amount fails fast in the UI instead of only surfacing as a `400` on submit.
 
 **Not yet covered — a separate follow-up:** the 9 vanilla Custom Elements under
 `web-components/import|export/` and every component's own `.html` template need

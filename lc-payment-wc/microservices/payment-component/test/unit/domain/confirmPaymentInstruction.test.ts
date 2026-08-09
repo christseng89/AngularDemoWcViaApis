@@ -150,12 +150,24 @@ describe('confirmPaymentInstruction', () => {
   });
 
   describe('balance tolerance', () => {
-    it('defaults to RPFM_BALANCE_TOLERANCE (0.01) for originModule RPFM', () => {
+    it('M-7: RPFM now also requires EXACT balance — a 0.01 difference is rejected (no automatic ±0.01 slack)', () => {
       const rpfmRequest = request({
         originModule: 'RPFM',
         mainRef: 'REF-RPFM',
         debitLegs: [{ accountNo: 'A', accountType: 'NOSTRO', currency: 'CNY', amountTxCcy: '100' }],
         creditLegs: [{ accountNo: 'B', accountType: 'CUSTOMER', currency: 'CNY', amountTxCcy: '99.99' }],
+      });
+      expect(() => confirmPaymentInstruction(store, rpfmRequest, { voucherCodePrefixOverride: 'RPFM01NULLNULLNULL' })).toThrow(
+        BusinessValidationError,
+      );
+    });
+
+    it('M-7: RPFM with an EXACTLY balanced voucher still confirms normally', () => {
+      const rpfmRequest = request({
+        originModule: 'RPFM',
+        mainRef: 'REF-RPFM-OK',
+        debitLegs: [{ accountNo: 'A', accountType: 'NOSTRO', currency: 'CNY', amountTxCcy: '100' }],
+        creditLegs: [{ accountNo: 'B', accountType: 'CUSTOMER', currency: 'CNY', amountTxCcy: '100' }],
       });
       expect(() => confirmPaymentInstruction(store, rpfmRequest, { voucherCodePrefixOverride: 'RPFM01NULLNULLNULL' })).not.toThrow();
     });

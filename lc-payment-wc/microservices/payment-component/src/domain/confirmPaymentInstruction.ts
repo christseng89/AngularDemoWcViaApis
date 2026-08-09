@@ -25,7 +25,7 @@ import Decimal from 'decimal.js';
 import { randomUUID, createHash } from 'crypto';
 import type { PaymentInstruction } from '../types';
 import type { ValidatedConfirmRequest } from '../validation/requestSchema';
-import { validateDrCrBalance, RPFM_BALANCE_TOLERANCE } from './balanceValidation';
+import { validateDrCrBalance } from './balanceValidation';
 import { classify } from './classification';
 import { enrichLegs, resolveVoucherCodePrefix } from './voucherDescription';
 import { buildSettlementEntries } from './accountEntries';
@@ -72,7 +72,15 @@ export interface ConfirmPaymentInstructionOptions {
   sourceFunctionCode?: string;
   /** Direct override, required for the two FSD rows with an unresolved dual prefix (EPLC PayAccept, EXCO SettlementAtMaturity). */
   voucherCodePrefixOverride?: string;
-  /** V8 tolerance override (§3/§9). Defaults to RPFM_BALANCE_TOLERANCE for originModule "RPFM", else exact equality. */
+  /**
+   * V8 tolerance override (§3/§9). Defaults to **exact equality (0) for EVERY
+   * originModule, including RPFM** (M-7): a GL voucher must balance Dr = Cr
+   * exactly — the legacy RPFM ±0.01 was a screen-level percentage-split slack,
+   * not a posting rule, and a genuine rounding residual belongs on an explicit
+   * rounding-difference leg, not swept under a tolerance. This remains as a
+   * deliberate, explicit per-call escape hatch only; it is never applied
+   * automatically.
+   */
   balanceTolerance?: Decimal.Value;
   /**
    * Preview mode for the Business Case Simulator's live onChange recompute
@@ -163,7 +171,11 @@ export function confirmPaymentInstruction(
   const creditLegsInput = [...bridgeFxCredit, ...request.creditLegs, ...bridgeSuspenseCredit];
 
   // Step 1 (§3): Dr/Cr balance validation (V8) — throws BusinessValidationError (409) on failure.
-  const tolerance = options.balanceTolerance ?? (request.originModule === 'RPFM' ? RPFM_BALANCE_TOLERANCE : 0);
+  // M-7: EXACT equality (tolerance 0) for EVERY originModule — RPFM no longer gets the automatic
+  // ±0.01 slack (a GL voucher must balance exactly; the legacy 0.01 was a screen-level split check,
+  // not a posting rule — see ConfirmPaymentInstructionOptions.balanceTolerance). An explicit
+  // options.balanceTolerance is still honoured as a deliberate per-call escape hatch.
+  const tolerance = options.balanceTolerance ?? 0;
   validateDrCrBalance(debitLegsInput, creditLegsInput, tolerance);
 
   const instructionId = randomUUID();
