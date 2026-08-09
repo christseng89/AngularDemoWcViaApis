@@ -10,6 +10,7 @@ import {
   knownMinorUnitsForCurrency,
   decimalPlaces,
   isNegativeAmount,
+  isZeroRate,
   InvalidMonetaryAmountError,
   InvalidExchangeRateError,
   MONETARY_AMOUNT_PATTERN,
@@ -199,6 +200,21 @@ describe('money', () => {
       expect(isNegativeAmount('-0.00')).toBe(false);
       expect(isNegativeAmount('100')).toBe(false);
       expect(isNegativeAmount('0.50')).toBe(false);
+    });
+  });
+
+  describe('isZeroRate', () => {
+    it('is true for any all-zero rate string', () => {
+      expect(isZeroRate('0')).toBe(true);
+      expect(isZeroRate('0.0')).toBe(true);
+      expect(isZeroRate('0.0000000000')).toBe(true);
+      expect(isZeroRate('00')).toBe(true);
+    });
+
+    it('is false for a positive rate', () => {
+      expect(isZeroRate('1')).toBe(false);
+      expect(isZeroRate('0.0000000001')).toBe(false);
+      expect(isZeroRate('1.100000')).toBe(false);
     });
   });
 });

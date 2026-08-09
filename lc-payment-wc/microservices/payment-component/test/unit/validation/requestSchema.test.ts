@@ -228,6 +228,38 @@ describe('validateConfirmRequest', () => {
     expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
   });
 
+  describe('exchange rate must be > 0 (M-2)', () => {
+    it('rejects a ZERO rate on a leg (drBuyRate = "0") with a "greater than 0" message', () => {
+      const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, drBuyRate: '0' }] };
+      try {
+        validateConfirmRequest(body);
+        fail('expected throw');
+      } catch (err) {
+        expect((err as RequestValidationError).message).toContain('greater than 0');
+      }
+    });
+
+    it('rejects a ZERO rate written with decimals ("0.0000000000")', () => {
+      const body = { ...validConfirmBody, creditLegs: [{ ...validLeg, accountType: 'NOSTRO', crBuyRate: '0.0000000000' }] };
+      expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+    });
+
+    it('rejects a ZERO Suspense crossRate', () => {
+      const body = { ...validConfirmBody, suspenseBridge: { debitEntries: [{ amount: '10', currency: 'EUR', crossRate: '0' }] } };
+      expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+    });
+
+    it('rejects a NEGATIVE rate (already blocked by the ExchangeRate pattern — no leading sign allowed)', () => {
+      const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, drBuyRate: '-1.5' }] };
+      expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+    });
+
+    it('accepts a positive rate', () => {
+      const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, drBuyRate: '1.100000' }] };
+      expect(() => validateConfirmRequest(body)).not.toThrow();
+    });
+  });
+
   it('throws for a non-ISO tenorStartDate', () => {
     expect(() => validateConfirmRequest({ ...validConfirmBody, tenorStartDate: '01/01/2026' })).toThrow(
       RequestValidationError,

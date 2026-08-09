@@ -22,6 +22,7 @@ import {
   knownMinorUnitsForCurrency,
   decimalPlaces,
   isNegativeAmount,
+  isZeroRate,
 } from '../money';
 import { RequestValidationError } from '../errors';
 
@@ -31,7 +32,12 @@ const monetaryAmountSchema = z
 
 const exchangeRateSchema = z
   .string()
-  .regex(EXCHANGE_RATE_PATTERN, 'must be a decimal string matching ExchangeRate pattern');
+  .regex(EXCHANGE_RATE_PATTERN, 'must be a decimal string matching ExchangeRate pattern')
+  // M-2: an ExchangeRate must be strictly > 0. NEGATIVE is already rejected by the pattern
+  // above (it has no leading '-'); this rule additionally rejects ZERO ("0", "0.00", …), which
+  // the pattern otherwise allows and which would silently drop a converted leg to 0. Applies to
+  // every rate field (drRate/drBuyRate/crBuyRate/sellRate and Suspense crossRate) by construction.
+  .refine((v) => !isZeroRate(v), 'ExchangeRate must be greater than 0 (a zero rate is not allowed)');
 
 // ISO date (YYYY-MM-DD) — matches OAS `format: date`.
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be an ISO date (YYYY-MM-DD)');

@@ -159,6 +159,19 @@ export function isNegativeAmount(value: string): boolean {
 }
 
 /**
+ * True iff an ExchangeRate wire string is zero ("0", "0.0", "0.0000000000",
+ * "00", …). A pure string test (no non-zero digit present), so it is SAFE on a
+ * value that has not yet been pattern-validated. Used to reject a zero FX rate
+ * (M-2): a zero crossRate makes the converted amount 0, which silently drops
+ * the leg (buildSuspenseBridgeLeg) — a real charge would vanish with no error.
+ * ExchangeRate is unsigned (pattern has no leading '-'), so zero is the only
+ * non-positive value to guard against.
+ */
+export function isZeroRate(value: string): boolean {
+  return !/[1-9]/.test(value);
+}
+
+/**
  * §8.2 of Payment_Component_Calculation_Validation.docx:
  *   CPYT_DR_AMT_DRCCY = CPYT_DR_AMT_TXCCY × CPYT_DR_BUY_RATE   (debit)
  *   CPYT_CR_AMT_CRCCY = CPYT_CR_AMT_TXCCY × CPYT_CR_BUY_RATE   (credit, symmetric)
