@@ -9,6 +9,7 @@ import {
   minorUnitsForCurrency,
   knownMinorUnitsForCurrency,
   decimalPlaces,
+  isNegativeAmount,
   InvalidMonetaryAmountError,
   InvalidExchangeRateError,
   MONETARY_AMOUNT_PATTERN,
@@ -183,6 +184,21 @@ describe('money', () => {
 
     it('handles a negative amount', () => {
       expect(decimalPlaces('-99.9')).toBe(1);
+    });
+  });
+
+  describe('isNegativeAmount', () => {
+    it('is true for a strictly-negative amount', () => {
+      expect(isNegativeAmount('-100')).toBe(true);
+      expect(isNegativeAmount('-0.01')).toBe(true);
+    });
+
+    it('is false for zero, "-0"/"-0.00", and positive amounts', () => {
+      expect(isNegativeAmount('0')).toBe(false);
+      expect(isNegativeAmount('-0')).toBe(false);
+      expect(isNegativeAmount('-0.00')).toBe(false);
+      expect(isNegativeAmount('100')).toBe(false);
+      expect(isNegativeAmount('0.50')).toBe(false);
     });
   });
 });

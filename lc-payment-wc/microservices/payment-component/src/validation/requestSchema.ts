@@ -21,6 +21,7 @@ import {
   EXCHANGE_RATE_PATTERN,
   knownMinorUnitsForCurrency,
   decimalPlaces,
+  isNegativeAmount,
 } from '../money';
 import { RequestValidationError } from '../errors';
 
@@ -143,6 +144,24 @@ export const paymentInstructionConfirmRequestSchema = z
       }
     };
 
+    // M-1: reject a strictly-negative CALLER amount (submitted legs + Suspense entries).
+    // Direction is expressed by the Dr/Cr side, never by a negative sign; allowing negatives
+    // lets a leg "balance" by cancellation under the aggregate-only V8 check. The only
+    // legitimate "negative" in the ledger is the FX Exchange (兌換) Dr/Cr side-swap (借貸對調) —
+    // the SERVER does that by generating the pair on the opposite side with a POSITIVE amount
+    // (domain/suspenseBridge.ts), AFTER this validation, so those legs are never seen here.
+    const checkNonNegative = (amount: string, path: (string | number)[]): void => {
+      if (isNegativeAmount(amount)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path,
+          message:
+            `amount "${amount}" is negative; submitted leg and Suspense amounts must be >= 0 ` +
+            '(direction is set by the Dr/Cr side, not the sign)',
+        });
+      }
+    };
+
     // amountTxCcy is denominated in the TRANSACTION currency (debitLegs[0].currency,
     // per the SuspenseEntry doc comment); amountAccountCcy is denominated in the leg's
     // OWN currency. Each is checked against the currency it is actually expressed in.
@@ -155,8 +174,10 @@ export const paymentInstructionConfirmRequestSchema = z
       if (transactionCurrency !== undefined) {
         checkScale(leg.amountTxCcy, transactionCurrency, [side, i, 'amountTxCcy']);
       }
+      checkNonNegative(leg.amountTxCcy, [side, i, 'amountTxCcy']);
       if (leg.amountAccountCcy !== undefined) {
         checkScale(leg.amountAccountCcy, leg.currency, [side, i, 'amountAccountCcy']);
+        checkNonNegative(leg.amountAccountCcy, [side, i, 'amountAccountCcy']);
       }
     };
     data.debitLegs.forEach((leg, i) => checkLeg(leg, 'debitLegs', i));
@@ -167,7 +188,10 @@ export const paymentInstructionConfirmRequestSchema = z
       entries: { amount: string; currency: string }[] | undefined,
       side: 'debitEntries' | 'creditEntries',
     ): void => {
-      (entries ?? []).forEach((e, i) => checkScale(e.amount, e.currency, ['suspenseBridge', side, i, 'amount']));
+      (entries ?? []).forEach((e, i) => {
+        checkScale(e.amount, e.currency, ['suspenseBridge', side, i, 'amount']);
+        checkNonNegative(e.amount, ['suspenseBridge', side, i, 'amount']);
+      });
     };
     checkEntries(data.suspenseBridge?.debitEntries, 'debitEntries');
     checkEntries(data.suspenseBridge?.creditEntries, 'creditEntries');

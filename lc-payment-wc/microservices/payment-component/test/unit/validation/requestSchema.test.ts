@@ -175,6 +175,54 @@ describe('validateConfirmRequest', () => {
     });
   });
 
+  describe('negative amount rejection (M-1)', () => {
+    it('rejects a negative amountTxCcy on a submitted leg', () => {
+      const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, amountTxCcy: '-100' }] };
+      try {
+        validateConfirmRequest(body);
+        fail('expected throw');
+      } catch (err) {
+        const msg = (err as RequestValidationError).message;
+        expect(msg).toContain('debitLegs.0.amountTxCcy');
+        expect(msg).toContain('is negative');
+      }
+    });
+
+    it('rejects a negative amountAccountCcy on a submitted leg', () => {
+      const body = {
+        ...validConfirmBody,
+        creditLegs: [{ ...validLeg, accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '100', amountAccountCcy: '-90' }],
+      };
+      try {
+        validateConfirmRequest(body);
+        fail('expected throw');
+      } catch (err) {
+        expect((err as RequestValidationError).message).toContain('creditLegs.0.amountAccountCcy');
+      }
+    });
+
+    it('rejects a negative Suspense Debit / Credit entry amount', () => {
+      const debitSide = { ...validConfirmBody, suspenseBridge: { debitEntries: [{ amount: '-10', currency: 'USD' }] } };
+      expect(() => validateConfirmRequest(debitSide)).toThrow(RequestValidationError);
+      const creditSide = { ...validConfirmBody, suspenseBridge: { creditEntries: [{ amount: '-10', currency: 'USD' }] } };
+      try {
+        validateConfirmRequest(creditSide);
+        fail('expected throw');
+      } catch (err) {
+        expect((err as RequestValidationError).message).toContain('suspenseBridge.creditEntries.0.amount');
+      }
+    });
+
+    it('accepts zero and "-0"/"-0.00" (which are zero, not negative)', () => {
+      const body = {
+        ...validConfirmBody,
+        debitLegs: [{ ...validLeg, amountTxCcy: '0' }],
+        creditLegs: [{ ...validLeg, accountType: 'NOSTRO', amountTxCcy: '-0.00' }],
+      };
+      expect(() => validateConfirmRequest(body)).not.toThrow();
+    });
+  });
+
   it('throws for a malformed ExchangeRate pattern', () => {
     const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, drRate: 'bad-rate' }] };
     expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);

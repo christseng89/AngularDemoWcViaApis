@@ -144,6 +144,21 @@ export function decimalPlaces(value: string): number {
 }
 
 /**
+ * True iff a MonetaryAmount wire string is strictly negative (< 0). `-0` /
+ * `-0.00` count as zero, not negative. A pure string test (any non-zero digit
+ * after a leading `-`), so it is SAFE on a value that has not yet been
+ * pattern-validated — it never parses/throws. Used to reject negative CALLER
+ * amounts (M-1): direction is expressed by the Dr/Cr side, never by a negative
+ * sign; the only "negative" concept in the ledger is the FX Exchange (兌換)
+ * Dr/Cr side-swap (借貸對調), which the SERVER performs by choosing the side
+ * with a positive amount — never a literal negative — and which is generated
+ * after this validation runs, so it is unaffected.
+ */
+export function isNegativeAmount(value: string): boolean {
+  return value.startsWith('-') && /[1-9]/.test(value);
+}
+
+/**
  * §8.2 of Payment_Component_Calculation_Validation.docx:
  *   CPYT_DR_AMT_DRCCY = CPYT_DR_AMT_TXCCY × CPYT_DR_BUY_RATE   (debit)
  *   CPYT_CR_AMT_CRCCY = CPYT_CR_AMT_TXCCY × CPYT_CR_BUY_RATE   (credit, symmetric)
