@@ -83,10 +83,14 @@ npm run test:coverage       # jest --coverage
 To run a single test file/spec, pass a path or `-t` pattern straight through, e.g.
 `npm test -- leg-allocator.component.spec.ts` or `npm test -- -t "30/70 split"`.
 
-Coverage target for this project's jest suite: 100% statements/functions/lines, ~97% branches. Deliberately
-excluded from `collectCoverageFrom` (see `jest.config.js`) rather than dragging the numbers down:
-`business-case-runner.component.ts` (Formly/RxJS orchestration) and the vanilla Custom Elements under
-`web-components/import|export/` — both need TestBed/DOM-level rendering tests as a separate follow-up.
+Coverage target for this project's jest suite: 90% statements/branches/functions/lines (`coverageThreshold`
+in `jest.config.js`) — `npm test` fails the build below it. Deliberately excluded from `collectCoverageFrom`
+rather than dragging the numbers down: `business-case-runner.component.ts`'s own `.html` template, all of
+`web-components/**` (the vanilla Custom Elements for the Import/Export LC tabs — need TestBed/DOM-level
+rendering tests as a separate follow-up), and pure Angular bootstrap/DI wiring (`app.component.ts`,
+`lc-payment.component.ts`). `business-case-runner.component.ts` itself (the Formly/RxJS orchestration
+component) *is* covered — direct instantiation with mocked services, same pattern as `leg-allocator`, no
+TestBed needed.
 
 The microservice has its own, separate Jest config (`microservices/payment-component/jest.config.js`):
 
@@ -99,8 +103,17 @@ npm run build             # tsc -p tsconfig.build.json → dist/
 npm run dev               # node --watch -r ts-node/register src/server.ts — auto-restarts on save
 ```
 
+Same single-test syntax as above applies here too (`npm test -- <file-or--t-pattern>`).
+
 If running the microservice some other way (e.g. plain `ts-node src/server.ts`), it will **not** auto-restart
 on source changes — a stale process serving old behavior looks exactly like a new bug.
+
+**Never let the two Jest configs cross.** Always `cd` into `microservices/payment-component` before running
+its own Jest commands, and don't run it from `lc-payment-wc/` directly. If the microservice's `test/**` gets
+pulled into `lc-payment-wc`'s own `npm test` run (wrong working directory, or otherwise mixing the two
+`tsconfig`s), the app's stricter `tsconfig.spec.json` (`noPropertyAccessFromIndexSignature`) fails
+`routes/paymentInstructions.ts` with TS4111 errors that look like a real break but aren't — nothing is
+actually broken, the configs just got crossed.
 
 ### Building the standalone Web Components bundle
 
@@ -126,7 +139,8 @@ Formly/Angular-dependent and only reachable through the full `ng serve` app.
   - `leg-allocator.component.ts` — the %/amount/currency split grid, decimal.js-backed (30/70-split rounding
     is a known regression area).
   - `payment-component-api.service.ts` / `fx-rate.service.ts` — the two backend clients.
-  - `business-case-runner.component.ts` — ties it all together (Formly/RxJS orchestration; not yet unit-tested).
+  - `business-case-runner.component.ts` — ties it all together (Formly/RxJS orchestration; unit-tested via
+    direct instantiation + mocked services, its `.html` template is the untested part).
 - `backend/server.js` — mock calculation API for the legacy tabs, plus `GET /api/fx/rates`.
 - `microservices/payment-component/` — the real Payment Component microservice the Simulator tab talks to;
   a separate Node/TypeScript project (own `package.json`, `jest.config.js`, README), nested here rather than
@@ -163,13 +177,17 @@ extension instead of an invented OAS property (`RequestExtensions` in `routes/pa
 this contract. (`chargeContext`/`liabilityContext` — the §6.2/§6.3 legacy extension fields — existed here
 through v1.5.0; removed v1.6.0 along with §6.2/§6.3 Account Entry generation itself. A Balance/Charge
 Component that bridges through Suspense now books its own Liability/Charge leg on its own books — see
-the microservice README's "Balance/Charge Component ↔ Payment Component bridge" section, which as of
-v1.7.0/v1.7.1 also covers per-currency handling of `suspenseBridge` entries against the caller's own
-same-currency Payment Legs — `debitEntries`/`debitLegs` genuinely NET (subtraction, can reach zero);
-`creditEntries`/`creditLegs` only ever COMBINE by addition (same polarity as the always-credit
-Suspense bridge leg, so they can never cancel — confirmed by accounting review: "Credit Suspense
-EUR 100 and a real Credit Leg EUR 100 is Credit EUR 200, not zero"). v1.7.2 additionally reorders
-the generated FX Exchange pair to read as one adjacent Dr/Cr block in debitLegs/creditLegs — Normal
+the microservice README's "Balance/Charge Component ↔ Payment Component bridge" section for the full
+version history. Current behavior (**v1.8.0**, superseding v1.7.0–v1.7.5): for each foreign-currency
+bucket in a `suspenseBridge` entry, `domain/suspenseBridge.ts` generates up to **two independent,
+self-balancing FX Exchange pairs** instead of one netted/combined pair — a "Suspense pair" (named
+`FX Exchange {ccy} - Suspense`, always credit-anchored, sized to the bucket's own Suspense legs) and,
+only when a matching real Payment Leg exists in that currency, a "real-leg pair" (plain `FX Exchange
+{ccy}` naming, direction matching the list). This is a genuine response-shape change (more legs when
+Suspense and a matching real leg coexist in a currency) that closed a one-minor-unit per-currency
+display gap the earlier netted-pair approach couldn't fix without breaking aggregate V8; the request
+contract itself (`SuspenseBridge`, `PaymentLegInput`) is unchanged. v1.7.2 separately reorders the
+generated FX Exchange pair(s) to read as one adjacent Dr/Cr block in debitLegs/creditLegs — Normal
 Debit(s) → FX Debit → FX Credit → Normal Credit(s) → Suspense Credit — an accounting-review best
 practice, not a correctness change.)
 

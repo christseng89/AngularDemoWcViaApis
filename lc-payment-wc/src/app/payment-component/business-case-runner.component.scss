@@ -113,6 +113,7 @@
 
 .header-summary {
   display: flex;
+  align-items: center;
   gap: 24px;
   font-size: 13px;
   color: #374151;
@@ -125,6 +126,25 @@
   strong {
     color: #1e3a5f;
     font-weight: 600;
+  }
+}
+
+.header-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  select,
+  input {
+    font-size: 13px;
+    padding: 3px 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: #fff;
+  }
+
+  input[type='number'] {
+    width: 110px;
   }
 }
 
@@ -169,6 +189,13 @@
   color: #9ca3af;
   font-size: 13px;
   font-style: italic;
+}
+
+.no-credit-leg-hint {
+  color: #6b7280;
+  font-size: 12px;
+  font-style: italic;
+  margin: -4px 0 12px;
 }
 
 .preview-status {

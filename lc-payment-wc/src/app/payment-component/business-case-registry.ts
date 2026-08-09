@@ -207,6 +207,84 @@ const PASS_CASES: BusinessCaseConfig[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// 1 CHARGE BRIDGE — IPLC Issue: NOT one of the 15 confirmed Payment Component
+// consumer functions above (no SYF_IPLC_IPLC_Issue.js Payment Component call
+// has been source-verified — Payment_Mapping_Functions.docx §6 does not list
+// LC Issue at all). Unlike every PASS_CASES entry, this case's citation is
+// therefore NOT a legacy file:line — it is a reviewer-confirmed ARCHITECTURE
+// PATTERN (see lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment
+// Component boundary"), included here so the pattern can actually be driven
+// end-to-end against the live microservice rather than only described in
+// prose. verdict is 'PASS' purely as a UI capability gate (full live preview
+// + Confirm) — it does NOT assert legacy source verification the way every
+// other PASS case's verdict does; the citation field says so explicitly so
+// this is never mistaken for one of the 15.
+//
+// Accounting: a separate Charge Component (not modeled in this repo) posts
+// `Dr Suspense - Credit / Cr Margin, Cr Commission, Cr Charge 1, Cr Charge 2`
+// on its own books. The Payment Component only ever collects the combined
+// total from the customer and credits the same clearing account:
+// `Dr Customer A/C / Cr Suspense - Credit`. Combined, both components net to
+// the LC Issue's true accounting effect (Dr Customer A/C / Cr Margin, Cr
+// Commission, Cr Charge 1, Cr Charge 2), with Suspense - Credit clearing to
+// zero across the two components' books.
+//
+// Reviewer-confirmed (2026-08-09): `chargeBridge: true` (business-case.model.ts — see that
+// field's own doc comment for the full contract) marks this case as collecting charges ONLY —
+// there is deliberately no Credit Leg at all. The entire credit side is provided via the
+// Suspense Credit bridge (suspenseBridge.creditEntries), never a directly-submitted real credit
+// leg. This is the ONE case in the registry with only a DEBIT entry in `legs`
+// (business-case-registry.spec.ts's data invariants exempt any chargeBridge:true case
+// explicitly, with a dedicated test asserting this exact shape) — business-case-runner.
+// component.ts's `creditLegsRequired` getter reads the flag directly (not `legs`' shape) and
+// hides the Credit <app-leg-allocator> entirely, seeding `creditValid = true` in selectCase()
+// (nothing will ever emit validChange for a side with no allocator). The Debit side can still be
+// split across multiple accounts/currencies via the existing leg-allocator UI, same as any other
+// case — chargeBridge only removes the Credit side, not multi-leg support on Debit.
+//
+// Business-requirement-confirmed (2026-08-09): Transaction Amount (== the Debit Leg #1 total) is
+// PROTECTED and auto-calculated as Σ(Suspense Credit entries' Trx Ccy Equivalent) — the user adds
+// Suspense Credit entries and the Debit side follows automatically, not the other way round (see
+// business-case-runner.component.ts's baseTotalAmount/sideDefaults doc comments). `legs` below
+// still carries a positive placeholder defaultAmountTxCcy ('150') purely to satisfy this
+// registry's own "every leg has a positive default amount" invariant
+// (business-case-registry.spec.ts) — it has no bearing on the live Debit total for this case,
+// unlike every other case in the registry. Suspense Debit is not applicable in this mode and is
+// hidden from the UI entirely. With zero Suspense Credit entries, the computed total is 0 and the
+// live preview reports "not ready yet" (same `previewIncomplete` convention as any other
+// incomplete case) rather than a 409 — leg-allocator.component.ts already refuses to emit a valid
+// leg set for a non-positive amount.
+//
+// Earlier iterations (both reviewer-caught, both fixed) are worth remembering before touching
+// this again: (1) a direct, always-valid `Cr SUSPENSE "Suspense - Credit"` leg was tried first,
+// to work around leg-allocator.component.ts's `amountTxCcy > 0` validity gate — but a real leg
+// on that exact glAccount got swept into response-viewer.component.ts's "Suspense Clearing"
+// section (that check has no way to distinguish a real caller leg from a server-generated
+// suspenseBridge leg); (2) since onConfirm() does NOT gate on debitValid/creditValid the way the
+// live preview does, fully offsetting that leg via Suspense Credit could reach Confirm with a
+// real 0.00-amount leg on the wire. response-viewer.component.ts's settlementEntries getter now
+// separately excludes zero-amount entries from display regardless of cause (defense in depth),
+// but removing the Credit Leg entirely (via chargeBridge) removes the underlying cause.
+// ---------------------------------------------------------------------------
+
+const CHARGE_BRIDGE_CASES: BusinessCaseConfig[] = [
+  {
+    id: 'iplc-issue-charge-bridge',
+    module: 'IPLC',
+    functionLabel: 'Charge Component Bridge',
+    verdict: 'PASS',
+    citation:
+      'NOT legacy-traced — reviewer-confirmed architecture pattern (lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component boundary"). LC Issue is not one of the 15 confirmed Payment Component consumer functions (Payment_Mapping_Functions.docx §6).',
+    note: 'Charge Bridge — charges only, no Credit Leg. Transaction Amount is protected and auto-calculated as the sum of the Suspense Credit entries below (multiple entries/currencies supported) — Dr Customer A/C (splittable across multiple accounts/currencies) follows automatically to match Cr Suspense - Credit. The separate Charge Component (not modeled here) consumes that Suspense amount and posts the itemized Dr Suspense - Credit / Cr Margin, Commission, Charge legs on its own books.',
+    dualPrefixOptions: [
+      { label: 'IPLC99NULLNULLNULL (illustrative placeholder — not FSD-documented, see citation)', value: 'IPLC99NULLNULLNULL' },
+    ],
+    chargeBridge: true,
+    legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '150')],
+  },
+];
+
+// ---------------------------------------------------------------------------
 // 4 GAP — RPFM: legs populated in source (incl. RTGS, modeled here as
 // accountType='NOSTRO' + rtgsIndicator — v1.3.0, see payment-component.types.ts),
 // but no voucher-assembly routine exists (no RPFM##NULLNULLNULL pattern
@@ -321,7 +399,7 @@ const NA_CASES: BusinessCaseConfig[] = [
   },
 ];
 
-export const BUSINESS_CASES: BusinessCaseConfig[] = [...PASS_CASES, ...GAP_CASES, ...NA_CASES];
+export const BUSINESS_CASES: BusinessCaseConfig[] = [...PASS_CASES, ...CHARGE_BRIDGE_CASES, ...GAP_CASES, ...NA_CASES];
 
 const MODULE_LABELS: Record<string, string> = {
   IPLC: 'IPLC — Import Letter of Credit',

@@ -147,6 +147,16 @@ export interface PaymentInstructionConfirmRequest {
   sourceFunctionCode?: string;
   voucherCodePrefixOverride?: string;
   dryRun?: boolean;
+  /**
+   * Charge Component Bridge Flag (2026-08-09) — unlike the three extension fields above, this
+   * one is NOT read out of a loose RequestExtensions sidecar server-side; it's a real field on
+   * the microservice's own zod schema (validation/requestSchema.ts) because it participates in
+   * a cross-field rule there: creditLegs may be empty only when this is true AND
+   * suspenseBridge.creditEntries has at least 1 entry. Set to true iff
+   * BusinessCaseConfig.chargeBridge is true for the selected case (business-case-request.ts) —
+   * see that field's own doc comment (business-case.model.ts) for the full contract.
+   */
+  chargeComponentBridge?: boolean;
 }
 
 export interface ClassificationResult {

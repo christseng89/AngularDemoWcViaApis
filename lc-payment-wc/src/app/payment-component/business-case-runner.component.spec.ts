@@ -91,6 +91,7 @@ function makeComponent(overrides: { crossRate?: number | null; decimals?: Record
         { label: 'EUR', value: 'EUR' },
       ]),
     ),
+    codes: jest.fn(() => of(['USD', 'EUR'])),
     decimals: jest.fn(() => of(overrides.decimals ?? {})),
   } as unknown as CurrencyService;
 
@@ -139,6 +140,90 @@ describe('BusinessCaseRunnerComponent', () => {
       const { comp } = makeComponent();
       comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '1000' })] }));
       expect(comp.baseTotalAmount).toBe(0);
+    });
+  });
+
+  describe('transactionCurrencyOverride / transactionAmountOverride (Single Transaction Currency and Amount as Input Fields)', () => {
+    it('onTransactionCurrencyInput/onTransactionAmountInput override transactionCurrency/baseTotalAmount, taking priority over the selected case\'s own registry legs', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD', defaultAmountTxCcy: '1000' }), leg({ side: 'CREDIT', defaultCurrency: 'USD', defaultAmountTxCcy: '1000' })] }));
+
+      comp.onTransactionCurrencyInput('EUR');
+      comp.onTransactionAmountInput(250);
+
+      expect(comp.transactionCurrency).toBe('EUR');
+      expect(comp.baseTotalAmount).toBe(250);
+      expect(comp.transactionCurrencyOverride).toBe('EUR');
+      expect(comp.transactionAmountOverride).toBe('250');
+    });
+
+    it('a single override drives BOTH sides\' sideDefaults() equally (debitDefaults/creditDefaults), matching how every registry case already keeps both sides symmetric', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD', defaultAmountTxCcy: '1000' }), leg({ side: 'CREDIT', defaultCurrency: 'USD', defaultAmountTxCcy: '1000' })] }));
+
+      comp.onTransactionCurrencyInput('GBP');
+      comp.onTransactionAmountInput(500);
+
+      expect(comp.debitDefaults.currency).toBe('GBP');
+      expect(comp.debitDefaults.totalAmount).toBe('500');
+      expect(comp.creditDefaults.currency).toBe('GBP');
+      expect(comp.creditDefaults.totalAmount).toBe('500');
+    });
+
+    it('onTransactionCurrencyInput(\'\') clears the override, reverting to the case\'s own derivation', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultCurrency: 'EUR', defaultAmountTxCcy: '2500' }), leg({ side: 'CREDIT', defaultCurrency: 'EUR', defaultAmountTxCcy: '2500' })] }));
+
+      comp.onTransactionCurrencyInput('GBP');
+      expect(comp.transactionCurrency).toBe('GBP');
+      comp.onTransactionCurrencyInput('');
+      expect(comp.transactionCurrencyOverride).toBeNull();
+      expect(comp.transactionCurrency).toBe('EUR');
+    });
+
+    it('onTransactionAmountInput(null) (field cleared via NumberValueAccessor) clears the override, reverting to the case\'s own derivation', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '1000' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '1000' })] }));
+
+      comp.onTransactionAmountInput(42);
+      expect(comp.baseTotalAmount).toBe(42);
+      comp.onTransactionAmountInput(null);
+      expect(comp.transactionAmountOverride).toBeNull();
+      expect(comp.baseTotalAmount).toBe(1000);
+    });
+
+    it('treats a non-numeric transactionAmountOverride (defensive — should not occur via onTransactionAmountInput itself) as 0 rather than NaN', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '1000' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '1000' })] }));
+      comp.transactionAmountOverride = 'not-a-number';
+      expect(comp.baseTotalAmount).toBe(0);
+    });
+
+    it('selectCase() resets both overrides to null so a freshly-picked case never inherits a previous case\'s override', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      comp.onTransactionCurrencyInput('JPY');
+      comp.onTransactionAmountInput(999);
+
+      comp.selectCase(passConfig({ id: 'case-2' }));
+
+      expect(comp.transactionCurrencyOverride).toBeNull();
+      expect(comp.transactionAmountOverride).toBeNull();
+    });
+  });
+
+  describe('currencyDecimalsMap', () => {
+    it('exposes the same CurrencyService.decimals() map decimalsFor() uses internally, for <app-response-viewer>\'s Currency View', () => {
+      const { comp } = makeComponent({ decimals: { JPY: 0, USD: 2 } });
+      expect(comp.currencyDecimalsMap).toEqual({ JPY: 0, USD: 2 });
+    });
+
+    it('starts as {} before CurrencyService.decimals() has emitted', () => {
+      const mockApi = { confirm: jest.fn(), classify: jest.fn() } as unknown as PaymentComponentApiService;
+      const mockCurrency = { options: jest.fn(() => of([])), codes: jest.fn(() => of([])), decimals: jest.fn(() => of()) } as unknown as CurrencyService;
+      const mockFx = { rates: jest.fn(() => of()), crossRate: jest.fn() } as unknown as FxRateService;
+      const comp = new BusinessCaseRunnerComponent(mockApi, mockCurrency, mockFx);
+      expect(comp.currencyDecimalsMap).toEqual({});
     });
   });
 
@@ -265,7 +350,7 @@ describe('BusinessCaseRunnerComponent', () => {
 
       it("end-to-end with the REAL reciprocal FX-rate convention (EUR/TWD=35.20, USD/TWD=32.50): CUST-ACC2 seeds to 9783.38, and the reported 9675.07 (seed - a live EUR leg's own 108.31) is exactly what the server accepts — genuinely balances aggregate V8", () => {
         const mockApi = { confirm: jest.fn(), classify: jest.fn() } as unknown as PaymentComponentApiService;
-        const mockCurrency = { options: jest.fn(() => of([])), decimals: jest.fn(() => of({})) } as unknown as CurrencyService;
+        const mockCurrency = { options: jest.fn(() => of([])), codes: jest.fn(() => of([])), decimals: jest.fn(() => of({})) } as unknown as CurrencyService;
         const mockFx = {
           rates: jest.fn(() => of({})),
           crossRate: jest.fn((_rates: unknown, from: string, to: string) => {
@@ -441,6 +526,144 @@ describe('BusinessCaseRunnerComponent', () => {
 
       comp.ngOnDestroy(); // avoid a dangling timer/subscription leaking into the next test
     }));
+  });
+
+  describe('creditLegsRequired (Charge Bridge Flag — chargeBridge:true cases have no Credit Leg, e.g. iplc-issue-charge-bridge)', () => {
+    it('is true for an ordinary case (chargeBridge unset)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      expect(comp.creditLegsRequired).toBe(true);
+    });
+
+    it('is false when the selected case has chargeBridge: true, regardless of legs\' own shape', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT' })] }));
+      expect(comp.creditLegsRequired).toBe(false);
+    });
+
+    it('is true for a case with chargeBridge left unset even if it happens to have only a DEBIT leg (the flag, not legs\' shape, is authoritative)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT' })] }));
+      expect(comp.creditLegsRequired).toBe(true);
+    });
+
+    it('is false when no case is selected', () => {
+      const { comp } = makeComponent();
+      expect(comp.creditLegsRequired).toBe(false);
+    });
+
+    it('selectCase() seeds creditValid = true for a chargeBridge:true case, so the live preview is never blocked forever by a side with no <app-leg-allocator> to emit validChange', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT' })] }));
+      expect((comp as any).creditValid).toBe(true);
+      expect(comp.creditLegs).toEqual([]);
+    });
+
+    it('selectCase() still seeds creditValid = false for an ordinary case (unchanged, real leg-allocator gates it)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      expect((comp as any).creditValid).toBe(false);
+    });
+
+    it('selectCase(null) seeds creditValid = false', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT' })] })); // first true...
+      comp.selectCase(null); // ...then cleared back to false, not left stuck true
+      expect((comp as any).creditValid).toBe(false);
+    });
+  });
+
+  describe('Charge Bridge Flag — Transaction Amount derivation (business-requirement-confirmed 2026-08-09: for chargeBridge:true, baseTotalAmount/Debit Leg #1 = Σ Suspense Credit Trx Ccy Equivalent, protected/read-only)', () => {
+    it('is 0 with no Suspense Credit entries, ignoring the registry leg\'s own placeholder defaultAmountTxCcy', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '999999' })] }));
+      expect(comp.baseTotalAmount).toBe(0);
+      expect(comp.debitDefaults.totalAmount).toBe('0');
+    });
+
+    it('equals the sum of Suspense Credit entries in the transaction currency (same currency, no conversion)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseCreditEntries = [entry('60', 'USD'), entry('90', 'USD')];
+      expect(comp.baseTotalAmount).toBe(150);
+      expect(comp.debitDefaults.totalAmount).toBe('150');
+    });
+
+    it('converts a foreign-currency Suspense Credit entry at its own crossRate before summing', () => {
+      const { comp } = makeComponent({ crossRate: 2 });
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseCreditEntries = [entry('50', 'EUR')];
+      expect(comp.debitDefaults.totalAmount).toBe('100'); // 50 * 2
+    });
+
+    it('is unaffected by suspenseDebitEntries — Suspense Debit is not applicable in this mode', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseDebitEntries = [entry('500', 'USD')];
+      comp.suspenseCreditEntries = [entry('60', 'USD')];
+      expect(comp.debitDefaults.totalAmount).toBe('60'); // suspenseDebitEntries has zero effect
+    });
+
+    it('onTransactionAmountInput is a no-op — Transaction Amount is protected, never user-overridden', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseCreditEntries = [entry('60', 'USD')];
+
+      comp.onTransactionAmountInput(9999);
+
+      expect(comp.transactionAmountOverride).toBeNull();
+      expect(comp.baseTotalAmount).toBe(60); // unchanged — still derived from Suspense Credit, not the attempted override
+    });
+
+    it('an ordinary (non-chargeBridge) case is unaffected — onTransactionAmountInput still overrides normally', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      comp.onTransactionAmountInput(250);
+      expect(comp.transactionAmountOverride).toBe('250');
+      expect(comp.baseTotalAmount).toBe(250);
+    });
+  });
+
+  describe('creditFxPairs (NG9 fix — template-safe alternative to referencing #creditAllocator, which is *ngIf-scoped, from <app-response-viewer>)', () => {
+    it('returns [] for a chargeBridge:true case, even if creditAllocatorRef somehow is set (defense in depth — the allocator element never renders for such a case)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ chargeBridge: true, legs: [leg({ side: 'DEBIT' })] }));
+      (comp as any).creditAllocatorRef = { fxPairs: [{ drCr: 'C', account: 'FX Exchange EUR', currency: 'USD', amount: 10, site: 'Trx Ccy' }] };
+      expect(comp.creditFxPairs).toEqual([]);
+    });
+
+    it('returns [] when creditAllocatorRef has not resolved yet (e.g. before the view\'s first change-detection pass)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      expect((comp as any).creditAllocatorRef).toBeUndefined();
+      expect(comp.creditFxPairs).toEqual([]);
+    });
+
+    it('returns the filtered creditAllocatorRef.fxPairs for an ordinary case once the ViewChild has resolved', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      const pairs: FxPairEntry[] = [
+        { drCr: 'C', account: 'FX Exchange EUR', currency: 'USD', amount: 55, site: 'Trx Ccy' },
+        { drCr: 'D', account: 'FX Exchange USD', currency: 'EUR', amount: 50, site: 'Other Ccy' },
+      ];
+      (comp as any).creditAllocatorRef = { fxPairs: pairs };
+      comp.suspenseCreditEntries = []; // nothing to net out — filterFxPairsNettedBySuspense leaves both untouched
+
+      expect(comp.creditFxPairs).toEqual(pairs);
+    });
+
+    it('a Suspense Credit entry in the matching currency suppresses the pair, same as debitFxPairs already does — proves this goes through filterFxPairsNettedBySuspense, not a raw pass-through', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      const pairs: FxPairEntry[] = [
+        { drCr: 'C', account: 'FX Exchange EUR', currency: 'USD', amount: 55, site: 'Trx Ccy' },
+        { drCr: 'D', account: 'FX Exchange USD', currency: 'EUR', amount: 50, site: 'Other Ccy' },
+      ];
+      (comp as any).creditAllocatorRef = { fxPairs: pairs };
+      comp.suspenseCreditEntries = [entry('50', 'EUR')];
+
+      expect(comp.creditFxPairs).toEqual([]);
+    });
   });
 
   describe('casesForSelectedModule', () => {

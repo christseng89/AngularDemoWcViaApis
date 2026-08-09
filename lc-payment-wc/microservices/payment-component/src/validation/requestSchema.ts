@@ -67,19 +67,55 @@ const suspenseBridgeSchema = z.object({
   creditEntries: z.array(suspenseEntrySchema).optional(),
 });
 
-export const paymentInstructionConfirmRequestSchema = z.object({
-  originModule: z.enum(ORIGIN_MODULES),
-  mainRef: z.string().min(1),
-  sequence: z.number().int(),
-  unitCode: z.string().min(1),
-  tenorType: z.string().optional(),
-  tenorStartDate: dateSchema.optional(),
-  maturityDate: dateSchema.optional(),
-  payInstrFlag: z.enum(PAY_INSTR_FLAGS).optional(),
-  debitLegs: z.array(paymentLegInputSchema).min(1, 'debitLegs must contain at least 1 item'),
-  creditLegs: z.array(paymentLegInputSchema).min(1, 'creditLegs must contain at least 1 item'),
-  suspenseBridge: suspenseBridgeSchema.optional(),
-});
+export const paymentInstructionConfirmRequestSchema = z
+  .object({
+    originModule: z.enum(ORIGIN_MODULES),
+    mainRef: z.string().min(1),
+    sequence: z.number().int(),
+    unitCode: z.string().min(1),
+    tenorType: z.string().optional(),
+    tenorStartDate: dateSchema.optional(),
+    maturityDate: dateSchema.optional(),
+    payInstrFlag: z.enum(PAY_INSTR_FLAGS).optional(),
+    debitLegs: z.array(paymentLegInputSchema).min(1, 'debitLegs must contain at least 1 item'),
+    // No .min(1) here — see the superRefine below for the actual (conditional) rule.
+    creditLegs: z.array(paymentLegInputSchema),
+    suspenseBridge: suspenseBridgeSchema.optional(),
+    /**
+     * Charge Component Bridge Flag (reviewer-confirmed, 2026-08-09) — NOT part of
+     * payment-instructions-post.yaml (no home in the official OAS, same situation as
+     * sourceFunctionCode — see that field's doc comment in routes/paymentInstructions.ts).
+     * Unlike sourceFunctionCode/voucherCodePrefixOverride/dryRun, this one is declared as a
+     * real zod field (not just read out of RequestExtensions) because it participates in a
+     * cross-field validation rule below, not just pass-through options.
+     *
+     * When true AND suspenseBridge.creditEntries has at least 1 entry, creditLegs may be
+     * empty — the entire credit side is provided by the Suspense Credit bridge to a separate
+     * Charge Component (see lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component
+     * boundary"), never a directly-submitted credit leg. This does not change how the balance
+     * check or classification behaves — confirmPaymentInstruction.ts already expands
+     * suspenseBridge.creditEntries into real credit legs before both run (v1.4.0); this flag's
+     * only job is relaxing the request-shape check below so that expansion is reachable with
+     * an empty creditLegs array. Omitted/false, or true with no suspenseBridge.creditEntries:
+     * creditLegs must contain at least 1 item, same as every other case — this flag is
+     * deliberately NOT a blanket bypass of the "must have a credit side" rule.
+     */
+    chargeComponentBridge: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const bridgeHasCredit = (data.suspenseBridge?.creditEntries?.length ?? 0) > 0;
+    const exempt = data.chargeComponentBridge === true && bridgeHasCredit;
+    if (data.creditLegs.length === 0 && !exempt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_small,
+        minimum: 1,
+        type: 'array',
+        inclusive: true,
+        path: ['creditLegs'],
+        message: 'creditLegs must contain at least 1 item',
+      });
+    }
+  });
 
 export type ValidatedConfirmRequest = z.infer<typeof paymentInstructionConfirmRequestSchema>;
 

@@ -38,7 +38,7 @@ Server listens on `PORT` (default 3000), all routes mounted under
 |---|---|---|
 | `src/types.ts` | — | TypeScript types mirroring every OAS schema exactly |
 | `src/money.ts` | §8.2 | Decimal-backed parse/format for `MonetaryAmount`/`ExchangeRate`; the only module allowed to construct a `Decimal` from a wire string |
-| `src/validation/requestSchema.ts` | — | zod schema for `PaymentInstructionConfirmRequest`; failures → 400 |
+| `src/validation/requestSchema.ts` | — | zod schema for `PaymentInstructionConfirmRequest`; failures → 400. `creditLegs` normally requires >=1 item; a `superRefine` relaxes this to 0 only when `chargeComponentBridge === true` AND `suspenseBridge.creditEntries` is non-empty (2026-08-09, not legacy-traced — see "Charge Component Bridge" below) |
 | `src/domain/balanceValidation.ts` | §3, V8 | Dr/Cr balance check |
 | `src/domain/classification.ts` | §4 | Payment Component Identification Rule (Rev. 2) |
 | `src/domain/voucherDescription.ts` | §5 | Per-leg `accountDesc` assembly |
@@ -70,6 +70,16 @@ schema, see `RequestExtensions` in `routes/paymentInstructions.ts`):
 fields — existed here through v1.5.0; removed v1.6.0 along with §6.2/§6.3
 generation itself. See "Balance/Charge Component ↔ Payment Component bridge"
 below for the current design.)
+
+A second field, **`chargeComponentBridge`** (boolean, added 2026-08-09), is a related but
+mechanically DIFFERENT case: it isn't routed through the `RequestExtensions` sidecar above at
+all (which bypasses zod validation entirely) because it needs to participate in a cross-field
+validation rule — it's declared directly on `paymentInstructionConfirmRequestSchema`
+(`validation/requestSchema.ts`) with a `superRefine` that relaxes `creditLegs`' normal `>= 1`
+item requirement to 0 items, but ONLY when `chargeComponentBridge === true` AND
+`suspenseBridge.creditEntries` has at least one entry. Also has no home in the OAS (same
+situation as `sourceFunctionCode`) — see "Charge Component Bridge (`chargeComponentBridge`,
+2026-08-09)" below for the full contract and the accounting rationale.
 
 ## Balance/Charge Component ↔ Payment Component bridge (`suspenseBridge`, v1.4.0 / v1.5.0 / v1.7.0-v1.8.0)
 
@@ -219,6 +229,64 @@ to the same zero incremental effect on the transaction currency once summed, jus
 instead of zero. This is a genuine **response-shape change** (more legs generated for a bucket with
 both a Suspense entry and a matching real leg; new `- Suspense`-suffixed account names) — the
 *request* contract (`SuspenseBridge`, `PaymentLegInput`, etc.) is entirely unchanged.
+
+### Charge Component Bridge (`chargeComponentBridge`, 2026-08-09)
+
+**Business-requirement-confirmed, not legacy-traced.** A distinct usage pattern from the general
+Balance/Charge Component bridge above: instead of a real leg and a Suspense entry being two
+*independent* sources that happen to share a currency (the v1.8.0 model above), a
+`chargeComponentBridge:true` request's `debitLegs` and `suspenseBridge.creditEntries` are the
+**two halves of the same transaction** — `Dr Customer A/C` / `Cr Suspense - Credit`, with
+`creditLegs` deliberately empty (the Simulator's `iplc-issue-charge-bridge` business case is the
+first caller of this shape; see `lc-payment-wc/CLAUDE.md`'s "Charge Component ↔ Payment Component
+boundary" for the Angular-side flag, `BusinessCaseConfig.chargeBridge`).
+
+Because `creditLegs` is always empty in this mode, the v1.8.0 "real-leg pair" logic above —
+which only ever compares a `creditEntries` bucket against the SAME-side `creditLegs` — can never
+fire for it, and the unconditional gross-sized "Suspense pair" would generate FX Exchange entries
+for every foreign-currency bucket regardless of whether `debitLegs` in that currency already
+account for it (pure decoration when they do — no conversion is actually happening).
+
+`expandSuspenseBridge` (`domain/suspenseBridge.ts`) instead computes, per foreign-currency
+`creditEntries` bucket, **`diff = grossSuspenseAmount − matching debitLegs' native-currency
+sum`** (both native-currency amounts; the transaction-currency side of `diff` is likewise
+`suspenseTrxEq − matchingDebitLegs' own already-rounded amountTxCcy` — subtracting two figures
+that are each ALREADY final/rounded/on-the-wire, never re-deriving one from a fresh rate
+multiplication, the specific failure mode the v1.7.3 revert above describes):
+
+- **`diff == 0`** (the debit legs in this currency exactly match the Suspense Credit bucket):
+  **no FX pair at all** — just the plain `Cr Suspense - Credit {ccy}` leg, same treatment as the
+  transaction-currency case.
+- **`diff > 0`** (Suspense exceeds the matching debit legs — including the common case of no
+  matching debit leg at all, where `diff` reduces to the full gross amount, byte-for-byte the
+  v1.8.0 behavior above): a CREDIT-anchored pair, sized to just the shortfall.
+- **`diff < 0`** (a real debit leg exceeds the Suspense bucket — e.g. partly funded by a surplus
+  collected in a different currency): a DEBIT-anchored pair (opposite polarity from the case
+  above), sized to just the excess.
+
+Worked examples (transaction currency USD, EUR/USD rate 1.2), all verified end-to-end via
+`confirmPaymentInstruction`:
+
+| Scenario | `debitLegs` | Suspense Credit | Result |
+|---|---|---|---|
+| Exact match | USD 80+20, EUR 200 | USD 100, EUR 200 | No FX lines at all; `Dr CUST-ACC EUR 200` / `Cr Suspense - Credit EUR 200` balance by currency on their own |
+| No matching leg | USD 340 (no EUR leg) | USD 100, EUR 200 | Full-gross FX pair (EUR 200 / USD 240) — identical to pre-existing v1.8.0 behavior |
+| Partial coverage | USD 160, EUR 150 | USD 100, EUR 200 | FX pair sized to just EUR 50 / USD 60 (the residual), not the full EUR 200 / USD 240 |
+| Debit exceeds | USD 88, EUR 210 | USD 100, EUR 200 | DEBIT-anchored FX pair sized to just EUR 10 / USD 12 (the excess) |
+
+Every pair here is self-balancing by construction (adds the identical amount to both debit and
+credit) regardless of how it's sized, so none of this ever affects whether aggregate V8 passes —
+a genuine, unexplained mismatch (no compensating leg anywhere else in the request) still throws
+409 `LEGS_UNBALANCED` exactly as before; sizing only changes the DISPLAYED magnitude. Gated
+narrowly on `chargeComponentBridge:true` — every other request's FX-pair behavior (the v1.8.0
+Suspense-pair-plus-real-leg-pair model above) is completely untouched. See
+`test/unit/domain/suspenseBridge.test.ts`'s and `test/unit/domain/confirmPaymentInstruction.test.ts`'s
+`chargeComponentBridge` describe blocks for the full test coverage of all four scenarios above.
+
+The Simulator has a companion frontend fix for the same reason: its "Debit FX Conversion Pair"
+display panel used to net only against `suspenseDebitEntries` (always empty for a chargeBridge
+case), so it kept showing a misleading naive FX pair the server no longer generates — see
+`lc-payment-wc/CLAUDE.md` for that fix.
 
 ### Settlement leg ordering (v1.7.2)
 

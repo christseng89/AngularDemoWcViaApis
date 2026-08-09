@@ -85,7 +85,13 @@ export function confirmPaymentInstruction(
   // caller's own debitLegs/creditLegs through — expandSuspenseBridge nets/combines each
   // foreign-currency Suspense bucket against same-currency legs on the matching side.
   const transactionCurrency = request.debitLegs[0]!.currency;
-  const bridge = expandSuspenseBridge(request.suspenseBridge, transactionCurrency, request.debitLegs, request.creditLegs);
+  const bridge = expandSuspenseBridge(
+    request.suspenseBridge,
+    transactionCurrency,
+    request.debitLegs,
+    request.creditLegs,
+    request.chargeComponentBridge === true,
+  );
 
   // v1.7.1 ordering: the FX Exchange pair should read as one adjacent Dr/Cr block in the
   // Settlement Vouchers table (accounting-review best practice — lets a reviewer confirm

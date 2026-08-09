@@ -26,9 +26,22 @@
   <div class="instruction-id" *ngIf="instructionId">instructionId: {{ instructionId }}</div>
 
   <ng-container *ngIf="accountEntries">
-    <div class="entries-section" *ngIf="settlementEntries.length">
-      <h6 class="section-label">Settlement Vouchers</h6>
-      <table class="entries-table settlement-table">
+    <div class="entries-section settlement-vouchers-section" *ngIf="settlementEntries.length">
+      <div class="settlement-header-row">
+        <h6 class="section-label">Settlement Vouchers</h6>
+        <div class="view-tabs" role="tablist">
+          <button type="button" role="tab" class="view-tab" [attr.aria-selected]="activeSettlementView === 'posting'"
+                  [class.active]="activeSettlementView === 'posting'" (click)="activeSettlementView = 'posting'">
+            Posting View
+          </button>
+          <button type="button" role="tab" class="view-tab" [attr.aria-selected]="activeSettlementView === 'currency'"
+                  [class.active]="activeSettlementView === 'currency'" (click)="activeSettlementView = 'currency'">
+            Currency View
+          </button>
+        </div>
+      </div>
+
+      <table class="entries-table settlement-table" *ngIf="activeSettlementView === 'posting'">
         <colgroup>
           <col class="col-drcr" /><col class="col-gl-account" /><col class="col-currency" /><col class="col-amount" /><col class="col-description" />
         </colgroup>
@@ -40,18 +53,41 @@
           </tr>
         </tbody>
       </table>
+
+      <table class="entries-table settlement-table currency-view-table" *ngIf="activeSettlementView === 'currency'">
+        <colgroup>
+          <col class="col-drcr" /><col class="col-gl-account" /><col class="col-amount" /><col class="col-entry-type" /><col class="col-description" />
+        </colgroup>
+        <thead><tr><th>Dr/Cr</th><th>GL Account</th><th>Amount</th><th>Entry Type</th><th>Description</th></tr></thead>
+        <tbody *ngFor="let group of currencyGroups">
+          <tr class="settlement-group-header"><td colspan="5">{{ group.currency }}</td></tr>
+          <tr *ngFor="let e of group.entries" [class.dr]="e.drCrIndicator === 'D'" [class.cr]="e.drCrIndicator === 'C'">
+            <td>{{ e.drCrIndicator }}</td><td>{{ e.glAccount }}</td><td>{{ e.amount }}</td><td>{{ e.entryType }}</td><td>{{ e.description }}</td>
+          </tr>
+          <tr class="currency-totals-row">
+            <td colspan="5">
+              <div class="currency-totals">
+                <span>Total Debit: {{ group.currency }} {{ group.totalDebit }}</span>
+                <span>Total Credit: {{ group.currency }} {{ group.totalCredit }}</span>
+                <span [class.imbalanced]="!group.balanced">Difference: {{ group.currency }} {{ group.difference }}</span>
+                <span class="status-badge" [class.balanced]="group.balanced" [class.unbalanced]="!group.balanced">
+                  {{ group.balanced ? 'Balanced' : 'Unbalanced' }}
+                </span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <div class="entries-section fx-pair-section" *ngIf="debitFxPairs.length">
-      <h6 class="section-label">Debit FX Conversion Pair <span class="new-badge">new — not in baseline source</span></h6>
-      <p class="fx-pair-hint">
-        SSSS_PaymentDebit.js posts one entry per leg only — Debit totals by currency wouldn't
-        otherwise balance. Computed independently of the Credit side, purely for display — not
-        sent to the microservice.
-      </p>
-      <table class="fx-pair-table">
+    <div class="entries-section" *ngIf="activeSettlementView === 'posting' && debitFxPairs.length">
+      <table class="entries-table settlement-table">
+        <colgroup>
+          <col class="col-drcr" /><col class="col-gl-account" /><col class="col-currency" /><col class="col-amount" /><col class="col-description" />
+        </colgroup>
         <thead><tr><th>Dr/Cr</th><th>Account</th><th>Currency</th><th>Amount</th><th>Site</th></tr></thead>
         <tbody>
+          <tr class="settlement-group-header"><td colspan="5">Debit FX Conversion Pair</td></tr>
           <tr *ngFor="let p of debitFxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
             <td>{{ p.drCr }}</td><td>{{ p.account }}</td><td>{{ p.currency }}</td><td>{{ p.amount }}</td><td>{{ p.site }}</td>
           </tr>
@@ -59,16 +95,14 @@
       </table>
     </div>
 
-    <div class="entries-section fx-pair-section" *ngIf="creditFxPairs.length">
-      <h6 class="section-label">Credit FX Conversion Pair <span class="new-badge">new — not in baseline source</span></h6>
-      <p class="fx-pair-hint">
-        SSSS_PaymentCredit.js posts one entry per leg only — Credit totals by currency wouldn't
-        otherwise balance. Computed independently of the Debit side, purely for display — not
-        sent to the microservice.
-      </p>
-      <table class="fx-pair-table">
+    <div class="entries-section" *ngIf="activeSettlementView === 'posting' && creditFxPairs.length">
+      <table class="entries-table settlement-table">
+        <colgroup>
+          <col class="col-drcr" /><col class="col-gl-account" /><col class="col-currency" /><col class="col-amount" /><col class="col-description" />
+        </colgroup>
         <thead><tr><th>Dr/Cr</th><th>Account</th><th>Currency</th><th>Amount</th><th>Site</th></tr></thead>
         <tbody>
+          <tr class="settlement-group-header"><td colspan="5">Credit FX Conversion Pair</td></tr>
           <tr *ngFor="let p of creditFxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
             <td>{{ p.drCr }}</td><td>{{ p.account }}</td><td>{{ p.currency }}</td><td>{{ p.amount }}</td><td>{{ p.site }}</td>
           </tr>

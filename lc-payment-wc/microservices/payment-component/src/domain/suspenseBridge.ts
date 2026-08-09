@@ -63,6 +63,21 @@
  * contract, including what this service does NOT adjust on the caller's
  * behalf (only Suspense/FX legs are ever ADDED — a caller's own submitted
  * debit/credit leg amounts are never modified).
+ *
+ * chargeComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed) — see the
+ * `if (chargeComponentBridge && side === 'CREDIT')` branch inside expandSuspenseBridge below for
+ * the full rationale. Short version: a chargeComponentBridge request's real legs sit on the
+ * OPPOSITE side from its suspenseBridge.creditEntries (creditLegs is always empty in that mode),
+ * a direction the ordinary same-side "real-leg pair" logic above never checks. Instead of the
+ * unconditional gross-sized Suspense pair every other request gets, a chargeComponentBridge
+ * bucket gets ONE pair sized to the DIFFERENCE between the bucket's own gross amount and the
+ * caller's matching-currency debitLegs — zero when they match exactly (no FX pair at all — no
+ * conversion is actually happening), the full gross amount when there's no matching debit leg at
+ * all (identical to the pre-existing behavior in that case), and just the residual otherwise.
+ * Scoped narrowly (chargeComponentBridge:true only) to avoid the netting/combining class of bug
+ * this file's v1.7.x history is full of — but safely so, because every pair here (gross- or
+ * diff-sized, it makes no difference) is self-balancing by construction and therefore never
+ * affects whether aggregate V8 passes; only the DISPLAYED magnitude changes.
  */
 import type { PaymentLegInput, SuspenseBridge, SuspenseEntry, LegSide } from '../types';
 import { parseMonetaryAmount, parseExchangeRate, formatMonetaryAmount, minorUnitsForCurrency, sumMonetaryAmounts } from '../money';
@@ -252,6 +267,7 @@ export function expandSuspenseBridge(
   transactionCurrency: string,
   debitLegs: readonly PaymentLegInput[] = [],
   creditLegs: readonly PaymentLegInput[] = [],
+  chargeComponentBridge = false,
 ): { debit: PaymentLegInput[]; credit: PaymentLegInput[] } {
   const debit: PaymentLegInput[] = [];
   const credit: PaymentLegInput[] = [];
@@ -283,6 +299,61 @@ export function expandSuspenseBridge(
       if (currency === transactionCurrency) continue; // case 1 — no FX pair, ever.
 
       const rate = resolveBucketRate(currency, bucket);
+      const grossSuspense = sumMonetaryAmounts(bucket.map((e) => e.amount));
+      const suspenseTrxEq = sumMonetaryAmounts(bucketSuspenseLegs.map((l) => l.amountTxCcy));
+
+      // Charge Component Bridge Flag (2026-08-09, business-requirement-confirmed): a
+      // chargeComponentBridge request's real legs are ALWAYS on the OPPOSITE side from its
+      // suspenseBridge.creditEntries (Dr Customer A/C / Cr Suspense - Credit — creditLegs is
+      // always empty in this mode, see this file's top doc comment), so the ordinary "real-leg
+      // pair" below — which only ever compares AGAINST THE SAME side (creditEntries vs
+      // creditLegs) — can never fire for it. Replaces BOTH the unconditional gross-sized
+      // Suspense pair AND the (always-skipped, for this mode) same-side real-leg pair with ONE
+      // pair sized to the DIFFERENCE between this bucket's own gross amount and the caller's
+      // OPPOSITE-side debitLegs in the SAME native currency:
+      //   - diff == 0 (exact match, e.g. 200 EUR debit vs 200 EUR Suspense Credit): NO FX pair
+      //     at all — Dr CUST-ACC {ccy} X / Cr Suspense - Credit {ccy} X already balances BY
+      //     CURRENCY on its own, so a full-gross pair would be pure decoration, misleadingly
+      //     implying a conversion that never occurred.
+      //   - diff > 0 (Suspense exceeds the matching debitLegs, e.g. no matching debit leg at
+      //     all in this currency): a CREDIT-anchored pair sized to just the shortfall — when
+      //     there's no matching leg at all this reduces to the pre-existing gross-sized
+      //     behavior (matchingDebitLegs = 0, so diff = the full gross amount), unchanged.
+      //   - diff < 0 (debitLegs exceed the Suspense bucket, e.g. a real leg partly funded by a
+      //     DIFFERENT currency's surplus): a DEBIT-anchored pair sized to the excess, the
+      //     mirror-image case.
+      // Sized using suspenseTrxEq/oppositeTrx — both ALREADY-rounded, already-on-the-wire
+      // amountTxCcy sums — via plain Decimal subtraction, never a fresh rate re-conversion of a
+      // derived magnitude. This is deliberately NOT the same class of bug as the v1.7.3 attempt
+      // this file's top doc comment describes (which combined amounts and re-converted the
+      // combined figure at a single rate, drifting from what was already independently rounded
+      // and on the wire): subtracting two figures that are each already final/verbatim cannot
+      // introduce a NEW rounding disagreement the way re-multiplying a combined magnitude did.
+      // A genuine, unexplained aggregate mismatch (no compensating leg anywhere else) is
+      // UNAFFECTED by any of this either way — every pair here is self-balancing by
+      // construction (adds the identical amount to both debit and credit), so it can never
+      // change whether Σ debitLegs == Σ creditLegs; that still gets caught by
+      // validateDrCrBalance (§3/V8) exactly as before, regardless of how this pair is sized.
+      if (chargeComponentBridge && side === 'CREDIT') {
+        const oppositeNative = sumLegsInCurrency(debitLegs, currency);
+        const oppositeTrx = sumLegsTrxCcy(debitLegs, currency);
+        const diffNative = grossSuspense.minus(oppositeNative);
+        const diffTrx = suspenseTrxEq.minus(oppositeTrx);
+
+        // NOTE: Decimal#isPositive() is true for >= 0 (zero counts as "positive" in decimal.js),
+        // NOT strictly > 0 — greaterThan(0)/lessThan(0) are used here instead so the zero case
+        // falls through neither branch, exactly as intended (diffNative === 0 means no pair).
+        if (diffNative.greaterThan(0)) {
+          const pair = buildFxPair(currency, transactionCurrency, diffNative, diffTrx, 'CREDIT', rate, ' - Suspense');
+          debit.push(...pair.debit);
+          credit.push(...pair.credit);
+        } else if (diffNative.lessThan(0)) {
+          const pair = buildFxPair(currency, transactionCurrency, diffNative.abs(), diffTrx.abs(), 'DEBIT', rate, ' - Suspense');
+          debit.push(...pair.debit);
+          credit.push(...pair.credit);
+        }
+        continue;
+      }
 
       // Suspense's own pair — always CREDIT-anchored (the bridge leg's own fixed
       // direction), regardless of which list it came from. Sized to reuse the
@@ -293,8 +364,6 @@ export function expandSuspenseBridge(
       // self-descriptive, not just when it happens to need disambiguating from a real leg's
       // own pair. A deliberate v1.8.0 naming change from the plain "FX Exchange {ccy}" this
       // pair carried pre-v1.8.0 when no leg coexisted.
-      const grossSuspense = sumMonetaryAmounts(bucket.map((e) => e.amount));
-      const suspenseTrxEq = sumMonetaryAmounts(bucketSuspenseLegs.map((l) => l.amountTxCcy));
       const suspensePair = buildFxPair(currency, transactionCurrency, grossSuspense, suspenseTrxEq, 'CREDIT', rate, ' - Suspense');
       debit.push(...suspensePair.debit);
       credit.push(...suspensePair.credit);
