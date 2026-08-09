@@ -209,8 +209,17 @@ export interface SwiftMessage {
   messageType: SwiftMessageType;
   status: SwiftMessageStatus;
   correspondentBic?: string;
+  /** field 32A currency — the interbank SETTLED currency (the leg's own/account currency). */
   settlementCurrency?: string;
+  /** field 32A amount — the interbank SETTLED amount, in settlementCurrency. */
   settlementAmount?: MonetaryAmount;
+  /**
+   * field 33B currency — the INSTRUCTED (originally ordered) currency. Added
+   * for H-3: distinct from settlementCurrency for a cross-currency payment
+   * (32A ≠ 33B). Equals settlementCurrency for a same-currency payment.
+   */
+  instructedCurrency?: string;
+  /** field 33B amount — the INSTRUCTED amount, in instructedCurrency (the transaction currency). */
   instructedAmount?: MonetaryAmount;
   valueDate?: string;
   uetr?: string;

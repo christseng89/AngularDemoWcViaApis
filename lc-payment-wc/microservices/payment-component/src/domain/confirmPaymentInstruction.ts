@@ -186,7 +186,7 @@ export function confirmPaymentInstruction(
 
   // Step 5 (§7): SWIFT cross-field validation (409 on violation), then message generation.
   validateSwiftCrossField(creditLegs);
-  const swiftMessages = buildSwiftMessages(instructionId, creditLegs);
+  const swiftMessages = buildSwiftMessages(instructionId, creditLegs, transactionCurrency);
 
   const instruction: PaymentInstruction = {
     instructionId,

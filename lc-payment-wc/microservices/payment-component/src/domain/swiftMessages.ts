@@ -13,6 +13,7 @@
  * preserved on the leg (never coerced away) so a future message-routing
  * distinction, if one is ever added, has something to key off.
  */
+import { randomUUID } from 'crypto';
 import type { PaymentLeg, SwiftMessage, SwiftMessageType } from '../types';
 import { BusinessValidationError } from '../errors';
 
@@ -51,12 +52,26 @@ function nextMessageId(): string {
 
 /**
  * §7.1 field mapping — applies only when payAdviceMsgType resolves to
- * MT103/PACS008. Note (documented, not silently "fixed"): settlement amount
- * (32A) and instructed amount (33B) are populated from the SAME source field
- * (CPYT_CR_AMT_CRCCY) in the traced source, so they are intentionally equal
- * here too — see §7.1/§12.5 of the Calculation & Validation doc.
+ * MT103/PACS008.
+ *
+ * H-3 fix (2026-08-09): 32A (interbank SETTLED amount) and 33B (INSTRUCTED
+ * amount) are NO LONGER forced equal. The traced source populated both from
+ * the same field (CPYT_CR_AMT_CRCCY, §7.1/§12.5), which is only correct for a
+ * SAME-currency payment. For a genuine cross-currency payment they differ:
+ *   - 32A = settlementCurrency (the leg's own/account currency) + the amount
+ *     actually settled in it (amountAccountCcy).
+ *   - 33B = instructedCurrency (the TRANSACTION currency the payment was
+ *     ordered in) + the transaction-currency amount (amountTxCcy).
+ * For a same-currency leg (no amountAccountCcy, leg.currency === transaction
+ * currency) both collapse to the identical currency+amount, exactly matching
+ * the old behaviour — so single-currency payments are byte-for-byte unchanged.
+ *
+ * `uetr` (H-3): a SWIFT gpi UETR — mandatory on CBPR+ pacs.008 / gpi MT103.
+ * The SAME uetr is shared by a leg's advice AND its cover message, per gpi
+ * (the cover that funds an MT103 carries that MT103's UETR). Generated as a
+ * v4 UUID (randomUUID(), already lowercase 8-4-4-4-12 — the required format).
  */
-function buildAdviceMessage(instructionId: string, leg: PaymentLeg): SwiftMessage {
+function buildAdviceMessage(instructionId: string, leg: PaymentLeg, transactionCurrency: string, uetr: string): SwiftMessage {
   return {
     messageId: nextMessageId(),
     instructionId,
@@ -65,21 +80,25 @@ function buildAdviceMessage(instructionId: string, leg: PaymentLeg): SwiftMessag
     status: 'PENDING',
     settlementCurrency: leg.currency,
     settlementAmount: leg.amountAccountCcy ?? leg.amountTxCcy,
-    instructedAmount: leg.amountAccountCcy ?? leg.amountTxCcy,
+    instructedCurrency: transactionCurrency,
+    instructedAmount: leg.amountTxCcy,
     valueDate: leg.valueDate,
+    uetr,
   };
 }
 
-function buildCoverMessage(instructionId: string, leg: PaymentLeg): SwiftMessage {
+function buildCoverMessage(instructionId: string, leg: PaymentLeg, uetr: string): SwiftMessage {
   return {
     messageId: nextMessageId(),
     instructionId,
     legId: leg.legId,
     messageType: leg.payCoverMsgType as SwiftMessageType,
     status: 'PENDING',
+    // A cover (MT202/MT202COV) settles the interbank amount only — 32A, no 33B.
     settlementCurrency: leg.currency,
     settlementAmount: leg.amountAccountCcy ?? leg.amountTxCcy,
     valueDate: leg.valueDate,
+    uetr,
   };
 }
 
@@ -88,15 +107,27 @@ function buildCoverMessage(instructionId: string, leg: PaymentLeg): SwiftMessage
  * payCoverMsgType resolve to a non-'None' value (FSD §5.4 step 5). Call
  * validateSwiftCrossField() first — this function assumes the cross-field
  * rule already passed.
+ *
+ * `transactionCurrency` (the instruction's transaction currency,
+ * debitLegs[0].currency) drives 33B's instructedCurrency — see
+ * buildAdviceMessage. NOT set here: serviceTypeId / isGpiMember, which are
+ * gpi-participation configuration (per-BIC / per-corridor), not derivable from
+ * the request — left for a config-driven follow-up rather than fabricated.
  */
-export function buildSwiftMessages(instructionId: string, creditLegs: readonly PaymentLeg[]): SwiftMessage[] {
+export function buildSwiftMessages(
+  instructionId: string,
+  creditLegs: readonly PaymentLeg[],
+  transactionCurrency: string,
+): SwiftMessage[] {
   const messages: SwiftMessage[] = [];
   for (const leg of creditLegs) {
+    // One UETR per leg, shared by its advice + cover (gpi ties them together).
+    const uetr = randomUUID();
     if (leg.payAdviceMsgType && leg.payAdviceMsgType !== 'None') {
-      messages.push(buildAdviceMessage(instructionId, leg));
+      messages.push(buildAdviceMessage(instructionId, leg, transactionCurrency, uetr));
     }
     if (leg.payCoverMsgType && leg.payCoverMsgType !== 'None') {
-      messages.push(buildCoverMessage(instructionId, leg));
+      messages.push(buildCoverMessage(instructionId, leg, uetr));
     }
   }
   return messages;

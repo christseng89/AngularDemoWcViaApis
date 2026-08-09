@@ -68,53 +68,83 @@ describe('validateSwiftCrossField', () => {
   });
 });
 
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 describe('buildSwiftMessages', () => {
   it('produces only an advice message when payAdviceMsgType is set and payCoverMsgType is None', () => {
     const messages = buildSwiftMessages('instr-1', [
       creditLeg({ payAdviceMsgType: 'MT103', payCoverMsgType: 'None', currency: 'USD', amountTxCcy: '500' }),
-    ]);
+    ], 'USD');
     expect(messages).toHaveLength(1);
     expect(messages[0]!.messageType).toBe('MT103');
+    // Same-currency payment: 32A == 33B, currencies both the transaction currency.
     expect(messages[0]!.settlementAmount).toBe('500');
     expect(messages[0]!.instructedAmount).toBe('500');
+    expect(messages[0]!.settlementCurrency).toBe('USD');
+    expect(messages[0]!.instructedCurrency).toBe('USD');
   });
 
   it('produces only a cover message when payCoverMsgType is set and payAdviceMsgType is None', () => {
-    const messages = buildSwiftMessages('instr-1', [creditLeg({ payCoverMsgType: 'MT202', payAdviceMsgType: 'None' })]);
+    const messages = buildSwiftMessages('instr-1', [creditLeg({ payCoverMsgType: 'MT202', payAdviceMsgType: 'None' })], 'USD');
     expect(messages).toHaveLength(1);
     expect(messages[0]!.messageType).toBe('MT202');
+    // A cover carries 32A only — no 33B (instructed) amount/currency.
     expect(messages[0]!.instructedAmount).toBeUndefined();
+    expect(messages[0]!.instructedCurrency).toBeUndefined();
   });
 
   it('produces both messages when both types are set', () => {
-    const messages = buildSwiftMessages('instr-1', [creditLeg({ payAdviceMsgType: 'MT103', payCoverMsgType: 'MT202COV' })]);
+    const messages = buildSwiftMessages('instr-1', [creditLeg({ payAdviceMsgType: 'MT103', payCoverMsgType: 'MT202COV' })], 'USD');
     expect(messages).toHaveLength(2);
   });
 
   it('produces no messages when both types are None or absent', () => {
-    expect(buildSwiftMessages('instr-1', [creditLeg({ payAdviceMsgType: 'None', payCoverMsgType: 'None' })])).toEqual([]);
-    expect(buildSwiftMessages('instr-1', [creditLeg()])).toEqual([]);
+    expect(buildSwiftMessages('instr-1', [creditLeg({ payAdviceMsgType: 'None', payCoverMsgType: 'None' })], 'USD')).toEqual([]);
+    expect(buildSwiftMessages('instr-1', [creditLeg()], 'USD')).toEqual([]);
   });
 
-  it('prefers amountAccountCcy over amountTxCcy for settlement/instructed amounts', () => {
+  it('H-3: for a CROSS-currency leg, 32A (settled, leg ccy) and 33B (instructed, transaction ccy) DIFFER', () => {
+    // Pay-out settles EUR 120 (leg/account currency), instructed as USD 100 (transaction currency).
     const messages = buildSwiftMessages('instr-1', [
-      creditLeg({ payAdviceMsgType: 'MT103', amountTxCcy: '100', amountAccountCcy: '120' }),
-    ]);
-    expect(messages[0]!.settlementAmount).toBe('120');
+      creditLeg({ payAdviceMsgType: 'MT103', currency: 'EUR', amountTxCcy: '100', amountAccountCcy: '120' }),
+    ], 'USD');
+    const m = messages[0]!;
+    expect(m.settlementCurrency).toBe('EUR'); // 32A
+    expect(m.settlementAmount).toBe('120'); // 32A
+    expect(m.instructedCurrency).toBe('USD'); // 33B
+    expect(m.instructedAmount).toBe('100'); // 33B
+    expect(m.settlementAmount).not.toBe(m.instructedAmount);
+  });
+
+  it('H-3: populates a v4 UETR on every generated message, shared between a leg\'s advice and its cover', () => {
+    const messages = buildSwiftMessages('instr-1', [creditLeg({ payAdviceMsgType: 'MT103', payCoverMsgType: 'MT202COV' })], 'USD');
+    expect(messages).toHaveLength(2);
+    expect(messages[0]!.uetr).toMatch(UUID_V4);
+    expect(messages[1]!.uetr).toMatch(UUID_V4);
+    // Advice + cover of the SAME leg share the SAME UETR (gpi cover carries the MT103's UETR).
+    expect(messages[0]!.uetr).toBe(messages[1]!.uetr);
+  });
+
+  it('H-3: different legs get different UETRs', () => {
+    const messages = buildSwiftMessages('instr-1', [
+      creditLeg({ payAdviceMsgType: 'MT103', legId: 'leg-a' }),
+      creditLeg({ payAdviceMsgType: 'MT103', legId: 'leg-b' }),
+    ], 'USD');
+    expect(messages[0]!.uetr).not.toBe(messages[1]!.uetr);
   });
 
   it('aggregates messages across multiple legs', () => {
     const messages = buildSwiftMessages('instr-1', [
       creditLeg({ payAdviceMsgType: 'MT103', legId: 'leg-a' }),
       creditLeg({ payCoverMsgType: 'MT202', legId: 'leg-b' }),
-    ]);
+    ], 'USD');
     expect(messages).toHaveLength(2);
     expect(messages[0]!.legId).toBe('leg-a');
     expect(messages[1]!.legId).toBe('leg-b');
   });
 
   it('carries instructionId and valueDate through onto each message', () => {
-    const messages = buildSwiftMessages('instr-99', [creditLeg({ payAdviceMsgType: 'PACS008', valueDate: '2026-03-01' })]);
+    const messages = buildSwiftMessages('instr-99', [creditLeg({ payAdviceMsgType: 'PACS008', valueDate: '2026-03-01' })], 'USD');
     expect(messages[0]!.instructionId).toBe('instr-99');
     expect(messages[0]!.valueDate).toBe('2026-03-01');
   });

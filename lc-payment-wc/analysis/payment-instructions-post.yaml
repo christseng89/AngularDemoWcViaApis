@@ -855,9 +855,10 @@ components:
             flow is integrated.
         status: { type: string, enum: [PENDING, GENERATED, TRANSMITTED, FAILED] }
         correspondentBic: { type: string }
-        settlementCurrency: { type: string, description: "field 32A / CPYT_CR_CCY" }
-        settlementAmount: { allOf: [ { $ref: '#/components/schemas/MonetaryAmount' } ], description: "field 32A / CPYT_CR_AMT_CRCCY" }
-        instructedAmount: { allOf: [ { $ref: '#/components/schemas/MonetaryAmount' } ], description: "field 33B" }
+        settlementCurrency: { type: string, description: "field 32A currency — interbank SETTLED currency (the leg's own/account currency) / CPYT_CR_CCY" }
+        settlementAmount: { allOf: [ { $ref: '#/components/schemas/MonetaryAmount' } ], description: "field 32A amount — interbank SETTLED amount, in settlementCurrency / CPYT_CR_AMT_CRCCY" }
+        instructedCurrency: { type: string, description: "field 33B currency — INSTRUCTED (ordered) currency (the transaction currency). Added v-H3: distinct from settlementCurrency for a cross-currency payment (32A != 33B); equal for same-currency." }
+        instructedAmount: { allOf: [ { $ref: '#/components/schemas/MonetaryAmount' } ], description: "field 33B amount — INSTRUCTED amount, in instructedCurrency (the transaction-currency amount, amountTxCcy). No longer forced equal to 32A (H-3)." }
         valueDate: { type: string, format: date }
         uetr: { type: string, description: "UETR_GPI_121 — SWIFT gpi tracking reference" }
         serviceTypeId: { type: string, description: "SERVICE_TYPE_ID_GPI_111" }
