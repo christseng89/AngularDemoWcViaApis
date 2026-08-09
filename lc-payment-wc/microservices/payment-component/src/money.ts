@@ -115,6 +115,35 @@ export function minorUnitsForCurrency(currency: string): number {
 }
 
 /**
+ * The currency's minor-unit count IF this service knows it (i.e. the currency
+ * is present in the Currency-API-sourced master CURRENCY_MINOR_UNITS above),
+ * else `undefined`.
+ *
+ * Distinct from minorUnitsForCurrency (which falls back to 2 so ARITHMETIC
+ * rounding always has some scale). Input VALIDATION must instead be able to
+ * tell "known 0/2/3-dp currency" apart from "currency we have no master data
+ * for": the Currency API is the source of truth for a currency's decimal
+ * places, so if we don't hold its data we must NOT invent a limit of 2 —
+ * that would wrongly reject a legitimate 3-minor-unit amount (BHD/KWD/OMR) or
+ * wrongly accept an over-precise amount in a currency that is really 0-dp.
+ * Callers use `undefined` to SKIP the decimal-scale check for such a currency.
+ */
+export function knownMinorUnitsForCurrency(currency: string): number | undefined {
+  return CURRENCY_MINOR_UNITS[currency];
+}
+
+/**
+ * Count of fractional digits literally present in a MonetaryAmount wire string
+ * (trailing zeros count — "100.50" -> 2, "100" -> 0). Used to check a submitted
+ * amount against its currency's minor-unit scale (see requestSchema.ts). Assumes
+ * the string already matched MONETARY_AMOUNT_PATTERN.
+ */
+export function decimalPlaces(value: string): number {
+  const dot = value.indexOf('.');
+  return dot === -1 ? 0 : value.length - dot - 1;
+}
+
+/**
  * §8.2 of Payment_Component_Calculation_Validation.docx:
  *   CPYT_DR_AMT_DRCCY = CPYT_DR_AMT_TXCCY × CPYT_DR_BUY_RATE   (debit)
  *   CPYT_CR_AMT_CRCCY = CPYT_CR_AMT_TXCCY × CPYT_CR_BUY_RATE   (credit, symmetric)

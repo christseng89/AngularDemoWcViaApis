@@ -919,6 +919,116 @@ describe('BusinessCaseRunnerComponent', () => {
     });
   });
 
+  describe('amountScaleErrors (H-2 client-side input guard: decimals from the Currency API)', () => {
+    const dp = { USD: 2, EUR: 2, JPY: 0 };
+
+    it('flags a Total Amount with more decimals than the transaction currency allows (USD = 2)', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig()); // transaction currency USD
+      comp.onTransactionAmountInput(10000.123);
+      expect(comp.hasAmountScaleError).toBe(true);
+      expect(comp.amountScaleErrors[0]).toContain('Total Amount');
+      expect(comp.amountScaleErrors[0]).toContain('USD allows at most 2');
+    });
+
+    it('flags a Suspense Debit entry over-precise for its own currency (JPY = 0)', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.onSuspenseDebitEntriesChange([entry('10.5', 'JPY')]);
+      expect(comp.hasAmountScaleError).toBe(true);
+      expect(comp.amountScaleErrors[0]).toContain('Suspense Debit');
+      expect(comp.amountScaleErrors[0]).toContain('JPY allows at most 0');
+    });
+
+    it('flags a Suspense Credit entry over-precise for its own currency', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.onSuspenseCreditEntriesChange([entry('1.234', 'EUR')]);
+      expect(comp.amountScaleErrors.some((e) => e.includes('Suspense Credit'))).toBe(true);
+    });
+
+    it('is empty for valid amounts (Total Amount at exactly 2dp, integer JPY suspense)', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.onTransactionAmountInput(10000.12);
+      comp.onSuspenseDebitEntriesChange([entry('10', 'JPY')]);
+      expect(comp.hasAmountScaleError).toBe(false);
+      expect(comp.amountScaleErrors).toEqual([]);
+    });
+
+    it('SKIPS a currency absent from the Currency master (source of truth) — no false rejection', () => {
+      const { comp } = makeComponent({ decimals: dp }); // no BHD in the map
+      comp.selectCase(passConfig());
+      comp.onSuspenseDebitEntriesChange([entry('1.234', 'BHD')]);
+      expect(comp.hasAmountScaleError).toBe(false);
+    });
+
+    it('skips empty amounts (still being typed)', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.onSuspenseDebitEntriesChange([entry('', 'USD')]);
+      expect(comp.hasAmountScaleError).toBe(false);
+    });
+
+    it('onConfirm refuses to POST while an amount is over-precise (sets confirmError, never calls the API)', () => {
+      const { comp, mockApi } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+      comp.onTransactionAmountInput(10000.123);
+
+      comp.onConfirm();
+
+      expect(mockApi.confirm).not.toHaveBeenCalled();
+      expect(comp.confirmError).toContain('Fix amount precision');
+    });
+
+    it('aggregates leg-allocator scale errors (via scaleErrorsChange) into the blocking guard', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.onDebitLegScaleErrorsChange(['DEBIT leg amount 9999.112 has 3 decimal place(s) but USD allows at most 2.']);
+      expect(comp.hasAmountScaleError).toBe(true);
+      expect(comp.allAmountScaleErrors.some((e) => e.includes('DEBIT leg amount 9999.112'))).toBe(true);
+    });
+
+    it('onConfirm refuses to POST while a leg amount is over-precise', () => {
+      const { comp, mockApi } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+      comp.onCreditLegScaleErrorsChange(['CREDIT leg amount 9988.123 has 3 decimal place(s) but USD allows at most 2.']);
+
+      comp.onConfirm();
+
+      expect(mockApi.confirm).not.toHaveBeenCalled();
+      expect(comp.confirmError).toContain('9988.123');
+    });
+
+    it('selectCase resets leg scale errors so a fresh case does not inherit them', () => {
+      const { comp } = makeComponent({ decimals: dp });
+      comp.selectCase(passConfig());
+      comp.onDebitLegScaleErrorsChange(['some error']);
+      expect(comp.hasAmountScaleError).toBe(true);
+      comp.selectCase(passConfig());
+      expect(comp.hasAmountScaleError).toBe(false);
+    });
+
+    it('runPreview surfaces the precision error and does not call the API', () => {
+      const { comp, mockApi } = makeComponent({ decimals: dp });
+      const config = passConfig();
+      comp.selectCase(config);
+      comp.onDebitValidChange(true);
+      comp.onCreditValidChange(true);
+      comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+      comp.onTransactionAmountInput(10000.123);
+
+      (comp as any).runPreview(config).subscribe();
+
+      expect(mockApi.confirm).not.toHaveBeenCalled();
+      expect(comp.result).toBeNull();
+      expect(comp.previewError).toContain('USD allows at most 2');
+      expect(comp.previewLoading).toBe(false);
+    });
+  });
+
   describe('runPreview (private — invoked directly to bypass the debounced RxJS pipeline)', () => {
     it('sets previewIncomplete and clears result when legs are not yet valid', () => {
       const { comp } = makeComponent();

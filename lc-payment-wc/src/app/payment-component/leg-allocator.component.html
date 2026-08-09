@@ -114,6 +114,9 @@
     The row marked <em>remainder</em> auto-tracks 100% − every other row — editing any row (including it) fixes that row and reflows the leftover into a new remainder, so this side always totals exactly {{ totalAmount }} {{ transactionCurrency }}.
   </p>
   <p class="allocator-error" *ngIf="isOverAllocated">⚠ Over-allocated — these rows add up to more than 100%. Reduce one of them.</p>
+  <p class="allocator-error" *ngIf="amountScaleErrors.length">
+    ⚠ <ng-container *ngFor="let e of amountScaleErrors">{{ e }} </ng-container>
+  </p>
 
   <!-- fxPairs (getter, in the .ts) is still computed here from this side's own rows — its DISPLAY
        moved to <app-response-viewer>'s "{Debit/Credit} FX Conversion Pair" sections (right after

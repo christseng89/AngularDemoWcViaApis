@@ -7,6 +7,8 @@ import {
   sumMonetaryAmounts,
   convertTxCcyToAccountCcy,
   minorUnitsForCurrency,
+  knownMinorUnitsForCurrency,
+  decimalPlaces,
   InvalidMonetaryAmountError,
   InvalidExchangeRateError,
   MONETARY_AMOUNT_PATTERN,
@@ -152,6 +154,35 @@ describe('money', () => {
 
     it('falls back to 2 for a currency not in the table', () => {
       expect(minorUnitsForCurrency('XYZ')).toBe(2);
+    });
+  });
+
+  describe('knownMinorUnitsForCurrency', () => {
+    it('returns the known minor units for a currency in the Currency master', () => {
+      expect(knownMinorUnitsForCurrency('USD')).toBe(2);
+      expect(knownMinorUnitsForCurrency('JPY')).toBe(0);
+      expect(knownMinorUnitsForCurrency('CNY')).toBe(2);
+    });
+
+    it('returns undefined (NOT a fallback of 2) for a currency not in the master', () => {
+      expect(knownMinorUnitsForCurrency('BHD')).toBeUndefined();
+      expect(knownMinorUnitsForCurrency('XYZ')).toBeUndefined();
+    });
+  });
+
+  describe('decimalPlaces', () => {
+    it('returns 0 for an integer amount', () => {
+      expect(decimalPlaces('100')).toBe(0);
+    });
+
+    it('counts fractional digits, trailing zeros included', () => {
+      expect(decimalPlaces('100.5')).toBe(1);
+      expect(decimalPlaces('100.50')).toBe(2);
+      expect(decimalPlaces('1.234')).toBe(3);
+    });
+
+    it('handles a negative amount', () => {
+      expect(decimalPlaces('-99.9')).toBe(1);
     });
   });
 });

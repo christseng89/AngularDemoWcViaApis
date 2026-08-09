@@ -16,7 +16,12 @@ import {
   SUSPENSE_SOURCE_COMPONENTS,
   BALANCE_MODULES,
 } from '../types';
-import { MONETARY_AMOUNT_PATTERN, EXCHANGE_RATE_PATTERN } from '../money';
+import {
+  MONETARY_AMOUNT_PATTERN,
+  EXCHANGE_RATE_PATTERN,
+  knownMinorUnitsForCurrency,
+  decimalPlaces,
+} from '../money';
 import { RequestValidationError } from '../errors';
 
 const monetaryAmountSchema = z
@@ -115,6 +120,57 @@ export const paymentInstructionConfirmRequestSchema = z
         message: 'creditLegs must contain at least 1 item',
       });
     }
+
+    // Currency minor-unit (decimal-places) validation — the currency's allowed
+    // decimals come from the Currency-API-sourced master (money.ts). A submitted
+    // amount must not carry more decimal places than its currency permits
+    // (e.g. JPY/TWD/IDR = 0, so "100.50" is invalid; EUR/USD = 2, so "1.234" is
+    // invalid). A currency whose scale this service does not hold is SKIPPED
+    // (knownMinorUnitsForCurrency -> undefined) rather than assumed to be 2 —
+    // the Currency API is the source of truth. Malformed patterns are caught
+    // earlier by monetaryAmountSchema; this only runs on already-pattern-valid
+    // strings.
+    const checkScale = (amount: string, currency: string, path: (string | number)[]): void => {
+      const minor = knownMinorUnitsForCurrency(currency);
+      if (minor !== undefined && decimalPlaces(amount) > minor) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path,
+          message:
+            `amount "${amount}" has ${decimalPlaces(amount)} decimal place(s) but currency ` +
+            `${currency} allows at most ${minor} (per the Currency master)`,
+        });
+      }
+    };
+
+    // amountTxCcy is denominated in the TRANSACTION currency (debitLegs[0].currency,
+    // per the SuspenseEntry doc comment); amountAccountCcy is denominated in the leg's
+    // OWN currency. Each is checked against the currency it is actually expressed in.
+    const transactionCurrency = data.debitLegs?.[0]?.currency;
+    const checkLeg = (
+      leg: { amountTxCcy: string; amountAccountCcy?: string; currency: string },
+      side: 'debitLegs' | 'creditLegs',
+      i: number,
+    ): void => {
+      if (transactionCurrency !== undefined) {
+        checkScale(leg.amountTxCcy, transactionCurrency, [side, i, 'amountTxCcy']);
+      }
+      if (leg.amountAccountCcy !== undefined) {
+        checkScale(leg.amountAccountCcy, leg.currency, [side, i, 'amountAccountCcy']);
+      }
+    };
+    data.debitLegs.forEach((leg, i) => checkLeg(leg, 'debitLegs', i));
+    data.creditLegs.forEach((leg, i) => checkLeg(leg, 'creditLegs', i));
+
+    // Suspense entry amounts are denominated in the entry's own currency.
+    const checkEntries = (
+      entries: { amount: string; currency: string }[] | undefined,
+      side: 'debitEntries' | 'creditEntries',
+    ): void => {
+      (entries ?? []).forEach((e, i) => checkScale(e.amount, e.currency, ['suspenseBridge', side, i, 'amount']));
+    };
+    checkEntries(data.suspenseBridge?.debitEntries, 'debitEntries');
+    checkEntries(data.suspenseBridge?.creditEntries, 'creditEntries');
   });
 
 export type ValidatedConfirmRequest = z.infer<typeof paymentInstructionConfirmRequestSchema>;

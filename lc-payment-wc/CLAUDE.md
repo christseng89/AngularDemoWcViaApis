@@ -29,7 +29,13 @@ You are a professional Trade Finance and Payment expert with strong knowledge of
 - ISO 20022
 - Accounting Entries / GL Posting
 
-Assume professional-level knowledge equivalent to a CITF-qualified Trade Finance specialist.
+Assume professional-level knowledge equivalent to a Trade Finance specialist holding, in priority order:
+**CITF** (Certificate in International Trade and Finance), **CPCM** (Certificate in Payments and Cash
+Management, formerly CertPAY), **CBAP** (Certified Business Analysis Professional), **CDCS** (Certified
+Documentary Credit Specialist, LC/UCP), **CTFP** (Certified Trade Finance Professional), **CSDG**
+(Certificate for Specialists in Demand Guarantees, URDG), **CSCF** (Certificate in Supply Chain Finance),
+**ISO 20022 / SWIFT** training & certification, **CAMS** (AML / Financial Crime), and **CDTS** (Certificate
+in Digital Trade Strategy) — plus **Bank Accounting / IFRS** training.
 
 ## Technical Expertise
 
@@ -345,3 +351,35 @@ selected case's own registry legs in both `transactionCurrency`/`baseTotalAmount
 — one override pair drives both sides' Leg #1 seed identically, matching the existing invariant that
 every registry case already keeps debit/credit defaults symmetric. Reset to null on every
 `selectCase()`, same as `suspenseDebitEntries`/`suspenseCreditEntries`.
+
+---
+
+# Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)
+
+Full record: `docs/RDD-oas-reference-event-model.md`. Planned, NOT yet implemented.
+
+Business fact clarified: the idempotency key is **an LC's Event**, not a running sequence number.
+`sequence` = **Event Time**, tied to TF events (LC Issue = 00, Amendment = 01, Document Arrival = 02, …).
+Instructions are mutable while **PENDING** (an update = delete-old + create-new), and become immutable
+only after **RELEASE (4-eyes / maker-checker)**. This service's Confirm endpoint posts the already-
+RELEASED (finalized) instruction — the PENDING drafting loop and the 4-eyes release live **upstream**,
+out of this service's scope (consistent with FSD §6.1's "既有的已確認結果" wording).
+
+Confirmed decisions:
+- **D-1** Add a structured `transactionReference` / `event` block to the OAS (NOT flat extra string fields).
+- **D-2** Idempotency key = `(originModule, bankContractRef, eventSeq)`. Primary ref = the **bank-internal
+  contract number** (行内合约号), NOT the customer LC number (customer LC numbers are not globally unique).
+- **D-3** `edition` (was tentatively `amendmentSeq`) is an **EDITION field, reference-only** — it never
+  participates in the idempotency key; changing `edition` alone is the SAME instruction (replay).
+- **D-4** Customer LC number → `customerRef` (typed: LC | IB | COLLECTION | GUARANTEE | …), carried for
+  audit + **SWIFT field 21 (related reference)**; not in the key.
+- **D-5** `event.type` is an enum incl. `REVERSAL` (gives post-release corrections a legal event to book).
+- **D-6** Implementation = **additive / backward-compatible**: keep `mainRef`/`sequence` as legacy aliases
+  derived from the new block (`mainRef ≙ bankContractRef`, `sequence ≙ eventSeq`) so the 15 existing
+  consumers and current tests do not break.
+- **D-7** Data migration is ALLOWED (this is a new microservice, no production-history baggage): old
+  records may be migrated to populate the new structured fields (`mainRef→bankContractRef`,
+  `sequence→eventSeq`, LC→`customerRef.value`). Data-layer migration coexists with the D-6 contract-layer
+  aliases.
+- **D-8** `eventSeq` / `edition` are **string + pattern `^\d{2,3}$`** (codes, not integers) to preserve
+  zero-padding; the legacy int `sequence` is retained only as the D-6 alias.

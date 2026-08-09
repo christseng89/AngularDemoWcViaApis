@@ -109,6 +109,72 @@ describe('validateConfirmRequest', () => {
     expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
   });
 
+  describe('currency minor-unit (decimal places) validation (H-2)', () => {
+    it('rejects amountTxCcy with more decimals than the transaction currency allows (JPY = 0)', () => {
+      const body = {
+        ...validConfirmBody,
+        debitLegs: [{ ...validLeg, currency: 'JPY', amountTxCcy: '100.50' }],
+        creditLegs: [{ ...validLeg, accountType: 'NOSTRO', currency: 'JPY', amountTxCcy: '100' }],
+      };
+      try {
+        validateConfirmRequest(body);
+        fail('expected throw');
+      } catch (err) {
+        const msg = (err as RequestValidationError).message;
+        expect(msg).toContain('debitLegs.0.amountTxCcy');
+        expect(msg).toContain('JPY');
+        expect(msg).toContain('at most 0');
+      }
+    });
+
+    it('rejects an EUR amount with 3 decimal places (EUR = 2)', () => {
+      const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, currency: 'EUR', amountTxCcy: '1.234' }] };
+      // transaction currency is EUR here (debitLegs[0]); creditLeg stays USD/100 — balance is checked later, not here.
+      expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
+    });
+
+    it('rejects amountAccountCcy (native) with more decimals than the leg currency allows', () => {
+      // Leg currency TWD (0-dp) with a fractional native amount; transaction currency USD is fine.
+      const body = {
+        ...validConfirmBody,
+        creditLegs: [{ ...validLeg, accountType: 'NOSTRO', currency: 'TWD', amountTxCcy: '100', amountAccountCcy: '100.5' }],
+      };
+      try {
+        validateConfirmRequest(body);
+        fail('expected throw');
+      } catch (err) {
+        expect((err as RequestValidationError).message).toContain('creditLegs.0.amountAccountCcy');
+      }
+    });
+
+    it('rejects a suspenseBridge entry amount with more decimals than its currency allows (JPY = 0)', () => {
+      const body = {
+        ...validConfirmBody,
+        suspenseBridge: { debitEntries: [{ amount: '10.5', currency: 'JPY', crossRate: '1' }] },
+      };
+      try {
+        validateConfirmRequest(body);
+        fail('expected throw');
+      } catch (err) {
+        expect((err as RequestValidationError).message).toContain('suspenseBridge.debitEntries.0.amount');
+      }
+    });
+
+    it('accepts an amount at exactly the currency minor-unit boundary (USD = 2)', () => {
+      const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, amountTxCcy: '100.00' }] };
+      expect(() => validateConfirmRequest(body)).not.toThrow();
+    });
+
+    it('SKIPS the decimal check for a currency not in the Currency master (source of truth) — a 3-dp BHD amount passes', () => {
+      const body = {
+        ...validConfirmBody,
+        debitLegs: [{ ...validLeg, currency: 'BHD', amountTxCcy: '1.234' }],
+        creditLegs: [{ ...validLeg, accountType: 'NOSTRO', currency: 'BHD', amountTxCcy: '1.234' }],
+      };
+      expect(() => validateConfirmRequest(body)).not.toThrow();
+    });
+  });
+
   it('throws for a malformed ExchangeRate pattern', () => {
     const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, drRate: 'bad-rate' }] };
     expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);

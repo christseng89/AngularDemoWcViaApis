@@ -100,8 +100,8 @@ describe('confirmPaymentInstruction', () => {
       const rpfmRequest = request({
         originModule: 'RPFM',
         mainRef: 'REF-RPFM',
-        debitLegs: [{ accountNo: 'A', accountType: 'NOSTRO', currency: 'IDR', amountTxCcy: '100' }],
-        creditLegs: [{ accountNo: 'B', accountType: 'CUSTOMER', currency: 'IDR', amountTxCcy: '99.99' }],
+        debitLegs: [{ accountNo: 'A', accountType: 'NOSTRO', currency: 'CNY', amountTxCcy: '100' }],
+        creditLegs: [{ accountNo: 'B', accountType: 'CUSTOMER', currency: 'CNY', amountTxCcy: '99.99' }],
       });
       expect(() => confirmPaymentInstruction(store, rpfmRequest, { voucherCodePrefixOverride: 'RPFM01NULLNULLNULL' })).not.toThrow();
     });

@@ -85,6 +85,10 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   suspenseDebitEntries: SuspenseEntry[] = [];
   suspenseCreditEntries: SuspenseEntry[] = [];
 
+  /** Leg-amount over-precision messages emitted by each <app-leg-allocator> (H-2 client-side guard). */
+  debitLegScaleErrors: string[] = [];
+  creditLegScaleErrors: string[] = [];
+
   result: DisplayResult | null = null;
   previewLoading = false;
   previewError: string | null = null;
@@ -161,6 +165,63 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    *  service-free) response-viewer component fetching it again itself. */
   get currencyDecimalsMap(): Record<string, number> {
     return this.currencyDecimals;
+  }
+
+  /**
+   * H-2 companion — CLIENT-SIDE input guard. Number of fractional digits in a
+   * user-entered amount (mirrors the microservice's own money.ts decimalPlaces()
+   * so the UI catches over-precision at input time instead of only surfacing it
+   * as a server 400 on preview/Confirm). "100.123" -> 3, "100" -> 0.
+   */
+  private decimalPlaces(value: string): number {
+    const s = String(value);
+    const dot = s.indexOf('.');
+    return dot === -1 ? 0 : s.length - dot - 1;
+  }
+
+  /**
+   * Every currently-entered amount whose decimal places exceed what its currency
+   * allows (CurrencyService.decimals() — the "Get Currency API": JPY/TWD/IDR = 0,
+   * USD/EUR = 2, …). Covers the two runner-owned inputs the user can over-type:
+   * the header Total Amount (checked against the transaction currency) and each
+   * Suspense Debit/Credit entry (checked against its OWN currency). A currency
+   * absent from the decimals map (unknown, or not loaded yet) is skipped — same
+   * "source of truth is the Currency API, don't invent a limit" posture as the
+   * microservice's knownMinorUnitsForCurrency(). Empty amounts are skipped
+   * (still being typed). A chargeBridge case's Total Amount is auto-derived /
+   * read-only, never user-typed, so it isn't checked here.
+   */
+  get amountScaleErrors(): string[] {
+    const errs: string[] = [];
+    const check = (label: string, amount: string, currency: string): void => {
+      if (amount === '' || amount === null || amount === undefined) return;
+      const max = this.currencyDecimals[currency];
+      if (max === undefined) return; // unknown / not yet loaded — Currency API is the source of truth
+      const dp = this.decimalPlaces(amount);
+      if (dp > max) {
+        errs.push(`${label} ${amount} has ${dp} decimal place(s) but ${currency} allows at most ${max}.`);
+      }
+    };
+    if (!this.selectedCase?.chargeBridge && this.transactionAmountOverride !== null) {
+      check('Total Amount', this.transactionAmountOverride, this.transactionCurrency);
+    }
+    this.suspenseDebitEntries.forEach((e) => check('Suspense Debit', e.amount, e.currency));
+    this.suspenseCreditEntries.forEach((e) => check('Suspense Credit', e.amount, e.currency));
+    return errs;
+  }
+
+  /** Leg-amount over-precision reported by the two <app-leg-allocator>s (via scaleErrorsChange). */
+  get legAmountScaleErrors(): string[] {
+    return [...this.debitLegScaleErrors, ...this.creditLegScaleErrors];
+  }
+
+  /** Every over-precision error across the header Total Amount, Suspense entries, AND leg allocators. */
+  get allAmountScaleErrors(): string[] {
+    return [...this.amountScaleErrors, ...this.legAmountScaleErrors];
+  }
+
+  get hasAmountScaleError(): boolean {
+    return this.allAmountScaleErrors.length > 0;
   }
 
   get casesForSelectedModule(): BusinessCaseConfig[] {
@@ -554,6 +615,13 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.legsChanged$.next();
   }
 
+  onDebitLegScaleErrorsChange(errors: string[]): void {
+    this.debitLegScaleErrors = errors;
+  }
+  onCreditLegScaleErrorsChange(errors: string[]): void {
+    this.creditLegScaleErrors = errors;
+  }
+
   selectModule(module: string): void {
     this.selectedModule = module;
     this.selectCase(null);
@@ -577,6 +645,8 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.creditValid = businessCase ? !!businessCase.chargeBridge : false;
     this.suspenseDebitEntries = [];
     this.suspenseCreditEntries = [];
+    this.debitLegScaleErrors = [];
+    this.creditLegScaleErrors = [];
     this.transactionCurrencyOverride = null;
     this.transactionAmountOverride = null;
     this.model = {};
@@ -596,6 +666,11 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
 
   onConfirm(): void {
     if (!this.selectedCase || this.selectedCase.verdict !== 'PASS') return;
+    // H-2 client-side guard: never POST an over-precise amount (the server would 409/400 it anyway).
+    if (this.hasAmountScaleError) {
+      this.confirmError = 'Fix amount precision before confirming — ' + this.allAmountScaleErrors.join(' ');
+      return;
+    }
     this.confirmLoading = true;
     this.confirmError = null;
     const request = buildConfirmRequest(this.selectedCase, this.model, this.debitLegs, this.creditLegs, this.buildSuspenseBridge());
@@ -624,6 +699,15 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   private runPreview(config: BusinessCaseConfig) {
     this.previewError = null;
     this.previewIncomplete = false;
+
+    // H-2 client-side guard: an over-precise amount can't post — surface it now
+    // (with the specific reason) instead of firing a preview that only 400s.
+    if (this.hasAmountScaleError) {
+      this.result = null;
+      this.previewError = this.allAmountScaleErrors.join(' ');
+      this.previewLoading = false;
+      return of(null);
+    }
 
     if (!this.debitValid || !this.creditValid) {
       // Point 1 fix: incomplete legs (still typing an account no, missing rate, etc.) must clear any stale result, not leave it hanging.

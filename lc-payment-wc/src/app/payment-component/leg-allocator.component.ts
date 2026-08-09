@@ -145,16 +145,75 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   @Output() legsChange = new EventEmitter<PaymentLegInput[]>();
   /** True once every row has an account number and (when split) a valid rate — parent gates preview calls on this. */
   @Output() validChange = new EventEmitter<boolean>();
+  /**
+   * H-2 companion: messages for any row whose amount was typed with more
+   * decimal places than its currency allows (Currency API decimals). Emitted
+   * alongside legsChange so the parent (business-case-runner) can block the
+   * live preview / Confirm — the same guard it already applies to the header
+   * Total Amount and Suspense entries.
+   */
+  @Output() scaleErrorsChange = new EventEmitter<string[]>();
 
   totalAmount = new Decimal(0);
   transactionCurrency = '';
   rows: Row[] = [];
+
+  /**
+   * Per-row over-precision messages, keyed by row id — set at INPUT time
+   * (onAmountInput / onAccountAmountInput) against the RAW typed value, because
+   * those handlers immediately money()-round to 2dp, so the raw over-precision
+   * ("9999.112") survives nowhere else. Cleared when the row's amount is
+   * re-driven cleanly (% edit) or its currency changes (the allowed scale
+   * changed and there is no stored raw value to re-check).
+   */
+  private readonly rowScaleErrors = new Map<number, string>();
+  /** Currency minor-unit places from CurrencyService.decimals() ("Get Currency API"). */
+  private currencyDecimals: Record<string, number> = {};
 
   /** "Get Currency API" (currency.service.ts) — populates the Transaction/Leg Currency dropdowns below. */
   readonly currencies$: Observable<string[]>;
 
   constructor(private readonly fx: FxRateService, currency: CurrencyService) {
     this.currencies$ = currency.codes();
+    currency.decimals().subscribe((d) => {
+      this.currencyDecimals = d;
+    });
+  }
+
+  private decimalPlacesOf(value: number): number {
+    const s = String(value);
+    const dot = s.indexOf('.');
+    return dot === -1 ? 0 : s.length - dot - 1;
+  }
+
+  /**
+   * Record/clear a row's over-precision error from a RAW typed amount against
+   * `currency`'s minor units. A currency absent from the Currency master (or
+   * not loaded yet) is skipped — the Currency API is the source of truth, so
+   * no limit is invented (mirrors the microservice's knownMinorUnitsForCurrency).
+   */
+  private checkRowScale(row: Row, rawValue: number, currency: string): void {
+    const max = this.currencyDecimals[currency];
+    if (max === undefined) {
+      this.rowScaleErrors.delete(row.id);
+      return;
+    }
+    const dp = this.decimalPlacesOf(rawValue);
+    if (dp > max) {
+      this.rowScaleErrors.set(
+        row.id,
+        `${this.side} leg amount ${rawValue} has ${dp} decimal place(s) but ${currency} allows at most ${max}.`,
+      );
+    } else {
+      this.rowScaleErrors.delete(row.id);
+    }
+  }
+
+  /** Over-precision messages for the CURRENT rows (stale ids for removed rows are ignored). */
+  get amountScaleErrors(): string[] {
+    return this.rows
+      .map((r) => this.rowScaleErrors.get(r.id))
+      .filter((m): m is string => m !== undefined);
   }
 
   ngOnInit(): void {
@@ -293,6 +352,9 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   onCurrencyChange(value: string): void {
+    // Transaction currency changed — the allowed scale for every Tx-Ccy amount changed too, and no
+    // raw typed value is retained to re-check against; clear stale over-precision flags.
+    this.rowScaleErrors.clear();
     // Bug fixed here: needsRate(row) must be evaluated against the OLD
     // transactionCurrency to tell "was already following the transaction
     // currency" apart from "was already diverged" — checking it AFTER
@@ -315,6 +377,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
 
   /** Called when a row's OWN currency is edited (as opposed to the shared transaction currency above). */
   onRowCurrencyChange(row: Row, value: string): void {
+    // Row's own currency changed — its allowed scale changed; clear any stale over-precision flag.
+    this.rowScaleErrors.delete(row.id);
     row.currency = value;
     if (this.needsRate(row)) {
       this.applyFxRate(row);
@@ -391,6 +455,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   onPctInput(row: Row, pct: number): void {
+    // %-driven amount is recomputed via money() (≤2dp) — any prior over-precision on this row is gone.
+    this.rowScaleErrors.delete(row.id);
     row.driver = 'pct';
     row.pct = clampPct(pct);
     row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100));
@@ -398,6 +464,9 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   onAmountInput(row: Row, amount: number): void {
+    // Amount (Tx Ccy) is denominated in the transaction currency — validate the RAW typed value now,
+    // before money() rounds it to 2dp (which would silently discard the over-precise digits).
+    this.checkRowScale(row, amount, this.transactionCurrency);
     row.driver = 'amount';
     row.amountTxCcy = money(Decimal.max(new Decimal(amount || 0), 0));
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
@@ -419,6 +488,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
    * never 0 there in practice, but guard anyway rather than divide by zero.
    */
   onAccountAmountInput(row: Row, accountAmount: number): void {
+    // Account Ccy Equiv. is denominated in the ROW's own currency — validate the RAW typed value now.
+    this.checkRowScale(row, accountAmount, row.currency);
     row.driver = 'amount';
     const amount = Decimal.max(new Decimal(accountAmount || 0), 0);
     row.amountTxCcy = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate)) : new Decimal(0);
@@ -452,6 +523,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
 
   removeRow(row: Row): void {
     if (this.rows.length <= 1) return;
+    this.rowScaleErrors.delete(row.id);
     this.rows = this.rows.filter((r) => r.id !== row.id);
     // Whatever the removed row held flows back into the remainder either way.
     this.ensureRemainderRow();
@@ -574,5 +646,6 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     const valid =
       legs.length > 0 && !this.isOverAllocated && legs.every((l) => l.accountNo.trim().length > 0 && Number(l.amountTxCcy) > 0);
     this.validChange.emit(valid);
+    this.scaleErrorsChange.emit(this.amountScaleErrors);
   }
 }

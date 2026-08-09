@@ -14,6 +14,7 @@ function makeComponent(overrides: Partial<{ crossRate: number | null }> = {}) {
 
   const mockCurrency = {
     codes: jest.fn(() => of(['USD', 'EUR', 'JPY', 'GBP', 'TWD'])),
+    decimals: jest.fn(() => of({ USD: 2, EUR: 2, JPY: 0, GBP: 2, TWD: 0 })),
   } as unknown as CurrencyService;
 
   const comp = new LegAllocatorComponent(mockFx, mockCurrency);
@@ -806,6 +807,75 @@ describe('LegAllocatorComponent', () => {
       const { comp } = makeComponent();
       comp.ngOnInit();
       expect(comp.trackById(0, comp.rows[0]!)).toBe(comp.rows[0]!.id);
+    });
+  });
+
+  describe('amountScaleErrors (H-2: leg amount over-precision vs Currency API decimals)', () => {
+    it('flags an Amount (Tx Ccy) typed with more decimals than the transaction currency allows (USD = 2)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onAmountInput(comp.rows[0]!, 9999.112);
+      expect(comp.amountScaleErrors).toHaveLength(1);
+      expect(comp.amountScaleErrors[0]).toContain('DEBIT leg amount 9999.112');
+      expect(comp.amountScaleErrors[0]).toContain('USD allows at most 2');
+    });
+
+    it('emits the scale errors via scaleErrorsChange so the parent can block', () => {
+      const { comp } = makeComponent();
+      const emitted: string[][] = [];
+      comp.scaleErrorsChange.subscribe((e) => emitted.push(e));
+      comp.ngOnInit();
+      comp.onAmountInput(comp.rows[0]!, 100.123);
+      expect(emitted[emitted.length - 1]).toEqual([expect.stringContaining('USD allows at most 2')]);
+    });
+
+    it('does not flag an amount that fits the currency (2dp for USD)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onAmountInput(comp.rows[0]!, 100.12);
+      expect(comp.amountScaleErrors).toEqual([]);
+    });
+
+    it('flags ANY decimals for a 0-dp transaction currency (JPY)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onCurrencyChange('JPY');
+      comp.onAmountInput(comp.rows[0]!, 10.5);
+      expect(comp.amountScaleErrors[0]).toContain('JPY allows at most 0');
+    });
+
+    it('flags an over-precise Account Ccy Equiv. against the ROW currency (EUR = 2)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onRowCurrencyChange(comp.rows[0]!, 'EUR'); // row becomes foreign -> needsRate, account-ccy input editable
+      comp.onAccountAmountInput(comp.rows[0]!, 12.123);
+      expect(comp.amountScaleErrors[0]).toContain('EUR allows at most 2');
+    });
+
+    it('clears a row error once its amount is re-driven by a clean % edit', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onAmountInput(comp.rows[0]!, 100.123);
+      expect(comp.amountScaleErrors).toHaveLength(1);
+      comp.onPctInput(comp.rows[0]!, 50);
+      expect(comp.amountScaleErrors).toEqual([]);
+    });
+
+    it('SKIPS a currency absent from the Currency master (source of truth) — no false rejection', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onRowCurrencyChange(comp.rows[0]!, 'BHD'); // not in the decimals map
+      comp.onAccountAmountInput(comp.rows[0]!, 1.234);
+      expect(comp.amountScaleErrors).toEqual([]);
+    });
+
+    it('clears stale errors when the transaction currency changes', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onAmountInput(comp.rows[0]!, 100.123);
+      expect(comp.amountScaleErrors).toHaveLength(1);
+      comp.onCurrencyChange('EUR');
+      expect(comp.amountScaleErrors).toEqual([]);
     });
   });
 });
