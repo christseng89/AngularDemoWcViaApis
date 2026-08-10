@@ -73,15 +73,15 @@ describe('buildConfirmRequest', () => {
     });
   });
 
-  describe('chargeComponentBridge (Charge Bridge Flag, 2026-08-09) — mirrors config.chargeBridge onto the wire', () => {
-    it('sends chargeComponentBridge: true when config.chargeBridge is true', () => {
-      const req = buildConfirmRequest(baseConfig({ chargeBridge: true }), baseModel, debitLegs, [], undefined);
-      expect(req.chargeComponentBridge).toBe(true);
+  describe('debitLegsComponentBridge (Debit Legs Component Bridge Flag, 2026-08-09) — mirrors config.debitLegsBridge onto the wire', () => {
+    it('sends debitLegsComponentBridge: true when config.debitLegsBridge is true', () => {
+      const req = buildConfirmRequest(baseConfig({ debitLegsBridge: true }), baseModel, debitLegs, [], undefined);
+      expect(req.debitLegsComponentBridge).toBe(true);
     });
 
-    it('omits chargeComponentBridge (undefined) when config.chargeBridge is unset', () => {
+    it('omits debitLegsComponentBridge (undefined) when config.debitLegsBridge is unset', () => {
       const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs);
-      expect(req.chargeComponentBridge).toBeUndefined();
+      expect(req.debitLegsComponentBridge).toBeUndefined();
     });
   });
 });

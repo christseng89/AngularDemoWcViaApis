@@ -38,7 +38,7 @@ Server listens on `PORT` (default 3000), all routes mounted under
 |---|---|---|
 | `src/types.ts` | — | TypeScript types mirroring every OAS schema exactly |
 | `src/money.ts` | §8.2 | Decimal-backed parse/format for `MonetaryAmount`/`ExchangeRate`; the only module allowed to construct a `Decimal` from a wire string |
-| `src/validation/requestSchema.ts` | — | zod schema for `PaymentInstructionConfirmRequest`; failures → 400. `creditLegs` normally requires >=1 item; a `superRefine` relaxes this to 0 only when `chargeComponentBridge === true` AND `suspenseBridge.creditEntries` is non-empty (2026-08-09, not legacy-traced — see "Charge Component Bridge" below) |
+| `src/validation/requestSchema.ts` | — | zod schema for `PaymentInstructionConfirmRequest`; failures → 400. `creditLegs` normally requires >=1 item; a `superRefine` relaxes this to 0 only when `debitLegsComponentBridge === true` AND `suspenseBridge.creditEntries` is non-empty (2026-08-09, not legacy-traced — see "Debit Payment Bridge" below) |
 | `src/domain/balanceValidation.ts` | §3, V8 | Dr/Cr balance check |
 | `src/domain/classification.ts` | §4 | Payment Component Identification Rule (Rev. 2) |
 | `src/domain/voucherDescription.ts` | §5 | Per-leg `accountDesc` assembly |
@@ -71,15 +71,15 @@ fields — existed here through v1.5.0; removed v1.6.0 along with §6.2/§6.3
 generation itself. See "Balance/Charge Component ↔ Payment Component bridge"
 below for the current design.)
 
-A second field, **`chargeComponentBridge`** (boolean, added 2026-08-09), is a related but
+A second field, **`debitLegsComponentBridge`** (boolean, added 2026-08-09), is a related but
 mechanically DIFFERENT case: it isn't routed through the `RequestExtensions` sidecar above at
 all (which bypasses zod validation entirely) because it needs to participate in a cross-field
 validation rule — it's declared directly on `paymentInstructionConfirmRequestSchema`
 (`validation/requestSchema.ts`) with a `superRefine` that relaxes `creditLegs`' normal `>= 1`
-item requirement to 0 items, but ONLY when `chargeComponentBridge === true` AND
+item requirement to 0 items, but ONLY when `debitLegsComponentBridge === true` AND
 `suspenseBridge.creditEntries` has at least one entry. Also has no home in the OAS (same
-situation as `sourceFunctionCode`) — see "Charge Component Bridge (`chargeComponentBridge`,
-2026-08-09)" below for the full contract and the accounting rationale.
+situation as `sourceFunctionCode`) — see "Debit Payment Bridge
+(`debitLegsComponentBridge`, 2026-08-09)" below for the full contract and the accounting rationale.
 
 ## Balance/Charge Component ↔ Payment Component bridge (`suspenseBridge`, v1.4.0 / v1.5.0 / v1.7.0-v1.8.0)
 
@@ -230,16 +230,24 @@ instead of zero. This is a genuine **response-shape change** (more legs generate
 both a Suspense entry and a matching real leg; new `- Suspense`-suffixed account names) — the
 *request* contract (`SuspenseBridge`, `PaymentLegInput`, etc.) is entirely unchanged.
 
-### Charge Component Bridge (`chargeComponentBridge`, 2026-08-09)
+### Debit Payment Bridge (`debitLegsComponentBridge`, 2026-08-09; renamed from
+`chargeComponentBridge` 2026-08-10)
 
 **Business-requirement-confirmed, not legacy-traced.** A distinct usage pattern from the general
 Balance/Charge Component bridge above: instead of a real leg and a Suspense entry being two
 *independent* sources that happen to share a currency (the v1.8.0 model above), a
-`chargeComponentBridge:true` request's `debitLegs` and `suspenseBridge.creditEntries` are the
-**two halves of the same transaction** — `Dr Customer A/C` / `Cr Suspense - Credit`, with
-`creditLegs` deliberately empty (the Simulator's `iplc-issue-charge-bridge` business case is the
+`debitLegsComponentBridge:true` request's `debitLegs` and `suspenseBridge.creditEntries` are the
+**two halves of the same transaction** — `Dr Customer A/C` / `Cr Suspense - X`, with
+`creditLegs` deliberately empty. The flag was renamed 2026-08-10 (from `chargeComponentBridge`)
+because this same request shape — Payment Component posts only `debitLegs`, the entire credit
+side is bridged out via `suspenseBridge.creditEntries` — is not charge-specific: it equally fits
+a **Customer IBL Payment** (Import Bill Loan funding under a Buyer's Usance LC — a Loan Component
+concept, distinct from the existing `balanceModule:'IBL'` "Import Bill Liability" tag above, and
+NOT itself modeled by this microservice, same as the Charge Component isn't) collecting from the
+customer and crediting `Suspense - IBL` instead of `Suspense - Credit`, or even both sources in
+the same request. The Simulator's `iplc-issue-charge-bridge` business case (Charge-only) is the
 first caller of this shape; see `lc-payment-wc/CLAUDE.md`'s "Charge Component ↔ Payment Component
-boundary" for the Angular-side flag, `BusinessCaseConfig.chargeBridge`).
+boundary" for the Angular-side flag, `BusinessCaseConfig.debitLegsBridge`.
 
 Because `creditLegs` is always empty in this mode, the v1.8.0 "real-leg pair" logic above —
 which only ever compares a `creditEntries` bucket against the SAME-side `creditLegs` — can never
@@ -278,15 +286,29 @@ Every pair here is self-balancing by construction (adds the identical amount to 
 credit) regardless of how it's sized, so none of this ever affects whether aggregate V8 passes —
 a genuine, unexplained mismatch (no compensating leg anywhere else in the request) still throws
 409 `LEGS_UNBALANCED` exactly as before; sizing only changes the DISPLAYED magnitude. Gated
-narrowly on `chargeComponentBridge:true` — every other request's FX-pair behavior (the v1.8.0
+narrowly on `debitLegsComponentBridge:true` — every other request's FX-pair behavior (the v1.8.0
 Suspense-pair-plus-real-leg-pair model above) is completely untouched. See
 `test/unit/domain/suspenseBridge.test.ts`'s and `test/unit/domain/confirmPaymentInstruction.test.ts`'s
-`chargeComponentBridge` describe blocks for the full test coverage of all four scenarios above.
+`debitLegsComponentBridge` describe blocks for the full test coverage of all four scenarios above.
 
 The Simulator has a companion frontend fix for the same reason: its "Debit FX Conversion Pair"
-display panel used to net only against `suspenseDebitEntries` (always empty for a chargeBridge
-case), so it kept showing a misleading naive FX pair the server no longer generates — see
-`lc-payment-wc/CLAUDE.md` for that fix.
+display panel is unconditionally hidden for a debitLegsBridge case (2026-08-11,
+business-requirement-confirmed — it's not needed for this case at all) — see
+`lc-payment-wc/CLAUDE.md` for the fix and its history (it first netted per-currency against
+`suspenseCreditEntries`, which still left gaps, before being simplified to a full hide).
+
+**400 error attribution fixed (2026-08-11).** `debitLegsComponentBridge:true` with `creditLegs`
+empty and `suspenseBridge.creditEntries` ALSO empty (or missing — reachable via a Confirm click
+before any Suspense Credit row is entered, since `onConfirm()` doesn't gate on leg validity the
+way the live preview does) always correctly 400'd, but the message blamed `creditLegs`
+(`"creditLegs: creditLegs must contain at least 1 item"`) — misleading, since `creditLegs` is
+never used in this mode at all. The `superRefine` in `requestSchema.ts` now attributes this case
+to `suspenseBridge.creditEntries` instead: `"suspenseBridge.creditEntries: suspenseBridge.creditEntries
+must contain at least 1 item when debitLegsComponentBridge is true — creditLegs is not used in
+this mode"`. The exemption's trigger condition itself is byte-for-byte unchanged (same requests
+pass/fail as before) — only which field a genuine failure reports. The ordinary (non-bridge)
+`creditLegs`-empty case is unaffected and still blames `creditLegs` itself — see
+`test/unit/validation/requestSchema.test.ts` for regression coverage of both directions.
 
 ### Settlement leg ordering (v1.7.2)
 

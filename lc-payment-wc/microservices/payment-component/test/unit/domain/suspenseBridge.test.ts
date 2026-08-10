@@ -325,14 +325,14 @@ describe('expandSuspenseBridge', () => {
     });
   });
 
-  describe('chargeComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed)', () => {
+  describe('debitLegsComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed)', () => {
     it('diff === 0 (exact match): no FX pair at all, only the plain Suspense - Credit leg', () => {
       const result = expandSuspenseBridge(
         { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
         'USD',
         [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })], // debitLegs — opposite side from creditEntries
-        [], // creditLegs always empty for a chargeBridge case
-        true, // chargeComponentBridge
+        [], // creditLegs always empty for a debitLegsComponentBridge case
+        true, // debitLegsComponentBridge
       );
       expect(result.credit).toEqual([
         { accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', crBuyRate: '1.2' },
@@ -415,7 +415,7 @@ describe('expandSuspenseBridge', () => {
       // confirmPaymentInstruction.test.ts's "debit exceeds Suspense Credit" integration test.
     });
 
-    it('does NOT apply when chargeComponentBridge is false/omitted, even with an exact native-currency match (opt-in only — the default 4-arg call site is unaffected, unconditional gross-sized pair still generates)', () => {
+    it('does NOT apply when debitLegsComponentBridge is false/omitted, even with an exact native-currency match (opt-in only — the default 4-arg call site is unaffected, unconditional gross-sized pair still generates)', () => {
       const result = expandSuspenseBridge(
         { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
         'USD',

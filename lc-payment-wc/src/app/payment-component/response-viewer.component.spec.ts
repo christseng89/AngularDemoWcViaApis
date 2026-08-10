@@ -44,7 +44,7 @@ describe('ResponseViewerComponent', () => {
   });
 
   describe('settlementEntries excludes zero-amount entries', () => {
-    it("does not include a real zero-amount leg — e.g. onConfirm() (unlike the live preview) doesn't gate on leg validity, so a Suspense Credit bridge entry that fully offsets the \"Charge Component Bridge\" case's default Cr \"Suspense - Credit\" leg can reach the server as a real 0.00 leg", () => {
+    it("does not include a real zero-amount leg — e.g. onConfirm() (unlike the live preview) doesn't gate on leg validity, so a Suspense Credit bridge entry that fully offsets the \"Debit Payment Bridge\" case's default Cr \"Suspense - Credit\" leg can reach the server as a real 0.00 leg", () => {
       const comp = new ResponseViewerComponent();
       comp.accountEntries = [
         entry('SETTLEMENT', { entryId: 'd1', drCrIndicator: 'D', glAccount: 'CUST-ACC', currency: 'USD', amount: '150.00' }),

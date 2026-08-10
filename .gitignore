@@ -4,3 +4,4 @@ node_modules/
 dist/
 ~*.docx
 /scratchpad_out*.md
+lc-payment-wc-backup/

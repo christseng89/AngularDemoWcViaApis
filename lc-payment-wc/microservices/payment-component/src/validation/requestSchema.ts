@@ -94,38 +94,64 @@ export const paymentInstructionConfirmRequestSchema = z
     creditLegs: z.array(paymentLegInputSchema),
     suspenseBridge: suspenseBridgeSchema.optional(),
     /**
-     * Charge Component Bridge Flag (reviewer-confirmed, 2026-08-09) — NOT part of
-     * payment-instructions-post.yaml (no home in the official OAS, same situation as
-     * sourceFunctionCode — see that field's doc comment in routes/paymentInstructions.ts).
-     * Unlike sourceFunctionCode/voucherCodePrefixOverride/dryRun, this one is declared as a
-     * real zod field (not just read out of RequestExtensions) because it participates in a
-     * cross-field validation rule below, not just pass-through options.
+     * Debit Legs Component Bridge Flag (reviewer-confirmed, 2026-08-09; renamed from
+     * chargeComponentBridge to debitLegsComponentBridge 2026-08-10 — see lc-payment-wc/CLAUDE.md's
+     * dated entry for why) — NOT part of payment-instructions-post.yaml (no home in the official
+     * OAS, same situation as sourceFunctionCode — see that field's doc comment in
+     * routes/paymentInstructions.ts). Unlike sourceFunctionCode/voucherCodePrefixOverride/dryRun,
+     * this one is declared as a real zod field (not just read out of RequestExtensions) because it
+     * participates in a cross-field validation rule below, not just pass-through options.
      *
      * When true AND suspenseBridge.creditEntries has at least 1 entry, creditLegs may be
-     * empty — the entire credit side is provided by the Suspense Credit bridge to a separate
-     * Charge Component (see lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component
-     * boundary"), never a directly-submitted credit leg. This does not change how the balance
-     * check or classification behaves — confirmPaymentInstruction.ts already expands
+     * empty — this request only ever carries debitLegs; the entire credit side is provided by
+     * the Suspense Credit bridge to one or more separate upstream components (originally just a
+     * Charge Component — see lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component
+     * boundary" — now also generalized to a Customer IBL Payment / Import Bill Loan scenario;
+     * neither component's own books are modeled by this microservice), never a
+     * directly-submitted credit leg. This does not change how the balance check or
+     * classification behaves — confirmPaymentInstruction.ts already expands
      * suspenseBridge.creditEntries into real credit legs before both run (v1.4.0); this flag's
      * only job is relaxing the request-shape check below so that expansion is reachable with
-     * an empty creditLegs array. Omitted/false, or true with no suspenseBridge.creditEntries:
-     * creditLegs must contain at least 1 item, same as every other case — this flag is
-     * deliberately NOT a blanket bypass of the "must have a credit side" rule.
+     * an empty creditLegs array. Omitted/false: creditLegs must contain at least 1 item, same as
+     * every other case. True with no suspenseBridge.creditEntries (2026-08-11, business-
+     * requirement-confirmed): still an error, but attributed to `suspenseBridge.creditEntries`
+     * instead of `creditLegs` (see the superRefine below) — creditLegs is never used in this
+     * mode, so blaming it is actively misleading; this flag is deliberately NOT a blanket bypass
+     * of the "must have a credit side" rule, just a relocation of WHICH field carries it.
      */
-    chargeComponentBridge: z.boolean().optional(),
+    debitLegsComponentBridge: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
+    const isDebitLegsBridge = data.debitLegsComponentBridge === true;
     const bridgeHasCredit = (data.suspenseBridge?.creditEntries?.length ?? 0) > 0;
-    const exempt = data.chargeComponentBridge === true && bridgeHasCredit;
+    const exempt = isDebitLegsBridge && bridgeHasCredit;
     if (data.creditLegs.length === 0 && !exempt) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.too_small,
-        minimum: 1,
-        type: 'array',
-        inclusive: true,
-        path: ['creditLegs'],
-        message: 'creditLegs must contain at least 1 item',
-      });
+      // Same trigger condition as before (creditLegs empty and not exempted) — only WHICH field
+      // gets blamed changes. In debitLegsComponentBridge mode, creditLegs is never used at all
+      // (see this field's own doc comment above); the actual missing input is
+      // suspenseBridge.creditEntries, so point the error there instead of at creditLegs — a
+      // "creditLegs must contain at least 1 item" message is actively misleading for a mode
+      // whose whole contract is "no Credit Legs, ever" (business-requirement-confirmed 2026-08-11).
+      if (isDebitLegsBridge) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_small,
+          minimum: 1,
+          type: 'array',
+          inclusive: true,
+          path: ['suspenseBridge', 'creditEntries'],
+          message:
+            'suspenseBridge.creditEntries must contain at least 1 item when debitLegsComponentBridge is true — creditLegs is not used in this mode',
+        });
+      } else {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_small,
+          minimum: 1,
+          type: 'array',
+          inclusive: true,
+          path: ['creditLegs'],
+          message: 'creditLegs must contain at least 1 item',
+        });
+      }
     }
 
     // Currency minor-unit (decimal-places) validation — the currency's allowed

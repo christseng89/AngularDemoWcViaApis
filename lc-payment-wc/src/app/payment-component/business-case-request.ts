@@ -24,9 +24,9 @@ export function buildConfirmRequest(
     creditLegs,
     sourceFunctionCode: config.dualPrefixOptions ? undefined : config.sourceFunctionCode,
     voucherCodePrefixOverride: config.dualPrefixOptions ? model['voucherPrefix'] : undefined,
-    // See PaymentInstructionConfirmRequest.chargeComponentBridge's doc comment — mirrors the
-    // case's own chargeBridge flag exactly, undefined (omitted on the wire) for every other case.
-    chargeComponentBridge: config.chargeBridge ? true : undefined,
+    // See PaymentInstructionConfirmRequest.debitLegsComponentBridge's doc comment — mirrors the
+    // case's own debitLegsBridge flag exactly, undefined (omitted on the wire) for every other case.
+    debitLegsComponentBridge: config.debitLegsBridge ? true : undefined,
   };
   if (suspenseBridge) {
     request.suspenseBridge = suspenseBridge;

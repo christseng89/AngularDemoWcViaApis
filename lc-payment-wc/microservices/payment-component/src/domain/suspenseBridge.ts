@@ -64,20 +64,25 @@
  * behalf (only Suspense/FX legs are ever ADDED — a caller's own submitted
  * debit/credit leg amounts are never modified).
  *
- * chargeComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed) — see the
- * `if (chargeComponentBridge && side === 'CREDIT')` branch inside expandSuspenseBridge below for
- * the full rationale. Short version: a chargeComponentBridge request's real legs sit on the
- * OPPOSITE side from its suspenseBridge.creditEntries (creditLegs is always empty in that mode),
- * a direction the ordinary same-side "real-leg pair" logic above never checks. Instead of the
- * unconditional gross-sized Suspense pair every other request gets, a chargeComponentBridge
+ * debitLegsComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed; flag
+ * renamed from chargeComponentBridge 2026-08-10 — see lc-payment-wc/CLAUDE.md's dated entry) —
+ * see the `if (debitLegsComponentBridge && side === 'CREDIT')` branch inside expandSuspenseBridge
+ * below for the full rationale. Short version: a debitLegsComponentBridge request's real legs sit
+ * on the OPPOSITE side from its suspenseBridge.creditEntries (creditLegs is always empty in that
+ * mode), a direction the ordinary same-side "real-leg pair" logic above never checks. Instead of
+ * the unconditional gross-sized Suspense pair every other request gets, a debitLegsComponentBridge
  * bucket gets ONE pair sized to the DIFFERENCE between the bucket's own gross amount and the
  * caller's matching-currency debitLegs — zero when they match exactly (no FX pair at all — no
  * conversion is actually happening), the full gross amount when there's no matching debit leg at
  * all (identical to the pre-existing behavior in that case), and just the residual otherwise.
- * Scoped narrowly (chargeComponentBridge:true only) to avoid the netting/combining class of bug
+ * Scoped narrowly (debitLegsComponentBridge:true only) to avoid the netting/combining class of bug
  * this file's v1.7.x history is full of — but safely so, because every pair here (gross- or
  * diff-sized, it makes no difference) is self-balancing by construction and therefore never
- * affects whether aggregate V8 passes; only the DISPLAYED magnitude changes.
+ * affects whether aggregate V8 passes; only the DISPLAYED magnitude changes. This pattern is not
+ * charge-specific — the credit side may be sourced from a Charge Component OR a Customer IBL
+ * Payment / Import Bill Loan scenario (Buyer's Usance LC funding, distinct from the existing
+ * balanceModule:'IBL' "Import Bill Liability" tag), or a mix of both in one request; neither
+ * upstream component's own books are modeled by this microservice.
  */
 import type { PaymentLegInput, SuspenseBridge, SuspenseEntry, LegSide } from '../types';
 import { parseMonetaryAmount, parseExchangeRate, formatMonetaryAmount, minorUnitsForCurrency, sumMonetaryAmounts } from '../money';
@@ -267,7 +272,7 @@ export function expandSuspenseBridge(
   transactionCurrency: string,
   debitLegs: readonly PaymentLegInput[] = [],
   creditLegs: readonly PaymentLegInput[] = [],
-  chargeComponentBridge = false,
+  debitLegsComponentBridge = false,
 ): { debit: PaymentLegInput[]; credit: PaymentLegInput[] } {
   const debit: PaymentLegInput[] = [];
   const credit: PaymentLegInput[] = [];
@@ -302,8 +307,9 @@ export function expandSuspenseBridge(
       const grossSuspense = sumMonetaryAmounts(bucket.map((e) => e.amount));
       const suspenseTrxEq = sumMonetaryAmounts(bucketSuspenseLegs.map((l) => l.amountTxCcy));
 
-      // Charge Component Bridge Flag (2026-08-09, business-requirement-confirmed): a
-      // chargeComponentBridge request's real legs are ALWAYS on the OPPOSITE side from its
+      // Debit Legs Component Bridge Flag (2026-08-09, business-requirement-confirmed; renamed
+      // from chargeComponentBridge 2026-08-10): a debitLegsComponentBridge request's real legs
+      // are ALWAYS on the OPPOSITE side from its
       // suspenseBridge.creditEntries (Dr Customer A/C / Cr Suspense - Credit — creditLegs is
       // always empty in this mode, see this file's top doc comment), so the ordinary "real-leg
       // pair" below — which only ever compares AGAINST THE SAME side (creditEntries vs
@@ -334,7 +340,7 @@ export function expandSuspenseBridge(
       // construction (adds the identical amount to both debit and credit), so it can never
       // change whether Σ debitLegs == Σ creditLegs; that still gets caught by
       // validateDrCrBalance (§3/V8) exactly as before, regardless of how this pair is sized.
-      if (chargeComponentBridge && side === 'CREDIT') {
+      if (debitLegsComponentBridge && side === 'CREDIT') {
         const oppositeNative = sumLegsInCurrency(debitLegs, currency);
         const oppositeTrx = sumLegsTrxCcy(debitLegs, currency);
         const diffNative = grossSuspense.minus(oppositeNative);

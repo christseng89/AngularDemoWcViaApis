@@ -148,15 +148,20 @@ export interface PaymentInstructionConfirmRequest {
   voucherCodePrefixOverride?: string;
   dryRun?: boolean;
   /**
-   * Charge Component Bridge Flag (2026-08-09) — unlike the three extension fields above, this
-   * one is NOT read out of a loose RequestExtensions sidecar server-side; it's a real field on
-   * the microservice's own zod schema (validation/requestSchema.ts) because it participates in
-   * a cross-field rule there: creditLegs may be empty only when this is true AND
-   * suspenseBridge.creditEntries has at least 1 entry. Set to true iff
-   * BusinessCaseConfig.chargeBridge is true for the selected case (business-case-request.ts) —
-   * see that field's own doc comment (business-case.model.ts) for the full contract.
+   * Debit Legs Component Bridge Flag (2026-08-09; renamed from chargeComponentBridge
+   * 2026-08-10 — see lc-payment-wc/CLAUDE.md's dated entry) — unlike the three extension
+   * fields above, this one is NOT read out of a loose RequestExtensions sidecar server-side;
+   * it's a real field on the microservice's own zod schema (validation/requestSchema.ts)
+   * because it participates in a cross-field rule there: creditLegs may be empty only when
+   * this is true AND suspenseBridge.creditEntries has at least 1 entry. Not charge-specific —
+   * this request shape (Payment Component posts only debitLegs, the entire credit side is
+   * bridged out via suspenseBridge.creditEntries) equally fits a Customer IBL Payment (Import
+   * Bill Loan under a Buyer's Usance LC, distinct from the existing balanceModule:'IBL'
+   * "Import Bill Liability" tag), or both sources in one request. Set to true iff
+   * BusinessCaseConfig.debitLegsBridge is true for the selected case (business-case-request.ts)
+   * — see that field's own doc comment (business-case.model.ts) for the full contract.
    */
-  chargeComponentBridge?: boolean;
+  debitLegsComponentBridge?: boolean;
 }
 
 export interface ClassificationResult {

@@ -20,7 +20,7 @@ import { ORIGIN_MODULES } from '../types';
  * were here through v1.5.0; removed v1.6.0 along with §6.2/§6.3 generation —
  * see domain/confirmPaymentInstruction.ts's doc comment.)
  *
- * chargeComponentBridge (2026-08-09) is NOT one of these — it's declared directly on
+ * debitLegsComponentBridge (2026-08-09, renamed from chargeComponentBridge 2026-08-10) is NOT one of these — it's declared directly on
  * paymentInstructionConfirmRequestSchema instead (validation/requestSchema.ts), because it
  * participates in that schema's own cross-field creditLegs rule rather than being a pure
  * pass-through option. See that field's own doc comment for the full contract.

@@ -207,8 +207,8 @@ const PASS_CASES: BusinessCaseConfig[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// 1 CHARGE BRIDGE — IPLC Issue: NOT one of the 15 confirmed Payment Component
-// consumer functions above (no SYF_IPLC_IPLC_Issue.js Payment Component call
+// 1 DEBIT LEGS COMPONENT BRIDGE — IPLC Issue: NOT one of the 15 confirmed Payment
+// Component consumer functions above (no SYF_IPLC_IPLC_Issue.js Payment Component call
 // has been source-verified — Payment_Mapping_Functions.docx §6 does not list
 // LC Issue at all). Unlike every PASS_CASES entry, this case's citation is
 // therefore NOT a legacy file:line — it is a reviewer-confirmed ARCHITECTURE
@@ -229,18 +229,31 @@ const PASS_CASES: BusinessCaseConfig[] = [
 // Commission, Cr Charge 1, Cr Charge 2), with Suspense - Credit clearing to
 // zero across the two components' books.
 //
-// Reviewer-confirmed (2026-08-09): `chargeBridge: true` (business-case.model.ts — see that
+// Renamed 2026-08-10 (functionLabel, and the flag itself: chargeBridge -> debitLegsBridge) from
+// "Charge Component Bridge", then again 2026-08-10 (functionLabel only, "Charge / Customer IBL
+// Payment Bridge" -> "Debit Payment Bridge") — this SAME mechanism is not charge-specific:
+// Payment Component posting only debitLegs, with the entire credit side bridged out via
+// suspenseBridge.creditEntries, equally fits a Customer IBL Payment (Import Bill Loan funding
+// under a Buyer's Usance LC — a separate Loan Component concept, distinct from the existing
+// balanceModule:'IBL' "Import Bill Liability" tag, and NOT itself modeled in this repo, same as
+// Charge Component isn't), or a mix of both sources in one instruction. The one case below
+// (`iplc-issue-charge-bridge`) still demonstrates the Charge-only path specifically — a
+// Customer-IBL-Payment-specific worked example is not yet modeled here (out of scope for now,
+// see lc-payment-wc/CLAUDE.md's dated entry) — but the label and flag now name the general
+// mechanism, not just this one worked example.
+//
+// Reviewer-confirmed (2026-08-09): `debitLegsBridge: true` (business-case.model.ts — see that
 // field's own doc comment for the full contract) marks this case as collecting charges ONLY —
 // there is deliberately no Credit Leg at all. The entire credit side is provided via the
 // Suspense Credit bridge (suspenseBridge.creditEntries), never a directly-submitted real credit
 // leg. This is the ONE case in the registry with only a DEBIT entry in `legs`
-// (business-case-registry.spec.ts's data invariants exempt any chargeBridge:true case
+// (business-case-registry.spec.ts's data invariants exempt any debitLegsBridge:true case
 // explicitly, with a dedicated test asserting this exact shape) — business-case-runner.
 // component.ts's `creditLegsRequired` getter reads the flag directly (not `legs`' shape) and
 // hides the Credit <app-leg-allocator> entirely, seeding `creditValid = true` in selectCase()
 // (nothing will ever emit validChange for a side with no allocator). The Debit side can still be
 // split across multiple accounts/currencies via the existing leg-allocator UI, same as any other
-// case — chargeBridge only removes the Credit side, not multi-leg support on Debit.
+// case — debitLegsBridge only removes the Credit side, not multi-leg support on Debit.
 //
 // Business-requirement-confirmed (2026-08-09): Transaction Amount (== the Debit Leg #1 total) is
 // PROTECTED and auto-calculated as Σ(Suspense Credit entries' Trx Ccy Equivalent) — the user adds
@@ -264,22 +277,22 @@ const PASS_CASES: BusinessCaseConfig[] = [
 // live preview does, fully offsetting that leg via Suspense Credit could reach Confirm with a
 // real 0.00-amount leg on the wire. response-viewer.component.ts's settlementEntries getter now
 // separately excludes zero-amount entries from display regardless of cause (defense in depth),
-// but removing the Credit Leg entirely (via chargeBridge) removes the underlying cause.
+// but removing the Credit Leg entirely (via debitLegsBridge) removes the underlying cause.
 // ---------------------------------------------------------------------------
 
-const CHARGE_BRIDGE_CASES: BusinessCaseConfig[] = [
+const DEBIT_LEGS_BRIDGE_CASES: BusinessCaseConfig[] = [
   {
     id: 'iplc-issue-charge-bridge',
     module: 'IPLC',
-    functionLabel: 'Charge Component Bridge',
+    functionLabel: 'Debit Payment Bridge',
     verdict: 'PASS',
     citation:
       'NOT legacy-traced — reviewer-confirmed architecture pattern (lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component boundary"). LC Issue is not one of the 15 confirmed Payment Component consumer functions (Payment_Mapping_Functions.docx §6).',
-    note: 'Charge Bridge — charges only, no Credit Leg. Transaction Amount is protected and auto-calculated as the sum of the Suspense Credit entries below (multiple entries/currencies supported) — Dr Customer A/C (splittable across multiple accounts/currencies) follows automatically to match Cr Suspense - Credit. The separate Charge Component (not modeled here) consumes that Suspense amount and posts the itemized Dr Suspense - Credit / Cr Margin, Commission, Charge legs on its own books.',
+    note: 'Debit Legs Bridge — no Credit Leg; the credit side is bridged out via Suspense to a separate upstream component (Charge Component here; the same mechanism also supports a Customer IBL Payment / Import Bill Loan scenario, or both in one instruction — see business-case.model.ts). Transaction Amount is protected and auto-calculated as the sum of the Suspense Credit entries below (multiple entries/currencies supported) — Dr Customer A/C (splittable across multiple accounts/currencies) follows automatically to match Cr Suspense - Credit. This worked example uses the Charge Component (not modeled here): it consumes that Suspense amount and posts the itemized Dr Suspense - Credit / Cr Margin, Commission, Charge legs on its own books.',
     dualPrefixOptions: [
       { label: 'IPLC99NULLNULLNULL (illustrative placeholder — not FSD-documented, see citation)', value: 'IPLC99NULLNULLNULL' },
     ],
-    chargeBridge: true,
+    debitLegsBridge: true,
     legs: [leg('DEBIT', 'CUSTOMER', 'CUST-ACC', 'USD', '150')],
   },
 ];
@@ -399,7 +412,7 @@ const NA_CASES: BusinessCaseConfig[] = [
   },
 ];
 
-export const BUSINESS_CASES: BusinessCaseConfig[] = [...PASS_CASES, ...CHARGE_BRIDGE_CASES, ...GAP_CASES, ...NA_CASES];
+export const BUSINESS_CASES: BusinessCaseConfig[] = [...PASS_CASES, ...DEBIT_LEGS_BRIDGE_CASES, ...GAP_CASES, ...NA_CASES];
 
 const MODULE_LABELS: Record<string, string> = {
   IPLC: 'IPLC — Import Letter of Credit',

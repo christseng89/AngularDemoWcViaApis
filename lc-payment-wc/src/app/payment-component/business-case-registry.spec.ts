@@ -1,7 +1,7 @@
 import { BUSINESS_CASES, MODULE_GROUPS } from './business-case-registry';
 
 describe('business-case-registry data invariants', () => {
-  it('has 16 PASS (15 legacy-traced + 1 charge-bridge) + 4 GAP + 4 N_A cases (24 total)', () => {
+  it('has 16 PASS (15 legacy-traced + 1 debit-legs-bridge) + 4 GAP + 4 N_A cases (24 total)', () => {
     const byVerdict = (v: string) => BUSINESS_CASES.filter((c) => c.verdict === v).length;
     expect(byVerdict('PASS')).toBe(16);
     expect(byVerdict('GAP')).toBe(4);
@@ -9,10 +9,10 @@ describe('business-case-registry data invariants', () => {
     expect(BUSINESS_CASES).toHaveLength(24);
   });
 
-  it('the one non-legacy-traced PASS case (Charge Component bridge) says so explicitly in its own citation, so it is never mistaken for one of the 15 source-verified functions', () => {
-    const chargeBridgeCases = BUSINESS_CASES.filter((c) => c.verdict === 'PASS' && !/^SYF_|ConfirmBusinessCall/.test(c.citation));
-    expect(chargeBridgeCases).toHaveLength(1);
-    expect(chargeBridgeCases[0]!.citation).toMatch(/NOT legacy-traced/i);
+  it('the one non-legacy-traced PASS case (Charge / Customer IBL Payment bridge) says so explicitly in its own citation, so it is never mistaken for one of the 15 source-verified functions', () => {
+    const debitLegsBridgeCases = BUSINESS_CASES.filter((c) => c.verdict === 'PASS' && !/^SYF_|ConfirmBusinessCall/.test(c.citation));
+    expect(debitLegsBridgeCases).toHaveLength(1);
+    expect(debitLegsBridgeCases[0]!.citation).toMatch(/NOT legacy-traced/i);
   });
 
   it('every case has a unique id', () => {
@@ -28,26 +28,26 @@ describe('business-case-registry data invariants', () => {
     }
   });
 
-  it('every PASS/GAP case has exactly one DEBIT and one CREDIT leg, except chargeBridge:true cases (charges only — credit comes entirely from the Suspense Credit bridge, never a real Credit Leg)', () => {
-    for (const c of BUSINESS_CASES.filter((c) => c.verdict !== 'N_A' && !c.chargeBridge)) {
+  it('every PASS/GAP case has exactly one DEBIT and one CREDIT leg, except debitLegsBridge:true cases (charges only — credit comes entirely from the Suspense Credit bridge, never a real Credit Leg)', () => {
+    for (const c of BUSINESS_CASES.filter((c) => c.verdict !== 'N_A' && !c.debitLegsBridge)) {
       const sides = c.legs.map((l) => l.side);
       expect(sides).toEqual(expect.arrayContaining(['DEBIT', 'CREDIT']));
       expect(c.legs).toHaveLength(2);
     }
   });
 
-  it('every chargeBridge:true case has ONLY DEBIT legs — no Credit Leg at all (Charge Bridge Flag contract, business-case.model.ts)', () => {
-    const chargeBridgeCases = BUSINESS_CASES.filter((c) => c.chargeBridge);
-    expect(chargeBridgeCases.length).toBeGreaterThan(0); // this invariant would be vacuous otherwise
-    for (const c of chargeBridgeCases) {
+  it('every debitLegsBridge:true case has ONLY DEBIT legs — no Credit Leg at all (Debit Legs Component Bridge Flag contract, business-case.model.ts)', () => {
+    const debitLegsBridgeCases = BUSINESS_CASES.filter((c) => c.debitLegsBridge);
+    expect(debitLegsBridgeCases.length).toBeGreaterThan(0); // this invariant would be vacuous otherwise
+    for (const c of debitLegsBridgeCases) {
       expect(c.legs.length).toBeGreaterThan(0);
       expect(c.legs.every((l) => l.side === 'DEBIT')).toBe(true);
     }
   });
 
-  it('iplc-issue-charge-bridge is flagged chargeBridge:true and has exactly one DEBIT leg', () => {
+  it('iplc-issue-charge-bridge is flagged debitLegsBridge:true and has exactly one DEBIT leg', () => {
     const c = BUSINESS_CASES.find((c) => c.id === 'iplc-issue-charge-bridge')!;
-    expect(c.chargeBridge).toBe(true);
+    expect(c.debitLegsBridge).toBe(true);
     expect(c.legs.map((l) => l.side)).toEqual(['DEBIT']);
   });
 

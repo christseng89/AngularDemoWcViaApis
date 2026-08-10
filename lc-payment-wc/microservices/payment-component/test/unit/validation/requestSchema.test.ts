@@ -44,63 +44,70 @@ describe('validateConfirmRequest', () => {
     expect(() => validateConfirmRequest({ ...validConfirmBody, debitLegs: [] })).toThrow(RequestValidationError);
   });
 
-  it('throws when creditLegs is an empty array (minItems 1)', () => {
-    expect(() => validateConfirmRequest({ ...validConfirmBody, creditLegs: [] })).toThrow(RequestValidationError);
+  it('throws when creditLegs is an empty array (minItems 1), blaming creditLegs itself for the ordinary (non-bridge) case', () => {
+    expect(() => validateConfirmRequest({ ...validConfirmBody, creditLegs: [] })).toThrow(
+      /^creditLegs: creditLegs must contain at least 1 item/,
+    );
   });
 
-  describe('chargeComponentBridge (empty creditLegs exemption)', () => {
-    it('allows empty creditLegs when chargeComponentBridge is true and suspenseBridge.creditEntries is populated', () => {
+  describe('debitLegsComponentBridge (empty creditLegs exemption)', () => {
+    it('allows empty creditLegs when debitLegsComponentBridge is true and suspenseBridge.creditEntries is populated', () => {
       const result = validateConfirmRequest({
         ...validConfirmBody,
         creditLegs: [],
-        chargeComponentBridge: true,
+        debitLegsComponentBridge: true,
         suspenseBridge: { creditEntries: [{ amount: '100', currency: 'USD' }] },
       });
       expect(result.creditLegs).toHaveLength(0);
-      expect(result.chargeComponentBridge).toBe(true);
+      expect(result.debitLegsComponentBridge).toBe(true);
     });
 
-    it('throws when chargeComponentBridge is true but suspenseBridge.creditEntries is missing', () => {
+    it('throws when debitLegsComponentBridge is true but suspenseBridge.creditEntries is missing, blaming suspenseBridge.creditEntries (NOT creditLegs — creditLegs is never used in this mode, 2026-08-11)', () => {
       expect(() =>
-        validateConfirmRequest({ ...validConfirmBody, creditLegs: [], chargeComponentBridge: true }),
-      ).toThrow(RequestValidationError);
+        validateConfirmRequest({ ...validConfirmBody, creditLegs: [], debitLegsComponentBridge: true }),
+      ).toThrow(/suspenseBridge\.creditEntries: suspenseBridge\.creditEntries must contain at least 1 item/);
+      try {
+        validateConfirmRequest({ ...validConfirmBody, creditLegs: [], debitLegsComponentBridge: true });
+      } catch (err) {
+        expect((err as Error).message).not.toMatch(/^creditLegs:/);
+      }
     });
 
-    it('throws when chargeComponentBridge is true but suspenseBridge only has debitEntries', () => {
+    it('throws when debitLegsComponentBridge is true but suspenseBridge only has debitEntries, blaming suspenseBridge.creditEntries', () => {
       expect(() =>
         validateConfirmRequest({
           ...validConfirmBody,
           creditLegs: [],
-          chargeComponentBridge: true,
+          debitLegsComponentBridge: true,
           suspenseBridge: { debitEntries: [{ amount: '100', currency: 'USD' }] },
         }),
-      ).toThrow(RequestValidationError);
+      ).toThrow(/suspenseBridge\.creditEntries: suspenseBridge\.creditEntries must contain at least 1 item/);
     });
 
-    it('throws when creditLegs is empty and chargeComponentBridge is omitted, even with suspenseBridge.creditEntries populated', () => {
+    it('throws when creditLegs is empty and debitLegsComponentBridge is omitted, even with suspenseBridge.creditEntries populated — still blaming creditLegs, not suspenseBridge.creditEntries', () => {
       expect(() =>
         validateConfirmRequest({
           ...validConfirmBody,
           creditLegs: [],
           suspenseBridge: { creditEntries: [{ amount: '100', currency: 'USD' }] },
         }),
-      ).toThrow(RequestValidationError);
+      ).toThrow(/^creditLegs: creditLegs must contain at least 1 item/);
     });
 
-    it('throws when creditLegs is empty and chargeComponentBridge is explicitly false, even with suspenseBridge.creditEntries populated', () => {
+    it('throws when creditLegs is empty and debitLegsComponentBridge is explicitly false, even with suspenseBridge.creditEntries populated — still blaming creditLegs', () => {
       expect(() =>
         validateConfirmRequest({
           ...validConfirmBody,
           creditLegs: [],
-          chargeComponentBridge: false,
+          debitLegsComponentBridge: false,
           suspenseBridge: { creditEntries: [{ amount: '100', currency: 'USD' }] },
         }),
-      ).toThrow(RequestValidationError);
+      ).toThrow(/^creditLegs: creditLegs must contain at least 1 item/);
     });
 
-    it('does not require chargeComponentBridge/suspenseBridge for an ordinary non-empty creditLegs request', () => {
+    it('does not require debitLegsComponentBridge/suspenseBridge for an ordinary non-empty creditLegs request', () => {
       const result = validateConfirmRequest(validConfirmBody);
-      expect(result.chargeComponentBridge).toBeUndefined();
+      expect(result.debitLegsComponentBridge).toBeUndefined();
     });
   });
 

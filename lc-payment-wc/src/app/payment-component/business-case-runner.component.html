@@ -65,20 +65,20 @@
         </label>
         <label class="header-input">
           <strong>Total Amount:</strong>
-          <input type="number" min="0" step="any" [ngModel]="baseTotalAmount" [ngModelOptions]="{standalone: true}" (ngModelChange)="onTransactionAmountInput($event)" [readOnly]="sc.chargeBridge" [title]="sc.chargeBridge ? 'Protected — auto-calculated as the sum of Suspense Credit entries (Trx Ccy Equivalent). Add/edit Suspense Credit entries below to change it.' : ''" />
+          <input type="number" min="0" step="any" [ngModel]="baseTotalAmount" [ngModelOptions]="{standalone: true}" (ngModelChange)="onTransactionAmountInput($event)" [readOnly]="sc.debitLegsBridge" [title]="sc.debitLegsBridge ? 'Protected — auto-calculated as the sum of Suspense Credit entries (Trx Ccy Equivalent). Add/edit Suspense Credit entries below to change it.' : ''" />
         </label>
       </div>
       <p class="confirm-error amount-scale-error" *ngIf="amountScaleErrors.length">
         ⚠ <ng-container *ngFor="let e of amountScaleErrors">{{ e }} </ng-container>
       </p>
-      <p class="no-credit-leg-hint" *ngIf="sc.chargeBridge">
+      <p class="no-credit-leg-hint" *ngIf="sc.debitLegsBridge">
         Transaction Amount is protected for this case — it is auto-calculated as the sum of the
         Suspense Credit entries below (Trx Ccy Equivalent), matching "Total Debit Legs = Total
         Suspense Credit". Add/edit Suspense Credit entries to change it.
       </p>
 
       <app-suspense-entries
-        *ngIf="!sc.chargeBridge"
+        *ngIf="!sc.debitLegsBridge"
         label="Suspense Debit"
         [defaultCurrency]="transactionCurrency"
         (entriesChange)="onSuspenseDebitEntriesChange($event)">
@@ -89,7 +89,7 @@
         [defaultCurrency]="transactionCurrency"
         (entriesChange)="onSuspenseCreditEntriesChange($event)">
       </app-suspense-entries>
-      <p class="no-credit-leg-hint" *ngIf="sc.chargeBridge">
+      <p class="no-credit-leg-hint" *ngIf="sc.debitLegsBridge">
         In production, these Suspense Credit entries would be defaulted automatically from the
         Charge Component's own result, not entered by hand — manual entry here is a stand-in for
         testing/demo purposes only (no live Charge Component to call yet).
@@ -153,7 +153,7 @@
         [accountEntries]="result.accountEntries"
         [swiftMessages]="result.swiftMessages"
         [instructionId]="result.instructionId"
-        [debitFxPairs]="filterFxPairsNettedBySuspense(debitAllocator.fxPairs, sc.chargeBridge ? suspenseCreditEntries : suspenseDebitEntries)"
+        [debitFxPairs]="sc.debitLegsBridge ? [] : filterFxPairsNettedBySuspense(debitAllocator.fxPairs, suspenseDebitEntries)"
         [creditFxPairs]="creditFxPairs"
         [currencyDecimals]="currencyDecimalsMap">
       </app-response-viewer>

@@ -97,7 +97,7 @@ export class ResponseViewerComponent {
    * never print. Reachable in practice: onConfirm() (business-case-runner.component.ts) does NOT
    * gate on debitValid/creditValid the way the live preview does, so a real leg can reach the
    * server with amountTxCcy "0.00" (e.g. a Suspense Credit bridge entry that fully offsets a real
-   * credit leg — see the "Charge Component Bridge" business case's own note). Such a leg,
+   * credit leg — see the "Debit Payment Bridge" business case's own note). Such a leg,
    * if its own accountNo happens to literally be "Suspense - Debit"/"Suspense - Credit", would
    * otherwise also get swept into groupedSettlementEntries' "Suspense Clearing" section below
    * (that section's own isSuspenseClearing check matches on glAccount alone, with no way to tell

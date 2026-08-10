@@ -13,6 +13,7 @@ relevant project before running any command.
 | `lc-issue-angular/` | yes | Angular 17 + Formly demo for LC (Letter of Credit) **Issue** — charge calculation, balance/tolerance commission. |
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
+| `lc-payment-wc-backup/` | **no (untracked)** | A local, out-of-band backup copy of `lc-payment-wc/` (not referenced by `.gitignore`, just never added). Not a second parallel project — don't build new work here, and don't assume it's in sync with `lc-payment-wc/`. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
 Everything here revolves around **trade finance back-office domain logic**: LC issuance charge/commission
@@ -20,6 +21,15 @@ calculation, and payment-instruction confirmation (Dr/Cr voucher generation, SWI
 legacy source systems and formal spec documents (OAS YAML, FSD `.docx`, calculation-validation `.docx`).
 When a module cites a spec section (e.g. "§5.4", "V8", "Rev. 2"), that citation is load-bearing — it points at
 a source-of-truth document under `lc-payment-wc/analysis/`, not an arbitrary comment.
+
+`lc-payment-wc/` has its own nested `CLAUDE.md` (auto-loaded by Claude Code whenever you're working inside
+that directory) — it carries the Trade Finance/Payments solution-architect persona plus a growing log of
+reviewer-confirmed architecture decisions for that project specifically: the Charge Component ↔ Payment
+Component boundary and the `debitLegsBridge` "Debit Payment Bridge" business case (renamed from
+`chargeBridge`/"Charge Component Bridge" 2026-08-10, retitled from "Charge / Customer IBL Payment Bridge"
+the same day), and the planned-but-not-yet-implemented OAS
+structured Reference/Event model (`docs/RDD-oas-reference-event-model.md`). Treat entries marked
+"reviewer-confirmed" there as settled — don't re-litigate them without new information from the user.
 
 ---
 

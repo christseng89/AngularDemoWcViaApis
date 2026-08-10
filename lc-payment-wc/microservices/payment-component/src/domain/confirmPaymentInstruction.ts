@@ -152,7 +152,7 @@ export function confirmPaymentInstruction(
     transactionCurrency,
     request.debitLegs,
     request.creditLegs,
-    request.chargeComponentBridge === true,
+    request.debitLegsComponentBridge === true,
   );
 
   // v1.7.1 ordering: the FX Exchange pair should read as one adjacent Dr/Cr block in the

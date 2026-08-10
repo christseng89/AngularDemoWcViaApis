@@ -415,15 +415,15 @@ describe('confirmPaymentInstruction', () => {
     expect(result.instruction.accountEntries.every((e) => e.voucherType === 'SETTLEMENT')).toBe(true);
   });
 
-  describe('chargeComponentBridge (2026-08-09, business-requirement-confirmed)', () => {
-    it('creditLegs may be empty when chargeComponentBridge:true and suspenseBridge.creditEntries is populated — the 400 this used to hit at the schema layer is gone, and confirmPaymentInstruction itself needed no change', () => {
+  describe('debitLegsComponentBridge (2026-08-09, business-requirement-confirmed)', () => {
+    it('creditLegs may be empty when debitLegsComponentBridge:true and suspenseBridge.creditEntries is populated — the 400 this used to hit at the schema layer is gone, and confirmPaymentInstruction itself needed no change', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
           mainRef: 'REF-CCB-1',
           debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '100', amountAccountCcy: '100' }],
           creditLegs: [],
-          chargeComponentBridge: true,
+          debitLegsComponentBridge: true,
           suspenseBridge: { creditEntries: [{ amount: '100', currency: 'USD', sourceComponent: 'CHARGE' }] },
         }),
         { sourceFunctionCode: 'PayAccept' },
@@ -445,7 +445,7 @@ describe('confirmPaymentInstruction', () => {
             { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', drRate: '1.2' },
           ],
           creditLegs: [],
-          chargeComponentBridge: true,
+          debitLegsComponentBridge: true,
           suspenseBridge: {
             creditEntries: [
               { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
@@ -477,7 +477,7 @@ describe('confirmPaymentInstruction', () => {
             { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '252', amountAccountCcy: '210', drRate: '1.2' },
           ],
           creditLegs: [],
-          chargeComponentBridge: true,
+          debitLegsComponentBridge: true,
           suspenseBridge: {
             creditEntries: [
               { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
@@ -516,7 +516,7 @@ describe('confirmPaymentInstruction', () => {
             { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '180', amountAccountCcy: '150', drRate: '1.2' },
           ],
           creditLegs: [],
-          chargeComponentBridge: true,
+          debitLegsComponentBridge: true,
           suspenseBridge: {
             creditEntries: [
               { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
@@ -557,7 +557,7 @@ describe('confirmPaymentInstruction', () => {
               { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '238.80', amountAccountCcy: '199', drRate: '1.2' },
             ],
             creditLegs: [],
-            chargeComponentBridge: true,
+            debitLegsComponentBridge: true,
             suspenseBridge: {
               creditEntries: [
                 { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },

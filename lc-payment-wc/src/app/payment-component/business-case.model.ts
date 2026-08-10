@@ -31,15 +31,21 @@ export interface BusinessCaseConfig {
   dualPrefixOptions?: { label: string; value: string }[];
 
   /**
-   * Charge Bridge Flag (reviewer-confirmed, 2026-08-09) — true when the Payment Component is
-   * being used purely as a funding/settlement bridge to a SEPARATE Charge Component (see
-   * lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component boundary"), not to post the
-   * final charge credit legs itself. When true:
+   * Debit Legs Component Bridge Flag (reviewer-confirmed, 2026-08-09; renamed from chargeBridge
+   * 2026-08-10 — see lc-payment-wc/CLAUDE.md's dated entry) — true when the Payment Component is
+   * being used purely as a funding/settlement bridge to one or more SEPARATE upstream components
+   * (see lc-payment-wc/CLAUDE.md, "Charge Component <-> Payment Component boundary"), not to post
+   * the final credit legs itself. Originally scoped to just a Charge Component; generalized
+   * 2026-08-10 because the same mechanism equally fits a **Customer IBL Payment** (Import Bill
+   * Loan funding under a Buyer's Usance LC — a Loan Component concept, distinct from the existing
+   * `balanceModule:'IBL'` "Import Bill Liability" tag on SuspenseEntry), or a mix of both sources
+   * in one instruction — neither the Charge Component's nor the Loan Component's own books are
+   * modeled in this repo. When true:
    *   - business-case-runner.component.ts's `creditLegsRequired` getter reads straight off this
    *     flag (not off `legs`' shape) and hides the Credit Legs <app-leg-allocator> entirely — the
    *     Payment Component never generates the detailed credit postings (Margin, Commission,
-   *     Charge 1, Charge 2, etc.); the separate Charge Component consumes the Suspense - Credit
-   *     amount this component posts and generates those itself.
+   *     Charge 1, Charge 2, IBL, etc.); the separate upstream component(s) consume the Suspense
+   *     amount this component posts and generate those themselves.
    *   - `legs` must contain ONLY DEBIT entries (business-case-registry.spec.ts's data invariants
    *     enforce this) — the Debit side (Customer A/C) can still be split across multiple
    *     accounts/currencies via the existing leg-allocator UI, same as any other case; there is
@@ -47,8 +53,8 @@ export interface BusinessCaseConfig {
    *   - The entire credit side is expected to come from the Suspense Credit bridge
    *     (`suspenseBridge.creditEntries`, itself already multi-entry/multi-currency capable via
    *     <app-suspense-entries>), never a directly-submitted real credit leg.
-   *   - business-case-request.ts's `buildConfirmRequest` sends `chargeComponentBridge: true` on
-   *     the wire (payment-component.types.ts) — the microservice's own zod schema
+   *   - business-case-request.ts's `buildConfirmRequest` sends `debitLegsComponentBridge: true`
+   *     on the wire (payment-component.types.ts) — the microservice's own zod schema
    *     (validation/requestSchema.ts) relaxes its `creditLegs` minItems:1 rule only when this
    *     flag is true AND `suspenseBridge.creditEntries` is non-empty; otherwise `creditLegs: []`
    *     is a 400, same as any other case.
@@ -59,13 +65,13 @@ export interface BusinessCaseConfig {
    *     confirmed 2026-08-09).
    *   - Suspense Debit is not applicable in this mode and is hidden from the UI entirely
    *     (business-case-runner.component.html) — `suspenseDebitEntries` stays permanently `[]`
-   *     for a chargeBridge case.
+   *     for a debitLegsBridge case.
    *   - Suspense Credit entries are entered manually in the Simulator (no live Charge Component
-   *     to call yet) as a stand-in for the production flow, where they would be defaulted
-   *     automatically from the Charge Component's own result.
+   *     or Loan Component to call yet) as a stand-in for the production flow, where they would be
+   *     defaulted automatically from that component's own result.
    * Undefined/false for every other case — unaffected, same behavior as before this flag existed.
    */
-  chargeBridge?: boolean;
+  debitLegsBridge?: boolean;
 
   legs: LegSpec[];
 
