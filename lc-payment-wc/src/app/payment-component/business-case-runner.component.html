@@ -65,7 +65,7 @@
         </label>
         <label class="header-input">
           <strong>Total Amount:</strong>
-          <input type="number" min="0" step="any" [ngModel]="baseTotalAmount" [ngModelOptions]="{standalone: true}" (ngModelChange)="onTransactionAmountInput($event)" [readOnly]="sc.debitLegsBridge" [title]="sc.debitLegsBridge ? 'Protected — auto-calculated as the sum of Suspense Credit entries (Trx Ccy Equivalent). Add/edit Suspense Credit entries below to change it.' : ''" />
+          <input type="number" min="0" step="any" [ngModel]="baseTotalAmount" [ngModelOptions]="{standalone: true}" (ngModelChange)="onTransactionAmountInput($event)" [readOnly]="sc.debitLegsBridge || sc.creditLegsBridge" [title]="sc.debitLegsBridge ? 'Protected — auto-calculated as the sum of Suspense Credit entries (Trx Ccy Equivalent). Add/edit Suspense Credit entries below to change it.' : sc.creditLegsBridge ? 'Protected — auto-calculated as the sum of Suspense Debit entries (Trx Ccy Equivalent). Add/edit Suspense Debit entries below to change it.' : ''" />
         </label>
       </div>
       <p class="confirm-error amount-scale-error" *ngIf="amountScaleErrors.length">
@@ -76,6 +76,11 @@
         Suspense Credit entries below (Trx Ccy Equivalent), matching "Total Debit Legs = Total
         Suspense Credit". Add/edit Suspense Credit entries to change it.
       </p>
+      <p class="no-debit-leg-hint" *ngIf="sc.creditLegsBridge">
+        Transaction Amount is protected for this case — it is auto-calculated as the sum of the
+        Suspense Debit entries below (Trx Ccy Equivalent), matching "Total Credit Legs = Total
+        Suspense Debit". Add/edit Suspense Debit entries to change it.
+      </p>
 
       <app-suspense-entries
         *ngIf="!sc.debitLegsBridge"
@@ -83,8 +88,14 @@
         [defaultCurrency]="transactionCurrency"
         (entriesChange)="onSuspenseDebitEntriesChange($event)">
       </app-suspense-entries>
+      <p class="no-debit-leg-hint" *ngIf="sc.creditLegsBridge">
+        In production, these Suspense Debit entries would be defaulted automatically from the
+        Loan Component's own result, not entered by hand — manual entry here is a stand-in for
+        testing/demo purposes only (no live Loan Component to call yet).
+      </p>
 
       <app-suspense-entries
+        *ngIf="!sc.creditLegsBridge"
         label="Suspense Credit"
         [defaultCurrency]="transactionCurrency"
         (entriesChange)="onSuspenseCreditEntriesChange($event)">
@@ -96,6 +107,7 @@
       </p>
 
       <app-leg-allocator
+        *ngIf="debitLegsRequired"
         #debitAllocator
         side="DEBIT"
         [caseKey]="sc.id"
@@ -110,6 +122,11 @@
         (validChange)="onDebitValidChange($event)"
         (scaleErrorsChange)="onDebitLegScaleErrorsChange($event)">
       </app-leg-allocator>
+
+      <p class="no-debit-leg-hint" *ngIf="!debitLegsRequired">
+        No Debit Leg for this case — the entire debit side is provided via the Suspense Debit
+        entries above (Dr Suspense - Debit). Add at least one there to see a balanced preview.
+      </p>
 
       <app-leg-allocator
         *ngIf="creditLegsRequired"
@@ -153,7 +170,7 @@
         [accountEntries]="result.accountEntries"
         [swiftMessages]="result.swiftMessages"
         [instructionId]="result.instructionId"
-        [debitFxPairs]="sc.debitLegsBridge ? [] : filterFxPairsNettedBySuspense(debitAllocator.fxPairs, suspenseDebitEntries)"
+        [debitFxPairs]="debitFxPairs"
         [creditFxPairs]="creditFxPairs"
         [currencyDecimals]="currencyDecimalsMap">
       </app-response-viewer>

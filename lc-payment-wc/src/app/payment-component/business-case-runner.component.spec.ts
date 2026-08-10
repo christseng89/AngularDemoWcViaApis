@@ -573,6 +573,51 @@ describe('BusinessCaseRunnerComponent', () => {
     });
   });
 
+  describe('debitLegsRequired (Credit Legs Component Bridge Flag, 2026-08-12 — mirror image of creditLegsRequired, creditLegsBridge:true cases have no Debit Leg, e.g. iplc-usance-settlement-credit-bridge)', () => {
+    it('is true for an ordinary case (creditLegsBridge unset)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      expect(comp.debitLegsRequired).toBe(true);
+    });
+
+    it('is false when the selected case has creditLegsBridge: true, regardless of legs\' own shape', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT' })] }));
+      expect(comp.debitLegsRequired).toBe(false);
+    });
+
+    it('is true for a case with creditLegsBridge left unset even if it happens to have only a CREDIT leg (the flag, not legs\' shape, is authoritative)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'CREDIT' })] }));
+      expect(comp.debitLegsRequired).toBe(true);
+    });
+
+    it('is false when no case is selected', () => {
+      const { comp } = makeComponent();
+      expect(comp.debitLegsRequired).toBe(false);
+    });
+
+    it('selectCase() seeds debitValid = true for a creditLegsBridge:true case, so the live preview is never blocked forever by a side with no <app-leg-allocator> to emit validChange', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT' })] }));
+      expect((comp as any).debitValid).toBe(true);
+      expect(comp.debitLegs).toEqual([]);
+    });
+
+    it('selectCase() still seeds debitValid = false for an ordinary case (unchanged, real leg-allocator gates it)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      expect((comp as any).debitValid).toBe(false);
+    });
+
+    it('selectCase(null) seeds debitValid = false', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT' })] })); // first true...
+      comp.selectCase(null); // ...then cleared back to false, not left stuck true
+      expect((comp as any).debitValid).toBe(false);
+    });
+  });
+
   describe('Debit Legs Component Bridge Flag — Transaction Amount derivation (business-requirement-confirmed 2026-08-09: for debitLegsBridge:true, baseTotalAmount/Debit Leg #1 = Σ Suspense Credit Trx Ccy Equivalent, protected/read-only)', () => {
     it('is 0 with no Suspense Credit entries, ignoring the registry leg\'s own placeholder defaultAmountTxCcy', () => {
       const { comp } = makeComponent();
@@ -624,6 +669,79 @@ describe('BusinessCaseRunnerComponent', () => {
     });
   });
 
+  describe('Credit Legs Component Bridge Flag — Transaction Amount derivation (2026-08-12, mirror image of the Debit Legs Component Bridge Flag block above: for creditLegsBridge:true, baseTotalAmount/Credit Leg #1 = Σ Suspense Debit Trx Ccy Equivalent, protected/read-only)', () => {
+    it('is 0 with no Suspense Debit entries, ignoring the registry leg\'s own placeholder defaultAmountTxCcy', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultAmountTxCcy: '999999' })] }));
+      expect(comp.baseTotalAmount).toBe(0);
+      expect(comp.creditDefaults.totalAmount).toBe('0');
+    });
+
+    it('equals the sum of Suspense Debit entries in the transaction currency (same currency, no conversion)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseDebitEntries = [entry('60', 'USD'), entry('90', 'USD')];
+      expect(comp.baseTotalAmount).toBe(150);
+      expect(comp.creditDefaults.totalAmount).toBe('150');
+    });
+
+    it('converts a foreign-currency Suspense Debit entry at its own crossRate before summing', () => {
+      const { comp } = makeComponent({ crossRate: 2 });
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseDebitEntries = [entry('50', 'EUR')];
+      expect(comp.creditDefaults.totalAmount).toBe('100'); // 50 * 2
+    });
+
+    it('is unaffected by suspenseCreditEntries — Suspense Credit is not applicable in this mode', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseCreditEntries = [entry('500', 'USD')];
+      comp.suspenseDebitEntries = [entry('60', 'USD')];
+      expect(comp.creditDefaults.totalAmount).toBe('60'); // suspenseCreditEntries has zero effect
+    });
+
+    it('onTransactionAmountInput is a no-op — Transaction Amount is protected, never user-overridden', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultCurrency: 'USD', defaultAmountTxCcy: '150' })] }));
+      comp.suspenseDebitEntries = [entry('60', 'USD')];
+
+      comp.onTransactionAmountInput(9999);
+
+      expect(comp.transactionAmountOverride).toBeNull();
+      expect(comp.baseTotalAmount).toBe(60); // unchanged — still derived from Suspense Debit, not the attempted override
+    });
+
+    it('an ordinary (non-creditLegsBridge) case is unaffected — onTransactionAmountInput still overrides normally', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      comp.onTransactionAmountInput(250);
+      expect(comp.transactionAmountOverride).toBe('250');
+      expect(comp.baseTotalAmount).toBe(250);
+    });
+  });
+
+  describe('transactionCurrency creditLegsBridge fallback (2026-08-12)', () => {
+    it('falls back to creditLegs[0].currency when debitLegs is empty, for a creditLegsBridge case', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultCurrency: 'USD' })] }));
+      comp.creditLegs = [creditLeg({ currency: 'EUR' })];
+      expect(comp.transactionCurrency).toBe('EUR');
+    });
+
+    it('falls back to the registry CREDIT leg spec\'s currency when both debitLegs and creditLegs are empty, for a creditLegsBridge case', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT', defaultCurrency: 'GBP' })] }));
+      expect(comp.transactionCurrency).toBe('GBP');
+    });
+
+    it('does NOT fall back to creditLegs[0].currency for an ordinary case, even with debitLegs empty — the gate that fixed the business-case-runner.component.spec.ts regression this exact scenario caused', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultCurrency: 'USD' }), leg({ side: 'CREDIT', defaultCurrency: 'USD' })] }));
+      comp.creditLegs = [creditLeg({ currency: 'EUR' })]; // debitLegs still [] — an ordinary case's normal transient state, not a signal
+      expect(comp.transactionCurrency).toBe('USD'); // registry DEBIT default, NOT creditLegs[0]'s EUR
+    });
+  });
+
   describe('creditFxPairs (NG9 fix — template-safe alternative to referencing #creditAllocator, which is *ngIf-scoped, from <app-response-viewer>)', () => {
     it('returns [] for a debitLegsBridge:true case, even if creditAllocatorRef somehow is set (defense in depth — the allocator element never renders for such a case)', () => {
       const { comp } = makeComponent();
@@ -663,6 +781,62 @@ describe('BusinessCaseRunnerComponent', () => {
       comp.suspenseCreditEntries = [entry('50', 'EUR')];
 
       expect(comp.creditFxPairs).toEqual([]);
+    });
+
+    it('returns [] unconditionally for a creditLegsBridge:true case (2026-08-12) — even with a resolved creditAllocatorRef and non-empty fxPairs, the panel is not needed at all in this mode', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT' })] }));
+      (comp as any).creditAllocatorRef = { fxPairs: [{ drCr: 'C', account: 'FX Exchange EUR', currency: 'USD', amount: 10, site: 'Trx Ccy' }] };
+      expect(comp.creditFxPairs).toEqual([]);
+    });
+  });
+
+  describe('debitFxPairs (NG9 fix — template-safe alternative to referencing #debitAllocator, which is *ngIf-scoped since 2026-08-12, from <app-response-viewer>)', () => {
+    it('returns [] unconditionally for a debitLegsBridge:true case (2026-08-11) — even with a resolved debitAllocatorRef and non-empty fxPairs, the panel is not needed at all in this mode', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ debitLegsBridge: true, legs: [leg({ side: 'DEBIT' })] }));
+      (comp as any).debitAllocatorRef = { fxPairs: [{ drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 10, site: 'Trx Ccy' }] };
+      expect(comp.debitFxPairs).toEqual([]);
+    });
+
+    it('returns [] unconditionally for a creditLegsBridge:true case (2026-08-12, mirror of creditFxPairs\' own creditLegsBridge hide) — debitAllocator never renders in this mode anyway', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig({ creditLegsBridge: true, legs: [leg({ side: 'CREDIT' })] }));
+      (comp as any).debitAllocatorRef = { fxPairs: [{ drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 10, site: 'Trx Ccy' }] };
+      expect(comp.debitFxPairs).toEqual([]);
+    });
+
+    it('returns [] when debitAllocatorRef has not resolved yet (e.g. before the view\'s first change-detection pass)', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      expect((comp as any).debitAllocatorRef).toBeUndefined();
+      expect(comp.debitFxPairs).toEqual([]);
+    });
+
+    it('returns the filtered debitAllocatorRef.fxPairs for an ordinary case once the ViewChild has resolved', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      const pairs: FxPairEntry[] = [
+        { drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 55, site: 'Trx Ccy' },
+        { drCr: 'C', account: 'FX Exchange USD', currency: 'EUR', amount: 50, site: 'Other Ccy' },
+      ];
+      (comp as any).debitAllocatorRef = { fxPairs: pairs };
+      comp.suspenseDebitEntries = []; // nothing to net out — filterFxPairsNettedBySuspense leaves both untouched
+
+      expect(comp.debitFxPairs).toEqual(pairs);
+    });
+
+    it('a Suspense Debit entry in the matching currency suppresses the pair — proves this still goes through filterFxPairsNettedBySuspense for an ordinary case, not a raw pass-through', () => {
+      const { comp } = makeComponent();
+      comp.selectCase(passConfig());
+      const pairs: FxPairEntry[] = [
+        { drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 55, site: 'Trx Ccy' },
+        { drCr: 'C', account: 'FX Exchange USD', currency: 'EUR', amount: 50, site: 'Other Ccy' },
+      ];
+      (comp as any).debitAllocatorRef = { fxPairs: pairs };
+      comp.suspenseDebitEntries = [entry('50', 'EUR')];
+
+      expect(comp.debitFxPairs).toEqual([]);
     });
   });
 

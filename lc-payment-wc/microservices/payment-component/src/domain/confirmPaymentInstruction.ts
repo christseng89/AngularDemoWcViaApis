@@ -142,32 +142,48 @@ export function confirmPaymentInstruction(
   // v1.4.0: expand suspenseBridge (if present) into additional legs BEFORE step 1,
   // so the balance check already sees them (see domain/suspenseBridge.ts). Transaction
   // currency = debitLegs[0].currency, per payment-instructions-post.yaml's SuspenseEntry
-  // doc comment; the `!` reflects debitLegs' zod-enforced minItems:1, not a `?? []`
-  // fallback for a condition that can't reach this line. v1.7.0: also passes the
-  // caller's own debitLegs/creditLegs through — expandSuspenseBridge nets/combines each
-  // foreign-currency Suspense bucket against same-currency legs on the matching side.
-  const transactionCurrency = request.debitLegs[0]!.currency;
+  // doc comment — debitLegs[0] preferred when present (the common case, and byte-for-byte
+  // pre-2026-08-12 behavior). Falls back to creditLegs[0].currency for a
+  // creditLegsComponentBridge request, whose debitLegs is always empty (the mirror-image
+  // gap: a debitLegsComponentBridge request's creditLegs can be empty instead, but that
+  // never mattered here since debitLegs[0] was already the preferred source). The final `!`
+  // is safe: validation/requestSchema.ts's superRefine guarantees at least one of
+  // debitLegs/creditLegs is non-empty (both independently required unless their own bridge
+  // flag exempts them, and the two flags are mutually exclusive — never both empty). v1.7.0:
+  // also passes the caller's own debitLegs/creditLegs through — expandSuspenseBridge
+  // nets/combines each foreign-currency Suspense bucket against same-currency legs on the
+  // matching side.
+  const transactionCurrency = (request.debitLegs[0] ?? request.creditLegs[0])!.currency;
   const bridge = expandSuspenseBridge(
     request.suspenseBridge,
     transactionCurrency,
     request.debitLegs,
     request.creditLegs,
     request.debitLegsComponentBridge === true,
+    request.creditLegsComponentBridge === true,
   );
 
   // v1.7.1 ordering: the FX Exchange pair should read as one adjacent Dr/Cr block in the
   // Settlement Vouchers table (accounting-review best practice — lets a reviewer confirm
   // the conversion/rate/per-currency balance at a glance, without hunting for the matching
-  // leg elsewhere). Bridge legs never land on debit except FX-pair legs (every Suspense
-  // leg is credit-direction, unconditionally — see suspenseBridge.ts), so bridge.debit is
-  // pure FX and already lands last simply by being appended after the caller's own
-  // debitLegs. bridge.credit mixes FX-pair legs (accountType INTERNAL) with Suspense legs
-  // (accountType SUSPENSE) — split them so the FX ones lead (immediately following the FX
-  // debit leg above) and the Suspense ones trail, after the caller's own creditLegs:
-  //   Normal Debits -> FX Debit -> FX Credit -> Normal Credits -> Suspense Credit
+  // leg elsewhere). Through 2026-08-11, bridge legs never landed on debit except FX-pair legs
+  // (every Suspense leg was credit-direction, unconditionally), so bridge.debit was pure FX and
+  // already landed last simply by being appended after the caller's own debitLegs. Since
+  // creditLegsComponentBridge (2026-08-12) can now also flip Suspense legs onto bridge.debit
+  // (see suspenseBridge.ts), bridge.debit gets the SAME FX-vs-Suspense split treatment
+  // bridge.credit already had — Suspense-debit leads (farthest from the FX/credit boundary,
+  // mirroring how Suspense-credit trails farthest on the other side), normal debits stay in the
+  // middle (always empty in creditLegsComponentBridge mode, so this reduces to
+  // [Suspense-debit, FX-debit] there), and FX-debit stays last, immediately adjacent to FX-credit
+  // across the boundary:
+  //   Suspense Debit -> Normal Debits -> FX Debit -> FX Credit -> Normal Credits -> Suspense Credit
+  // For every existing case (bridgeSuspenseDebit always [] outside creditLegsComponentBridge),
+  // this is byte-for-byte the pre-2026-08-12 order — purely additive.
   const bridgeFxCredit = bridge.credit.filter((l) => l.accountType === 'INTERNAL');
   const bridgeSuspenseCredit = bridge.credit.filter((l) => l.accountType !== 'INTERNAL');
-  const debitLegsInput = [...request.debitLegs, ...bridge.debit];
+  const bridgeFxDebit = bridge.debit.filter((l) => l.accountType === 'INTERNAL');
+  const bridgeSuspenseDebit = bridge.debit.filter((l) => l.accountType !== 'INTERNAL');
+  const debitLegsInput = [...bridgeSuspenseDebit, ...request.debitLegs, ...bridgeFxDebit];
   const creditLegsInput = [...bridgeFxCredit, ...request.creditLegs, ...bridgeSuspenseCredit];
 
   // Step 1 (§3): Dr/Cr balance validation (V8) — throws BusinessValidationError (409) on failure.

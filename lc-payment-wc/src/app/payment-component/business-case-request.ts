@@ -27,6 +27,8 @@ export function buildConfirmRequest(
     // See PaymentInstructionConfirmRequest.debitLegsComponentBridge's doc comment — mirrors the
     // case's own debitLegsBridge flag exactly, undefined (omitted on the wire) for every other case.
     debitLegsComponentBridge: config.debitLegsBridge ? true : undefined,
+    // Mirror of the above for creditLegsComponentBridge/creditLegsBridge (2026-08-12).
+    creditLegsComponentBridge: config.creditLegsBridge ? true : undefined,
   };
   if (suspenseBridge) {
     request.suspenseBridge = suspenseBridge;

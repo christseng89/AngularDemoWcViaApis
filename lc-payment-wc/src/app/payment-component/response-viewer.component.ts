@@ -115,13 +115,15 @@ export class ResponseViewerComponent {
    * v1.8.1 — Settlement Vouchers, reordered for audit readability: customer/
    * debit legs, then each FX Exchange pair as one adjacent Dr/Cr block
    * (display-only — the underlying accountEntries/wire response is
-   * unchanged), then customer/credit legs, then Suspense clearing last.
-   * Purely a client-side re-grouping of settlementEntries; no server or
-   * wire-contract change.
+   * unchanged), then customer/credit legs, then Suspense clearing last —
+   * EXCEPT when Suspense clearing is itself debit-direction (2026-08-13,
+   * creditLegsComponentBridge), in which case it leads instead of trailing;
+   * see the "Suspense clearing position" block below. Purely a client-side
+   * re-grouping of settlementEntries; no server or wire-contract change.
    *
    * Pairing/attribution is derived entirely from data already on the wire
-   * (glAccount naming + amounts + the inferred transaction currency — the
-   * plurality currency across all entries), with one acknowledged edge
+   * (glAccount naming + amounts + the inferred transaction currency — see
+   * the "transaction currency" block below), with one acknowledged edge
    * case: a Suspense-driven FX pair is attributed to "Debit" vs "Credit" by
    * matching its own gross magnitude against the Suspense - Debit /
    * Suspense - Credit clearing entries' own per-currency sums (both are
@@ -156,15 +158,23 @@ export class ResponseViewerComponent {
     };
     const suspenseDebitSums = sumByGlAccount('Suspense - Debit');
 
-    // Every FX pair has exactly one leg in the shared transaction currency (the "Trx-Ccy-site")
-    // and one in a foreign currency (the "Other-Ccy-site"). The transaction currency itself is
-    // defined server-side as debitLegs[0].currency (confirmPaymentInstruction.ts) — and
-    // debitLegsInput = [...request.debitLegs, ...bridge.debit] always prepends the caller's own
-    // legs, so entries[0] (settlementEntries maps debitLegs first, in order) is ALWAYS
-    // request.debitLegs[0], never a generated leg. This is exact, not a heuristic — a plurality/
-    // most-common-currency guess would be wrong whenever foreign-currency legs (Other-Ccy-site
-    // pairs + Suspense clearing entries) happen to outnumber transaction-currency ones.
-    const transactionCurrency = entries[0]!.currency;
+    // Transaction currency (2026-08-13 fix): PREFERS the first real (non-FX, non-Suspense) DEBIT
+    // leg's currency, falling back to the first real CREDIT leg's — mirroring the server's own
+    // `(request.debitLegs[0] ?? request.creditLegs[0])!.currency` (confirmPaymentInstruction.ts).
+    // Through 2026-08-12 this was simply `entries[0]!.currency`, on the claim "entries[0] is
+    // ALWAYS request.debitLegs[0], never a generated leg" — true when debitLegsInput always
+    // prepended the caller's own debitLegs, but FALSE since creditLegsComponentBridge started
+    // prepending bridgeSuspenseDebit instead (confirmPaymentInstruction.ts's debitLegsInput =
+    // [...bridgeSuspenseDebit, ...request.debitLegs, ...bridgeFxDebit]) — entries[0] could then be
+    // a GENERATED Suspense leg, silently misdetecting the transaction currency (and therefore the
+    // FX-pair Debit/Credit attribution below, and Currency View's balance grouping) whenever the
+    // first Suspense entry submitted doesn't happen to share the transaction currency. normalDebit/
+    // normalCredit (both real, caller-submitted legs, computed above) are immune to this — a real
+    // leg's own currency is never ambiguous — and by schema validation at least one of them is
+    // always non-empty (the two bridge flags are mutually exclusive and each independently
+    // requires its own non-bridged side to be non-empty). entries[0]!.currency is kept as a final
+    // defensive fallback only; it should be unreachable in practice.
+    const transactionCurrency = normalDebit[0]?.currency ?? normalCredit[0]?.currency ?? entries[0]!.currency;
 
     const consumed = new Set<AccountEntry>();
     const pairs: { debit: AccountEntry; credit: AccountEntry }[] = [];
@@ -202,14 +212,28 @@ export class ResponseViewerComponent {
       }
     }
 
+    // Suspense clearing position (2026-08-13, creditLegsComponentBridge): every OTHER mode
+    // (the general Balance/Charge bridge, debitLegsComponentBridge) posts Suspense clearing
+    // credit-direction, unconditionally — a trailing settlement/clearing step, correctly pushed
+    // last below. creditLegsComponentBridge is the one exception (suspenseBridge.ts's
+    // isFlippedDebitSide): its Suspense clearing is debit-direction — the FUNDING SOURCE the
+    // whole instruction is funded from, not a trailing clearing step — so it belongs FIRST,
+    // mirroring confirmPaymentInstruction.ts's own debitLegsInput ordering
+    // ([...bridgeSuspenseDebit, ...request.debitLegs, ...bridgeFxDebit], Suspense-debit leading).
+    // All suspenseClearing entries in one response share the same drCrIndicator in every real
+    // scenario (the two bridge flags are mutually exclusive, and the general bridge pattern is
+    // unconditionally credit-direction), so checking the first entry is sufficient — never a mix.
+    const suspenseIsFunding = suspenseClearing.length > 0 && suspenseClearing[0]!.drCrIndicator === 'D';
+
     const sections: SettlementSection[] = [];
+    if (suspenseIsFunding) sections.push({ label: 'Suspense Clearing / Funding', entries: suspenseClearing });
     if (normalDebit.length) sections.push({ label: 'Customer / Debit Legs', entries: normalDebit });
     for (const pair of legPairsDebit) sections.push({ label: 'FX Debit Leg Pair', entries: pair });
     for (const pair of suspensePairsDebit) sections.push({ label: 'FX Debit Suspense Pair', entries: pair });
     for (const pair of suspensePairsCredit) sections.push({ label: 'FX Credit Suspense Pair', entries: pair });
     for (const pair of legPairsCredit) sections.push({ label: 'FX Credit Leg Pair', entries: pair });
     if (normalCredit.length) sections.push({ label: 'Settlement / Credit Legs', entries: normalCredit });
-    if (suspenseClearing.length) sections.push({ label: 'Suspense Clearing', entries: suspenseClearing });
+    if (!suspenseIsFunding && suspenseClearing.length) sections.push({ label: 'Suspense Clearing', entries: suspenseClearing });
     return sections;
   }
 
@@ -249,6 +273,17 @@ export class ResponseViewerComponent {
    * decimal.js end-to-end — same convention as leg-allocator.component.ts and the microservice's
    * own money.ts — since summing several already-rounded decimal-string amounts as native JS
    * numbers can drift by a binary-float ULP even when every individual amount was correct.
+   *
+   * Row order within a currency (2026-08-13): Debit rows always precede Credit rows. Insertion
+   * order alone happened to already produce this for every pre-2026-08-12 scenario (Posting
+   * View's section order always grouped all-debit sections before all-credit ones), but that was
+   * an emergent property of section ordering, not a guarantee this getter itself enforced — and
+   * creditLegsComponentBridge's more varied section interleaving (Suspense clearing now able to
+   * lead OR trail, per-currency FX pairs split across debit-anchored/credit-anchored buckets) is
+   * exactly the kind of shape that emergent property was never proven to hold for in general.
+   * Sorted explicitly here instead — a stable sort (relative order within each direction is
+   * otherwise preserved) — so this view's own Dr/Cr grouping no longer depends on Posting View's
+   * section order at all.
    */
   get currencyGroups(): CurrencyGroup[] {
     const byCurrency = new Map<string, CurrencyViewEntry[]>();
@@ -271,7 +306,8 @@ export class ResponseViewerComponent {
     }
 
     return [...byCurrency.keys()].sort().map((currency) => {
-      const entries = byCurrency.get(currency)!;
+      // Stable sort: 'D' before 'C', relative order within each direction unchanged.
+      const entries = [...byCurrency.get(currency)!].sort((a, b) => (a.drCrIndicator === b.drCrIndicator ? 0 : a.drCrIndicator === 'D' ? -1 : 1));
       const dp = this.currencyDecimals[currency] ?? 2;
       const totalDebit = entries.filter((e) => e.drCrIndicator === 'D').reduce((sum, e) => sum.plus(e.amount), new Decimal(0));
       const totalCredit = entries.filter((e) => e.drCrIndicator === 'C').reduce((sum, e) => sum.plus(e.amount), new Decimal(0));

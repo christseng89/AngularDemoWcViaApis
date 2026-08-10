@@ -84,4 +84,26 @@ describe('buildConfirmRequest', () => {
       expect(req.debitLegsComponentBridge).toBeUndefined();
     });
   });
+
+  describe('creditLegsComponentBridge (Credit Legs Component Bridge Flag, 2026-08-12) — mirrors config.creditLegsBridge onto the wire', () => {
+    it('sends creditLegsComponentBridge: true when config.creditLegsBridge is true', () => {
+      const req = buildConfirmRequest(baseConfig({ creditLegsBridge: true }), baseModel, [], creditLegs, undefined);
+      expect(req.creditLegsComponentBridge).toBe(true);
+    });
+
+    it('omits creditLegsComponentBridge (undefined) when config.creditLegsBridge is unset', () => {
+      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs);
+      expect(req.creditLegsComponentBridge).toBeUndefined();
+    });
+
+    it('sets both flags independently — a debitLegsBridge case never sends creditLegsComponentBridge, and vice versa', () => {
+      const debitBridgeReq = buildConfirmRequest(baseConfig({ debitLegsBridge: true }), baseModel, debitLegs, [], undefined);
+      expect(debitBridgeReq.debitLegsComponentBridge).toBe(true);
+      expect(debitBridgeReq.creditLegsComponentBridge).toBeUndefined();
+
+      const creditBridgeReq = buildConfirmRequest(baseConfig({ creditLegsBridge: true }), baseModel, [], creditLegs, undefined);
+      expect(creditBridgeReq.creditLegsComponentBridge).toBe(true);
+      expect(creditBridgeReq.debitLegsComponentBridge).toBeUndefined();
+    });
+  });
 });

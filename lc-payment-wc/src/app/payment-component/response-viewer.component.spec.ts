@@ -142,6 +142,46 @@ describe('ResponseViewerComponent', () => {
       expect(sections.find((s) => s.label === 'Suspense Clearing')!.entries.map((e) => e.entryId)).toEqual(['c-susp-debit', 'c-susp-credit']);
     });
 
+    it("creditLegsComponentBridge mirror (2026-08-13): Suspense clearing is DEBIT-direction (the funding source), so 'Suspense Clearing / Funding' leads instead of trailing — reproduces the Buyer's Usance LC worked example from RAW WIRE ORDER exactly as confirmPaymentInstruction.ts/expandSuspenseBridge produce it", () => {
+      const comp = new ResponseViewerComponent();
+      // Wire order: debitLegsInput = [...bridgeSuspenseDebit, ...request.debitLegs(empty), ...bridgeFxDebit],
+      // creditLegsInput = [...bridgeFxCredit, ...request.creditLegs, ...bridgeSuspenseCredit(empty)].
+      comp.accountEntries = [
+        fx({ entryId: 'd-susp-usd', drCrIndicator: 'D', glAccount: 'Suspense - Debit', currency: 'USD', amount: '100.00' }),
+        fx({ entryId: 'd-susp-eur', drCrIndicator: 'D', glAccount: 'Suspense - Debit', currency: 'EUR', amount: '200.00' }),
+        fx({ entryId: 'd-fx-trx', drCrIndicator: 'D', glAccount: 'FX Exchange EUR - Suspense', currency: 'USD', amount: '216.62' }),
+        fx({ entryId: 'c-fx-other', drCrIndicator: 'C', glAccount: 'FX Exchange USD - Suspense', currency: 'EUR', amount: '200.00' }),
+        fx({ entryId: 'c-nostro', drCrIndicator: 'C', glAccount: 'NOSTRO-ACC', currency: 'USD', amount: '316.62' }),
+      ];
+
+      const sections = comp.groupedSettlementEntries;
+      expect(sections.map((s) => s.label)).toEqual(['Suspense Clearing / Funding', 'FX Debit Suspense Pair', 'Settlement / Credit Legs']);
+      expect(sections.find((s) => s.label === 'Suspense Clearing / Funding')!.entries.map((e) => e.entryId)).toEqual(['d-susp-usd', 'd-susp-eur']);
+      expect(sections.find((s) => s.label === 'FX Debit Suspense Pair')!.entries.map((e) => e.entryId)).toEqual(['d-fx-trx', 'c-fx-other']);
+      expect(sections.find((s) => s.label === 'Settlement / Credit Legs')!.entries.map((e) => e.entryId)).toEqual(['c-nostro']);
+    });
+
+    it('transactionCurrency fix (2026-08-13): correctly resolves via the real Credit Leg even when entries[0] is a generated Suspense-Debit leg — a hypothetical entries[0]-only derivation would misread this as EUR and misclassify the FX pair', () => {
+      const comp = new ResponseViewerComponent();
+      // Suspense-Debit EUR happens to be entries[0] here (bridgeSuspenseDebit's own currency
+      // grouping order, not necessarily USD-first) — the real Credit Leg (NOSTRO-ACC, USD) must
+      // still win as the transaction currency, matching the server's own debitLegs[0] ??
+      // creditLegs[0] derivation.
+      comp.accountEntries = [
+        fx({ entryId: 'd-susp-eur', drCrIndicator: 'D', glAccount: 'Suspense - Debit', currency: 'EUR', amount: '200.00' }),
+        fx({ entryId: 'd-susp-usd', drCrIndicator: 'D', glAccount: 'Suspense - Debit', currency: 'USD', amount: '100.00' }),
+        fx({ entryId: 'd-fx-trx', drCrIndicator: 'D', glAccount: 'FX Exchange EUR - Suspense', currency: 'USD', amount: '216.62' }),
+        fx({ entryId: 'c-fx-other', drCrIndicator: 'C', glAccount: 'FX Exchange USD - Suspense', currency: 'EUR', amount: '200.00' }),
+        fx({ entryId: 'c-nostro', drCrIndicator: 'C', glAccount: 'NOSTRO-ACC', currency: 'USD', amount: '316.62' }),
+      ];
+
+      const sections = comp.groupedSettlementEntries;
+      // Correctly attributed to "FX Debit Suspense Pair" (matching the Suspense-Debit EUR bucket) —
+      // an entries[0]-derived (EUR) transactionCurrency would have swapped the Trx-Ccy-site/
+      // Other-Ccy-site roles and broken this attribution.
+      expect(sections.map((s) => s.label)).toEqual(['Suspense Clearing / Funding', 'FX Debit Suspense Pair', 'Settlement / Credit Legs']);
+    });
+
     it("pairs correctly even when a pair's CREDIT leg appears before its DEBIT partner in the entries array (order-independent matching)", () => {
       const comp = new ResponseViewerComponent();
       comp.accountEntries = [
@@ -212,6 +252,35 @@ describe('ResponseViewerComponent', () => {
       const allGroupedAccounts = comp.groupedSettlementEntries.flatMap((s) => s.entries.map((e) => e.glAccount));
       const allCurrencyViewAccounts = groups.flatMap((g) => g.entries.map((e) => e.glAccount));
       expect([...allCurrencyViewAccounts].sort()).toEqual([...allGroupedAccounts].sort());
+    });
+
+    it("orders Debit rows before Credit rows within a currency (2026-08-13), regardless of Posting View's own section/insertion order — creditLegsComponentBridge worked example (Suspense Debit USD 100 + EUR 200, FX Debit Suspense Pair, Nostro settlement USD 316.62)", () => {
+      const comp = new ResponseViewerComponent();
+      comp.accountEntries = [
+        fx({ entryId: 'd-susp-usd', drCrIndicator: 'D', glAccount: 'Suspense - Debit', currency: 'USD', amount: '100.00' }),
+        fx({ entryId: 'd-susp-eur', drCrIndicator: 'D', glAccount: 'Suspense - Debit', currency: 'EUR', amount: '200.00' }),
+        fx({ entryId: 'd-fx-trx', drCrIndicator: 'D', glAccount: 'FX Exchange EUR - Suspense', currency: 'USD', amount: '216.62' }),
+        fx({ entryId: 'c-fx-other', drCrIndicator: 'C', glAccount: 'FX Exchange USD - Suspense', currency: 'EUR', amount: '200.00' }),
+        fx({ entryId: 'c-nostro', drCrIndicator: 'C', glAccount: 'NOSTRO-ACC', currency: 'USD', amount: '316.62' }),
+      ];
+
+      const groups = comp.currencyGroups;
+      const usd = groups.find((g) => g.currency === 'USD')!;
+      const eur = groups.find((g) => g.currency === 'EUR')!;
+
+      // USD: both Debit entries (Suspense-Debit + FX Debit) precede the single Credit entry (Nostro).
+      expect(usd.entries.map((e) => ({ drCrIndicator: e.drCrIndicator, glAccount: e.glAccount }))).toEqual([
+        { drCrIndicator: 'D', glAccount: 'Suspense - Debit' },
+        { drCrIndicator: 'D', glAccount: 'FX Exchange EUR - Suspense' },
+        { drCrIndicator: 'C', glAccount: 'NOSTRO-ACC' },
+      ]);
+      // EUR: the single Debit entry (Suspense-Debit) precedes the single Credit entry (FX pair's other leg).
+      expect(eur.entries.map((e) => ({ drCrIndicator: e.drCrIndicator, glAccount: e.glAccount }))).toEqual([
+        { drCrIndicator: 'D', glAccount: 'Suspense - Debit' },
+        { drCrIndicator: 'C', glAccount: 'FX Exchange USD - Suspense' },
+      ]);
+      expect(usd).toMatchObject({ totalDebit: '316.62', totalCredit: '316.62', difference: '0.00', balanced: true });
+      expect(eur).toMatchObject({ totalDebit: '200.00', totalCredit: '200.00', difference: '0.00', balanced: true });
     });
 
     it('never sums amounts across currencies — each group totals only its own currency', () => {
@@ -299,9 +368,12 @@ describe('ResponseViewerComponent', () => {
           { drCrIndicator: 'D', glAccount: 'CUST-ACC', amount: '9232.95', entryType: 'Customer / Debit Legs' },
           { drCrIndicator: 'C', glAccount: 'FX Exchange USD', amount: '9232.95', entryType: 'Debit FX Conversion Pair' },
         ]);
+        // 2026-08-13: Debit rows always sort before Credit rows within a currency group — the
+        // 'D' FX overlay entry (pushed after 'Settlement / Credit Legs' by insertion order) now
+        // sorts ahead of the 'C' NOSTRO-ACC entry.
         expect(usd.entries.map((e) => ({ drCrIndicator: e.drCrIndicator, glAccount: e.glAccount, amount: e.amount, entryType: e.entryType }))).toEqual([
-          { drCrIndicator: 'C', glAccount: 'NOSTRO-ACC', amount: '10000.00', entryType: 'Settlement / Credit Legs' },
           { drCrIndicator: 'D', glAccount: 'FX Exchange EUR', amount: '10000', entryType: 'Debit FX Conversion Pair' },
+          { drCrIndicator: 'C', glAccount: 'NOSTRO-ACC', amount: '10000.00', entryType: 'Settlement / Credit Legs' },
         ]);
       });
 

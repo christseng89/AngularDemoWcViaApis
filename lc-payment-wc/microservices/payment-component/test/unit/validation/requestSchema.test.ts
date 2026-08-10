@@ -40,8 +40,10 @@ describe('validateConfirmRequest', () => {
     expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);
   });
 
-  it('throws when debitLegs is an empty array (minItems 1)', () => {
-    expect(() => validateConfirmRequest({ ...validConfirmBody, debitLegs: [] })).toThrow(RequestValidationError);
+  it('throws when debitLegs is an empty array (minItems 1), blaming debitLegs itself for the ordinary (non-bridge) case', () => {
+    expect(() => validateConfirmRequest({ ...validConfirmBody, debitLegs: [] })).toThrow(
+      /^debitLegs: debitLegs must contain at least 1 item/,
+    );
   });
 
   it('throws when creditLegs is an empty array (minItems 1), blaming creditLegs itself for the ordinary (non-bridge) case', () => {
@@ -108,6 +110,102 @@ describe('validateConfirmRequest', () => {
     it('does not require debitLegsComponentBridge/suspenseBridge for an ordinary non-empty creditLegs request', () => {
       const result = validateConfirmRequest(validConfirmBody);
       expect(result.debitLegsComponentBridge).toBeUndefined();
+    });
+  });
+
+  describe('creditLegsComponentBridge (empty debitLegs exemption, mirror image of debitLegsComponentBridge, 2026-08-12)', () => {
+    it('allows empty debitLegs when creditLegsComponentBridge is true and suspenseBridge.debitEntries is populated', () => {
+      const result = validateConfirmRequest({
+        ...validConfirmBody,
+        debitLegs: [],
+        creditLegsComponentBridge: true,
+        suspenseBridge: { debitEntries: [{ amount: '100', currency: 'USD' }] },
+      });
+      expect(result.debitLegs).toHaveLength(0);
+      expect(result.creditLegsComponentBridge).toBe(true);
+    });
+
+    it('throws when creditLegsComponentBridge is true but suspenseBridge.debitEntries is missing, blaming suspenseBridge.debitEntries (NOT debitLegs — debitLegs is never used in this mode)', () => {
+      expect(() =>
+        validateConfirmRequest({ ...validConfirmBody, debitLegs: [], creditLegsComponentBridge: true }),
+      ).toThrow(/suspenseBridge\.debitEntries: suspenseBridge\.debitEntries must contain at least 1 item/);
+      try {
+        validateConfirmRequest({ ...validConfirmBody, debitLegs: [], creditLegsComponentBridge: true });
+      } catch (err) {
+        expect((err as Error).message).not.toMatch(/^debitLegs:/);
+      }
+    });
+
+    it('throws when creditLegsComponentBridge is true but suspenseBridge only has creditEntries, blaming suspenseBridge.debitEntries', () => {
+      expect(() =>
+        validateConfirmRequest({
+          ...validConfirmBody,
+          debitLegs: [],
+          creditLegsComponentBridge: true,
+          suspenseBridge: { creditEntries: [{ amount: '100', currency: 'USD' }] },
+        }),
+      ).toThrow(/suspenseBridge\.debitEntries: suspenseBridge\.debitEntries must contain at least 1 item/);
+    });
+
+    it('throws when debitLegs is empty and creditLegsComponentBridge is omitted, even with suspenseBridge.debitEntries populated — still blaming debitLegs', () => {
+      expect(() =>
+        validateConfirmRequest({
+          ...validConfirmBody,
+          debitLegs: [],
+          suspenseBridge: { debitEntries: [{ amount: '100', currency: 'USD' }] },
+        }),
+      ).toThrow(/^debitLegs: debitLegs must contain at least 1 item/);
+    });
+
+    it('throws when debitLegs is empty and creditLegsComponentBridge is explicitly false, even with suspenseBridge.debitEntries populated — still blaming debitLegs', () => {
+      expect(() =>
+        validateConfirmRequest({
+          ...validConfirmBody,
+          debitLegs: [],
+          creditLegsComponentBridge: false,
+          suspenseBridge: { debitEntries: [{ amount: '100', currency: 'USD' }] },
+        }),
+      ).toThrow(/^debitLegs: debitLegs must contain at least 1 item/);
+    });
+
+    it('does not require creditLegsComponentBridge/suspenseBridge for an ordinary non-empty debitLegs request', () => {
+      const result = validateConfirmRequest(validConfirmBody);
+      expect(result.creditLegsComponentBridge).toBeUndefined();
+    });
+  });
+
+  describe('debitLegsComponentBridge and creditLegsComponentBridge mutual exclusivity (2026-08-12)', () => {
+    it('throws when both bridge flags are true, even with both suspenseBridge lists populated', () => {
+      expect(() =>
+        validateConfirmRequest({
+          ...validConfirmBody,
+          debitLegs: [],
+          creditLegs: [],
+          debitLegsComponentBridge: true,
+          creditLegsComponentBridge: true,
+          suspenseBridge: {
+            debitEntries: [{ amount: '100', currency: 'USD' }],
+            creditEntries: [{ amount: '100', currency: 'USD' }],
+          },
+        }),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it('the mutual-exclusivity error takes priority over (and suppresses) the per-field empty-array errors', () => {
+      try {
+        validateConfirmRequest({
+          ...validConfirmBody,
+          debitLegs: [],
+          creditLegs: [],
+          debitLegsComponentBridge: true,
+          creditLegsComponentBridge: true,
+        });
+        throw new Error('expected validateConfirmRequest to throw');
+      } catch (err) {
+        const message = (err as Error).message;
+        expect(message).toMatch(/mutually exclusive/);
+        expect(message).not.toMatch(/must contain at least 1 item/);
+      }
     });
   });
 

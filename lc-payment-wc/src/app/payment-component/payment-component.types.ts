@@ -162,6 +162,20 @@ export interface PaymentInstructionConfirmRequest {
    * — see that field's own doc comment (business-case.model.ts) for the full contract.
    */
   debitLegsComponentBridge?: boolean;
+  /**
+   * Credit Legs Component Bridge Flag (2026-08-12) — the mirror image of
+   * debitLegsComponentBridge above: when true AND suspenseBridge.debitEntries has at least
+   * 1 entry, debitLegs may be empty — this request only ever carries creditLegs (the real
+   * outgoing settlement/payment legs, e.g. Cr Nostro); the entire debit side is provided by
+   * the Suspense Debit bridge to a separate upstream component (e.g. a Loan Component
+   * generating Dr IBL / Cr Suspense - IBL on its own books for a Buyer's Usance LC — see
+   * lc-payment-wc/CLAUDE.md's dated entry for the full worked example). Mutually exclusive
+   * with debitLegsComponentBridge (the microservice's zod schema rejects both true at once
+   * with a 400). Set to true iff BusinessCaseConfig.creditLegsBridge is true for the selected
+   * case (business-case-request.ts) — see that field's own doc comment (business-case.model.ts)
+   * for the full contract.
+   */
+  creditLegsComponentBridge?: boolean;
 }
 
 export interface ClassificationResult {

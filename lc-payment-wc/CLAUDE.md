@@ -426,6 +426,145 @@ is not charge-specific:
   a concrete Customer-IBL-Payment worked example (its own business case, and/or a
   `sourceComponent`/provenance taxonomy for it) is future work if requested.
 
+**Credit Payment Bridge (`creditLegsComponentBridge`, business-requirement-confirmed, 2026-08-12)
+— the mirror image of the Debit Payment Bridge above, now actually implemented as a concrete
+worked example** (the "future work if requested" noted in the previous entry — the Loan Component
+scenario, not deferred this time). A separate upstream component (a Loan Component, for a Buyer's
+Usance LC) generates the CREDIT-side funding obligation through a Suspense account; Payment
+Component performs the real settlement to the beneficiary/Nostro account:
+
+```text
+Loan Component (own books, not modeled here)
+Dr IBL
+    Cr Suspense - IBL
+
+Payment Component (this service)
+Dr Suspense - Debit      <- suspenseBridge.debitEntries (Suspense Debit)
+    Cr Nostro             <- Credit Legs
+```
+
+Combined: `Dr IBL / Cr Nostro`. Same "never duplicate the upstream component's own entries"
+principle as the Charge Component boundary above — this service's responsibility begins at
+`Dr Suspense - Debit` and ends at the real Credit Legs.
+
+- **New business case:** `src/app/payment-component/business-case-registry.ts`'s
+  `CREDIT_LEGS_BRIDGE_CASES` (`iplc-usance-settlement-credit-bridge`, module `IPLC`, functionLabel
+  "Credit Payment Bridge") — NOT legacy-traced, same reviewer-confirmed-architecture-pattern
+  footing as `iplc-issue-charge-bridge`. `creditLegsBridge: true`
+  (`BusinessCaseConfig.creditLegsBridge`, `business-case.model.ts`) is the mirror of
+  `debitLegsBridge`: `legs` must contain ONLY a CREDIT entry, the entire debit side comes from
+  `suspenseBridge.debitEntries`, mutually exclusive with `debitLegsBridge` (no case sets both).
+- **Account naming (reviewer-confirmed 2026-08-12): reuses the existing generic `'Suspense -
+  Debit'` account, NOT a literal `'Suspense - IBL'` account** — same decision as the Debit Payment
+  Bridge's `'Suspense - Credit'`. `accountNo` is tied to which LIST an entry came from
+  (`buildSuspenseBridgeLeg`), not to a per-scenario name; which upstream component/product a
+  Suspense entry is for stays metadata (`sourceComponent`), not a custom account name.
+- **Mutual exclusivity (reviewer-confirmed 2026-08-12):** `debitLegsComponentBridge` and
+  `creditLegsComponentBridge` reject a request with both true (400,
+  `validation/requestSchema.ts`'s `superRefine`) — both true at once would mean Payment Component
+  posts no real legs on either side, which doesn't correspond to any described scenario. To
+  combine a debit-side and credit-side Suspense bridge in one instruction, use the general
+  `suspenseBridge` mechanism directly instead of either flag — that combined case (real
+  `debitLegs`/`creditLegs` alongside `suspenseBridge.debitEntries`/`creditEntries`) is already
+  supported without them.
+- **The core architectural change — not just a UI mirror, a real fix to a hard invariant.** Every
+  other `suspenseBridge` use relies on: a generated leg ALWAYS lands CREDIT, regardless of source
+  list (`buildSuspenseBridgeLeg`'s doc comment). `debitLegsComponentBridge` never needed to touch
+  this (it uses `creditEntries`, whose desired direction already matched). `creditLegsComponentBridge`
+  uses `debitEntries` but needs genuine DEBIT-direction posting — the opposite of the general
+  pattern's placement for that list. `domain/suspenseBridge.ts`'s `expandSuspenseBridge` now flips
+  placement (`isFlippedDebitSide`) narrowly for `creditLegsComponentBridge:true` AND `side ===
+  'DEBIT'` only — every other combination is byte-for-byte unchanged. A flipped leg's rate field
+  is also relabeled `crBuyRate` → `drBuyRate` (response-shape correctness, matching
+  `buildFxPair`'s own DR/CR-tied field convention). `domain/confirmPaymentInstruction.ts`'s
+  `transactionCurrency` derivation — previously an unconditional `request.debitLegs[0]!.currency`,
+  safe because `debitLegs` was never empty in any prior mode — now falls back to
+  `request.creditLegs[0]!.currency` when `debitLegs` is empty; `debitLegsInput`'s ordering gets
+  the same FX-vs-Suspense split `creditLegsInput` already had, since `bridge.debit` can now carry
+  real Suspense legs too, not just FX-pair legs (`[...bridgeSuspenseDebit, ...request.debitLegs,
+  ...bridgeFxDebit]`, mirroring `creditLegsInput`'s `[...bridgeFxCredit, ...request.creditLegs,
+  ...bridgeSuspenseCredit]`).
+- **Diff-sized FX pair, mirrored with opposite anchor polarity.** New branch,
+  `if (creditLegsComponentBridge && side === 'DEBIT')`, structurally identical to
+  `debitLegsComponentBridge`'s own branch but comparing against `creditLegs` (opposite side), with
+  `diff > 0` anchoring DEBIT (not CREDIT) and `diff < 0` anchoring CREDIT (not DEBIT) — matching
+  the Suspense leg's own flipped placement. Every worked example from the Debit Payment Bridge has
+  a direct mirror in `test/unit/domain/suspenseBridge.test.ts`'s and
+  `confirmPaymentInstruction.test.ts`'s `creditLegsComponentBridge` describe blocks.
+- **400 error attribution, mirroring the 2026-08-11 fix above:** `creditLegsComponentBridge:true`
+  with `debitLegs` empty and `suspenseBridge.debitEntries` also empty blames
+  `suspenseBridge.debitEntries`, not `debitLegs` — `debitLegs` is never used in this mode. The
+  ordinary `debitLegs`-empty case is unaffected and still blames `debitLegs` itself.
+- **Angular UI, full mirror of the debitLegsBridge machinery** (`business-case-runner.component.ts`/
+  `.html`): new `debitLegsRequired` getter (mirrors `creditLegsRequired`) drives whether
+  `<app-leg-allocator side="DEBIT">` renders at all — the FIRST time it became conditionally
+  rendered. That immediately hit the same NG9 template-reference-scoping issue the "Verification
+  gap" entry below already documents for the CREDIT allocator (a `#debitAllocator` template ref
+  read from `<app-response-viewer>`'s binding, outside the new `*ngIf`'s embedded view) — fixed
+  the same way: `@ViewChild('debitAllocator') debitAllocatorRef`, plus a new `debitFxPairs` getter
+  (mirroring `creditFxPairs`) that also carries the existing debitLegsBridge full-hide (moved out
+  of the old inline template expression, which stopped being template-safe once `debitAllocator`
+  became conditionally rendered). `creditFxPairs` gained a matching unconditional hide for
+  `creditLegsBridge` — applied proactively this time (not after a reported bug, unlike the
+  Debit-side "Debit FX Conversion Pair" fix on 2026-08-11), since `suspenseCreditEntries` stays
+  permanently `[]` in this mode, same reasoning. `selectCase()` seeds `debitValid = true` for a
+  `creditLegsBridge` case (mirrors `creditValid`'s existing seeding); `sideDefaults('CREDIT')` and
+  `baseTotalAmount` get the mirror branch (Σ Suspense Debit instead of Σ Suspense Credit); Suspense
+  Credit gets `*ngIf="!sc.creditLegsBridge"` (mirrors Suspense Debit's existing hide).
+- **`transactionCurrency` getter fix, and the regression it caused before being gated correctly.**
+  The getter's fallback chain (`debitLegs[0] → registry DEBIT spec → 'USD'`) needed a
+  `creditLegs[0]`/registry-CREDIT-spec fallback for a `creditLegsBridge` case (mirroring the
+  server-side fix above) — but applying it **unconditionally** whenever `debitLegs` was empty
+  broke 2 pre-existing tests (`business-case-runner.component.spec.ts`'s `sideDefaults` suite),
+  because an empty `debitLegs` is also just a normal transient state for an ORDINARY case (a test
+  deliberately setting `comp.creditLegs` for unrelated setup, with `comp.debitLegs` incidentally
+  still `[]`) — not a genuine "this mode has no debit side" signal the way it is for
+  `creditLegsBridge`. Fixed by gating the `creditLegs[0]`/registry-CREDIT fallback on
+  `this.selectedCase?.creditLegsBridge` specifically, leaving every other case's currency
+  derivation byte-for-byte unchanged. (The server-side equivalent doesn't need this gate — schema
+  validation already guarantees `debitLegs` is empty ONLY when `creditLegsComponentBridge` is true
+  by the time `confirmPaymentInstruction.ts` sees the request; the client's own `debitLegs`/
+  `creditLegs` have no such guarantee mid-edit.)
+- **`response-viewer.component.ts`'s Settlement Vouchers display — a real bug found via a live
+  multi-currency Buyer's Usance LC scenario (reviewer-provided), not just a preference (2026-08-13).**
+  `groupedSettlementEntries` (Posting View's client-side re-grouping) had two latent breaks specific
+  to `creditLegsComponentBridge`, both now fixed:
+  1. **`transactionCurrency` derivation.** Was `entries[0]!.currency`, documented as "ALWAYS
+     `request.debitLegs[0]`, never a generated leg" — true when `debitLegsInput` always prepended
+     the caller's own `debitLegs`, FALSE since `confirmPaymentInstruction.ts`'s `debitLegsInput =
+     [...bridgeSuspenseDebit, ...request.debitLegs, ...bridgeFxDebit]` can now prepend a
+     **generated** Suspense-Debit leg instead. `entries[0]` could then silently misdetect the
+     transaction currency (breaking FX-pair Debit/Credit attribution and Currency View grouping)
+     whenever the first Suspense entry submitted doesn't happen to share the transaction currency.
+     Fixed: now `normalDebit[0]?.currency ?? normalCredit[0]?.currency ?? entries[0]!.currency` —
+     preferring a REAL (non-FX, non-Suspense) leg's currency, mirroring the server's own
+     `debitLegs[0] ?? creditLegs[0]` fix; `entries[0]` kept only as an unreachable-in-practice
+     defensive fallback.
+  2. **Section ordering — "Suspense Clearing" position.** Was unconditionally pushed LAST — correct
+     for every other mode, where Suspense clearing is credit-direction (a trailing settlement
+     step), but wrong for `creditLegsComponentBridge`, whose Suspense clearing is debit-direction —
+     the **funding source** the instruction is funded FROM, not a trailing clearing step. Fixed:
+     `suspenseIsFunding` (checks `suspenseClearing[0]!.drCrIndicator === 'D'` — safe, since all
+     Suspense clearing entries in one response share the same direction in every real scenario)
+     now pushes a relabeled **"Suspense Clearing / Funding"** section FIRST instead, mirroring
+     `confirmPaymentInstruction.ts`'s own `debitLegsInput` ordering (Suspense-debit leading). Every
+     other mode is byte-for-byte unchanged (still trailing, still labeled "Suspense Clearing").
+     Reviewer-confirmed worked example (Suspense Debit USD 100 + EUR 200, one FX Debit Suspense
+     Pair, one Nostro settlement leg) now groups exactly as: Suspense Clearing / Funding → FX Debit
+     Suspense Pair → Settlement / Credit Legs.
+  3. **Currency View row order.** `currencyGroups` relied on section-push order alone to keep Debit
+     rows before Credit rows within a currency — true only as an EMERGENT property of every
+     pre-2026-08-12 section order always grouping all-debit sections before all-credit ones; never
+     a guarantee the getter itself enforced, and `creditLegsComponentBridge`'s more varied section
+     interleaving (Suspense now leading OR trailing, FX pairs split debit-anchored/credit-anchored)
+     is exactly the shape that emergent property was never proven to hold for. Fixed with an
+     explicit stable sort (`'D'` before `'C'`, relative order within each direction preserved) —
+     Currency View's own Dr/Cr grouping no longer depends on Posting View's section order at all.
+     (Business-requirement-confirmed 2026-08-13: Debit rows before Credit rows in Currency View,
+     for every scenario — not just this one.)
+  See `response-viewer.component.spec.ts`'s new tests mirroring the exact reviewer-provided
+  worked example, for both `groupedSettlementEntries` and `currencyGroups`.
+
 ---
 
 # Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)

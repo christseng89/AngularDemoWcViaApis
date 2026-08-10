@@ -298,6 +298,52 @@ const DEBIT_LEGS_BRIDGE_CASES: BusinessCaseConfig[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// 1 CREDIT LEGS COMPONENT BRIDGE — IPLC Buyer's Usance LC settlement (2026-08-12,
+// business-requirement-confirmed): the mirror image of DEBIT_LEGS_BRIDGE_CASES above. A
+// separate Loan Component generates the credit-side funding obligation through a Suspense
+// account — for a Buyer's Usance LC:
+//
+//   Loan Component (own books, not modeled here)
+//   Dr IBL
+//       Cr Suspense - IBL
+//
+// — and the Payment Component performs the actual settlement to the beneficiary/Nostro
+// account, never duplicating the Loan Component's own Dr IBL / Cr Suspense - IBL entries:
+//
+//   Payment Component (this case)
+//   Dr Suspense - Debit    <- suspenseBridge.debitEntries (labeled "Suspense - IBL" in the
+//                              business scenario above, but posts to the existing generic
+//                              'Suspense - Debit' account server-side — reviewer-confirmed
+//                              2026-08-12, see business-case.model.ts's creditLegsBridge doc
+//                              comment for why no new literal account name was introduced)
+//       Cr Nostro          <- Credit Legs (the real settlement)
+//
+// Combined across both components: Dr IBL / Cr Nostro. NOT legacy-traced, same footing as
+// DEBIT_LEGS_BRIDGE_CASES's single case — the citation says so explicitly. `creditLegsBridge:
+// true` marks this case as collecting the outgoing settlement ONLY — there is deliberately no
+// Debit Leg at all; the entire debit side is provided via the Suspense Debit bridge
+// (suspenseBridge.debitEntries), never a directly-submitted real debit leg. Mutually exclusive
+// with debitLegsBridge (see business-case.model.ts) — no case in this registry sets both.
+// ---------------------------------------------------------------------------
+
+const CREDIT_LEGS_BRIDGE_CASES: BusinessCaseConfig[] = [
+  {
+    id: 'iplc-usance-settlement-credit-bridge',
+    module: 'IPLC',
+    functionLabel: 'Credit Payment Bridge',
+    verdict: 'PASS',
+    citation:
+      'NOT legacy-traced — reviewer-confirmed architecture pattern (lc-payment-wc/CLAUDE.md, "Credit Payment Bridge" dated entry, 2026-08-12). Buyer\'s Usance LC settlement is not one of the 15 confirmed Payment Component consumer functions (Payment_Mapping_Functions.docx §6).',
+    note: 'Credit Legs Bridge — no Debit Leg; the debit side is bridged in via Suspense from a separate upstream component (a Loan Component here, generating the IBL liability/loan accounting for a Buyer\'s Usance LC). Transaction Amount is protected and auto-calculated as the sum of the Suspense Debit entries below (multiple entries/currencies supported) — Cr Nostro (splittable across multiple accounts/currencies) follows automatically to match Dr Suspense - Debit. The separate Loan Component (not modeled here) posts Dr IBL / Cr Suspense - IBL on its own books; this service never duplicates that entry — its responsibility begins at Dr Suspense - Debit and ends at the real Credit Legs.',
+    dualPrefixOptions: [
+      { label: 'IPLC98NULLNULLNULL (illustrative placeholder — not FSD-documented, see citation)', value: 'IPLC98NULLNULLNULL' },
+    ],
+    creditLegsBridge: true,
+    legs: [leg('CREDIT', 'NOSTRO', 'NOSTRO-ACC', 'USD', '150')],
+  },
+];
+
+// ---------------------------------------------------------------------------
 // 4 GAP — RPFM: legs populated in source (incl. RTGS, modeled here as
 // accountType='NOSTRO' + rtgsIndicator — v1.3.0, see payment-component.types.ts),
 // but no voucher-assembly routine exists (no RPFM##NULLNULLNULL pattern
@@ -412,7 +458,7 @@ const NA_CASES: BusinessCaseConfig[] = [
   },
 ];
 
-export const BUSINESS_CASES: BusinessCaseConfig[] = [...PASS_CASES, ...DEBIT_LEGS_BRIDGE_CASES, ...GAP_CASES, ...NA_CASES];
+export const BUSINESS_CASES: BusinessCaseConfig[] = [...PASS_CASES, ...DEBIT_LEGS_BRIDGE_CASES, ...CREDIT_LEGS_BRIDGE_CASES, ...GAP_CASES, ...NA_CASES];
 
 const MODULE_LABELS: Record<string, string> = {
   IPLC: 'IPLC — Import Letter of Credit',

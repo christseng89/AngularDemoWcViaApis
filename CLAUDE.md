@@ -27,8 +27,11 @@ that directory) — it carries the Trade Finance/Payments solution-architect per
 reviewer-confirmed architecture decisions for that project specifically: the Charge Component ↔ Payment
 Component boundary and the `debitLegsBridge` "Debit Payment Bridge" business case (renamed from
 `chargeBridge`/"Charge Component Bridge" 2026-08-10, retitled from "Charge / Customer IBL Payment Bridge"
-the same day), and the planned-but-not-yet-implemented OAS
-structured Reference/Event model (`docs/RDD-oas-reference-event-model.md`). Treat entries marked
+the same day), its mirror-image `creditLegsBridge` "Credit Payment Bridge" business case
+(2026-08-12 — a Loan Component / Buyer's Usance LC settlement scenario, which required a real fix
+to the `suspenseBridge` module's leg-placement logic, not just a UI mirror), and the
+planned-but-not-yet-implemented OAS structured Reference/Event model
+(`docs/RDD-oas-reference-event-model.md`). Treat entries marked
 "reviewer-confirmed" there as settled — don't re-litigate them without new information from the user.
 
 ---

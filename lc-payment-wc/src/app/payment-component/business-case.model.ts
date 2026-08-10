@@ -73,6 +73,45 @@ export interface BusinessCaseConfig {
    */
   debitLegsBridge?: boolean;
 
+  /**
+   * Credit Legs Component Bridge Flag (business-requirement-confirmed, 2026-08-12) — the mirror
+   * image of debitLegsBridge above: true when the Payment Component is being used purely as a
+   * settlement bridge FROM a separate upstream component that generates the credit-side funding
+   * obligation through a Suspense account (e.g. a Loan Component posting Dr IBL / Cr Suspense -
+   * IBL for a Buyer's Usance LC, own books, not modeled here), never generating the debit legs
+   * itself. When true:
+   *   - `legs` must contain ONLY CREDIT entries — no Debit Leg at all (business-case-registry.spec.ts's
+   *     data invariants enforce this generically for every `creditLegsBridge:true` case). The
+   *     Credit side (e.g. Nostro settlement) can still be split across multiple accounts/currencies
+   *     via the existing leg-allocator UI — the flag only removes the Debit side.
+   *   - business-case-runner.component.ts's `debitLegsRequired` getter reads the flag directly
+   *     (mirroring `creditLegsRequired`) and hides `<app-leg-allocator side="DEBIT">` entirely;
+   *     `selectCase()` seeds `debitValid = true` in that state (nothing will ever emit `validChange`
+   *     for a side with no allocator), so the live preview isn't permanently blocked.
+   *   - The entire debit side is expected to come from the Suspense Debit bridge
+   *     (`suspenseBridge.debitEntries` — itself already multi-entry/multi-currency via
+   *     `<app-suspense-entries>`).
+   *   - business-case-request.ts's `buildConfirmRequest` sends `creditLegsComponentBridge: true`
+   *     on the wire (payment-component.types.ts) — the microservice's own zod schema
+   *     (validation/requestSchema.ts) relaxes its `debitLegs` minItems:1 rule only when this
+   *     flag is true AND `suspenseBridge.debitEntries` is non-empty.
+   *   - Transaction Amount is PROTECTED (read-only) and derived directly as Σ(Suspense Debit
+   *     entries' Trx Ccy Equivalent) — the mirror of debitLegsBridge's "Σ(Suspense Credit entries)"
+   *     rule, matching the balance principle "Total Credit Legs = Total Suspense Debit".
+   *   - Suspense Credit is not applicable in this mode and is hidden from the UI entirely —
+   *     `suspenseCreditEntries` stays permanently `[]` for a creditLegsBridge case.
+   *   - Mutually exclusive with debitLegsBridge — a case must never set both. The microservice
+   *     rejects a request with both wire flags true (400); the Simulator has no registry case
+   *     that sets both, and no UI path to combine them.
+   *   - Account naming (reviewer-confirmed 2026-08-12): the Suspense entries use the existing
+   *     generic 'Suspense - Debit' account (server-side, tied to which LIST an entry came from,
+   *     same convention as debitLegsBridge's 'Suspense - Credit') — NOT a literal 'Suspense - IBL'
+   *     account. Which upstream component/product a Suspense entry is for is metadata
+   *     (sourceComponent), not a custom account name.
+   * Undefined/false for every other case — unaffected, same behavior as before this flag existed.
+   */
+  creditLegsBridge?: boolean;
+
   legs: LegSpec[];
 
   // N_A only:
