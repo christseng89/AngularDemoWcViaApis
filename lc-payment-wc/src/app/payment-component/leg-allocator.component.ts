@@ -81,6 +81,14 @@ export interface FxPairEntry {
   currency: string;
   amount: number;
   site: 'Trx Ccy' | 'Other Ccy';
+  /**
+   * The row's own exchange rate (row.rate) — only set on the 'Other Ccy' pair, since that's
+   * the leg actually being converted (see fxPairs getter below). Display-only, shown in its
+   * own "Rate" column (response-viewer.component.html/.ts's formatFxPairRate) — never sent to
+   * the microservice, and never conflated with a real settlement entry's own
+   * AccountEntry.exchangeRate1 (see CurrencyViewEntry's doc comment).
+   */
+  rate?: number;
 }
 
 /**
@@ -492,6 +500,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
         currency: row.currency,
         amount: this.accountCcyAmount(row),
         site: 'Other Ccy',
+        rate: row.rate.toNumber(),
       });
     }
     return pairs;

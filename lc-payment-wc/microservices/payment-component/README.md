@@ -97,6 +97,28 @@ New callers should always send `transactionCurrency` explicitly rather than rely
 `suspenseBridge` expansion and `domain/swiftMessages.ts`'s 33B `instructedCurrency` — both switched
 from `request.debitLegs[0]!.currency` to `request.transactionCurrency ?? request.debitLegs[0]!.currency`.
 
+## `exchangeRate1` — echoing a leg's own rate back in the Settlement Vouchers response (v1.11.0)
+
+`AccountEntry.exchangeRate1`/`exchangeRate2` exist in both the official `Payment_component.yaml`
+and the extracted `payment-instructions-post.yaml` — but neither OAS source elaborates on what they
+mean, and until v1.11.0 `domain/accountEntries.ts` never populated either field on any Settlement
+Voucher entry, even though the request side already lets a caller submit a rate per leg
+(`PaymentLegInput.drRate`/`drBuyRate`/`crBuyRate`/`sellRate`). A rate went in on the request and
+silently never came back out on the response.
+
+`buildSettlementEntries` now sets `exchangeRate1` from whichever of the leg's own rate fields
+matches its side — `drRate ?? drBuyRate` for a DEBIT leg, `crBuyRate ?? sellRate` for a CREDIT leg —
+omitted entirely when the leg carries neither (the common case: a same-currency leg never needs a
+rate). This is one code path shared by both a caller's own foreign-currency legs AND the
+suspenseBridge-generated FX Exchange pair legs (`domain/suspenseBridge.ts`'s `buildFxPair` already
+sets `drBuyRate`/`crBuyRate` on those before they reach `buildSettlementEntries` — no special-casing
+needed).
+
+**`exchangeRate2` is deliberately left unset.** Neither OAS source documents what a second rate
+would represent, and a leg only ever carries one rate value on the wire — populating it would mean
+fabricating a second figure with no basis, exactly the kind of unsupported guess this service avoids
+(see "Gaps against the official OAS" above).
+
 ## Balance/Charge Component ↔ Payment Component bridge (`suspenseBridge`, v1.4.0 / v1.5.0 / v1.7.0-v1.8.0)
 
 Not part of the legacy trace — the legacy screens never had these components live in the same

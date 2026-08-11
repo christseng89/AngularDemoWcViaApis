@@ -454,7 +454,7 @@ describe('LegAllocatorComponent', () => {
 
       expect(pairs).toHaveLength(2);
       expect(pairs[0]).toMatchObject({ drCr: 'D', site: 'Trx Ccy', currency: 'USD', account: 'FX Exchange EUR' });
-      expect(pairs[1]).toMatchObject({ drCr: 'C', site: 'Other Ccy', currency: 'EUR', account: 'FX Exchange USD' });
+      expect(pairs[1]).toMatchObject({ drCr: 'C', site: 'Other Ccy', currency: 'EUR', account: 'FX Exchange USD', rate: 1.1 });
     });
 
     it('flips direction for the CREDIT side', () => {

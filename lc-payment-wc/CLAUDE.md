@@ -357,6 +357,81 @@ by the fee (README's "Common mistake to avoid" note) — getting this wrong is a
 `LEGS_UNBALANCED`, not a 400. **None of the three are implemented as registry business cases yet** —
 no citation, no default account numbers, no regression test — this is usage guidance only.
 
+## `exchangeRate1` echoed back on Settlement Voucher entries; Debit/Credit FX Conversion Pair Rate shown in its own column, not appended to Site (v1.11.0, business-requirement-confirmed 2026-08-11)
+
+Reviewer's stated requirement, refining an earlier attempt: for a Debit/Credit FX Conversion Pair
+row with Site = "Other Ccy", the Exchange Rate must be **its own column**, and — critically — for
+the **Settlement Vouchers** table specifically, that rate must be **part of the actual OAS Return**,
+not a client-side-only value. ("Settlement Vouchers 是 Return response 的一部分" — confirmed
+directly.) An earlier attempt appended `"(Rate: 1.083123)"` into the Site/Description text itself;
+superseded by this section, since it neither used a separate column nor sourced the Settlement
+Vouchers figure from the server.
+
+**Root finding: `AccountEntry.exchangeRate1`/`exchangeRate2` already exist in both OAS sources**
+(official `Payment_component.yaml` and the extracted `payment-instructions-post.yaml`) but neither
+document what they mean, and the microservice never populated either field on any response entry —
+even though the request side already accepts a rate per leg (`PaymentLegInput.drRate`/`drBuyRate`/
+`crBuyRate`/`sellRate`, already sent by `leg-allocator.component.ts`'s `emit()`). A rate went in on
+the request and silently never came back out.
+
+**Fix — two independent, clearly-separated data sources, not one collapsed into the other:**
+- **Server (real OAS data):** `microservices/payment-component/src/domain/accountEntries.ts`'s
+  `buildSettlementEntries` now sets `exchangeRate1` from whichever of the leg's own rate fields
+  matches its side (`drRate ?? drBuyRate` for DEBIT, `crBuyRate ?? sellRate` for CREDIT) — one code
+  path covers both a caller's own foreign-currency legs AND the suspenseBridge-generated FX Exchange
+  pair legs. `exchangeRate2` is deliberately left unset — neither OAS source documents a second
+  rate's meaning, and a leg only ever carries one rate value on the wire. See the microservice
+  README's own `exchangeRate1` section for full detail.
+- **Client, Settlement Vouchers table (`response-viewer.component.html`):** both Posting View and
+  Currency View gained a real "Exchange Rate" column reading `AccountEntry.exchangeRate1` straight
+  from the response — genuine OAS-Return data, not computed in the browser.
+- **Client, Debit/Credit FX Conversion Pair overlay (`leg-allocator.component.ts`'s `fxPairs`
+  getter):** this table is explicitly a client-only preview and stays that way — it is NOT sent to
+  or returned by the microservice (see its own doc comment). It also gained its own separate "Rate"
+  column (`FxPairEntry.rate`, only set on the "Other Ccy" pair), but the value is still the
+  leg-allocator row's own client-side `rate` — never conflated with, or presented as, the server's
+  `exchangeRate1`. Keeping these as two distinct columns in two distinct tables (rather than one
+  merged "Rate" concept) is deliberate: one is authoritative server data, the other is a same-page
+  simulation preview, and the UI must not blur which is which.
+
+See `microservices/payment-component/test/unit/domain/accountEntries.test.ts`'s "exchangeRate1
+echo-back" describe block and `confirmPaymentInstruction.test.ts`'s `REF-SB-RATE-1` test for the
+server-side worked examples (including the suspenseBridge-generated FX Exchange pair carrying the
+caller's own `crossRate`), and `leg-allocator.component.spec.ts`'s `fxPairs`/`response-viewer
+.component.spec.ts`'s currencyGroups tests for the client-side column wiring.
+
+**Follow-up layout refinement, same session (reviewer-confirmed 2026-08-11) — final column order
+is Amount → Exchange Rate/Rate → Description/Site, not Amount → Description/Site → Exchange
+Rate/Rate as first shipped.** Putting the new rate column immediately after Description/Site (its
+markup-adjacent position) left it visually stranded — a wide Description/Site column with typically
+short content ("Trx Ccy", short voucher codes) reads as a large empty gap before the rate value.
+Reviewer's fix, applied to **all three** `response-viewer.component.html` tables (Settlement
+Vouchers Posting View, Settlement Vouchers Currency View, both FX Conversion Pair tables): reorder
+so Exchange Rate/Rate sits right after Amount (both short, numeric-ish values — tight against each
+other), and Description/Site moves to the LAST column instead. This is a deliberate structural
+choice, not cosmetic: Description/Site is the one column whose content length genuinely varies (a
+short site label vs. a long real voucher-description code), so it's the right column to absorb the
+table's leftover width — trailing slack after the rightmost column reads as normal margin, since
+there's nothing after it to look "far" from, whereas the same slack sandwiched between two columns
+someone is visually comparing reads as a gap. `response-viewer.component.scss`'s `.settlement-table`
+column-width comments explain the full reasoning; every `.col-*` percentage was re-tuned to closely
+fit typical content (GL Account/Currency included, per the same "distance between Currency and GL
+Account" reviewer note) rather than an even/generous split.
+
+**Same pass — Amount column now always shows the row's own currency's minor-unit decimal places
+(reviewer: "金額應該使用幣別的 Decimal space,例如美金100.00"), never a bare wire-precision
+passthrough.** Root cause: `money.ts`'s `formatMonetaryAmount(value, scale)` leaves a Decimal's
+existing precision alone when `scale` is omitted, and `accountEntries.ts`'s `makeEntry` calls it with
+no scale — so a whole-number USD amount round-tripped as `"10000"`, not `"10000.00"`, and
+`FxPairEntry.amount` (a plain client-side JS `number`) drops trailing zeros on template interpolation
+the same way. Fixed display-only, client-side, via a new `ResponseViewerComponent.formatAmount(amount,
+currency)` (`response-viewer.component.ts`) that rounds/pads to `currencyDecimals[currency] ?? 2`
+(the same map `currencyGroups`'s own Balanced/Unbalanced precision already uses) — applied at every
+Amount cell across all three tables. Deliberately does NOT touch the wire contract or
+`AccountEntry.amount`/`FxPairEntry.amount` themselves — this is presentation only, same posture as
+`fxPairSiteLabel`'s predecessor. See `response-viewer.component.spec.ts`'s `formatAmount` describe
+block (whole-number padding, already-scaled passthrough, 0dp currency, unknown-currency fallback).
+
 ---
 
 # Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)

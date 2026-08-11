@@ -43,6 +43,49 @@ describe('ResponseViewerComponent', () => {
     expect(comp.creditFxPairs).toEqual([]);
   });
 
+  describe('formatAmount (Amount column — pads/rounds to the currency\'s own minor units)', () => {
+    it('pads a whole-number amount to the currency\'s decimal places', () => {
+      const comp = new ResponseViewerComponent();
+      comp.currencyDecimals = { USD: 2, JPY: 0 };
+      expect(comp.formatAmount('10000', 'USD')).toBe('10000.00');
+    });
+
+    it('leaves an already-correctly-scaled amount unchanged', () => {
+      const comp = new ResponseViewerComponent();
+      comp.currencyDecimals = { EUR: 2 };
+      expect(comp.formatAmount('9232.95', 'EUR')).toBe('9232.95');
+    });
+
+    it('accepts a plain number (FxPairEntry.amount) as well as a wire string', () => {
+      const comp = new ResponseViewerComponent();
+      comp.currencyDecimals = { USD: 2 };
+      expect(comp.formatAmount(10000, 'USD')).toBe('10000.00');
+    });
+
+    it('respects a 0dp currency (JPY) — never pads a whole yen amount with decimals', () => {
+      const comp = new ResponseViewerComponent();
+      comp.currencyDecimals = { JPY: 0 };
+      expect(comp.formatAmount('1490826', 'JPY')).toBe('1490826');
+    });
+
+    it('falls back to 2dp for a currency missing from currencyDecimals', () => {
+      const comp = new ResponseViewerComponent();
+      expect(comp.formatAmount('100', 'XYZ')).toBe('100.00');
+    });
+  });
+
+  describe('formatFxPairRate (Posting View FX Conversion Pair "Rate" column)', () => {
+    it("formats an 'Other Ccy' pair's rate to 6dp", () => {
+      const comp = new ResponseViewerComponent();
+      expect(comp.formatFxPairRate({ drCr: 'C', account: 'FX Exchange USD', currency: 'EUR', amount: 100, site: 'Other Ccy', rate: 1.1 })).toBe('1.100000');
+    });
+
+    it("shows '—' for a 'Trx Ccy' pair (never carries a rate)", () => {
+      const comp = new ResponseViewerComponent();
+      expect(comp.formatFxPairRate({ drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 100, site: 'Trx Ccy' })).toBe('—');
+    });
+  });
+
   describe('settlementEntries excludes zero-amount entries', () => {
     it("does not include a real zero-amount leg — e.g. onConfirm() (unlike the live preview) doesn't gate on leg validity, so a Suspense Credit bridge entry that fully offsets a real Cr \"Suspense - Credit\" leg can reach the server as a real 0.00 leg", () => {
       const comp = new ResponseViewerComponent();
@@ -356,6 +399,36 @@ describe('ResponseViewerComponent', () => {
         expect(groups.find((g) => g.currency === 'USD')).toMatchObject({ totalDebit: '10000.00', totalCredit: '10000.00', balanced: true });
         const eurFxRow = groups.find((g) => g.currency === 'EUR')!.entries.find((e) => e.glAccount === 'FX Exchange USD')!;
         expect(eurFxRow.entryType).toBe('Credit FX Conversion Pair');
+      });
+
+      it("an 'Other Ccy' pair carrying a rate gets its own exchangeRate column value (formatted to 6dp); Description stays plain 'Site' text; the 'Trx Ccy' pair gets no exchangeRate at all", () => {
+        const comp = new ResponseViewerComponent();
+        comp.debitFxPairs = [
+          { drCr: 'D', account: 'FX Exchange EUR', currency: 'USD', amount: 10000, site: 'Trx Ccy' },
+          { drCr: 'C', account: 'FX Exchange USD', currency: 'EUR', amount: 9232.95, site: 'Other Ccy', rate: 1.083123 },
+        ];
+
+        const groups = comp.currencyGroups;
+        const trxCcyRow = groups.find((g) => g.currency === 'USD')!.entries.find((e) => e.glAccount === 'FX Exchange EUR')!;
+        const otherCcyRow = groups.find((g) => g.currency === 'EUR')!.entries.find((e) => e.glAccount === 'FX Exchange USD')!;
+        expect(trxCcyRow.description).toBe('Trx Ccy');
+        expect(trxCcyRow.exchangeRate).toBeUndefined();
+        expect(otherCcyRow.description).toBe('Other Ccy');
+        expect(otherCcyRow.exchangeRate).toBe('1.083123');
+      });
+
+      it("a real settlement entry's exchangeRate column comes from AccountEntry.exchangeRate1 (genuine OAS-Return data), independent of any FX pair overlay", () => {
+        const comp = new ResponseViewerComponent();
+        comp.accountEntries = [
+          fx({ entryId: 'd-cust', drCrIndicator: 'D', glAccount: 'EUR-ACC', currency: 'EUR', amount: '9232.95', exchangeRate1: '1.083123' }),
+          fx({ entryId: 'c-nostro', drCrIndicator: 'C', glAccount: 'NOSTRO-ACC', currency: 'USD', amount: '10000.00' }),
+        ];
+
+        const groups = comp.currencyGroups;
+        const eurRow = groups.find((g) => g.currency === 'EUR')!.entries.find((e) => e.glAccount === 'EUR-ACC')!;
+        const usdRow = groups.find((g) => g.currency === 'USD')!.entries.find((e) => e.glAccount === 'NOSTRO-ACC')!;
+        expect(eurRow.exchangeRate).toBe('1.083123');
+        expect(usdRow.exchangeRate).toBeUndefined();
       });
 
       it('never double-counts a currency that already has a real server-generated FX Exchange leg pair in groupedSettlementEntries — Currency View sums each currency\'s entries exactly once regardless of source', () => {

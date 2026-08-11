@@ -23,6 +23,12 @@ export interface SettlementSection {
  * shape rather than `extends AccountEntry`: `amount` is always a string (FxPairEntry's is a
  * number), `glAccount` is used for both AccountEntry.glAccount and FxPairEntry.account, and
  * `description` covers both AccountEntry.description and FxPairEntry.site.
+ *
+ * `exchangeRate` (v1.11.0) is display-only and, deliberately, sourced differently per side —
+ * NEVER conflate the two: for a real settlement entry it's `AccountEntry.exchangeRate1`
+ * straight off the wire (genuine OAS-Return data); for an overlay FX pair it's the
+ * leg-allocator row's own client-side `rate` (a same-page preview, never sent to or returned
+ * by the microservice). Both are only ever present on that pair's "Other Ccy" leg.
  */
 export interface CurrencyViewEntry {
   drCrIndicator: DrCrIndicator;
@@ -30,6 +36,7 @@ export interface CurrencyViewEntry {
   amount: string;
   entryType: string;
   description: string;
+  exchangeRate?: string;
 }
 
 export interface CurrencyGroup {
@@ -77,6 +84,11 @@ export class ResponseViewerComponent {
   @Input() debitFxPairs: FxPairEntry[] = [];
   @Input() creditFxPairs: FxPairEntry[] = [];
 
+  /** Posting View's FX Conversion Pair "Rate" column — p.rate is only set on the "Other Ccy" leg (see FxPairEntry's doc comment); '—' otherwise. */
+  formatFxPairRate(p: FxPairEntry): string {
+    return p.rate != null ? p.rate.toFixed(6) : '—';
+  }
+
   /**
    * Minor-unit decimal places per currency code, same map business-case-runner.component.ts
    * already fetches from CurrencyService for its own Suspense-equivalent rounding (see its
@@ -86,6 +98,21 @@ export class ResponseViewerComponent {
    * back to 2 for any currency missing from the map, matching CurrencyService's own fallback.
    */
   @Input() currencyDecimals: Record<string, number> = {};
+
+  /**
+   * Display-only Amount formatting for BOTH Settlement Vouchers tables and the FX Conversion
+   * Pair overlay — rounds/pads to the row's own currency's minor units (via currencyDecimals,
+   * falling back to 2) rather than showing whatever precision the underlying value happens to
+   * carry verbatim. Needed because a whole-number amount ("10000") would otherwise render
+   * without its currency's own decimal places ("10000.00") — AccountEntry.amount is a wire
+   * string at whatever precision the server emitted it (money.ts's formatMonetaryAmount leaves
+   * a value's existing precision alone when no scale is passed), and FxPairEntry.amount is a
+   * plain JS number, which drops trailing zeros on interpolation. Never mutates the underlying
+   * data — purely how a value is presented in the template.
+   */
+  formatAmount(amount: string | number, currency: string): string {
+    return new Decimal(amount).toFixed(this.currencyDecimals[currency] ?? 2);
+  }
 
   /** Settlement Vouchers tab state — Posting View is the default per the UI spec. Switching
    *  tabs is a pure local view-state change: it never touches accountEntries or re-derives
@@ -264,14 +291,14 @@ export class ResponseViewerComponent {
 
     for (const section of this.groupedSettlementEntries) {
       for (const e of section.entries) {
-        push(e.currency, { drCrIndicator: e.drCrIndicator, glAccount: e.glAccount, amount: e.amount, entryType: section.label, description: e.description ?? '' });
+        push(e.currency, { drCrIndicator: e.drCrIndicator, glAccount: e.glAccount, amount: e.amount, entryType: section.label, description: e.description ?? '', exchangeRate: e.exchangeRate1 });
       }
     }
     for (const p of this.debitFxPairs) {
-      push(p.currency, { drCrIndicator: p.drCr, glAccount: p.account, amount: String(p.amount), entryType: 'Debit FX Conversion Pair', description: p.site });
+      push(p.currency, { drCrIndicator: p.drCr, glAccount: p.account, amount: String(p.amount), entryType: 'Debit FX Conversion Pair', description: p.site, exchangeRate: p.rate != null ? p.rate.toFixed(6) : undefined });
     }
     for (const p of this.creditFxPairs) {
-      push(p.currency, { drCrIndicator: p.drCr, glAccount: p.account, amount: String(p.amount), entryType: 'Credit FX Conversion Pair', description: p.site });
+      push(p.currency, { drCrIndicator: p.drCr, glAccount: p.account, amount: String(p.amount), entryType: 'Credit FX Conversion Pair', description: p.site, exchangeRate: p.rate != null ? p.rate.toFixed(6) : undefined });
     }
 
     return [...byCurrency.keys()].sort().map((currency) => {

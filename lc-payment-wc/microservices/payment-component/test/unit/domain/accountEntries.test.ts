@@ -49,4 +49,41 @@ describe('buildSettlementEntries', () => {
   it('returns an empty array for no legs', () => {
     expect(buildSettlementEntries('instr-1', [], 'DEBIT')).toEqual([]);
   });
+
+  describe('exchangeRate1 echo-back', () => {
+    it('omits exchangeRate1 for a same-currency leg carrying no rate field', () => {
+      const entries = buildSettlementEntries('instr-1', [leg()], 'DEBIT');
+      expect(entries[0]!.exchangeRate1).toBeUndefined();
+    });
+
+    it('a DEBIT leg uses drBuyRate', () => {
+      const entries = buildSettlementEntries('instr-1', [leg({ drBuyRate: '1.083123' })], 'DEBIT');
+      expect(entries[0]!.exchangeRate1).toBe('1.083123');
+    });
+
+    it('a DEBIT leg prefers drRate over drBuyRate when both are present', () => {
+      const entries = buildSettlementEntries('instr-1', [leg({ drRate: '1.100000', drBuyRate: '1.083123' })], 'DEBIT');
+      expect(entries[0]!.exchangeRate1).toBe('1.100000');
+    });
+
+    it('a CREDIT leg uses crBuyRate', () => {
+      const entries = buildSettlementEntries('instr-1', [leg({ crBuyRate: '149.082600' })], 'CREDIT');
+      expect(entries[0]!.exchangeRate1).toBe('149.082600');
+    });
+
+    it('a CREDIT leg prefers crBuyRate over sellRate when both are present', () => {
+      const entries = buildSettlementEntries('instr-1', [leg({ crBuyRate: '149.082600', sellRate: '150.000000' })], 'CREDIT');
+      expect(entries[0]!.exchangeRate1).toBe('149.082600');
+    });
+
+    it("a CREDIT leg's own drBuyRate is ignored (side-mismatched rate field never leaks across sides)", () => {
+      const entries = buildSettlementEntries('instr-1', [leg({ drBuyRate: '1.083123' })], 'CREDIT');
+      expect(entries[0]!.exchangeRate1).toBeUndefined();
+    });
+
+    it('never populates exchangeRate2 — no second rate value exists on the wire to map to it', () => {
+      const entries = buildSettlementEntries('instr-1', [leg({ drBuyRate: '1.083123' })], 'DEBIT');
+      expect(entries[0]!.exchangeRate2).toBeUndefined();
+    });
+  });
 });

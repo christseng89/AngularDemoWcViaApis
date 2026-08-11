@@ -69,6 +69,20 @@ function makeEntry(
  * currency/Dr-Cr) don't depend on that prefix at all — only the description
  * string does — so when accountDesc is absent this substitutes a placeholder
  * that says so explicitly, rather than fabricating a voucher code.
+ *
+ * `exchangeRate1` echo-back (added after AccountEntry.exchangeRate1/exchangeRate2 were
+ * found to exist in the official OAS — both `payment-instructions-post.yaml` and the
+ * traced `Payment_component.yaml` — but were never wired to any domain logic, so no
+ * response ever populated them even though the request already carries a rate per leg):
+ * `exchangeRate1` is set from whichever of the leg's own rate fields matches its side
+ * (`drRate ?? drBuyRate` for a DEBIT leg, `crBuyRate ?? sellRate` for a CREDIT leg) —
+ * omitted entirely when the leg carries none (the common case: a same-currency leg never
+ * needs a rate). This covers BOTH a caller's own foreign-currency legs AND the
+ * suspenseBridge-generated FX Exchange pair legs (domain/suspenseBridge.ts sets
+ * drBuyRate/crBuyRate directly on those before they reach this function) — one code path,
+ * no special-casing needed. `exchangeRate2` is deliberately left unset: neither OAS source
+ * documents what a second rate would represent, and a leg only ever carries one rate value
+ * on the wire, so populating it would mean fabricating a second figure with no basis.
  */
 export function buildSettlementEntries(
   instructionId: string,
@@ -78,6 +92,7 @@ export function buildSettlementEntries(
   const drCr: DrCrIndicator = side === 'DEBIT' ? 'D' : 'C';
   return legs.map((leg) => {
     const amountStr = leg.amountAccountCcy ?? leg.amountTxCcy;
+    const exchangeRate1 = side === 'DEBIT' ? (leg.drRate ?? leg.drBuyRate) : (leg.crBuyRate ?? leg.sellRate);
     return makeEntry(
       instructionId,
       'SETTLEMENT',
@@ -86,7 +101,7 @@ export function buildSettlementEntries(
       parseMonetaryAmount(amountStr),
       leg.currency,
       leg.accountDesc ?? NO_VOUCHER_PREFIX_DESC,
-      { custId: leg.partyId, referenceNumber: leg.accountNo },
+      { custId: leg.partyId, referenceNumber: leg.accountNo, ...(exchangeRate1 ? { exchangeRate1 } : {}) },
     );
   });
 }

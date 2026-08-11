@@ -338,6 +338,30 @@ describe('confirmPaymentInstruction', () => {
       expect(Math.round(sum(result.instruction.debitLegs) * 100)).toBe(Math.round(sum(result.instruction.creditLegs) * 100));
     });
 
+    it("v1.11.0: the suspenseBridge-generated FX Exchange pair's own accountEntries carry exchangeRate1 = the caller's crossRate — not just debitLegs/creditLegs", () => {
+      const result = confirmPaymentInstruction(
+        store,
+        request({
+          mainRef: 'REF-SB-RATE-1',
+          debitLegs: [
+            { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '100' },
+            { accountNo: 'EUR-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '18', amountAccountCcy: '20' },
+          ],
+          creditLegs: [{ accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '99.3' }],
+          suspenseBridge: { debitEntries: [{ amount: '17', currency: 'EUR', crossRate: '1.1' }] },
+        }),
+        { sourceFunctionCode: 'PayAccept' },
+      );
+      const fxOtherCcyEntry = result.instruction.accountEntries.find((e) => e.glAccount === 'FX Exchange USD');
+      const fxTrxCcyEntry = result.instruction.accountEntries.find((e) => e.glAccount === 'FX Exchange EUR');
+      expect(fxOtherCcyEntry?.exchangeRate1).toBe('1.1');
+      expect(fxTrxCcyEntry?.exchangeRate1).toBe('1.1');
+      expect(fxOtherCcyEntry?.exchangeRate2).toBeUndefined();
+      // The caller's own same-currency USD leg never needed a rate, so it stays unset.
+      const custEntry = result.instruction.accountEntries.find((e) => e.glAccount === 'CUST-ACC');
+      expect(custEntry?.exchangeRate1).toBeUndefined();
+    });
+
     it('v1.9.0: a real EUR debit leg (17) exactly matching gross Suspense (17) skips the FX pair entirely — clean Settlement Vouchers, no FX Exchange lines, still balances', () => {
       const result = confirmPaymentInstruction(
         store,

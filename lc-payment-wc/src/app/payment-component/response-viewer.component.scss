@@ -94,12 +94,23 @@
   // which would badly under-size Dr/Cr and over-size Currency relative to Description.
   table-layout: fixed;
 
+  // Column ORDER (see the .html) puts Exchange Rate/Rate right after Amount, with
+  // Description/Site LAST — deliberately, not just cosmetic reshuffling: Description/Site is
+  // the one column whose content length genuinely varies a lot (short "Trx Ccy" vs. a long
+  // voucher-description code), so it's the right column to absorb the table's leftover width
+  // (the table itself is always 100% of its container). Every other column below is sized to
+  // closely fit its typical content — a column wider than its own content stretches a visible
+  // gap to whatever comes after it, since cells are left-aligned — so Rate now sits tight
+  // against Amount, and GL Account/Currency stay tight against each other too. Putting the
+  // flexible column last means its own slack trails after the rightmost value with nothing
+  // after it to look "far" from.
   .col-drcr { width: 6%; }
-  .col-gl-account { width: 22%; }
-  .col-currency { width: 10%; }
-  .col-amount { width: 14%; }
-  .col-description { width: 48%; }
-  // currency-view-table's own 5 columns (no Currency column — the group itself is per-currency).
+  .col-gl-account { width: 20%; }
+  .col-currency { width: 8%; }
+  .col-amount { width: 12%; }
+  .col-rate { width: 12%; }
+  .col-description { width: 42%; }
+  // currency-view-table's own 6 columns (no Currency column — the group itself is per-currency).
   .col-entry-type { width: 19%; }
 
   td {
@@ -113,7 +124,7 @@
 // .col-amount) — this only narrows gl-account/description to make room for .col-entry-type.
 .currency-view-table {
   .col-gl-account { width: 20%; }
-  .col-description { width: 42%; }
+  .col-description { width: 31%; }
 }
 
 .settlement-header-row {
