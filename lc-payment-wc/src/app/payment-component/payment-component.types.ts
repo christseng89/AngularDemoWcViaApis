@@ -137,7 +137,9 @@ export interface PaymentInstructionConfirmRequest {
   tenorStartDate?: string;
   maturityDate?: string;
   payInstrFlag?: PayInstrFlag;
+  /** Unconditionally required (min 1) — the server never generates a debit-side leg from suspenseBridge. */
   debitLegs: PaymentLegInput[];
+  /** v1.10.0: may be empty when suspenseBridge (debitEntries or creditEntries, either non-empty) will contribute its own credit-side leg — see PaymentInstructionConfirmRequest.transactionCurrency's sibling doc comment in the microservice's own types.ts for the full rationale (pure fee-collection: Dr Customer A/C / Cr Suspense - Credit, no other real credit leg). Otherwise still required (min 1). */
   creditLegs: PaymentLegInput[];
   /**
    * Added v1.10.0. The deal's actual transaction currency, independent of any

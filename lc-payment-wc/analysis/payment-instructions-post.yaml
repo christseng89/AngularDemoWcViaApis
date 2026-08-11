@@ -307,7 +307,23 @@ info:
     H-2 decimal-places check compared it against the wrong currency's minor
     units). New callers should always send transactionCurrency explicitly
     rather than rely on the debitLegs[0].currency fallback.
-  version: "1.10.0"
+
+
+    v1.10.1 changelog (correctness fix, 2026-08-11, request-schema relaxation):
+    creditLegs is no longer unconditionally required to contain at least 1
+    item — it may now be EMPTY when suspenseBridge (debitEntries or
+    creditEntries, either non-empty) will contribute its own credit-side leg.
+    domain/suspenseBridge.ts's expandSuspenseBridge always generates its
+    offsetting legs on the CREDIT side, regardless of which list the entry
+    came from — so a non-empty suspenseBridge genuinely guarantees at least
+    one credit-side leg even when the caller submits none of its own. This
+    enables the reviewer-confirmed pure fee-collection pattern (Dr Customer
+    A/C / Cr Suspense - Credit — see the "Charge Component ↔ Payment
+    Component boundary" section of lc-payment-wc/CLAUDE.md), which the prior
+    unconditional minItems:1 rejected with a 400. debitLegs keeps its
+    unconditional minItems:1 — the bridge never generates a debit-side leg,
+    so at least one real debit leg is always required.
+  version: "1.10.1"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -490,10 +506,25 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+          description: >
+            Unconditionally required (at least 1 item) — domain/suspenseBridge.ts's
+            expandSuspenseBridge always generates its offsetting legs on the
+            CREDIT side (see creditLegs below), so a debit-side leg can only
+            ever come from here.
         creditLegs:
           type: array
-          minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+          description: >
+            v1.10.1: may be EMPTY when suspenseBridge (debitEntries or
+            creditEntries, either non-empty — both always generate a
+            credit-direction leg) will contribute its own credit-side leg —
+            otherwise still required (at least 1 item; enforced by a
+            superRefine check, not a plain minItems, since it's conditional
+            on suspenseBridge). Enables the pure fee-collection pattern
+            (Dr Customer A/C / Cr Suspense - Credit, no other real credit leg
+            to submit — see the "transactionCurrency" section above's sibling
+            v1.10.1 changelog entry, and lc-payment-wc/CLAUDE.md's "Charge
+            Component ↔ Payment Component boundary").
         transactionCurrency:
           type: string
           description: >

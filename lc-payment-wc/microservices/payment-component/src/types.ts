@@ -158,7 +158,16 @@ export interface PaymentInstructionConfirmRequest {
   tenorStartDate?: string;
   maturityDate?: string;
   payInstrFlag?: PayInstrFlag;
+  /** Unconditionally required (min 1) — domain/suspenseBridge.ts's expandSuspenseBridge always generates its offsetting legs on the CREDIT side (see creditLegs below), so a debit leg can only ever come from here. */
   debitLegs: PaymentLegInput[];
+  /**
+   * v1.10.0: may be EMPTY when `suspenseBridge` (debitEntries or creditEntries, either
+   * non-empty — both always generate a credit-direction leg, see domain/suspenseBridge.ts's top
+   * doc comment) will contribute its own credit-side leg — otherwise still required (min 1).
+   * Enables the pure fee-collection pattern (Dr Customer A/C / Cr Suspense - Credit, no other real
+   * credit leg to submit — see lc-payment-wc/CLAUDE.md's "Charge Component ↔ Payment Component
+   * boundary"), which the unconditional min(1) used to reject.
+   */
   creditLegs: PaymentLegInput[];
   /**
    * Added v1.10.0. The deal's actual transaction currency, independent of any

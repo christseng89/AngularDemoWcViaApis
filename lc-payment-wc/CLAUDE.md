@@ -327,6 +327,36 @@ Full-pay-in-JPY regression (verified live end-to-end in-browser: Transaction Cur
 both Debit/Credit Legs boxes, Debit leg posts JPY 1,490,826 via a proper FX Conversion Pair against
 the USD transaction currency, Confirm succeeds with no error).
 
+## `creditLegs` may be empty when `suspenseBridge` contributes its own credit-side leg (v1.10.1, business-requirement-confirmed 2026-08-11)
+
+**Bug, surfaced while validating the fee-collection pattern documented above ("Charge Component ↔
+Payment Component boundary"):** that pattern's own worked example (`creditLegs: []`, offsetting `Cr
+Suspense - Credit` generated entirely from `suspenseBridge.creditEntries`) no longer validated —
+`requestSchema.ts` required `creditLegs.min(1)` **unconditionally**, so the documented "already fully
+implemented" example actually 400'd. Fixed: `creditLegs` may now be empty specifically when
+`suspenseBridge` (`debitEntries` OR `creditEntries`, either non-empty) will contribute its own
+credit-side leg — both always generate a credit-direction leg regardless of which list they came
+from (see the bridge section above), so a non-empty `suspenseBridge` genuinely guarantees at least
+one credit-side leg even with zero caller-submitted ones. `debitLegs` keeps its unconditional
+`min(1)` — the bridge never generates a debit-direction leg, so a real debit leg is always required.
+See the microservice README's "`transactionCurrency`" section (the `creditLegs` field description)
+and its new "Extended usage scenarios" subsection for worked request shapes.
+
+## Extended usage scenarios — LC fee collection, IBL/EBL Takedown, IBL/EBL Repayment (documented 2026-08-11, NOT yet in the business-case registry)
+
+Corrected wire-level request shapes for three trade-finance scenarios the reviewer proposed, full
+detail in the microservice README's "Extended usage scenarios" subsection (right after the
+Balance/Charge Component bridge section): **A. Fee collection** (LC Issue/Amendment — the
+`creditLegs: []` fee-collection pattern above, worked example with the buyer-CA/seller-Nostro
+alternative), **B. IBL/EBL Takedown** (disbursement — `Dr Legs (Suspense)` must be a REAL
+`accountType: 'SUSPENSE'` leg, never `suspenseBridge`-generated, since bridge legs are always
+credit-direction), **C. IBL/EBL Repayment** (mirrors Takedown; the Balance Component's own
+`Dr Suspense / Cr IBL` booking is inferred by symmetry only, not independently confirmed elsewhere).
+For B/C, an optional Trx Charges bridge entry requires adjusting the matching real leg's OWN amount
+by the fee (README's "Common mistake to avoid" note) — getting this wrong is a 409
+`LEGS_UNBALANCED`, not a 400. **None of the three are implemented as registry business cases yet** —
+no citation, no default account numbers, no regression test — this is usage guidance only.
+
 ---
 
 # Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)

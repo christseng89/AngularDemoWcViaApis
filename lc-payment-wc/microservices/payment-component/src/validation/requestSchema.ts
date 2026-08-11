@@ -89,14 +89,41 @@ export const paymentInstructionConfirmRequestSchema = z
     tenorStartDate: dateSchema.optional(),
     maturityDate: dateSchema.optional(),
     payInstrFlag: z.enum(PAY_INSTR_FLAGS).optional(),
+    // debitLegs stays unconditionally required — domain/suspenseBridge.ts's expandSuspenseBridge
+    // ALWAYS generates its offsetting legs on the CREDIT side (see that file's top doc comment:
+    // every suspenseBridge entry, from EITHER debitEntries or creditEntries, lands as a
+    // credit-direction "Suspense - Debit"/"Suspense - Credit" leg) — there is no mechanism that can
+    // ever produce a debit-direction leg other than a caller-submitted one, so at least one real
+    // debitLegs entry is always required.
     debitLegs: z.array(paymentLegInputSchema).min(1, 'debitLegs must contain at least 1 item'),
-    creditLegs: z.array(paymentLegInputSchema).min(1, 'creditLegs must contain at least 1 item'),
+    // v1.10.0: no longer unconditionally min(1) here — see the superRefine check below, which
+    // allows an empty creditLegs array when suspenseBridge will contribute at least one
+    // credit-side leg of its own (e.g. a pure fee-collection request: Dr Customer A/C / Cr
+    // Suspense - Credit, with no OTHER real credit leg to submit — see the "Charge Component ↔
+    // Payment Component boundary" section of lc-payment-wc/CLAUDE.md).
+    creditLegs: z.array(paymentLegInputSchema),
     // Added v1.10.0 — see PaymentInstructionConfirmRequest.transactionCurrency's doc comment
     // (types.ts) for why this is now independent of any leg's own currency.
     transactionCurrency: z.string().min(1).optional(),
     suspenseBridge: suspenseBridgeSchema.optional(),
   })
   .superRefine((data, ctx) => {
+    // creditLegs may be empty ONLY when suspenseBridge will contribute its own credit-side leg
+    // (from EITHER debitEntries or creditEntries — both always generate a credit-direction leg,
+    // per domain/suspenseBridge.ts) — otherwise there would be no credit leg at all, which V8
+    // could never balance. A non-empty creditLegs array needs no such compensating bridge entry.
+    const bridgeContributesCreditLeg =
+      (data.suspenseBridge?.debitEntries?.length ?? 0) > 0 || (data.suspenseBridge?.creditEntries?.length ?? 0) > 0;
+    if (data.creditLegs.length === 0 && !bridgeContributesCreditLeg) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['creditLegs'],
+        message:
+          'creditLegs must contain at least 1 item unless suspenseBridge contributes a credit-side ' +
+          'leg of its own (debitEntries or creditEntries, either non-empty)',
+      });
+    }
+
     // Currency minor-unit (decimal-places) validation — the currency's allowed
     // decimals come from the Currency-API-sourced master (money.ts). A submitted
     // amount must not carry more decimal places than its currency permits

@@ -307,6 +307,95 @@ owns the other leg), now simply with no server-side validation or processing con
 Any caller that genuinely still needs a §6.2/§6.3 posting independent of a Suspense bridge must be
 handled outside this service.
 
+### Extended usage scenarios (2026-08-11) — LC fee collection, IBL/EBL Takedown, IBL/EBL Repayment
+
+**Usage guidance, not yet in the business-case registry.** These three request shapes correct an
+earlier framing that (a) used `suspenseBridge.creditEntries`/`debitEntries` as if they controlled a
+generated leg's Dr/Cr *direction* — they don't; both always generate a CREDIT-direction leg (see
+"Balance/Charge Component ↔ Payment Component bridge" above) — and (b) described a `Dr`/`Cr Legs
+(Suspense)` as if it could come from `suspenseBridge` — a debit-direction Suspense leg can only ever
+be a real, caller-submitted leg with `accountType: 'SUSPENSE'`, never bridge-generated. None of the
+three are yet implemented as `business-case-registry.ts` cases (no citation, no pre-verified worked
+example, no regression test) — the shapes below are correct against the CURRENT server contract, but
+unverified end-to-end beyond the fee-collection pattern's own unit test
+(`test/unit/domain/confirmPaymentInstruction.test.ts`, "pure fee collection" case).
+
+**A. Fee collection (LC Issue / Amendment, etc.)** — pure fee collection, no separate trade
+principal in this call. The IBL/EBL wording elsewhere on this page doesn't apply; this is the
+Charge Component pattern from the section above, restated as a worked example:
+
+```jsonc
+{
+  // "Transaction Amount = 0" is a UI/conceptual framing (no trade principal moves in this call) —
+  // the WIRE debit leg's own amountTxCcy is the charge total itself, never a literal 0.
+  "debitLegs": [
+    // Buyer pays: accountType 'CUSTOMER' (their Current Account). Alternative: fee deducted from
+    // the seller's proceeds instead — accountType 'NOSTRO'. Exactly one of the two, not both.
+    { "accountNo": "CUST-ACC", "accountType": "CUSTOMER", "currency": "USD", "amountTxCcy": "25.00" }
+  ],
+  "creditLegs": [],  // valid since v1.10.1 — see "creditLegs may be empty" above
+  "suspenseBridge": {
+    "creditEntries": [{ "amount": "25.00", "currency": "USD", "sourceComponent": "CHARGE" }]
+  }
+}
+```
+
+Server generates the offsetting `Cr Suspense - Credit` leg (25.00) from `creditEntries` — this
+balances against the real `Dr Customer A/C` leg with no further adjustment needed.
+
+**B. IBL/EBL Takedown (loan/liability disbursement)** — money goes OUT to the customer/
+correspondent against a newly booked liability. The Balance Component's own books (external, not
+this service): `Dr IBL / Cr Suspense`.
+
+```jsonc
+{
+  "debitLegs": [
+    // REAL leg, accountType 'SUSPENSE' — NOT suspenseBridge (bridge legs are always credit-direction).
+    { "accountNo": "SUSPENSE-ACC", "accountType": "SUSPENSE", "currency": "USD", "amountTxCcy": "100000.00" }
+  ],
+  "creditLegs": [
+    // Optional Trx Charges via creditEntries below REDUCES this leg's own amount by the fee —
+    // see "What this service does NOT do" above (Credit Leg #1 = Total - Σ creditEntries).
+    // No fee -> this equals the full Transaction Amount (100000.00) exactly.
+    { "accountNo": "NOSTRO-ACC", "accountType": "NOSTRO", "currency": "USD", "amountTxCcy": "99975.00" }
+  ],
+  "suspenseBridge": {
+    // Optional — omit entirely when there's no Trx Charges for this Takedown.
+    "creditEntries": [{ "amount": "25.00", "currency": "USD", "sourceComponent": "BALANCE", "balanceModule": "IBL" }]
+  }
+}
+```
+
+**C. IBL/EBL Repayment** — money comes IN from the customer/correspondent against an outstanding
+liability. Mirrors Takedown; the Balance Component's own books are inferred by symmetry
+(`Dr Suspense / Cr IBL`) — this specific mirrored booking is **not independently confirmed anywhere
+else in this codebase**, unlike Takedown's `Dr IBL / Cr Suspense` above.
+
+```jsonc
+{
+  "debitLegs": [
+    // Optional Trx Charges via debitEntries below INCREASES this leg's own amount by the fee —
+    // see "What this service does NOT do" above (Debit Leg #1 = Total + Σ debitEntries).
+    // No fee -> this equals the full Transaction Amount (100000.00) exactly.
+    { "accountNo": "CUST-ACC", "accountType": "CUSTOMER", "currency": "USD", "amountTxCcy": "100025.00" }
+  ],
+  "creditLegs": [
+    // REAL leg, accountType 'SUSPENSE' — NOT suspenseBridge, same reasoning as Takedown above.
+    { "accountNo": "SUSPENSE-ACC", "accountType": "SUSPENSE", "currency": "USD", "amountTxCcy": "100000.00" }
+  ],
+  "suspenseBridge": {
+    // Optional — omit entirely when there's no Trx Charges for this Repayment.
+    "debitEntries": [{ "amount": "25.00", "currency": "USD", "sourceComponent": "BALANCE", "balanceModule": "IBL" }]
+  }
+}
+```
+
+**Common mistake to avoid for B/C:** when the optional Trx Charges entry is present, the matching
+real leg on the SAME side as the entry list (`creditLegs` for `creditEntries`, `debitLegs` for
+`debitEntries`) must be adjusted by the fee amount — it does NOT stay at the bare Transaction Amount.
+Getting this wrong produces a 409 `LEGS_UNBALANCED`, not a 400 — the request is well-formed, just
+imbalanced by exactly the fee amount.
+
 ## Known anomalies replicated (or not) from source
 
 (The EPLC Liability Voucher `.valuee` typo and the RPFM `Settle Participant`

@@ -52,6 +52,44 @@ describe('validateConfirmRequest', () => {
     );
   });
 
+  describe('creditLegs may be empty when suspenseBridge contributes its own credit-side leg (v1.10.0)', () => {
+    // Reproduces the pure fee-collection pattern (lc-payment-wc/CLAUDE.md's "Charge Component ↔
+    // Payment Component boundary"): Dr Customer A/C / Cr Suspense - Credit, with no OTHER real
+    // credit leg to submit. Before v1.10.0, creditLegs.min(1) was unconditional and rejected this
+    // exact, reviewer-confirmed example.
+    it('does not throw when creditLegs is empty and suspenseBridge.creditEntries has an entry', () => {
+      const body = {
+        ...validConfirmBody,
+        creditLegs: [],
+        suspenseBridge: { creditEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'CHARGE' }] },
+      };
+      expect(() => validateConfirmRequest(body)).not.toThrow();
+    });
+
+    it('does not throw when creditLegs is empty and suspenseBridge.debitEntries has an entry (also always lands credit-side)', () => {
+      const body = {
+        ...validConfirmBody,
+        creditLegs: [],
+        suspenseBridge: { debitEntries: [{ amount: '10', currency: 'USD' }] },
+      };
+      expect(() => validateConfirmRequest(body)).not.toThrow();
+    });
+
+    it('still throws when creditLegs is empty and suspenseBridge is present but both entry lists are empty', () => {
+      const body = { ...validConfirmBody, creditLegs: [], suspenseBridge: {} };
+      expect(() => validateConfirmRequest(body)).toThrow(/^creditLegs: creditLegs must contain at least 1 item/);
+    });
+
+    it('debitLegs stays unconditionally required even when suspenseBridge is present — bridge legs never land debit-side', () => {
+      const body = {
+        ...validConfirmBody,
+        debitLegs: [],
+        suspenseBridge: { creditEntries: [{ amount: '10', currency: 'USD' }] },
+      };
+      expect(() => validateConfirmRequest(body)).toThrow(/^debitLegs: debitLegs must contain at least 1 item/);
+    });
+  });
+
   it('throws for a malformed MonetaryAmount pattern', () => {
     const body = { ...validConfirmBody, debitLegs: [{ ...validLeg, amountTxCcy: 'not-a-number' }] };
     expect(() => validateConfirmRequest(body)).toThrow(RequestValidationError);

@@ -1,7 +1,7 @@
 {
   "name": "payment-component-service",
-  "version": "1.10.0",
-  "description": "Payment Component microservice — implements POST /payment-instructions per payment-instructions-post.yaml v1.10.0, PaymentComponent-Microservice-FSD-zh.docx, and Payment_Component_Calculation_Validation.docx.",
+  "version": "1.10.1",
+  "description": "Payment Component microservice — implements POST /payment-instructions per payment-instructions-post.yaml v1.10.1, PaymentComponent-Microservice-FSD-zh.docx, and Payment_Component_Calculation_Validation.docx.",
   "private": true,
   "type": "commonjs",
   "main": "dist/server.js",

@@ -245,6 +245,28 @@ describe('confirmPaymentInstruction', () => {
       );
     });
 
+    it('v1.10.0: pure fee collection (Dr Customer A/C / Cr Suspense - Credit) confirms with an EMPTY creditLegs — no other real credit leg to submit', () => {
+      // The reviewer-confirmed Charge Component ↔ Payment Component fee-collection pattern
+      // (lc-payment-wc/CLAUDE.md's "Charge Component ↔ Payment Component boundary" section):
+      // the caller submits only the debit leg and a suspenseBridge.creditEntries entry; the
+      // offsetting Cr Suspense - Credit leg is entirely server-generated. Before v1.10.0,
+      // requestSchema.ts's unconditional creditLegs.min(1) rejected this exact example.
+      const result = confirmPaymentInstruction(
+        store,
+        request({
+          mainRef: 'REF-SB-FEE',
+          debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '25' }],
+          creditLegs: [],
+          suspenseBridge: { creditEntries: [{ amount: '25', currency: 'USD', sourceComponent: 'CHARGE' }] },
+        }),
+        { sourceFunctionCode: 'PayAccept' },
+      );
+      expect(result.created).toBe(true);
+      expect(result.instruction.debitLegs).toHaveLength(1);
+      expect(result.instruction.creditLegs).toHaveLength(1);
+      expect(result.instruction.creditLegs[0]).toMatchObject({ accountNo: 'Suspense - Credit', amountTxCcy: '25' });
+    });
+
     it('creditEntries paired with the matching caller-side credit reduction stays balanced', () => {
       const result = confirmPaymentInstruction(
         store,

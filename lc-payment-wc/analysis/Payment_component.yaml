@@ -167,7 +167,17 @@ info:
     see payment-instructions-post.yaml's own v1.10.0 changelog entry for the
     full derivation and worked example; kept in lockstep here per this
     file's own scope note above.
-  version: "1.10.0"
+
+
+    v1.10.1 changelog (correctness fix, 2026-08-11, request-schema
+    relaxation): creditLegs no longer unconditionally requires at least 1
+    item — may be empty when suspenseBridge (debitEntries or creditEntries,
+    either non-empty) will contribute its own credit-side leg, enabling the
+    pure fee-collection pattern (Dr Customer A/C / Cr Suspense - Credit) —
+    see payment-instructions-post.yaml's own v1.10.1 changelog entry for the
+    full derivation; kept in lockstep here per this file's own scope note
+    above.
+  version: "1.10.1"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -487,10 +497,17 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+          description: >
+            Unconditionally required (at least 1 item) — the bridge never
+            generates a debit-side leg, see creditLegs below.
         creditLegs:
           type: array
-          minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+          description: >
+            v1.10.1: may be EMPTY when suspenseBridge will contribute its own
+            credit-side leg — otherwise still required (at least 1 item; see
+            payment-instructions-post.yaml's own creditLegs description for
+            the full rationale).
         transactionCurrency:
           type: string
           description: >
