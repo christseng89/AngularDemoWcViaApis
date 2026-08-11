@@ -58,24 +58,10 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   private debitValid = false;
   private creditValid = false;
 
-  /**
-   * NG9 fix: `<app-leg-allocator #creditAllocator *ngIf="creditLegsRequired">`'s template
-   * reference variable is scoped to that *ngIf's own embedded view — Angular's strict template
-   * type-checker (`ng build`/`ng serve`, NOT plain `tsc`, which doesn't compile templates at all
-   * and silently misses this) rejects any reference to `creditAllocator` from a sibling element
-   * outside that scope, e.g. the <app-response-viewer> binding further down the template that
-   * needs its `.fxPairs`. A @ViewChild query isn't subject to that structural-directive scoping
-   * restriction — it resolves to undefined while the element is *ngIf-hidden and re-resolves once
-   * it reappears, so `creditFxPairs` below can safely read it from anywhere in the template.
-   */
+  /** `<app-leg-allocator #creditAllocator>` — read by creditFxPairs below to feed <app-response-viewer>'s `.fxPairs`. */
   @ViewChild('creditAllocator') creditAllocatorRef?: LegAllocatorComponent;
 
-  /**
-   * Same NG9 fix as creditAllocatorRef above, mirrored for the DEBIT side (2026-08-12) —
-   * `<app-leg-allocator #debitAllocator *ngIf="debitLegsRequired">` needed this the moment
-   * debitLegsRequired started being able to return false (creditLegsBridge case); see
-   * debitFxPairs below.
-   */
+  /** Debit-side mirror of creditAllocatorRef above — read by debitFxPairs below. */
   @ViewChild('debitAllocator') debitAllocatorRef?: LegAllocatorComponent;
 
   /**
@@ -196,8 +182,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    * absent from the decimals map (unknown, or not loaded yet) is skipped — same
    * "source of truth is the Currency API, don't invent a limit" posture as the
    * microservice's knownMinorUnitsForCurrency(). Empty amounts are skipped
-   * (still being typed). A debitLegsBridge or creditLegsBridge case's Total Amount is
-   * auto-derived / read-only, never user-typed, so it isn't checked here.
+   * (still being typed).
    */
   get amountScaleErrors(): string[] {
     const errs: string[] = [];
@@ -210,7 +195,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
         errs.push(`${label} ${amount} has ${dp} decimal place(s) but ${currency} allows at most ${max}.`);
       }
     };
-    if (!this.selectedCase?.debitLegsBridge && !this.selectedCase?.creditLegsBridge && this.transactionAmountOverride !== null) {
+    if (this.transactionAmountOverride !== null) {
       check('Total Amount', this.transactionAmountOverride, this.transactionCurrency);
     }
     this.suspenseDebitEntries.forEach((e) => check('Suspense Debit', e.amount, e.currency));
@@ -239,78 +224,36 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   /**
    * Shown once, right under the Unit Code row (business-case-runner.component.html) —
    * NOT repeated inside either <app-leg-allocator> (see that component's
-   * showTotalAmount input).
+   * showTotalAmount input). This is THE deal's transaction currency, sent to the
+   * server explicitly as PaymentInstructionConfirmRequest.transactionCurrency
+   * (v1.10.0) — see business-case-request.ts's buildConfirmRequest.
    *
-   * Prefers the LIVE first debit leg's own currency (this.debitLegs[0].currency)
-   * over the case's static registry default, matching the microservice's own
-   * definition of "transaction currency" exactly (confirmPaymentInstruction.ts:
-   * `(request.debitLegs[0] ?? request.creditLegs[0])!.currency` — see
-   * payment-instructions-post.yaml's SuspenseEntry doc comment). This matters because
-   * <app-leg-allocator> lets the user change a debit leg's own currency (its "Transaction
-   * Currency" dropdown / a row's own currency select) independently of this component —
-   * falling back to the registry default here after that edit would silently
-   * disagree with what the server actually treats as the transaction currency,
-   * misclassifying a Suspense entry in that SAME (now-changed) currency as
-   * cross-currency and applying an FX conversion that shouldn't happen (a real
-   * bug: a same-currency Suspense entry generating a fractional balance
-   * mismatch). Falls back to the registry default only before the allocator
-   * has emitted anything yet (initial render, no case, etc.) — by construction
-   * every case in the registry already has sum(debit defaults) === sum(credit
-   * defaults) (V8 requires it) at that point, so DEBIT is a safe arbitrary
-   * canonical source.
-   *
-   * creditLegsBridge fallback (2026-08-12): debitLegs and the registry's own DEBIT leg spec are
-   * BOTH permanently absent for a creditLegsBridge case (no Debit Leg at all, by the flag's own
-   * contract) — falls through to this.creditLegs[0]?.currency, then the registry's CREDIT leg
-   * spec, mirroring the server's own debitLegs[0] ?? creditLegs[0] fallback so this getter never
-   * silently disagrees with what confirmPaymentInstruction.ts actually derives. Deliberately
-   * GATED on `this.selectedCase?.creditLegsBridge` rather than applied unconditionally whenever
-   * debitLegs happens to be empty: for an ORDINARY case, an empty debitLegs is just a normal
-   * transient state (initial render, still typing) that says nothing about which currency is
-   * authoritative — falling back to creditLegs[0] there would be reading state for the wrong
-   * reason, not a genuine "debit side doesn't exist in this mode" signal the way it is for
-   * creditLegsBridge. (The server-side equivalent doesn't need this gate because schema
-   * validation already guarantees debitLegs is empty ONLY when creditLegsComponentBridge is
-   * true by the time confirmPaymentInstruction.ts ever sees the request — this component's own
-   * debitLegs/creditLegs have no such guarantee mid-edit.)
-   *
-   * transactionCurrencyOverride (above) takes priority over all of this when set — the user
-   * explicitly typing a Transaction Currency is a stronger signal than any derivation.
+   * v1.10.0: no longer falls back to the live first debit leg's own currency
+   * (this.debitLegs[0]?.currency). Before v1.10.0 it did, to match the server's
+   * OLD inference of "transaction currency" as debitLegs[0].currency — but that
+   * made this value (and therefore each <app-leg-allocator>'s own displayed
+   * "Transaction Currency" box, and Suspense-entry FX classification below)
+   * silently flip whenever the user changed a debit leg's own currency (its
+   * per-row "Leg Currency" select) — e.g. switching a single JPY-settling debit
+   * leg's currency would flip the WHOLE deal's displayed Transaction Currency to
+   * JPY too, even though the deal itself is still transacted in USD and the
+   * customer is simply paying in JPY (a real, reviewer-reported UX bug: a leg's
+   * own settlement currency is not the same concept as the deal's transaction
+   * currency, and editing one must never silently move the other). Now that the
+   * server has its own explicit transactionCurrency field (independent of any
+   * leg's currency), this getter can — and must — stay anchored to what the user
+   * actually set (transactionCurrencyOverride) or the case's registry default,
+   * with no reactive coupling to leg edits at all.
    */
   get transactionCurrency(): string {
-    const isCreditLegsBridge = !!this.selectedCase?.creditLegsBridge;
     return (
       this.transactionCurrencyOverride ??
-      this.debitLegs[0]?.currency ??
-      (isCreditLegsBridge ? this.creditLegs[0]?.currency : undefined) ??
       this.selectedCase?.legs.find((l) => l.side === 'DEBIT')?.defaultCurrency ??
-      (isCreditLegsBridge ? this.selectedCase?.legs.find((l) => l.side === 'CREDIT')?.defaultCurrency : undefined) ??
       'USD'
     );
   }
-  /**
-   * Debit Legs Component Bridge Flag (2026-08-09, business-requirement-confirmed): for a debitLegsBridge case,
-   * Transaction Amount is NOT this free-typed/registry-default base at all — it's PROTECTED
-   * (read-only, see onTransactionAmountInput below and the template's [readOnly] binding) and
-   * derived entirely as Σ(Suspense Credit entries' Trx Ccy Equivalent), matching the balance
-   * principle "Total Debit Legs = Total Suspense Credit" (lc-payment-wc/CLAUDE.md, "Charge
-   * Component <-> Payment Component boundary"). Delegates to debitDefaults.totalAmount
-   * (sideDefaults('DEBIT') below) rather than re-deriving the same sum a second time — see
-   * suspenseAdjustment()'s own doc comment on why a second independent implementation of "the
-   * same" math is exactly the class of bug this file keeps finding.
-   *
-   * Credit Legs Component Bridge Flag (2026-08-12) — the mirror image: for a creditLegsBridge
-   * case, the REAL leg is the CREDIT side (e.g. Nostro settlement), so Transaction Amount
-   * derives from creditDefaults.totalAmount (sideDefaults('CREDIT') below) instead — Σ(Suspense
-   * Debit entries' Trx Ccy Equivalent), matching "Total Credit Legs = Total Suspense Debit".
-   */
+
   get baseTotalAmount(): number {
-    if (this.selectedCase?.debitLegsBridge) {
-      return Number(this.debitDefaults.totalAmount);
-    }
-    if (this.selectedCase?.creditLegsBridge) {
-      return Number(this.creditDefaults.totalAmount);
-    }
     const debitLegs = this.selectedCase?.legs.filter((l) => l.side === 'DEBIT') ?? [];
     return this.overriddenOrDefaultAmount(debitLegs.reduce((sum, l) => sum + (Number(l.defaultAmountTxCcy) || 0), 0));
   }
@@ -330,17 +273,8 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    * NumberValueAccessor for `input[type=number]` — see suspense-entries.component.ts's emit()
    * doc comment for why the stored override is normalized back to a string. Clearing the field
    * (null) reverts to the case's own registry-derived default rather than pinning it at 0.
-   *
-   * Debit Legs Component Bridge Flag: Transaction Amount is PROTECTED (read-only) for a debitLegsBridge case —
-   * it's derived from Σ Suspense Credit, never user-typed (see baseTotalAmount/sideDefaults('DEBIT')
-   * above). Credit Legs Component Bridge Flag (2026-08-12): same protection, mirrored, for a
-   * creditLegsBridge case — derived from Σ Suspense Debit (sideDefaults('CREDIT')). The template
-   * already sets [readOnly] on the input for either case; this guard is defense-in-depth against
-   * any path that could still fire a (ngModelChange) here (e.g. a readonly input still emits on
-   * programmatic value changes in some browsers).
    */
   onTransactionAmountInput(value: number | null): void {
-    if (this.selectedCase?.debitLegsBridge || this.selectedCase?.creditLegsBridge) return;
     this.transactionAmountOverride = value === null || value === undefined || Number.isNaN(value) ? null : String(value);
     this.legsChanged$.next();
   }
@@ -446,61 +380,34 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    * comment for why combining with a live leg, tried in v1.7.3, broke
    * aggregate V8 instead of fixing anything).
    *
-   * The conversion/comparison target MUST be `this.transactionCurrency`
-   * (the LIVE getter, derived from the actual first debit leg) — NOT this
-   * side's own registry-default `currency` below. Regression: those two used
-   * to diverge whenever the user changed the debit leg's own currency after
-   * a Suspense entry was already in EUR — sideDefaults() kept converting
-   * against the stale registry default (e.g. USD) while
-   * buildSuspenseBridgeEntries() (and the server) had already moved on to
-   * the live currency, so the client's own seeded Leg #1 amount silently
-   * disagreed with what actually got sent on the wire for "the same" entry,
-   * producing a real (if small) 409 LEGS_UNBALANCED. `currency` below is
-   * still the right value for the row's own SEEDED currency label
-   * (`initialCurrency`) — only the conversion target changes.
+   * The conversion/comparison target MUST be `this.transactionCurrency` — NOT
+   * this side's own registry-default `currency` below — so a Suspense entry's
+   * conversion always agrees with what's actually sent on the wire as
+   * PaymentInstructionConfirmRequest.transactionCurrency (v1.10.0) for "the
+   * same" deal. `currency` below is still the right value for the row's own
+   * SEEDED currency label (`initialCurrency`) — only the conversion target
+   * changes. (Pre-v1.10.0, `this.transactionCurrency` itself reactively
+   * followed the live first debit leg's own currency, which could disagree
+   * with this side's stale registry default after the user edited a leg's
+   * currency directly — see that getter's own doc comment for why v1.10.0
+   * removed the reactive coupling instead of chasing this side of it.)
    *
    * transactionAmountOverride/transactionCurrencyOverride, when set, take priority over the
    * case's own registry legs for BOTH sides equally (baseTotalAmount and currency below) — a
    * single Transaction Currency/Amount pair is meant to seed both Leg #1s identically, same as
    * every registry case's own debit/credit defaults already agree by construction (V8).
-   *
-   * Debit Legs Component Bridge Flag exception (2026-08-09, business-requirement-confirmed): the above
-   * "base ± Σ Suspense" model does NOT apply to a debitLegsBridge case's DEBIT side. There is no
-   * real Credit Leg to reduce and no registry base amount to seed from — the Debit Leg total
-   * (== the case's own Transaction Amount, see baseTotalAmount getter above) is computed
-   * DIRECTLY as Σ(Suspense Credit entries' Trx Ccy Equivalent), full stop. Reuses
-   * suspenseAdjustment('DEBIT', ...) purely for its ADDING sign convention — the entries passed
-   * are Suspense CREDIT, not Suspense Debit; Suspense Debit is not applicable in this mode and
-   * has no UI to populate it (business-case-runner.component.html hides it entirely for a
-   * debitLegsBridge case), so suspenseDebitEntries stays permanently [] and never needs its own
-   * branch here.
-   *
-   * Credit Legs Component Bridge Flag exception (2026-08-12) — the mirror image, for a
-   * creditLegsBridge case's CREDIT side: no real Debit Leg to reduce, no registry base amount to
-   * seed from — the Credit Leg total is computed DIRECTLY as Σ(Suspense Debit entries' Trx Ccy
-   * Equivalent). Reuses suspenseAdjustment('DEBIT', ...) for the same reason the debitLegsBridge
-   * branch does — purely its ADDING sign convention, applied here to suspenseDebitEntries
-   * (suspenseCreditEntries is not applicable in this mode and has no UI to populate it, hidden
-   * entirely in business-case-runner.component.html for a creditLegsBridge case).
    */
   private sideDefaults(side: 'DEBIT' | 'CREDIT') {
     const legs = this.selectedCase?.legs.filter((l) => l.side === side) ?? [];
     const currency = this.transactionCurrencyOverride ?? legs[0]?.defaultCurrency ?? 'USD';
     const trxCurrency = this.transactionCurrency;
 
-    let totalAmount: Decimal;
-    if (this.selectedCase?.debitLegsBridge && side === 'DEBIT') {
-      totalAmount = this.suspenseAdjustment('DEBIT', this.suspenseCreditEntries, trxCurrency);
-    } else if (this.selectedCase?.creditLegsBridge && side === 'CREDIT') {
-      totalAmount = this.suspenseAdjustment('DEBIT', this.suspenseDebitEntries, trxCurrency);
-    } else {
-      const baseTotalAmount = this.overriddenOrDefaultAmount(legs.reduce((sum, l) => sum + (Number(l.defaultAmountTxCcy) || 0), 0));
-      const adjustment =
-        side === 'DEBIT'
-          ? this.suspenseAdjustment('DEBIT', this.suspenseDebitEntries, trxCurrency)
-          : this.suspenseAdjustment('CREDIT', this.suspenseCreditEntries, trxCurrency);
-      totalAmount = new Decimal(baseTotalAmount).plus(adjustment);
-    }
+    const baseTotalAmount = this.overriddenOrDefaultAmount(legs.reduce((sum, l) => sum + (Number(l.defaultAmountTxCcy) || 0), 0));
+    const adjustment =
+      side === 'DEBIT'
+        ? this.suspenseAdjustment('DEBIT', this.suspenseDebitEntries, trxCurrency)
+        : this.suspenseAdjustment('CREDIT', this.suspenseCreditEntries, trxCurrency);
+    let totalAmount: Decimal = new Decimal(baseTotalAmount).plus(adjustment);
     // Decimal end-to-end, one final rounding pass (matching leg-allocator's own money()/
     // ensureRemainderRow convention) — see suspenseAdjustment()'s doc comment for why summing
     // already-rounded plain-number trxEquivalents risked a binary-float ULP drift here.
@@ -583,29 +490,6 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    * happens to that currency. A foreign-currency leg with NO suspense
    * entry in its currency is untouched: the panel still shows the naive
    * conversion for it, exactly as before v1.7.0.
-   *
-   * Debit Legs Component Bridge Flag exception (2026-08-09, business-requirement-confirmed;
-   * simplified 2026-08-11 from a per-currency net to an unconditional hide — see below) — the
-   * SAME-side assumption above ("a Suspense entry on the SAME side nets a leg's exposure") never
-   * held for a debitLegsBridge case in the first place: its real legs sit on the DEBIT side, but
-   * the netting source is the Suspense CREDIT bridge (domain/suspenseBridge.ts's
-   * debitLegsComponentBridge diff-sized pair, microservice side). An earlier version (2026-08-09)
-   * called this method with `suspenseCreditEntries` instead of `suspenseDebitEntries` to net
-   * per-currency against that Suspense-side data — but that still left a gap: a debit leg whose
-   * OWN currency happens to have NO matching Suspense Credit entry (a perfectly normal split — the
-   * whole point of this bridge is the debit side funding one or more Suspense buckets, not
-   * necessarily currency-for-currency) would fall through un-suppressed, showing a misleading
-   * naive pair even though the server-side diff-sized-pair logic is the only authoritative source
-   * of what actually needs converting in this mode. Business-requirement-confirmed (2026-08-11):
-   * this panel is simply not needed at all for a debitLegsBridge case — the debitFxPairs getter
-   * below returns `[]` directly whenever `sc.debitLegsBridge` is true, bypassing this method
-   * entirely rather than computing a partial per-currency filter (moved from an inline template
-   * expression to a getter 2026-08-12, when debitAllocator itself became conditionally rendered —
-   * see debitAllocatorRef's own doc comment). Same suppress-don't-recompute philosophy as the rest
-   * of this method: the Settlement Vouchers table already reflects the server's own (diff-sized,
-   * possibly zero) FX Exchange entries for every currency, in every scenario — this panel has
-   * nothing left to add in this mode. creditFxPairs below applies the exact mirror-image
-   * unconditional hide for a creditLegsBridge case, for the same reason on the opposite side.
    */
   filterFxPairsNettedBySuspense(pairs: readonly FxPairEntry[], suspenseEntries: readonly SuspenseEntry[]): FxPairEntry[] {
     const suspenseCurrencies = new Set(suspenseEntries.map((e) => e.currency));
@@ -640,65 +524,15 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.creditValid = valid;
   }
 
-  /**
-   * False when the selected case's Debit Legs Component Bridge Flag (BusinessCaseConfig.debitLegsBridge — see
-   * that field's own doc comment for the full contract) is set — i.e. the Payment Component is
-   * being used purely as a funding/settlement bridge to a separate Charge Component, and never
-   * generates the final charge credit legs itself. Reads the flag directly rather than inferring
-   * it from `legs`' shape, so a case's UI behavior is driven by an explicit, self-documenting
-   * signal instead of a structural coincidence. Drives whether <app-leg-allocator side="CREDIT">
-   * is rendered at all (business-case-runner.component.html) — when it isn't, creditLegs stays
-   * at its initial [] and creditValid is seeded true in selectCase() below, since nothing will
-   * ever emit validChange for a side with no allocator.
-   */
-  get creditLegsRequired(): boolean {
-    return !!this.selectedCase && !this.selectedCase.debitLegsBridge;
-  }
-
-  /**
-   * Mirror of creditLegsRequired above (2026-08-12) — false when the selected case's Credit Legs
-   * Component Bridge Flag (BusinessCaseConfig.creditLegsBridge) is set — i.e. the Payment
-   * Component is being used purely as a settlement bridge FROM a separate upstream component
-   * (e.g. a Loan Component), and never generates the debit legs itself. Drives whether
-   * <app-leg-allocator side="DEBIT"> is rendered at all — when it isn't, debitLegs stays at its
-   * initial [] and debitValid is seeded true in selectCase() below, since nothing will ever emit
-   * validChange for a side with no allocator.
-   */
-  get debitLegsRequired(): boolean {
-    return !!this.selectedCase && !this.selectedCase.creditLegsBridge;
-  }
-
-  /**
-   * Template-safe replacement for referencing `creditAllocator.fxPairs` directly in
-   * <app-response-viewer>'s binding — see creditAllocatorRef's own doc comment for why that
-   * template reference variable can't be read from outside its *ngIf scope. Falls back to []
-   * when the allocator isn't currently rendered (debitLegsBridge case, or ViewChild not yet
-   * resolved), matching what <app-response-viewer>'s [creditFxPairs] always defaulted to anyway.
-   * creditLegsBridge full-hide (2026-08-12, matching the 2026-08-11 debitFxPairs lesson below):
-   * suspenseCreditEntries stays permanently [] for a creditLegsBridge case (Suspense Credit is
-   * hidden from the UI entirely in that mode), so netting against it would be netting against an
-   * always-empty list — the exact bug debitFxPairs already fixed for the mirror-image case.
-   * Hidden unconditionally instead, before even checking creditLegsRequired/creditAllocatorRef.
-   */
+  /** Reads creditAllocatorRef (ViewChild) so <app-response-viewer>'s `.fxPairs` binding doesn't reference the template variable directly. */
   get creditFxPairs(): FxPairEntry[] {
-    if (this.selectedCase?.creditLegsBridge) return [];
-    if (!this.creditLegsRequired || !this.creditAllocatorRef) return [];
+    if (!this.creditAllocatorRef) return [];
     return this.filterFxPairsNettedBySuspense(this.creditAllocatorRef.fxPairs, this.suspenseCreditEntries);
   }
 
-  /**
-   * Debit-side mirror of creditFxPairs above (2026-08-12) — template-safe replacement for
-   * referencing `debitAllocator.fxPairs` directly, now that the DEBIT allocator can also be
-   * conditionally hidden (*ngIf="debitLegsRequired", creditLegsBridge case) via debitAllocatorRef.
-   * Also carries the existing debitLegsBridge full-hide (2026-08-11 business-requirement-confirmed
-   * — the "Debit FX Conversion Pair" panel is not needed at all for that case), moved here from
-   * the old inline template expression (`sc.debitLegsBridge ? [] : filterFxPairsNettedBySuspense(
-   * debitAllocator.fxPairs, suspenseDebitEntries)`) now that debitAllocator can no longer be
-   * referenced directly from the template outside its own *ngIf scope.
-   */
+  /** Debit-side mirror of creditFxPairs above. */
   get debitFxPairs(): FxPairEntry[] {
-    if (this.selectedCase?.debitLegsBridge) return [];
-    if (!this.debitLegsRequired || !this.debitAllocatorRef) return [];
+    if (!this.debitAllocatorRef) return [];
     return this.filterFxPairsNettedBySuspense(this.debitAllocatorRef.fxPairs, this.suspenseDebitEntries);
   }
 
@@ -734,15 +568,8 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.confirmError = null;
     this.debitLegs = [];
     this.creditLegs = [];
-    // Vacuously true when the Credit Legs Component Bridge Flag is set (debitLegsRequired above,
-    // 2026-08-12) — no <app-leg-allocator side="DEBIT"> will exist to ever emit a real
-    // validChange otherwise, which would leave debitValid permanently false and block the live
-    // preview forever. Mirror of creditValid's own seeding below.
-    this.debitValid = businessCase ? !!businessCase.creditLegsBridge : false;
-    // Vacuously true when the Debit Legs Component Bridge Flag is set (creditLegsRequired above) — no
-    // <app-leg-allocator side="CREDIT"> will exist to ever emit a real validChange otherwise,
-    // which would leave creditValid permanently false and block the live preview forever.
-    this.creditValid = businessCase ? !!businessCase.debitLegsBridge : false;
+    this.debitValid = false;
+    this.creditValid = false;
     this.suspenseDebitEntries = [];
     this.suspenseCreditEntries = [];
     this.debitLegScaleErrors = [];
@@ -773,7 +600,14 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     }
     this.confirmLoading = true;
     this.confirmError = null;
-    const request = buildConfirmRequest(this.selectedCase, this.model, this.debitLegs, this.creditLegs, this.buildSuspenseBridge());
+    const request = buildConfirmRequest(
+      this.selectedCase,
+      this.model,
+      this.debitLegs,
+      this.creditLegs,
+      this.transactionCurrency,
+      this.buildSuspenseBridge(),
+    );
     this.api.confirm(request, false).subscribe({
       next: ({ instruction, created }) => {
         this.result = {
@@ -820,7 +654,14 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
     this.previewLoading = true;
 
     if (config.verdict === 'PASS') {
-      const request = buildConfirmRequest(config, this.model, this.debitLegs, this.creditLegs, this.buildSuspenseBridge());
+      const request = buildConfirmRequest(
+        config,
+        this.model,
+        this.debitLegs,
+        this.creditLegs,
+        this.transactionCurrency,
+        this.buildSuspenseBridge(),
+      );
       if (!request.mainRef || !request.unitCode) {
         this.result = null;
         this.previewIncomplete = true;

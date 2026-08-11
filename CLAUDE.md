@@ -13,7 +13,6 @@ relevant project before running any command.
 | `lc-issue-angular/` | yes | Angular 17 + Formly demo for LC (Letter of Credit) **Issue** — charge calculation, balance/tolerance commission. |
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
-| `lc-payment-wc-backup/` | **no (untracked)** | A local, out-of-band backup copy of `lc-payment-wc/` (not referenced by `.gitignore`, just never added). Not a second parallel project — don't build new work here, and don't assume it's in sync with `lc-payment-wc/`. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
 Everything here revolves around **trade finance back-office domain logic**: LC issuance charge/commission
@@ -24,15 +23,14 @@ a source-of-truth document under `lc-payment-wc/analysis/`, not an arbitrary com
 
 `lc-payment-wc/` has its own nested `CLAUDE.md` (auto-loaded by Claude Code whenever you're working inside
 that directory) — it carries the Trade Finance/Payments solution-architect persona plus a growing log of
-reviewer-confirmed architecture decisions for that project specifically: the Charge Component ↔ Payment
-Component boundary and the `debitLegsBridge` "Debit Payment Bridge" business case (renamed from
-`chargeBridge`/"Charge Component Bridge" 2026-08-10, retitled from "Charge / Customer IBL Payment Bridge"
-the same day), its mirror-image `creditLegsBridge` "Credit Payment Bridge" business case
-(2026-08-12 — a Loan Component / Buyer's Usance LC settlement scenario, which required a real fix
-to the `suspenseBridge` module's leg-placement logic, not just a UI mirror), and the
+reviewer-confirmed architecture decisions for that project specifically, most centrally the
+Charge/Balance Component ↔ Payment Component boundary (the `suspenseBridge` mechanism — see below) and a
 planned-but-not-yet-implemented OAS structured Reference/Event model
-(`docs/RDD-oas-reference-event-model.md`). Treat entries marked
-"reviewer-confirmed" there as settled — don't re-litigate them without new information from the user.
+(`docs/RDD-oas-reference-event-model.md`). That log records individual decisions (and their supersessions —
+entries get renamed, extended, or removed outright as requirements change) in more granular, dated detail
+than belongs here; treat entries marked "reviewer-confirmed"/"business-requirement-confirmed" there as
+settled, don't re-litigate them without new information from the user, and check that file directly rather
+than assuming a specific past decision is still current — it changes frequently.
 
 ---
 
@@ -191,18 +189,20 @@ this contract. (`chargeContext`/`liabilityContext` — the §6.2/§6.3 legacy ex
 through v1.5.0; removed v1.6.0 along with §6.2/§6.3 Account Entry generation itself. A Balance/Charge
 Component that bridges through Suspense now books its own Liability/Charge leg on its own books — see
 the microservice README's "Balance/Charge Component ↔ Payment Component bridge" section for the full
-version history. Current behavior (**v1.8.0**, superseding v1.7.0–v1.7.5): for each foreign-currency
-bucket in a `suspenseBridge` entry, `domain/suspenseBridge.ts` generates up to **two independent,
-self-balancing FX Exchange pairs** instead of one netted/combined pair — a "Suspense pair" (named
-`FX Exchange {ccy} - Suspense`, always credit-anchored, sized to the bucket's own Suspense legs) and,
-only when a matching real Payment Leg exists in that currency, a "real-leg pair" (plain `FX Exchange
-{ccy}` naming, direction matching the list). This is a genuine response-shape change (more legs when
-Suspense and a matching real leg coexist in a currency) that closed a one-minor-unit per-currency
-display gap the earlier netted-pair approach couldn't fix without breaking aggregate V8; the request
-contract itself (`SuspenseBridge`, `PaymentLegInput`) is unchanged. v1.7.2 separately reorders the
-generated FX Exchange pair(s) to read as one adjacent Dr/Cr block in debitLegs/creditLegs — Normal
-Debit(s) → FX Debit → FX Credit → Normal Credit(s) → Suspense Credit — an accounting-review best
-practice, not a correctness change.)
+version history. Current behavior (**v1.9.0**, superseding v1.7.0–v1.8.0): for each foreign-currency
+bucket in a `suspenseBridge` entry, `domain/suspenseBridge.ts` generates **at most one** self-balancing
+FX Exchange pair, not a caller-reconciled netted figure. A `creditEntries` bucket still gets up to two
+independent pairs when a matching real credit leg coexists (a "Suspense pair", always credit-anchored,
+plus a "real-leg pair") — a same-direction real leg is an independent exposure, not the same money. A
+`debitEntries` bucket instead nets the Suspense amount against any matching-currency real `debitLegs`
+first and emits only the residual (zero pair on an exact match — "Same Currency + Same Amount → Direct
+Settlement → No FX Pair") — safe because a debit leg is opposite-direction from the (always-credit)
+Suspense leg, i.e. genuinely the same money. `domain/suspenseBridge.ts`'s own top doc comment has the
+full per-version history and the algebraic proof of why the two sides are treated asymmetrically; the
+request contract itself (`SuspenseBridge`, `PaymentLegInput`) is unchanged throughout. Generated FX
+Exchange pair(s) also read as one adjacent Dr/Cr block in debitLegs/creditLegs — Normal Debit(s) → FX
+Debit → FX Credit → Normal Credit(s) → Suspense Credit — an accounting-review best practice, not a
+correctness change.)
 
 **Known deliberate deviations from legacy source** (see the microservice README for full detail before
 touching this logic):

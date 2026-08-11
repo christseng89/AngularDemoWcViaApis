@@ -289,7 +289,7 @@ describe('confirmPaymentInstruction', () => {
       expect(result.instruction.creditLegs).toHaveLength(1);
     });
 
-    it('v1.8.0 per-source pairs: a real EUR debit leg (20) alongside a EUR Suspense Debit entry (17) each get their OWN independent FX pair — the leg pair reuses the leg\'s own amountTxCcy verbatim, the Suspense pair reuses the bridge leg\'s own amountTxCcy verbatim', () => {
+    it('v1.9.0: a real EUR debit leg (20) alongside a EUR Suspense Debit entry (17) net to ONE Leg-anchored pair sized to the 3 EUR / 0.7 USD residual (debitLegs exceed Suspense) — no longer two independent gross pairs', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
@@ -304,18 +304,19 @@ describe('confirmPaymentInstruction', () => {
         { sourceFunctionCode: 'PayAccept' },
       );
       const bridgeLeg = result.instruction.creditLegs.find((l) => l.accountNo === 'Suspense - Debit');
-      expect(bridgeLeg?.amountAccountCcy).toBe('17'); // gross, unaffected by the leg pair
-      const suspenseFxOtherCcy = result.instruction.debitLegs.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
-      expect(suspenseFxOtherCcy?.amountAccountCcy).toBe('17'); // Suspense pair sized to gross Suspense alone
+      expect(bridgeLeg?.amountAccountCcy).toBe('17'); // gross, unaffected by the diff-netted pair
+      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange USD - Suspense')).toBe(false); // Suspense-anchored pair no longer generates — diff < 0
+      const legFxOtherCcy = result.instruction.creditLegs.find((l) => l.accountNo === 'FX Exchange USD');
+      expect(legFxOtherCcy?.amountAccountCcy).toBe('3'); // diff = 17 (gross Suspense) - 20 (real leg) = -3
       const legFxTrxCcy = result.instruction.debitLegs.find((l) => l.accountNo === 'FX Exchange EUR');
-      expect(legFxTrxCcy?.amountTxCcy).toBe('18'); // leg pair reuses the leg's own amountTxCcy verbatim (not re-derived from 20)
+      expect(legFxTrxCcy?.amountTxCcy).toBe('0.7'); // diffTrx = 18.7 (Suspense trx-eq) - 18 (the leg's own amountTxCcy)
 
       // Full aggregate V8 (submitted legs + all generated legs) balances exactly.
       const sum = (legs: { amountTxCcy: string }[]) => legs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
       expect(Math.round(sum(result.instruction.debitLegs) * 100)).toBe(Math.round(sum(result.instruction.creditLegs) * 100));
     });
 
-    it('v1.8.0 per-source pairs: a real EUR debit leg (17) exactly matching gross Suspense (17) no longer skips the FX pairs — BOTH still generate independently, netting to the same zero incremental effect once summed', () => {
+    it('v1.9.0: a real EUR debit leg (17) exactly matching gross Suspense (17) skips the FX pair entirely — clean Settlement Vouchers, no FX Exchange lines, still balances', () => {
       const result = confirmPaymentInstruction(
         store,
         request({
@@ -329,8 +330,8 @@ describe('confirmPaymentInstruction', () => {
         }),
         { sourceFunctionCode: 'PayAccept' },
       );
-      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange EUR')).toBe(true); // leg pair — DOES generate now (v1.8.0)
-      expect(result.instruction.debitLegs.some((l) => l.accountNo === 'FX Exchange USD - Suspense')).toBe(true); // Suspense pair's Other-Ccy-site — DOES generate now (CREDIT-anchored, so Other-Ccy-site lands on debit)
+      expect(result.instruction.debitLegs.some((l) => l.accountNo.includes('FX Exchange'))).toBe(false); // no FX Exchange lines at all — exact match nets to zero
+      expect(result.instruction.creditLegs.some((l) => l.accountNo.includes('FX Exchange'))).toBe(false);
       expect(result.instruction.creditLegs.some((l) => l.accountNo === 'Suspense - Debit')).toBe(true);
       const sum = (legs: { amountTxCcy: string }[]) => legs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
       expect(Math.round(sum(result.instruction.debitLegs) * 100)).toBe(Math.round(sum(result.instruction.creditLegs) * 100));
@@ -415,323 +416,6 @@ describe('confirmPaymentInstruction', () => {
     expect(result.instruction.accountEntries.every((e) => e.voucherType === 'SETTLEMENT')).toBe(true);
   });
 
-  describe('debitLegsComponentBridge (2026-08-09, business-requirement-confirmed)', () => {
-    it('creditLegs may be empty when debitLegsComponentBridge:true and suspenseBridge.creditEntries is populated — the 400 this used to hit at the schema layer is gone, and confirmPaymentInstruction itself needed no change', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-CCB-1',
-          debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '100', amountAccountCcy: '100' }],
-          creditLegs: [],
-          debitLegsComponentBridge: true,
-          suspenseBridge: { creditEntries: [{ amount: '100', currency: 'USD', sourceComponent: 'CHARGE' }] },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-      expect(result.instruction.creditLegs.map((l) => l.accountNo)).toEqual(['Suspense - Credit']);
-      const debitTotal = result.instruction.debitLegs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
-      const creditTotal = result.instruction.creditLegs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
-      expect(debitTotal).toBe(creditTotal); // V8
-    });
-
-    it('reviewer-confirmed multi-currency worked example: USD 80+20 / EUR 200 debit legs against USD 100 / EUR 200 Suspense Credit — clean Settlement Vouchers, no FX Exchange lines, both currencies balance', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-CCB-MULTI',
-          debitLegs: [
-            { accountNo: 'CUST-ACC2', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '80', amountAccountCcy: '80' },
-            { accountNo: 'CUST-ACC3', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '20', amountAccountCcy: '20' },
-            { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', drRate: '1.2' },
-          ],
-          creditLegs: [],
-          debitLegsComponentBridge: true,
-          suspenseBridge: {
-            creditEntries: [
-              { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
-              { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'CHARGE' },
-            ],
-          },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-
-      const settlement = result.instruction.accountEntries.map((e) => `${e.drCrIndicator} ${e.glAccount} ${e.currency} ${e.amount}`);
-      expect(settlement).toEqual([
-        'D CUST-ACC2 USD 80',
-        'D CUST-ACC3 USD 20',
-        'D CUST-ACC EUR 200',
-        'C Suspense - Credit USD 100',
-        'C Suspense - Credit EUR 200',
-      ]);
-      expect(settlement.some((s) => s.includes('FX Exchange'))).toBe(false);
-    });
-
-    it('debit exceeds Suspense Credit: a real EUR 210 debit leg against only EUR 200 Suspense Credit (the 10 EUR excess funded by a smaller compensating USD leg) — a DEBIT-anchored FX pair sized to just the 10 EUR / 12 USD excess, balances by currency AND in aggregate', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-CCB-EXCESS',
-          debitLegs: [
-            { accountNo: 'CUST-ACC2', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '88', amountAccountCcy: '88' },
-            { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '252', amountAccountCcy: '210', drRate: '1.2' },
-          ],
-          creditLegs: [],
-          debitLegsComponentBridge: true,
-          suspenseBridge: {
-            creditEntries: [
-              { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
-              { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'CHARGE' },
-            ],
-          },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-
-      const settlement = result.instruction.accountEntries.map((e) => `${e.drCrIndicator} ${e.glAccount} ${e.currency} ${e.amount}`);
-      expect(settlement).toEqual([
-        'D CUST-ACC2 USD 88',
-        'D CUST-ACC EUR 210',
-        'D FX Exchange EUR - Suspense USD 12',
-        'C FX Exchange USD - Suspense EUR 10',
-        'C Suspense - Credit USD 100',
-        'C Suspense - Credit EUR 200',
-      ]);
-
-      const eurDebit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const eurCredit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(eurDebit).toBe(eurCredit);
-      const usdDebit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const usdCredit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(usdDebit).toBe(usdCredit);
-    });
-
-    it('partial coverage: only EUR 150 of the EUR 200 Suspense Credit is matched by a real EUR debit leg, the rest funded by extra USD — the FX pair is sized to just the EUR 50 / USD 60 residual, and the whole instruction still balances by currency AND in aggregate', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-CCB-PARTIAL',
-          debitLegs: [
-            { accountNo: 'CUST-ACC2', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '160', amountAccountCcy: '160' },
-            { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '180', amountAccountCcy: '150', drRate: '1.2' },
-          ],
-          creditLegs: [],
-          debitLegsComponentBridge: true,
-          suspenseBridge: {
-            creditEntries: [
-              { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
-              { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'CHARGE' },
-            ],
-          },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-
-      const settlement = result.instruction.accountEntries.map((e) => `${e.drCrIndicator} ${e.glAccount} ${e.currency} ${e.amount}`);
-      expect(settlement).toEqual([
-        'D CUST-ACC2 USD 160',
-        'D CUST-ACC EUR 150',
-        'D FX Exchange USD - Suspense EUR 50',
-        'C FX Exchange EUR - Suspense USD 60',
-        'C Suspense - Credit USD 100',
-        'C Suspense - Credit EUR 200',
-      ]);
-
-      const eurDebit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const eurCredit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(eurDebit).toBe(eurCredit); // per-currency balance, EUR
-      const usdDebit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const usdCredit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(usdDebit).toBe(usdCredit); // per-currency balance, USD
-    });
-
-    it('genuine per-currency mismatch (debit EUR 199 vs Suspense Credit EUR 200, no compensating leg elsewhere) still throws LEGS_UNBALANCED — every pair here is self-balancing by construction, so no sizing choice can mask a real aggregate discrepancy', () => {
-      expect(() =>
-        confirmPaymentInstruction(
-          store,
-          request({
-            mainRef: 'REF-CCB-MISMATCH',
-            debitLegs: [
-              { accountNo: 'CUST-ACC2', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '80', amountAccountCcy: '80' },
-              { accountNo: 'CUST-ACC3', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '20', amountAccountCcy: '20' },
-              { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '238.80', amountAccountCcy: '199', drRate: '1.2' },
-            ],
-            creditLegs: [],
-            debitLegsComponentBridge: true,
-            suspenseBridge: {
-              creditEntries: [
-                { amount: '100', currency: 'USD', sourceComponent: 'CHARGE' },
-                { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'CHARGE' },
-              ],
-            },
-          }),
-          { sourceFunctionCode: 'PayAccept' },
-        ),
-      ).toThrow(BusinessValidationError);
-    });
-  });
-
-  describe('creditLegsComponentBridge (2026-08-12, business-requirement-confirmed — mirror image of debitLegsComponentBridge)', () => {
-    it('transactionCurrency correctly falls back to creditLegs[0].currency when debitLegs is empty — the fix that makes this whole mode possible (request.debitLegs[0]!.currency would otherwise throw a TypeError before validation even runs)', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-DCB-CCY',
-          debitLegs: [],
-          creditLegs: [{ accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '50' }],
-          creditLegsComponentBridge: true,
-          suspenseBridge: { debitEntries: [{ amount: '50', currency: 'EUR' }] },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-      expect(result.instruction.debitLegs.map((l) => l.accountNo)).toEqual(['Suspense - Debit']);
-      expect(result.instruction.debitLegs[0]!.currency).toBe('EUR');
-    });
-
-    it('debitLegs may be empty when creditLegsComponentBridge:true and suspenseBridge.debitEntries is populated — the mirror image of the debitLegsComponentBridge case', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-DCB-1',
-          debitLegs: [],
-          creditLegs: [{ accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '100', amountAccountCcy: '100' }],
-          creditLegsComponentBridge: true,
-          suspenseBridge: { debitEntries: [{ amount: '100', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' }] },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-      expect(result.instruction.debitLegs.map((l) => l.accountNo)).toEqual(['Suspense - Debit']);
-      const debitTotal = result.instruction.debitLegs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
-      const creditTotal = result.instruction.creditLegs.reduce((s, l) => s + Number(l.amountTxCcy), 0);
-      expect(debitTotal).toBe(creditTotal); // V8
-    });
-
-    it("reviewer-confirmed multi-currency worked example (mirror): USD 80+20 / EUR 200 credit legs (Nostro settlement) against USD 100 / EUR 200 Suspense Debit — clean Settlement Vouchers in the new Suspense-Debit-leads ordering, no FX Exchange lines, both currencies balance", () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-DCB-MULTI',
-          debitLegs: [],
-          creditLegs: [
-            { accountNo: 'NOSTRO-ACC2', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '80', amountAccountCcy: '80' },
-            { accountNo: 'NOSTRO-ACC3', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '20', amountAccountCcy: '20' },
-            { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' },
-          ],
-          creditLegsComponentBridge: true,
-          suspenseBridge: {
-            debitEntries: [
-              { amount: '100', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-              { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-            ],
-          },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-
-      const settlement = result.instruction.accountEntries.map((e) => `${e.drCrIndicator} ${e.glAccount} ${e.currency} ${e.amount}`);
-      expect(settlement).toEqual([
-        'D Suspense - Debit USD 100',
-        'D Suspense - Debit EUR 200',
-        'C NOSTRO-ACC2 USD 80',
-        'C NOSTRO-ACC3 USD 20',
-        'C NOSTRO-ACC EUR 200',
-      ]);
-      expect(settlement.some((s) => s.includes('FX Exchange'))).toBe(false);
-    });
-
-    it('credit exceeds Suspense Debit: a real EUR 210 credit (Nostro) leg against only EUR 200 Suspense Debit (the 10 EUR excess funded by a smaller compensating USD leg) — a CREDIT-anchored FX pair sized to just the 10 EUR / 12 USD excess (mirror of the DEBIT-anchored original), balances by currency AND in aggregate', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-DCB-EXCESS',
-          debitLegs: [],
-          creditLegs: [
-            { accountNo: 'NOSTRO-ACC2', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '88', amountAccountCcy: '88' },
-            { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '252', amountAccountCcy: '210' },
-          ],
-          creditLegsComponentBridge: true,
-          suspenseBridge: {
-            debitEntries: [
-              { amount: '100', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-              { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-            ],
-          },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-
-      const eurDebit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const eurCredit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(eurDebit).toBe(eurCredit);
-      const usdDebit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const usdCredit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(usdDebit).toBe(usdCredit);
-    });
-
-    it('partial coverage: only EUR 150 of the EUR 200 Suspense Debit is matched by a real EUR credit (Nostro) leg, the rest funded by extra USD — the FX pair is sized to just the EUR 50 / USD 60 residual (mirror of the original), and the whole instruction still balances by currency AND in aggregate', () => {
-      const result = confirmPaymentInstruction(
-        store,
-        request({
-          mainRef: 'REF-DCB-PARTIAL',
-          debitLegs: [],
-          creditLegs: [
-            { accountNo: 'NOSTRO-ACC2', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '160', amountAccountCcy: '160' },
-            { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '180', amountAccountCcy: '150' },
-          ],
-          creditLegsComponentBridge: true,
-          suspenseBridge: {
-            debitEntries: [
-              { amount: '100', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-              { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-            ],
-          },
-        }),
-        { sourceFunctionCode: 'PayAccept' },
-      );
-
-      const eurDebit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const eurCredit = result.instruction.accountEntries.filter((e) => e.currency === 'EUR' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(eurDebit).toBe(eurCredit); // per-currency balance, EUR
-      const usdDebit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'D').reduce((s, e) => s + Number(e.amount), 0);
-      const usdCredit = result.instruction.accountEntries.filter((e) => e.currency === 'USD' && e.drCrIndicator === 'C').reduce((s, e) => s + Number(e.amount), 0);
-      expect(usdDebit).toBe(usdCredit); // per-currency balance, USD
-    });
-
-    it('genuine per-currency mismatch (credit EUR 199 vs Suspense Debit EUR 200, no compensating leg elsewhere) still throws LEGS_UNBALANCED — every pair here is self-balancing by construction, so no sizing choice can mask a real aggregate discrepancy', () => {
-      expect(() =>
-        confirmPaymentInstruction(
-          store,
-          request({
-            mainRef: 'REF-DCB-MISMATCH',
-            debitLegs: [],
-            creditLegs: [
-              { accountNo: 'NOSTRO-ACC2', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '80', amountAccountCcy: '80' },
-              { accountNo: 'NOSTRO-ACC3', accountType: 'NOSTRO', currency: 'USD', amountTxCcy: '20', amountAccountCcy: '20' },
-              { accountNo: 'NOSTRO-ACC', accountType: 'NOSTRO', currency: 'EUR', amountTxCcy: '238.80', amountAccountCcy: '199' },
-            ],
-            creditLegsComponentBridge: true,
-            suspenseBridge: {
-              debitEntries: [
-                { amount: '100', currency: 'USD', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-                { amount: '200', currency: 'EUR', crossRate: '1.2', sourceComponent: 'BALANCE', balanceModule: 'IBL' },
-              ],
-            },
-          }),
-          { sourceFunctionCode: 'PayAccept' },
-        ),
-      ).toThrow(BusinessValidationError);
-    });
-
-    // Mutual exclusivity between debitLegsComponentBridge and creditLegsComponentBridge is
-    // enforced entirely at the schema layer (validation/requestSchema.ts's superRefine, tested in
-    // requestSchema.test.ts) — confirmPaymentInstruction() itself trusts a pre-validated
-    // ValidatedConfirmRequest and does not re-check it. A hand-built request() with both flags
-    // true and both leg arrays empty would hit the transactionCurrency derivation's own
-    // not-null assertion with a TypeError, not a RequestValidationError — that's expected: this
-    // combination genuinely never reaches this function outside a test that deliberately bypasses
-    // the schema layer, same as any other schema-only invariant this function trusts.
-  });
-
   it('generates SWIFT messages when credit legs specify valid message types', () => {
     const result = confirmPaymentInstruction(
       store,
@@ -751,5 +435,58 @@ describe('confirmPaymentInstruction', () => {
     );
     expect(result.instruction.swiftMessages).toHaveLength(1);
     expect(result.instruction.swiftMessages[0]!.messageType).toBe('MT103');
+  });
+
+  describe('transactionCurrency (v1.10.0)', () => {
+    it('drives suspenseBridge expansion and SWIFT instructedCurrency instead of debitLegs[0].currency — Full pay in JPY against a USD transaction', () => {
+      const result = confirmPaymentInstruction(
+        store,
+        request({
+          mainRef: 'REF-TXCCY-JPY',
+          // Sole debit/credit leg settles in JPY — no leg left in USD to anchor debitLegs[0].
+          // Debit pre-adjusted by the bridge's own 50 (per the OAS contract — see the
+          // 'suspenseBridge (v1.4.0)' describe block above) so V8 stays balanced.
+          debitLegs: [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'JPY', amountTxCcy: '10050' }],
+          creditLegs: [
+            {
+              accountNo: 'NOSTRO-ACC',
+              accountType: 'NOSTRO',
+              currency: 'JPY',
+              amountTxCcy: '10000',
+              payAdviceMsgType: 'MT103',
+            },
+          ],
+          transactionCurrency: 'USD',
+          // A same-currency-as-transactionCurrency (USD) Suspense entry needs no crossRate. If the
+          // service still inferred transactionCurrency from debitLegs[0].currency (JPY) here, this
+          // entry (USD, differing from JPY) would be misclassified as cross-currency and throw for
+          // missing crossRate — proving which source actually drove the expansion.
+          suspenseBridge: { debitEntries: [{ amount: '50', currency: 'USD' }] },
+        }),
+        { sourceFunctionCode: 'PayAccept' },
+      );
+      expect(result.instruction.swiftMessages).toHaveLength(1);
+      expect(result.instruction.swiftMessages[0]!.instructedCurrency).toBe('USD');
+    });
+
+    it('falls back to debitLegs[0].currency when transactionCurrency is omitted (pre-v1.10.0 callers)', () => {
+      const result = confirmPaymentInstruction(
+        store,
+        request({
+          mainRef: 'REF-TXCCY-FALLBACK',
+          creditLegs: [
+            {
+              accountNo: 'NOSTRO-ACC',
+              accountType: 'NOSTRO',
+              currency: 'USD',
+              amountTxCcy: '100',
+              payAdviceMsgType: 'MT103',
+            },
+          ],
+        }),
+        { sourceFunctionCode: 'PayAccept' },
+      );
+      expect(result.instruction.swiftMessages[0]!.instructedCurrency).toBe('USD');
+    });
   });
 });

@@ -96,7 +96,7 @@ export type BalanceModule = (typeof BALANCE_MODULES)[number];
 export interface SuspenseBridgeEntry {
   amount: MonetaryAmount;
   currency: string;
-  /** Required when currency differs from the request's transaction currency (debitLegs[0].currency); ignored otherwise. */
+  /** Required when currency differs from the request's transaction currency (transactionCurrency, v1.10.0 — falls back to debitLegs[0].currency if omitted); ignored otherwise. */
   crossRate?: ExchangeRate;
   /**
    * Added v1.5.0. Which upstream component already booked the OTHER leg of
@@ -139,6 +139,18 @@ export interface PaymentInstructionConfirmRequest {
   payInstrFlag?: PayInstrFlag;
   debitLegs: PaymentLegInput[];
   creditLegs: PaymentLegInput[];
+  /**
+   * Added v1.10.0. The deal's actual transaction currency, independent of any
+   * individual leg's OWN settlement currency (PaymentLegInput.currency).
+   * amountTxCcy on every leg (debit AND credit) is denominated in THIS
+   * currency, never a leg's own currency (which can legitimately diverge —
+   * amountAccountCcy/drBuyRate/crBuyRate carry that conversion). Always send
+   * this explicitly — the server's fallback to debitLegs[0].currency exists
+   * only for pre-v1.10.0 callers and silently breaks when a side's legs are
+   * ALL in a foreign currency (see business-case-runner.component.ts's
+   * transactionCurrency getter, the single source this is built from).
+   */
+  transactionCurrency?: string;
   /** Added v1.4.0 — see SuspenseBridge's doc comment above. */
   suspenseBridge?: SuspenseBridge;
   // Extension fields (see microservices/payment-component/src/routes/paymentInstructions.ts RequestExtensions).
@@ -147,35 +159,6 @@ export interface PaymentInstructionConfirmRequest {
   sourceFunctionCode?: string;
   voucherCodePrefixOverride?: string;
   dryRun?: boolean;
-  /**
-   * Debit Legs Component Bridge Flag (2026-08-09; renamed from chargeComponentBridge
-   * 2026-08-10 — see lc-payment-wc/CLAUDE.md's dated entry) — unlike the three extension
-   * fields above, this one is NOT read out of a loose RequestExtensions sidecar server-side;
-   * it's a real field on the microservice's own zod schema (validation/requestSchema.ts)
-   * because it participates in a cross-field rule there: creditLegs may be empty only when
-   * this is true AND suspenseBridge.creditEntries has at least 1 entry. Not charge-specific —
-   * this request shape (Payment Component posts only debitLegs, the entire credit side is
-   * bridged out via suspenseBridge.creditEntries) equally fits a Customer IBL Payment (Import
-   * Bill Loan under a Buyer's Usance LC, distinct from the existing balanceModule:'IBL'
-   * "Import Bill Liability" tag), or both sources in one request. Set to true iff
-   * BusinessCaseConfig.debitLegsBridge is true for the selected case (business-case-request.ts)
-   * — see that field's own doc comment (business-case.model.ts) for the full contract.
-   */
-  debitLegsComponentBridge?: boolean;
-  /**
-   * Credit Legs Component Bridge Flag (2026-08-12) — the mirror image of
-   * debitLegsComponentBridge above: when true AND suspenseBridge.debitEntries has at least
-   * 1 entry, debitLegs may be empty — this request only ever carries creditLegs (the real
-   * outgoing settlement/payment legs, e.g. Cr Nostro); the entire debit side is provided by
-   * the Suspense Debit bridge to a separate upstream component (e.g. a Loan Component
-   * generating Dr IBL / Cr Suspense - IBL on its own books for a Buyer's Usance LC — see
-   * lc-payment-wc/CLAUDE.md's dated entry for the full worked example). Mutually exclusive
-   * with debitLegsComponentBridge (the microservice's zod schema rejects both true at once
-   * with a 400). Set to true iff BusinessCaseConfig.creditLegsBridge is true for the selected
-   * case (business-case-request.ts) — see that field's own doc comment (business-case.model.ts)
-   * for the full contract.
-   */
-  creditLegsComponentBridge?: boolean;
 }
 
 export interface ClassificationResult {

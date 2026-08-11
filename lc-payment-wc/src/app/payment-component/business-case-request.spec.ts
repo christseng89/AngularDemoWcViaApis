@@ -23,7 +23,7 @@ const baseModel = { mainRef: 'IPLC-test-0001', sequence: 1, unitCode: 'HQ' };
 
 describe('buildConfirmRequest', () => {
   it('assembles header fields, module, and legs from the model/config/legs inputs', () => {
-    const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs);
+    const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs, 'USD');
 
     expect(req.originModule).toBe('IPLC');
     expect(req.mainRef).toBe('IPLC-test-0001');
@@ -34,13 +34,13 @@ describe('buildConfirmRequest', () => {
   });
 
   it('coerces model.sequence to a number', () => {
-    const req = buildConfirmRequest(baseConfig(), { ...baseModel, sequence: '3' }, debitLegs, creditLegs);
+    const req = buildConfirmRequest(baseConfig(), { ...baseModel, sequence: '3' }, debitLegs, creditLegs, 'USD');
     expect(req.sequence).toBe(3);
   });
 
   describe('voucher prefix resolution', () => {
     it('uses config.sourceFunctionCode when there is no dual-prefix choice', () => {
-      const req = buildConfirmRequest(baseConfig({ sourceFunctionCode: 'PayAccept' }), baseModel, debitLegs, creditLegs);
+      const req = buildConfirmRequest(baseConfig({ sourceFunctionCode: 'PayAccept' }), baseModel, debitLegs, creditLegs, 'USD');
       expect(req.sourceFunctionCode).toBe('PayAccept');
       expect(req.voucherCodePrefixOverride).toBeUndefined();
     });
@@ -53,57 +53,38 @@ describe('buildConfirmRequest', () => {
           { label: 'B', value: 'EPLC03NULLNULLNULL' },
         ],
       });
-      const req = buildConfirmRequest(config, { ...baseModel, voucherPrefix: 'EPLC03NULLNULLNULL' }, debitLegs, creditLegs);
+      const req = buildConfirmRequest(config, { ...baseModel, voucherPrefix: 'EPLC03NULLNULLNULL' }, debitLegs, creditLegs, 'USD');
 
       expect(req.sourceFunctionCode).toBeUndefined();
       expect(req.voucherCodePrefixOverride).toBe('EPLC03NULLNULLNULL');
     });
   });
 
+  describe('transactionCurrency (v1.10.0)', () => {
+    it('is sent explicitly, independent of any leg currency', () => {
+      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs, 'USD');
+      expect(req.transactionCurrency).toBe('USD');
+    });
+
+    it('can diverge from every leg\'s own currency — e.g. Full pay in JPY against a USD transaction', () => {
+      const jpyDebitLegs: PaymentLegInput[] = [{ accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'JPY', amountTxCcy: '10000.00' }];
+      const req = buildConfirmRequest(baseConfig(), baseModel, jpyDebitLegs, creditLegs, 'USD');
+      expect(req.transactionCurrency).toBe('USD');
+      expect(req.debitLegs[0]!.currency).toBe('JPY');
+    });
+  });
+
   describe('suspenseBridge passthrough (v1.4.0)', () => {
     it('is omitted from the request when not supplied', () => {
-      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs);
+      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs, 'USD');
       expect(req.suspenseBridge).toBeUndefined();
     });
 
     it('is included verbatim when supplied', () => {
       const suspenseBridge: SuspenseBridge = { debitEntries: [{ amount: '10', currency: 'USD', sourceComponent: 'CHARGE' }] };
-      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs, suspenseBridge);
+      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs, 'USD', suspenseBridge);
       expect(req.suspenseBridge).toBe(suspenseBridge);
     });
   });
 
-  describe('debitLegsComponentBridge (Debit Legs Component Bridge Flag, 2026-08-09) — mirrors config.debitLegsBridge onto the wire', () => {
-    it('sends debitLegsComponentBridge: true when config.debitLegsBridge is true', () => {
-      const req = buildConfirmRequest(baseConfig({ debitLegsBridge: true }), baseModel, debitLegs, [], undefined);
-      expect(req.debitLegsComponentBridge).toBe(true);
-    });
-
-    it('omits debitLegsComponentBridge (undefined) when config.debitLegsBridge is unset', () => {
-      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs);
-      expect(req.debitLegsComponentBridge).toBeUndefined();
-    });
-  });
-
-  describe('creditLegsComponentBridge (Credit Legs Component Bridge Flag, 2026-08-12) — mirrors config.creditLegsBridge onto the wire', () => {
-    it('sends creditLegsComponentBridge: true when config.creditLegsBridge is true', () => {
-      const req = buildConfirmRequest(baseConfig({ creditLegsBridge: true }), baseModel, [], creditLegs, undefined);
-      expect(req.creditLegsComponentBridge).toBe(true);
-    });
-
-    it('omits creditLegsComponentBridge (undefined) when config.creditLegsBridge is unset', () => {
-      const req = buildConfirmRequest(baseConfig(), baseModel, debitLegs, creditLegs);
-      expect(req.creditLegsComponentBridge).toBeUndefined();
-    });
-
-    it('sets both flags independently — a debitLegsBridge case never sends creditLegsComponentBridge, and vice versa', () => {
-      const debitBridgeReq = buildConfirmRequest(baseConfig({ debitLegsBridge: true }), baseModel, debitLegs, [], undefined);
-      expect(debitBridgeReq.debitLegsComponentBridge).toBe(true);
-      expect(debitBridgeReq.creditLegsComponentBridge).toBeUndefined();
-
-      const creditBridgeReq = buildConfirmRequest(baseConfig({ creditLegsBridge: true }), baseModel, [], creditLegs, undefined);
-      expect(creditBridgeReq.creditLegsComponentBridge).toBe(true);
-      expect(creditBridgeReq.debitLegsComponentBridge).toBeUndefined();
-    });
-  });
 });

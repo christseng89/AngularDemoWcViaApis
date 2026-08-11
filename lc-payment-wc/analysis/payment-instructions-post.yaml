@@ -289,7 +289,25 @@ info:
     currency once summed, just as four legs instead of zero. The Suspense
     leg(s) themselves, and the caller's own submitted leg amounts, are
     unaffected by any of this.
-  version: "1.8.0"
+
+
+    v1.10.0 changelog (correctness fix, 2026-08-11, client-visible — new
+    optional request field): added PaymentInstructionConfirmRequest.
+    transactionCurrency, an explicit top-level currency code for the deal's
+    actual transaction currency, independent of any individual leg's OWN
+    settlement currency (PaymentLegInput.currency). Every prior version
+    inferred "the transaction currency" purely as debitLegs[0].currency
+    (v1.4.0's SuspenseEntry description, still this field's fallback when
+    omitted for backward compatibility) — a heuristic that silently broke
+    for a side with NO leg left in the true transaction currency to anchor
+    index 0 (e.g. transaction currency USD, customer pays 100% in a
+    foreign-currency account): the lone leg's own settlement currency got
+    misread as the transaction currency, which then wrongly rejected a
+    genuinely-valid amountTxCcy scaled to the REAL transaction currency (the
+    H-2 decimal-places check compared it against the wrong currency's minor
+    units). New callers should always send transactionCurrency explicitly
+    rather than rely on the debitLegs[0].currency fallback.
+  version: "1.10.0"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -476,6 +494,18 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+        transactionCurrency:
+          type: string
+          description: >
+            Added v1.10.0. The deal's actual transaction currency, independent
+            of any individual leg's OWN settlement currency
+            (PaymentLegInput.currency — amountAccountCcy/drBuyRate/crBuyRate
+            carry the conversion when a leg's own currency diverges).
+            amountTxCcy on every leg (debit AND credit) is denominated in
+            THIS currency. Falls back to debitLegs[0].currency when omitted,
+            for backward compatibility with pre-v1.10.0 callers — new callers
+            should always send this explicitly (see the v1.10.0 changelog
+            entry above for the bug this fixes).
         suspenseBridge:
           allOf: [ { $ref: '#/components/schemas/SuspenseBridge' } ]
           description: >
@@ -525,7 +555,8 @@ components:
           allOf: [ { $ref: '#/components/schemas/ExchangeRate' } ]
           description: >
             Required when currency differs from the instruction's
-            transaction currency (debitLegs[0].currency); ignored
+            transaction currency (transactionCurrency, v1.10.0 — falls back
+            to debitLegs[0].currency if omitted); ignored
             otherwise. The rate converting this entry's own currency INTO
             the transaction currency. This service does not resolve FX
             rates itself — same posture as PaymentLegInput's own rate

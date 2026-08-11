@@ -201,6 +201,37 @@ describe('LegAllocatorComponent', () => {
       expect(lastEmit[0]!.rtgsIndicator).toBeUndefined();
     });
 
+    it('onAccountTypeChange resets Account No. to the new type\'s own default placeholder, replacing whatever the prior type left behind — avoids a stale "CUST-ACC" surviving a switch to NOSTRO', () => {
+      const { comp, emittedLegs } = makeComponent();
+      comp.ngOnInit();
+      expect(comp.rows[0]!.accountNo).toBe('CUST-ACC'); // seeded from defaultAccountNo
+
+      comp.onAccountTypeChange(comp.rows[0]!, 'NOSTRO');
+      expect(comp.rows[0]!.accountNo).toBe('NOSTRO-ACC');
+
+      comp.onAccountTypeChange(comp.rows[0]!, 'VOSTRO');
+      expect(comp.rows[0]!.accountNo).toBe('VOSTRO-ACC');
+
+      comp.onAccountTypeChange(comp.rows[0]!, 'INTERNAL');
+      expect(comp.rows[0]!.accountNo).toBe('INTERNAL-ACC');
+
+      comp.onAccountTypeChange(comp.rows[0]!, 'SUSPENSE');
+      expect(comp.rows[0]!.accountNo).toBe('SUSPENSE-ACC');
+
+      const lastEmit = emittedLegs[emittedLegs.length - 1]!;
+      expect(lastEmit[0]!.accountNo).toBe('SUSPENSE-ACC'); // reflected on the wire too
+    });
+
+    it('onAccountTypeChange overwrites a manually-edited Account No. too — the reset is unconditional on any real type switch, not just when the field was untouched', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.accountNo = 'MY-CUSTOM-ACC-123'; // user hand-typed something before switching type
+
+      comp.onAccountTypeChange(comp.rows[0]!, 'NOSTRO');
+
+      expect(comp.rows[0]!.accountNo).toBe('NOSTRO-ACC');
+    });
+
     it('makeRow forces rtgsIndicator false for a non-NOSTRO row even if a truthy default was passed', () => {
       const { comp } = makeComponent();
       comp.defaultAccountType = 'CUSTOMER';
@@ -570,12 +601,70 @@ describe('LegAllocatorComponent', () => {
       expect(comp.isSplit).toBe(true);
     });
 
-    it('accountCcyAmount multiplies amountTxCcy by rate, rounded to 2dp', () => {
+    it('accountCcyAmount multiplies amountTxCcy by rate, rounded to the row\'s own currency scale (2dp for USD)', () => {
       const { comp } = makeComponent();
       comp.ngOnInit();
       comp.rows[0]!.amountTxCcy = new Decimal(100);
       comp.rows[0]!.rate = new Decimal(1.234);
       expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(123.4);
+    });
+
+    it('accountCcyAmount rounds to the ROW\'s own currency scale, not a hardcoded 2dp — JPY (0dp) shows no fractional yen', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit(); // transaction currency USD, total 10000
+      comp.rows[0]!.currency = 'JPY';
+      comp.rows[0]!.amountTxCcy = new Decimal(100);
+      comp.rows[0]!.rate = new Decimal(149.0825); // 100 * 149.0825 = 14908.25 -> rounds to 14908 (0dp, ROUND_HALF_UP)
+      expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(14908);
+    });
+
+    it('accountCcyAmount falls back to 2dp for a currency absent from the Currency master (unknown/not yet loaded) — same fallback as the rest of the app', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'BHD'; // not in mockCurrency's decimals map
+      comp.rows[0]!.amountTxCcy = new Decimal(100);
+      comp.rows[0]!.rate = new Decimal(1.2345);
+      expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(123.45);
+    });
+  });
+
+  describe('emit() currency-scale formatting (JPY decimal precision fix — reviewer-reported)', () => {
+    it('amountAccountCcy on the wire is formatted to the ROW\'s own currency scale, not a hardcoded 2dp — a JPY row emits a whole-number string with no decimal point', () => {
+      const { comp, emittedLegs } = makeComponent();
+      comp.ngOnInit(); // transaction currency USD, total 10000
+      comp.rows[0]!.currency = 'JPY';
+      comp.rows[0]!.amountTxCcy = new Decimal(100);
+      comp.rows[0]!.rate = new Decimal(149.0825);
+      comp.onFieldChange(); // re-emit with the manually-set row state above
+
+      const lastLeg = emittedLegs[emittedLegs.length - 1]![0]!;
+      expect(lastLeg.amountAccountCcy).toBe('14908'); // 100 * 149.0825 = 14908.25 -> 0dp ROUND_HALF_UP -> 14908, no ".xx"
+    });
+
+    it('amountTxCcy on the wire is formatted to the TRANSACTION currency scale — a JPY transaction currency emits a whole-number string, no ".00"', () => {
+      const { comp, emittedLegs } = makeComponent();
+      comp.initialCurrency = 'JPY';
+      comp.initialTotalAmount = '10000';
+      comp.ngOnInit();
+
+      const lastLeg = emittedLegs[emittedLegs.length - 1]![0]!;
+      expect(lastLeg.currency).toBe('JPY');
+      expect(lastLeg.amountTxCcy).toBe('10000'); // not '10000.00' — JPY has 0 decimal places
+    });
+
+    it('a USD row alongside a JPY transaction currency still gets its OWN 2dp scale for amountAccountCcy — the two currencies are never conflated', () => {
+      const { comp, emittedLegs } = makeComponent();
+      comp.initialCurrency = 'JPY';
+      comp.initialTotalAmount = '10000';
+      comp.ngOnInit();
+      comp.rows[0]!.currency = 'USD';
+      comp.rows[0]!.amountTxCcy = new Decimal(24908); // JPY amount
+      comp.rows[0]!.rate = new Decimal(0.006708); // JPY -> USD
+      comp.onFieldChange();
+
+      const lastLeg = emittedLegs[emittedLegs.length - 1]![0]!;
+      expect(lastLeg.currency).toBe('USD');
+      expect(lastLeg.amountAccountCcy).toBe('167.08'); // 24908 * 0.006708 = 167.082864 -> 2dp ROUND_HALF_UP -> 167.08 (USD's own scale, unaffected by the JPY transaction currency)
     });
   });
 
@@ -716,10 +805,9 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows[1]!.currency).toBe('USD');
 
       const emitted = emittedLegs[emittedLegs.length - 1]!;
-      // The EMITTED order must NOT mirror internal array order here: server-side
-      // (confirmPaymentInstruction.ts) defines "transaction currency" as debitLegs[0].currency —
-      // if EUR were emitted first, the server would treat EUR as the transaction currency and
-      // Suspense netting/FX decisions downstream would be silently wrong.
+      // The EMITTED order must NOT mirror internal array order here — kept as a
+      // display/readability nicety (see emit()'s own doc comment): a leg whose OWN currency
+      // matches the shared Transaction Currency reads more naturally first in the array.
       expect(emitted[0]!.currency).toBe('USD');
       expect(emitted[1]!.currency).toBe('EUR');
     });

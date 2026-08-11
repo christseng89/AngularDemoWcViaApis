@@ -172,8 +172,8 @@ describe('expandSuspenseBridge', () => {
     expect(result.credit).toEqual([{ accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '10' }]);
   });
 
-  describe('v1.8.0 DEBIT side — a real debit leg gets its own pair, independent of the Suspense pair', () => {
-    it('real EUR Debit Leg 20 + Suspense Debit EUR 17: BOTH pairs generate independently — Suspense reuses its OWN bridge-leg amountTxCcy (18.7), the leg pair reuses the LEG\'s OWN already-submitted amountTxCcy (18.18) verbatim, never recombined into one net figure', () => {
+  describe('v1.9.0 DEBIT side — a real matching debit leg nets against the Suspense pair (superseded v1.8.0\'s "both pairs generate independently")', () => {
+    it('real EUR Debit Leg 20 + Suspense Debit EUR 17: nets to ONE Leg-anchored pair sized to the 3 EUR / 0.52 USD residual (debitLegs exceed Suspense) — no longer two independent gross pairs', () => {
       const result = expandSuspenseBridge(
         { debitEntries: [{ amount: '17', currency: 'EUR', crossRate: '1.1' }] },
         'USD',
@@ -181,37 +181,27 @@ describe('expandSuspenseBridge', () => {
       );
       expect(result.credit).toEqual([
         { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '18.7', amountAccountCcy: '17', crBuyRate: '1.1' },
-        // Suspense pair's Trx-Ccy-site (CREDIT-anchored — the bridge leg is always credit-direction).
-        { accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '18.7', crBuyRate: '1.1' },
-        // Leg pair's Other-Ccy-site (CREDIT direction for a DEBIT-anchored pair) — reuses the leg's
-        // own EUR 20 and its own 18.18 verbatim (NOT re-derived as 20 * some rate).
-        { accountNo: 'FX Exchange USD', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '18.18', amountAccountCcy: '20', crBuyRate: '1.1' },
+        // diff = 17 (gross Suspense) - 20 (real leg) = -3 -> Leg-anchored (DEBIT), no " - Suspense" suffix.
+        { accountNo: 'FX Exchange USD', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '0.52', amountAccountCcy: '3', crBuyRate: '1.1' },
       ]);
       expect(result.debit).toEqual([
-        // Suspense pair's Other-Ccy-site.
-        { accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '18.7', amountAccountCcy: '17', drBuyRate: '1.1' },
-        // Leg pair's Trx-Ccy-site — DEBIT-anchored (matches the real leg's own direction), reusing
-        // the leg's OWN 18.18 verbatim.
-        { accountNo: 'FX Exchange EUR', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '18.18', drBuyRate: '1.1' },
+        { accountNo: 'FX Exchange EUR', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '0.52', drBuyRate: '1.1' },
       ]);
     });
 
-    it('a real Debit Leg EXACTLY matching gross Suspense no longer skips the FX pair (v1.8.0 — no more netting-to-zero special case; both self-balancing pairs still generate independently, and still net to the same overall effect once summed)', () => {
+    it('a real Debit Leg EXACTLY matching gross Suspense skips the FX pair entirely (v1.9.0 — diff-netted to zero, superseding v1.8.0\'s "no more netting-to-zero" approach)', () => {
       const result = expandSuspenseBridge(
         { debitEntries: [{ amount: '17', currency: 'EUR', crossRate: '1.1' }] },
         'USD',
         [payLeg({ currency: 'EUR', amountTxCcy: '18.7', amountAccountCcy: '17' })],
       );
-      // Two pairs now exist (not zero, as the old Net_C=0 special case produced) — but their
-      // Trx-Ccy-site legs are equal-and-opposite (18.7 credit vs 18.7 debit), netting to the same
-      // zero incremental effect on the USD total once summed.
-      const debitTrxCcySite = result.debit.filter((l) => l.currency === 'USD');
-      const creditTrxCcySite = result.credit.filter((l) => l.currency === 'USD');
-      expect(debitTrxCcySite.map((l) => l.amountTxCcy)).toEqual(['18.7']); // leg pair, DEBIT-anchored
-      expect(creditTrxCcySite.map((l) => l.amountTxCcy)).toEqual(['18.7']); // Suspense pair, CREDIT-anchored
+      expect(result.debit).toEqual([]);
+      expect(result.credit).toEqual([
+        { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '18.7', amountAccountCcy: '17', crBuyRate: '1.1' },
+      ]);
     });
 
-    it('multiple same-currency Suspense entries: the Suspense pair reuses the SUM of their individually-rounded bridge legs (not a bucket-combined-then-rounded-once figure)', () => {
+    it('multiple same-currency Suspense entries: the Suspense legs stay itemized (unaffected by diff-netting) — 12+5=17 gross vs a real 20 EUR leg nets to the same 3 EUR / 0.52 USD Leg-anchored residual', () => {
       const result = expandSuspenseBridge(
         { debitEntries: [{ amount: '12', currency: 'EUR', crossRate: '1.1' }, { amount: '5', currency: 'EUR', crossRate: '1.1' }] },
         'USD',
@@ -219,13 +209,13 @@ describe('expandSuspenseBridge', () => {
       );
       const bridgeLegs = result.credit.filter((l) => l.accountNo === 'Suspense - Debit');
       expect(bridgeLegs.map((l) => l.amountAccountCcy)).toEqual(['12', '5']); // itemized, not merged
-      const suspenseFxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      expect(suspenseFxCredit?.amountTxCcy).toBe('18.7'); // round(12*1.1)+round(5*1.1) = 13.2+5.5 = 18.7
+      const legFxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange USD');
+      expect(legFxCredit?.amountAccountCcy).toBe('3'); // diff = round(12*1.1)+round(5*1.1)=17 gross Suspense - 20 real leg = -3
       const legFxDebit = result.debit.find((l) => l.accountNo === 'FX Exchange EUR');
-      expect(legFxDebit?.amountTxCcy).toBe('18.18'); // the leg's own amountTxCcy, unaffected by Suspense
+      expect(legFxDebit?.amountTxCcy).toBe('0.52'); // diffTrx = 18.7 (13.2+5.5) - 18.18 (the leg's own amountTxCcy)
     });
 
-    it('a leg in a DIFFERENT currency does not produce a leg pair for this bucket — only the Suspense pair generates', () => {
+    it('a leg in a DIFFERENT currency does not net against this bucket — only the full-gross Suspense-anchored pair generates (diff reduces to the full gross amount, no matching-currency debitLegs at all)', () => {
       const result = expandSuspenseBridge(
         { debitEntries: [{ amount: '17', currency: 'EUR', crossRate: '1.1' }] },
         'USD',
@@ -234,25 +224,26 @@ describe('expandSuspenseBridge', () => {
       expect(result.debit.map((l) => l.accountNo)).toEqual(['FX Exchange USD - Suspense']); // no unsuffixed "FX Exchange USD" leg pair
     });
 
-    it('falls back to amountTxCcy for a leg missing amountAccountCcy (raw API caller edge case) when sizing the leg pair\'s own-currency amount', () => {
+    it('falls back to amountTxCcy for a leg missing amountAccountCcy (raw API caller edge case) when sizing the diff-netted pair\'s own-currency amount', () => {
       const result = expandSuspenseBridge(
         { debitEntries: [{ amount: '17', currency: 'EUR', crossRate: '1.1' }] },
         'USD',
         [payLeg({ currency: 'EUR', amountTxCcy: '20' })], // no amountAccountCcy
       );
+      // legsOwnCcy falls back to amountTxCcy (20) for the native-currency diff: 17 (gross Suspense) - 20 = -3.
       const legFxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange USD');
-      expect(legFxCredit?.amountAccountCcy).toBe('20'); // falls back to amountTxCcy
-      expect(legFxCredit?.amountTxCcy).toBe('20'); // and the Trx-Ccy-site side reuses the same value verbatim
+      expect(legFxCredit?.amountAccountCcy).toBe('3');
+      expect(legFxCredit?.amountTxCcy).toBe('1.3'); // diffTrx = 18.7 (Suspense trx-eq) - 20 (leg's own amountTxCcy, no fallback needed here)
     });
 
-    it('a zero-amount entry inside an otherwise-foreign-currency bucket is skipped, but sibling entries and both pairs still post', () => {
+    it('a zero-amount entry inside an otherwise-foreign-currency bucket is skipped, but the sibling entry and the diff-netted pair still post', () => {
       const result = expandSuspenseBridge(
         { debitEntries: [{ amount: '0', currency: 'EUR', crossRate: '1.1' }, { amount: '17', currency: 'EUR', crossRate: '1.1' }] },
         'USD',
         [payLeg({ currency: 'EUR', amountTxCcy: '18.18', amountAccountCcy: '20' })],
       );
       expect(result.credit.filter((l) => l.accountNo === 'Suspense - Debit')).toHaveLength(1); // zero-amount entry produced no leg
-      expect(result.debit.map((l) => l.accountNo)).toEqual(['FX Exchange USD - Suspense', 'FX Exchange EUR']);
+      expect(result.debit.map((l) => l.accountNo)).toEqual(['FX Exchange EUR']); // Leg-anchored diff pair only (diff = 17 - 20 = -3)
     });
 
     it('throws RequestValidationError when same-currency entries carry different crossRate values', () => {
@@ -325,284 +316,17 @@ describe('expandSuspenseBridge', () => {
     });
   });
 
-  describe('debitLegsComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed)', () => {
-    it('diff === 0 (exact match): no FX pair at all, only the plain Suspense - Credit leg', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })], // debitLegs — opposite side from creditEntries
-        [], // creditLegs always empty for a debitLegsComponentBridge case
-        true, // debitLegsComponentBridge
-      );
-      expect(result.credit).toEqual([
-        { accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', crBuyRate: '1.2' },
-      ]);
-      expect(result.debit).toEqual([]);
-    });
-
-    it('reproduces the reviewer-confirmed multi-currency worked example (USD 100+EUR 200 Suspense Credit vs USD 80+20 / EUR 200 debit legs) — clean output, no FX Exchange lines at all', () => {
-      const result = expandSuspenseBridge(
-        {
-          creditEntries: [
-            { amount: '100', currency: 'USD' },
-            { amount: '200', currency: 'EUR', crossRate: '1.2' },
-          ],
-        },
-        'USD',
-        [
-          payLeg({ accountNo: 'CUST-ACC2', currency: 'USD', amountTxCcy: '80', amountAccountCcy: '80' }),
-          payLeg({ accountNo: 'CUST-ACC3', currency: 'USD', amountTxCcy: '20', amountAccountCcy: '20' }),
-          payLeg({ accountNo: 'CUST-ACC', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' }),
-        ],
-        [],
-        true,
-      );
-      expect(result.debit).toEqual([]);
-      expect(result.credit).toEqual([
-        { accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '100' },
-        { accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', crBuyRate: '1.2' },
-      ]);
-    });
-
-    it('diff > 0, NO matching debit leg at all: reduces to the full gross-sized pair — identical to the pre-existing "no matching leg" behavior', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [], // no EUR debit leg at all
-        [],
-        true,
-      );
-      expect(result.credit).toEqual([
-        { accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', crBuyRate: '1.2' },
-        { accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '240', crBuyRate: '1.2' },
-      ]);
-      expect(result.debit).toEqual([
-        { accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', drBuyRate: '1.2' },
-      ]);
-    });
-
-    it('diff > 0, PARTIAL match (150 of 200 EUR): the pair is sized to just the 50 EUR / 60 USD residual, not the full 200/240 gross', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [payLeg({ currency: 'EUR', amountTxCcy: '180', amountAccountCcy: '150' })], // only 150 of the 200 EUR is matched
-        [],
-        true,
-      );
-      const fxDebit = result.debit.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      expect(fxDebit).toEqual({ accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '60', amountAccountCcy: '50', drBuyRate: '1.2' });
-      expect(fxCredit).toEqual({ accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '60', crBuyRate: '1.2' });
-      // Full end-to-end aggregate + per-currency balance for this exact scenario (plus the USD
-      // Suspense Credit bucket this isolated call doesn't exercise) is verified via
-      // confirmPaymentInstruction.test.ts's "partial coverage" integration test.
-    });
-
-    it('diff < 0 (debitLegs EXCEED the Suspense Credit bucket): a DEBIT-anchored pair, sized to just the excess, direction mirrors the diff > 0 case', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [payLeg({ currency: 'EUR', amountTxCcy: '252', amountAccountCcy: '210' })], // 210, not 200 — a 10 EUR excess
-        [],
-        true,
-      );
-      const fxDebit = result.debit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
-      expect(fxDebit).toEqual({ accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '12', drBuyRate: '1.2' });
-      expect(fxCredit).toEqual({ accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '12', amountAccountCcy: '10', crBuyRate: '1.2' });
-      // Full end-to-end aggregate + per-currency balance for this exact scenario (with a
-      // compensating leg elsewhere covering the 10 EUR / 12 USD excess) is verified via
-      // confirmPaymentInstruction.test.ts's "debit exceeds Suspense Credit" integration test.
-    });
-
-    it('does NOT apply when debitLegsComponentBridge is false/omitted, even with an exact native-currency match (opt-in only — the default 4-arg call site is unaffected, unconditional gross-sized pair still generates)', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })],
-        [],
-      );
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      expect(fxCredit?.amountTxCcy).toBe('240'); // full gross, not diff-sized — the old default path, untouched
-    });
-
-    it('does NOT apply to a debitEntries bucket (side DEBIT) — only ever compares creditEntries against the OPPOSITE-side debitLegs, never the reverse', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [],
-        [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })], // creditLegs matching debitEntries — not the shape this targets
-        true,
-      );
-      const fxDebit = result.debit.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
-      expect(fxDebit?.amountAccountCcy).toBe('200'); // full gross, not diff-sized — side DEBIT is untouched by this branch
-    });
-  });
-
-  describe('creditLegsComponentBridge leg placement flip (2026-08-12, mirror image of debitLegsComponentBridge)', () => {
-    it('a debitEntries-sourced same-currency entry posts to the DEBIT array when creditLegsComponentBridge is true (flipped from the default always-credit placement)', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '100', currency: 'USD' }] },
-        'USD',
-        [],
-        [payLeg({ currency: 'USD', amountTxCcy: '100' })],
-        false,
-        true,
-      );
-      expect(result.debit).toEqual([{ accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '100' }]);
-      expect(result.credit).toEqual([]);
-    });
-
-    it('the same entry posts to the CREDIT array (default, unflipped) when creditLegsComponentBridge is false/omitted, even with a debitEntries source', () => {
-      const result = expandSuspenseBridge({ debitEntries: [{ amount: '100', currency: 'USD' }] }, 'USD', [], []);
-      expect(result.credit).toEqual([{ accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '100' }]);
-      expect(result.debit).toEqual([]);
-    });
-
-    it("relabels a flipped cross-currency entry's rate field from crBuyRate to drBuyRate (response-shape correctness, matching buildFxPair's own DR/CR-tied convention) — never both, never neither", () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '100', currency: 'EUR', crossRate: '1.1' }] },
-        'USD',
-        [],
-        [payLeg({ currency: 'EUR', amountTxCcy: '110', amountAccountCcy: '100' })],
-        false,
-        true,
-      );
-      const suspenseLeg = result.debit.find((l) => l.accountNo === 'Suspense - Debit');
-      expect(suspenseLeg?.drBuyRate).toBe('1.1');
-      expect(suspenseLeg?.crBuyRate).toBeUndefined();
-    });
-
-    it('does NOT flip placement for a creditEntries bucket even when creditLegsComponentBridge is true — only debitEntries-sourced legs are ever flipped', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '100', currency: 'USD' }] },
-        'USD',
-        [payLeg({ currency: 'USD', amountTxCcy: '100' })],
-        [],
-        false,
-        true,
-      );
-      expect(result.credit).toEqual([{ accountNo: 'Suspense - Credit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '100' }]);
-      expect(result.debit).toEqual([]);
-    });
-  });
-
-  describe('creditLegsComponentBridge diff-sized pair (2026-08-12, mirror image of debitLegsComponentBridge diff-sized pair — same rationale, opposite side and opposite anchor polarity)', () => {
-    it('diff === 0 (exact match): no FX pair at all, only the plain Suspense - Debit leg (now DEBIT-direction, drBuyRate not crBuyRate)', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [],
-        [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })], // creditLegs — opposite side from debitEntries
-        false,
-        true, // creditLegsComponentBridge
-      );
-      expect(result.debit).toEqual([
-        { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', drBuyRate: '1.2' },
-      ]);
-      expect(result.credit).toEqual([]);
-    });
-
-    it('reproduces the multi-currency worked example (mirrored: USD 100+EUR 200 Suspense Debit vs USD 80+20 / EUR 200 credit legs) — clean output, no FX Exchange lines at all', () => {
-      const result = expandSuspenseBridge(
-        {
-          debitEntries: [
-            { amount: '100', currency: 'USD' },
-            { amount: '200', currency: 'EUR', crossRate: '1.2' },
-          ],
-        },
-        'USD',
-        [],
-        [
-          payLeg({ accountNo: 'NOSTRO-ACC2', currency: 'USD', amountTxCcy: '80', amountAccountCcy: '80' }),
-          payLeg({ accountNo: 'NOSTRO-ACC3', currency: 'USD', amountTxCcy: '20', amountAccountCcy: '20' }),
-          payLeg({ accountNo: 'NOSTRO-ACC', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' }),
-        ],
-        false,
-        true,
-      );
-      expect(result.credit).toEqual([]);
-      expect(result.debit).toEqual([
-        { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'USD', amountTxCcy: '100' },
-        { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', drBuyRate: '1.2' },
-      ]);
-    });
-
-    it('diff > 0, NO matching credit leg at all: reduces to the full gross-sized pair, DEBIT-anchored (mirror of the CREDIT-anchored original)', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [],
-        [], // no EUR credit leg at all
-        false,
-        true,
-      );
-      expect(result.debit).toEqual([
-        { accountNo: 'Suspense - Debit', accountType: 'SUSPENSE', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', drBuyRate: '1.2' },
-        { accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '240', drBuyRate: '1.2' },
-      ]);
-      expect(result.credit).toEqual([
-        { accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200', crBuyRate: '1.2' },
-      ]);
-    });
-
-    it('diff > 0, PARTIAL match (150 of 200 EUR): the pair is sized to just the 50 EUR / 60 USD residual, DEBIT-anchored', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [],
-        [payLeg({ currency: 'EUR', amountTxCcy: '180', amountAccountCcy: '150' })], // only 150 of the 200 EUR is matched
-        false,
-        true,
-      );
-      const fxDebit = result.debit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
-      expect(fxDebit).toEqual({ accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '60', drBuyRate: '1.2' });
-      expect(fxCredit).toEqual({ accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '60', amountAccountCcy: '50', crBuyRate: '1.2' });
-    });
-
-    it('diff < 0 (creditLegs EXCEED the Suspense Debit bucket): a CREDIT-anchored pair, sized to just the excess (mirror of the DEBIT-anchored original)', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [],
-        [payLeg({ currency: 'EUR', amountTxCcy: '252', amountAccountCcy: '210' })], // 210, not 200 — a 10 EUR excess
-        false,
-        true,
-      );
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      const fxDebit = result.debit.find((l) => l.accountNo === 'FX Exchange USD - Suspense');
-      expect(fxCredit).toEqual({ accountNo: 'FX Exchange EUR - Suspense', accountType: 'INTERNAL', currency: 'USD', amountTxCcy: '12', crBuyRate: '1.2' });
-      expect(fxDebit).toEqual({ accountNo: 'FX Exchange USD - Suspense', accountType: 'INTERNAL', currency: 'EUR', amountTxCcy: '12', amountAccountCcy: '10', drBuyRate: '1.2' });
-    });
-
-    it('does NOT flip placement or diff-size when creditLegsComponentBridge is false/omitted, even for a debitEntries bucket with a matching real leg', () => {
-      const result = expandSuspenseBridge(
-        { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })],
-        [],
-        // debitLegsComponentBridge and creditLegsComponentBridge both omitted (default false)
-      );
-      const suspenseLeg = result.credit.find((l) => l.accountNo === 'Suspense - Debit');
-      expect(suspenseLeg).toBeDefined(); // still lands on CREDIT, not flipped
-      expect(result.debit.find((l) => l.accountNo === 'Suspense - Debit')).toBeUndefined();
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      expect(fxCredit?.amountTxCcy).toBe('240'); // full gross, not diff-sized — the old default path, untouched
-    });
-
-    it('does NOT apply to a creditEntries bucket (side CREDIT) — only ever compares debitEntries against the OPPOSITE-side creditLegs, never the reverse', () => {
-      const result = expandSuspenseBridge(
-        { creditEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
-        'USD',
-        [payLeg({ currency: 'EUR', amountTxCcy: '240', amountAccountCcy: '200' })], // debitLegs matching creditEntries — not the shape this targets
-        [],
-        false,
-        true,
-      );
-      const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
-      expect(fxCredit?.amountTxCcy).toBe('240'); // full gross, not diff-sized — side CREDIT is untouched by this branch
-      expect(result.credit.some((l) => l.accountNo === 'Suspense - Credit')).toBe(true); // placement stays unflipped too
-    });
+  it('a partial-match debitEntries bucket nets to a residual pair unconditionally — no request flag is involved', () => {
+    const result = expandSuspenseBridge(
+      { debitEntries: [{ amount: '200', currency: 'EUR', crossRate: '1.2' }] },
+      'USD',
+      [payLeg({ currency: 'EUR', amountTxCcy: '180', amountAccountCcy: '150' })], // only 150 of the 200 EUR is matched
+      [],
+    );
+    const suspenseLeg = result.credit.find((l) => l.accountNo === 'Suspense - Debit');
+    expect(suspenseLeg).toBeDefined(); // always lands on CREDIT — no flag-driven flip exists anymore
+    expect(result.debit.find((l) => l.accountNo === 'Suspense - Debit')).toBeUndefined();
+    const fxCredit = result.credit.find((l) => l.accountNo === 'FX Exchange EUR - Suspense');
+    expect(fxCredit?.amountTxCcy).toBe('60'); // diff-sized (v1.9.0): 200 gross - 150 matched = 50 EUR / 60 USD residual
   });
 });

@@ -13,6 +13,7 @@ export function buildConfirmRequest(
   model: Record<string, any>,
   debitLegs: PaymentLegInput[],
   creditLegs: PaymentLegInput[],
+  transactionCurrency: string,
   suspenseBridge?: SuspenseBridge,
 ): PaymentInstructionConfirmRequest {
   const request: PaymentInstructionConfirmRequest = {
@@ -22,13 +23,12 @@ export function buildConfirmRequest(
     unitCode: model['unitCode'],
     debitLegs,
     creditLegs,
+    // v1.10.0 — sent explicitly rather than relying on the server's debitLegs[0].currency
+    // fallback, which breaks when a side's legs are all in a currency other than the
+    // deal's actual transaction currency (e.g. Full pay in JPY against a USD transaction).
+    transactionCurrency,
     sourceFunctionCode: config.dualPrefixOptions ? undefined : config.sourceFunctionCode,
     voucherCodePrefixOverride: config.dualPrefixOptions ? model['voucherPrefix'] : undefined,
-    // See PaymentInstructionConfirmRequest.debitLegsComponentBridge's doc comment — mirrors the
-    // case's own debitLegsBridge flag exactly, undefined (omitted on the wire) for every other case.
-    debitLegsComponentBridge: config.debitLegsBridge ? true : undefined,
-    // Mirror of the above for creditLegsComponentBridge/creditLegsBridge (2026-08-12).
-    creditLegsComponentBridge: config.creditLegsBridge ? true : undefined,
   };
   if (suspenseBridge) {
     request.suspenseBridge = suspenseBridge;

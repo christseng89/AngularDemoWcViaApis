@@ -1,20 +1,12 @@
 import { BUSINESS_CASES, MODULE_GROUPS } from './business-case-registry';
 
 describe('business-case-registry data invariants', () => {
-  it('has 17 PASS (15 legacy-traced + 1 debit-legs-bridge + 1 credit-legs-bridge) + 4 GAP + 4 N_A cases (25 total)', () => {
+  it('has 15 PASS (all legacy-traced) + 4 GAP + 4 N_A cases (23 total)', () => {
     const byVerdict = (v: string) => BUSINESS_CASES.filter((c) => c.verdict === v).length;
-    expect(byVerdict('PASS')).toBe(17);
+    expect(byVerdict('PASS')).toBe(15);
     expect(byVerdict('GAP')).toBe(4);
     expect(byVerdict('N_A')).toBe(4);
-    expect(BUSINESS_CASES).toHaveLength(25);
-  });
-
-  it('the two non-legacy-traced PASS cases (the Debit and Credit Payment Bridges) say so explicitly in their own citation, so neither is ever mistaken for one of the 15 source-verified functions', () => {
-    const bridgeCases = BUSINESS_CASES.filter((c) => c.verdict === 'PASS' && !/^SYF_|ConfirmBusinessCall/.test(c.citation));
-    expect(bridgeCases).toHaveLength(2);
-    for (const c of bridgeCases) {
-      expect(c.citation).toMatch(/NOT legacy-traced/i);
-    }
+    expect(BUSINESS_CASES).toHaveLength(23);
   });
 
   it('every case has a unique id', () => {
@@ -30,48 +22,12 @@ describe('business-case-registry data invariants', () => {
     }
   });
 
-  it('every PASS/GAP case has exactly one DEBIT and one CREDIT leg, except debitLegsBridge:true or creditLegsBridge:true cases (bridge cases — the missing side comes entirely from the Suspense bridge, never a real leg)', () => {
-    for (const c of BUSINESS_CASES.filter((c) => c.verdict !== 'N_A' && !c.debitLegsBridge && !c.creditLegsBridge)) {
+  it('every PASS/GAP case has exactly one DEBIT and one CREDIT leg', () => {
+    for (const c of BUSINESS_CASES.filter((c) => c.verdict !== 'N_A')) {
       const sides = c.legs.map((l) => l.side);
       expect(sides).toEqual(expect.arrayContaining(['DEBIT', 'CREDIT']));
       expect(c.legs).toHaveLength(2);
     }
-  });
-
-  it('every debitLegsBridge:true case has ONLY DEBIT legs — no Credit Leg at all (Debit Legs Component Bridge Flag contract, business-case.model.ts)', () => {
-    const debitLegsBridgeCases = BUSINESS_CASES.filter((c) => c.debitLegsBridge);
-    expect(debitLegsBridgeCases.length).toBeGreaterThan(0); // this invariant would be vacuous otherwise
-    for (const c of debitLegsBridgeCases) {
-      expect(c.legs.length).toBeGreaterThan(0);
-      expect(c.legs.every((l) => l.side === 'DEBIT')).toBe(true);
-    }
-  });
-
-  it('every creditLegsBridge:true case has ONLY CREDIT legs — no Debit Leg at all (Credit Legs Component Bridge Flag contract, business-case.model.ts, mirror of debitLegsBridge)', () => {
-    const creditLegsBridgeCases = BUSINESS_CASES.filter((c) => c.creditLegsBridge);
-    expect(creditLegsBridgeCases.length).toBeGreaterThan(0); // this invariant would be vacuous otherwise
-    for (const c of creditLegsBridgeCases) {
-      expect(c.legs.length).toBeGreaterThan(0);
-      expect(c.legs.every((l) => l.side === 'CREDIT')).toBe(true);
-    }
-  });
-
-  it('no case is flagged both debitLegsBridge:true and creditLegsBridge:true — the two flags are mutually exclusive (the microservice rejects both with a 400)', () => {
-    for (const c of BUSINESS_CASES) {
-      expect(!!c.debitLegsBridge && !!c.creditLegsBridge).toBe(false);
-    }
-  });
-
-  it('iplc-issue-charge-bridge is flagged debitLegsBridge:true and has exactly one DEBIT leg', () => {
-    const c = BUSINESS_CASES.find((c) => c.id === 'iplc-issue-charge-bridge')!;
-    expect(c.debitLegsBridge).toBe(true);
-    expect(c.legs.map((l) => l.side)).toEqual(['DEBIT']);
-  });
-
-  it('iplc-usance-settlement-credit-bridge is flagged creditLegsBridge:true and has exactly one CREDIT leg', () => {
-    const c = BUSINESS_CASES.find((c) => c.id === 'iplc-usance-settlement-credit-bridge')!;
-    expect(c.creditLegsBridge).toBe(true);
-    expect(c.legs.map((l) => l.side)).toEqual(['CREDIT']);
   });
 
   it('every N_A case has no legs and a populated moduleStats summary', () => {

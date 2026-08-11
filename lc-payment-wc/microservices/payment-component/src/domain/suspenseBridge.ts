@@ -1,5 +1,5 @@
 /**
- * Charge Component <-> Payment Component accounting bridge — added v1.4.0.
+ * Charge/Balance Component <-> Payment Component accounting bridge — added v1.4.0.
  * NOT part of the legacy trace (no §-section citation exists for this; the
  * legacy screens never had both components live in the same request path).
  *
@@ -10,10 +10,7 @@
  * entry in EITHER list, unconditionally (see buildSuspenseBridgeLeg's doc
  * comment for the balance identity this preserves) — plus FX Exchange pair
  * legs so the settlement voucher balances BY CURRENCY, not just in
- * transaction-currency aggregate. EXCEPTION (2026-08-12, creditLegsComponentBridge
- * only — see that flag's own dated section below): a debitEntries-sourced leg posts
- * DEBIT instead, narrowly for that one mode; every other mode keeps the original
- * always-credit placement described above unchanged.
+ * transaction-currency aggregate.
  *
  * v1.7.0/v1.7.1 (SUPERSEDED by v1.8.0 below, kept here for the record): when
  * a Suspense entry's currency differed from the transaction currency AND the
@@ -50,13 +47,33 @@
  * — including the transaction currency, once every bucket's contributions
  * are summed — balances exactly, simultaneously with aggregate V8 (which
  * was already guaranteed either way, since both legs of every pair always
- * carry the identical amountTxCcy). No netting/combining step, and
- * therefore no debitEntries-vs-creditEntries asymmetry, is needed anymore —
- * each source (a real leg, or the Suspense entries in a currency) is
- * self-balancing on its own, and balance is additive: two independently
- * self-balancing pairs sum to a still-balanced whole. The Suspense leg(s)
- * themselves are unaffected by any of this — always posted gross, per
- * entry, always credit-direction, exactly as pre-v1.7.0.
+ * carry the identical amountTxCcy). The Suspense leg(s) themselves are
+ * unaffected by any of this — always posted gross, per entry, always
+ * credit-direction, exactly as pre-v1.7.0.
+ *
+ * v1.9.0 (SUPERSEDES v1.8.0's "up to TWO independent pairs" for a
+ * debitEntries bucket ONLY — 2026-08-13, business-requirement-confirmed,
+ * Import LC Pay/Accept scenario): v1.8.0's independent-pairs approach was
+ * byte-for-byte aggregate-safe but produced decorative FX Exchange lines
+ * whenever a debitEntries bucket's Suspense entries were already fully
+ * matched by a same-currency real Customer Debit leg (e.g. Suspense Debit
+ * EUR 100 funded by a real Customer Debit EUR 100 — no conversion is
+ * actually happening). Fixed by netting the Suspense pair against the
+ * matching debitLegs pair — via plain Decimal subtraction of the two
+ * ALREADY-rounded amounts (never a fresh rate re-conversion of a combined
+ * magnitude, so this cannot reintroduce the v1.7.x combine-then-reconvert
+ * drift bug) — down to at most ONE pair per bucket: see
+ * expandSuspenseBridge's own inline comment for diff===0/diff>0/diff<0.
+ * This is SAFE (preserves per-native-currency balance unconditionally —
+ * proven, not just tested, in that inline comment) specifically because a
+ * debitEntries Suspense leg lands CREDIT while its matching debitLegs are
+ * DEBIT-direction — opposite actual placement, i.e. "the same money." A
+ * creditEntries bucket's matching creditLegs are the SAME actual direction
+ * the Suspense leg itself already lands on (both CREDIT) — a fundamentally
+ * different, independent-exposure relationship where netting would silently
+ * break per-currency balance — so v1.9.0 deliberately does NOT touch a
+ * creditEntries bucket's own two-independent-pairs behavior, which stays
+ * byte-for-byte pre-v1.9.0 (see the "reviewer-confirmed EUR100+EUR100" test).
  *
  * Ported 1:1 (pre-v1.7.0 baseline) from the algorithm previously implemented
  * client-side in
@@ -66,55 +83,6 @@
  * contract, including what this service does NOT adjust on the caller's
  * behalf (only Suspense/FX legs are ever ADDED — a caller's own submitted
  * debit/credit leg amounts are never modified).
- *
- * debitLegsComponentBridge diff-sized pair (2026-08-09, business-requirement-confirmed; flag
- * renamed from chargeComponentBridge 2026-08-10 — see lc-payment-wc/CLAUDE.md's dated entry) —
- * see the `if (debitLegsComponentBridge && side === 'CREDIT')` branch inside expandSuspenseBridge
- * below for the full rationale. Short version: a debitLegsComponentBridge request's real legs sit
- * on the OPPOSITE side from its suspenseBridge.creditEntries (creditLegs is always empty in that
- * mode), a direction the ordinary same-side "real-leg pair" logic above never checks. Instead of
- * the unconditional gross-sized Suspense pair every other request gets, a debitLegsComponentBridge
- * bucket gets ONE pair sized to the DIFFERENCE between the bucket's own gross amount and the
- * caller's matching-currency debitLegs — zero when they match exactly (no FX pair at all — no
- * conversion is actually happening), the full gross amount when there's no matching debit leg at
- * all (identical to the pre-existing behavior in that case), and just the residual otherwise.
- * Scoped narrowly (debitLegsComponentBridge:true only) to avoid the netting/combining class of bug
- * this file's v1.7.x history is full of — but safely so, because every pair here (gross- or
- * diff-sized, it makes no difference) is self-balancing by construction and therefore never
- * affects whether aggregate V8 passes; only the DISPLAYED magnitude changes. This pattern is not
- * charge-specific — the credit side may be sourced from a Charge Component OR a Customer IBL
- * Payment / Import Bill Loan scenario (Buyer's Usance LC funding, distinct from the existing
- * balanceModule:'IBL' "Import Bill Liability" tag), or a mix of both in one request; neither
- * upstream component's own books are modeled by this microservice.
- *
- * creditLegsComponentBridge (2026-08-12, business-requirement-confirmed) — the mirror image of
- * debitLegsComponentBridge above, for the opposite scenario: a Loan Component (or other upstream
- * component) generates the CREDIT-side funding obligation through a Suspense account (e.g.
- * Dr IBL / Cr Suspense - IBL for a Buyer's Usance LC), and Payment Component performs the actual
- * settlement to the beneficiary/Nostro account. A creditLegsComponentBridge:true request's
- * debitLegs is always empty; the entire debit side is provided by suspenseBridge.debitEntries.
- * Two things this mode changes that debitLegsComponentBridge does NOT need to:
- *   1. Leg placement itself. debitLegsComponentBridge only ever used suspenseBridge.creditEntries,
- *      whose desired direction (credit) already matched the general always-credit placement — no
- *      placement change was needed. creditLegsComponentBridge uses suspenseBridge.debitEntries,
- *      but wants a DEBIT-direction posting (Dr Suspense - Debit) — the opposite of what the
- *      general pattern gives a debitEntries-sourced leg. isFlippedDebitSide() inside
- *      expandSuspenseBridge below flips placement to `debit` specifically for this combination
- *      (creditLegsComponentBridge:true AND side === 'DEBIT') — every other combination (the
- *      general pattern, and debitLegsComponentBridge itself) is completely unaffected.
- *   2. The diff-sized FX pair — mirrored onto the `if (creditLegsComponentBridge && side ===
- *      'DEBIT')` branch below, comparing this bucket against the caller's own creditLegs (the
- *      opposite side, matching how debitLegsComponentBridge compares its CREDIT bucket against
- *      debitLegs). The anchor polarity is the mirror image too (DEBIT-anchored for diff > 0,
- *      CREDIT-anchored for diff < 0) — see that branch's own comment for why.
- * Account naming (reviewer-confirmed 2026-08-12): the Suspense leg still uses the existing
- * generic 'Suspense - Debit' account (accountNo is tied to which LIST an entry came from, per
- * buildSuspenseBridgeLeg, not to a per-scenario name) — NOT a literal 'Suspense - IBL' account.
- * Which upstream component/product a Suspense entry is for is metadata (sourceComponent), same
- * posture as the existing 'BALANCE'/'CHARGE' tags, not a custom account name.
- * Mutually exclusive with debitLegsComponentBridge (validation/requestSchema.ts's superRefine
- * rejects both true at once with a 400) — the general Balance/Charge Component bridge pattern
- * above already supports bridging both sides in one request without either narrow flag.
  */
 import type { PaymentLegInput, SuspenseBridge, SuspenseEntry, LegSide } from '../types';
 import { parseMonetaryAmount, parseExchangeRate, formatMonetaryAmount, minorUnitsForCurrency, sumMonetaryAmounts } from '../money';
@@ -123,14 +91,10 @@ import Decimal from 'decimal.js';
 
 /**
  * One entry -> one Suspense leg (accountType SUSPENSE), landing on accountNo
- * 'Suspense - Debit' or 'Suspense - Credit' per which list it came from — this
- * function itself does not decide which array (debit/credit) the leg is placed
- * into; expandSuspenseBridge's caller-side placement decides that (isFlippedDebitSide
- * — see that function and this module's top doc comment, creditLegsComponentBridge
- * section, for the one narrow exception). Always posted at the entry's own GROSS
- * amount. For every mode except creditLegsComponentBridge, the resulting leg ALWAYS
- * lands on the CREDIT side regardless of which list it came from, mirroring the
- * original client-side implementation's documented balance derivation:
+ * 'Suspense - Debit' or 'Suspense - Credit' per which list it came from. Always
+ * posted at the entry's own GROSS amount, and ALWAYS lands on the CREDIT side
+ * regardless of which list it came from, mirroring the original client-side
+ * implementation's documented balance derivation:
  *
  *   Σ Debit  = (Total + SD)                                          = Total + SD
  *   Σ Credit = (Total - SC) + SD [bridge for SD] + SC [bridge for SC] = Total + SD
@@ -168,7 +132,7 @@ export function buildSuspenseBridgeLeg(
   if (!entry.crossRate) {
     throw new RequestValidationError(
       `suspenseBridge entry in currency "${entry.currency}" differs from the transaction currency ` +
-        `"${transactionCurrency}" (debitLegs[0].currency) but has no crossRate`,
+        `"${transactionCurrency}" but has no crossRate`,
     );
   }
   const rate = parseExchangeRate(entry.crossRate);
@@ -291,13 +255,23 @@ function resolveBucketRate(currency: string, bucket: readonly SuspenseEntry[]): 
 /**
  * Every entry in both debitEntries/creditEntries, turned into its own gross
  * Suspense leg (see buildSuspenseBridgeLeg — always credit, regardless of
- * list), grouped by currency. For each foreign-currency bucket, up to two
- * independent, self-balancing FX Exchange pairs are added (v1.8.0 — see
- * this file's top doc comment): one for the bucket's own Suspense entries,
- * one for the caller's own matching-currency real legs (skipped if none
- * exist). Entries whose currency equals transactionCurrency are unaffected
- * (case 1 — folds directly into the caller's own Leg #1 seed, no FX pair,
- * always credit): each becomes its own credit leg, exactly as pre-v1.7.0.
+ * list), grouped by currency. For each foreign-currency bucket:
+ *   - a debitEntries bucket (side DEBIT) gets at most ONE self-balancing FX
+ *     Exchange pair (v1.9.0 — see this file's top doc comment), sized to the
+ *     DIFFERENCE between the bucket's own gross Suspense amount and the
+ *     caller's matching-currency debitLegs: no pair at all when they match
+ *     exactly, a Suspense-anchored pair for the shortfall when Suspense
+ *     exceeds debitLegs (or there are no matching debitLegs at all — the
+ *     common case, reducing to the full gross amount), a Leg-anchored pair
+ *     for the excess when debitLegs exceed Suspense.
+ *   - a creditEntries bucket (side CREDIT) is unaffected by v1.9.0 and keeps
+ *     the original v1.8.0 behavior: up to TWO independent, gross-sized,
+ *     self-balancing pairs (a Suspense pair, and — only when a matching
+ *     creditLegs entry exists in that currency — a separate leg pair) —
+ *     see this branch's own inline comment for why netting is unsafe here.
+ * Entries whose currency equals transactionCurrency are unaffected (case 1
+ * — folds directly into the caller's own Leg #1 seed, no FX pair, always
+ * credit): each becomes its own credit leg, exactly as pre-v1.7.0.
  *
  * `debitLegs`/`creditLegs` are the CALLER's own submitted legs
  * (pre-bridge-expansion) — read only to size the real-leg FX pair; never
@@ -308,8 +282,6 @@ export function expandSuspenseBridge(
   transactionCurrency: string,
   debitLegs: readonly PaymentLegInput[] = [],
   creditLegs: readonly PaymentLegInput[] = [],
-  debitLegsComponentBridge = false,
-  creditLegsComponentBridge = false,
 ): { debit: PaymentLegInput[]; credit: PaymentLegInput[] } {
   const debit: PaymentLegInput[] = [];
   const credit: PaymentLegInput[] = [];
@@ -325,36 +297,15 @@ export function expandSuspenseBridge(
     { accountNo: 'Suspense - Credit', entries: bridge.creditEntries ?? [], side: 'CREDIT', sideLegs: creditLegs },
   ];
 
-  // creditLegsComponentBridge:true flips debitEntries-sourced legs to DEBIT-direction —
-  // see this file's top doc comment for the full rationale. Every other combination (including
-  // creditEntries under creditLegsComponentBridge, and both lists under every other mode) keeps
-  // the original always-credit placement.
-  const isFlippedDebitSide = (side: LegSide): boolean => creditLegsComponentBridge && side === 'DEBIT';
-
   for (const { accountNo, entries, side, sideLegs } of sides) {
     for (const [currency, bucket] of groupByCurrency(entries)) {
       // Every bridge leg lands on credit, unconditionally, for every currency and every side —
-      // see this file's top doc comment / buildSuspenseBridgeLeg — EXCEPT a debitEntries-sourced
-      // leg under creditLegsComponentBridge:true, which lands on debit instead (isFlippedDebitSide
-      // above).
+      // see this file's top doc comment / buildSuspenseBridgeLeg.
       const bucketSuspenseLegs: PaymentLegInput[] = [];
       for (const entry of bucket) {
         const leg = buildSuspenseBridgeLeg(accountNo, entry, transactionCurrency);
         if (leg) {
-          if (isFlippedDebitSide(side)) {
-            // buildSuspenseBridgeLeg always labels a cross-currency entry's rate crBuyRate — a
-            // safe assumption pre-2026-08-12, when every Suspense leg always posted credit. Now
-            // that this one is being placed on debit, relabel to drBuyRate (matching buildFxPair's
-            // own convention of tying the field name to actual DR/CR placement) — response-shape
-            // correctness only, nothing downstream branches on crBuyRate vs drBuyRate today.
-            if (leg.crBuyRate !== undefined) {
-              leg.drBuyRate = leg.crBuyRate;
-              delete leg.crBuyRate;
-            }
-            debit.push(leg);
-          } else {
-            credit.push(leg);
-          }
+          credit.push(leg);
           bucketSuspenseLegs.push(leg);
         }
       }
@@ -365,105 +316,79 @@ export function expandSuspenseBridge(
       const grossSuspense = sumMonetaryAmounts(bucket.map((e) => e.amount));
       const suspenseTrxEq = sumMonetaryAmounts(bucketSuspenseLegs.map((l) => l.amountTxCcy));
 
-      // Debit Legs Component Bridge Flag (2026-08-09, business-requirement-confirmed; renamed
-      // from chargeComponentBridge 2026-08-10): a debitLegsComponentBridge request's real legs
-      // are ALWAYS on the OPPOSITE side from its
-      // suspenseBridge.creditEntries (Dr Customer A/C / Cr Suspense - Credit — creditLegs is
-      // always empty in this mode, see this file's top doc comment), so the ordinary "real-leg
-      // pair" below — which only ever compares AGAINST THE SAME side (creditEntries vs
-      // creditLegs) — can never fire for it. Replaces BOTH the unconditional gross-sized
-      // Suspense pair AND the (always-skipped, for this mode) same-side real-leg pair with ONE
-      // pair sized to the DIFFERENCE between this bucket's own gross amount and the caller's
-      // OPPOSITE-side debitLegs in the SAME native currency:
-      //   - diff == 0 (exact match, e.g. 200 EUR debit vs 200 EUR Suspense Credit): NO FX pair
-      //     at all — Dr CUST-ACC {ccy} X / Cr Suspense - Credit {ccy} X already balances BY
-      //     CURRENCY on its own, so a full-gross pair would be pure decoration, misleadingly
-      //     implying a conversion that never occurred.
-      //   - diff > 0 (Suspense exceeds the matching debitLegs, e.g. no matching debit leg at
-      //     all in this currency): a CREDIT-anchored pair sized to just the shortfall — when
-      //     there's no matching leg at all this reduces to the pre-existing gross-sized
-      //     behavior (matchingDebitLegs = 0, so diff = the full gross amount), unchanged.
-      //   - diff < 0 (debitLegs exceed the Suspense bucket, e.g. a real leg partly funded by a
-      //     DIFFERENT currency's surplus): a DEBIT-anchored pair sized to the excess, the
-      //     mirror-image case.
-      // Sized using suspenseTrxEq/oppositeTrx — both ALREADY-rounded, already-on-the-wire
-      // amountTxCcy sums — via plain Decimal subtraction, never a fresh rate re-conversion of a
-      // derived magnitude. This is deliberately NOT the same class of bug as the v1.7.3 attempt
-      // this file's top doc comment describes (which combined amounts and re-converted the
-      // combined figure at a single rate, drifting from what was already independently rounded
-      // and on the wire): subtracting two figures that are each already final/verbatim cannot
-      // introduce a NEW rounding disagreement the way re-multiplying a combined magnitude did.
-      // A genuine, unexplained aggregate mismatch (no compensating leg anywhere else) is
-      // UNAFFECTED by any of this either way — every pair here is self-balancing by
-      // construction (adds the identical amount to both debit and credit), so it can never
-      // change whether Σ debitLegs == Σ creditLegs; that still gets caught by
-      // validateDrCrBalance (§3/V8) exactly as before, regardless of how this pair is sized.
-      if (debitLegsComponentBridge && side === 'CREDIT') {
+      // v1.9.0 (2026-08-13, business-requirement-confirmed — "Same Currency + Same Amount ->
+      // Direct Settlement -> No FX Pair") — a debitEntries bucket ONLY (side === 'DEBIT') nets
+      // its own gross Suspense amount against `debitLegs`' matching-currency sum, via plain
+      // Decimal subtraction of two ALREADY-rounded, already-on-the-wire figures — never a fresh
+      // rate re-conversion of a combined magnitude, so this cannot reintroduce the per-currency
+      // drift the v1.7.x "combine then convert once" attempts caused (see this file's top doc
+      // comment):
+      //   - diff === 0 (exact match, e.g. Suspense Debit EUR 100 funded by a real Customer Debit
+      //     EUR 100 — no conversion is actually happening): no FX pair at all, replacing what
+      //     pre-v1.9.0 unconditionally emitted as TWO decorative, fully self-cancelling gross
+      //     pairs (a Suspense pair and a leg pair) for the exact same net effect.
+      //   - diff > 0 (Suspense exceeds the matching debitLegs, incl. the common "no matching
+      //     debit leg at all" case, where diff reduces to the full gross amount — byte-for-byte
+      //     the pre-existing behavior): a CREDIT-anchored pair (" - Suspense" suffix, matching the
+      //     Suspense leg's own placement), sized to just the shortfall.
+      //   - diff < 0 (the debitLegs exceed the Suspense bucket): a DEBIT-anchored pair (no
+      //     suffix, matching the real leg's own direction), sized to just the excess.
+      // This is SAFE (preserves per-native-currency balance for any S/L split — see this branch's
+      // own worked-example tests) specifically because a debitEntries Suspense leg lands CREDIT
+      // (buildSuspenseBridgeLeg's default) while its matching debitLegs are DEBIT-direction — i.e.
+      // OPPOSITE actual placement, i.e. "a credit needs a debit counterpart."
+      //
+      // Deliberately NOT mirrored onto a creditEntries bucket (side === 'CREDIT'): there, the
+      // matching creditLegs are the SAME actual direction the Suspense leg itself already lands
+      // on (both CREDIT) — a same-direction real leg represents a genuinely INDEPENDENT exposure
+      // (e.g. a real Nostro settlement leg, unrelated money, that merely happens to share a
+      // currency with a Charge/Balance Component's Suspense-Credit bridge amount), not "the same
+      // money" the way a real DEBIT leg naturally funds a CREDIT-landing Suspense entry. Netting
+      // that combination would UNDER-post the FX pair and leave the settlement voucher genuinely
+      // unbalanced BY CURRENCY (still aggregate-V8-safe, since every pair is self-balancing by
+      // construction, but no longer decomposable per currency the way the "reviewer-confirmed
+      // EUR100+EUR100" scenario below relies on) — so a creditEntries bucket keeps the original,
+      // unconditional two-independent-pairs behavior below, completely untouched.
+      if (side === 'DEBIT') {
         const oppositeNative = sumLegsInCurrency(debitLegs, currency);
         const oppositeTrx = sumLegsTrxCcy(debitLegs, currency);
         const diffNative = grossSuspense.minus(oppositeNative);
         const diffTrx = suspenseTrxEq.minus(oppositeTrx);
 
-        // NOTE: Decimal#isPositive() is true for >= 0 (zero counts as "positive" in decimal.js),
-        // NOT strictly > 0 — greaterThan(0)/lessThan(0) are used here instead so the zero case
-        // falls through neither branch, exactly as intended (diffNative === 0 means no pair).
+        // NOTE: Decimal#isPositive() is true for >= 0 in decimal.js — greaterThan(0)/lessThan(0)
+        // are used here so diffNative === 0 falls through both branches (no pair at all).
         if (diffNative.greaterThan(0)) {
           const pair = buildFxPair(currency, transactionCurrency, diffNative, diffTrx, 'CREDIT', rate, ' - Suspense');
           debit.push(...pair.debit);
           credit.push(...pair.credit);
         } else if (diffNative.lessThan(0)) {
-          const pair = buildFxPair(currency, transactionCurrency, diffNative.abs(), diffTrx.abs(), 'DEBIT', rate, ' - Suspense');
+          // Leg-anchored (no " - Suspense" suffix, matching the pre-v1.9.0 "leg pair" naming) — a
+          // debitLegs-exceeds-Suspense residual here is still meaningfully a real leg's own excess
+          // exposure, so it keeps the distinct, un-suffixed Leg Pair label.
+          const pair = buildFxPair(currency, transactionCurrency, diffNative.abs(), diffTrx.abs(), 'DEBIT', rate, '');
           debit.push(...pair.debit);
           credit.push(...pair.credit);
         }
         continue;
       }
 
-      // creditLegsComponentBridge mirror of the branch above (2026-08-12) — same rationale,
-      // opposite side and opposite anchor polarity: a creditLegsComponentBridge request's real
-      // legs (creditLegs) are ALWAYS on the OPPOSITE side from its suspenseBridge.debitEntries
-      // (debitLegs is always empty in this mode), and this bucket's own Suspense legs now post
-      // DEBIT-direction (isFlippedDebitSide above) rather than the usual credit. diff is sized
-      // identically (grossSuspense/suspenseTrxEq minus the opposite side's matching-currency
-      // sum) but the anchor polarity flips to match: diff > 0 (Suspense exceeds the matching
-      // creditLegs) anchors DEBIT — matching the Suspense leg's own new direction — instead of
-      // CREDIT; diff < 0 (creditLegs exceed the Suspense bucket) anchors CREDIT instead of DEBIT.
-      if (creditLegsComponentBridge && side === 'DEBIT') {
-        const oppositeNative = sumLegsInCurrency(creditLegs, currency);
-        const oppositeTrx = sumLegsTrxCcy(creditLegs, currency);
-        const diffNative = grossSuspense.minus(oppositeNative);
-        const diffTrx = suspenseTrxEq.minus(oppositeTrx);
-
-        if (diffNative.greaterThan(0)) {
-          const pair = buildFxPair(currency, transactionCurrency, diffNative, diffTrx, 'DEBIT', rate, ' - Suspense');
-          debit.push(...pair.debit);
-          credit.push(...pair.credit);
-        } else if (diffNative.lessThan(0)) {
-          const pair = buildFxPair(currency, transactionCurrency, diffNative.abs(), diffTrx.abs(), 'CREDIT', rate, ' - Suspense');
-          debit.push(...pair.debit);
-          credit.push(...pair.credit);
-        }
-        continue;
-      }
-
-      // Suspense's own pair — always CREDIT-anchored (the bridge leg's own fixed
-      // direction), regardless of which list it came from. Sized to reuse the
-      // bucket's own bridge legs' already-rounded amountTxCcy, summed — never
-      // re-derived — so it always agrees exactly with what was just posted above.
-      // Always suffixed " - Suspense" — even when no matching real leg coexists in this
-      // currency (the common case) — so every Suspense-driven FX line is unambiguously
-      // self-descriptive, not just when it happens to need disambiguating from a real leg's
-      // own pair. A deliberate v1.8.0 naming change from the plain "FX Exchange {ccy}" this
-      // pair carried pre-v1.8.0 when no leg coexisted.
+      // Suspense's own pair — always CREDIT-anchored (the bridge leg's own fixed direction,
+      // unaffected by v1.9.0 above, which only ever applies to a debitEntries bucket). Sized to
+      // reuse the bucket's own bridge legs' already-rounded amountTxCcy, summed — never
+      // re-derived — so it always agrees exactly with what was just posted above. Always
+      // suffixed " - Suspense", even when no matching real leg coexists in this currency (the
+      // common case) — so every Suspense-driven FX line is unambiguously self-descriptive, not
+      // just when it happens to need disambiguating from a real leg's own pair.
       const suspensePair = buildFxPair(currency, transactionCurrency, grossSuspense, suspenseTrxEq, 'CREDIT', rate, ' - Suspense');
       debit.push(...suspensePair.debit);
       credit.push(...suspensePair.credit);
 
-      // The caller's own matching real legs' pair — direction matches `side`.
-      // Sized to reuse those legs' own already-submitted amountTxCcy, summed —
-      // never re-derived — so it agrees exactly with whatever the caller put on
-      // the wire, regardless of how many legs share the currency or what rate
-      // each individually used. Skipped when no real leg exists in this currency.
+      // The caller's own matching real legs' pair — direction matches `side` (always CREDIT
+      // here, since a debitEntries bucket already `continue`d above). Sized to reuse those legs'
+      // own already-submitted amountTxCcy, summed — never re-derived — so it agrees exactly with
+      // whatever the caller put on the wire. Skipped when no real leg exists in this currency.
+      // Deliberately NOT netted against the Suspense pair above — see this branch's own doc
+      // comment for why a same-direction real leg represents an independent exposure.
       const legsOwnCcy = sumLegsInCurrency(sideLegs, currency);
       const legsTrxCcy = sumLegsTrxCcy(sideLegs, currency);
       const legPair = buildFxPair(currency, transactionCurrency, legsOwnCcy, legsTrxCcy, side, rate, '');

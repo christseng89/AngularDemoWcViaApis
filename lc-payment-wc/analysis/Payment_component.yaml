@@ -155,7 +155,19 @@ info:
     server side instead — see payment-instructions-post.yaml's own v1.8.0
     changelog entry for the full derivation and worked example; kept in
     lockstep here per this file's own scope note above.
-  version: "1.8.0"
+
+
+    v1.10.0 changelog (correctness fix, 2026-08-11, client-visible — new
+    optional request field): added PaymentInstructionConfirmRequest.
+    transactionCurrency, an explicit top-level currency code for the deal's
+    actual transaction currency, independent of any leg's own settlement
+    currency — fixes a false-negative H-2 rejection when a side's legs are
+    ALL in a currency other than the true transaction currency (no leg left
+    to anchor debitLegs[0], the field's own pre-v1.10.0 fallback source) —
+    see payment-instructions-post.yaml's own v1.10.0 changelog entry for the
+    full derivation and worked example; kept in lockstep here per this
+    file's own scope note above.
+  version: "1.10.0"
 servers:
   - url: https://api.bank.example/payment-component/v1
 tags:
@@ -479,6 +491,16 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/PaymentLegInput' }
+        transactionCurrency:
+          type: string
+          description: >
+            Added v1.10.0. The deal's actual transaction currency, independent
+            of any individual leg's OWN settlement currency
+            (PaymentLegInput.currency). amountTxCcy on every leg (debit AND
+            credit) is denominated in THIS currency. Falls back to
+            debitLegs[0].currency when omitted, for backward compatibility
+            with pre-v1.10.0 callers — new callers should always send this
+            explicitly (see the v1.10.0 changelog entry above).
         suspenseBridge:
           allOf: [ { $ref: '#/components/schemas/SuspenseBridge' } ]
           description: >
@@ -528,7 +550,8 @@ components:
           allOf: [ { $ref: '#/components/schemas/ExchangeRate' } ]
           description: >
             Required when currency differs from the instruction's
-            transaction currency (debitLegs[0].currency); ignored
+            transaction currency (transactionCurrency, v1.10.0 — falls back
+            to debitLegs[0].currency if omitted); ignored
             otherwise. The rate converting this entry's own currency INTO
             the transaction currency. This service does not resolve FX
             rates itself — same posture as PaymentLegInput's own rate

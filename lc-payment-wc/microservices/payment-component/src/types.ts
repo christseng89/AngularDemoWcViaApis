@@ -125,7 +125,7 @@ export type BalanceModule = (typeof BALANCE_MODULES)[number];
 export interface SuspenseEntry {
   amount: MonetaryAmount;
   currency: string;
-  /** Required when currency differs from the instruction's transaction currency (debitLegs[0].currency); ignored otherwise. Caller-resolved — this service does not look up FX rates itself. */
+  /** Required when currency differs from the instruction's transaction currency (transactionCurrency, v1.10.0 — falls back to debitLegs[0].currency if omitted); ignored otherwise. Caller-resolved — this service does not look up FX rates itself. */
   crossRate?: ExchangeRate;
   /**
    * Added v1.5.0. Pure provenance/audit metadata identifying which upstream
@@ -160,6 +160,25 @@ export interface PaymentInstructionConfirmRequest {
   payInstrFlag?: PayInstrFlag;
   debitLegs: PaymentLegInput[];
   creditLegs: PaymentLegInput[];
+  /**
+   * Added v1.10.0. The deal's actual transaction currency, independent of any
+   * individual leg's OWN settlement currency (PaymentLegInput.currency).
+   * amountTxCcy on every leg (debit AND credit) is denominated in THIS
+   * currency, per its own field doc comment — never in the leg's own
+   * currency, which can legitimately diverge (a leg posts to a
+   * foreign-currency account, amountAccountCcy/drBuyRate/crBuyRate carry the
+   * conversion). Before v1.10.0 this had no field of its own — the service
+   * inferred it as debitLegs[0].currency (still the fallback here when this
+   * field is omitted, for backward compatibility with existing callers/test
+   * vectors). That inference silently broke for a fully foreign-currency
+   * side with no leg left in the true transaction currency to anchor
+   * index 0 (e.g. transaction currency USD, customer pays 100% in JPY): the
+   * lone leg's OWN currency (JPY) got misread as the transaction currency,
+   * which then wrongly rejected a genuinely-valid USD-scaled amountTxCcy
+   * (or, worse, silently accepted one scaled to the wrong currency). Always
+   * send this explicitly — do not rely on the fallback for new callers.
+   */
+  transactionCurrency?: string;
   /**
    * Added v1.4.0 — Charge Component <-> Payment Component accounting
    * bridge. NOT part of the legacy trace. See domain/suspenseBridge.ts for

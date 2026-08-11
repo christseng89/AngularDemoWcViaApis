@@ -56,6 +56,23 @@ interface Row {
   driver: 'pct' | 'amount';
 }
 
+/**
+ * Per-A/C-Type placeholder account numbers, used ONLY by onAccountTypeChange below to replace a
+ * row's Account No. the moment the user switches its A/C Type — otherwise the OLD type's account
+ * number (e.g. "CUST-ACC") silently survives a switch to NOSTRO, reading as if that Nostro leg
+ * genuinely posts to a customer account. Naming matches the convention already used throughout
+ * business-case-registry.ts's own leg() defaults (CUST-ACC/NOSTRO-ACC/VOSTRO-ACC/INTERNAL-ACC).
+ * Purely a same-page UI convenience — the field stays freely editable afterward, same as any other
+ * row; this only seeds a sane, unambiguous starting value at the moment of the switch.
+ */
+const DEFAULT_ACCOUNT_NO_BY_TYPE: Record<AccountType, string> = {
+  CUSTOMER: 'CUST-ACC',
+  NOSTRO: 'NOSTRO-ACC',
+  VOSTRO: 'VOSTRO-ACC',
+  SUSPENSE: 'SUSPENSE-ACC',
+  INTERNAL: 'INTERNAL-ACC',
+};
+
 let rowIdCounter = 0;
 
 export interface FxPairEntry {
@@ -66,9 +83,24 @@ export interface FxPairEntry {
   site: 'Trx Ccy' | 'Other Ccy';
 }
 
-/** Rounds to 2dp, ROUND_HALF_UP — matches microservices/payment-component/src/money.ts's convention for the same reason: this feeds MonetaryAmount fields on the wire (pattern ^-?\d{1,18}(\.\d{1,3})?$), and split percentages (e.g. 33.33/33.33/33.34 over a large total) can genuinely drift under binary-float math, which is exactly why the sibling microservice uses decimal.js instead of native numbers for this class of arithmetic. */
-function money(value: Decimal.Value): Decimal {
-  return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+/**
+ * Rounds to `scale` decimal places, ROUND_HALF_UP — matches
+ * microservices/payment-component/src/money.ts's own formatMonetaryAmount(value, scale)
+ * convention for the same two reasons: this feeds MonetaryAmount fields on the wire (pattern
+ * ^-?\d{1,18}(\.\d{1,3})?$), and split percentages (e.g. 33.33/33.33/33.34 over a large total)
+ * can genuinely drift under binary-float math, which is exactly why the sibling microservice
+ * uses decimal.js instead of native numbers for this class of arithmetic.
+ *
+ * `scale` is REQUIRED, never a hardcoded 2 — it must be the SPECIFIC currency's own minor units
+ * (LegAllocatorComponent.scaleFor), which every call site below has: `this.transactionCurrency`
+ * for an `amountTxCcy` figure, `row.currency` for an `amountAccountCcy`/Account Ccy Equivalent
+ * figure. Rounding a JPY (0dp) or BHD/KWD (3dp) amount to a hardcoded 2dp — as this function used
+ * to do unconditionally — produces a value the microservice's own H-2 currency-scale validation
+ * then rejects (or, worse, silently accepts a value that's wrong for that currency), even though
+ * the underlying figure was already a whole number / already within its own currency's precision.
+ */
+function money(value: Decimal.Value, scale: number): Decimal {
+  return new Decimal(value).toDecimalPlaces(scale, Decimal.ROUND_HALF_UP);
 }
 
 function clampPct(value: Decimal.Value): Decimal {
@@ -161,8 +193,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   /**
    * Per-row over-precision messages, keyed by row id — set at INPUT time
    * (onAmountInput / onAccountAmountInput) against the RAW typed value, because
-   * those handlers immediately money()-round to 2dp, so the raw over-precision
-   * ("9999.112") survives nowhere else. Cleared when the row's amount is
+   * those handlers immediately money()-round to the relevant currency's own scale, so the raw
+   * over-precision ("9999.112") survives nowhere else. Cleared when the row's amount is
    * re-driven cleanly (% edit) or its currency changes (the allowed scale
    * changed and there is no stored raw value to re-check).
    */
@@ -184,6 +216,17 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     const s = String(value);
     const dot = s.indexOf('.');
     return dot === -1 ? 0 : s.length - dot - 1;
+  }
+
+  /**
+   * Minor-unit decimal places for `currency` from the Currency API (CurrencyService.decimals()),
+   * falling back to 2 for a currency absent from the map (unknown, or not yet loaded) — same
+   * fallback convention business-case-runner.component.ts's own decimalsFor() uses. Feeds every
+   * money()/toFixed() call below so a row's amounts round to ITS OWN currency's precision (JPY =
+   * 0dp, BHD/KWD = 3dp, etc.), never a hardcoded 2dp.
+   */
+  private scaleFor(currency: string): number {
+    return this.currencyDecimals[currency] ?? 2;
   }
 
   /**
@@ -263,7 +306,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       accountNo,
       currency: this.transactionCurrency,
       pct: pctDecimal,
-      amountTxCcy: money(this.totalAmount.times(pctDecimal).dividedBy(100)),
+      amountTxCcy: money(this.totalAmount.times(pctDecimal).dividedBy(100), this.scaleFor(this.transactionCurrency)),
       rate: new Decimal(1),
       exchangeAccountNo: '',
       dealNumber: '',
@@ -302,7 +345,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   accountCcyAmount(row: Row): number {
-    return money(row.amountTxCcy.times(row.rate)).toNumber();
+    return money(row.amountTxCcy.times(row.rate), this.scaleFor(row.currency)).toNumber();
   }
 
   /**
@@ -345,7 +388,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
           ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
           : new Decimal(0);
       } else {
-        row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100));
+        row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
       }
     }
     this.ensureRemainderRow();
@@ -455,20 +498,21 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   onPctInput(row: Row, pct: number): void {
-    // %-driven amount is recomputed via money() (≤2dp) — any prior over-precision on this row is gone.
+    // %-driven amount is recomputed via money() (rounded to the transaction currency's own scale) — any prior over-precision on this row is gone.
     this.rowScaleErrors.delete(row.id);
     row.driver = 'pct';
     row.pct = clampPct(pct);
-    row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100));
+    row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
     this.fixRow(row);
   }
 
   onAmountInput(row: Row, amount: number): void {
     // Amount (Tx Ccy) is denominated in the transaction currency — validate the RAW typed value now,
-    // before money() rounds it to 2dp (which would silently discard the over-precise digits).
+    // before money() rounds it to the transaction currency's own scale (which would silently discard
+    // any over-precise digits).
     this.checkRowScale(row, amount, this.transactionCurrency);
     row.driver = 'amount';
-    row.amountTxCcy = money(Decimal.max(new Decimal(amount || 0), 0));
+    row.amountTxCcy = money(Decimal.max(new Decimal(amount || 0), 0), this.scaleFor(this.transactionCurrency));
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
     this.fixRow(row);
   }
@@ -492,7 +536,9 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     this.checkRowScale(row, accountAmount, row.currency);
     row.driver = 'amount';
     const amount = Decimal.max(new Decimal(accountAmount || 0), 0);
-    row.amountTxCcy = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate)) : new Decimal(0);
+    // Deriving amountTxCcy (always transaction-currency-denominated — see the Row field doc
+    // comment), so it rounds to the TRANSACTION currency's own scale, not row.currency's.
+    row.amountTxCcy = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency)) : new Decimal(0);
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
     this.fixRow(row);
   }
@@ -501,9 +547,18 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     this.emit();
   }
 
+  /**
+   * Switching A/C Type also resets Account No. to that type's own default placeholder — the field
+   * stays free text and freely re-editable, but leaving the PRIOR type's account number behind
+   * (e.g. still "CUST-ACC" after switching CUSTOMER -> NOSTRO) reads as if this leg genuinely posts
+   * to a customer account, which is exactly the confusion this avoids. Only fires on a real type
+   * switch (the template's ngModelChange only emits on a change), so this never clobbers an
+   * in-progress edit to the same type.
+   */
   onAccountTypeChange(row: Row, accountType: AccountType): void {
     row.accountType = accountType;
     if (accountType !== 'NOSTRO') row.rtgsIndicator = false;
+    row.accountNo = DEFAULT_ACCOUNT_NO_BY_TYPE[accountType];
     this.emit();
   }
 
@@ -589,7 +644,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       // total - sum(fixed) instead guarantees every split sums to exactly
       // totalAmount, matching how a final loan installment absorbs rounding.
       const fixedAmountSum = fixed.reduce((sum, r) => sum.plus(r.amountTxCcy), new Decimal(0));
-      remainderRow.amountTxCcy = money(this.totalAmount.minus(fixedAmountSum));
+      remainderRow.amountTxCcy = money(this.totalAmount.minus(fixedAmountSum), this.scaleFor(this.transactionCurrency));
       // Existing rows keep their current array position — no reassignment here.
     } else {
       // Fully allocated (or over-allocated) — no leftover to show a remainder row for.
@@ -599,23 +654,17 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Regression fix: the wire/server convention (payment-instructions-post.yaml,
-   * confirmPaymentInstruction.ts) defines "the transaction currency" as
-   * `debitLegs[0].currency` — a v1.4.0 baseline decision, not something this
-   * component controls. That definition is fragile against row INSERTION
-   * order: `this.rows` (and therefore the emitted array) keeps whichever row
-   * was created first at index 0 regardless of `isRemainder` — so if the
-   * user recolors that very first row's own currency directly (Leg Currency
-   * dropdown on a single 100% row) INSTEAD of splitting off a new row for the
-   * foreign currency, the foreign-currency row ends up at index 0 while the
-   * shared Transaction Currency (this.transactionCurrency, tracked
-   * separately, only moved by the shared dropdown/onCurrencyChange) is
-   * unchanged — silently making the SERVER treat the wrong currency as
-   * canonical for every FX/netting decision downstream. Sorting a
-   * transactionCurrency-matching leg to the front (stable — every other
-   * leg's relative order is preserved) keeps `legs[0].currency` aligned with
-   * what the UI actually displays as "Transaction Currency", independent of
-   * which row the user happened to edit first.
+   * v1.10.0: the server now takes the transaction currency from an explicit
+   * request field (business-case-runner.component.ts's own transactionCurrency
+   * getter, sent as PaymentInstructionConfirmRequest.transactionCurrency —
+   * see that getter's doc comment for why it's deliberately NOT derived from
+   * any leg's own currency), so `legs[0].currency` no longer needs to match
+   * this.transactionCurrency for the server to classify correctly — the
+   * pre-v1.10.0 fallback (debitLegs[0].currency) only matters for callers that
+   * omit the new field. Kept as a display/readability nicety regardless: a
+   * leg whose OWN currency matches the shared Transaction Currency reads more
+   * naturally first in the array (and in anything that iterates it, e.g. the
+   * Settlement Vouchers table) than one that needed an FX rate to get there.
    */
   private emit(): void {
     const legs: PaymentLegInput[] = this.rows
@@ -625,13 +674,21 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
           accountNo: r.accountNo,
           accountType: r.accountType,
           currency: r.currency,
-          amountTxCcy: r.amountTxCcy.toFixed(2),
+          // amountTxCcy is always transaction-currency-denominated (see the Row field doc
+          // comment) — formatted to ITS scale, not a hardcoded 2dp, so e.g. a JPY transaction
+          // currency (0dp) never puts a fractional ".00" on the wire that the microservice's
+          // own H-2 currency-scale validation would then reject.
+          amountTxCcy: r.amountTxCcy.toFixed(this.scaleFor(this.transactionCurrency)),
         };
         if (r.accountType === 'NOSTRO' && r.rtgsIndicator) {
           leg.rtgsIndicator = true;
         }
         if (this.needsRate(r)) {
-          leg.amountAccountCcy = money(r.amountTxCcy.times(r.rate)).toFixed(2);
+          // amountAccountCcy is denominated in the ROW's OWN currency — formatted to ITS scale,
+          // same reasoning as amountTxCcy above (this is the field the JPY Account Ccy
+          // Equivalent bug actually shipped on the wire, not just in the display).
+          const rowScale = this.scaleFor(r.currency);
+          leg.amountAccountCcy = money(r.amountTxCcy.times(r.rate), rowScale).toFixed(rowScale);
           if (this.side === 'DEBIT') leg.drBuyRate = r.rate.toFixed(6);
           else leg.crBuyRate = r.rate.toFixed(6);
         }

@@ -97,7 +97,7 @@ export class ResponseViewerComponent {
    * never print. Reachable in practice: onConfirm() (business-case-runner.component.ts) does NOT
    * gate on debitValid/creditValid the way the live preview does, so a real leg can reach the
    * server with amountTxCcy "0.00" (e.g. a Suspense Credit bridge entry that fully offsets a real
-   * credit leg — see the "Debit Payment Bridge" business case's own note). Such a leg,
+   * credit leg on the same account). Such a leg,
    * if its own accountNo happens to literally be "Suspense - Debit"/"Suspense - Credit", would
    * otherwise also get swept into groupedSettlementEntries' "Suspense Clearing" section below
    * (that section's own isSuspenseClearing check matches on glAccount alone, with no way to tell
@@ -115,11 +115,9 @@ export class ResponseViewerComponent {
    * v1.8.1 — Settlement Vouchers, reordered for audit readability: customer/
    * debit legs, then each FX Exchange pair as one adjacent Dr/Cr block
    * (display-only — the underlying accountEntries/wire response is
-   * unchanged), then customer/credit legs, then Suspense clearing last —
-   * EXCEPT when Suspense clearing is itself debit-direction (2026-08-13,
-   * creditLegsComponentBridge), in which case it leads instead of trailing;
-   * see the "Suspense clearing position" block below. Purely a client-side
-   * re-grouping of settlementEntries; no server or wire-contract change.
+   * unchanged), then customer/credit legs, then Suspense clearing last.
+   * Purely a client-side re-grouping of settlementEntries; no server or
+   * wire-contract change.
    *
    * Pairing/attribution is derived entirely from data already on the wire
    * (glAccount naming + amounts + the inferred transaction currency — see
@@ -158,23 +156,11 @@ export class ResponseViewerComponent {
     };
     const suspenseDebitSums = sumByGlAccount('Suspense - Debit');
 
-    // Transaction currency (2026-08-13 fix): PREFERS the first real (non-FX, non-Suspense) DEBIT
-    // leg's currency, falling back to the first real CREDIT leg's — mirroring the server's own
-    // `(request.debitLegs[0] ?? request.creditLegs[0])!.currency` (confirmPaymentInstruction.ts).
-    // Through 2026-08-12 this was simply `entries[0]!.currency`, on the claim "entries[0] is
-    // ALWAYS request.debitLegs[0], never a generated leg" — true when debitLegsInput always
-    // prepended the caller's own debitLegs, but FALSE since creditLegsComponentBridge started
-    // prepending bridgeSuspenseDebit instead (confirmPaymentInstruction.ts's debitLegsInput =
-    // [...bridgeSuspenseDebit, ...request.debitLegs, ...bridgeFxDebit]) — entries[0] could then be
-    // a GENERATED Suspense leg, silently misdetecting the transaction currency (and therefore the
-    // FX-pair Debit/Credit attribution below, and Currency View's balance grouping) whenever the
-    // first Suspense entry submitted doesn't happen to share the transaction currency. normalDebit/
-    // normalCredit (both real, caller-submitted legs, computed above) are immune to this — a real
-    // leg's own currency is never ambiguous — and by schema validation at least one of them is
-    // always non-empty (the two bridge flags are mutually exclusive and each independently
-    // requires its own non-bridged side to be non-empty). entries[0]!.currency is kept as a final
-    // defensive fallback only; it should be unreachable in practice.
-    const transactionCurrency = normalDebit[0]?.currency ?? normalCredit[0]?.currency ?? entries[0]!.currency;
+    // Transaction currency — mirrors the server's own `request.debitLegs[0]!.currency`
+    // (confirmPaymentInstruction.ts): debitLegsInput always prepends the caller's own debitLegs
+    // (schema-required, non-empty) ahead of any generated bridge legs, so entries[0] is always a
+    // real, caller-submitted debit leg.
+    const transactionCurrency = entries[0]!.currency;
 
     const consumed = new Set<AccountEntry>();
     const pairs: { debit: AccountEntry; credit: AccountEntry }[] = [];
@@ -212,28 +198,14 @@ export class ResponseViewerComponent {
       }
     }
 
-    // Suspense clearing position (2026-08-13, creditLegsComponentBridge): every OTHER mode
-    // (the general Balance/Charge bridge, debitLegsComponentBridge) posts Suspense clearing
-    // credit-direction, unconditionally — a trailing settlement/clearing step, correctly pushed
-    // last below. creditLegsComponentBridge is the one exception (suspenseBridge.ts's
-    // isFlippedDebitSide): its Suspense clearing is debit-direction — the FUNDING SOURCE the
-    // whole instruction is funded from, not a trailing clearing step — so it belongs FIRST,
-    // mirroring confirmPaymentInstruction.ts's own debitLegsInput ordering
-    // ([...bridgeSuspenseDebit, ...request.debitLegs, ...bridgeFxDebit], Suspense-debit leading).
-    // All suspenseClearing entries in one response share the same drCrIndicator in every real
-    // scenario (the two bridge flags are mutually exclusive, and the general bridge pattern is
-    // unconditionally credit-direction), so checking the first entry is sufficient — never a mix.
-    const suspenseIsFunding = suspenseClearing.length > 0 && suspenseClearing[0]!.drCrIndicator === 'D';
-
     const sections: SettlementSection[] = [];
-    if (suspenseIsFunding) sections.push({ label: 'Suspense Clearing / Funding', entries: suspenseClearing });
     if (normalDebit.length) sections.push({ label: 'Customer / Debit Legs', entries: normalDebit });
     for (const pair of legPairsDebit) sections.push({ label: 'FX Debit Leg Pair', entries: pair });
     for (const pair of suspensePairsDebit) sections.push({ label: 'FX Debit Suspense Pair', entries: pair });
     for (const pair of suspensePairsCredit) sections.push({ label: 'FX Credit Suspense Pair', entries: pair });
     for (const pair of legPairsCredit) sections.push({ label: 'FX Credit Leg Pair', entries: pair });
     if (normalCredit.length) sections.push({ label: 'Settlement / Credit Legs', entries: normalCredit });
-    if (!suspenseIsFunding && suspenseClearing.length) sections.push({ label: 'Suspense Clearing', entries: suspenseClearing });
+    if (suspenseClearing.length) sections.push({ label: 'Suspense Clearing', entries: suspenseClearing });
     return sections;
   }
 
@@ -274,16 +246,13 @@ export class ResponseViewerComponent {
    * own money.ts — since summing several already-rounded decimal-string amounts as native JS
    * numbers can drift by a binary-float ULP even when every individual amount was correct.
    *
-   * Row order within a currency (2026-08-13): Debit rows always precede Credit rows. Insertion
-   * order alone happened to already produce this for every pre-2026-08-12 scenario (Posting
-   * View's section order always grouped all-debit sections before all-credit ones), but that was
-   * an emergent property of section ordering, not a guarantee this getter itself enforced — and
-   * creditLegsComponentBridge's more varied section interleaving (Suspense clearing now able to
-   * lead OR trail, per-currency FX pairs split across debit-anchored/credit-anchored buckets) is
-   * exactly the kind of shape that emergent property was never proven to hold for in general.
-   * Sorted explicitly here instead — a stable sort (relative order within each direction is
-   * otherwise preserved) — so this view's own Dr/Cr grouping no longer depends on Posting View's
-   * section order at all.
+   * Row order within a currency (business-requirement-confirmed 2026-08-13): Debit rows always
+   * precede Credit rows, for every scenario. Insertion order alone happened to already produce
+   * this in practice (Posting View's section order always groups all-debit sections before
+   * all-credit ones), but that was only ever an emergent property of section ordering, never a
+   * guarantee this getter itself enforced. Sorted explicitly here instead — a stable sort
+   * (relative order within each direction is otherwise preserved) — so this view's own Dr/Cr
+   * grouping no longer depends on Posting View's section order at all.
    */
   get currencyGroups(): CurrencyGroup[] {
     const byCurrency = new Map<string, CurrencyViewEntry[]>();

@@ -108,8 +108,9 @@ function buildCoverMessage(instructionId: string, leg: PaymentLeg, uetr: string)
  * validateSwiftCrossField() first — this function assumes the cross-field
  * rule already passed.
  *
- * `transactionCurrency` (the instruction's transaction currency,
- * debitLegs[0].currency) drives 33B's instructedCurrency — see
+ * `transactionCurrency` (the instruction's transaction currency — v1.10.0:
+ * request.transactionCurrency, falling back to debitLegs[0].currency) drives
+ * 33B's instructedCurrency — see
  * buildAdviceMessage. NOT set here: serviceTypeId / isGpiMember, which are
  * gpi-participation configuration (per-BIC / per-corridor), not derivable from
  * the request — left for a config-driven follow-up rather than fabricated.
