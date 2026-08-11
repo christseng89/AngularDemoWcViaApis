@@ -456,7 +456,7 @@ rounding-difference leg, not tolerated (follow-up).
 
 ## Hardening review changes (2026-08)
 
-Post-review fixes; each is unit-tested and keeps the suite at 100% coverage (**261 tests**,
+Post-review fixes; each is unit-tested and keeps the suite at 100% coverage (**262 tests**,
 `npm test`).
 
 | Ref | File(s) | Change |

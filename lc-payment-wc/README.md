@@ -73,7 +73,7 @@ npm run test:coverage # jest --coverage
 ```
 
 Jest + `jest-preset-angular` (a separate config from `microservices/payment-component`'s
-own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 216 tests,
+own Jest setup — see `jest.config.js`/`setup-jest.ts`/`tsconfig.spec.json`). 319 tests,
 12 suites; `jest.config.js` enforces a **90% floor** (`coverageThreshold`) across
 statements/branches/functions/lines for everything `collectCoverageFrom` tracks — `npm test`
 fails the build if a change drops coverage below it. Current numbers:
@@ -90,13 +90,15 @@ fails the build if a change drops coverage below it. Current numbers:
 
 | Metric | Coverage |
 |---|---|
-| Statements | 99.8% |
-| Functions | 99.3% |
+| Statements | 99.1% |
+| Functions | 99.47% |
 | Lines | 100% |
-| Branches | 97.72% |
+| Branches | 96.22% |
 
 **Covered:** `leg-allocator.component.ts` (incl. RTGS-indicator threading, the
-30/70-split rounding regression, `*ngFor` row-array stability), `suspense-entries.component.ts`
+30/70-split rounding regression, `*ngFor` row-array stability, the Debit/Credit Legs Amount
+waterfall — see §6.3.1 of the User Manual — and its `accountCcyOverride` round-trip fix),
+`suspense-entries.component.ts`
 (the Suspense Debit/Credit repeater), `business-case-runner.component.ts` (the Formly/RxJS
 orchestration component itself — direct instantiation + mocked services, same pattern as
 leg-allocator, no TestBed needed; covers the Suspense/FX bridge-leg calculations, the real
@@ -125,8 +127,8 @@ numbers down.
 
 `microservices/payment-component/` has its own independent Jest setup (its own
 `jest.config.js`, `node_modules`, and `tsconfig`) — it is **not** run by this project's
-`npm test` and isn't part of the 196-test/90%-floor numbers above. Run it from inside
-that directory:
+`npm test` and isn't part of the 319-test/90%-floor numbers above (it has its own suite —
+262 tests, 100% coverage — see its own README). Run it from inside that directory:
 
 ```bash
 cd microservices/payment-component
