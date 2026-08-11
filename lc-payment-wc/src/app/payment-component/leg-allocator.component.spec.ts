@@ -84,48 +84,116 @@ describe('LegAllocatorComponent', () => {
       expect(sum.toNumber()).toBe(0.35);
     });
 
-    it('with TWO independently-fixed rows — one same-currency-different-account, one foreign-currency — the remainder is Total - SUM(Trx Equivalent) - Other Trx Amount, exact to the cent (both terms Decimal-summed, one final rounding pass — not two separately-rounded subtractions)', () => {
-      const { comp } = makeComponent({ crossRate: 2 });
-      comp.ngOnInit(); // rows[0]: 100% remainder, USD, total=10000
+    it("a newly-spawned remainder row (the ordinary split path — NOT rule 3's last-row-decrease new row) defaults its Account No. to the account TYPE's own placeholder, not blank — same DEFAULT_ACCOUNT_NO_BY_TYPE convention v1.12.2 already applied to rule 3's new row (reviewer-reported: this far-more-common spawn path, e.g. the very first % or Amount split, was still left blank)", () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit(); // row0 @ 100%/10000.00, accountNo = defaultAccountNo ('CUST-ACC')
 
-      // "Add Row" freezes the CURRENT remainder as fixed without creating a new one (nothing left
-      // over yet) — the documented "manual multi-row control" escape hatch (see addRow's own tests)
-      // that lets a SECOND row be fixed afterward without fixRow's swap-fallback promoting rows[0]
-      // back to remainder out from under it.
-      comp.addRow(); // rows[0] fixed @ 100% / 10000.00, no remainder anywhere
+      comp.onPctInput(comp.rows[0]!, 30); // row0 -> 30% fixed; row1 spawns as a brand-new remainder row @ 70%
 
-      // Row 1: "Other Trx Amount (Same Currency, different account)" — same currency as the
-      // transaction (USD), a genuinely different account, fixed directly via onAmountInput.
-      comp.onAmountInput(comp.rows[0]!, 333.33);
       expect(comp.rows).toHaveLength(2);
-      const otherSameCcyRow = comp.rows[0]!;
-      const remainderAfterRow0 = comp.rows[1]!;
-      expect(remainderAfterRow0.isRemainder).toBe(true);
-      expect(remainderAfterRow0.amountTxCcy.toNumber()).toBe(9666.67); // 10000 - 333.33
+      const remainderRow = comp.rows[1]!;
+      expect(remainderRow.isRemainder).toBe(true);
+      expect(remainderRow.accountNo).toBe('CUST-ACC'); // DEFAULT_ACCOUNT_NO_BY_TYPE['CUSTOMER'] — was '' before this fix
+    });
 
-      // Freeze THIS remainder too, so fixing the next (foreign-currency) row doesn't swap
-      // otherSameCcyRow back to remainder.
-      comp.addRow(); // rows[1] fixed @ its current 9666.67, still no remainder anywhere
+    it('with TWO independently-fixed NON-last rows — one same-currency-different-account, one foreign-currency, EACH refined via the amount waterfall (v1.12.3: every non-last row offsets directly against the LAST row) — the last row absorbs both differences exact to the cent, and neither non-last row ever touches the other', () => {
+      const { comp } = makeComponent({ crossRate: 2 });
+      comp.ngOnInit(); // row0: 100% remainder, USD, total=10000
 
-      // Row 2 (the just-frozen rows[1]): "SUM(Trx Equivalent)" — foreign currency, amount typed
-      // in its OWN currency ("this leg pays EUR 250"), converted via onAccountAmountInput.
-      const foreignRow = comp.rows[1]!;
-      comp.onRowCurrencyChange(foreignRow, 'EUR');
-      comp.onAccountAmountInput(foreignRow, 250); // amountTxCcy = money(250 / rate) = money(250/2) = 125.00
-      expect(foreignRow.amountTxCcy.toNumber()).toBe(125);
-
+      // Pre-carve THREE rows via %-editing (untouched by the waterfall — that rule is Amount-
+      // only). addRow() freezes a row (fixes it at its current %/amount, isRemainder:false)
+      // WITHOUT itself being a waterfall-affecting amount edit — used here purely so the NEXT
+      // onPctInput's fixRow() doesn't fall back to re-promoting an already-fixed earlier row (a
+      // pre-existing fixRow quirk, orthogonal to this rule: with exactly one non-remainder row,
+      // fixing the sole remainder falls back to promoting whichever OTHER row exists, even an
+      // already-fixed one).
+      comp.addRow(); // row0 fixed @ 100% / 10000.00, no remainder anywhere
+      comp.onPctInput(comp.rows[0]!, 50); // row0 -> 50%/5000.00 fixed; row1 spawns as remainder @ 50%/5000.00
+      comp.addRow(); // row1 fixed @ 50%/5000.00 too, no remainder anywhere
+      comp.onPctInput(comp.rows[1]!, 20); // row1 -> 20%/2000.00 fixed; row2 spawns as remainder @ 30%/3000.00
       expect(comp.rows).toHaveLength(3);
-      const finalRemainder = comp.rows[2]!;
-      expect(finalRemainder.isRemainder).toBe(true);
-      expect(finalRemainder.currency).toBe('USD');
-      // Total(10000) - SUM(Trx Equivalent)(125.00) - Other Trx Amount(333.33) = 9541.67, exactly.
-      expect(finalRemainder.amountTxCcy.toNumber()).toBe(9541.67);
+      const [row0, row1, row2] = comp.rows;
 
-      // otherSameCcyRow's own fixed value must be untouched by fixing the foreign row afterward.
-      expect(otherSameCcyRow.amountTxCcy.toNumber()).toBe(333.33);
+      // Row 0: "Other Trx Amount (Same Currency, different account)" — refined to its final exact
+      // value via onAmountInput. A decrease (5000.00 -> 333.33) on row0 — NOT the last row —
+      // waterfalls the freed 4666.67 straight to row2 (the last row), NOT row1 (its positional
+      // neighbor): row1 is untouched.
+      comp.onAmountInput(row0!, 333.33);
+      expect(row0!.amountTxCcy.toNumber()).toBe(333.33);
+      expect(row1!.amountTxCcy.toNumber()).toBe(2000); // untouched — rule 2 targets the LAST row only, never the neighbor
+      expect(row2!.amountTxCcy.toNumber()).toBe(7666.67); // 3000.00 + 4666.67 — temporary, refined next
 
-      const total = otherSameCcyRow.amountTxCcy.plus(foreignRow.amountTxCcy).plus(finalRemainder.amountTxCcy);
+      // Row 1: "SUM(Trx Equivalent)" — foreign currency, refined via onAccountAmountInput ("this
+      // leg pays EUR 250"). A decrease (2000 -> 125.00, rate 2) on row1 — also NOT the last row —
+      // likewise waterfalls its own freed 1875 straight to row2. row0 is never touched by this
+      // second edit either: EVERY non-last row's edit targets the last row directly.
+      comp.onRowCurrencyChange(row1!, 'EUR');
+      comp.onAccountAmountInput(row1!, 250); // amountTxCcy = money(250 / rate) = money(250 / 2) = 125.00
+      expect(row1!.amountTxCcy.toNumber()).toBe(125);
+      expect(row0!.amountTxCcy.toNumber()).toBe(333.33); // untouched by row1's own edit
+
+      // row2 absorbed BOTH decreases in sequence (3000.00 + 4666.67 + 1875) —
+      // Total(10000) - Other Trx Amount(333.33) - SUM(Trx Equivalent)(125.00) = 9541.67, exactly.
+      expect(row2!.amountTxCcy.toNumber()).toBe(9541.67);
+      expect(row2!.currency).toBe('USD');
+      // No longer literally "the remainder" — the waterfall fixes every row it touches, same as
+      // a directly-typed amount (see applyAmountWaterfall's own doc comment) — but its VALUE is
+      // exactly what the old remainder-recompute formula would have produced.
+      expect(row2!.isRemainder).toBe(false);
+
+      const total = row0!.amountTxCcy.plus(row1!.amountTxCcy).plus(row2!.amountTxCcy);
       expect(total.toNumber()).toBe(10000);
+    });
+  });
+
+  describe("last-row % exact-complement (v1.12.1 — reviewer: 100% − Σ(every row before the last), so amount-driven splits never display a .01% drift)", () => {
+    it('a three-way 1/3 split (the classic repeating-fraction case) reads Total Allocated as exactly 100.00%, not 99.99% — each row independently rounds to 33.33%, but the LAST row absorbs the exact complement (33.34%) instead', () => {
+      const { comp } = makeComponent();
+      comp.initialTotalAmount = '3';
+      comp.ngOnInit(); // row0 @ 100%/3.00
+      comp.addRow(); // freeze row0 @ 100%/3.00 (still 1 row — neutral, no waterfall involved)
+      comp.onAmountInput(comp.rows[0]!, 1); // rows.length was 1 at call time -> bypass path -> row0=1.00 fixed; row1 spawns remainder @ 2.00
+      const row1 = comp.rows[1]!;
+
+      comp.onAmountInput(row1, 1); // NOW rows.length=2>1 -> waterfall; row1 is last -> decrease opens row2 @ 1.00 (the freed difference)
+
+      expect(comp.rows).toHaveLength(3); // no phantom 4th "remainder" row for the amount-exact-but-%-drifted 0.01
+      const [row0, row1b, row2] = comp.rows;
+      expect(row0.amountTxCcy.toNumber()).toBe(1);
+      expect(row1b.amountTxCcy.toNumber()).toBe(1);
+      expect(row2.amountTxCcy.toNumber()).toBe(1);
+      expect(row0.pct.toNumber()).toBe(33.33); // independently rounded — unchanged, matches its own amount
+      expect(row1b.pct.toNumber()).toBe(33.33); // independently rounded too — only the LAST row gets the correction
+      expect(row2.pct.toNumber()).toBe(33.34); // 100 - 33.33 - 33.33, NOT the independently-rounded 33.33
+      const pctSum = row0.pct.plus(row1b.pct).plus(row2.pct);
+      expect(pctSum.toNumber()).toBe(100); // exact — this is the actual bug being fixed (would be 99.99 without it)
+      expect(comp.totalPct).toBe(100);
+    });
+
+    it("does NOT mask a genuine over-allocation by force-correcting the last row's % — the Total Allocated warning must still fire", () => {
+      const { comp } = makeComponent(); // total = 10000
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 60); // row0=60% fixed; row1 spawns remainder @ 40%
+      comp.addRow(); // freeze row1 @ 40% (neutral — avoids fixRow's sole-remainder fallback complicating this setup)
+      comp.onPctInput(comp.rows[1]!, 60); // row1 -> 60% too — fixedPct now 120%, genuinely over-allocated by AMOUNT (12000 > 10000)
+
+      const [row0, row1] = comp.rows;
+      expect(row1!.pct.toNumber()).toBe(60); // NOT force-corrected to 40 (100 - 60) — that would hide the real over-allocation
+      expect(row0!.pct.toNumber()).toBe(60);
+      expect(comp.totalPct).toBe(120);
+      expect(comp.isOverAllocated).toBe(true); // the warning still fires — unmasked
+    });
+
+    it('a genuine (non-drift) leftover still correctly spawns a real remainder row, unaffected by switching the routing decision from %-based to amount-based', () => {
+      const { comp } = makeComponent(); // total = 10000
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 30); // row0=30% fixed; row1 spawns remainder — a REAL 70%/7000 leftover, not drift
+
+      expect(comp.rows).toHaveLength(2);
+      const row1 = comp.rows[1]!;
+      expect(row1.isRemainder).toBe(true);
+      expect(row1.pct.toNumber()).toBe(70);
+      expect(row1.amountTxCcy.toNumber()).toBe(7000);
     });
   });
 
@@ -284,16 +352,28 @@ describe('LegAllocatorComponent', () => {
     it('regression: a fixed foreign-currency row keeps its own-currency amount EXACT — not rescaled by % — when the seeded total later changes for an unrelated reason (e.g. a Suspense entry)', () => {
       const { comp } = makeComponent({ crossRate: 1 }); // rate=1 so accountCcyAmount === amountTxCcy, isolating this test from FX-conversion arithmetic
       comp.ngOnInit(); // total = 10000, USD
-      comp.onPctInput(comp.rows[0]!, 99.56); // rows[0]=99.56% fixed, rows[1]=0.44% remainder appears
+      comp.onPctInput(comp.rows[0]!, 99.56); // rows[0]=99.56% fixed (driver:'pct'), rows[1]=0.44% remainder appears
 
+      // Directly construct "rows[0] is the remainder, eurRow is a fixed EUR 40 leg" rather than
+      // reaching it via onAccountAmountInput — since v1.12.0's amount waterfall now applies to a
+      // remainder row exactly like any other (see finishAmountEdit's doc comment), decreasing the
+      // remainder here (44 -> 40, and it's the last row) would correctly open a THIRD row for the
+      // freed 4 instead of promoting rows[0] back to remainder — genuinely different, equally
+      // correct behavior, just not what THIS test is about. This test's own concern — onTotalChange
+      // skipping a remainder row entirely (exact total-minus-fixed subtraction) vs. rescaling a
+      // pct-driven row by its stale % — is unrelated to the waterfall and unchanged by it.
       const eurRow = comp.rows.find((r) => r.isRemainder)!;
-      comp.onRowCurrencyChange(eurRow, 'EUR');
-      comp.onAccountAmountInput(eurRow, 40); // user types "EUR 40" — rows[0] (USD) is promoted back to remainder
+      const usdRow = comp.rows.find((r) => r !== eurRow)!;
+      eurRow.currency = 'EUR';
+      eurRow.rate = new Decimal(1);
+      eurRow.amountTxCcy = new Decimal(40);
+      eurRow.driver = 'amount';
+      eurRow.isRemainder = false;
+      usdRow.isRemainder = true;
 
       comp.onTotalChange(10110); // e.g. a Suspense Debit entry reseeds the total from 10000 to 10110
 
       expect(comp.accountCcyAmount(eurRow)).toBe(40); // unchanged — NOT rescaled to a stale-%-based drift
-      const usdRow = comp.rows.find((r) => r.currency === 'USD')!;
       expect(usdRow.amountTxCcy.toNumber()).toBe(10070); // EXACT: 10110 - 40 (EUR row's own amountTxCcy), not a %-rescale
     });
 
@@ -308,6 +388,97 @@ describe('LegAllocatorComponent', () => {
       comp.onTotalChange(0);
 
       expect(eurRow.pct.toNumber()).toBe(0);
+    });
+  });
+
+  describe('onTotalChange absorbs into the LAST row when fully amount-driven (v1.12.2 — reviewer-confirmed: increase adds directly, decrease cascades backward, no drawing needed for an increase since it is new money)', () => {
+    /**
+     * Builds `pcts.length` explicit, AMOUNT-DRIVEN rows (driver:'amount', which is what
+     * absorbTotalDeltaIntoLastRow actually requires — a purely %-driven row still rescales via
+     * onTotalChange's own pre-existing, unrelated logic). Seeds each row's value via %
+     * (addRow()+onPctInput, the same neutral-freeze pattern used in the "amount waterfall"
+     * describe block above, avoiding fixRow's sole-remainder fallback quirk), then immediately
+     * re-types the SAME amount via onAmountInput to flip driver to 'amount' — a zero-delta edit,
+     * so it never cascades into any other row. No trailing remainder — pcts must sum to 100.
+     */
+    function buildFixedRows(comp: LegAllocatorComponent, pcts: number[]): void {
+      comp.ngOnInit();
+      for (const pct of pcts) {
+        comp.addRow();
+        const row = comp.rows[comp.rows.length - 1]!;
+        comp.onPctInput(row, pct);
+        comp.onAmountInput(row, row.amountTxCcy.toNumber());
+      }
+    }
+
+    it('an INCREASE adds the entire delta directly to the last row — every other row is untouched, no cascading', () => {
+      const { comp } = makeComponent();
+      buildFixedRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000 — all fixed, no remainder
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onTotalChange(13000); // +3000
+
+      expect(comp.totalAmount.toNumber()).toBe(13000);
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000); // untouched
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched
+      expect(row2!.amountTxCcy.toNumber()).toBe(7000); // 4000 + 3000, absorbed directly
+      expect(row2!.driver).toBe('amount');
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(13000);
+    });
+
+    it('a DECREASE the last row alone can cover subtracts only from the last row', () => {
+      const { comp } = makeComponent();
+      buildFixedRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onTotalChange(8500); // -1500, less than row2's own 4000
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000); // untouched
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched
+      expect(row2!.amountTxCcy.toNumber()).toBe(2500); // 4000 - 1500
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(8500);
+    });
+
+    it('a DECREASE exceeding the last row cascades backward into the row(s) before it, capped at 0 — never negative', () => {
+      const { comp } = makeComponent();
+      buildFixedRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onTotalChange(1500); // -8500: drains row2 (4000) and row1 (3000) fully, then takes 1500 from row0
+
+      expect(row2!.amountTxCcy.toNumber()).toBe(0);
+      expect(row1!.amountTxCcy.toNumber()).toBe(0);
+      expect(row0!.amountTxCcy.toNumber()).toBe(1500); // 3000 - 1500
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(1500);
+    });
+
+    it('a DECREASE larger than every row combined drains everything to 0 and stops there — capped, not negative', () => {
+      const { comp } = makeComponent();
+      buildFixedRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000 — sum 10000
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onTotalChange(0); // -10000: every row drains to exactly 0
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(0);
+      expect(row1!.amountTxCcy.toNumber()).toBe(0);
+      expect(row2!.amountTxCcy.toNumber()).toBe(0);
+    });
+
+    it('is skipped entirely when a genuine remainder row still exists — the pre-existing exact-subtraction handling applies unchanged, no row is touched by this new logic', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 40); // rows[0]=40% fixed, rows[1]=60% remainder — genuine leftover, not drift
+      const [row0, row1] = comp.rows;
+
+      comp.onTotalChange(20000); // total doubles
+
+      expect(comp.rows).toHaveLength(2); // no new row appended
+      expect(row0!.amountTxCcy.toNumber()).toBe(8000); // rescaled via its own 40% — pct-driven row, unaffected by v1.12.2
+      expect(row1!.isRemainder).toBe(true);
+      expect(row1!.amountTxCcy.toNumber()).toBe(12000); // exact: 20000 - 8000, via ensureRemainderRow's existing mechanism
     });
   });
 
@@ -786,6 +957,434 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows).toHaveLength(2);
       expect(comp.rows[1]!.isRemainder).toBe(true);
       expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(6000);
+    });
+
+    describe('accountCcyOverride round-trip fix (reviewer-reported: typing JPY 20000 at rate 149.0825 read back as 19999)', () => {
+      it("reproduces the exact reported bug WITHOUT the fix — 20000 / 149.0825 rounds to amountTxCcy 134.15 (not the exact 134.15389…), and re-deriving 134.15 × 149.0825 rounds DOWN to 19999, not 20000 — this is the failure mode accountCcyOverride exists to prevent", () => {
+        const derivedAmountTxCcy = new Decimal(20000).dividedBy(149.0825).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        expect(derivedAmountTxCcy.toNumber()).toBe(134.15);
+        const derivedBack = derivedAmountTxCcy.times(149.0825).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+        expect(derivedBack.toNumber()).toBe(19999); // the bug, absent the override
+      });
+
+      it('typing JPY 20000 (rate 149.0825) round-trips back to EXACTLY 20000 via accountCcyAmount(), not the derived 19999', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'JPY';
+        comp.rows[0]!.rate = new Decimal('149.0825');
+
+        comp.onAccountAmountInput(comp.rows[0]!, 20000);
+
+        expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(134.15); // unchanged — still the rounded Tx Ccy figure
+        expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(20000); // was 19999 before the fix
+      });
+
+      it('the same round-trip holds on the wire (emit -> amountAccountCcy), not just the display getter', () => {
+        const { comp, emittedLegs } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'JPY';
+        comp.rows[0]!.rate = new Decimal('149.0825');
+
+        comp.onAccountAmountInput(comp.rows[0]!, 20000);
+
+        // Only 134.15 of the 10000 USD total was allocated by this edit — the rest spawns a
+        // second (USD, transaction-currency-matching) remainder leg that sorts FIRST on the wire
+        // (see emit()'s own sort comment), so look up the JPY leg by currency, not by index.
+        const jpyLeg = emittedLegs[emittedLegs.length - 1]!.find((l) => l.currency === 'JPY');
+        expect(jpyLeg!.amountAccountCcy).toBe('20000');
+      });
+
+      it('a SUBSEQUENT plain Amount (Tx Ccy) edit (onAmountInput) drops the override — accountCcyAmount() goes back to the ordinary amountTxCcy × rate derivation', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'JPY';
+        comp.rows[0]!.rate = new Decimal('149.0825');
+        comp.onAccountAmountInput(comp.rows[0]!, 20000);
+        expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(20000); // override active
+
+        comp.onAmountInput(comp.rows[0]!, 134.15); // re-typing the SAME Tx Ccy figure directly
+
+        expect(comp.rows[0]!.accountCcyOverride).toBeNull();
+        expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(19999); // back to the ordinary (lossy) derivation — expected once the user is editing Amount (Tx Ccy) directly instead
+      });
+
+      it('a waterfall edit that CAPS the requested amount (rule 1, non-last row increase beyond what the last row holds) does NOT set an override — the actual amountTxCcy differs from what the raw account-ccy figure implies', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.addRow(); // row0 fixed @ 100%/10000, no remainder
+        comp.onPctInput(comp.rows[0]!, 50); // row0 -> 5000 fixed; row1 spawns remainder @ 5000 (LAST)
+        const [row0, row1] = comp.rows;
+        row0!.currency = 'JPY';
+        row0!.rate = new Decimal('149.0825');
+
+        // row0 wants to grow to JPY equivalent of USD 20000 (needs +15000 Tx Ccy), but row1 (last) only holds 5000 — capped.
+        comp.onAccountAmountInput(row0!, new Decimal(20000).times(149.0825).toNumber());
+
+        expect(row0!.amountTxCcy.toNumber()).toBe(10000); // capped: 5000 + 5000 drawn from row1, not the full request
+        expect(row1!.amountTxCcy.toNumber()).toBe(0);
+        expect(row0!.accountCcyOverride).toBeNull(); // NOT set — the request was capped
+      });
+
+      it('a % edit (onPctInput) on a row that previously had an override clears it', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'JPY';
+        comp.rows[0]!.rate = new Decimal('149.0825');
+        comp.onAccountAmountInput(comp.rows[0]!, 20000);
+        expect(comp.rows[0]!.accountCcyOverride).not.toBeNull();
+
+        comp.onPctInput(comp.rows[0]!, 50);
+
+        expect(comp.rows[0]!.accountCcyOverride).toBeNull();
+      });
+
+      it("changing the row's OWN currency clears a stale override (it was denominated in the OLD currency)", () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'JPY';
+        comp.rows[0]!.rate = new Decimal('149.0825');
+        comp.onAccountAmountInput(comp.rows[0]!, 20000);
+        expect(comp.rows[0]!.accountCcyOverride).not.toBeNull();
+
+        comp.onRowCurrencyChange(comp.rows[0]!, 'EUR');
+
+        expect(comp.rows[0]!.accountCcyOverride).toBeNull();
+      });
+
+      it("changing the shared Transaction Currency clears every row's override", () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'JPY';
+        comp.rows[0]!.rate = new Decimal('149.0825');
+        comp.onAccountAmountInput(comp.rows[0]!, 20000);
+        expect(comp.rows[0]!.accountCcyOverride).not.toBeNull();
+
+        comp.onCurrencyChange('EUR');
+
+        expect(comp.rows[0]!.accountCcyOverride).toBeNull();
+      });
+
+      it('a row touched by the waterfall as the LAST-row counterparty (rule 1/2, via markCascaded) has its own override cleared even if it had one', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.addRow();
+        comp.onPctInput(comp.rows[0]!, 30);
+        comp.addRow();
+        comp.onPctInput(comp.rows[1]!, 30); // row0=3000, row1=3000, row2=4000 (remainder, LAST)
+        const [row0, row1, row2] = comp.rows;
+        row2!.currency = 'JPY';
+        row2!.rate = new Decimal('149.0825');
+        comp.onAccountAmountInput(row2!, new Decimal(4000).times(149.0825).toNumber()); // fix row2's own account-ccy figure, giving it an override
+        expect(row2!.accountCcyOverride).not.toBeNull();
+
+        comp.onAmountInput(row0!, 1000); // decrease 3000 -> 1000 on row0 (non-last) — freed 2000 flows to row2 (last)
+
+        expect(row2!.accountCcyOverride).toBeNull();
+      });
+    });
+  });
+
+  describe('amount waterfall (v1.12.0 — decrease flows forward, increase draws backward)', () => {
+    /**
+     * Builds `pcts.length` explicit, independently-fixed rows (via addRow()+onPctInput — %
+     * editing is untouched by the waterfall, so this never itself triggers it) plus one trailing
+     * auto-remainder row for whatever's left. Same "neutral freeze before each fix" pattern used
+     * in the rounding-regression test above, avoiding fixRow's pre-existing sole-remainder
+     * fallback quirk. Total = 10000 USD unless the caller overrides initialTotalAmount first.
+     */
+    function buildRows(comp: LegAllocatorComponent, pcts: number[]): void {
+      comp.ngOnInit();
+      for (const pct of pcts) {
+        comp.addRow();
+        comp.onPctInput(comp.rows[comp.rows.length - 1]!, pct);
+      }
+    }
+
+    it('a decrease on a NON-last row flows the exact freed difference straight to the LAST row — never the row positionally next to it', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30]); // row0=3000 fixed, row1=3000 fixed, row2=4000 remainder (LAST)
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onAmountInput(row0!, 1000); // decrease 3000 -> 1000
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(1000);
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched — NOT the target under v1.12.3 (it's not the last row)
+      expect(row2!.amountTxCcy.toNumber()).toBe(6000); // 4000 + 2000 freed, straight to the LAST row
+      expect(row2!.driver).toBe('amount');
+      expect(row2!.isRemainder).toBe(false);
+    });
+
+    it("an increase on a NON-last row decreases the LAST row by the same amount, capped at what it has — a single direct offset, never the row positionally before it", () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30]); // row0=3000, row1=3000, row2=4000 (remainder, LAST)
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onAmountInput(row1!, 5000); // increase 3000 -> 5000, needs 2000
+
+      expect(row1!.amountTxCcy.toNumber()).toBe(5000);
+      expect(row2!.amountTxCcy.toNumber()).toBe(2000); // 4000 - 2000 — the LAST row absorbs it
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000); // untouched — not drawn from, even though it's positionally before row1
+      expect(row2!.driver).toBe('amount');
+      expect(row2!.isRemainder).toBe(false);
+    });
+
+    it('an increase on the LAST row itself (rule 4, unchanged since v1.12.0) cascades through MULTIPLE earlier rows when the immediately preceding one alone cannot cover it — draining each to exactly 0, never negative', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [5, 5, 5, 5]); // row0..row3=500 each fixed, row4=8000 remainder (LAST)
+      const [row0, row1, row2, row3, row4] = comp.rows;
+
+      comp.onAmountInput(row4!, 9300); // increase 8000 -> 9300, needs 1300: row3 covers 500, row2 covers 500, row1 covers the remaining 300
+
+      expect(row4!.amountTxCcy.toNumber()).toBe(9300);
+      expect(row3!.amountTxCcy.toNumber()).toBe(0);
+      expect(row2!.amountTxCcy.toNumber()).toBe(0);
+      expect(row1!.amountTxCcy.toNumber()).toBe(200); // 500 - 300
+      expect(row0!.amountTxCcy.toNumber()).toBe(500); // untouched — cascade stopped once fully covered
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000);
+    });
+
+    it('an increase on the LAST row needing more than every earlier row combined (even fully drained) is silently CAPPED to whatever was actually available (rule 4)', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [5, 5, 5]); // row0=500, row1=500, row2=500 fixed, row3=8500 remainder (LAST)
+      const [row0, row1, row2, row3] = comp.rows;
+
+      comp.onAmountInput(row3!, 10500); // wants +2000, but row0+row1+row2 together only have 1500
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(0);
+      expect(row1!.amountTxCcy.toNumber()).toBe(0);
+      expect(row2!.amountTxCcy.toNumber()).toBe(0);
+      expect(row3!.amountTxCcy.toNumber()).toBe(10000); // 8500 + 1500 (capped), NOT 10500
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000); // invariant holds even when the request was capped
+    });
+
+    it("an increase on a NON-last row is capped at just the LAST row's own balance (rule 1) — never cascades further back into other rows, even when they hold more", () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [5, 5, 5]); // row0=500, row1=500, row2=500 fixed, row3=8500 remainder (LAST)
+      const [row0, row1, row2, row3] = comp.rows;
+
+      comp.onAmountInput(row0!, 9000); // increase row0 500 -> requests +8500, exactly what row3 (the target) has
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(9000); // fully covered — exactly matches what row3 had
+      expect(row3!.amountTxCcy.toNumber()).toBe(0); // drained
+      expect(row1!.amountTxCcy.toNumber()).toBe(500); // untouched — rule 1 never reaches back to row1/row2
+      expect(row2!.amountTxCcy.toNumber()).toBe(500); // untouched
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000);
+    });
+
+    it("an increase on a NON-last row exceeding even the LAST row's full balance is capped there (rule 1) — no cascading into other rows to make up the rest", () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [5, 5, 5]); // row0=500, row1=500, row2=500 fixed, row3=8500 remainder (LAST)
+      const [row0, row1, row2, row3] = comp.rows;
+
+      comp.onAmountInput(row0!, 20000); // wants +19500, but row3 only has 8500
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(9000); // 500 + 8500 (capped to what row3 had), NOT 20000
+      expect(row3!.amountTxCcy.toNumber()).toBe(0);
+      expect(row1!.amountTxCcy.toNumber()).toBe(500); // untouched
+      expect(row2!.amountTxCcy.toNumber()).toBe(500); // untouched
+    });
+
+    it('decreasing the LAST row (fully allocated, no remainder) opens a brand-new trailing row to hold exactly the freed difference — earlier rows are untouched', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000 — ALL fixed, no remainder (100% exactly covered)
+      const [row0, row1, row2] = comp.rows;
+      expect(comp.rows).toHaveLength(3);
+
+      comp.onAmountInput(row2!, 1000); // decrease on the last row: 4000 -> 1000, freed = 3000
+
+      expect(comp.rows).toHaveLength(4);
+      expect(row2!.amountTxCcy.toNumber()).toBe(1000);
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000); // untouched
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched
+      const row3 = comp.rows[3]!;
+      expect(row3.amountTxCcy.toNumber()).toBe(3000); // exactly the freed difference
+      expect(row3.accountNo).toBe('CUST-ACC'); // v1.12.2: defaultAccountType's own placeholder, not blank — same convention as onAccountTypeChange
+      expect(row3.currency).toBe('USD'); // transaction currency, same convention as makeRow's other callers
+      expect(row3.driver).toBe('amount');
+      expect(row3.isRemainder).toBe(false);
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000);
+    });
+
+    it('decreasing the (now-last) newly-created row cascades again, opening yet another trailing row — the chain keeps working, not just a one-shot escape hatch', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000
+      const [row0, row1, row2] = comp.rows;
+      comp.onAmountInput(row2!, 1000); // row2 -> 1000, row3 spawns @ 3000 (LAST now)
+      const row3 = comp.rows[3]!;
+
+      comp.onAmountInput(row3, 500); // decrease on the NEW last row: 3000 -> 500, freed = 2500
+
+      expect(comp.rows).toHaveLength(5);
+      expect(row3.amountTxCcy.toNumber()).toBe(500);
+      const row4 = comp.rows[4]!;
+      expect(row4.amountTxCcy.toNumber()).toBe(2500);
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000); // still untouched two edits later
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000);
+      expect(row2!.amountTxCcy.toNumber()).toBe(1000);
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000);
+    });
+
+    it('increasing the FIRST row now SUCCEEDS under v1.12.3 (superseding the old "REJECTED, no previous row" boundary) — it decreases the LAST row directly, exactly like any other non-last row (rule 1)', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000 — ALL fixed
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onAmountInput(row0!, 5000); // increase on the first row: 3000 -> 5000, needs 2000
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(5000); // took effect — no longer blocked
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched — row1 is neither the edited row nor the last row
+      expect(row2!.amountTxCcy.toNumber()).toBe(2000); // 4000 - 2000 — the LAST row absorbs it, per rule 1
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000);
+    });
+
+    it('decreasing a row that is STILL the current remainder goes through the SAME waterfall as any other row — this is the reviewer-reported fix (regression: an earlier, overly-broad `!row.isRemainder` gate made this silently fall back to fixRow\'s fallback-promotion instead, so decreasing "the last leg" while it was still marked remainder — the common case, since the remainder is normally last — never created a new leg, contrary to the confirmed rule)', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30]); // row0=3000, row1=3000 fixed; row2=4000 REMAINDER (LAST)
+      const row2 = comp.rows[2]!;
+      expect(row2.isRemainder).toBe(true);
+
+      comp.onAmountInput(row2, 1000); // a decrease on the last row, which still happens to be the remainder
+
+      expect(comp.rows).toHaveLength(4); // a NEW row was appended — same as decreasing an already-fixed last row
+      expect(row2.amountTxCcy.toNumber()).toBe(1000);
+      expect(row2.isRemainder).toBe(false); // no longer floating — this edit made it explicit
+      const row3 = comp.rows[3]!;
+      expect(row3.amountTxCcy.toNumber()).toBe(3000); // 4000 - 1000 freed
+      expect(row3.isRemainder).toBe(false);
+      // No OTHER row was silently reassigned to "remainder" — the pre-existing fixRow fallback-
+      // promotion this test used to rely on (before this session's fix) is deliberately bypassed now.
+      expect(comp.rows.filter((r) => r.isRemainder)).toHaveLength(0);
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000);
+    });
+
+    it('onAccountAmountInput (foreign-currency Account Ccy Equiv. edit) triggers the identical waterfall — same underlying amountTxCcy field, just a different input surface', () => {
+      const { comp } = makeComponent({ crossRate: 2 });
+      buildRows(comp, [30, 30]); // row0=3000, row1=3000 fixed; row2=4000 remainder
+      const [row0, row1] = comp.rows;
+      comp.onRowCurrencyChange(row1!, 'EUR'); // rate=2
+
+      comp.onAccountAmountInput(row1!, 2000); // EUR 2000 / 2 = USD 1000 — a decrease from 3000
+
+      expect(row1!.amountTxCcy.toNumber()).toBe(1000);
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000); // untouched — row1 isn't row0's own neighbor for a decrease
+      const row2 = comp.rows[2]!;
+      expect(row2.amountTxCcy.toNumber()).toBe(6000); // 4000 + 2000 freed
+    });
+
+    it('onAccountAmountInput on the LAST row also opens a new trailing leg on a decrease, same as onAmountInput', () => {
+      const { comp } = makeComponent({ crossRate: 2 });
+      buildRows(comp, [30, 30, 40]); // row0=3000, row1=3000, row2=4000 — ALL fixed, row2 is last
+      const row2 = comp.rows[2]!;
+      comp.onRowCurrencyChange(row2, 'EUR'); // rate=2
+
+      comp.onAccountAmountInput(row2, 2000); // EUR 2000 / 2 = USD 1000 — a decrease from 4000
+
+      expect(comp.rows).toHaveLength(4);
+      expect(row2.amountTxCcy.toNumber()).toBe(1000);
+      const row3 = comp.rows[3]!;
+      expect(row3.amountTxCcy.toNumber()).toBe(3000); // 4000 - 1000 freed
+      expect(row3.currency).toBe('USD');
+    });
+
+    it("the cascade transfer works correctly when the DONOR and RECEIVER legs are both foreign currencies — different from the transaction currency AND from each other. The common amountTxCcy (transaction-currency) field is what actually moves between rows; each leg's own Account Ccy Equiv. is a pure derived scale of it via ITS OWN rate, so both legs' own-currency displays update correctly with no separate conversion step needed (reviewer-confirmed worked example: 1000 USD-equivalent freed shows up as exactly 850 EUR on the receiving EUR leg)", () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [60, 40]); // row0=6000 (60%), row1=4000 (40%) — both fixed, no remainder, total 10000 USD (Tx Ccy)
+      const [row0, row1] = comp.rows;
+      row0!.currency = 'JPY';
+      row0!.rate = new Decimal(150); // 1 USD (Tx Ccy) = 150 JPY
+      row1!.currency = 'EUR';
+      row1!.rate = new Decimal(0.85); // 1 USD (Tx Ccy) = 0.85 EUR
+      expect(comp.accountCcyAmount(row0!)).toBe(900000); // 6000 * 150
+      expect(comp.accountCcyAmount(row1!)).toBe(3400); // 4000 * 0.85
+
+      comp.onAmountInput(row0!, 5000); // decrease the JPY leg by 1000 USD-equivalent
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(5000);
+      expect(comp.accountCcyAmount(row0!)).toBe(750000); // down 150000 JPY = 1000 * 150 — donor's own currency correctly reflects the freed amount
+      expect(row1!.amountTxCcy.toNumber()).toBe(5000); // 4000 + 1000 freed (transaction-currency terms)
+      expect(comp.accountCcyAmount(row1!)).toBe(4250); // up 850 EUR = 1000 * 0.85 — receiver's own currency correctly reflects it too
+      const total = comp.rows.reduce((s, r) => s.plus(r.amountTxCcy), new Decimal(0));
+      expect(total.toNumber()).toBe(10000); // Total Allocated invariant holds regardless of either leg's own currency
+    });
+
+    it('a zero-delta edit (retyping the same amount) is a no-op — no row is touched, applied stays true', () => {
+      const { comp } = makeComponent();
+      buildRows(comp, [30, 30]);
+      const [row0, row1] = comp.rows;
+
+      comp.onAmountInput(row0!, 3000); // same value already there
+
+      expect(row0!.amountTxCcy.toNumber()).toBe(3000);
+      expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched
+    });
+  });
+
+  describe('amountInputTitle (Amount (Tx Ccy) input tooltip)', () => {
+    it('describes the remainder-spawn behavior for the sole row (not yet split)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      expect(comp.amountInputTitle(comp.rows[0]!)).toContain('Remainder');
+    });
+
+    it('is blank for a non-remainder single row (defensive — not reachable via the UI today, since a lone row is always the remainder)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.isRemainder = false;
+      expect(comp.amountInputTitle(comp.rows[0]!)).toBe('');
+    });
+
+    it('gets the ordinary last-leg message, NOT the old "Remainder" message, for a row that is the current remainder in a genuine multi-row split — it goes through the same waterfall as any other row now (v1.12.0 fix)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 30); // spawns rows[1] as remainder, LAST
+      expect(comp.amountInputTitle(comp.rows[1]!)).toContain('Last leg');
+      expect(comp.amountInputTitle(comp.rows[1]!)).not.toContain('Remainder');
+    });
+
+    // Each test below calls addRow() right before every onPctInput that fixes the row currently
+    // holding sole-remainder status — a NEUTRAL freeze (fixes it at its current %/amount without
+    // touching any other row) that sidesteps a pre-existing fixRow() quirk: fixing the sole
+    // remainder without this falls back to re-promoting whichever OTHER row exists, even an
+    // already-fixed one, corrupting its remainder status out from under it. Same pattern as the
+    // "amount waterfall" describe block's own buildRows() helper above.
+    it('describes the last-leg behavior (decrease creates a new leg) for a fixed row with no next neighbor', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.addRow();
+      comp.onPctInput(comp.rows[0]!, 30); // row0 -> 30% fixed; row1 spawns remainder @ 70%
+      comp.addRow();
+      comp.onPctInput(comp.rows[1]!, 70); // row1 -> 70% fixed too — both fixed now, rows[1] is last, non-remainder
+      expect(comp.amountInputTitle(comp.rows[1]!)).toContain('Last leg');
+      expect(comp.amountInputTitle(comp.rows[1]!)).toContain('creates a new leg');
+    });
+
+    it('describes the direct-to-last-leg waterfall for any NON-last fixed row (v1.12.3 — superseding the old "First leg" boundary message, since a non-last row no longer has a rejected/special first-row case)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.addRow();
+      comp.onPctInput(comp.rows[0]!, 30);
+      comp.addRow();
+      comp.onPctInput(comp.rows[1]!, 70);
+      expect(comp.amountInputTitle(comp.rows[0]!)).toContain('LAST leg');
+    });
+
+    it('describes the same direct-to-last-leg waterfall for a genuine middle row (v1.12.3 — superseding the old "Decreasing pushes [to adjacent neighbor]" message)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.addRow();
+      comp.onPctInput(comp.rows[0]!, 30);
+      comp.addRow();
+      comp.onPctInput(comp.rows[1]!, 30);
+      comp.addRow();
+      comp.onPctInput(comp.rows[2]!, 40); // all three fixed; rows[1] is a genuine middle row
+      expect(comp.amountInputTitle(comp.rows[1]!)).toContain('LAST leg');
     });
   });
 

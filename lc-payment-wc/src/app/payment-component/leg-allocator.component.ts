@@ -54,6 +54,30 @@ interface Row {
    * inert until the row is fixed by a genuine user edit).
    */
   driver: 'pct' | 'amount';
+  /**
+   * The EXACT account-currency amount most recently typed via onAccountAmountInput, kept
+   * alongside (not instead of) amountTxCcy — null whenever it doesn't apply (never typed that
+   * way, or invalidated by a later edit; see every assignment site below). Reviewer-reported
+   * round-trip bug this fixes: amountTxCcy is always rounded to the TRANSACTION currency's own
+   * scale (by design — see that field's own doc comment; it's what the wire/%-split math/V8
+   * balance check all operate on), so re-deriving the account-ccy figure as
+   * amountTxCcy × rate for display/wire (accountCcyAmount()/emit()) silently loses precision
+   * whenever the row's own currency has COARSER minor units than the transaction currency's —
+   * concretely, typing JPY 20000 (rate 149.0825) computes amountTxCcy = money(20000/149.0825, 2dp)
+   * = 134.15 (the exact quotient is 134.15389…, rounded down), and re-deriving from THAT
+   * (134.15 × 149.0825 = 19999.42, rounded to JPY's 0dp) reads back as 19999, not the 20000 the
+   * user actually typed. Storing the raw account-ccy figure here and preferring it over the
+   * derivation (whenever it's still valid) makes that edit round-trip exactly. Only ever set by
+   * onAccountAmountInput, and only when the edit wasn't capped by the waterfall (a capped edit's
+   * actual amountTxCcy differs from what the raw account-ccy figure would imply, so the
+   * derivation — not the stale override — is the correct value there). Cleared by every OTHER
+   * thing that changes what this row's amount/currency/rate means: onAmountInput (the OTHER
+   * input surface for the same underlying amountTxCcy — now THAT'S the authoritative edit),
+   * onPctInput, onRowCurrencyChange, onCurrencyChange, and markCascaded (this row's amount moved
+   * for a reason that has nothing to do with a fresh account-ccy retype — a waterfall donor/
+   * receiver, a Total Amount absorption, or a newly-spawned row).
+   */
+  accountCcyOverride: Decimal | null;
 }
 
 /**
@@ -320,6 +344,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       dealNumber: '',
       isRemainder,
       driver: 'pct',
+      accountCcyOverride: null,
     };
   }
 
@@ -352,8 +377,36 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     return !!row.currency && row.currency !== this.transactionCurrency;
   }
 
+  /**
+   * Amount (Tx Ccy) input tooltip — describes whichever rebalancing rule editing THIS row would
+   * actually trigger (see applyAmountWaterfall's doc comment for the full rule). Only the
+   * single-row, not-yet-split case still gets the old "Remainder" message — a row that's still
+   * marked isRemainder in a genuine multi-row split goes through the SAME waterfall as any other
+   * row now (see finishAmountEdit), so it gets the ordinary first/middle/last message too.
+   */
+  amountInputTitle(row: Row): string {
+    if (this.rows.length <= 1) {
+      return row.isRemainder ? "Remainder — editing it fixes this row and opens a new remainder for what's left" : '';
+    }
+    const index = this.rows.indexOf(row);
+    if (index === this.rows.length - 1) return 'Last leg — decreasing creates a new leg to hold the difference; increasing draws from the leg(s) before it.';
+    return 'Increasing decreases the LAST leg by the same amount; decreasing increases the LAST leg by the same amount.';
+  }
+
   accountCcyAmount(row: Row): number {
-    return money(row.amountTxCcy.times(row.rate), this.scaleFor(row.currency)).toNumber();
+    return this.accountCcyAmountDecimal(row).toNumber();
+  }
+
+  /**
+   * Prefers row.accountCcyOverride (the exact figure last typed via onAccountAmountInput, when
+   * still valid) over re-deriving amountTxCcy × rate — see the Row.accountCcyOverride field doc
+   * comment for the precision-loss bug this avoids. Shared by the public accountCcyAmount()
+   * getter (template display) and emit() (the wire's amountAccountCcy) so both read the same
+   * value — the whole point is that what's displayed is exactly what gets sent.
+   */
+  private accountCcyAmountDecimal(row: Row): Decimal {
+    if (row.accountCcyOverride !== null) return money(row.accountCcyOverride, this.scaleFor(row.currency));
+    return money(row.amountTxCcy.times(row.rate), this.scaleFor(row.currency));
   }
 
   /**
@@ -386,6 +439,22 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
    * ensureRemainderRow() instead recomputes it EXACTLY as
    * totalAmount − Σ(every other row's now-correct amount), matching how a
    * fresh remainder is always computed elsewhere in this component.
+   *
+   * v1.12.2 (reviewer-confirmed 2026-08-11): once every row is amount-driven (no floating
+   * remainder row left — the normal state after using the Amount waterfall), the loop above still
+   * leaves every amount-driven row's OWN amount untouched (only its display % refreshes) — by
+   * design, per the doc comment above. The gap that opens up between Σ(all rows) and the NEW
+   * totalAmount is what absorbTotalDeltaIntoLastRow() below resolves, targeting the LAST row
+   * specifically rather than letting ensureRemainderRow's own amount-based routing spawn/grow a
+   * brand-new row for it (which is what would otherwise happen, per v1.12.1). Reviewer's rule,
+   * worked through with concrete examples until unambiguous: an INCREASE just adds directly to the
+   * last row (no cascading — growing the total doesn't require taking money from anywhere); a
+   * DECREASE subtracts from the last row and, if it alone can't cover it without going negative,
+   * continues subtracting from the row before it, and so on — capped at 0 per row, same
+   * "no-negative" precedent as applyAmountWaterfall's own increase-draw cascade. When a genuine
+   * remainder row still exists (the split isn't yet fully amount-driven), this step is skipped
+   * entirely — ensureRemainderRow's EXISTING exact-subtraction handling of that row already does
+   * the right thing, unchanged.
    */
   onTotalChange(value: number): void {
     this.totalAmount = new Decimal(value || 0);
@@ -399,7 +468,47 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
         row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
       }
     }
+    if (!this.rows.some((r) => r.isRemainder)) this.absorbTotalDeltaIntoLastRow();
     this.ensureRemainderRow();
+  }
+
+  /**
+   * v1.12.2 — called from onTotalChange only, and only when no row is currently the floating
+   * remainder (see that method's own doc comment for the full rule and reviewer citation). Every
+   * OTHER row's amount is left exactly as onTotalChange's own loop set it (unchanged for
+   * amount-driven rows, freshly rescaled via % for pct-driven ones) — this only ever touches the
+   * LAST row, and — on a decrease that exceeds it — rows before it, in strict back-to-front order.
+   */
+  private absorbTotalDeltaIntoLastRow(): void {
+    if (this.rows.length === 0) return;
+    const scale = this.scaleFor(this.transactionCurrency);
+    const currentSum = this.rows.reduce((sum, r) => sum.plus(r.amountTxCcy), new Decimal(0));
+    const gap = money(this.totalAmount.minus(currentSum), scale);
+    if (gap.isZero()) return;
+
+    const last = this.rows[this.rows.length - 1]!;
+    if (gap.greaterThan(0)) {
+      // Total grew — the new money just adds to the last row directly. No cascading: growing the
+      // total doesn't require taking anything from any other row.
+      last.amountTxCcy = last.amountTxCcy.plus(gap);
+      this.markCascaded(last);
+      return;
+    }
+
+    // Total shrank — remove |gap| starting from the last row; if it alone can't cover the full
+    // decrease without going negative, keep removing from the row before it, and so on. Capped at
+    // 0 per row (never negative) — if every row drains to 0 and a shortfall remains, that's the
+    // same "capped to whatever was actually available" precedent applyAmountWaterfall's own
+    // increase-draw cascade already establishes; nothing further to do.
+    let remaining = gap.abs();
+    for (let j = this.rows.length - 1; j >= 0 && remaining.greaterThan(0); j--) {
+      const row = this.rows[j]!;
+      const take = Decimal.min(row.amountTxCcy, remaining);
+      if (take.isZero()) continue;
+      row.amountTxCcy = row.amountTxCcy.minus(take);
+      this.markCascaded(row);
+      remaining = remaining.minus(take);
+    }
   }
 
   onCurrencyChange(value: string): void {
@@ -418,6 +527,11 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     this.transactionCurrency = value;
     for (const row of this.rows) {
       if (!alreadyDivergedIds.has(row.id)) row.currency = value;
+      // The transaction currency itself moved — every row's amountTxCcy is now denominated
+      // relative to a different currency, so a previously-exact account-ccy figure (typed against
+      // the OLD transaction currency's rate/rounding) no longer round-trips reliably. See
+      // Row.accountCcyOverride.
+      row.accountCcyOverride = null;
     }
     this.emit();
     // Transaction currency moved — every row still quoted in a different currency needs a fresh cross rate.
@@ -431,6 +545,9 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     // Row's own currency changed — its allowed scale changed; clear any stale over-precision flag.
     this.rowScaleErrors.delete(row.id);
     row.currency = value;
+    // Any account-ccy figure typed under the OLD currency doesn't mean anything under the new
+    // one. See Row.accountCcyOverride.
+    row.accountCcyOverride = null;
     if (this.needsRate(row)) {
       this.applyFxRate(row);
     } else {
@@ -512,7 +629,136 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     row.driver = 'pct';
     row.pct = clampPct(pct);
     row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
+    row.accountCcyOverride = null; // recomputed via %, not a fresh account-ccy retype — see Row.accountCcyOverride
     this.fixRow(row);
+  }
+
+  /**
+   * User-requested "waterfall" rebalancing rule (business-requirement-confirmed, v1.12.3
+   * REPLACES the earlier v1.12.0 "adjacent neighbor" model — see below) for editing an Amount
+   * (Tx Ccy) — kicks in whenever the side already has more than one row (`rows.length > 1`, a
+   * genuine multi-leg split), REGARDLESS of whether the edited row is currently the remainder
+   * (see finishAmountEdit's own doc comment for why an earlier `!row.isRemainder` gate here was a
+   * bug). The LAST row is the universal counterparty for every OTHER row; only the last row's own
+   * edits have their own distinct rules. Four cases, all reviewer-confirmed with worked numeric
+   * examples (2026-08-11):
+   *
+   * 1. INCREASE on a NON-last row → decreases the LAST row by the same amount, capped at whatever
+   *    the last row actually has (never negative) — a single direct offset, NOT cascading through
+   *    any other row. Reviewer: "不是最後一筆增加金額 就減少至最後一筆幣別等值".
+   * 2. DECREASE on a NON-last row → increases the LAST row by the exact freed amount — always
+   *    fully absorbed, since increasing has no capacity limit. Reviewer: "不是最後一筆減少金額加
+   *    增加至最後一筆幣別等值".
+   * 3. DECREASE on the LAST row → auto-CREATES A NEW ROW (Account No. defaults to the account
+   *    TYPE's own placeholder — `DEFAULT_ACCOUNT_NO_BY_TYPE[defaultAccountType]`, e.g. `CUST-ACC`
+   *    — same convention onAccountTypeChange already uses; same transaction currency) at the end
+   *    of the array, holding exactly the freed difference — the edited row becomes leg N, the new
+   *    row becomes leg N+1, so a further decrease on the (still-)last row keeps working the same
+   *    way, cascading into yet another fresh row each time. This is the ONLY place
+   *    applyAmountWaterfall grows `this.rows`. Reviewer: "最後一筆減少金額 增加一筆新的Trx幣別等值"
+   *    (unchanged since v1.12.0/v1.12.1, reconfirmed verbatim).
+   * 4. INCREASE on the LAST row → draws from the row immediately before it, then the one before
+   *    THAT, and so on — as far back as needed, capping each donor row at 0 (never negative).
+   *    Reviewer: "最後一筆增加金額 減少上一筆幣別等值 不夠繼續往上減少" (unchanged since
+   *    v1.12.0, reconfirmed verbatim).
+   *
+   * Why rule 1 doesn't ALSO cascade past the last row the way rule 4 does: the reviewer's own
+   * phrasing for rule 1 names a single target ("減少至最後一筆", decrease TO the last row) with no
+   * "不夠繼續" (if insufficient, continue) clause — unlike rule 4's, which explicitly has one. A
+   * non-last row's increase is capped, not rejected and not cascaded further, if the last row
+   * alone can't fully cover it.
+   *
+   * This keeps Σ Amount (Tx Ccy) and Total Allocated automatically unchanged by construction —
+   * money only ever moves BETWEEN existing rows (or into a freshly-created one, rule 3), so
+   * nothing needs to separately re-verify the total. The single-row (not-yet-split) case is the
+   * ONLY one still exempt — see onAmountInput/onAccountAmountInput's own `wentThroughWaterfall`
+   * gate — since there the ORIGINAL "typing a smaller amount splits off a new remainder row"
+   * behavior already achieves the same practical outcome via a different, pre-existing mechanism
+   * (fixRow/ensureRemainderRow).
+   *
+   * Superseded from v1.12.0: rule 1 no longer flows into the immediate next row (N+1) — it always
+   * targets the LAST row directly, even when there are several rows between them. Rule 2 likewise
+   * no longer flows into N+1 specifically — same target. Rules 3 and 4 (the last row's own
+   * behavior) are UNCHANGED from v1.12.0/v1.12.1. The old "increasing the FIRST row is REJECTED"
+   * boundary case no longer exists as a special case: under this model the first row is just
+   * another non-last row, so increasing it now succeeds via rule 1 (decreasing the last row),
+   * rather than being blocked for lack of an N-1 to draw from.
+   *
+   * Every row this method actually touches (the last row, any donor row during rule 4's cascade,
+   * or a newly-created row under rule 3 — via markCascaded — NOT the edited row itself, which the
+   * caller still finishes via finishAmountEdit) becomes driver:'amount'/isRemainder:false, exactly
+   * as if the user had typed that row directly — a deliberate consequence, not an oversight: the
+   * whole point of this feature is precision-tuning individual legs, so a leg touched by the
+   * cascade should stick the same way a directly-typed one already does.
+   *
+   * Returns the row's actual final amount (after any capping) and `applied` (always true now —
+   * rule 1 caps rather than rejects, and rule 2/3/4 always succeed; the parameter is kept in the
+   * return shape for the caller's existing boundary-rejection handling, which is simply never
+   * exercised post-v1.12.3, rather than restructuring both call sites for one guaranteed-true field).
+   */
+  private applyAmountWaterfall(index: number, requestedAmount: Decimal): { finalAmount: Decimal; applied: boolean } {
+    const rows = this.rows;
+    const row = rows[index]!;
+    const oldAmount = row.amountTxCcy;
+    const delta = requestedAmount.minus(oldAmount);
+    if (delta.isZero()) return { finalAmount: oldAmount, applied: true };
+
+    const lastIndex = rows.length - 1;
+
+    if (index === lastIndex) {
+      if (delta.isNegative()) {
+        // Rule 3 — last row decrease: create a new trailing row for the freed difference.
+        const freed = oldAmount.minus(requestedAmount);
+        const newRow = this.makeRow(0, this.defaultAccountType, DEFAULT_ACCOUNT_NO_BY_TYPE[this.defaultAccountType], false);
+        newRow.amountTxCcy = freed;
+        this.rows = [...this.rows, newRow];
+        this.markCascaded(newRow);
+        return { finalAmount: requestedAmount, applied: true };
+      }
+      // Rule 4 — last row increase: draw from the row(s) before it, cascading backward, capped at 0.
+      let remaining = delta;
+      let drawn = new Decimal(0);
+      for (let j = index - 1; j >= 0 && remaining.greaterThan(0); j--) {
+        const donor = rows[j]!;
+        const take = Decimal.min(donor.amountTxCcy, remaining);
+        if (take.isZero()) continue;
+        donor.amountTxCcy = donor.amountTxCcy.minus(take);
+        this.markCascaded(donor);
+        remaining = remaining.minus(take);
+        drawn = drawn.plus(take);
+      }
+      return { finalAmount: oldAmount.plus(drawn), applied: true }; // capped to `drawn` if earlier rows couldn't fully cover the request
+    }
+
+    // NOT the last row — rules 1 & 2: any change here offsets directly against the LAST row,
+    // regardless of this row's own position (first or middle), never the adjacent neighbor.
+    const last = rows[lastIndex]!;
+    if (delta.isPositive()) {
+      // Rule 1 — non-last row increase: decrease the last row by the same amount, capped at what it has.
+      const take = Decimal.min(last.amountTxCcy, delta);
+      last.amountTxCcy = last.amountTxCcy.minus(take);
+      this.markCascaded(last);
+      return { finalAmount: oldAmount.plus(take), applied: true }; // capped to `take` if the last row couldn't fully cover the request
+    }
+    // Rule 2 — non-last row decrease: increase the last row by the exact freed amount (always fully absorbed).
+    const freed = oldAmount.minus(requestedAmount);
+    last.amountTxCcy = last.amountTxCcy.plus(freed);
+    this.markCascaded(last);
+    return { finalAmount: requestedAmount, applied: true };
+  }
+
+  /** Fixes a donor/receiver row touched by applyAmountWaterfall above, and refreshes its display %. */
+  private markCascaded(row: Row): void {
+    row.driver = 'amount';
+    row.isRemainder = false;
+    row.pct = this.totalAmount.greaterThan(0)
+      ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+      : new Decimal(0);
+    this.rowScaleErrors.delete(row.id); // programmatic move via exact Decimal arithmetic — never over-precise.
+    // This row's amount just moved for a reason that has nothing to do with a fresh account-ccy
+    // retype (a waterfall donor/receiver, a Total Amount absorption, or a newly-spawned row) — any
+    // previously-stored exact figure no longer describes it. See Row.accountCcyOverride.
+    row.accountCcyOverride = null;
   }
 
   onAmountInput(row: Row, amount: number): void {
@@ -520,10 +766,23 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     // before money() rounds it to the transaction currency's own scale (which would silently discard
     // any over-precise digits).
     this.checkRowScale(row, amount, this.transactionCurrency);
+    const requested = money(Decimal.max(new Decimal(amount || 0), 0), this.scaleFor(this.transactionCurrency));
+    const index = this.rows.indexOf(row);
+    const wentThroughWaterfall = this.rows.length > 1 && index !== -1;
+    if (wentThroughWaterfall) {
+      const { finalAmount, applied } = this.applyAmountWaterfall(index, requested);
+      if (!applied) this.rowScaleErrors.delete(row.id); // boundary-rejected — the edit never took effect.
+      row.amountTxCcy = finalAmount;
+    } else {
+      row.amountTxCcy = requested;
+    }
+    // This is the OTHER input surface for the same amountTxCcy field — now THAT'S the
+    // authoritative edit, so any account-ccy figure previously typed via onAccountAmountInput no
+    // longer describes this row (see Row.accountCcyOverride's own doc comment).
+    row.accountCcyOverride = null;
     row.driver = 'amount';
-    row.amountTxCcy = money(Decimal.max(new Decimal(amount || 0), 0), this.scaleFor(this.transactionCurrency));
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
-    this.fixRow(row);
+    this.finishAmountEdit(row, wentThroughWaterfall);
   }
 
   /**
@@ -543,13 +802,60 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   onAccountAmountInput(row: Row, accountAmount: number): void {
     // Account Ccy Equiv. is denominated in the ROW's own currency — validate the RAW typed value now.
     this.checkRowScale(row, accountAmount, row.currency);
-    row.driver = 'amount';
     const amount = Decimal.max(new Decimal(accountAmount || 0), 0);
     // Deriving amountTxCcy (always transaction-currency-denominated — see the Row field doc
     // comment), so it rounds to the TRANSACTION currency's own scale, not row.currency's.
-    row.amountTxCcy = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency)) : new Decimal(0);
+    const requested = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency)) : new Decimal(0);
+    // Same waterfall rule as onAmountInput above — this is just an alternate input surface for
+    // the identical underlying amountTxCcy field, so it must rebalance neighbors the same way.
+    const index = this.rows.indexOf(row);
+    const wentThroughWaterfall = this.rows.length > 1 && index !== -1;
+    if (wentThroughWaterfall) {
+      const { finalAmount, applied } = this.applyAmountWaterfall(index, requested);
+      if (!applied) this.rowScaleErrors.delete(row.id);
+      row.amountTxCcy = finalAmount;
+    } else {
+      row.amountTxCcy = requested;
+    }
+    // Round-trip fix (see Row.accountCcyOverride's own doc comment): only trustworthy when this
+    // row actually landed on `requested` — i.e. the waterfall didn't cap it short (rule 1 capping
+    // at the last row's own balance). A capped edit's real amountTxCcy is smaller than what the
+    // raw account-ccy figure implies, so the ordinary derivation (not this stale override) is the
+    // correct value there — leave it null and let accountCcyAmountDecimal() fall back to it.
+    row.accountCcyOverride = row.amountTxCcy.equals(requested) ? amount : null;
+    row.driver = 'amount';
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
-    this.fixRow(row);
+    this.finishAmountEdit(row, wentThroughWaterfall);
+  }
+
+  /**
+   * Finishes an Amount (Tx Ccy) / Account Ccy Equiv. edit — called by both onAmountInput and
+   * onAccountAmountInput. When the waterfall actually ran (`wentThroughWaterfall`), it already
+   * manages exactly which rows exist and their amounts (including creating a brand-new trailing
+   * row on a last-leg decrease — see applyAmountWaterfall), so this just clears the edited row's
+   * OWN isRemainder flag and runs ensureRemainderRow() as a consistency pass (a no-op in practice,
+   * since Σ Amount already equals totalAmount exactly by construction). It deliberately does NOT
+   * call fixRow(): fixRow's single-remainder fallback-promotion (reverse-find some OTHER row to
+   * re-designate as "the remainder" whenever the edited row WAS the sole remainder) is built for
+   * the OLD one-remainder-row model and would otherwise silently reassign an unrelated, already-
+   * correct row's isRemainder flag even though the waterfall already balanced everything exactly
+   * — confusing, and no longer needed now that a last-leg decrease creates its own new row instead
+   * of relying on that promotion. (Bug this fixes, reviewer-reported: decreasing a row that was
+   * STILL marked isRemainder — the common case, since the remainder row is normally last —
+   * previously bypassed the waterfall entirely via an earlier, overly-broad `!row.isRemainder`
+   * gate, so decreasing "the last leg" silently fell back to fixRow's fallback-promotion instead
+   * of creating a new leg, i.e. exactly the reported "沒有增加一筆TRX等值的" gap.)
+   *
+   * When the waterfall did NOT run (still a single, not-yet-split row), delegates to fixRow(row)
+   * — the ORIGINAL, unchanged "typing a smaller amount splits off a new remainder row" behavior.
+   */
+  private finishAmountEdit(row: Row, wentThroughWaterfall: boolean): void {
+    if (wentThroughWaterfall) {
+      row.isRemainder = false;
+      this.ensureRemainderRow();
+    } else {
+      this.fixRow(row);
+    }
   }
 
   onFieldChange(): void {
@@ -635,29 +941,63 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   private ensureRemainderRow(): void {
     const fixed = this.rows.filter((r) => !r.isRemainder);
     const fixedPct = fixed.reduce((sum, r) => sum.plus(r.pct), new Decimal(0));
+    // 100 - Σ(every fixed row's own, independently-rounded %) — the exact-complement % a
+    // remainder row (real or the "last row" fallback below) needs to make the total read exactly
+    // 100.00%, regardless of drift in the fixed rows' own %. Also used for the fixed-vs-remainder
+    // routing decision as a first pass, refined below by amountRemaining below.
     const remaining = new Decimal(100).minus(fixedPct).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+    const fixedAmountSum = fixed.reduce((sum, r) => sum.plus(r.amountTxCcy), new Decimal(0));
+    // v1.12.1: whether a real remainder row is needed is decided by AMOUNT, never by the
+    // independently-rounded % sum above — % is reference-only once amount has been entered (per
+    // this project's own confirmed principle; see finishAmountEdit/applyAmountWaterfall). Money
+    // per row is already scale-rounded, so a genuinely fully-allocated split always sums to
+    // EXACTLY totalAmount — no epsilon/tolerance needed, unlike the pct-based `remaining` above.
+    // Repeating-fraction splits (e.g. three equal 1/3 shares) are the concrete case this matters
+    // for: each row's % independently rounds to 33.33%, summing to 99.99% — `remaining` alone
+    // would read as "0.01% left" and spawn a phantom remainder row holding 0.00, even though the
+    // AMOUNTS already sum to totalAmount exactly and nothing is actually missing.
+    const amountRemaining = money(this.totalAmount.minus(fixedAmountSum), this.scaleFor(this.transactionCurrency));
 
-    if (remaining.greaterThan(0.001)) {
+    if (amountRemaining.greaterThan(0)) {
       let remainderRow = this.rows.find((r) => r.isRemainder);
       if (!remainderRow) {
-        remainderRow = this.makeRow(0, this.defaultAccountType, '', true);
+        // Same DEFAULT_ACCOUNT_NO_BY_TYPE placeholder the v1.12.2 rule-3 new-row path already
+        // uses (line ~666 above) — this is the OTHER place a brand-new row gets spawned (any
+        // fixed-row edit that leaves a leftover, not just a last-row decrease), and it was
+        // still defaulting to '' until now: a blank Account No. here reads as incomplete/broken
+        // the same way it did before v1.12.2, and this path fires far more often (it's how the
+        // very first split happens) than rule 3's own new-row case.
+        remainderRow = this.makeRow(0, this.defaultAccountType, DEFAULT_ACCOUNT_NO_BY_TYPE[this.defaultAccountType], true);
         this.rows = [...this.rows, remainderRow]; // brand-new row — appending is the only order change that's actually happening.
       }
       remainderRow.pct = remaining;
-      // Mortgage/loan-style rounding: the remainder row absorbs whatever's left
-      // after the fixed rows' own (independently rounded) amounts, rather than
-      // being independently rounded itself from its own percentage. Rounding
-      // every row from its percentage (money(total * pct / 100)) can make the
-      // rows sum to more or less than total — e.g. total=0.35 split 30/70 gives
-      // 0.11 + 0.25 = 0.36, a cent over. Deriving the remainder as
-      // total - sum(fixed) instead guarantees every split sums to exactly
-      // totalAmount, matching how a final loan installment absorbs rounding.
-      const fixedAmountSum = fixed.reduce((sum, r) => sum.plus(r.amountTxCcy), new Decimal(0));
-      remainderRow.amountTxCcy = money(this.totalAmount.minus(fixedAmountSum), this.scaleFor(this.transactionCurrency));
+      // Mortgage/loan-style rounding: the remainder row absorbs whatever's left after the fixed
+      // rows' own (independently rounded) amounts, rather than being independently rounded itself
+      // from its own percentage — guarantees every split sums to exactly totalAmount, matching how
+      // a final loan installment absorbs rounding. amountRemaining above already IS this figure.
+      remainderRow.amountTxCcy = amountRemaining;
       // Existing rows keep their current array position — no reassignment here.
     } else {
-      // Fully allocated (or over-allocated) — no leftover to show a remainder row for.
+      // Fully allocated by AMOUNT (or over-allocated) — no leftover to show a remainder row for.
       this.rows = fixed.length > 0 ? fixed : [this.makeRow(100, this.defaultAccountType, this.defaultAccountNo, true)];
+      // Reviewer-requested (v1.12.1): give the LAST row's own displayed % the same "exact
+      // complement" treatment a dedicated remainder row already gets above
+      // (`remainderRow.pct = remaining`) — otherwise, once every row is amount-driven (the normal
+      // end state after using the Amount waterfall repeatedly — see applyAmountWaterfall/
+      // finishAmountEdit above), each row's % is only ever independently rounded from its OWN
+      // amount (2dp), which can fail to sum to exactly 100.00% even though the underlying AMOUNTS
+      // sum to totalAmount exactly (e.g. three equal 1/3 splits each round to 33.33%, summing to
+      // 99.99%, not 100.00% — the classic repeating-fraction rounding gap). Formula, exactly as
+      // specified: last row's % = 100% − Σ(every OTHER row's own %).
+      //
+      // Skipped when genuinely over-allocated (amountRemaining negative — a REAL, amount-level
+      // over-allocation, not just %-drift) — silently "fixing" the last row's % there would mask
+      // the real over-allocation the Total Allocated warning exists to surface.
+      if (this.rows.length > 0 && !amountRemaining.isNegative()) {
+        const last = this.rows[this.rows.length - 1]!;
+        const othersPct = this.rows.slice(0, -1).reduce((sum, r) => sum.plus(r.pct), new Decimal(0));
+        last.pct = new Decimal(100).minus(othersPct).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      }
     }
     this.emit();
   }
@@ -694,10 +1034,15 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
         }
         if (this.needsRate(r)) {
           // amountAccountCcy is denominated in the ROW's OWN currency — formatted to ITS scale,
-          // same reasoning as amountTxCcy above (this is the field the JPY Account Ccy
-          // Equivalent bug actually shipped on the wire, not just in the display).
+          // same reasoning as amountTxCcy above. Reviewer-reported round-trip bug fixed here: this
+          // used to always re-derive amountTxCcy × rate, which silently lost precision whenever
+          // the row's own currency has coarser minor units than the transaction currency's (e.g.
+          // typing JPY 20000 came back as 19999) — see the Row.accountCcyOverride field doc
+          // comment for the full mechanism. accountCcyAmountDecimal() prefers that exact
+          // last-typed figure when it's still valid, so the wire sends exactly what was typed,
+          // same as the display now does.
           const rowScale = this.scaleFor(r.currency);
-          leg.amountAccountCcy = money(r.amountTxCcy.times(r.rate), rowScale).toFixed(rowScale);
+          leg.amountAccountCcy = this.accountCcyAmountDecimal(r).toFixed(rowScale);
           if (this.side === 'DEBIT') leg.drBuyRate = r.rate.toFixed(6);
           else leg.crBuyRate = r.rate.toFixed(6);
         }

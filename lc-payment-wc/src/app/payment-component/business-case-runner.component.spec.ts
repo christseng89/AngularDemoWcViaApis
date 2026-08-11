@@ -1080,6 +1080,39 @@ describe('BusinessCaseRunnerComponent', () => {
       expect(comp.result).toBeNull();
       expect(comp.previewError).toBe('classify failed');
     });
+
+    it("clears a STALE confirmError left over from a PRIOR failed Confirm click the moment the form is corrected and the debounced pipeline re-runs — reviewer-reported: a fixed field (e.g. a previously-blank Account No.) left the old '⚠ [400] ...' banner on screen indefinitely, since nothing but a NEW Confirm click used to reset it", () => {
+      const { comp, mockApi } = makeComponent();
+      (mockApi.confirm as jest.Mock).mockReturnValue(
+        of({ instruction: { classification: { paymentComponentRelated: true }, accountEntries: [], swiftMessages: [], instructionId: 'i1' }, created: true }),
+      );
+      const config = passConfig();
+      comp.selectCase(config);
+      comp.confirmError = '[400] REQUEST_VALIDATION_FAILED: debitLegs.1.accountNo: String must contain at least 1 character(s)';
+      comp.onDebitValidChange(true);
+      comp.onCreditValidChange(true);
+      comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+
+      (comp as any).runPreview(config).subscribe();
+
+      expect(comp.confirmError).toBeNull();
+    });
+
+    it('clears a stale confirmError even on a preview that STILL fails — the fresh previewError takes over rather than showing both stacked', () => {
+      const { comp, mockApi } = makeComponent();
+      (mockApi.confirm as jest.Mock).mockReturnValue(throwError(() => new PaymentComponentApiError(400, 'still invalid')));
+      const config = passConfig();
+      comp.selectCase(config);
+      comp.confirmError = '[400] some earlier confirm failure';
+      comp.onDebitValidChange(true);
+      comp.onCreditValidChange(true);
+      comp.model = { unitCode: 'HQ', mainRef: 'REF-1', sequence: 1 };
+
+      (comp as any).runPreview(config).subscribe();
+
+      expect(comp.confirmError).toBeNull();
+      expect(comp.previewError).toBe('[400] still invalid');
+    });
   });
 
   describe('filterFxPairsNettedBySuspense', () => {

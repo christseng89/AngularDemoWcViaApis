@@ -56,12 +56,27 @@
       (ngModelChange)="onPctInput(row, $event)"
       [title]="row.isRemainder ? 'Remainder — editing it fixes this row and opens a new remainder for what\'s left' : ''" />
 
+    <!-- Commits on blur/Enter, NOT on every keystroke (deliberately not (ngModelChange)) — the
+         waterfall rebalances OTHER rows on every call, so live-firing per keystroke while typing
+         a multi-digit amount (e.g. "5000") ran onAmountInput 4 times with the INTERMEDIATE values
+         5, 50, 500, 5000 in turn, each one its own decrease-then-increase-then-... cascade against
+         neighboring rows — slow, visually janky, and occasionally left a neighbor at the wrong
+         value if an intermediate keystroke happened to hit a boundary case a later one didn't.
+         Deferring to blur means exactly ONE onAmountInput call for the value the user actually
+         meant to type. The explicit `amtInput.value = ...` afterward is still needed even so: the
+         waterfall can reject an edit (e.g. increasing the first leg) and leave row.amountTxCcy
+         exactly as it was, and since the bound value then hasn't structurally changed, Angular's
+         own dirty-checking would otherwise skip re-writing the DOM and leave the field showing
+         whatever the user typed rather than the real, unchanged amount. (keydown.enter) just
+         blurs — same commit path, no separate handler to keep in sync. -->
     <input
+      #amtInput
       type="number" min="0" step="any"
       *ngIf="!needsRate(row); else txCcyComputed"
       [ngModel]="toNum(row.amountTxCcy)"
-      (ngModelChange)="onAmountInput(row, $event)"
-      [title]="row.isRemainder ? 'Remainder — editing it fixes this row and opens a new remainder for what\'s left' : ''" />
+      (blur)="onAmountInput(row, amtInput.value === '' ? 0 : +amtInput.value); amtInput.value = toNum(row.amountTxCcy).toString()"
+      (keydown.enter)="amtInput.blur()"
+      [title]="amountInputTitle(row)" />
     <ng-template #txCcyComputed>
       <span class="computed" title="Derived from the Account Ccy Equiv. amount ÷ rate — edit that field, or the % column, instead.">{{ toNum(row.amountTxCcy) }}</span>
     </ng-template>
@@ -78,11 +93,16 @@
       title="Auto-filled from GET /api/fx/rates when the currency changed — still freely editable." />
     <ng-template #noRate><span class="muted">—</span></ng-template>
 
+    <!-- Same blur/Enter-commit reasoning as the Amount (Tx Ccy) input above — this field drives
+         the identical underlying amountTxCcy field (just entered in the row's own currency) and
+         goes through the same waterfall, so the same per-keystroke-cascade problem applied here too. -->
     <input
+      #acctAmtInput
       type="number" min="0" step="any"
       *ngIf="needsRate(row); else sameCcy"
       [ngModel]="accountCcyAmount(row)"
-      (ngModelChange)="onAccountAmountInput(row, $event)"
+      (blur)="onAccountAmountInput(row, acctAmtInput.value === '' ? 0 : +acctAmtInput.value); acctAmtInput.value = accountCcyAmount(row).toString()"
+      (keydown.enter)="acctAmtInput.blur()"
       [title]="'Amount in this row\'s own currency (' + row.currency + ') — the figure Suspense netting compares against. Amount (Tx Ccy) is derived from this ÷ rate.'" />
     <ng-template #sameCcy><span class="muted">—</span></ng-template>
 
@@ -111,7 +131,14 @@
     <span class="total-pct" [class.over]="isOverAllocated">Total allocated: {{ totalPct }}%</span>
   </div>
   <p class="allocator-hint" *ngIf="isSplit">
-    The row marked <em>remainder</em> auto-tracks 100% − every other row — editing any row (including it) fixes that row and reflows the leftover into a new remainder, so this side always totals exactly {{ totalAmount }} {{ transactionCurrency }}.
+    Editing a row's <em>%</em> fixes that row and reflows the leftover into the <em>remainder</em>
+    row (100% − every other row). Editing a row's <em>Amount</em> instead waterfalls the
+    difference against the <em>last</em> leg: on any OTHER leg, increasing it decreases the last
+    leg by the same amount and decreasing it increases the last leg — always the last leg
+    directly, never the leg next to it. Editing the <em>last</em> leg itself works the other way:
+    decreasing it opens a brand-new leg to hold the difference; increasing it draws from the
+    leg(s) before it, as far back as needed. Either way this side always totals exactly {{ totalAmount }}
+    {{ transactionCurrency }}.
   </p>
   <p class="allocator-error" *ngIf="isOverAllocated">⚠ Over-allocated — these rows add up to more than 100%. Reduce one of them.</p>
   <p class="allocator-error" *ngIf="amountScaleErrors.length">

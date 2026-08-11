@@ -633,6 +633,15 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   private runPreview(config: BusinessCaseConfig) {
     this.previewError = null;
     this.previewIncomplete = false;
+    // A stale Confirm error (from a PRIOR click of the Confirm button) refers to whatever was
+    // wrong with the request at that moment — it says nothing about the form's current state.
+    // Every edit that reaches here (any Formly field, leg-allocator row, Suspense entry, or
+    // header override) re-runs this debounced recompute regardless of outcome, so clearing it
+    // here — same as previewError/previewIncomplete above — means a corrected field (e.g. a
+    // previously-blank Account No.) drops the old "⚠ [400] ..." banner the moment the user's
+    // fix is reflected in a fresh preview, instead of leaving it displayed indefinitely until
+    // the next Confirm click.
+    this.confirmError = null;
 
     // H-2 client-side guard: an over-precise amount can't post — surface it now
     // (with the specific reason) instead of firing a preview that only 400s.

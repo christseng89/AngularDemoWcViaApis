@@ -432,6 +432,376 @@ Amount cell across all three tables. Deliberately does NOT touch the wire contra
 `fxPairSiteLabel`'s predecessor. See `response-viewer.component.spec.ts`'s `formatAmount` describe
 block (whole-number padding, already-scaled passthrough, 0dp currency, unknown-currency fallback).
 
+## Leg-allocator: Amount (Tx Ccy) "waterfall" rebalancing — decrease flows forward, increase draws backward (v1.12.0, business-requirement-confirmed 2026-08-11, both Debit and Credit Legs)
+
+Reviewer's stated rule, given as both a detailed spec and its own one-line summary: **"下調時，
+差額往後流；上調時，差額往前逐筆回補"** (on a decrease, the difference flows forward; on an
+increase, the difference is backfilled leg-by-leg from earlier legs). Decreasing leg N's Amount (Tx
+Ccy) pushes the freed difference into leg N+1 (the very next leg); increasing leg N's amount draws
+the needed difference from leg N−1 first, then N−2, N−3, … as far back as needed. Applies
+identically to both `<app-leg-allocator side="DEBIT">` and `side="CREDIT">` (same shared component,
+independent per-side state, never cross-side).
+
+**Validity check before implementing:** the rule is sound and total-preserving BY CONSTRUCTION —
+money only ever moves between rows already in the array, so Σ Amount (Tx Ccy) and Total Allocated
+never need separate re-verification. Three boundary cases the literal rule left unstated were
+explicitly put to the reviewer; two were confirmed as first proposed, the third (rule 1) was
+revised the same day per reviewer follow-up:
+1. Decreasing the LAST leg (no N+1 to receive the difference) — **first attempt** rejected the
+   edit outright (the recommended/safe option offered at the time). **Superseded same day**: the
+   reviewer's follow-up ("最後一筆 - A. 調小金額增加新的一筆 B. 調大金額 往上一筆減少") asks for a
+   NEW leg to be auto-created at the end of the array instead, sized to exactly the freed
+   difference (empty Account No, transaction currency, same convention as a fresh remainder row —
+   the user fills it in afterward). The edited row becomes leg N, the new row becomes leg N+1, so
+   a further decrease on the still-last leg keeps working the same way, chaining another new leg
+   each time. This is the ONLY branch of `applyAmountWaterfall` that grows `this.rows` — every
+   other branch only moves money between rows that already exist. (Part B of the same follow-up —
+   "調大金額 往上一筆減少" for the last leg — needed no change: increasing any non-first row,
+   including the last one, already drew from N−1 backward.)
+2. Increasing the FIRST leg (no N−1 to draw from) → **rejected**, the row snaps back to its
+   current amount — confirmed as originally proposed, unchanged. Deliberately NOT symmetric with
+   rule 1: the reviewer's spec only ever described drawing backward from EXISTING legs for an
+   increase, never inventing one, and inserting a new leg BEFORE the first would also disturb
+   every other leg's array position, unlike appending.
+3. An increase needing more than every earlier leg combined can supply (even fully drained to 0) →
+   **silently capped** to whatever was actually available, not rejected outright or allowed to
+   overshoot — confirmed as originally proposed, unchanged.
+
+**Scope refinement, NOT explicitly asked but necessary to avoid a regression:** the waterfall only
+applies when the edited row is NOT the current remainder (`!row.isRemainder`) AND the side already
+has more than one row. Editing the floating remainder row keeps the PRE-EXISTING, unrelated
+behavior unchanged (fix it at the typed value, reflow the true leftover into a freshly-spawned
+remainder — the well-established "split off another leg by typing into the auto-filled one"
+workflow). Without this carve-out, that very common flow — which is very often a DECREASE on
+whatever the grid currently shows as the trailing remainder — would hit boundary rule 1 above and
+silently stop working. The new rule is specifically about fine-tuning legs that are ALREADY
+explicit, not about the in-progress act of carving up a still-floating remainder. `onPctInput` (%
+editing) is completely untouched either way — the reviewer's rule was Amount-only.
+
+**Implementation:** `leg-allocator.component.ts`'s new `applyAmountWaterfall` (private), called from
+both `onAmountInput` and `onAccountAmountInput` (the latter is just an alternate input surface for
+the identical underlying `amountTxCcy` field — Account Ccy Equiv. edits on a foreign-currency row
+waterfall the same way). Every row the cascade actually touches becomes
+`driver:'amount'`/`isRemainder:false`, exactly as if the user had typed that row directly.
+
+**Real UX bug found and fixed during browser verification, not just unit tests (still applies —
+rule 2's rejection is the remaining case that leaves `row.amountTxCcy` unchanged):** when the
+bound value doesn't structurally change, Angular's own change-detection dirty-check has no reason
+to re-write the `<input>`'s raw DOM value, so the field visually kept showing whatever the user had
+just typed, even though the edit never took effect. Reproduced with literal keystroke-by-keystroke
+typing (not just a scripted single value-set), confirmed via `document.querySelector(...).value`
+reading the live DOM, not just a screenshot. Fixed in `leg-allocator.component.html`: both the
+Amount (Tx Ccy) and Account Ccy Equiv. inputs now force-resync their own raw DOM value
+(`amtInput.value = toNum(row.amountTxCcy).toString()`) immediately after calling the handler — a
+harmless no-op on a successful edit (the value already matches), but what actually snaps a rejected
+edit back on screen. `npx ng build` was re-run after this template change per this file's own
+"always `ng build` after touching `.html`" rule above.
+
+See `leg-allocator.component.spec.ts`'s "amount waterfall (v1.12.0 …)" and "amountInputTitle" describe
+blocks (17 tests: forward-flow, single- and multi-donor backward draw, the last-leg new-row-creation
+case (including a chained second decrease opening yet another new row), the first-leg rejection, the
+capped-increase case, the remainder bypass, `onAccountAmountInput` parity for both the ordinary
+cascade AND the last-leg new-row case, zero-delta no-op, and every tooltip variant) — including a
+rewrite of the pre-existing "TWO independently-fixed rows... remainder is Total - SUM..." regression
+test, whose original construction (shrink an already-frozen LAST row to spawn a third) is no longer a
+valid sequence now that a last-row decrease creates a genuinely NEW row rather than reusing an
+existing one; the rewrite reaches the identical expected numbers via a valid sequence instead. Also
+verified live end-to-end in-browser twice (Pay/Accept case, Debit Legs split into multiple rows): the
+final new-leg-creation behavior (a decrease on the last, already-fixed leg visibly adds a new grid
+row holding exactly the freed amount, with an empty Account No awaiting input), and a full Confirm
+POST succeeding with the adjusted split.
+
+**Follow-up usability fix, same session (reviewer: "金額修改輸入很難用" — the amount input is hard
+to use):** both the Amount (Tx Ccy) and Account Ccy Equiv. inputs used to fire on
+`(ngModelChange)`, i.e. on every keystroke — typing a multi-digit value like "5000" ran
+`onAmountInput` four times with the INTERMEDIATE values 5, 50, 500, 5000, each one its own
+decrease-then-increase-then-… cascade against neighboring rows. Slow, visually janky, and an
+intermediate keystroke could hit a boundary case (e.g. transiently look like a last-leg decrease)
+that the final typed value never would have. Switched both inputs to commit on `(blur)` /
+`(keydown.enter)` instead (Enter just calls `.blur()` — same commit path) — exactly ONE
+`onAmountInput`/`onAccountAmountInput` call for the value the user actually meant to type, while
+still freely typing without any recalculation firing mid-edit. The existing forced DOM-resync
+(`amtInput.value = toNum(row.amountTxCcy).toString()`) moved into the same `(blur)` handler,
+immediately after the call — still needed for the same reason as before (a rejected edit leaves
+the bound value unchanged, so Angular's own dirty-check won't otherwise rewrite the DOM). Verified
+live in-browser: typing keystroke-by-keystroke into an Amount field no longer touches any other
+row until blur, at which point exactly one correct cascade (or one correct rejection-with-reset)
+fires. Three reviewer follow-up messages during this same fix were all confirmations of
+ALREADY-implemented, already-tested behavior rather than new requirements (decrease → new leg IS
+positionally the last leg; increase draws from the previous leg's Amount (Tx Ccy), with Account
+Ccy Equiv. auto-recomputing since it's a pure derived display value, never separately stored) — no
+further logic change resulted from them, confirmed via `AskUserQuestion` before touching code
+again, per this project's standing rule of not re-litigating settled behavior without new
+information.
+
+**Real bug found and fixed, same session (reviewer-reported: "最後一筆減少金額 沒有增加一筆TRX等值的"
+— decreasing the last leg did NOT open a new leg):** the original v1.12.0 implementation gated the
+whole waterfall on `!row.isRemainder` — deliberately, to preserve the pre-existing "typing into the
+auto-filled remainder row fixes it and reflows the leftover into a freshly-spawned remainder"
+workflow (see the scope-refinement note earlier in this section). That gate was too broad: since
+the remainder row is normally the LAST row, decreasing "the last leg" in the common case — while it
+was STILL marked `isRemainder` (the user had never separately fixed it first) — silently bypassed
+the waterfall entirely and fell back to the OLD `fixRow()` fallback-promotion behavior instead
+(reassigning some OTHER existing row's `isRemainder` flag and recomputing IT via exact
+subtraction), never creating a new row at all. This was the ORIGINAL reason for the carve-out
+(avoiding rule 1's then-REJECTION on a remainder decrease) — but once rule 1 was revised to create
+a new leg instead of rejecting (see above), the carve-out's justification disappeared and it became
+a straightforward regression instead.
+
+**Fix:** removed the `!row.isRemainder` condition from both `onAmountInput` and
+`onAccountAmountInput` — the waterfall now applies whenever `rows.length > 1`, regardless of the
+edited row's remainder status. The single-row (not-yet-split) case remains the only exemption
+(unchanged `fixRow`/`ensureRemainderRow` "split off a new row" behavior). Introduced
+`finishAmountEdit(row, wentThroughWaterfall)`: when the waterfall ran, it clears the edited row's
+OWN `isRemainder` flag and calls `ensureRemainderRow()` directly (a no-op in practice, since the
+waterfall already keeps Σ Amount exactly equal to `totalAmount`) — deliberately WITHOUT calling
+`fixRow()`, since `fixRow`'s fallback-promotion is built for the old one-remainder-row model and
+would otherwise reassign an unrelated row's `isRemainder` flag for no reason now that the waterfall
+manages its own row creation. `amountInputTitle` updated to match: a remainder row in a genuine
+multi-row split now gets the ordinary first/middle/last tooltip, not the old "Remainder" message
+(still shown only for the true single-row case).
+
+Three pre-existing tests relied on the old bypass (directly or via its interaction with
+`onTotalChange`'s pct-vs-amount-driven distinction) and were updated: the `onTotalChange`
+exact-subtraction regression test now constructs its "one remainder + one fixed foreign row" setup
+via direct property assignment rather than via `onAccountAmountInput` (that path now correctly
+opens a third row instead, which is a different, equally-valid scenario, just not what that test is
+about); the old "remainder row bypasses the waterfall" test was rewritten to assert the FIX
+(decreasing a still-remainder last row now opens a new row, and no other row gets silently
+reassigned to remainder); and the corresponding `amountInputTitle` test now expects the ordinary
+"Last leg" message instead of "Remainder". Verified live in-browser: splitting into two rows,
+leaving the second one as the untouched auto-remainder, and decreasing ITS Amount (Tx Ccy) directly
+now correctly opens a third row holding exactly the freed difference — matching the originally
+reported gap.
+
+## Leg-allocator: LAST row's displayed % gets the exact complement, not an independently-rounded value (v1.12.1, business-requirement-confirmed 2026-08-11)
+
+Reviewer-reported: once a split is fully amount-driven (the normal end state after repeated use of
+the Amount waterfall above — no row left marked `isRemainder`), each row's displayed `%` was only
+ever independently rounded from its OWN amount (`amountTxCcy / totalAmount * 100`, 2dp). This can
+fail to sum to exactly 100.00% even though the underlying AMOUNTS sum to `totalAmount` exactly — the
+classic repeating-fraction gap: three equal thirds of a total each round to 33.33%, summing to
+99.99%, not 100.00%. Reviewer's fix, stated precisely: **last row's % = 100% − Σ(every row before
+it's own %)** — exactly mirroring how a dedicated remainder row already gets its own % as the exact
+complement (`remainderRow.pct = 100 − Σfixed%`, pre-existing). Reviewer also reaffirmed the
+project's standing principle directly: **"輸入金額後，比例僅供參考，不須再用比例算"** (once amount
+is entered, % is reference-only — never used to drive further calculation) — i.e. this fix must
+only ever touch the DISPLAY `.pct` field, never `.amountTxCcy` (the sole source of truth).
+
+**Fix, in `ensureRemainderRow()`:** after collapsing to `fixed` rows (no leftover to show a
+dedicated remainder row for), if the split is not over-allocated, the LAST row's `.pct` is set to
+`100 − Σ(every other row's own .pct)` — a pure display correction, `.amountTxCcy` never touched.
+
+**A necessary, deeper companion fix surfaced while implementing this precisely:** the decision of
+"is there a real leftover" (whether to spawn/keep a dedicated remainder row at all) used to be
+**%-based** (`remaining = 100 − Σfixed%`, spawn a remainder row whenever `remaining > 0.001`). That
+threshold is exactly the same repeating-fraction drift this fix targets — for the three-equal-
+thirds example, `remaining` reads as `0.01` (`100 − 99.99`), which is `> 0.001`, so the OLD code
+would spawn a **phantom remainder row holding `0.00`** (since `totalAmount − Σfixed amounts` is
+genuinely `0` — the amounts already balance exactly) even though nothing is actually missing.
+Switched the routing decision to be **amount-based** instead (`amountRemaining = totalAmount −
+Σfixed amounts`, exact since every amount is already scale-rounded): spawn/keep a real remainder row
+only when `amountRemaining > 0`; otherwise take the "fully allocated" branch and apply the %
+correction above. This is the same amount-is-truth principle applied one level up, and required
+because the reviewer's own %-is-reference-only principle above applies to ROUTING decisions too, not
+just to the final displayed value. The over-allocated case is guarded the same way on both fronts:
+`amountRemaining` negative → skip the % correction (so a genuine over-allocation still visibly shows
+non-complementary percentages and the Total Allocated warning still fires) and skip spawning a
+remainder row (unchanged from before — over-allocation was never eligible for a remainder row).
+
+See `leg-allocator.component.spec.ts`'s "last-row % exact-complement (v1.12.1 …)" describe block:
+the three-way 1/3 split reads Total Allocated as exactly 100% (not 99.99%) with no phantom 4th row;
+a genuine over-allocation (two explicit 60% rows) is confirmed NOT masked (last row's % stays 60,
+`isOverAllocated` still fires); and a genuine (non-drift) leftover still correctly spawns a real
+remainder row, proving the amount-based routing change didn't regress the ordinary case. All 96
+leg-allocator tests (300 project-wide) still pass with no other behavior changes. Verified live
+in-browser: Total Amount 30000 split into three explicit 10000/10000/10000 legs displays
+33.33% / 33.33% / 33.34% — "Total allocated: 100%", not 99.99%.
+
+## Leg-allocator: a Total Amount (header) change absorbs entirely into the LAST row, distinct from the per-leg Amount waterfall (v1.12.2, business-requirement-confirmed 2026-08-11)
+
+Reviewer's rule, worked through across several follow-up messages until unambiguous (the first
+phrasing implied drawing/cascading symmetric with the per-leg waterfall, which turned out to be
+mathematically inconsistent with a total INCREASE — see below): when the **Total Amount header
+field itself** changes (not an individual leg edit) and the split is fully amount-driven (no
+floating remainder row — the normal state after using the per-leg waterfall), the ENTIRE delta
+lands on the LAST row specifically:
+- **Increase**: adds directly to the last row. No cascading/drawing — growing the total is new
+  money, it doesn't need to come from anywhere else. (An earlier proposed reading — "increase draws
+  from the previous leg, same as the per-leg rule" — was walked through with a concrete worked
+  example: 3 rows at 1000/1000/1000, Total Amount 3000→4000; drawing 1000 from a previous row to
+  fund the last row's increase would leave the rows summing to 3000 while `totalAmount` says 4000 —
+  a real mismatch. Reviewer confirmed the direct-add reading instead.)
+- **Decrease**: subtracts from the last row; if it alone can't cover the full decrease without
+  going negative, continues subtracting from the row before it, and so on — capped at 0 per row,
+  same "never negative" precedent as the per-leg waterfall's own increase-draw cascade. Reviewer:
+  "不是最後一筆，增加減少都調整至最後一筆幣別等值" / "如果不是最後一筆 減少最後一筆 不夠才往上減".
+
+**Deliberately distinct from, and does not touch, the pre-existing per-leg Amount waterfall
+(`applyAmountWaterfall`/v1.12.0-1) — reviewer explicitly re-confirmed both remain unchanged and
+side-by-side**: decreasing a leg directly (via its own Amount input) still opens a NEW trailing leg
+for the freed difference; increasing a leg directly still draws backward from the previous leg(s).
+The Total-Amount-header case never creates a new row — it only ever adjusts rows that already
+exist. Two genuinely different triggers (editing the header field vs. editing an individual leg),
+two genuinely different mechanisms; conflating them was exactly the source of the mathematical
+inconsistency above.
+
+**Implementation:** `onTotalChange`'s existing per-row loop (pct-driven rows rescale via their own
+%; amount-driven rows keep their exact typed amount, only their display % refreshes) is unchanged.
+New `absorbTotalDeltaIntoLastRow()`, called only when no row is currently the floating remainder,
+resolves the gap left by that loop by targeting the last row (and, on an insufficient decrease,
+earlier rows via the same backward cascade shape as `applyAmountWaterfall`'s increase-draw, reusing
+`markCascaded` for every row it touches). When a genuine remainder row still exists, this step is
+skipped entirely — `ensureRemainderRow`'s pre-existing exact-subtraction handling of that row
+already does the right thing, unchanged.
+
+**Companion fix, same session — the per-leg waterfall's auto-created new leg (rule 1) now defaults
+its Account No. to the account TYPE's own placeholder** (`DEFAULT_ACCOUNT_NO_BY_TYPE[defaultAccountType]`,
+e.g. `CUST-ACC` for CUSTOMER — same convention `onAccountTypeChange` already uses), not blank —
+reviewer: "增加新的 ACCOUNT NUMBER賦值 根據 AC TYPE DEFAULT AC NUMBER". A blank Account No. on an
+auto-created row read as incomplete/broken rather than a placeholder awaiting input.
+
+See `leg-allocator.component.spec.ts`'s "onTotalChange absorbs into the LAST row…" describe block
+(5 tests: direct-add on increase, last-row-alone-sufficient decrease, multi-row backward-cascade
+decrease, drain-everything-to-0 decrease, and confirming the genuine-remainder case is unaffected)
+and the updated per-leg-waterfall new-row test (now asserts `CUST-ACC`, not blank). All 101
+leg-allocator tests (305 project-wide) pass. Verified live in-browser: a 70/30 two-row amount-driven
+split — Total Amount 10000→13000 added the full +3000 directly to the last row only (7000
+untouched, 3000→6000); a further 13000→4000 decrease drained the last row (6000→0) then cascaded
+the remaining 3000 into the first row (7000→4000); separately, directly editing the (now-last) row's
+own Amount from 9000→2000 correctly opened a new row holding exactly 7000 with Account No. `CUST-ACC`
+— both mechanisms verified working side-by-side without interfering with each other.
+
+## Leg-allocator: the per-leg Amount waterfall (`applyAmountWaterfall`) now targets the LAST row directly on every non-last-row edit, superseding v1.12.0's "adjacent neighbor" model (v1.12.3, reviewer-confirmed 2026-08-11)
+
+Reviewer supplied the complete 4-rule replacement spec in one message, confirmed unambiguous after a
+follow-up A/B check ("A B 都對"):
+
+1. **Non-last row, increase**: decreases the **LAST** row by the same amount (capped at what it has)
+   — not the row positionally next to it. Reviewer: "不是最後一筆增加金額 就減少至最後一筆幣別等值".
+2. **Non-last row, decrease**: increases the **LAST** row by the exact freed amount (always fully
+   absorbed — no cap needed on an increase). Reviewer: "不是最後一筆減少金額加增加至最後一筆幣別等值".
+3. **Last row, decrease**: unchanged from v1.12.0 — opens a brand-new trailing row holding the freed
+   difference (Account No. defaults per `DEFAULT_ACCOUNT_NO_BY_TYPE`, per the v1.12.2 companion fix).
+   Reviewer: "最後一筆減少金額 增加一筆新的Trx幣別等值".
+4. **Last row, increase**: unchanged from v1.12.0 — draws backward from the row(s) before it,
+   cascading further back if one row alone can't cover it, capped at 0 per row. Reviewer: "最後一筆增加
+   金額 減少上一筆幣別等值 不夠繼續往上減少".
+
+This **replaces** the old "increase draws from N−1, decrease flows to N+1" adjacent-neighbor model
+entirely for non-last rows (rules 1–2) — every non-last row, regardless of position (first, middle,
+whatever), now offsets directly against the last row, never the row physically next to it. Rules 3–4
+(the last row's own behavior) are untouched. A consequence, not a separate decision: the old
+"increasing the FIRST row is REJECTED — no previous row to draw from" boundary case **no longer
+exists** — under this model the first row is just another non-last row, so increasing it now succeeds
+via rule 1 (decreases the last row) instead of being blocked. Confirmed with the reviewer directly
+("UX設計 比較合理 對嗎?") — always-last-row targeting is a simpler mental model than
+position-dependent adjacency, and removes a boundary case (first-row rejection) that had no
+intuitive justification once amount-editing was meant to be freely usable on any row.
+
+**Implementation:** `applyAmountWaterfall(index, requestedAmount)` branches on `index === lastIndex`
+first; the non-last branch (rules 1–2) always reads/writes `rows[rows.length - 1]` directly rather than
+`rows[index ± 1]`. Every row the method touches (the last row itself, any donor row during rule 4's
+backward cascade, or a newly-created row under rule 3) goes through the same `markCascaded` helper as
+before — unchanged. `amountInputTitle`'s tooltip and the template's `<p class="allocator-hint">` copy
+were both rewritten to describe "always the last leg, never the leg next to it" instead of the old
+adjacent-neighbor phrasing.
+
+See `leg-allocator.component.spec.ts`'s "amount waterfall" describe block: rewrote the 5
+non-last-row-facing tests to assert the last row is the target (not the adjacent row), added 2 new
+tests specifically covering rule 1's cap-at-the-last-row's-own-balance behavior (never cascades further
+back into other rows even when they hold more), rewrote the former "FIRST row REJECTED" test into "FIRST
+row increase now SUCCEEDS via rule 1", and rewrote both `amountInputTitle` tests (the old
+"First leg"/"Decreasing pushes" substrings no longer exist) to expect the new "LAST leg" phrasing. Rules
+3–4 (last-row behavior) and the Total-Amount-header mechanism (`absorbTotalDeltaIntoLastRow`, v1.12.2)
+are unaffected and their existing tests needed no changes. All 103 leg-allocator tests (307
+project-wide) pass; `tsc --noEmit` and `ng build --configuration development` are both clean. Verified
+live in-browser end-to-end on a 4-row USD split (2000/1000/2000/3000, last row initially 5000 before the
+rule-3 step below): increasing row0 (non-last, first) by +2000 decreased the last row by 2000 with the
+middle row untouched (rule 1); decreasing row1 (non-last, middle) by −2000 increased the last row by
+2000 with row0 untouched (rule 2); decreasing the last row 5000→2000 opened a new 4th row holding
+exactly 3000 (rule 3); increasing that new last row 3000→8000 cascaded backward through all three
+earlier rows in order, draining two of them to 0 and leaving the first at 2000 (rule 4) — Total
+Allocated stayed exactly 100% throughout, no errors.
+
+## Business-case-runner: a stale Confirm error now clears itself once the form is corrected; leg-allocator's ordinary row-split path also defaults the new row's Account No. (two small reviewer-reported fixes, 2026-08-11)
+
+**Fix 1 — stale `confirmError` never self-cleared.** A failed Confirm click (e.g. `⚠ [400]
+REQUEST_VALIDATION_FAILED: debitLegs.1.accountNo: String must contain at least 1 character(s)`) set
+`confirmError`, but nothing cleared it afterward except clicking Confirm again or switching business
+case — so correcting the underlying field (typing in the missing Account No.) left the old error
+banner on screen indefinitely even after the form was valid again. Reviewer: "當交易修正成功 把上次的
+ERROR 清除". Fixed by resetting `confirmError = null` at the top of `runPreview()`, alongside the
+pre-existing `previewError`/`previewIncomplete` resets — `runPreview` already re-runs on every
+debounced edit (any Formly field, leg-allocator row, Suspense entry, or header override, via the same
+merged `form.valueChanges` / `legsChanged$` pipeline in `selectCase`), so this clears the stale banner
+the moment the next recompute cycle fires, whether or not that recompute itself succeeds (a preview
+that still fails shows its own fresh `previewError` instead, never both stacked).
+
+**Fix 2 — the ORDINARY row-split path (`ensureRemainderRow`'s own new-row branch, not rule 3's
+last-row-decrease case from v1.12.2) still defaulted a newly-spawned remainder row's Account No. to
+`''`.** This is the far more common of the two "a new row gets created" paths — it's how the very
+first split happens (fixing any row via % or Amount leaves a leftover) — so a blank Account No. was
+the common case, not the rare one. Reviewer: "第一筆輸入不同幣別金額後 DEFAULT ACCOUNT NUMBER沒有作用
+仍然是空值". Fixed by applying the same `DEFAULT_ACCOUNT_NO_BY_TYPE[this.defaultAccountType]`
+placeholder v1.12.2 already used for rule 3's new row.
+
+See `business-case-runner.component.spec.ts`'s two new tests in the "runPreview" describe block (stale
+confirmError clears on both a successful and a still-failing re-preview) and
+`leg-allocator.component.spec.ts`'s new test in the "remainder rounding" describe block (a plain % split
+now asserts the spawned row's `accountNo` is `'CUST-ACC'`, not `''`). All 310 project-wide tests pass;
+`tsc --noEmit` and `ng build --configuration development` are both clean. Verified live in-browser:
+cleared a debit leg's Account No., clicked Confirm, got the exact reported 400/accountNo error banner;
+retyping the Account No. and waiting for the debounced re-preview made the banner disappear with no
+further clicks. Separately, typing a smaller Amount into a sole 10000 row (a plain split, not a
+last-row decrease) spawned a second row with Account No. `CUST-ACC`, not blank.
+
+## Leg-allocator: Account Ccy Equiv. edits now round-trip exactly (`Row.accountCcyOverride`), fixing a JPY 20000 → 19999 precision-loss bug (reviewer-reported, 2026-08-11)
+
+Reviewer's report was a concrete worked example — CUSTOMER / CUST-ACC / 1.34% / 134.15 / JPY / rate
+149.0825 / **Account Ccy Equiv. 20000** / FX Exchange USD — typing JPY 20000 into Account Ccy Equiv.
+read back as **19999** after commit. Root cause, confirmed by the reviewer's own follow-up explanation
+(banking calculations are B-Tree: whichever field was actually typed is authoritative and is never
+re-derived from its own rounded counterpart — "C = A / B 後又用 A = B * C 就不符合銀行業務計算方式";
+concrete proof: "A = 1 B = 3。1 / 3 = .33, .33 * 3 = .99。.99 NOT = 1"): `amountTxCcy` is always
+rounded to the **transaction** currency's own scale (2dp for USD — by design, since it's what the
+wire/%-split math/V8 balance check all operate on), so `20000 ÷ 149.0825` rounds to `134.15` (the
+exact quotient is `134.15389…`). `accountCcyAmount()` (the display) and `emit()`'s `amountAccountCcy`
+(the wire) both used to **re-derive** the account-ccy figure as `amountTxCcy × rate` every time —
+`134.15 × 149.0825 = 19999.42`, which rounds to JPY's 0dp scale as `19999`, not the `20000` actually
+typed. Exactly the A=1/B=3/.33×3=.99 pattern: re-deriving the source field from its own already-rounded
+derivative loses information, every time the two currencies' minor-unit scales don't line up evenly.
+
+**Fix — store the exact typed figure instead of re-deriving it.** New `Row.accountCcyOverride: Decimal
+| null`, set by `onAccountAmountInput` to the raw typed account-ccy amount whenever the edit wasn't
+capped by the waterfall (a capped edit's real `amountTxCcy` is smaller than what the raw figure would
+imply, so the derivation is correct there instead — see the field's own doc comment). New private
+`accountCcyAmountDecimal()` prefers the override when present; both `accountCcyAmount()` (display) and
+`emit()`'s `amountAccountCcy` (wire) now call it, so what's shown is exactly what's sent. `amountTxCcy`
+itself is completely unchanged — still rounds to the transaction currency's own scale, still what the
+waterfall/%-split/wire `amountTxCcy` field all use — this fix touches ONLY the account-ccy side of the
+pair, leaving the transaction-ccy-side B-Tree math (rows, totals, waterfall) untouched.
+
+**The override is cleared wherever it would otherwise go stale** — `onAmountInput` (the OTHER input
+surface for the identical `amountTxCcy` field; that edit is now authoritative instead),
+`onPctInput`, `onRowCurrencyChange`, `onCurrencyChange` (the row's own currency, or the shared
+transaction currency, changed — the old figure no longer means anything), and `markCascaded` (every
+row the waterfall itself touches — a donor/receiver in rule 1/2/4, or `absorbTotalDeltaIntoLastRow` —
+moved for a reason unrelated to a fresh account-ccy retype).
+
+See `leg-allocator.component.spec.ts`'s new "accountCcyOverride round-trip fix" describe block (9
+tests: reproduces the raw-math bug in isolation; confirms the fix round-trips 20000 exactly via both
+`accountCcyAmount()` and the wire's `amountAccountCcy`; confirms the override is dropped — falling
+back to the lossy derivation — after a subsequent `onAmountInput`, `onPctInput`, currency change
+(row-level and transaction-level), and a capped waterfall edit; confirms a row touched only as the
+waterfall's LAST-row counterparty also loses its own stale override). All 319 project-wide tests pass
+(9 new, zero regressions in the other 310); `tsc --noEmit` and `ng build --configuration development`
+are both clean. Verified live in-browser end-to-end, reproducing the reviewer's exact scenario: set a
+Debit leg's currency to JPY (auto-fetched rate ≈149.082569), overrode the rate to the reviewer's exact
+149.0825, typed Account Ccy Equiv. 20000 and committed (blur) — the field held at exactly **20000**
+(previously snapped to 19999), Amount (Tx Ccy) correctly showed the rounded USD-equivalent 134.15, and
+`ng.getComponent` confirmed `row.accountCcyOverride === '20000'` driving `accountCcyAmount()`.
+
 ---
 
 # Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)
