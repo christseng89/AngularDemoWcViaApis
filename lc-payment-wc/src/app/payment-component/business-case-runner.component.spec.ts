@@ -437,6 +437,96 @@ describe('BusinessCaseRunnerComponent', () => {
         expect(totalCredit).toBe(totalDebit); // exact equality — this is what balanceValidation.ts (V8) actually enforces
       });
     });
+
+    describe('debitSuspenseCurrencyTotals / creditSuspenseCurrencyTotals (business-requirement-confirmed 2026-08-12: per-currency breakdown feeding leg-allocator\'s granularity-unification snap)', () => {
+      it('groups entries by currency, exposing each bucket\'s raw total and its per-entry-rounded trxEquivalent — the SAME math suspenseAdjustment() itself uses', () => {
+        const { comp } = makeComponent({ crossRate: 1.083077 });
+        comp.selectCase(passConfig());
+        comp.suspenseDebitEntries = [entry('10', 'USD'), entry('20', 'EUR'), entry('50', 'EUR')];
+
+        expect(comp.debitSuspenseCurrencyTotals).toEqual({
+          USD: { rawTotal: '10', trxEquivalent: '10.00' }, // same-currency pass-through, no conversion
+          EUR: { rawTotal: '70', trxEquivalent: '75.81' }, // round(20*1.083077)+round(50*1.083077) = 21.66+54.15 = 75.81
+        });
+      });
+
+      it('the per-currency bucket total agrees with suspenseAdjustment()\'s own aggregate figure — a breakdown, not a different total', () => {
+        const { comp } = makeComponent({ crossRate: 1.083077 });
+        comp.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '10000' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '10000' })] }));
+        comp.suspenseDebitEntries = [entry('10', 'USD'), entry('20', 'EUR'), entry('50', 'EUR')];
+
+        expect(comp.debitDefaults.totalAmount).toBe('10085.81'); // 10000 + 10 + 75.81
+      });
+
+      it('omits a currency entirely when it has no entries', () => {
+        const { comp } = makeComponent();
+        comp.selectCase(passConfig());
+        comp.suspenseDebitEntries = [entry('20', 'EUR')];
+
+        expect(comp.debitSuspenseCurrencyTotals['USD']).toBeUndefined();
+      });
+
+      it('the CREDIT-side getter mirrors the DEBIT one, independently', () => {
+        const { comp } = makeComponent({ crossRate: 1.083077 });
+        comp.selectCase(passConfig());
+        comp.suspenseCreditEntries = [entry('20', 'EUR'), entry('50', 'EUR')];
+
+        expect(comp.creditSuspenseCurrencyTotals).toEqual({ EUR: { rawTotal: '70', trxEquivalent: '75.81' } });
+        expect(comp.debitSuspenseCurrencyTotals).toEqual({});
+      });
+
+      it("END-TO-END with a REAL <app-leg-allocator>: the EUR debit row's Account Ccy Equiv. snaps to the per-entry-rounded 75.81 (not the combined 75.82), so the USD remainder row lands at exactly 10010.00 — the reviewer-reported 1-cent gap is gone", () => {
+        const mockApi = { confirm: jest.fn(), classify: jest.fn() } as unknown as PaymentComponentApiService;
+        const mockCurrency = {
+          codes: jest.fn(() => of(['USD', 'EUR'])),
+          options: jest.fn(() => of([])),
+          decimals: jest.fn(() => of({})),
+        } as unknown as CurrencyService;
+        const mockFx = {
+          rates: jest.fn(() => of({ 'USD/TWD': 32.5, 'EUR/TWD': 35.2 })),
+          crossRate: jest.fn((_rates: unknown, from: string, to: string) => {
+            if (from === to) return 1;
+            const twd = (ccy: string) => (ccy === 'USD' ? 32.5 : ccy === 'EUR' ? 35.2 : null);
+            const f = twd(from);
+            const t = twd(to);
+            return f === null || t === null ? null : f / t;
+          }),
+        } as unknown as FxRateService;
+
+        const runner = new BusinessCaseRunnerComponent(mockApi, mockCurrency, mockFx);
+        runner.selectCase(passConfig({ legs: [leg({ side: 'DEBIT', defaultAmountTxCcy: '10000' }), leg({ side: 'CREDIT', defaultAmountTxCcy: '10000' })] }));
+        runner.suspenseDebitEntries = [entry('10', 'USD'), entry('20', 'EUR'), entry('50', 'EUR')];
+        expect(runner.debitDefaults.totalAmount).toBe('10085.81'); // 10000 + round(10) + [round(20*1.083077)+round(50*1.083077)]
+
+        const allocator = new LegAllocatorComponent(mockFx, mockCurrency);
+        allocator.side = 'DEBIT';
+        allocator.accountTypeOptions = ['CUSTOMER', 'NOSTRO', 'VOSTRO', 'SUSPENSE', 'INTERNAL'];
+        allocator.defaultAccountType = 'CUSTOMER';
+        allocator.defaultAccountNo = 'CUST-ACC';
+        allocator.caseKey = 'case-1';
+        allocator.initialTotalAmount = runner.debitDefaults.totalAmount;
+        allocator.initialCurrency = runner.transactionCurrency;
+        allocator.suspenseCurrencyTotals = runner.debitSuspenseCurrencyTotals;
+        allocator.legsChange.subscribe((legs) => runner.onDebitLegsChange(legs));
+
+        allocator.ngOnInit(); // single 100% CUST-ACC row, seeded at 10085.81
+        expect(allocator.totalAmount.toNumber()).toBe(10085.81);
+
+        const eurRow = allocator.rows[0]!;
+        allocator.onRowCurrencyChange(eurRow, 'EUR'); // row.rate resolves to 32.5/35.2 = 0.923295 (6dp) — same convention the reported bug used
+        allocator.onAccountAmountInput(eurRow, 70); // exactly the EUR bucket's rawTotal (20 + 50)
+        expect(allocator.rows).toHaveLength(2);
+        const usdRemainderRow = allocator.rows[1]!;
+
+        expect(eurRow.amountTxCcy.toNumber()).toBe(75.81); // per-entry-rounded, NOT the combined-conversion 75.82
+        expect(usdRemainderRow.amountTxCcy.toNumber()).toBe(10010); // 10085.81 - 75.81, exactly — no 1-cent gap onto this row
+        // emit() sorts the transaction-currency-matching leg first — USD ahead of EUR here.
+        expect(runner.debitLegs).toEqual([
+          { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'USD', amountTxCcy: '10010.00' },
+          { accountNo: 'CUST-ACC', accountType: 'CUSTOMER', currency: 'EUR', amountTxCcy: '75.81', amountAccountCcy: '70.00', drBuyRate: '0.923295' },
+        ]);
+      });
+    });
   });
 
   describe('leg state setters', () => {

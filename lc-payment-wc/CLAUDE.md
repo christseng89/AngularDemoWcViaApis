@@ -969,6 +969,68 @@ yet `business-case-registry.ts` cases** — confirmed by grepping the registry f
 Issue/Amendment cases and finding none — matching this file's own existing "Extended usage
 scenarios" section's caveat above, not a new claim.
 
+## Leg-allocator: a row funding a multi-entry Suspense currency bucket now snaps to the SAME per-entry-rounded conversion the seed uses, closing a reviewer-reported 1-cent gap (v1.13.1, business-requirement-confirmed 2026-08-12)
+
+**Bug, reviewer-reported with a concrete worked example:** Transaction Currency USD, Total Amount
+10000, Suspense Debit = 10 USD + 20 EUR + 50 EUR (all "Charge"). Splitting the Debit Legs into an
+EUR row (typed Account Ccy Equiv. 70 — the combined EUR Suspense total) and a USD remainder row
+produced EUR row Amount (Tx Ccy) **75.82** and USD row **10009.99**, not the expected **10010.00**
+(= 10000 + the 10 USD charge, since the EUR row already claims to fund the full 70 EUR).
+
+**Root cause: two independently-implemented FX conversions of the SAME 70 EUR of Suspense charges,
+at different rounding granularity.** `business-case-runner.component.ts`'s `suspenseAdjustment()`
+(the side's seeded "Total Amount (protected)", feeding `<app-leg-allocator [initialTotalAmount]>`)
+converts and rounds **PER SUSPENSE ENTRY** — round(20×rate) + round(50×rate) = 21.66 + 54.15 =
+**75.81** — deliberately mirroring the microservice's own `buildSuspenseBridgeLeg` (see that
+method's own v1.7.4 doc comment: this is why the seed total is 10085.81, not 10085.82). The
+leg-allocator's EUR row, driven by the user's own single Account Ccy Equiv. input (70), instead
+converted the **combined** amount in ONE shot — 70 ÷ 0.923295 = 75.8155… → **75.82**. Summing
+already-rounded per-entry conversions vs. rounding one combined conversion legitimately land a
+minor unit apart — a classic "round-per-line vs. round-once" financial rounding artifact, not a
+bug in either formula individually. `absorbTotalDeltaIntoLastRow()`/`ensureRemainderRow()` then
+blindly forced the LAST row to absorb whatever gap remained between the seeded total (10085.81,
+per-entry-rounded) and Σ(other rows) (which included the EUR row's own combined-rounded 75.82),
+silently transferring that stray cent onto the USD row (10009.99) with no way to know it was a
+rounding artifact rather than genuine leftover money.
+
+**Direction of the fix, deliberately NOT the seed formula.** `suspenseAdjustment()`'s per-entry
+rounding stays exactly as-is — this is the SAME direction v1.7.3 tried and v1.7.4 reverted (see
+that section above): rounding the seed bucket-first-then-once instead would disagree with the
+server's own per-entry `buildSuspenseBridgeLeg`, and in the traced v1.7.3 regression this produced
+a real 409 `LEGS_UNBALANCED` (a genuine aggregate-V8 mismatch), not just a display glitch. Fixing
+the OTHER side — making the leg-allocator ROW conversion agree with the per-entry-rounded figure —
+is what actually unifies the two without touching a decision already proven load-bearing for V8.
+
+**Implementation:**
+- `business-case-runner.component.ts`: `suspenseAdjustment()` now delegates its per-entry
+  conversion/rounding to a new private `suspenseCurrencyBuckets(entries, trxCurrency)`, which
+  groups the SAME per-entry-rounded trx-equivalents by currency instead of collapsing them
+  straight into one total (Decimal addition is exact/order-independent, so `suspenseAdjustment`'s
+  own external total is unchanged — verified by the pre-existing v1.7.4 tests, unmodified). Two new
+  getters, `debitSuspenseCurrencyTotals` / `creditSuspenseCurrencyTotals`, expose this as
+  `Record<currency, { rawTotal, trxEquivalent }>` (plain strings, same posture as every other
+  cross-component value here).
+- `business-case-runner.component.html`: both `<app-leg-allocator>` elements gained
+  `[suspenseCurrencyTotals]="debitSuspenseCurrencyTotals"` / `"creditSuspenseCurrencyTotals"`.
+- `leg-allocator.component.ts`: new `@Input() suspenseCurrencyTotals` (defaults to `{}` — inert for
+  any caller that doesn't wire it). `onAccountAmountInput` now checks whether the typed account-ccy
+  figure exactly equals `suspenseCurrencyTotals[row.currency].rawTotal`; if so, uses that bucket's
+  own `trxEquivalent` for `amountTxCcy` instead of the row's own `amount ÷ rate` combined division.
+  A typed figure that does NOT match any bucket's `rawTotal` is completely unaffected — ordinary
+  combined conversion, exactly as before. `row.accountCcyOverride` is still set to the raw typed
+  figure either way, so the Account Ccy Equiv. display still round-trips exactly (70, not some
+  derived value) — only the derived `amountTxCcy` changes.
+
+See `business-case-runner.component.spec.ts`'s "debitSuspenseCurrencyTotals / creditSuspenseCurrencyTotals"
+describe block (per-currency breakdown, agreement with `suspenseAdjustment()`'s own total, an
+empty-currency omission case, the CREDIT-side mirror, and a full END-TO-END test with a real
+`<app-leg-allocator>` reproducing the exact reported scenario: EUR row lands at 75.81, USD
+remainder row lands at exactly 10010.00, `debitLegs` wire shape included) and
+`leg-allocator.component.spec.ts`'s "suspenseCurrencyTotals granularity snap" describe block (the
+snap itself, the same end-to-end 10085.81/75.81/10010.00 case standalone, and two fallback cases —
+a non-matching typed amount, and no `suspenseCurrencyTotals` wired at all). All 354 project-wide
+tests pass; `tsc --noEmit` and `ng build --configuration development` are both clean.
+
 ---
 
 # Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)

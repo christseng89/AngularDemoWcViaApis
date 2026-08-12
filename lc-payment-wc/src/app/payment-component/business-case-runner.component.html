@@ -95,6 +95,7 @@
         [initialTotalAmount]="debitDefaults.totalAmount"
         [initialCurrency]="debitDefaults.currency"
         [showTotalAmount]="false"
+        [suspenseCurrencyTotals]="debitSuspenseCurrencyTotals"
         (legsChange)="onDebitLegsChange($event)"
         (validChange)="onDebitValidChange($event)"
         (scaleErrorsChange)="onDebitLegScaleErrorsChange($event)">
@@ -111,6 +112,7 @@
         [initialTotalAmount]="creditDefaults.totalAmount"
         [initialCurrency]="creditDefaults.currency"
         [showTotalAmount]="false"
+        [suspenseCurrencyTotals]="creditSuspenseCurrencyTotals"
         (legsChange)="onCreditLegsChange($event)"
         (validChange)="onCreditValidChange($event)"
         (scaleErrorsChange)="onCreditLegScaleErrorsChange($event)">

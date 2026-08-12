@@ -205,6 +205,17 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
   @Input({ required: true }) caseKey!: string;
   /** When false, hides the "Total Amount (protected)" input so it isn't shown a second time next to a caller's own Total Amount summary (e.g. business-case-runner's Unit-Code-row display). The Transaction Currency select stays visible either way — this only suppresses the amount input, not currency editing. Purely a display toggle: totalAmount/onTotalChange still work exactly as before, still seeded from initialTotalAmount. */
   @Input() showTotalAmount = true;
+  /**
+   * Per-foreign-currency Suspense breakdown for THIS side (business-case-runner's
+   * debitSuspenseCurrencyTotals/creditSuspenseCurrencyTotals — see those getters' own doc
+   * comments), keyed by currency: `rawTotal` is that currency's Σ Suspense entry.amount (untouched);
+   * `trxEquivalent` is the SAME per-entry-rounded conversion suspenseAdjustment()/the server's own
+   * buildSuspenseBridgeLeg use to fund it — i.e. what this side's seeded Total Amount actually
+   * expects that bucket to contribute. Consumed only by onAccountAmountInput's granularity-snap
+   * below; every other computation in this component is unaffected. Defaults to `{}` (no snapping)
+   * for any caller that doesn't wire this input.
+   */
+  @Input() suspenseCurrencyTotals: Record<string, { rawTotal: string; trxEquivalent: string }> = {};
 
   @Output() legsChange = new EventEmitter<PaymentLegInput[]>();
   /** True once every row has an account number and (when split) a valid rate — parent gates preview calls on this. */
@@ -995,6 +1006,23 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
    * same-currency row (rate always 1 there) this would be a no-op; the
    * template only renders this input when needsRate(row) is true, so rate is
    * never 0 there in practice, but guard anyway rather than divide by zero.
+   *
+   * Granularity-unification snap (business-requirement-confirmed 2026-08-12, reviewer-reported
+   * 1-cent gap on a Suspense Debit of 20 EUR + 50 EUR): when the typed figure exactly equals a
+   * `suspenseCurrencyTotals[row.currency]` bucket's own `rawTotal`, this row is funding that WHOLE
+   * bucket via a single leg — use the bucket's `trxEquivalent` (the SAME per-entry-rounded
+   * conversion suspenseAdjustment()/the server's own buildSuspenseBridgeLeg use: round(20*rate) +
+   * round(50*rate) = 75.81) instead of this row's own combined, round-once division (70 / rate =
+   * 75.82). The two are NOT interchangeable — summing already-rounded per-entry conversions vs.
+   * rounding one combined conversion can legitimately land a minor unit apart — and this side's
+   * seeded Total Amount (business-case-runner's sideDefaults()) is built from the FORMER, so a row
+   * using the latter left a 1-minor-unit gap that absorbTotalDeltaIntoLastRow() then silently
+   * dumped onto the last row. Deliberately does NOT change the seed formula itself
+   * (suspenseAdjustment stays per-entry — see that method's own v1.7.4 doc comment for why a
+   * v1.7.3 attempt at the opposite direction caused a real 409 LEGS_UNBALANCED) — this only changes
+   * which conversion THIS row uses when it's unambiguously standing in for that whole bucket. A
+   * typed figure that does NOT match any bucket's rawTotal is completely unaffected — ordinary
+   * combined conversion, exactly as before.
    */
   onAccountAmountInput(row: Row, accountAmount: number): void {
     // Account Ccy Equiv. is denominated in the ROW's own currency — validate the RAW typed value now.
@@ -1002,7 +1030,13 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     const amount = Decimal.max(new Decimal(accountAmount || 0), 0);
     // Deriving amountTxCcy (always transaction-currency-denominated — see the Row field doc
     // comment), so it rounds to the TRANSACTION currency's own scale, not row.currency's.
-    const requested = row.rate.greaterThan(0) ? money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency)) : new Decimal(0);
+    const suspenseBucket = this.suspenseCurrencyTotals[row.currency];
+    const matchesSuspenseBucket = !!suspenseBucket && amount.equals(new Decimal(suspenseBucket.rawTotal));
+    const requested = matchesSuspenseBucket
+      ? money(suspenseBucket.trxEquivalent, this.scaleFor(this.transactionCurrency))
+      : row.rate.greaterThan(0)
+        ? money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency))
+        : new Decimal(0);
     // Same waterfall rule as onAmountInput above — this is just an alternate input surface for
     // the identical underlying amountTxCcy field, so it must rebalance neighbors the same way.
     const index = this.rows.indexOf(row);

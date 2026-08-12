@@ -346,9 +346,49 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
    * Staying in Decimal until sideDefaults() does its own final rounding
    * avoids ever converting an intermediate (unrounded-relative-to-the-
    * running-total) value to a binary double.
+   *
+   * Delegates the actual per-entry conversion/rounding to
+   * suspenseCurrencyBuckets() below — same math as before this was split
+   * out, just grouped by currency first (Decimal addition is exact/
+   * order-independent, so the total is unaffected either way).
    */
   private suspenseAdjustment(side: 'DEBIT' | 'CREDIT', entries: readonly SuspenseEntry[], trxCurrency: string): Decimal {
     let total = new Decimal(0);
+    for (const bucket of this.suspenseCurrencyBuckets(entries, trxCurrency).values()) {
+      total = side === 'DEBIT' ? total.plus(bucket.trxEquivalent) : total.minus(bucket.trxEquivalent);
+    }
+    return total;
+  }
+
+  /**
+   * Per-foreign-currency-bucket breakdown of `entries`, keyed by currency — the SAME per-entry
+   * conversion+rounding suspenseAdjustment() itself uses for its own (currency-blind) total, just
+   * not yet collapsed into one number. `rawTotal` is the bucket's raw, unconverted Σ entry.amount
+   * (in that shared currency); `trxEquivalent` is Σ each entry's own independently-rounded
+   * trx-equivalent — i.e. the exact figure a "settle this bucket via one leg" Debit/Credit row
+   * SHOULD show, per the granularity-unification fix below.
+   *
+   * Exists for LegAllocatorComponent's `suspenseCurrencyTotals` input (see
+   * debitSuspenseCurrencyTotals/creditSuspenseCurrencyTotals getters below) — reviewer-reported
+   * bug: a Debit leg row funding a multi-entry Suspense currency bucket (e.g. Suspense Debit
+   * 20 EUR + 50 EUR) by typing the bucket's own combined total (70) into Account Ccy Equiv. got a
+   * COMBINED, round-once conversion (70 ÷ rate = 75.82) that disagreed by 1 minor unit from what
+   * this side's own seeded Total Amount actually funds — round(20×rate)+round(50×rate) = 75.81,
+   * the very figure suspenseAdjustment() above (and the server's own per-entry
+   * buildSuspenseBridgeLeg) uses. The gap silently landed on whichever row absorbTotalDeltaIntoLastRow()
+   * happened to target, one minor unit short of what an unsuspecting user would expect there. A
+   * prior fix (v1.7.4, see resolveCrossRate's doc comment above) deliberately did NOT chase this by
+   * changing the SEED formula — v1.7.3 tried exactly that and it broke aggregate V8 (a genuine 409
+   * LEGS_UNBALANCED), because the server's own bridge-leg generation is per-entry, not
+   * per-currency-bucket. This fix instead corrects the OTHER side: LegAllocatorComponent snaps a
+   * row's amountTxCcy to this bucket's own trxEquivalent when the row's typed Account Ccy Equiv.
+   * exactly equals rawTotal — see onAccountAmountInput's doc comment there.
+   */
+  private suspenseCurrencyBuckets(
+    entries: readonly SuspenseEntry[],
+    trxCurrency: string,
+  ): Map<string, { rawTotal: Decimal; trxEquivalent: Decimal }> {
+    const buckets = new Map<string, { rawTotal: Decimal; trxEquivalent: Decimal }>();
     for (const entry of entries) {
       const amount = Number(entry.amount) || 0;
       if (amount === 0 || !entry.currency) continue; // blank/incomplete row — matches buildSuspenseBridgeEntries()'s own skip
@@ -362,9 +402,38 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
         const scale = this.decimalsFor(trxCurrency);
         trxEquivalent = new Decimal(amount).times(rate).toDecimalPlaces(scale, Decimal.ROUND_HALF_UP);
       }
-      total = side === 'DEBIT' ? total.plus(trxEquivalent) : total.minus(trxEquivalent);
+      const existing = buckets.get(entry.currency);
+      if (existing) {
+        existing.rawTotal = existing.rawTotal.plus(amount);
+        existing.trxEquivalent = existing.trxEquivalent.plus(trxEquivalent);
+      } else {
+        buckets.set(entry.currency, { rawTotal: new Decimal(amount), trxEquivalent });
+      }
     }
-    return total;
+    return buckets;
+  }
+
+  /**
+   * Plain-string view of suspenseCurrencyBuckets(), for the DEBIT side's Suspense entries — the
+   * shape LegAllocatorComponent's `suspenseCurrencyTotals` input actually consumes (Decimal isn't
+   * passed across the component boundary, same posture as every other seeded value here).
+   * Recomputed on every access — cheap (at most a handful of Suspense rows), same posture as
+   * baseTotalAmount/sideDefaults() above.
+   */
+  get debitSuspenseCurrencyTotals(): Record<string, { rawTotal: string; trxEquivalent: string }> {
+    return this.suspenseCurrencyTotalsFor(this.suspenseDebitEntries);
+  }
+  /** CREDIT-side mirror of debitSuspenseCurrencyTotals above. */
+  get creditSuspenseCurrencyTotals(): Record<string, { rawTotal: string; trxEquivalent: string }> {
+    return this.suspenseCurrencyTotalsFor(this.suspenseCreditEntries);
+  }
+  private suspenseCurrencyTotalsFor(entries: readonly SuspenseEntry[]): Record<string, { rawTotal: string; trxEquivalent: string }> {
+    const scale = this.decimalsFor(this.transactionCurrency);
+    const result: Record<string, { rawTotal: string; trxEquivalent: string }> = {};
+    for (const [currency, bucket] of this.suspenseCurrencyBuckets(entries, this.transactionCurrency)) {
+      result[currency] = { rawTotal: bucket.rawTotal.toString(), trxEquivalent: bucket.trxEquivalent.toFixed(scale) };
+    }
+    return result;
   }
 
   /**

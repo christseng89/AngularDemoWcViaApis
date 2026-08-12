@@ -972,6 +972,60 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(6000);
     });
 
+    describe('suspenseCurrencyTotals granularity snap (business-requirement-confirmed 2026-08-12: unify Row1\'s combined FX conversion with the per-entry-rounded Suspense figure)', () => {
+      it('uses the bucket\'s trxEquivalent instead of a combined division when the typed account-ccy amount exactly equals the bucket\'s rawTotal', () => {
+        const { comp } = makeComponent(); // total = 10000
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'EUR';
+        comp.rows[0]!.rate = new Decimal(0.923295); // combined: 70 / 0.923295 = 75.8155… -> rounds to 75.82
+        comp.suspenseCurrencyTotals = { EUR: { rawTotal: '70', trxEquivalent: '75.81' } }; // per-entry: round(20*r)+round(50*r) = 75.81
+
+        comp.onAccountAmountInput(comp.rows[0]!, 70);
+
+        expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(75.81); // NOT 75.82 — the combined-conversion figure
+        expect(comp.accountCcyAmount(comp.rows[0]!)).toBe(70); // round-trips the raw typed EUR amount unchanged
+      });
+
+      it('reproduces the reported end-to-end scenario: Total 10085.81 (server-consistent seed), EUR leg snaps to 75.81, last USD row absorbs to exactly 10010.00', () => {
+        const { comp } = makeComponent();
+        comp.initialTotalAmount = '10085.81'; // 10000 + 10 (USD suspense charge) + 75.81 (EUR suspense bucket, per-entry-rounded)
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'EUR';
+        comp.rows[0]!.rate = new Decimal(0.923295);
+        comp.suspenseCurrencyTotals = { EUR: { rawTotal: '70', trxEquivalent: '75.81' } };
+
+        comp.onAccountAmountInput(comp.rows[0]!, 70);
+
+        expect(comp.rows).toHaveLength(2);
+        expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(75.81);
+        expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(10010); // 10085.81 - 75.81, exactly — no 1-cent gap
+      });
+
+      it('falls back to the ordinary combined conversion when the typed amount does NOT match the bucket\'s rawTotal', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'EUR';
+        comp.rows[0]!.rate = new Decimal(0.923295);
+        comp.suspenseCurrencyTotals = { EUR: { rawTotal: '70', trxEquivalent: '75.81' } };
+
+        comp.onAccountAmountInput(comp.rows[0]!, 71); // does not match the 70 bucket
+
+        expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(new Decimal(71).dividedBy(0.923295).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber());
+      });
+
+      it('falls back to the ordinary combined conversion when suspenseCurrencyTotals has no entry for the row\'s currency (default {})', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit();
+        comp.rows[0]!.currency = 'EUR';
+        comp.rows[0]!.rate = new Decimal(0.923295);
+        // comp.suspenseCurrencyTotals left at its default {}
+
+        comp.onAccountAmountInput(comp.rows[0]!, 70);
+
+        expect(comp.rows[0]!.amountTxCcy.toNumber()).toBe(75.82); // the pre-existing combined-conversion behavior, unchanged
+      });
+    });
+
     describe('accountCcyOverride round-trip fix (reviewer-reported: typing JPY 20000 at rate 149.0825 read back as 19999)', () => {
       it("reproduces the exact reported bug WITHOUT the fix — 20000 / 149.0825 rounds to amountTxCcy 134.15 (not the exact 134.15389…), and re-deriving 134.15 × 149.0825 rounds DOWN to 19999, not 20000 — this is the failure mode accountCcyOverride exists to prevent", () => {
         const derivedAmountTxCcy = new Decimal(20000).dividedBy(149.0825).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
