@@ -659,6 +659,13 @@ app.post('/api/export/settlement/calc', (req, res) => {
     let effectiveCommPayCcy = 'TWD';
     let comm = 0;
     let rawComm = 0;
+    // Only meaningful on the Direct-to-CA path (net Cr CA amount after embedding FBC/comm) — stay
+    // undefined on the EBL path (no Cr CA leg exists there), so res.json()'s JSON.stringify simply
+    // omits them from summary rather than the route throwing "crCaTwd is not defined" (was declared
+    // via `const` inside the `else` block below, out of scope for the summary object built after
+    // the if/else — a ReferenceError on every EBL settlement).
+    let crCaAmt;
+    let crCaTwd;
 
     if (settlementType === 'ebl') {
       // ── EBL path ──
@@ -700,10 +707,10 @@ app.post('/api/export/settlement/calc', (req, res) => {
       const commEmbedded = comm > 0 && effectiveCommPayCcy  === effectiveBillPayCcy;
 
       // Cr CA = bill minus all embedded charges
-      const crCaAmt = effectiveBillPayCcy === 'TWD'
+      crCaAmt = effectiveBillPayCcy === 'TWD'
         ? billTwd    - (fbcEmbedded ? fbcTwd : 0) - (commEmbedded ? comm        : 0)
         : billAmount - (fbcEmbedded ? fbc    : 0) - (commEmbedded ? commPayFcy  : 0);
-      const crCaTwd = billTwd - (fbcEmbedded ? fbcTwd : 0) - (commEmbedded ? comm : 0);
+      crCaTwd = billTwd - (fbcEmbedded ? fbcTwd : 0) - (commEmbedded ? comm : 0);
 
       // Dr CA (FBC) — only when NOT embedded
       const fbcDrEntry = (!fbcEmbedded && fbc > 0) ? [
@@ -868,20 +875,27 @@ app.post('/api/export/collection/calc', (req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
+// Only binds the port when run directly (`node server.js` / `npm start` / `npm run dev`) — guarded
+// so `require('./server')` from a test (server.test.js, via supertest) can exercise `app` without
+// also trying to listen on :3001, which would collide with an already-running dev instance.
 const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`\nlc-payment-wc backend running on port ${PORT}\n`);
-  console.log('Endpoints:');
-  console.log('  GET  /api/health');
-  console.log('  GET  /api/fx/rates');
-  console.log('  GET  /api/currencies');
-  console.log('  POST /api/import/issue/calc          — A1 (chargeSelections: margin/comm/swift)');
-  console.log('  POST /api/import/settlement/calc     — A2 (marginHeld in billCcy, chargeSelections: net)');
-  console.log('  POST /api/import/sight-payment/calc  — A3 (bank-internal)');
-  console.log('  POST /api/import/sight-settlement/calc — A4 (marginHeld in iblCcy, chargeSelections: net)');
-  console.log('  POST /api/export/advise/calc          — B1 (flat TWD 500)');
-  console.log('  POST /api/export/confirmed/calc       — B2');
-  console.log('  POST /api/export/nego/calc            — B3 (min TWD 800)');
-  console.log('  POST /api/export/settlement/calc      — B4 (EBL or direct)');
-  console.log('  POST /api/export/collection/calc      — B5 (on collection, min TWD 500)\n');
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`\nlc-payment-wc backend running on port ${PORT}\n`);
+    console.log('Endpoints:');
+    console.log('  GET  /api/health');
+    console.log('  GET  /api/fx/rates');
+    console.log('  GET  /api/currencies');
+    console.log('  POST /api/import/issue/calc          — A1 (chargeSelections: margin/comm/swift)');
+    console.log('  POST /api/import/settlement/calc     — A2 (marginHeld in billCcy, chargeSelections: net)');
+    console.log('  POST /api/import/sight-payment/calc  — A3 (bank-internal)');
+    console.log('  POST /api/import/sight-settlement/calc — A4 (marginHeld in iblCcy, chargeSelections: net)');
+    console.log('  POST /api/export/advise/calc          — B1 (flat TWD 500)');
+    console.log('  POST /api/export/confirmed/calc       — B2');
+    console.log('  POST /api/export/nego/calc            — B3 (min TWD 800)');
+    console.log('  POST /api/export/settlement/calc      — B4 (EBL or direct)');
+    console.log('  POST /api/export/collection/calc      — B5 (on collection, min TWD 500)\n');
+  });
+}
+
+module.exports = app;
