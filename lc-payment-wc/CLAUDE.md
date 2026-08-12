@@ -802,6 +802,173 @@ Debit leg's currency to JPY (auto-fetched rate ≈149.082569), overrode the rate
 (previously snapped to 19999), Amount (Tx Ccy) correctly showed the rounded USD-equivalent 134.15, and
 `ng.getComponent` confirmed `row.accountCcyOverride === '20000'` driving `accountCcyAmount()`.
 
+## Leg-allocator: `%` editing now has its own waterfall — the same 4-rule model as the Amount waterfall, applied to `row.pct` instead of `row.amountTxCcy` (business-requirement-confirmed 2026-08-12, "同 Amount調整規則")
+
+Reviewer's stated requirement, given across several messages and confirmed rule-by-rule: the `%`
+column should rebalance the same way the Amount (Tx Ccy) column already does (`applyAmountWaterfall`,
+v1.12.0–v1.12.3 above), not the older "fix this row, reflow the leftover into the remainder" model it
+had used until now. Four rules, directly mirroring the Amount waterfall's own four:
+
+1. **Non-last row, % increase or decrease → always targets the LAST row**, never the adjacent row —
+   reviewer: "非最後一筆%調升調降 都調到最後一筆". An increase decreases the last row's % by the same
+   amount (capped at whatever the last row currently has); a decrease increases the last row's % by
+   the exact freed amount (always fully absorbed).
+2. **Last row, % decrease → auto-creates a new trailing row** holding exactly the freed % difference,
+   Account No. defaulting to the account TYPE's own placeholder (`DEFAULT_ACCOUNT_NO_BY_TYPE
+   [defaultAccountType]`) — reviewer: "最後一筆調降 % 新增一筆 Account Number 根據 Account Type
+   Default Account Number", same convention as the Amount waterfall's own rule 3.
+3. **Last row, % increase → draws from the row immediately before it**, cascading further back if one
+   row alone can't cover it — reviewer: "最後一筆調升% 減少上一筆%比例 不足再繼續往上調降", same shape
+   as the Amount waterfall's rule 4.
+4. **No row's % is ever pushed below 0** — reviewer: "調降後不得小於0% i.e. 單筆%不能為負數" — and the
+   **total across all rows never exceeds 100%** — reviewer: "總比例不得超過100%". Both are structural
+   invariants of the 4-rule model (% only ever moves BETWEEN existing rows, or into a freshly-created
+   one under rule 2), not separately validated.
+
+**`%` is whole-percentage-point only (1% granularity); a split needing finer precision must switch to
+Amount instead — reviewer: "輸入比例保留 但以整數輸入％為主" / "如果不是整數調整% 用戶須改用金額調整模
+式".** Every typed `%` is rounded to the nearest integer (`Decimal.ROUND_HALF_UP`, 0dp) before the
+waterfall runs. This is deliberately narrower than the Amount waterfall, which has no such rounding —
+by design: **the derived `%` shown when a row is Amount-driven (via `onAmountInput`/
+`onAccountAmountInput`/the Amount waterfall's own `markCascaded`) is UNCHANGED and still non-integer
+(2dp)** — reviewer explicitly reconfirmed this is a separate, unaffected concern: "調整金額時 准許非整
+數％ 原業務需求不變" (adjusting Amount still permits non-integer %, unchanged). The integer rule applies
+only to a DIRECTLY TYPED `%` value (`onPctInput`), never to a `%` merely displayed as Amount's derived
+read-only figure. The native `<input step="1">` spinner's up/down arrows move exactly ±1%; typing an
+arbitrary integer directly (not just via the spinner) is still fully supported — the same delta-based
+4-rule logic applies regardless of how large the typed jump is.
+
+**A structural property worth noting, not present on the Amount side: `%`'s rule-3 backward cascade
+(the mirror of the Amount waterfall's rule 4) can never actually be under-supplied through the normal
+`onPctInput` entry point.** The donor pool for a last-row increase is exactly "every row except the
+last," and Σ% = 100 always holds by construction — so the donor pool's own total is always exactly
+`100 − (last row's current %)`, which is always ≥ any valid requested delta (since a typed `%` is
+clamped to `[0, 100]` first). The Amount waterfall's equivalent rule CAN be capped short (Amount has no
+natural per-field ceiling, so a caller can request more than the whole total), but `%`'s rule 3
+structurally cannot be. Rule 1 (non-last-row increase, targeting only the last row specifically, not
+the full donor pool) CAN still be capped short when a untouched middle row holds a large %, exactly
+like the Amount waterfall's own rule 1 — see the test file's worked example (row0=5%, row1=90%
+untouched middle, row2=5% last: increasing row0 to 50% is capped at 10%, not the full 50%, since the
+LAST row alone only had 5% to give).
+
+**A consequence, not a separate decision: constructing a genuinely over-allocated split (`totalPct` >
+100%) is no longer reachable through `onPctInput` alone**, since the waterfall itself conserves Σ% =
+100 by construction on every call — exactly matching the reviewer's own "總比例不得超過100%" rule.
+Three pre-existing tests that used to build an over-allocated fixture via two independent `onPctInput`
+calls were updated to construct that state via direct field assignment instead (bypassing the
+waterfall on purpose), isolating the `isOverAllocated`/`validChange` WARNING logic — which still fires
+correctly — from the waterfall's own conservation behavior, which is what now prevents that state from
+arising through ordinary use.
+
+**Implementation:** `leg-allocator.component.ts`'s new `applyPctWaterfall` (private) mirrors
+`applyAmountWaterfall`'s structure exactly, branching on `index === lastIndex` first; a `markPctCascaded`
+helper (the `%` mirror of `markCascaded`) fixes every row the cascade touches (`driver:'pct'`,
+`isRemainder:false`, `amountTxCcy` recomputed from the new `%`). `onPctInput` rounds the typed value to
+an integer, routes through the waterfall whenever `rows.length > 1` (same `wentThroughWaterfall` gating
+as `onAmountInput`), and delegates to a new `finishPctEdit` (the `%` mirror of `finishAmountEdit`) —
+deliberately NOT `fixRow()` once the waterfall has run, for the identical reason `finishAmountEdit`
+doesn't: `fixRow`'s fallback-promotion is built for the old one-remainder-row model and would otherwise
+reassign an unrelated row's `isRemainder` flag even though the waterfall already balanced everything
+exactly. The single-row (not-yet-split) case is the sole exemption, unchanged — still `fixRow`/
+`ensureRemainderRow`'s original "typing a smaller % splits off a new remainder row" behavior, now with
+integer rounding applied first. A new `pctInputTitle` tooltip mirrors `amountInputTitle`'s three-way
+phrasing (single-row/last-leg/non-last-leg), noting the whole-percentage-point rule. The `%` input
+itself moved from live `(ngModelChange)` firing to `(blur)`/`(keydown.enter)` commit with a forced DOM
+resync afterward — the identical per-keystroke-cascade problem the Amount input's own v1.12.0 usability
+fix addressed, now relevant to `%` too since it cascades against other rows on every call.
+
+See `leg-allocator.component.spec.ts`'s "% waterfall" and "pctInputTitle" describe blocks (18 tests:
+non-last-row inc/dec targeting the last row, multi-row backward cascade, the maximum-valid-%
+full-cascade case proving the no-under-supply structural guarantee, the rule-1 cap against an untouched
+middle row, the already-zero no-op case, last-row decrease new-row creation (and its chaining), first-row
+increase success, fractional-input integer rounding, zero-delta no-op, the single-row bypass, and every
+tooltip variant). Three pre-existing tests were updated for this session's change (not regressions in
+the new logic itself, but consequences of `%` now conserving its own total): the 'amount waterfall'
+describe block's own `buildRows` fixture helper switched from `onPctInput`-based construction to direct
+field assignment (since `%` editing itself can now waterfall mid-fixture-setup); two `onTotalChange`
+tests that used a fractional `onPctInput(row, 99.56)` call purely as a fixture-construction shorthand
+switched to the equivalent integer `99`; and the three over-allocation tests noted above. All 336
+project-wide tests pass (18 new, zero regressions); `tsc --noEmit` and `ng build --configuration
+development` are both clean.
+
+## Leg-allocator: a row is auto-deleted the instant it settles at 0% AND 0 amount (business-requirement-confirmed 2026-08-12, applies to both the % and Amount waterfalls)
+
+Reviewer: "如果單筆比例為0%＆金額=0 就直接刪除該筆" (if a single row's % is 0% and its amount is 0,
+delete it directly). Scope and timing both confirmed explicitly: applies to **both** waterfalls (%
+and Amount — a row can be drained to exactly zero by either), and rows are removed **immediately as
+each one settles**, not deferred to a post-edit sweep.
+
+A dangling empty leg conveyed no information on the wire even before this change —
+`emit()`'s own `pct.greaterThan(0)` filter already excluded any 0%-row from what's actually POSTed to
+the microservice — so this is a **UI-only grid-cleanliness fix**, not a wire-contract change.
+
+**Where a row can settle at 0%/0 and gets pruned:**
+- A donor row fully drained by rule 4's backward cascade (last-row increase, both waterfalls).
+- The LAST row itself, when a non-last row's increase (rule 1) caps it down to exactly 0 (its own
+  cap coincides with fully draining it) — the row before it becomes the new LAST row for any
+  subsequent edit.
+- The edited row itself, when a direct decrease (rule 2, non-last row) settles it at exactly 0 —
+  its full value hands off to the LAST row, and the now-empty edited row disappears.
+
+**Deliberately exempt: the single-row (not-yet-split) `fixRow`/`ensureRemainderRow` bypass path.**
+Typing 0 (or a negative value, clamped to 0) into the SOLE row still shows that row at 0, with a
+freshly-spawned 100% remainder alongside — it is NOT pruned in favor of that remainder. Reason: this
+bypass is a genuinely different, pre-existing mechanism (unrelated to either waterfall), and
+auto-pruning here would make ordinary input-clamping (e.g. "typing -500 shows 0") unobservable on
+the row the user actually edited, silently swapping in a fresh object with reset defaults instead.
+Both `onPctInput`/`onAmountInput`/`onAccountAmountInput` guard the edited-row prune check on
+`wentThroughWaterfall` specifically for this reason.
+
+**Never prunes below 1 row** — same guard `removeRow()` already uses; a side must always show at
+least one row even if every other row drains to 0.
+
+**Implementation:** new private `pruneZeroRow(row)` (checks `row.pct.isZero() && row.amountTxCcy
+.isZero()`, `this.rows.length > 1`, splices `row` out of `this.rows` **in place** — deliberately not
+a reassigned `[...]` copy, since it's called from inside `applyAmountWaterfall`'s/
+`applyPctWaterfall`'s own rule-4 loops, which capture `const rows = this.rows` once at the top of the
+method; an in-place splice keeps that local reference correctly synced for the loop's remaining
+iterations, whereas reassignment would leave the loop iterating a stale pre-prune copy). Called from
+four sites: rule 4's donor loop and rule 1's capped-`last` branch in both waterfalls, plus the edited
+row itself at the end of all three top-level input handlers (guarded on `wentThroughWaterfall`).
+
+See `leg-allocator.component.spec.ts`'s "auto-delete a row once it settles at 0% AND 0 amount"
+describe blocks (mirrored under both the "% waterfall" and "amount waterfall" sections, 5 tests
+each): donor-drained-by-cascade removal, last-row-capped-to-zero removal (new LAST row becomes the
+row before it), edited-row-decreased-to-zero removal, the never-below-1-row guard, and the
+single-row-bypass exemption. All 345 project-wide tests pass; `tsc --noEmit` and `ng build
+--configuration development` are both clean.
+
+## User Manual: §6.6 corrected (was describing the pre-v1.4.0 client-side Suspense bridge, now stale), plus new §6.6.1/§6.6.2 usage-guidance subsections (2026-08-12)
+
+While adding user-manual documentation for the Amount/% waterfall's auto-delete-on-zero rule
+above, a **separate, pre-existing staleness bug** was found and fixed in `docs/LC-Payment-WC-User-
+Manual-{en,cn}.docx`'s §6.6 ("Suspense Debit / Suspense Credit — the Charge Component bridge"): it
+still described the **pre-v1.4.0** behavior — "these are ordinary PaymentLegInput entries sent
+through the normal debitLegs/creditLegs arrays — no backend changes were needed for this feature"
+— and cited `business-case-runner.component.ts`'s own `suspenseBridgeLeg()`/`fxExchangePairLegs()`/
+`suspenseBridgeLegs()` as the live implementation. Per that same file's own doc comment (confirmed
+by direct code inspection, not assumed), those functions were ported 1:1 to the microservice
+(`domain/suspenseBridge.ts`) back in v1.4.0 — the client's remaining job since then is just building
+the wire-level `suspenseBridge` request field (`buildSuspenseBridgeEntries()`/`buildSuspenseBridge()`
+in `business-case-runner.component.ts`, sent via `business-case-request.ts`), and the actual
+leg/FX-pair expansion happens server-side. §6.6's three bullets (intro paragraph, the FX-pair
+citation, and the "no backend changes" claim) were corrected to describe the current v1.4.0+ split
+accurately, in both languages.
+
+**Also added, both languages:** a plain-language semantics sentence in §6.6's intro (Suspense Debit
+= bank collects MORE from the customer, adds to the Debit side's total; Suspense Credit = bank pays
+the customer LESS, reduces the Credit side's total — verified against `business-case-runner
+.component.ts`'s own `total = side === 'DEBIT' ? total.plus(trxEquivalent) : total.minus
+(trxEquivalent)` line, not assumed); and two new subsections citing the microservice README's
+"Extended usage scenarios" section verbatim in structure — **§6.6.1 LC Issue/LC Amendment customer
+fee collection** (the `creditLegs: []` + `suspenseBridge.creditEntries` pattern) and **§6.6.2
+IBL/EBL Takedown & Repayment** (real `accountType: 'SUSPENSE'` legs, never `suspenseBridge`-
+generated for the debit-direction Takedown/credit-direction Repayment leg, plus the Trx-Charges
+common-mistake note). Both new subsections explicitly flag themselves as **usage guidance only, not
+yet `business-case-registry.ts` cases** — confirmed by grepping the registry for `ibl`/`ebl`/LC
+Issue/Amendment cases and finding none — matching this file's own existing "Extended usage
+scenarios" section's caveat above, not a new claim.
+
 ---
 
 # Confirmed Requirement — OAS structured Reference / Event model (reviewer-confirmed 2026-08-09; do not re-ask)

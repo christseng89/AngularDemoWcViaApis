@@ -175,7 +175,14 @@ describe('LegAllocatorComponent', () => {
       comp.ngOnInit();
       comp.onPctInput(comp.rows[0]!, 60); // row0=60% fixed; row1 spawns remainder @ 40%
       comp.addRow(); // freeze row1 @ 40% (neutral — avoids fixRow's sole-remainder fallback complicating this setup)
-      comp.onPctInput(comp.rows[1]!, 60); // row1 -> 60% too — fixedPct now 120%, genuinely over-allocated by AMOUNT (12000 > 10000)
+      // Direct field assignment, not a second onPctInput — the % waterfall (2026-08-12) itself
+      // conserves Σ% = 100 by construction (an increase on the last row draws from row0 instead of
+      // over-allocating), so genuine over-allocation is no longer reachable through the input
+      // handler alone; see the equivalent notes in the 'addRow / removeRow' and 'validChange'
+      // describe blocks above. This isolates the isOverAllocated/%-complement-skip WARNING logic
+      // under test here from the waterfall's own conservation behavior.
+      comp.rows[1]!.pct = new Decimal(60); // fixedPct now 120%, genuinely over-allocated by AMOUNT (12000 > 10000)
+      comp.onFieldChange();
 
       const [row0, row1] = comp.rows;
       expect(row1!.pct.toNumber()).toBe(60); // NOT force-corrected to 40 (100 - 60) — that would hide the real over-allocation
@@ -212,25 +219,27 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows[1]!.pct.toNumber()).toBe(55);
     });
 
-    it('editing the remainder row itself swaps fixed/remainder roles in place, without reordering or appending', () => {
+    it('editing the current remainder (LAST) row via % opens a new trailing row for the freed difference — the % waterfall (2026-08-12) applies to it exactly like any other last-row edit, superseding the old fixRow fallback-promotion (role-swap) behavior', () => {
       const { comp } = makeComponent();
       comp.ngOnInit();
       comp.onPctInput(comp.rows[0]!, 30); // rows = [row0 30% fixed, row1 70% remainder]
       const [firstId, secondId] = comp.rows.map((r) => r.id);
 
-      // Editing rows[1] (the current remainder) fixes IT at the typed value;
-      // since it was the sole remainder, fixRow()'s fallback promotes rows[0]
-      // back to remainder rather than appending a third row — array positions
-      // must stay exactly as they were.
-      comp.onPctInput(comp.rows[1]!, 20);
+      comp.onPctInput(comp.rows[1]!, 20); // decrease on the LAST row, which still happens to be the remainder
 
-      expect(comp.rows).toHaveLength(2);
+      expect(comp.rows).toHaveLength(3); // a NEW row was appended — not a role-swap back to rows[0]
       expect(comp.rows[0]!.id).toBe(firstId);
       expect(comp.rows[1]!.id).toBe(secondId);
-      expect(comp.rows[0]!.isRemainder).toBe(true);
-      expect(comp.rows[0]!.pct.toNumber()).toBe(80);
-      expect(comp.rows[1]!.isRemainder).toBe(false);
+      expect(comp.rows[0]!.pct.toNumber()).toBe(30); // untouched
       expect(comp.rows[1]!.pct.toNumber()).toBe(20);
+      expect(comp.rows[1]!.isRemainder).toBe(false); // no longer floating — this edit made it explicit
+      const row2 = comp.rows[2]!;
+      expect(row2.pct.toNumber()).toBe(50); // 70 - 20 freed
+      expect(row2.isRemainder).toBe(false);
+      // No OTHER row was silently reassigned to "remainder" — the old fixRow fallback-promotion
+      // this test used to rely on is deliberately bypassed now (same rationale as the Amount
+      // waterfall's own analogous fix).
+      expect(comp.rows.filter((r) => r.isRemainder)).toHaveLength(0);
     });
   });
 
@@ -352,7 +361,7 @@ describe('LegAllocatorComponent', () => {
     it('regression: a fixed foreign-currency row keeps its own-currency amount EXACT — not rescaled by % — when the seeded total later changes for an unrelated reason (e.g. a Suspense entry)', () => {
       const { comp } = makeComponent({ crossRate: 1 }); // rate=1 so accountCcyAmount === amountTxCcy, isolating this test from FX-conversion arithmetic
       comp.ngOnInit(); // total = 10000, USD
-      comp.onPctInput(comp.rows[0]!, 99.56); // rows[0]=99.56% fixed (driver:'pct'), rows[1]=0.44% remainder appears
+      comp.onPctInput(comp.rows[0]!, 99); // rows[0]=99% fixed (driver:'pct'), rows[1]=1% remainder appears — % is integer-only (2026-08-12), so an exact value is used instead of the prior 99.56
 
       // Directly construct "rows[0] is the remainder, eurRow is a fixed EUR 40 leg" rather than
       // reaching it via onAccountAmountInput — since v1.12.0's amount waterfall now applies to a
@@ -380,7 +389,7 @@ describe('LegAllocatorComponent', () => {
     it('a foreign-currency row\'s pct is refreshed to 0 (not NaN/Infinity) when the new total is 0', () => {
       const { comp } = makeComponent({ crossRate: 1.5 });
       comp.ngOnInit();
-      comp.onPctInput(comp.rows[0]!, 99.56);
+      comp.onPctInput(comp.rows[0]!, 99); // % is integer-only (2026-08-12)
       const eurRow = comp.rows.find((r) => r.isRemainder)!;
       comp.onRowCurrencyChange(eurRow, 'EUR');
       comp.onAccountAmountInput(eurRow, 40);
@@ -568,14 +577,14 @@ describe('LegAllocatorComponent', () => {
       expect(comp.rows[1]!.pct.toNumber()).toBe(40);
     });
 
-    it('addRow lets the user deliberately construct an over-allocated state across independently-fixed rows', () => {
+    it('a genuinely over-allocated state still surfaces the Total Allocated warning (constructed by direct field assignment — the %/Amount waterfalls themselves now conserve Σ% = 100 by construction, per the 2026-08-12 % waterfall rule "總比例不得超過100%", so over-allocation is no longer reachable through onPctInput/onAmountInput alone)', () => {
       const { comp, emittedValid } = makeComponent();
       comp.ngOnInit();
       comp.addRow(); // rows[0] fixed 100%, no remainder
       comp.onPctInput(comp.rows[0]!, 50); // rows[0] fixed 50%, rows[1] 50% remainder (auto-created)
       comp.addRow(); // rows[1] converted to fixed too — neither row is remainder now
-
-      comp.onPctInput(comp.rows[1]!, 80); // no remainder exists to absorb this -> total 130%
+      comp.rows[1]!.pct = new Decimal(80); // bypasses the waterfall's own conservation — isolates the warning logic
+      comp.onFieldChange();
 
       expect(comp.totalPct).toBe(130);
       expect(comp.isOverAllocated).toBe(true);
@@ -655,7 +664,11 @@ describe('LegAllocatorComponent', () => {
       comp.addRow(); // rows[0] fixed 100%, no remainder
       comp.onPctInput(comp.rows[0]!, 50); // rows[0] fixed 50%, rows[1] 50% remainder
       comp.addRow(); // rows[1] converted to fixed too
-      comp.onPctInput(comp.rows[1]!, 80); // no remainder to absorb this -> 130%
+      // Direct field assignment, not onPctInput — the % waterfall (2026-08-12) itself conserves
+      // Σ% = 100 by construction, so over-allocation is no longer reachable through the input
+      // handler alone; see the equivalent note in the 'addRow / removeRow' describe block above.
+      comp.rows[1]!.pct = new Decimal(80);
+      comp.onFieldChange();
 
       expect(comp.isOverAllocated).toBe(true);
       expect(emittedValid[emittedValid.length - 1]).toBe(false);
@@ -1086,17 +1099,26 @@ describe('LegAllocatorComponent', () => {
 
   describe('amount waterfall (v1.12.0 — decrease flows forward, increase draws backward)', () => {
     /**
-     * Builds `pcts.length` explicit, independently-fixed rows (via addRow()+onPctInput — %
-     * editing is untouched by the waterfall, so this never itself triggers it) plus one trailing
-     * auto-remainder row for whatever's left. Same "neutral freeze before each fix" pattern used
-     * in the rounding-regression test above, avoiding fixRow's pre-existing sole-remainder
-     * fallback quirk. Total = 10000 USD unless the caller overrides initialTotalAmount first.
+     * Builds `pcts.length` explicit, independently-fixed rows via DIRECT field assignment +
+     * addRow() — NOT via onPctInput, since % editing now has its own waterfall (this session's
+     * change) that would otherwise fire the moment a later iteration's addRow() collapses the
+     * split to "no remainder" (amountRemaining exactly 0) before the loop's final entry, silently
+     * mutating this fixture instead of leaving it neutral. addRow() alone is still always neutral
+     * — it only flips isRemainder and runs ensureRemainderRow()'s pre-existing exact-amount
+     * bookkeeping — so this produces the identical end state the old onPctInput-based version did
+     * (traced step-for-step: pcts summing to exactly 100 leave every row fixed with no remainder;
+     * summing to < 100 leave the final row as the floating, positionally-LAST remainder). Same
+     * "neutral freeze before each fix" pattern as the % waterfall's own buildPctFixture below.
+     * Total = 10000 USD unless the caller overrides initialTotalAmount first.
      */
     function buildRows(comp: LegAllocatorComponent, pcts: number[]): void {
       comp.ngOnInit();
       for (const pct of pcts) {
+        const row = comp.rows[comp.rows.length - 1]!;
+        row.pct = new Decimal(pct);
+        row.amountTxCcy = comp.totalAmount.times(pct).dividedBy(100);
+        row.driver = 'pct';
         comp.addRow();
-        comp.onPctInput(comp.rows[comp.rows.length - 1]!, pct);
       }
     }
 
@@ -1324,6 +1346,63 @@ describe('LegAllocatorComponent', () => {
       expect(row0!.amountTxCcy.toNumber()).toBe(3000);
       expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched
     });
+
+    describe('auto-delete a row once it settles at 0 amount AND 0% (reviewer-confirmed 2026-08-12: "如果單筆比例為0%＆金額=0 就直接刪除該筆", mirrors the identical % waterfall rule)', () => {
+      it("a donor row fully drained to 0 by the LAST row's backward cascade (rule 4) is removed from the grid entirely, not just left showing 0", () => {
+        const { comp } = makeComponent();
+        buildRows(comp, [5, 5, 5, 5]); // row0..row3=500 each, row4=8000 (LAST)
+        const [row0, row1, row2, row3, row4] = comp.rows;
+
+        comp.onAmountInput(row4!, 9000); // increase 8000 -> 9000, needs 1000: row3 covers 500, row2 covers the remaining 500 — both drained to exactly 0
+
+        expect(comp.rows).toHaveLength(3); // row2 and row3 vanished, not just zeroed
+        expect(comp.rows).not.toContain(row2);
+        expect(comp.rows).not.toContain(row3);
+        expect(comp.rows).toEqual([row0, row1, row4]);
+        expect(row1!.amountTxCcy.toNumber()).toBe(500); // untouched — cascade stopped once fully covered
+        expect(row4!.amountTxCcy.toNumber()).toBe(9000);
+      });
+
+      it("the LAST row, when a non-last row's increase (rule 1) caps it down to exactly 0, is removed — the row before it becomes the new LAST row", () => {
+        const { comp } = makeComponent();
+        buildRows(comp, [40, 60]); // row0=4000 fixed, row1=6000 fixed, no remainder — row1 is LAST
+        const [row0, row1] = comp.rows;
+
+        comp.onAmountInput(row0!, 10000); // increase 4000 -> requests 10000, needs 6000 — exactly what row1 (LAST) has
+
+        expect(row1!.amountTxCcy.toNumber()).toBe(0);
+        expect(comp.rows).toHaveLength(1); // row1 was drained to exactly 0 and removed
+        expect(comp.rows).toEqual([row0]);
+        expect(row0!.amountTxCcy.toNumber()).toBe(10000);
+      });
+
+      it('the edited row itself is removed once a decrease settles it at exactly 0 (rule 2: a non-last row decreased to 0 hands its full amount to the LAST row)', () => {
+        const { comp } = makeComponent();
+        buildRows(comp, [30, 30]); // row0=3000, row1=3000, row2=4000 (remainder, LAST)
+        const [row0, row1, row2] = comp.rows;
+
+        comp.onAmountInput(row0!, 0); // decrease 3000 -> 0, freed 3000 flows to the LAST row
+
+        expect(comp.rows).toHaveLength(2);
+        expect(comp.rows).not.toContain(row0);
+        expect(comp.rows).toEqual([row1, row2]);
+        expect(row1!.amountTxCcy.toNumber()).toBe(3000); // untouched
+        expect(row2!.amountTxCcy.toNumber()).toBe(7000); // 4000 + 3000 freed
+      });
+
+      it('is scoped to the multi-row waterfall only — the single-row (not-yet-split) bypass keeps showing a typed 0 on that row instead of vanishing it in favor of the freshly-spawned remainder', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit(); // sole row @ 100%/10000, not yet split
+        const solo = comp.rows[0]!;
+
+        comp.onAmountInput(solo, 0);
+
+        expect(comp.rows).toHaveLength(2);
+        expect(comp.rows[0]).toBe(solo); // NOT pruned — still the same row, showing 0
+        expect(solo.amountTxCcy.toNumber()).toBe(0);
+        expect(comp.rows[1]!.amountTxCcy.toNumber()).toBe(10000); // freshly-spawned remainder holds the rest
+      });
+    });
   });
 
   describe('amountInputTitle (Amount (Tx Ccy) input tooltip)', () => {
@@ -1385,6 +1464,332 @@ describe('LegAllocatorComponent', () => {
       comp.addRow();
       comp.onPctInput(comp.rows[2]!, 40); // all three fixed; rows[1] is a genuine middle row
       expect(comp.amountInputTitle(comp.rows[1]!)).toContain('LAST leg');
+    });
+  });
+
+  describe('% waterfall (business-requirement-confirmed 2026-08-12, "同 Amount調整規則" — same 4-rule model as the Amount waterfall above, applied to row.pct)', () => {
+    /**
+     * Builds `pcts.length` explicit, integer-%, fixed rows via DIRECT field assignment + addRow()
+     * — never via onPctInput/onAmountInput — a neutral fixture that bypasses BOTH the % and
+     * Amount waterfalls entirely (which is the whole point: applyPctWaterfall is what's under
+     * test here, so setup must not itself invoke it). addRow() alone never triggers either
+     * waterfall — it only flips isRemainder and runs ensureRemainderRow()'s pre-existing exact-
+     * amount bookkeeping. Traced step-for-step against the pre-existing 'amount waterfall'
+     * describe block's own buildRows() helper (which used onPctInput, back when % editing had no
+     * waterfall of its own) to confirm this produces an IDENTICAL end state: pcts summing to
+     * exactly 100 leave every row fixed (no floating remainder); pcts summing to < 100 leave the
+     * final row as the floating (but positionally LAST) remainder. Only the final entry in `pcts`
+     * may bring the running total to exactly 100 — an earlier entry doing so would leave no
+     * "current remainder" row for the next iteration to grab. Total = 10000 USD (makeComponent's
+     * default) unless initialTotalAmount is overridden before calling.
+     */
+    function buildPctFixture(comp: LegAllocatorComponent, pcts: number[]): void {
+      comp.ngOnInit();
+      for (const pct of pcts) {
+        const row = comp.rows[comp.rows.length - 1]!;
+        row.pct = new Decimal(pct);
+        row.amountTxCcy = comp.totalAmount.times(pct).dividedBy(100);
+        row.driver = 'pct';
+        comp.addRow();
+      }
+    }
+
+    it("a decrease on a NON-last row's % flows the exact freed % straight to the LAST row — never the row positionally next to it", () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30]); // row0=30% fixed, row1=30% fixed, row2=40% remainder (LAST)
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onPctInput(row0!, 10); // decrease 30% -> 10%
+
+      expect(row0!.pct.toNumber()).toBe(10);
+      expect(row0!.amountTxCcy.toNumber()).toBe(1000);
+      expect(row1!.pct.toNumber()).toBe(30); // untouched — not the target under this rule
+      expect(row2!.pct.toNumber()).toBe(60); // 40 + 20 freed, straight to the LAST row
+      expect(row2!.amountTxCcy.toNumber()).toBe(6000);
+      expect(row2!.driver).toBe('pct');
+      expect(row2!.isRemainder).toBe(false);
+    });
+
+    it("an increase on a NON-last row decreases the LAST row's % by the same amount, capped at what it has — a single direct offset, never the row positionally before it", () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30]); // row0=30%, row1=30%, row2=40% (remainder, LAST)
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onPctInput(row1!, 50); // increase 30% -> 50%, needs 20%
+
+      expect(row1!.pct.toNumber()).toBe(50);
+      expect(row1!.amountTxCcy.toNumber()).toBe(5000);
+      expect(row2!.pct.toNumber()).toBe(20); // 40 - 20 — the LAST row absorbs it
+      expect(row0!.pct.toNumber()).toBe(30); // untouched
+    });
+
+    it('an increase on the LAST row cascades through MULTIPLE earlier rows when the immediately preceding one alone cannot cover it — draining each to exactly 0%, never negative', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [5, 5, 5, 5]); // row0..row3=5% each fixed, row4=80% remainder (LAST)
+      const [row0, row1, row2, row3, row4] = comp.rows;
+
+      comp.onPctInput(row4!, 93); // increase 80% -> 93%, needs 13%: row3 covers 5, row2 covers 5, row1 covers the remaining 3
+
+      expect(row4!.pct.toNumber()).toBe(93);
+      expect(row3!.pct.toNumber()).toBe(0);
+      expect(row2!.pct.toNumber()).toBe(0);
+      expect(row1!.pct.toNumber()).toBe(2); // 5 - 3
+      expect(row0!.pct.toNumber()).toBe(5); // untouched — cascade stopped once fully covered
+      const total = comp.rows.reduce((s, r) => s.plus(r.pct), new Decimal(0));
+      expect(total.toNumber()).toBe(100);
+    });
+
+    it('an increase on the LAST row all the way to the maximum valid % (100) still fully succeeds via the backward cascade — unlike the Amount rule this mirrors, % can never be under-supplied: the donor pool is every OTHER row, and Σ% = 100 by construction guarantees it always holds exactly enough for any request in [0, 100]', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [5, 5, 5]); // row0=5%, row1=5%, row2=5% fixed, row3=85% remainder (LAST)
+      const [row0, row1, row2, row3] = comp.rows;
+
+      comp.onPctInput(row3!, 100); // increase 85% -> 100%, needs 15% — exactly what row0+row1+row2 hold combined
+
+      expect(row0!.pct.toNumber()).toBe(0);
+      expect(row1!.pct.toNumber()).toBe(0);
+      expect(row2!.pct.toNumber()).toBe(0);
+      expect(row3!.pct.toNumber()).toBe(100);
+      const total = comp.rows.reduce((s, r) => s.plus(r.pct), new Decimal(0));
+      expect(total.toNumber()).toBe(100);
+    });
+
+    it("an increase on a NON-last row is capped at just the LAST row's own %, even when an untouched MIDDLE row holds far more — never cascades further back or draws from the middle row", () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [5, 90]); // row0=5% fixed, row1=90% fixed (middle), row2=5% remainder (LAST)
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onPctInput(row0!, 50); // increase 5% -> requests 50% (needs +45%), but the LAST row (row2) only has 5%
+
+      expect(row0!.pct.toNumber()).toBe(10); // 5 + 5 (capped to what row2 had), NOT 50
+      expect(row2!.pct.toNumber()).toBe(0); // drained
+      expect(row1!.pct.toNumber()).toBe(90); // untouched — rule never reaches into the middle row
+    });
+
+    it('an increase on a NON-last row when the LAST row is already at 0% is a full no-op — nothing to take, capped at 0', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [40, 60]); // row0=40% fixed, row1=60% fixed, no remainder
+      const [row0, row1] = comp.rows;
+      // Simulate a last row already drained by a prior edit (e.g. a previous rule-1 cap) — direct
+      // field assignment isolates just this no-op case from any earlier cascade.
+      row1!.pct = new Decimal(0);
+      row1!.amountTxCcy = new Decimal(0);
+
+      comp.onPctInput(row0!, 80); // increase 40% -> requests 80%, but the LAST row has 0% to give
+
+      expect(row0!.pct.toNumber()).toBe(40); // unchanged
+      expect(row1!.pct.toNumber()).toBe(0);
+    });
+
+    it('decreasing the LAST row (fully allocated, no remainder) opens a brand-new trailing row to hold exactly the freed % difference, Account No. defaulting to the account TYPE\'s own placeholder — earlier rows are untouched', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30, 40]); // row0=30%, row1=30%, row2=40% — ALL fixed, no remainder
+      const [row0, row1, row2] = comp.rows;
+      expect(comp.rows).toHaveLength(3);
+
+      comp.onPctInput(row2!, 10); // decrease on the last row: 40% -> 10%, freed = 30%
+
+      expect(comp.rows).toHaveLength(4);
+      expect(row2!.pct.toNumber()).toBe(10);
+      expect(row2!.amountTxCcy.toNumber()).toBe(1000);
+      expect(row0!.pct.toNumber()).toBe(30); // untouched
+      expect(row1!.pct.toNumber()).toBe(30); // untouched
+      const row3 = comp.rows[3]!;
+      expect(row3.pct.toNumber()).toBe(30); // exactly the freed difference
+      expect(row3.amountTxCcy.toNumber()).toBe(3000);
+      expect(row3.accountNo).toBe('CUST-ACC'); // DEFAULT_ACCOUNT_NO_BY_TYPE['CUSTOMER'], same convention as the Amount rule
+      expect(row3.currency).toBe('USD');
+      expect(row3.driver).toBe('pct');
+      expect(row3.isRemainder).toBe(false);
+      const total = comp.rows.reduce((s, r) => s.plus(r.pct), new Decimal(0));
+      expect(total.toNumber()).toBe(100);
+    });
+
+    it('decreasing the (now-last) newly-created row cascades again, opening yet another trailing row — the chain keeps working, not just a one-shot escape hatch', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30, 40]); // row0=30%, row1=30%, row2=40%
+      const [row0, row1, row2] = comp.rows;
+      comp.onPctInput(row2!, 10); // row2 -> 10%, row3 spawns @ 30% (LAST now)
+      const row3 = comp.rows[3]!;
+
+      comp.onPctInput(row3, 5); // decrease on the NEW last row: 30% -> 5%, freed = 25%
+
+      expect(comp.rows).toHaveLength(5);
+      expect(row3.pct.toNumber()).toBe(5);
+      const row4 = comp.rows[4]!;
+      expect(row4.pct.toNumber()).toBe(25);
+      expect(row0!.pct.toNumber()).toBe(30); // still untouched two edits later
+      expect(row1!.pct.toNumber()).toBe(30);
+      expect(row2!.pct.toNumber()).toBe(10);
+      const total = comp.rows.reduce((s, r) => s.plus(r.pct), new Decimal(0));
+      expect(total.toNumber()).toBe(100);
+    });
+
+    it('increasing the FIRST row succeeds — decreases the LAST row directly, exactly like any other non-last row', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30, 40]); // row0=30%, row1=30%, row2=40% — ALL fixed
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onPctInput(row0!, 50); // increase on the first row: 30% -> 50%, needs 20%
+
+      expect(row0!.pct.toNumber()).toBe(50);
+      expect(row1!.pct.toNumber()).toBe(30); // untouched — neither the edited row nor the last row
+      expect(row2!.pct.toNumber()).toBe(20); // 40 - 20 — the LAST row absorbs it
+      const total = comp.rows.reduce((s, r) => s.plus(r.pct), new Decimal(0));
+      expect(total.toNumber()).toBe(100);
+    });
+
+    it('a fractional typed % is rounded to the nearest whole percentage point (ROUND_HALF_UP) before the waterfall runs — reviewer-confirmed 2026-08-12: "輸入比例保留 但以整數輸入％為主"; a split needing finer precision must use Amount instead', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30]); // row0=30%, row1=30%, row2=40% (remainder, LAST)
+      const [row0, , row2] = comp.rows;
+
+      comp.onPctInput(row0!, 12.6); // rounds to 13 first, THEN the waterfall sees a decrease of 17
+
+      expect(row0!.pct.toNumber()).toBe(13);
+      expect(row2!.pct.toNumber()).toBe(57); // 40 + 17 freed
+    });
+
+    it('a zero-delta % edit (retyping the same %) is a no-op — no row is touched', () => {
+      const { comp } = makeComponent();
+      buildPctFixture(comp, [30, 30]); // row0=30%, row1=30%, row2=40% (remainder, LAST)
+      const [row0, row1, row2] = comp.rows;
+
+      comp.onPctInput(row0!, 30); // same value already there
+
+      expect(row0!.pct.toNumber()).toBe(30);
+      expect(row1!.pct.toNumber()).toBe(30); // untouched
+      expect(row2!.pct.toNumber()).toBe(40); // untouched
+    });
+
+    describe('auto-delete a row once it settles at 0% AND 0 amount (reviewer-confirmed 2026-08-12: "如果單筆比例為0%＆金額=0 就直接刪除該筆")', () => {
+      it("a donor row fully drained to 0% by the LAST row's backward cascade (rule 4) is removed from the grid entirely, not just left showing 0%", () => {
+        const { comp } = makeComponent();
+        buildPctFixture(comp, [5, 5, 5, 5]); // row0..row3=5% each, row4=80% (LAST)
+        const [row0, row1, row2, row3, row4] = comp.rows;
+
+        comp.onPctInput(row4!, 90); // increase 80% -> 90%, needs 10%: row3 covers 5, row2 covers the remaining 5 — both drained to exactly 0
+
+        expect(comp.rows).toHaveLength(3); // row2 and row3 vanished, not just zeroed
+        expect(comp.rows).not.toContain(row2);
+        expect(comp.rows).not.toContain(row3);
+        expect(comp.rows).toEqual([row0, row1, row4]);
+        expect(row1!.pct.toNumber()).toBe(5); // untouched — cascade stopped once fully covered
+        expect(row4!.pct.toNumber()).toBe(90);
+      });
+
+      it("the LAST row, when a non-last row's increase (rule 1) caps it down to exactly 0%, is removed — the row before it becomes the new LAST row", () => {
+        const { comp } = makeComponent();
+        buildPctFixture(comp, [40, 60]); // row0=40% fixed, row1=60% fixed, no remainder — row1 is LAST
+        const [row0, row1] = comp.rows;
+
+        comp.onPctInput(row0!, 100); // increase 40% -> requests 100%, needs 60% — exactly what row1 (LAST) has
+
+        expect(row1!.pct.toNumber()).toBe(0);
+        expect(comp.rows).toHaveLength(1); // row1 was drained to exactly 0% and removed
+        expect(comp.rows).toEqual([row0]);
+        expect(row0!.pct.toNumber()).toBe(100);
+      });
+
+      it('the edited row itself is removed once a decrease settles it at exactly 0% (rule 2: a non-last row decreased to 0 hands its full % to the LAST row)', () => {
+        const { comp } = makeComponent();
+        buildPctFixture(comp, [30, 30]); // row0=30%, row1=30%, row2=40% (remainder, LAST)
+        const [row0, row1, row2] = comp.rows;
+
+        comp.onPctInput(row0!, 0); // decrease 30% -> 0%, freed 30% flows to the LAST row
+
+        expect(comp.rows).toHaveLength(2);
+        expect(comp.rows).not.toContain(row0);
+        expect(comp.rows).toEqual([row1, row2]);
+        expect(row1!.pct.toNumber()).toBe(30); // untouched
+        expect(row2!.pct.toNumber()).toBe(70); // 40 + 30 freed
+      });
+
+      it('never prunes below 1 row — draining every OTHER row to 0 via a maximal last-row increase still leaves exactly one row standing', () => {
+        const { comp } = makeComponent();
+        buildPctFixture(comp, [50, 50]); // row0=50%, row1=50% (LAST), no remainder
+        const [row0, row1] = comp.rows;
+
+        comp.onPctInput(row1!, 100); // increase 50% -> 100%, drains row0 to exactly 0%
+
+        expect(comp.rows).toHaveLength(1);
+        expect(comp.rows).toEqual([row1]);
+        expect(row0!.pct.toNumber()).toBe(0); // drained, but not removed since only 1 row would remain — guard holds
+        expect(row1!.pct.toNumber()).toBe(100);
+      });
+
+      it('is scoped to the multi-row waterfall only — the single-row (not-yet-split) bypass keeps showing a typed 0% on that row instead of vanishing it in favor of the freshly-spawned remainder', () => {
+        const { comp } = makeComponent();
+        comp.ngOnInit(); // sole row @ 100%, not yet split
+        const solo = comp.rows[0]!;
+
+        comp.onPctInput(solo, 0);
+
+        expect(comp.rows).toHaveLength(2);
+        expect(comp.rows[0]).toBe(solo); // NOT pruned — still the same row, showing 0%
+        expect(solo.pct.toNumber()).toBe(0);
+        expect(comp.rows[1]!.pct.toNumber()).toBe(100); // freshly-spawned remainder holds the rest
+      });
+    });
+
+    it('the single-row (not-yet-split) case is unaffected by the waterfall — still the original fixRow/ensureRemainderRow spawn-a-remainder behavior, integer-rounded', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit(); // sole row @ 100%, not yet split
+
+      comp.onPctInput(comp.rows[0]!, 64.3); // rounds to 64 first
+
+      expect(comp.rows).toHaveLength(2);
+      expect(comp.rows[0]!.pct.toNumber()).toBe(64);
+      expect(comp.rows[1]!.isRemainder).toBe(true);
+      expect(comp.rows[1]!.pct.toNumber()).toBe(36);
+    });
+  });
+
+  describe('pctInputTitle (% input tooltip)', () => {
+    it('describes the remainder-spawn behavior for the sole row (not yet split)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      expect(comp.pctInputTitle(comp.rows[0]!)).toContain('Remainder');
+    });
+
+    it('is blank for a non-remainder single row (defensive — not reachable via the UI today, since a lone row is always the remainder)', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.rows[0]!.isRemainder = false;
+      expect(comp.pctInputTitle(comp.rows[0]!)).toBe('');
+    });
+
+    it('gets the ordinary last-leg message, NOT the old "Remainder" message, for a row that is the current remainder in a genuine multi-row split — it goes through the same waterfall as any other row now', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.onPctInput(comp.rows[0]!, 30); // spawns rows[1] as remainder, LAST
+      expect(comp.pctInputTitle(comp.rows[1]!)).toContain('Last leg');
+      expect(comp.pctInputTitle(comp.rows[1]!)).not.toContain('Remainder');
+    });
+
+    it('describes the last-leg behavior (decrease creates a new leg) for a fixed row with no next neighbor, and mentions the whole-percentage-point rule', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.addRow();
+      comp.onPctInput(comp.rows[0]!, 30);
+      comp.addRow();
+      comp.onPctInput(comp.rows[1]!, 70); // both fixed now, rows[1] is last, non-remainder
+      expect(comp.pctInputTitle(comp.rows[1]!)).toContain('Last leg');
+      expect(comp.pctInputTitle(comp.rows[1]!)).toContain('creates a new leg');
+      expect(comp.pctInputTitle(comp.rows[1]!)).toContain('Whole percentage points');
+    });
+
+    it('describes the direct-to-last-leg waterfall for any NON-last fixed row, including a genuine middle row', () => {
+      const { comp } = makeComponent();
+      comp.ngOnInit();
+      comp.addRow();
+      comp.onPctInput(comp.rows[0]!, 30);
+      comp.addRow();
+      comp.onPctInput(comp.rows[1]!, 30);
+      comp.addRow();
+      comp.onPctInput(comp.rows[2]!, 40); // all three fixed; rows[1] is a genuine middle row
+      expect(comp.pctInputTitle(comp.rows[0]!)).toContain('LAST leg');
+      expect(comp.pctInputTitle(comp.rows[1]!)).toContain('LAST leg');
     });
   });
 

@@ -623,14 +623,173 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     return pairs;
   }
 
-  onPctInput(row: Row, pct: number): void {
-    // %-driven amount is recomputed via money() (rounded to the transaction currency's own scale) — any prior over-precision on this row is gone.
-    this.rowScaleErrors.delete(row.id);
+  /**
+   * % input tooltip — the % mirror of amountInputTitle above (see that method's own doc comment
+   * for the single-row exemption). A genuine multi-row split gets the same "always the last leg"
+   * phrasing as the Amount waterfall, plus a note that % is whole-percentage-point only.
+   */
+  pctInputTitle(row: Row): string {
+    if (this.rows.length <= 1) {
+      return row.isRemainder ? "Remainder — editing it fixes this row and opens a new remainder for what's left" : '';
+    }
+    const index = this.rows.indexOf(row);
+    if (index === this.rows.length - 1) {
+      return 'Last leg — decreasing creates a new leg to hold the difference; increasing draws from the leg(s) before it. Whole percentage points only (1%) — use Amount for a finer split.';
+    }
+    return "Increasing decreases the LAST leg's % by the same amount; decreasing increases the LAST leg's % by the same amount. Whole percentage points only (1%) — use Amount for a finer split.";
+  }
+
+  /**
+   * % waterfall — the same 4-rule model as applyAmountWaterfall above (business-requirement-
+   * confirmed 2026-08-12, explicitly requested as "same as Amount調整規則"), applied to `row.pct`
+   * instead of `row.amountTxCcy`:
+   *
+   * 1. Non-last row, % increase → decreases the LAST row's % by the same amount, capped at
+   *    whatever the last row currently has (never negative). Reviewer: "非最後一筆%調升調升 都調
+   *    到最後一筆" (non-last-row inc/dec always targets the last row, never the adjacent row).
+   * 2. Non-last row, % decrease → increases the LAST row's % by the exact freed amount (always
+   *    fully absorbed — the same 100% total, minus one row, plus the same amount elsewhere).
+   * 3. Last row, % decrease → auto-creates a new trailing row holding exactly the freed %
+   *    difference (Account No. defaults to the account TYPE's own placeholder,
+   *    `DEFAULT_ACCOUNT_NO_BY_TYPE[defaultAccountType]` — same convention as Amount rule 3).
+   *    Reviewer: "最後一筆調降 % 新增一筆 Account Number 根據 Account Type Default Account
+   *    Number".
+   * 4. Last row, % increase → draws from the row immediately before it, cascading further back
+   *    if one row alone can't cover it, each donor capped at 0 (never negative). Reviewer: "最後
+   *    一筆調升% 減少上一筆%比例 不足再繼續往上調降".
+   *
+   * Because % only ever moves BETWEEN existing rows (or into a freshly-created one, rule 3), Σ %
+   * across all rows never changes and — critically — never goes negative on any single row
+   * (reviewer: "調降後不得小於0% i.e. 單筆%不能為負數") and never exceeds 100% in total (reviewer:
+   * "總比例不得超過100%") — both are structural invariants of this method, not separately
+   * validated. `requestedPct` is always already an integer (0–100) by the time this is called —
+   * see onPctInput's own rounding — so every row this method touches also stays an integer; no
+   * separate rounding needed here.
+   *
+   * Every row this method actually touches (the last row, any donor row during rule 4's backward
+   * cascade, or a newly-created row under rule 3 — via markPctCascaded — NOT the edited row
+   * itself, which the caller (onPctInput) still finishes) becomes driver:'pct'/isRemainder:false,
+   * exactly as if the user had typed that row's % directly.
+   *
+   * Deliberately independent of applyAmountWaterfall — a % edit never triggers the Amount
+   * waterfall and vice versa; the two are separate input surfaces for the same underlying
+   * amountTxCcy/pct pair (see Row.driver), each managing its own rebalancing the same way Total
+   * Amount header changes (absorbTotalDeltaIntoLastRow) stay independent of both per-leg
+   * waterfalls.
+   */
+  private applyPctWaterfall(index: number, requestedPct: Decimal): { finalPct: Decimal } {
+    const rows = this.rows;
+    const row = rows[index]!;
+    const oldPct = row.pct;
+    const delta = requestedPct.minus(oldPct);
+    if (delta.isZero()) return { finalPct: oldPct };
+
+    const lastIndex = rows.length - 1;
+
+    if (index === lastIndex) {
+      if (delta.isNegative()) {
+        // Rule 3 — last row decrease: create a new trailing row for the freed % difference.
+        const freed = oldPct.minus(requestedPct);
+        const newRow = this.makeRow(freed, this.defaultAccountType, DEFAULT_ACCOUNT_NO_BY_TYPE[this.defaultAccountType], false);
+        this.rows = [...this.rows, newRow];
+        this.markPctCascaded(newRow);
+        return { finalPct: requestedPct };
+      }
+      // Rule 4 — last row increase: draw from the row(s) before it, cascading backward, capped at 0.
+      let remaining = delta;
+      let drawn = new Decimal(0);
+      for (let j = index - 1; j >= 0 && remaining.greaterThan(0); j--) {
+        const donor = rows[j]!;
+        const take = Decimal.min(donor.pct, remaining);
+        if (take.isZero()) continue;
+        donor.pct = donor.pct.minus(take);
+        this.markPctCascaded(donor);
+        this.pruneZeroRow(donor); // fully drained (0%/0) — remove the now-empty leg (2026-08-12)
+        remaining = remaining.minus(take);
+        drawn = drawn.plus(take);
+      }
+      return { finalPct: oldPct.plus(drawn) }; // capped to `drawn` if earlier rows couldn't fully cover the request
+    }
+
+    // NOT the last row — rules 1 & 2: any change here offsets directly against the LAST row,
+    // regardless of this row's own position (first or middle), never the adjacent neighbor.
+    const last = rows[lastIndex]!;
+    if (delta.isPositive()) {
+      // Rule 1 — non-last row increase: decrease the last row by the same amount, capped at what it has.
+      const take = Decimal.min(last.pct, delta);
+      last.pct = last.pct.minus(take);
+      this.markPctCascaded(last);
+      this.pruneZeroRow(last); // the cap fully drained the last row (0%/0) — remove it (2026-08-12)
+      return { finalPct: oldPct.plus(take) }; // capped to `take` if the last row couldn't fully cover the request
+    }
+    // Rule 2 — non-last row decrease: increase the last row by the exact freed amount (always fully absorbed).
+    const freed = oldPct.minus(requestedPct);
+    last.pct = last.pct.plus(freed);
+    this.markPctCascaded(last);
+    return { finalPct: requestedPct };
+  }
+
+  /** Fixes a donor/receiver/new row touched by applyPctWaterfall above — the % mirror of markCascaded. */
+  private markPctCascaded(row: Row): void {
     row.driver = 'pct';
-    row.pct = clampPct(pct);
+    row.isRemainder = false;
+    row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
+    this.rowScaleErrors.delete(row.id); // programmatic move via exact Decimal arithmetic — never over-precise.
+    // This row's amount just moved for a reason that has nothing to do with a fresh account-ccy
+    // retype — see Row.accountCcyOverride.
+    row.accountCcyOverride = null;
+  }
+
+  /**
+   * % is whole-percentage-point only (reviewer-confirmed 2026-08-12: "輸入比例保留 但以整數輸入
+   * ％為主" — keep free-text %, but integer only; a split needing finer-than-1% precision must
+   * use Amount instead — "如果不是整數調整% 用戶須改用金額調整模式"). `clampPct` bounds to
+   * [0, 100] first (unchanged, existing behavior), then rounded to 0dp — matches this component's
+   * own money()/scaleFor() convention of never leaving a scale implicit.
+   */
+  onPctInput(row: Row, pct: number): void {
+    this.rowScaleErrors.delete(row.id);
+    const requested = clampPct(pct).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+    const index = this.rows.indexOf(row);
+    const wentThroughWaterfall = this.rows.length > 1 && index !== -1;
+    if (wentThroughWaterfall) {
+      const { finalPct } = this.applyPctWaterfall(index, requested);
+      row.pct = finalPct;
+    } else {
+      row.pct = requested;
+    }
+    row.driver = 'pct';
     row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
     row.accountCcyOverride = null; // recomputed via %, not a fresh account-ccy retype — see Row.accountCcyOverride
-    this.fixRow(row);
+    this.finishPctEdit(row, wentThroughWaterfall);
+    // Scoped to the genuine multi-row waterfall only — NOT the single-row (not-yet-split) bypass,
+    // where fixRow()'s pre-existing "typing a smaller value splits off a new remainder" behavior
+    // must keep showing the edited row at its own (possibly 0) value, not silently vanish it in
+    // favor of the freshly-spawned remainder (which would make e.g. "clamp a negative input to 0"
+    // unobservable on the row the user actually edited).
+    if (wentThroughWaterfall && this.pruneZeroRow(row)) this.emit(); // the edited row itself settled at 0%/0 — remove it (2026-08-12)
+  }
+
+  /**
+   * Finishes a % edit — the % mirror of finishAmountEdit above. When the waterfall actually ran,
+   * it already manages exactly which rows exist and their %/amounts (including creating a
+   * brand-new trailing row on a last-leg decrease), so this just clears the edited row's OWN
+   * isRemainder flag and runs ensureRemainderRow() as a consistency pass (a no-op in practice,
+   * since Σ % already equals 100 exactly by construction). Deliberately does NOT call fixRow() for
+   * the same reason finishAmountEdit doesn't — fixRow's fallback-promotion is built for the OLD
+   * one-remainder-row model and would otherwise silently reassign an unrelated, already-correct
+   * row's isRemainder flag even though the waterfall already balanced everything exactly.
+   *
+   * When the waterfall did NOT run (still a single, not-yet-split row), delegates to fixRow(row) —
+   * the ORIGINAL, unchanged "typing a smaller % splits off a new remainder row" behavior.
+   */
+  private finishPctEdit(row: Row, wentThroughWaterfall: boolean): void {
+    if (wentThroughWaterfall) {
+      row.isRemainder = false;
+      this.ensureRemainderRow();
+    } else {
+      this.fixRow(row);
+    }
   }
 
   /**
@@ -724,6 +883,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
         if (take.isZero()) continue;
         donor.amountTxCcy = donor.amountTxCcy.minus(take);
         this.markCascaded(donor);
+        this.pruneZeroRow(donor); // fully drained (0/0) — remove the now-empty leg (2026-08-12)
         remaining = remaining.minus(take);
         drawn = drawn.plus(take);
       }
@@ -738,6 +898,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       const take = Decimal.min(last.amountTxCcy, delta);
       last.amountTxCcy = last.amountTxCcy.minus(take);
       this.markCascaded(last);
+      this.pruneZeroRow(last); // the cap fully drained the last row (0/0) — remove it (2026-08-12)
       return { finalAmount: oldAmount.plus(take), applied: true }; // capped to `take` if the last row couldn't fully cover the request
     }
     // Rule 2 — non-last row decrease: increase the last row by the exact freed amount (always fully absorbed).
@@ -745,6 +906,40 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     last.amountTxCcy = last.amountTxCcy.plus(freed);
     this.markCascaded(last);
     return { finalAmount: requestedAmount, applied: true };
+  }
+
+  /**
+   * Removes `row` from the grid entirely once it has genuinely settled at 0% AND 0 amount — a
+   * dangling empty leg conveys no information and just clutters the grid (it was already excluded
+   * from the wire by emit()'s own `pct.greaterThan(0)` filter, so this is a UI-only cleanup, not a
+   * contract change). Reviewer-confirmed 2026-08-12: "如果單筆比例為0%＆金額=0 就直接刪除該筆",
+   * applied uniformly to both the % and Amount waterfalls — checked immediately as each row
+   * settles (a donor drained by rule 4's backward cascade, the LAST row when rule 1's cap drains
+   * it to exactly 0, or the edited row itself when typed/derived down to exactly 0), not deferred
+   * to a post-edit sweep. Never removes the LAST REMAINING row (same guard as removeRow) — a side
+   * must always show at least one row. The edited row itself is only pruned when the edit actually
+   * went through the waterfall (`wentThroughWaterfall`, both call sites) — the single-row
+   * (not-yet-split) `fixRow`/`ensureRemainderRow` bypass is deliberately exempt, so e.g. clamping a
+   * negative typed amount to 0 on the sole row still shows 0 on that row instead of it vanishing
+   * in favor of a freshly-spawned 100% remainder.
+   *
+   * Mutates `this.rows` IN PLACE (`splice`, not a reassigned `[...]` copy) deliberately: this is
+   * called from inside applyAmountWaterfall's/applyPctWaterfall's own rule-4 backward-cascade
+   * loops, which capture `const rows = this.rows` once at the top of the method — an in-place
+   * splice keeps that local reference correctly in sync for the loop's remaining iterations,
+   * whereas reassigning `this.rows` to a new array would silently leave the loop iterating over a
+   * stale, pre-prune copy. Safe with the default (non-OnPush) change detection this component
+   * uses — Angular's *ngFor differ walks the current array contents on every cycle regardless of
+   * whether the array's own object identity changed.
+   */
+  private pruneZeroRow(row: Row): boolean {
+    if (this.rows.length <= 1) return false;
+    if (!row.pct.isZero() || !row.amountTxCcy.isZero()) return false;
+    const idx = this.rows.indexOf(row);
+    if (idx === -1) return false;
+    this.rows.splice(idx, 1);
+    this.rowScaleErrors.delete(row.id);
+    return true;
   }
 
   /** Fixes a donor/receiver row touched by applyAmountWaterfall above, and refreshes its display %. */
@@ -783,6 +978,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     row.driver = 'amount';
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
     this.finishAmountEdit(row, wentThroughWaterfall);
+    // Scoped to the genuine multi-row waterfall only — see the identical note in onPctInput above.
+    if (wentThroughWaterfall && this.pruneZeroRow(row)) this.emit(); // the edited row itself settled at 0/0 — remove it (2026-08-12)
   }
 
   /**
@@ -826,6 +1023,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     row.driver = 'amount';
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
     this.finishAmountEdit(row, wentThroughWaterfall);
+    // Scoped to the genuine multi-row waterfall only — see the identical note in onPctInput above.
+    if (wentThroughWaterfall && this.pruneZeroRow(row)) this.emit(); // the edited row itself settled at 0/0 — remove it (2026-08-12)
   }
 
   /**

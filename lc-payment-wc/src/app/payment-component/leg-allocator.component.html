@@ -50,11 +50,21 @@
 
     <input type="text" [(ngModel)]="row.accountNo" (ngModelChange)="onFieldChange()" placeholder="Account No" />
 
+    <!-- Same blur/Enter-commit reasoning as the Amount (Tx Ccy) input below — the % waterfall
+         (applyPctWaterfall) rebalances OTHER rows on every call too, so live-firing per keystroke
+         would cascade mid-type. step="1": whole percentage points only (reviewer-confirmed
+         2026-08-12) — the native spinner arrows move exactly ±1%; typing a multi-digit % directly
+         still works and is applied as a single delta on commit. The explicit `pctInput.value = ...`
+         resync afterward matters here too: a capped edit (e.g. increasing a non-last row past what
+         the last row has left) leaves row.pct short of what was typed, and Angular's dirty-check
+         alone wouldn't rewrite the DOM for that. -->
     <input
-      type="number" min="0" max="100" step="any"
+      #pctInput
+      type="number" min="0" max="100" step="1"
       [ngModel]="toNum(row.pct)"
-      (ngModelChange)="onPctInput(row, $event)"
-      [title]="row.isRemainder ? 'Remainder — editing it fixes this row and opens a new remainder for what\'s left' : ''" />
+      (blur)="onPctInput(row, pctInput.value === '' ? 0 : +pctInput.value); pctInput.value = toNum(row.pct).toString()"
+      (keydown.enter)="pctInput.blur()"
+      [title]="pctInputTitle(row)" />
 
     <!-- Commits on blur/Enter, NOT on every keystroke (deliberately not (ngModelChange)) — the
          waterfall rebalances OTHER rows on every call, so live-firing per keystroke while typing
@@ -131,14 +141,14 @@
     <span class="total-pct" [class.over]="isOverAllocated">Total allocated: {{ totalPct }}%</span>
   </div>
   <p class="allocator-hint" *ngIf="isSplit">
-    Editing a row's <em>%</em> fixes that row and reflows the leftover into the <em>remainder</em>
-    row (100% − every other row). Editing a row's <em>Amount</em> instead waterfalls the
-    difference against the <em>last</em> leg: on any OTHER leg, increasing it decreases the last
-    leg by the same amount and decreasing it increases the last leg — always the last leg
-    directly, never the leg next to it. Editing the <em>last</em> leg itself works the other way:
-    decreasing it opens a brand-new leg to hold the difference; increasing it draws from the
-    leg(s) before it, as far back as needed. Either way this side always totals exactly {{ totalAmount }}
-    {{ transactionCurrency }}.
+    Editing a row's <em>%</em> or <em>Amount</em> both waterfall the difference against the
+    <em>last</em> leg the same way: on any OTHER leg, increasing it decreases the last leg by the
+    same amount and decreasing it increases the last leg — always the last leg directly, never the
+    leg next to it. Editing the <em>last</em> leg itself works the other way: decreasing it opens a
+    brand-new leg to hold the difference; increasing it draws from the leg(s) before it, as far
+    back as needed. No leg's % or Amount is ever pushed below 0. <em>%</em> moves in whole
+    percentage points only — for a finer split, use <em>Amount</em> instead. Either way this side
+    always totals exactly {{ totalAmount }} {{ transactionCurrency }}.
   </p>
   <p class="allocator-error" *ngIf="isOverAllocated">⚠ Over-allocated — these rows add up to more than 100%. Reduce one of them.</p>
   <p class="allocator-error" *ngIf="amountScaleErrors.length">

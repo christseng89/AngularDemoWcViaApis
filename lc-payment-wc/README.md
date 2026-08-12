@@ -90,14 +90,16 @@ fails the build if a change drops coverage below it. Current numbers:
 
 | Metric | Coverage |
 |---|---|
-| Statements | 99.1% |
-| Functions | 99.47% |
+| Statements | 98.72% |
+| Functions | 99.48% |
 | Lines | 100% |
-| Branches | 96.22% |
+| Branches | 95.7% |
 
 **Covered:** `leg-allocator.component.ts` (incl. RTGS-indicator threading, the
 30/70-split rounding regression, `*ngFor` row-array stability, the Debit/Credit Legs Amount
-waterfall — see §6.3.1 of the User Manual — and its `accountCcyOverride` round-trip fix),
+waterfall and its % waterfall counterpart — including the auto-delete-a-row-at-0%/0-amount rule
+shared by both — see §6.3.1/§6.3.2 of the User Manual — and the
+Amount side's `accountCcyOverride` round-trip fix),
 `suspense-entries.component.ts`
 (the Suspense Debit/Credit repeater), `business-case-runner.component.ts` (the Formly/RxJS
 orchestration component itself — direct instantiation + mocked services, same pattern as
