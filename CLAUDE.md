@@ -103,6 +103,10 @@ rendering tests as a separate follow-up), and pure Angular bootstrap/DI wiring (
 component) *is* covered — direct instantiation with mocked services, same pattern as `leg-allocator`, no
 TestBed needed.
 
+Unlike most Angular projects, `lc-payment-wc/coverage/` (the `lcov-report/` HTML + `lcov.info`) is
+**tracked in git, not gitignored** — running `npm test`/`npm run test:coverage` regenerates it, and
+`git status` will then show those files as modified. That's expected, not a sign something broke.
+
 The microservice has its own, separate Jest config (`microservices/payment-component/jest.config.js`):
 
 ```bash
