@@ -44,7 +44,7 @@ npm install
 cd backend && npm install && cd ..
 
 # Terminal 1
-cd backend && npm start
+cd backend && npm start        # or `npm run dev` for nodemon auto-restart on save
 # Terminal 2
 npm start        # ng serve --open
 ```
@@ -82,7 +82,8 @@ npm run dev:all   # runs all three concurrently (concurrently, color-coded per p
 ```
 
 Or individually: `microservices/payment-component && npm run dev` (Terminal 1), `backend && npm start`
-(Terminal 2), `npm start` i.e. `ng serve --open` (Terminal 3).
+(Terminal 2 — or `npm run dev` there too, for nodemon auto-restart), `npm start` i.e. `ng serve --open`
+(Terminal 3).
 
 ### Testing
 
