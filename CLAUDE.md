@@ -92,6 +92,9 @@ npm test                    # jest, single run (Angular app — jest-preset-angu
 npm run test:coverage       # jest --coverage
 ```
 
+`backend/` (the legacy Import/Export LC mock API) also has its own Jest suite, separate from both of the
+above — `cd backend && npm test`.
+
 To run a single test file/spec, pass a path or `-t` pattern straight through, e.g.
 `npm test -- leg-allocator.component.spec.ts` or `npm test -- -t "30/70 split"`.
 
@@ -123,6 +126,13 @@ Same single-test syntax as above applies here too (`npm test -- <file-or--t-patt
 
 If running the microservice some other way (e.g. plain `ts-node src/server.ts`), it will **not** auto-restart
 on source changes — a stale process serving old behavior looks exactly like a new bug.
+
+`microservices/payment-component/test/curl-tests/` is a third, separate testing surface from the two Jest
+suites above — hand-built curl requests (`run-cases.bat` + `requests/*.json`) that hit
+`POST /payment-instructions` directly over HTTP with the microservice running, no assertions, no Angular/
+Formly involved. Useful for manually exploring `suspenseBridge`/FX-pair behavior against a live server;
+see `lc-payment-wc/Payment-Component-Suspense-FX-Test-Cases-zh.md` (Traditional Chinese) for the worked
+examples it currently covers.
 
 **Never let the two Jest configs cross.** Always `cd` into `microservices/payment-component` before running
 its own Jest commands, and don't run it from `lc-payment-wc/` directly. If the microservice's `test/**` gets
@@ -164,7 +174,11 @@ Formly/Angular-dependent and only reachable through the full `ng serve` app.
 - `docs/` — bilingual (EN/zh-TW) user manuals.
 - `analysis/` — source-of-truth spec documents: `payment-instructions-post.yaml` (OAS), FSD and
   calculation-validation `.docx`, gap-analysis notes. Code comments citing "§N" or a named validation rule
-  refer here.
+  refer here. The OAS file's own `info.version` field and changelog prose lag the actual implementation by
+  one release at times (e.g. it can read `1.10.1` while `microservices/payment-component/package.json` is
+  already at a later version with a schema change already reflected but not yet changelogged) — trust the
+  microservice's own `package.json`/`README.md` for "what version is this" over the YAML's self-reported
+  banner.
 
 #### `microservices/payment-component/` internals
 

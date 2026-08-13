@@ -1,0 +1,25 @@
+{
+  "originModule": "EXCO",
+  "mainRef": "EXCO-CASE-0001",
+  "sequence": 1,
+  "unitCode": "HQ",
+  "transactionCurrency": "USD",
+  "debitLegs": [
+    { "accountNo": "CUST-ACC", "accountType": "CUSTOMER", "currency": "EUR", "amountAccountCcy": "200.00", "amountTxCcy": "216.62", "drRate": "0.923295" },
+    { "accountNo": "CUST-ACC", "accountType": "CUSTOMER", "currency": "USD", "amountTxCcy": "9826.38" }
+  ],
+  "creditLegs": [
+    { "accountNo": "NOSTRO-ACC", "accountType": "NOSTRO", "currency": "USD", "amountTxCcy": "9965.00" }
+  ],
+  "suspenseBridge": {
+    "debitEntries": [
+      { "amount": "10", "currency": "USD", "sourceComponent": "CHARGE" },
+      { "amount": "20", "currency": "USD", "sourceComponent": "CHARGE" },
+      { "amount": "12", "currency": "EUR", "crossRate": "1.0831", "sourceComponent": "CHARGE" }
+    ],
+    "creditEntries": [
+      { "amount": "35", "currency": "USD", "sourceComponent": "CHARGE" }
+    ]
+  },
+  "sourceFunctionCode": "Payment"
+}
