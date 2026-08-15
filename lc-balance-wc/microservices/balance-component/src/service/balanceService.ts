@@ -1,0 +1,539 @@
+/**
+ * Orchestration layer wiring the pure domain functions (src/domain/) and the
+ * DB store (src/store/) together into the operations the HTTP routes need.
+ * No business RULES live here beyond resolving which domain check applies
+ * to which movementType — the actual math is all in src/domain/.
+ *
+ * Deliberately does NOT implement the linked "UTILIZE+CREATE Acceptance" /
+ * "ACCEPT+CREATE Acceptance" combination as a single server-side operation —
+ * Design doc §7.4's "one movement, one call" principle means the CALLER
+ * (the Node.js 中台 orchestrator) makes two separate calls for a Usance
+ * drawing: release the UTILIZE/ACCEPT, then create+release the Acceptance
+ * CREATE. This keeps release() a plain, uniform state transition with no
+ * hidden cross-contract side effects.
+ */
+import { randomUUID } from 'crypto';
+import Decimal from 'decimal.js';
+import type { Db } from '../db';
+import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
+import { BalanceMovementStore } from '../store/balanceMovementStore';
+import { applyStatusTransition } from '../domain/statusTransition';
+import { computeCeilingAmount } from '../domain/tolerance';
+import { computeAvailableBalance, computeConfirmedBalance } from '../domain/balanceDerivation';
+import {
+  checkUtilizeSufficiency,
+  computeOffBalanceExposure,
+  computePresentDocsEarmark,
+  computePresentDocsEarmarkApproved,
+  computePresentDocsEarmarkPending,
+} from '../domain/offBalanceExposure';
+import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
+import { checkRedeemSufficiency } from '../domain/shgtRedeem';
+import { IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
+import type {
+  AccountEntry,
+  BalanceContract,
+  BalanceMovement,
+  BalanceSnapshot,
+  ExposureNature,
+  InstrumentType,
+  MovementWarning,
+  NaturalKey,
+  TenorType,
+} from '../types';
+
+/** Design doc §5 — movementTypes that create a new Logical Contract when the natural key doesn't yet resolve. */
+const CREATING_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'CREATE']);
+
+/** Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on Acceptance; ISSUE on SHGT). */
+const NO_CHECK_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'CREATE', 'AMEND']);
+
+/** Design doc §6/§6.1 — UTILIZE-shaped checks: sufficiency against Available Balance, plus the §6.1 off-balance WARNING (0 exposure for non-LC instrumentTypes). */
+const UTILIZE_SHAPED_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['UTILIZE', 'HONOUR', 'ACCEPT']);
+
+/**
+ * Design doc §5 (v0.6) — SHGT redemption + (reused, same "≤ outstanding" shape) Acceptance settlement.
+ * 2026-08-15 (Export Confirmation Gap Analysis §4.2): REIMBURSE (CNF_REIMB — issuing bank actually
+ * pays, clears EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE / EPLC_EXPORT_BILLS_DISCOUNTED)
+ * and RECLASSIFY_OUT (CNF_DISCOUNT's outgoing leg — no cash, just relabels the same claim on the
+ * issuing bank as EPLC_EXPORT_BILLS_DISCOUNTED via a linked CREATE on the new contract) share the same
+ * "can't clear more than what's actually outstanding" shape, just never more than what's Available.
+ */
+const OUTSTANDING_CAPPED_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
+  'PARTIAL_REDEEM',
+  'FULL_REDEEM',
+  'REIMBURSE',
+  'RECLASSIFY_OUT',
+  'PARTIAL_SETTLE',
+  'FULL_SETTLE',
+]);
+
+export interface CreateMovementRequest {
+  instrumentType: InstrumentType;
+  naturalKey?: NaturalKey;
+  balanceContractId?: string;
+  movementType: string;
+  eventSeq: number;
+  amount: string;
+  currency: string;
+  legRef?: string | null;
+  accountEntries?: AccountEntry[] | null;
+  businessEventId?: string | null;
+  parentLogicalContractId?: string | null;
+  /** Only meaningful for IPLC_LC/EPLC_LC ISSUE — see Design doc §6.2. Ignored for every other instrumentType. */
+  tolerancePct?: string | null;
+  exposureNature?: ExposureNature;
+  /**
+   * Design doc §7 Tenor Type Routing (v0.7) — only meaningful when this
+   * call creates a new IPLC_ACCEPTANCE/EPLC_ACCEPTANCE contract (CREATE).
+   * SELLERS_USANCE and BUYERS_USANCE drive IDENTICAL Balance +/- mechanics
+   * (this field changes nothing about how the movement is checked or
+   * applied) — it exists purely so the distinction survives for audit/
+   * reporting, since the Loan/Payment side that actually differs between
+   * the two is out of Balance Component's own scope.
+   */
+  tenorType?: TenorType | null;
+  tenorDays?: number | null;
+  maturityDate?: string | null;
+  transactionDate?: string | null;
+  businessDate?: string | null;
+  valueDate?: string | null;
+  sourceModule?: string | null;
+  sourceFunction?: string | null;
+  sourceTransactionRef?: string | null;
+  createdBy: string;
+}
+
+export type CreateMovementResult =
+  | { created: true; movement: BalanceMovement }
+  | { created: false; existing: BalanceMovement };
+
+export class BalanceService {
+  private readonly contracts: BalanceContractStore;
+  private readonly movements: BalanceMovementStore;
+
+  constructor(db: Db, private readonly now: () => string = () => new Date().toISOString()) {
+    this.contracts = new BalanceContractStore(db);
+    this.movements = new BalanceMovementStore(db);
+  }
+
+  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
+    return this.contracts.findActiveByNaturalKey(instrumentType, naturalKey);
+  }
+
+  catalog(filter: CatalogFilter): CatalogPage {
+    return this.contracts.listCatalog(filter);
+  }
+
+  /**
+   * @param asOfEventSeq — when set (business instruction 2026-08-14, event
+   *   timeline lookup), only movements with eventSeq <= this value are
+   *   included in confirmedBalance/availableBalance/pendingEarmarkTotal —
+   *   i.e. "the balance right after this specific event", not the current
+   *   live balance. offBalanceExposure/tightAvailableBalance are
+   *   deliberately NOT point-in-time (they always reflect the SHGT
+   *   contract's CURRENT movements) — the SHGT side has its own
+   *   independent eventSeq sequence, and reconstructing a true joint
+   *   point-in-time view across two contracts is out of scope for this
+   *   prototype; documented here rather than silently approximated.
+   */
+  getBalanceSnapshot(balanceContractId: string, asOfEventSeq?: number): BalanceSnapshot {
+    const contract = this.contracts.findById(balanceContractId);
+    if (!contract) throw new NotFoundError(`No BalanceContract ${balanceContractId}`);
+
+    const allMovements = this.movements.listByContract(balanceContractId);
+    const movements = asOfEventSeq === undefined ? allMovements : allMovements.filter((m) => m.eventSeq <= asOfEventSeq);
+    const confirmed = computeConfirmedBalance(movements);
+    const available = computeAvailableBalance(confirmed, movements);
+
+    let offBalanceExposure: string | null = null;
+    let tightAvailableBalance: string | null = null;
+    if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
+      const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
+      const exposure = computeOffBalanceExposure(shgtMovements);
+      offBalanceExposure = exposure.toFixed();
+      tightAvailableBalance = available.minus(exposure).toFixed();
+    }
+
+    // Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION
+    // only. Deliberately NOT point-in-time (same reasoning as offBalanceExposure/tightAvailableBalance
+    // above — EPLC_EXAMINATION has its own independent eventSeq sequence).
+    let presentDocsEarmarkPending: string | null = null;
+    let presentDocsEarmarkApproved: string | null = null;
+    if (contract.instrumentType === 'EPLC_CONFIRMATION') {
+      const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
+      presentDocsEarmarkPending = computePresentDocsEarmarkPending(examinationMovements).toFixed();
+      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements).toFixed();
+    }
+
+    return {
+      balanceContractId: contract.balanceContractId,
+      logicalContractId: contract.logicalContractId,
+      currency: contract.currency,
+      confirmedBalance: confirmed.toFixed(),
+      availableBalance: available.toFixed(),
+      pendingEarmarkTotal: available.minus(confirmed).toFixed(),
+      offBalanceExposure,
+      tightAvailableBalance,
+      presentDocsEarmarkPending,
+      presentDocsEarmarkApproved,
+      asOf: null,
+    };
+  }
+
+  /** Event timeline (business instruction 2026-08-14) — every movement against one contract, in time order (eventSeq is already strictly increasing per contract, Design doc §8). */
+  listMovements(balanceContractId: string): BalanceMovement[] {
+    if (!this.contracts.findById(balanceContractId)) throw new NotFoundError(`No BalanceContract ${balanceContractId}`);
+    return this.movements.listByContract(balanceContractId);
+  }
+
+  /** Balance snapshot "as of" one specific movement in the timeline — resolves its own contract, no separate balanceContractId needed from the caller. */
+  getBalanceSnapshotAsOfMovement(movementId: string): BalanceSnapshot {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+    return this.getBalanceSnapshot(movement.balanceContractId, movement.eventSeq);
+  }
+
+  createMovement(req: CreateMovementRequest): CreateMovementResult {
+    let contract = req.balanceContractId
+      ? this.contracts.findById(req.balanceContractId)
+      : req.naturalKey
+        ? this.contracts.findActiveByNaturalKey(req.instrumentType, req.naturalKey)
+        : undefined;
+
+    // Business-reported gap 2026-08-14: "Issue LC Number 後不能再 Issue 同一筆 LC
+    // Number" — a creating movementType (ISSUE/CREATE) against a natural key
+    // that ALREADY resolves to an ACTIVE contract must be rejected outright,
+    // never silently applied as an extra movement on top of the existing one
+    // (that would double-count the Ceiling/Confirmed Balance). This only
+    // applies to the naturalKey path — an explicit balanceContractId already
+    // implies the caller knows the contract exists.
+    if (contract && req.naturalKey && CREATING_MOVEMENT_TYPES.has(req.movementType)) {
+      throw new NaturalKeyAlreadyExistsError(
+        `An ACTIVE ${req.instrumentType} already exists for natural key ${JSON.stringify(req.naturalKey)} ` +
+          `(balanceContractId ${contract.balanceContractId}) — cannot ${req.movementType} again. ` +
+          `Use AMEND_INCREASE/AMEND_DECREASE${req.instrumentType === 'EPLC_CONFIRMATION' ? '/AMEND' : ''} to change it instead.`,
+      );
+    }
+
+    if (!contract) {
+      if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
+      if (!CREATING_MOVEMENT_TYPES.has(req.movementType)) {
+        throw new NotFoundError(
+          `No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`,
+        );
+      }
+
+      // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
+      // COMPONENT範圍之一" — Design doc §7 Tenor Type Routing says a Sight LC
+      // never produces an Acceptance, and Seller's/Buyer's Usance Acceptances
+      // must carry the SAME Tenor Type their parent LC declared at ISSUE. This
+      // is enforced here, not left as an unchecked convention, precisely to
+      // stop a maker from creating a flow-inconsistent Acceptance by mistake.
+      if (
+        (req.instrumentType === 'IPLC_ACCEPTANCE' || req.instrumentType === 'EPLC_ACCEPTANCE') &&
+        req.movementType === 'CREATE' &&
+        req.parentLogicalContractId
+      ) {
+        const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+        if (parent?.tenorType === 'SIGHT') {
+          throw new RequestValidationError(
+            `Cannot Create Acceptance under a Sight LC (parent ${parent.balanceContractId} was Issued with tenorType=SIGHT) — ` +
+              `a Sight presentation settles via UTILIZE alone (Design doc §7 Tenor Type Routing: Sight -> A4, never A5).`,
+          );
+        }
+        if (parent?.tenorType && req.tenorType && parent.tenorType !== req.tenorType) {
+          throw new RequestValidationError(
+            `Acceptance tenorType (${req.tenorType}) does not match its parent LC's own declared tenorType ` +
+              `(${parent.tenorType}, set at Issue) — the two must agree.`,
+          );
+        }
+      }
+
+      // Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
+      // example S001 has 3000 LC Available Balance, the SG Issue should be not greater than 3000... It should
+      // be a validation for the Maker Input."): explicit override of Design doc §5/§11's earlier decision that
+      // SHGT's sufficiency target is the customer's LMTS Available Limit, not the LC Balance (see design doc
+      // v0.10 changelog for the reversal record). Checked HERE — inside the "creating a new contract" branch,
+      // before createContract() — same positioning as the Acceptance tenor check above it: a rejected request
+      // must never leave an orphaned, empty BalanceContract row behind (found live: a first attempt at 3,001
+      // against a 3,000-available LC left exactly that behind before this was moved here). Uses req.amount
+      // directly rather than a computed ceilingAmount — SHGT is never in TOLERANCE_APPLICABLE_INSTRUMENT_TYPES
+      // (tolerance.ts), so the two are always numerically identical for this instrumentType regardless.
+      //
+      // Business-confirmed fix 2026-08-14 (v0.11): the v0.10 version of this check compared the requested SG
+      // amount against the parent LC's plain Available Balance only, oblivious to any OTHER Shipping Guarantee
+      // already outstanding on the same LC — so two overlapping SG issuances (e.g. 90,000 + 90,000 against a
+      // 100,000-available LC) could each individually pass. Now nets out the LC's existing §6.1 off-balance SG
+      // exposure first (reusing computeOffBalanceExposure — the same "Tight Available Balance" already computed
+      // for the UTILIZE-side WARNING check, see domain/offBalanceExposure.ts), so a new SG Issue is checked
+      // against what's actually still uncommitted, not just what the LC itself shows. This SG doesn't exist yet
+      // (we're still inside the "creating a new contract" branch), so listShgtMovementsForParent here can only
+      // ever return OTHER SGs' movements — no need to exclude "self".
+      if (req.instrumentType === 'SHGT' && req.movementType === 'ISSUE') {
+        if (!req.parentLogicalContractId) {
+          throw new RequestValidationError('parentLogicalContractId is required to check SG Issue against the parent LC\'s Available Balance.');
+        }
+        const parentLc = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+        if (!parentLc) {
+          throw new RequestValidationError(`Parent LC (logicalContractId ${req.parentLogicalContractId}) not found or not ACTIVE.`);
+        }
+        const parentMovements = this.movements.listByContract(parentLc.balanceContractId);
+        const parentConfirmed = computeConfirmedBalance(parentMovements);
+        const parentAvailable = computeAvailableBalance(parentConfirmed, parentMovements);
+        const existingShgtMovements = this.movements.listShgtMovementsForParent(parentLc.logicalContractId);
+        const existingShgtExposure = computeOffBalanceExposure(existingShgtMovements);
+        const tightAvailable = parentAvailable.minus(existingShgtExposure);
+        const requestedAmount = new Decimal(req.amount);
+        if (requestedAmount.greaterThan(tightAvailable)) {
+          throw new InsufficientBalanceError(
+            `SG Issue amount ${requestedAmount.toFixed()} exceeds parent LC's Tight Available Balance ${tightAvailable.toFixed()} ` +
+              `(Available Balance ${parentAvailable.toFixed()} minus ${existingShgtExposure.toFixed()} already-outstanding ` +
+              `Shipping Guarantee exposure on this same LC).`,
+          );
+        }
+      }
+
+      // Business-reported gap 2026-08-15 ("B3 沒檢查到單金額超過 Balance餘額", repro'd with LC CU02 / EB E04 —
+      // a 70,000 presentation against a Confirmation whose own Available Balance was only 60,000 was accepted
+      // with zero check), HARDENED the same day ("Export S001 都超 Present Docs. E01-E04 應該有一個 Present
+      // Earmark Amount 控制 B3＋，B4－" — E01 50,000 / E02 70,000 / E03 100,000 were each individually checked
+      // in isolation against the SAME still-100,000 Available Balance and each passed, but their SUM (220,000)
+      // was never checked, since none of them had actually moved the Confirmation's own balance yet). Reverses
+      // this check's original 2026-08-15 same-day design ("does NOT net out other still-PENDING EPLC_EXAMINATION
+      // presentations... two presentations can legitimately co-exist even if their sum nominally exceeds
+      // Available") — that reasoning is wrong: a running "Present Earmark Amount" IS wanted, same shape as
+      // SHGT's own Tight Available Balance netting just above (Σ other still-PENDING presentations on the same
+      // Confirmation, via computePresentDocsEarmark/listExaminationMovementsForParent) — EPLC_EXAMINATION's own
+      // CREATE is still MEMO_ONLY and still does NOT itself move the Confirmation's real balance (cs-tf-balance-
+      // knowhow D3 stands), this is purely a soft commitment-control check, same species as the SHGT one. "B3＋"
+      // = a new PENDING presentation adds to this earmark (this check); "B4－" = once B4 actually releases a
+      // specific presentation (Honour/Accept), it drops out of the PENDING filter and so out of the earmark —
+      // no separate bookkeeping needed, it falls out of computePresentDocsEarmark's own PENDING-only filter.
+      if (req.instrumentType === 'EPLC_EXAMINATION' && req.movementType === 'CREATE') {
+        if (!req.parentLogicalContractId) {
+          throw new RequestValidationError('parentLogicalContractId is required to check a Present Docs amount against the parent Confirmation\'s Available Balance.');
+        }
+        const parentConfirmation = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+        if (!parentConfirmation) {
+          throw new RequestValidationError(`Parent Confirmation (logicalContractId ${req.parentLogicalContractId}) not found or not ACTIVE.`);
+        }
+        const parentMovements = this.movements.listByContract(parentConfirmation.balanceContractId);
+        const parentConfirmed = computeConfirmedBalance(parentMovements);
+        const parentAvailable = computeAvailableBalance(parentConfirmed, parentMovements);
+        const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
+        const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
+        const tightAvailable = parentAvailable.minus(presentDocsEarmark);
+        const requestedAmount = new Decimal(req.amount);
+        if (requestedAmount.greaterThan(tightAvailable)) {
+          throw new InsufficientBalanceError(
+            `Present Docs amount ${requestedAmount.toFixed()} exceeds the parent Confirmation's Present Earmark-adjusted Available Balance ` +
+              `${tightAvailable.toFixed()} (Available Balance ${parentAvailable.toFixed()} minus ${presentDocsEarmark.toFixed()} already-outstanding ` +
+              `Present Docs earmark on this same Confirmation, balanceContractId ${parentConfirmation.balanceContractId}) — this presentation could ` +
+              `never be Honoured/Accepted in full alongside the other still-open presentations on this LC.`,
+          );
+        }
+      }
+
+      contract = this.createContract(req);
+    }
+
+    const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
+    if (existing) return { created: false, existing };
+
+    const ceilingAmount = computeCeilingAmount(req.amount, contract.tolerancePct, req.movementType, contract.instrumentType);
+
+    const existingMovements = this.movements.listByContract(contract.balanceContractId);
+
+    // Business-reported gap 2026-08-14: "同一筆LC 2ndary reference 也不可以相同"
+    // — sourceTransactionRef (Amendment No./IB Number/EB Number, see
+    // balance-component.model.ts's secondaryRefLabel) must be unique WITHIN
+    // one contract's own movement history. Scoped to balanceContractId, same
+    // granularity as the eventSeq idempotency key (Design doc §8) — reusing
+    // a reference number silently on a second, genuinely different event
+    // would make the audit trail unable to tell the two apart.
+    if (req.sourceTransactionRef) {
+      const duplicateRef = existingMovements.find((m) => m.sourceTransactionRef === req.sourceTransactionRef);
+      if (duplicateRef) {
+        throw new RequestValidationError(
+          `sourceTransactionRef "${req.sourceTransactionRef}" is already used by movement ${duplicateRef.movementId} ` +
+            `(eventSeq ${duplicateRef.eventSeq}) against this same contract — secondary reference numbers must be unique per contract.`,
+        );
+      }
+    }
+
+    const confirmed = computeConfirmedBalance(existingMovements);
+    const available = computeAvailableBalance(confirmed, existingMovements);
+
+    let warnings: MovementWarning[] | null = null;
+
+    if (NO_CHECK_MOVEMENT_TYPES.has(req.movementType)) {
+      // no sufficiency check — ISSUE (LC)/AMEND_INCREASE/CREATE/AMEND. SHGT's own ISSUE is checked earlier,
+      // inside the "creating a new contract" branch above (before createContract()), not here — see that
+      // comment for why: a rejected check must never leave an orphaned, empty BalanceContract row behind.
+    } else if (req.movementType === 'AMEND_DECREASE') {
+      const check = checkAmendDecreaseSufficiency({ amount: new Decimal(req.amount), ceilingAmount, availableBalance: available });
+      if (!check.ok) throw new InsufficientBalanceError(check.error!);
+    } else if (UTILIZE_SHAPED_MOVEMENT_TYPES.has(req.movementType)) {
+      let offBalanceExposure = new Decimal(0);
+      if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
+        const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
+        offBalanceExposure = computeOffBalanceExposure(shgtMovements);
+      }
+      const check = checkUtilizeSufficiency({ requestedAmount: ceilingAmount, availableBalance: available, offBalanceExposure });
+      if (!check.ok) throw new InsufficientBalanceError(check.error!);
+      if (check.warning) warnings = [check.warning];
+    } else if (OUTSTANDING_CAPPED_MOVEMENT_TYPES.has(req.movementType)) {
+      // Bug fixed 2026-08-15 — must check against `available` (nets out other still-PENDING
+      // redemptions on this same SG), not the static `confirmed` balance; see shgtRedeem.ts's own
+      // doc comment for the live scenario this was caught from.
+      const check = checkRedeemSufficiency({ redeemAmount: ceilingAmount, sgAvailableBalance: available });
+      if (!check.ok) throw new InsufficientBalanceError(check.error!);
+    } else {
+      throw new RequestValidationError(`Unrecognized movementType "${req.movementType}" for instrumentType ${req.instrumentType}.`);
+    }
+
+    const movement: BalanceMovement = {
+      movementId: randomUUID(),
+      balanceContractId: contract.balanceContractId,
+      eventSeq: req.eventSeq,
+      businessEventId: req.businessEventId ?? null,
+      movementType: req.movementType,
+      exposureNature: req.exposureNature ?? 'CONTINGENT',
+      amount: req.amount,
+      ceilingAmount: ceilingAmount.toFixed(),
+      currency: req.currency,
+      legRef: req.legRef ?? null,
+      accountEntries: req.exposureNature === 'MEMO' ? null : (req.accountEntries ?? null),
+      status: 'PENDING',
+      transactionDate: req.transactionDate ?? null,
+      businessDate: req.businessDate ?? null,
+      valueDate: req.valueDate ?? null,
+      sourceModule: req.sourceModule ?? null,
+      sourceFunction: req.sourceFunction ?? null,
+      sourceTransactionRef: req.sourceTransactionRef ?? null,
+      warnings,
+      createdBy: req.createdBy,
+      createdAt: this.now(),
+    };
+
+    const result = this.movements.insert(movement);
+    if (!result.created) return { created: false, existing: result.existing };
+    return { created: true, movement };
+  }
+
+  release(movementId: string, releasedBy: string): BalanceMovement {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+
+    applyStatusTransition({ currentStatus: movement.status, action: 'RELEASE', createdBy: movement.createdBy, actingUser: releasedBy });
+
+    const contract = this.contracts.findById(movement.balanceContractId)!;
+    const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
+    const releasedAt = this.now();
+    // Compute the after-figure by simulating this one movement flipping to RELEASED,
+    // rather than a second DB round-trip — cheaper and avoids a two-write window.
+    const after = before.plus(
+      computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]),
+    );
+    this.movements.updateStatus({
+      movementId,
+      status: 'RELEASED',
+      releasedBy,
+      releasedAt,
+      balanceBefore: before.toFixed(),
+      balanceAfter: after.toFixed(),
+    });
+
+    return this.movements.findById(movementId)!;
+  }
+
+  reject(movementId: string, releasedBy: string, reasonCode: string, remarks?: string): BalanceMovement {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+    applyStatusTransition({ currentStatus: movement.status, action: 'REJECT', createdBy: movement.createdBy, actingUser: releasedBy });
+    this.movements.updateStatus({ movementId, status: 'REJECTED', releasedBy, releasedAt: this.now(), reasonCode, remarks });
+    return this.movements.findById(movementId)!;
+  }
+
+  /**
+   * Business instruction 2026-08-15 ("need a option for Maker to Delete Pending (i.e. EC) to ensure
+   * the DB design is working properly. for all functions") — a Maker-initiated withdrawal of their OWN
+   * still-PENDING (not yet Checker-released/rejected) entry, distinct from REJECT (a Checker's 4-eyes
+   * decline). PENDING -> CANCEL -> CANCELLED was already a fully-designed, tested transition in
+   * statusTransition.ts (types.ts's own MovementStatus doc comment: "Maker action on their own
+   * not-yet-released record") — this was the only piece missing: no service method or route ever called
+   * it. Same "Maker/Checker identity not enforced here" posture as release()/reject() (statusTransition.ts's
+   * own top comment) — cancelledBy is audit metadata, not an ownership check; a system-authorization
+   * layer would enforce "only the original Maker" separately if required.
+   */
+  cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): BalanceMovement {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+    applyStatusTransition({ currentStatus: movement.status, action: 'CANCEL', createdBy: movement.createdBy, actingUser: cancelledBy });
+    this.movements.updateStatus({
+      movementId,
+      status: 'CANCELLED',
+      releasedBy: cancelledBy,
+      releasedAt: this.now(),
+      reasonCode: reasonCode ?? 'MAKER_EC',
+      remarks,
+    });
+    return this.movements.findById(movementId)!;
+  }
+
+  /**
+   * Business instruction 2026-08-15 ("Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
+   * 來控制") — B3's own Checker Release action. Used to be entirely client-side (a UI-only flag, lost
+   * on reload, invisible to any other Checker/session) — now a genuine backend acknowledgment: sets
+   * acknowledgedBy/acknowledgedAt, but deliberately does NOT call applyStatusTransition or touch
+   * status — the movement stays PENDING (B4 still needs to find and consume it via its own real
+   * release()). EPLC_EXAMINATION/CREATE only — this is specifically the Present Docs earmark
+   * acknowledgment, not a generic "acknowledge anything" action.
+   */
+  acknowledge(movementId: string, acknowledgedBy: string): BalanceMovement {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+
+    const contract = this.contracts.findById(movement.balanceContractId);
+    if (!contract || contract.instrumentType !== 'EPLC_EXAMINATION' || movement.movementType !== 'CREATE') {
+      throw new RequestValidationError(
+        `acknowledge() only applies to an EPLC_EXAMINATION CREATE movement (Present Docs earmark) — ` +
+          `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+      );
+    }
+    if (movement.status !== 'PENDING') {
+      throw new IllegalStateTransitionError(`Cannot acknowledge movement ${movementId} — its status is ${movement.status}, not PENDING.`);
+    }
+    if (movement.acknowledgedAt) {
+      throw new IllegalStateTransitionError(`Movement ${movementId} was already acknowledged by ${movement.acknowledgedBy} at ${movement.acknowledgedAt}.`);
+    }
+
+    this.movements.acknowledge({ movementId, acknowledgedBy, acknowledgedAt: this.now() });
+    return this.movements.findById(movementId)!;
+  }
+
+  private createContract(req: CreateMovementRequest): BalanceContract {
+    const now = this.now();
+    const contract: BalanceContract = {
+      balanceContractId: randomUUID(),
+      logicalContractId: randomUUID(),
+      contractVersion: 1,
+      instrumentType: req.instrumentType,
+      naturalKey: req.naturalKey!,
+      parentLogicalContractId: req.parentLogicalContractId ?? null,
+      status: 'ACTIVE',
+      currency: req.currency,
+      tolerancePct: req.tolerancePct ?? null,
+      tenorType: req.tenorType ?? null,
+      tenorDays: req.tenorDays ?? null,
+      maturityDate: req.maturityDate ?? null,
+      openingBalance: '0',
+      effectiveFrom: now,
+      createdBy: req.createdBy,
+      createdAt: now,
+    };
+    this.contracts.insert(contract);
+    return contract;
+  }
+}

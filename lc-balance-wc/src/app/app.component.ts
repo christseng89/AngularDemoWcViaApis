@@ -1,0 +1,21 @@
+import { Component } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  template: `
+    <nav class="navbar navbar-expand navbar-light bg-white border-bottom mb-3">
+      <div class="container">
+        <span class="navbar-brand">Balance Component</span>
+        <div class="navbar-nav">
+          <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Business Case Runner</a>
+          <a class="nav-link" routerLink="/transactions" routerLinkActive="active">Transaction Builder</a>
+        </div>
+      </div>
+    </nav>
+    <router-outlet />
+  `,
+})
+export class AppComponent {}

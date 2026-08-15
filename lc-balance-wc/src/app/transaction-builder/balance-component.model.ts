@@ -1,0 +1,677 @@
+/**
+ * Field/rule definitions transcribed directly from
+ * analysis/COMMON-BalanceComponent-Design-zh.md (v0.6) §3.1 (natural key
+ * table) / §5 (movementType per instrumentType) / §6.2 (Tolerance
+ * applicability) — this is the FSD-equivalent for Balance Component (no
+ * separate FSD docx exists yet; the design doc + OAS are authoritative).
+ * The Transaction Builder UI must not invent movementTypes or fields
+ * beyond what these tables declare.
+ */
+
+/**
+ * EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE / EPLC_EXPORT_BILLS_DISCOUNTED —
+ * added 2026-08-15 per analysis/COMMON-BalanceComponent-ExportConfirmation-Gap-Analysis-zh.md §4.1.
+ * The asset-side counterpart the Confirmation contingent transforms into once honoured (Sight) or
+ * accepted (Usance) — obligor is always the issuing bank, never the exporter. See the microservice's
+ * own src/types.ts for the matching frozen-spec grounding (CNF_HONOUR_SIGHT/CNF_HONOUR_BU/CNF_ACCEPT/
+ * CNF_DISCOUNT in cs-tf-balance-knowhow's event catalogue).
+ */
+/**
+ * EPLC_EXAMINATION — added 2026-08-15, cs-tf-balance-knowhow business-expert review of a proposed
+ * "Confirm LC Balance control" lifecycle table found "Confirmation Pending 100K" at Present Docs
+ * violates Design Principle D3 ("Documents arriving is a physical event... Only legal events move
+ * balances") — impl-spec-en.md's own event matrix confirms `EX_DOC_RCV` only ever touches
+ * `EXPORT_BILLS_UNDER_EXAMINATION`/`_CONTRA`, never `CONFIRMATION_OUTSTANDING`. `MEMO_ONLY`, CREATE
+ * only — B3 (Present Docs) creates it under a parent Confirmation; B4 (Honour/Acceptance) releases
+ * that same PENDING CREATE as the first leg of its own compound once the actual legal decision fires.
+ */
+export type InstrumentType =
+  | 'IPLC_LC'
+  | 'EPLC_LC'
+  | 'IPLC_ACCEPTANCE'
+  | 'EPLC_ACCEPTANCE'
+  | 'SHGT'
+  | 'EPLC_CONFIRMATION'
+  | 'EPLC_DUE_FROM_ISSUING_BANK'
+  | 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE'
+  | 'EPLC_EXPORT_BILLS_DISCOUNTED'
+  | 'EPLC_EXAMINATION';
+
+export const INSTRUMENT_TYPE_OPTIONS: { value: InstrumentType; label: string }[] = [
+  { value: 'IPLC_LC', label: 'IPLC_LC — Import LC Balance' },
+  { value: 'EPLC_LC', label: 'EPLC_LC — Export LC (reference only, no liability)' },
+  { value: 'IPLC_ACCEPTANCE', label: 'IPLC_ACCEPTANCE — Import Acceptance Liability' },
+  { value: 'EPLC_ACCEPTANCE', label: 'EPLC_ACCEPTANCE — Export Acceptance Liability / MEMO tracking' },
+  { value: 'SHGT', label: 'SHGT — Shipping Guarantee Liability' },
+  { value: 'EPLC_CONFIRMATION', label: 'EPLC_CONFIRMATION — Export Confirmation Liability (CONF LIAB)' },
+  { value: 'EPLC_DUE_FROM_ISSUING_BANK', label: 'EPLC_DUE_FROM_ISSUING_BANK — Confirmed Sight/BU honour asset (obligor = issuing bank)' },
+  { value: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', label: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE — Confirmed Usance acceptance asset (obligor = issuing bank)' },
+  { value: 'EPLC_EXPORT_BILLS_DISCOUNTED', label: 'EPLC_EXPORT_BILLS_DISCOUNTED — Discounted (Nego) confirmed acceptance asset' },
+  { value: 'EPLC_EXAMINATION', label: 'EPLC_EXAMINATION — Present Docs MEMO_ONLY earmark (no Confirmation impact)' },
+];
+
+/** Design doc §5 — the only legal movementType values per instrumentType, as actually implemented. */
+export const MOVEMENT_TYPES_BY_INSTRUMENT: Record<InstrumentType, string[]> = {
+  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE'],
+  EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
+  IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
+  EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
+  SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
+  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT'],
+  EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
+  EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
+  EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
+  EPLC_EXAMINATION: ['CREATE'],
+};
+
+/** Design doc §3.1 — which natural-key fields apply to which instrumentType. lcNumber is always required. */
+export const NATURAL_KEY_FIELDS_BY_INSTRUMENT: Record<InstrumentType, ('ibNumber' | 'sgNumber')[]> = {
+  IPLC_LC: [],
+  EPLC_LC: [],
+  IPLC_ACCEPTANCE: ['ibNumber'],
+  EPLC_ACCEPTANCE: ['ibNumber'],
+  SHGT: ['sgNumber'],
+  EPLC_CONFIRMATION: [],
+  // Same EB Number as the specific presentation (B3's secondaryRef) they arose from — one asset
+  // record per presentation, so an LC/Confirmation with multiple presentations doesn't collide.
+  EPLC_DUE_FROM_ISSUING_BANK: ['ibNumber'],
+  EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['ibNumber'],
+  EPLC_EXPORT_BILLS_DISCOUNTED: ['ibNumber'],
+  EPLC_EXAMINATION: ['ibNumber'],
+};
+
+/** Design doc §6.2 — Tolerance only applies to these instrumentTypes' own ISSUE/AMEND*. */
+export const TOLERANCE_APPLICABLE_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set(['IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION']);
+export const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND']);
+
+/** movementTypes that implicitly create a new Logical Contract if the natural key doesn't resolve yet (Design doc §3.3). */
+export const CREATING_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'CREATE']);
+
+/** Design doc §3.1/§6.1 — instrumentTypes that hang off a parent LC (parentLogicalContractId). */
+export const HAS_PARENT: ReadonlySet<InstrumentType> = new Set(['IPLC_ACCEPTANCE', 'EPLC_ACCEPTANCE', 'SHGT', 'EPLC_EXAMINATION']);
+
+/** For EPLC_ACCEPTANCE, the parent may be EPLC_CONFIRMATION (Confirmed -> ACTUAL) or EPLC_LC (Unconfirmed -> MEMO, Design doc §6.2 Export LC). */
+export const PARENT_INSTRUMENT_OPTIONS: Record<InstrumentType, InstrumentType[]> = {
+  IPLC_LC: [],
+  EPLC_LC: [],
+  IPLC_ACCEPTANCE: ['IPLC_LC'],
+  EPLC_ACCEPTANCE: ['EPLC_CONFIRMATION'],
+  SHGT: ['IPLC_LC'],
+  EPLC_CONFIRMATION: [],
+  // Created programmatically by B4's own compound Submit (createsIssuingBankReceivableOnHonour) — no
+  // Balance Component function ever picks an EXISTING one via a Parent LC picker (business instruction
+  // 2026-08-16, "Balance Component 只負責 Contingent Liability" — collecting this pure receivable, with
+  // no paired liability, is out of scope here; B5 is Usance/EPLC_ACCEPTANCE-only).
+  EPLC_DUE_FROM_ISSUING_BANK: [],
+  EPLC_ACCEPTANCE_REIMB_RECEIVABLE: [],
+  EPLC_EXPORT_BILLS_DISCOUNTED: [],
+  // B3 (Present Docs) only — a genuinely new EPLC_EXAMINATION record per presentation, picked via the
+  // Parent LC picker like A8's own SHGT-under-a-parent-LC pattern.
+  EPLC_EXAMINATION: ['EPLC_CONFIRMATION'],
+};
+
+export function isToleranceApplicable(instrumentType: InstrumentType, movementType: string): boolean {
+  return TOLERANCE_APPLICABLE_INSTRUMENT_TYPES.has(instrumentType) && TOLERANCE_APPLICABLE_MOVEMENT_TYPES.has(movementType);
+}
+
+/**
+ * Business instruction 2026-08-14: "還有相關BALANCE為0的交易過濾" — mirrors
+ * src/domain/balanceDerivation.ts's MOVEMENT_DIRECTION on the microservice
+ * (movementTypes with direction -1). Used to filter existing-contract
+ * pickers (Catalog dropdown, Parent LC picker) so a contract with 0
+ * Available Balance isn't offered as the target of an action that would
+ * immediately fail (Design doc §6) — e.g. don't list a fully-drawn LC as a
+ * Document Arrival target, don't list a fully-settled Acceptance as a
+ * Settlement target. Deliberately NOT applied to AMEND_INCREASE/ISSUE/
+ * CREATE/AMEND — 0 is a perfectly normal starting point to top up or begin.
+ */
+export const DECREASING_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
+  'AMEND_DECREASE',
+  'UTILIZE',
+  'HONOUR',
+  'ACCEPT',
+  'PARTIAL_SETTLE',
+  'FULL_SETTLE',
+  'PARTIAL_REDEEM',
+  'FULL_REDEEM',
+  // 2026-08-15 (Export Confirmation Gap Analysis §4.1/§4.2) — same "don't offer an already-cleared
+  // record" exclusion for the new asset-side instruments' own settlement/reclass movements.
+  'REIMBURSE',
+  'RECLASSIFY_OUT',
+]);
+
+/**
+ * Named business functions (business instruction 2026-08-14: "similar as
+ * Payment Component A1-A4, B1-B5") — each pins down instrumentType +
+ * movementType (and, where the real business function has one, a
+ * meaningful sub-choice like Increase/Decrease or Sight/Usance) so the
+ * Transaction Builder never makes the user pick raw instrumentType/
+ * movementType combinations by hand. Grouped Import (A-series) / Export
+ * (B-series), same split as lc-payment-wc's own
+ * src/app/web-components/import/ vs export/ screens.
+ */
+export interface SubChoice {
+  key: string;
+  label: string;
+  options: { value: string; label: string }[];
+}
+
+export interface TransactionFunction {
+  code: string;
+  label: string;
+  side: 'IMPORT' | 'EXPORT';
+  help: string;
+  instrumentType: InstrumentType;
+  /** Fixed movementType, OR a sub-choice the user picks (its value becomes the movementType, or feeds resolveMovementType). */
+  movementType?: string;
+  subChoice?: SubChoice;
+  /** True when this function's parent-instrument default should be pre-selected (SHGT/IPLC_ACCEPTANCE always IPLC_LC; EPLC_ACCEPTANCE depends on the Confirmed/Unconfirmed sub-choice). */
+  defaultParentInstrumentType?: InstrumentType;
+  /**
+   * Business instruction 2026-08-14: "amend number, ib number and sg
+   * number can be treated as 2ndary reference number for events after LC
+   * issue" — every function except LC Issue (A1/B1) requires ONE generic
+   * secondary reference (sent as sourceTransactionRef), just labeled per
+   * context (Amendment No./Times, IB Number, …). SG Number is deliberately
+   * NOT covered by this — for A8/A9 it's SHGT's own PRIMARY natural key
+   * (naturalKey.sgNumber / searchNaturalKey.sgNumber), not a secondary tag
+   * on top of some other instrument's own key.
+   */
+  secondaryRefLabel?: string;
+  /**
+   * Design doc §7 Tenor Type Routing (v0.7/v0.9) — when set, Tenor Type is
+   * mandatory and offers exactly these options. LC Issue (A1/B1) offers all
+   * three (the LC's own stated tenor, declared at issuance — business
+   * instruction 2026-08-14: "開證時必須輸入Tenor Type"); Acceptance (A6/B4)
+   * offers only the two Usance options, since Sight never produces an
+   * Acceptance (Design doc §7's routing table). SELLERS_USANCE/
+   * BUYERS_USANCE drive IDENTICAL Balance +/- mechanics wherever they
+   * appear — this field is audit/reporting only, never changes a check.
+   */
+  tenorTypeOptions?: { value: string; label: string }[];
+  /**
+   * Business-reported gap 2026-08-14 ("There is no Sight Payment function
+   * for the Tenor Sight to pay") — for A4, which Catalog picker
+   * entries are eligible: filters out contracts whose OWN declared
+   * tenorType (set at A1 Issue) doesn't match, so a Usance LC can't be
+   * picked under the Sight cards or vice versa. Contracts with no
+   * tenorType recorded (legacy, pre-v0.9) are never filtered out — silently
+   * hiding them would make them permanently unreachable.
+   */
+  catalogTenorFilter?: 'SIGHT' | 'USANCE';
+  /**
+   * Business instruction 2026-08-14 ("pickup LC then pickup IB Number...
+   * Amount will be captured... without further input") — when true, this
+   * function does NOT create a new movement at all: pick the LC (existing
+   * Catalog picker), then pick a still-PENDING movement under it (IB
+   * Index, component.ts's payableMovements), then Pay releases that exact
+   * movement. The Amount/currency/secondaryRef Formly fields are hidden
+   * entirely — there is nothing left to type. A4 (Sight Settlement) only.
+   */
+  payExistingUtilize?: boolean;
+  /**
+   * Business instruction 2026-08-14, revised: "When Submit A6, the LC
+   * Balance is remain unchanged but create an Acceptance Balance in
+   * Pending. When Checker approve it, then LC Balance will be approved and
+   * Acceptance Balance will be approved too." — A6 only. When true, the
+   * Parent LC picker's Step 2 shows still-PENDING Document Arrival
+   * movements under the picked LC (component.ts's payableMovements — same
+   * mechanism as A4's IB Index, just triggered from onSelectParent()
+   * instead of onSelectContract()); picking one auto-fills AND LOCKS
+   * naturalKey.ibNumber and model.amount (protected — see rebuildFields()).
+   * submit() (Maker) only createMovement()s the new Acceptance (PENDING) —
+   * the LC's own Balance stays untouched. release() (Checker) is the
+   * compound call: release the picked Document Arrival FIRST (finalizes
+   * the LC's own Balance, Pending -> Approved/Utilized), THEN release the
+   * new Acceptance — matching balanceService.ts's own documented "two
+   * separate calls, orchestrated by the caller" principle for a Usance
+   * drawing, but now both halves happen at the CHECKER step, not the
+   * Maker's submit — a Maker must never unilaterally finalize the LC's own
+   * Balance just by submitting a request (4-eyes).
+   */
+  settlesDocumentArrival?: boolean;
+  /**
+   * Business instruction 2026-08-15 ("B4 should index records from B3, once B3 record is processed
+   * via B4, then it is no longer to run B3 again") — reused by B4 (Create Acceptance) alongside
+   * settlesDocumentArrival above: on IPLC_LC the "still-PENDING" thing being converted is A3's own
+   * UTILIZE (Document Arrival); on EPLC_CONFIRMATION for B4 it's B3's own ACCEPT (Present Docs,
+   * Usance branch) instead. Parameterizes loadPayableMovements()'s own movementType filter — defaults
+   * to 'UTILIZE' when unset (A4/A6, unchanged).
+   */
+  payableMovementType?: string;
+  /**
+   * Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — B4 only. A3's own
+   * UTILIZE lives on the SAME contract A6 browses (IPLC_LC), so loadPayableMovements() can just call
+   * listMovements() on the picked contract directly. B3's own CREATE does NOT — it lives on a
+   * SEPARATE child EPLC_EXAMINATION contract (parentLogicalContractId -> the Confirmation), so finding
+   * it means: catalog-search EPLC_EXAMINATION contracts under the picked Confirmation's own LC Number,
+   * then fetch each one's own movements. Set only when the "still-PENDING source" isn't on the browsed
+   * contract itself — unset (A6, unchanged) means same-contract lookup.
+   */
+  payableMovementInstrumentType?: InstrumentType;
+  /**
+   * Business instruction 2026-08-15 ("B4 只能挑 Approved 的記錄" — B4 should only be able to pick a B3
+   * Present Docs record the Checker has already acknowledged via B3's own Checker Release, enforcing
+   * the 4-eyes check on the presentation itself before Honour/Accept becomes possible). B4 only — A6's
+   * own equivalent (still-PENDING A3 Document Arrivals) has no acknowledgment concept and is
+   * unaffected. Filters loadPayableMovementsAcrossChildContracts()'s own candidate pool to
+   * `m.acknowledgedAt` truthy, on top of the existing status/movementType filter.
+   */
+  payableMovementRequiresAcknowledgment?: boolean;
+  /** Display term for whatever payableMovementType above picks out — "Document Arrival" (A4/A6) vs "Present Docs" (B4). Drives the 2ndary Index picker's own label/emptyText/autoPickedHint (component.html). */
+  pendingItemLabel?: string;
+  /** Which function to point the Maker at when nothing is PENDING yet — "A3 (Document Arrival)" vs "B3 (Present Docs)". */
+  pendingItemSourceHint?: string;
+  /**
+   * Business instruction 2026-08-15 ("LC Index — Existing Contract then EB Index - Existing Contract
+   * (from B3)") — just the function code half of pendingItemSourceHint above, for the 2ndary Index
+   * picker's own label ("{IB/EB} Index — Existing Contract (from {code})", component.html — the IB/EB
+   * half comes from ibNumberLabel). Defaults to 'A3' when unset (A6, unchanged).
+   */
+  pendingItemSourceCode?: string;
+  /**
+   * Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review), REVISED 2026-08-16 ("從
+   * Balance Component角度來看B5不需要，B6改成B5") — B5 only (formerly B6). Resolves whichever
+   * instrumentType the LC's own tenor actually produced under B4: `EPLC_DUE_FROM_ISSUING_BANK` (Sight)
+   * or `EPLC_ACCEPTANCE` (Usance held-to-maturity, the liability itself — NOT `EPLC_ACCEPTANCE_REIMB_
+   * RECEIVABLE`, since settlesAcceptanceOnMature below settles that as a linked second leg once the
+   * Acceptance is found) — same LC+EB Number natural key either way, so B5 doesn't need to ask which.
+   * searchExistingContract() tries the function's own primary instrumentType first, then this fallback,
+   * before giving up.
+   */
+  dualInstrumentFallback?: InstrumentType;
+  /**
+   * Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
+   * Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5 only. When dualInstrumentFallback
+   * above resolves to EPLC_ACCEPTANCE (Usance held-to-maturity), Submit derives FULL_SETTLE/
+   * PARTIAL_SETTLE from Amount vs the Acceptance's own Available Balance (same shape as autoRedeemType,
+   * see its own doc comment), then creates a linked REIMBURSE for the SAME amount against the matching
+   * EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract (found via the same LC+EB Number) — one Checker Release
+   * finalizes both. Grounded in impl-spec-en.md's own CNF_MATURE event row, which clears both balance
+   * types together, not two independent events. The Sight case (resolved type stays EPLC_DUE_FROM_
+   * ISSUING_BANK) is unaffected — a plain REIMBURSE, no second leg.
+   */
+  settlesAcceptanceOnMature?: boolean;
+  /**
+   * Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB Index —
+   * Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5 only. Adds a
+   * genuine "EB Index" Step-2 picker after the Parent LC ("LC Index") Step 1 — same two-step shape A6/
+   * B4 already have, but merging candidates across BOTH of B5's own possible instrumentTypes
+   * (instrumentType + dualInstrumentFallback) instead of one, since the picked Confirmation could have
+   * either a Sight Due-from-Issuing-Bank asset or a Usance Acceptance still outstanding under the same
+   * EB Number, and the Maker doesn't know which in advance. Only 0-Available candidates are excluded
+   * (nothing left to settle). Does not replace the existing free-text LC+EB search — that stays as a
+   * manual fallback, same precedent as every other Parent-LC-picker function.
+   */
+  settleableBalanceIndex?: boolean;
+  /**
+   * Business instruction 2026-08-14 (revised Maker/Checker statement):
+   * "A3 Checker: Release/approve the Document Arrival. No further LC
+   * Balance update. A4 Checker: upon settlement approval, move the
+   * corresponding LC Balance from Pending to Approved/Utilized." — the LC
+   * Balance is only genuinely finalized (moved out of Pending) by A4's
+   * release() call; A3's own Checker step must NOT trigger that same
+   * balance-finalizing transition, or A4 would never find anything still
+   * PENDING to settle. A3 (Document Arrival (Sight)) only — component.ts's
+   * approveArrival() is a Checker-visible acknowledgment that does NOT call
+   * the release API; the movement stays PENDING server-side. Reject still
+   * calls the real reject API (releases the earmark back), since that's a
+   * genuine, correctness-critical action regardless of this flag.
+   */
+  deferSettlement?: boolean;
+  /**
+   * Business instruction 2026-08-15 ("B4 should index records from B3, once B3 record is processed
+   * via B4, then it is no longer to run B3 again") — which movementType deferSettlement above applies
+   * to. Defaults to 'UTILIZE' when unset (A3, unchanged). B3 (post-restructuring, EPLC_EXAMINATION)
+   * sets this to 'CREATE' — applies to its single CREATE movement, Sight or Usance alike, since B3
+   * itself no longer branches by tenor (that decision moved to B4's own movementTypeFromContractTenor).
+   */
+  deferSettlementMovementType?: string;
+  /** Display noun for deferSettlement's own acknowledgment hint/checkmark — "Document Arrival" (A3) vs "Present Docs" (B3, Usance). Defaults to 'Document Arrival' when unset. */
+  deferSettlementLabel?: string;
+  /** "go to X to actually finalize it" — which function(s) the Maker/Checker should go to next. Defaults to 'A4 (Sight Settlement) or A6 (Acceptance)' when unset. */
+  deferSettlementNextStepHint?: string;
+  /**
+   * Business instruction 2026-08-15 ("Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
+   * 來控制") — B3 only. A3's own deferSettlement acknowledgment (approveArrival()) stays purely
+   * client-side (a UI flag, lost on reload) — that's fine for A3/A4/A6, which don't need a persisted
+   * Pending-vs-Approved split. B3 does: the Present Docs Earmark needs a REAL backend-persisted
+   * acknowledgment (survives reload, correct across Checker sessions) so it can be reported as two
+   * genuine numbers. When set, component.ts's approveArrival() also calls api.acknowledge() on the
+   * selected Checker movement instead of only setting the local arrivalApproved flag.
+   */
+  deferSettlementRequiresBackendAck?: boolean;
+  /**
+   * Business instruction 2026-08-14 ("Document Arrival w Shipping Gtee...
+   * pick up the LC Number and associated SG Record... Bill Amount will be
+   * protected and carry from selected SG Record", "always response full
+   * match only") — A3S only. Step 2 (component.ts's loadSgsForArrival(),
+   * triggered from onSelectContract() once the LC is picked) lists the
+   * LC's own outstanding SHGT records instead of A6's still-PENDING
+   * Document Arrivals; picking one auto-fills AND LOCKS Amount = that SG's
+   * current full outstanding balance (never a partial/typed figure — v0.13
+   * business decision, full match only).
+   *
+   * Maker Submit creates TWO new PENDING movements, in this exact order:
+   * (1) the matched SG's own FULL_REDEEM, (2) the LC's own UTILIZE for the
+   * same amount. The order matters for the balance math, not just
+   * bookkeeping — src/domain/offBalanceExposure.ts's computeOffBalanceExposure()
+   * counts a PENDING redemption the same as a RELEASED one, so by the time
+   * step (2)'s sufficiency check runs, this SG's exposure is already
+   * netted out of Tight Available (Design doc §6.1 v0.12) and the check
+   * passes even though an unmatched arrival of the same amount would now
+   * hard-reject. Checker Release is the mirrored compound action: release
+   * the SG's FULL_REDEEM first, then the Document Arrival — both finalize
+   * together on one click, matching A6's "one Release does both" pattern.
+   */
+  documentArrivalWithSg?: boolean;
+  /**
+   * Business instruction 2026-08-15 (analysis/COMMON-BalanceComponent-ExportConfirmation-Gap-Analysis-zh.md
+   * §3, Row 5) — B3's Sight/HONOUR branch only. rationale-en.md §7.4a: "paying the exporter under a
+   * confirmation creates an asset against the issuing/reimbursing bank, not another liability."
+   * Maker Submit creates TWO new PENDING movements, same compound-and-linked shape as A3S's
+   * documentArrivalWithSg above: (1) the EPLC_CONFIRMATION's own HONOUR (releases the Confirmation
+   * contingent), (2) a new EPLC_DUE_FROM_ISSUING_BANK CREATE for the same amount (naturalKey.ibNumber
+   * = this submission's own secondaryRef/EB Number — one asset record per presentation). Checker
+   * Release is the mirrored compound action. Usance's ACCEPT branch (Row 6, the 3-way
+   * Confirmation+Acceptance+Receivable compound) is intentionally NOT yet covered by this flag —
+   * follow-up work, see the gap analysis §5.
+   */
+  createsIssuingBankReceivableOnHonour?: boolean;
+  /**
+   * Business instruction 2026-08-15 ("B4 should index records from B3, once B3 record is processed
+   * via B4, then it is no longer to run B3 again") — B4 only. Closes Gap Analysis Row 6's Critical
+   * Gap: the 3-way Confirmation+Acceptance+Receivable compound createsIssuingBankReceivableOnHonour's
+   * own doc comment above flagged as "NOT yet covered". Works together with settlesDocumentArrival/
+   * payableMovementType='ACCEPT' above (B4 must convert a SPECIFIC still-PENDING B3 ACCEPT record, not
+   * create an Acceptance untethered from one — same reasoning as A6). Maker Submit creates TWO new
+   * PENDING movements, same compound-and-linked shape as createsIssuingBankReceivableOnHonour: (1) the
+   * new EPLC_ACCEPTANCE CREATE (the liability half, req), (2) a new EPLC_ACCEPTANCE_REIMB_RECEIVABLE
+   * CREATE for the same amount (the asset half — naturalKey.ibNumber matches the Acceptance's own,
+   * carried from the picked B3 record). Checker Release is a 3-way compound: release the picked B3
+   * ACCEPT record FIRST (settlesDocumentArrival's existing release() branch), THEN release the
+   * Acceptance (releaseAcceptance()), THEN release the Receivable asset (new
+   * releaseAcceptanceReimbReceivable()) — once released, that B3 record is gone from the "still-
+   * PENDING" 2ndary Index and can never be picked/converted a second time.
+   */
+  createsAcceptanceReimbReceivableOnCreate?: boolean;
+  /**
+   * Business instruction 2026-08-15 ("There is no need to select Full or Partial as long as the
+   * amount is not greater than the SG Balance. The defaulted amount is the SG Balance and
+   * mandatory.", refined same day: "Amount default to SG Available Balance") — A9 only. Replaces a
+   * manual Full/Partial Redeem subChoice: Amount defaults to the picked SG's own Available Balance
+   * (component.ts's refreshSelectedContractSnapshot()) — Available, not Confirmed, so any OTHER
+   * redemption already PENDING against this same SG is correctly netted out — and stays freely
+   * editable down, capped at it (never disabled — rebuildFields()'s amountCappedAtSg/props.max).
+   * movementType is DERIVED at submit() time from whether the typed amount still equals that
+   * Available Balance (FULL_REDEEM) or was reduced below it (PARTIAL_REDEEM), never picked by the
+   * user.
+   */
+  autoRedeemType?: boolean;
+  /**
+   * Business instruction 2026-08-15 ("B3 不須選 Sight/Usance 因為交易本身已經有此訊息了 — 登記 B1 時已經
+   * 有此訊息了") — B3 only. Replaces a manual Sight/Usance subChoice: the picked EPLC_CONFIRMATION
+   * contract's own tenorType (declared once, at B1 Confirm LC) already says which it is, so asking
+   * again at Present Docs time was redundant — and could theoretically diverge from the contract's
+   * real tenorType if the Maker picked wrong. onSelectContract() (component.ts) derives
+   * model.movementType from the picked contract's own tenorType instead: 'SIGHT' -> 'HONOUR', anything
+   * else (Usance, i.e. SELLERS_USANCE per B1's own Sight/Usance-only Tenor Type options) -> 'ACCEPT'.
+   */
+  movementTypeFromContractTenor?: boolean;
+}
+
+const ALL_TENOR_OPTIONS = [
+  { value: 'SIGHT', label: 'Sight' },
+  { value: 'SELLERS_USANCE', label: "Seller's Usance" },
+  { value: 'BUYERS_USANCE', label: "Buyer's Usance" },
+];
+
+const USANCE_ONLY_TENOR_OPTIONS = [
+  { value: 'SELLERS_USANCE', label: "Seller's Usance" },
+  { value: 'BUYERS_USANCE', label: "Buyer's Usance" },
+];
+
+// Business instruction 2026-08-15: from the Export/confirming bank's own point of view, Buyer's
+// Usance vs Seller's Usance is meaningless — that split is an Import-side domestic financing-structure
+// decision (rationale non-negotiable #4, BU-A/BU-B fundingParty) the confirming bank has no visibility
+// into. The confirming bank's own undertaking only ever distinguishes Sight vs Usance. Stored as
+// SELLERS_USANCE (the backend TenorType enum has no generic USANCE value) but labelled plain "Usance".
+const EXPORT_TENOR_OPTIONS = [
+  { value: 'SIGHT', label: 'Sight' },
+  { value: 'SELLERS_USANCE', label: 'Usance' },
+];
+
+/**
+ * Business instruction 2026-08-14 — full Import function renumbering:
+ * "A3-Document Arrival (Sight), A4-Sight Settlement, A5-Document Arrival
+ * (Usance), A6-Acceptance (Usance), A7-Acceptance Settlement, A8-Shipping
+ * Gtee (Issue), A9-Shipping Gtee (Redemption)". A1/A2 unchanged. Also
+ * splits what was a single SHGT card (Issue/Partial Redeem/Full Redeem
+ * subChoice) into two dedicated cards (A8 Issue, A9 Redemption), matching
+ * how A3/A6/A7 already separate Document Arrival from Acceptance from
+ * Settlement rather than subChoice-ing them together.
+ *
+ * Business instruction 2026-08-14 (later) — A3 (Sight) and the former A5
+ * (Usance) were then MERGED: mechanically identical (IPLC_LC/UTILIZE, same
+ * fields), the only difference was which tenor's Catalog picker filter was
+ * applied. The picked LC's own tenorType already determines whether it
+ * routes to A4 (Sight) or A6 (Usance) — no need to pre-split the function
+ * itself. A5's number was retired, not reused; A6-A9 numbers unchanged.
+ */
+export const IMPORT_FUNCTIONS: TransactionFunction[] = [
+  { code: 'A1', label: 'LC Issue', side: 'IMPORT', instrumentType: 'IPLC_LC', movementType: 'ISSUE',
+    tenorTypeOptions: ALL_TENOR_OPTIONS,
+    help: 'Establish a new Import LC, with Tolerance on a Maximum Exposure Basis. Tenor Type is the LC\'s own stated payment term, declared at issuance (Design doc §7) — determines whether A3 routes to A4 (Sight) or A6 (Usance) later.' },
+  { code: 'A2', label: 'LC Amendment', side: 'IMPORT', instrumentType: 'IPLC_LC',
+    subChoice: { key: 'movementType', label: 'Direction', options: [{ value: 'AMEND_INCREASE', label: 'Increase' }, { value: 'AMEND_DECREASE', label: 'Decrease' }] },
+    secondaryRefLabel: 'Amendment No./Times',
+    help: 'Increase always succeeds; Decrease is checked against Available Balance (Design doc §6.2).' },
+  // Business instruction 2026-08-14 ("A3 and A5 could be combined, the only
+  // difference that A3 => A4 for Sight, and A3 => A6 Usance based on the LC
+  // Event flow"): A3 and the former A5 were mechanically identical
+  // (IPLC_LC/UTILIZE, same fields) — the only difference was which Catalog
+  // picker filter was applied, which routing help text pointed at, and
+  // nothing about the ACTION itself. The picked LC's own tenorType (set at
+  // A1 Issue) already determines the correct downstream step; the function
+  // doesn't need to be pre-split by tenor. Merged into one card, showing
+  // ALL ACTIVE IPLC_LC contracts regardless of tenor — no catalogTenorFilter.
+  { code: 'A3', label: 'Document Arrival', side: 'IMPORT', instrumentType: 'IPLC_LC', movementType: 'UTILIZE',
+    secondaryRefLabel: 'IB Number',
+    // Business instruction 2026-08-14 (revised Maker/Checker statement):
+    // Maker moves the amount to Pending (the earmark, at creation);
+    // Checker's Approve here does NOT further update the LC Balance —
+    // component.ts's approveArrival() is an acknowledgment only, it does
+    // NOT call the release API, so the movement stays PENDING server-side
+    // either way (Sight or Usance) — only A4 (Sight) or A6 (Usance)
+    // actually finalizes it. Reject still calls the real reject API.
+    deferSettlement: true,
+    help: 'Presentation Earmark (PENDING) for ANY tenor. Checker Approve here is an acknowledgment only — it does NOT finalize the LC Balance, which stays Pending either way. Go to A4 (Sight Settlement) if this LC is Sight, or A6 (Acceptance) if it\'s Usance — the LC\'s own declared Tenor Type (from A1 Issue) decides which. If this LC has an outstanding Shipping Guarantee reserving the capacity this arrival needs, use A3S instead — a plain A3 now hard-rejects past Tight Available (Design doc §6.1 v0.12).' },
+  // Business instruction 2026-08-14 ("Document Arrival w Shipping Gtee... Bill Amount will be protected and
+  // carry from selected SG Record"): a plain A3 checks against Tight Available (Available Balance minus ALL
+  // outstanding SG exposure on this LC) and now hard-rejects if exceeded (v0.12) — this function is the
+  // explicit, SG-matched alternative for exactly that case, netting the picked SG's own exposure out of the
+  // check by redeeming it first. See documentArrivalWithSg's own doc comment above for the full mechanism.
+  { code: 'A3S', label: 'Document Arrival w/ Shipping Gtee', side: 'IMPORT', instrumentType: 'IPLC_LC', movementType: 'UTILIZE',
+    secondaryRefLabel: 'IB Number',
+    documentArrivalWithSg: true,
+    deferSettlement: true,
+    // Business instruction 2026-08-15 ("SG redemption should support partial redemption... SG
+    // Redemption Amount = system-calculated MIN(Bill Amount, SG Outstanding)") — reverses the prior
+    // full-match-only rule (Bill Amount used to be locked to the SG's own outstanding).
+    help: 'For documents arriving against an LC that still has an outstanding Shipping Guarantee reserving the capacity (A8). Pick the LC, then the specific SG record below — Bill Amount is the actual document amount, freely typed; SG Redemption Amount = MIN(Bill Amount, SG Outstanding), shown below once picked (any excess above the SG\'s outstanding is ordinary incremental LC exposure, still checked against Tight Available). Maker: Submit reserves BOTH the SG\'s own redemption (Full or Partial, whichever the match works out to) and this Document Arrival as PENDING. Checker: one Release does BOTH — the SG redemption releases AND the Document Arrival moves to Pending LC Balance (still not finalized — go to A4/A6 next, same as a plain A3).' },
+  { code: 'A4', label: 'Sight Settlement', side: 'IMPORT', instrumentType: 'IPLC_LC', movementType: 'UTILIZE',
+    catalogTenorFilter: 'SIGHT',
+    // Business-reported gap 2026-08-14: "There is no Sight Payment function
+    // for the Tenor Sight to pay", then clarified: "Sight Payment needs to
+    // pickup the LC number then the pickup IB Number under the LC Number,
+    // once pickup, the Amount will be captured for the IB records without
+    // further input." Amount is NOT re-typed here — it was already fixed
+    // when A3 recorded the presentation; re-typing it would risk a payment
+    // amount that doesn't match the documents actually presented.
+    // payExistingUtilize (component.ts) makes this the Checker step:
+    // search-and-release ONLY — no createMovement call, unlike A3.
+    payExistingUtilize: true,
+    help: 'Sight only — pick the LC (LC Index), then the still-PENDING IB record under it (IB Index) that A3 recorded; Amount is shown read-only from that record, never re-typed. Maker: no LC Balance update. Checker (Pay): moves the LC Balance from Pending to Approved/Utilized — this is the only step that finalizes it. If nothing is PENDING yet, use A3 (Document Arrival) first.' },
+  { code: 'A6', label: 'Acceptance (Usance)', side: 'IMPORT', instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE',
+    defaultParentInstrumentType: 'IPLC_LC',
+    tenorTypeOptions: USANCE_ONLY_TENOR_OPTIONS,
+    // Business instruction 2026-08-14, revised: "When Submit A6, the LC
+    // Balance is remain unchanged but create an Acceptance Balance in
+    // Pending. When Checker approve it, then LC Balance will be approved
+    // and Acceptance Balance will be approved too." — matching
+    // balanceService.ts's own documented principle that a Usance drawing
+    // is deliberately two separate calls, orchestrated by the caller, not
+    // the backend — but BOTH calls now happen at the CHECKER's Release
+    // click, not the Maker's Submit: (1) release the picked still-PENDING
+    // Document Arrival (A3) — finalizes the ORIGINAL LC Balance, Pending ->
+    // Approved/Utilized; (2) THEN release the new Acceptance itself. Amount
+    // and Tenor Type/Days are carried from the picked Document
+    // Arrival/parent LC and protected (read-only) — see component.ts's
+    // rebuildFields().
+    settlesDocumentArrival: true,
+    payableMovementType: 'UTILIZE',
+    pendingItemLabel: 'Document Arrival',
+    pendingItemSourceHint: 'use A3 (Document Arrival) first',
+    help: 'Usance only — pick the LC (LC Index), then the still-PENDING Document Arrival under it (IB Index) that A3 recorded; Amount, Tenor Type, and Tenor Days are carried over and protected (read-only). Maker: Submit only creates the new Acceptance Balance (PENDING) — the LC Balance stays unchanged. Checker: one Release click does BOTH — releases that Document Arrival (LC Balance Pending -> Approved/Utilized) AND approves the new Acceptance Balance.' },
+  { code: 'A7', label: 'Acceptance Settlement', side: 'IMPORT', instrumentType: 'IPLC_ACCEPTANCE',
+    subChoice: { key: 'movementType', label: 'Settlement type', options: [{ value: 'FULL_SETTLE', label: 'Full Settle' }, { value: 'PARTIAL_SETTLE', label: 'Partial Settle' }] },
+    defaultParentInstrumentType: 'IPLC_LC',
+    // Business instruction 2026-08-14 ("A7 should filter out LC records Tenor = Sight") — an Acceptance can
+    // only ever exist under a Usance LC (Design doc §7: Sight never routes to A6/A7), so a Sight LC in the LC
+    // Index would always have zero IBs to pick in Step 2. A7 has no tenorTypeOptions of its own (nothing is
+    // being declared here), so this piggybacks on the same catalogTenorFilter used by A4's flat Catalog picker.
+    catalogTenorFilter: 'USANCE',
+    help: 'Settlement Due Date — never touches the LC Balance itself (Cross-Reference Finding 1). Pick the LC below (LC Index, Usance only — a Sight LC never has an Acceptance), then the IB Number (IB Index) — a single LC can have multiple Document Arrivals.' },
+  { code: 'A8', label: 'Shipping Gtee (Issue)', side: 'IMPORT', instrumentType: 'SHGT', movementType: 'ISSUE',
+    defaultParentInstrumentType: 'IPLC_LC',
+    // Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
+    // example S001 has 3000 LC Available Balance, the SG Issue should be not greater than 3000... a validation
+    // for the Maker Input") — server-enforced (balanceService.ts), rejects with 409 at Submit if exceeded.
+    // Overrides Design doc §5/§11's earlier LMTS-Available-Limit-based decision (see design doc v0.10 note).
+    help: 'Independent contingent liability, issued against the LC as parent. Amount is capped at the parent LC\'s current Available Balance — rejected at Submit if exceeded (business instruction 2026-08-14, overriding the original LMTS-based sufficiency design). See Design doc §6.1 for the separate, non-blocking off-balance WARNING that also applies later against the LC\'s own UTILIZE. SG Number is SHGT\'s own natural key field (below), not a separate reference.' },
+  // Business instruction 2026-08-15 ("There is no need to select Full or Partial as long as the
+  // amount is not greater than the SG Balance. The defaulted amount is the SG Balance and
+  // mandatory.", refined same day: "Amount default to SG Available Balance") — drops the earlier
+  // explicit Full/Partial Redeem subChoice entirely (superseding a same-session prior design where it
+  // stayed a manual choice). movementType is now fixed to FULL_REDEEM as a placeholder — the real
+  // value is DERIVED at submit() time (autoRedeemType, see its own doc comment) from whether the typed
+  // Amount still equals the SG's Available Balance.
+  { code: 'A9', label: 'Shipping Gtee (Redemption)', side: 'IMPORT', instrumentType: 'SHGT', movementType: 'FULL_REDEEM',
+    autoRedeemType: true,
+    defaultParentInstrumentType: 'IPLC_LC',
+    help: 'Search by LC Number + SG Number (below) — a single LC can have multiple Shipping Guarantees. Amount defaults to the SG\'s current Available Balance and stays editable, capped at it — reduce it for a Partial Redeem, leave it as-is for a Full Redeem (no separate type to pick). Design doc §6.1: redemption is NOT auto-linked to Document Arrival (A3) — it\'s a separate, explicit action.' },
+];
+
+/**
+ * Business instruction 2026-08-15 ("EBL does not include in the Balance Component Scope, therefore
+ * the Export LC without confirmation should be removed from the Export") — this side ("Export
+ * Confirmed" in the UI) ONLY models Confirmed Export LC. Plain (unconfirmed) advising and Unconfirmed
+ * negotiation (EBL) are deliberately absent: per rationale-en.md §6/§7.4b, advising itself creates no
+ * contingent, and Unconfirmed negotiation/refinancing are both funded-lending products that belong to
+ * a separate Loan Component, not this one. `EPLC_LC` stays a valid InstrumentType in the schema, but
+ * no function here creates one, and (2026-08-15) it was also dropped from the "Look Up Current
+ * Balance" instrumentType dropdown (transaction-builder.component.html) for the same reason — this
+ * dev prototype's DB carries no real historical EPLC_LC records worth keeping reachable.
+ */
+export const EXPORT_FUNCTIONS: TransactionFunction[] = [
+  // Business instruction 2026-08-15 ("EBL does not include in the Balance Component Scope, therefore
+  // the Export LC without confirmation should be removed from the Export"): checked against the frozen
+  // event catalogue (rationale-en.md §6/§7.4b) — the ONLY substantive events under an Unconfirmed
+  // (Nominated) LC are EX_NEGOTIATE (with-recourse negotiation, obligor=Exporter — the Unconfirmed EBL)
+  // and EX_REFIN (this bank refinancing the issuing bank) — both funded-lending products, already out
+  // of Balance Component scope. EX_ADVISE itself creates no contingent (§6, NO_BALANCE_EFFECT). So
+  // once EBL/Nego is excluded, an Unconfirmed Export LC has NOTHING left for the Balance Component to
+  // track — the Confirmed?/subChoice previously here, and B4's EPLC_LC-parented MEMO Acceptance path,
+  // are both removed. This side now ONLY models Confirmed Export LC.
+  { code: 'B1', label: 'Confirm LC', side: 'EXPORT', instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE',
+    tenorTypeOptions: EXPORT_TENOR_OPTIONS,
+    help: 'Adds this bank\'s own confirmation — an independent undertaking to the beneficiary, obligor = issuing bank (rationale §7.1). Plain advising (no confirmation) and Unconfirmed negotiation (EBL) are out of Balance Component scope — see the module note above. Tenor Type is the LC\'s own stated payment term, declared at confirmation (Design doc §7) — Sight or Usance only from the confirming bank\'s own perspective (Seller\'s/Buyer\'s Usance is an Import-side financing-structure distinction the confirming bank has no visibility into).' },
+  { code: 'B2', label: 'Confirm LC Amendment', side: 'EXPORT', instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND',
+    secondaryRefLabel: 'Amendment No./Times',
+    help: 'Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC\'s own face amount. This function only ever moves the Confirmation\'s own contingent.' },
+  // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review, cs-tf-balance-knowhow
+  // business-expert check) — B3 REBUILT as a genuinely separate physical event (D3: "documents
+  // arriving is a physical event... only legal events move balances"; impl-spec-en.md's own matrix:
+  // `EX_DOC_RCV` touches only `EXPORT_BILLS_UNDER_EXAMINATION`/`_CONTRA`, never `CONFIRMATION_
+  // OUTSTANDING`). B3 no longer auto-derives Sight/Usance or touches the Confirmation at all — it
+  // only creates a MEMO_ONLY `EPLC_EXAMINATION` earmark under the picked Confirmation (either tenor,
+  // same event either way). B4 (Honour / Acceptance) is now the actual legal-event step — see its own
+  // doc comment for the full B3→B4 handoff.
+  { code: 'B3', label: 'Present Docs', side: 'EXPORT', instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE',
+    defaultParentInstrumentType: 'EPLC_CONFIRMATION',
+    // No secondaryRefLabel — unlike old-B3 (EPLC_CONFIRMATION, an existing-contract lookup with no
+    // ibNumber of its own), B3's own instrumentType (EPLC_EXAMINATION) HAS ibNumber as its natural
+    // key (like A8's SHGT Issue), so the "New Reference — Natural Key" EB Number field already serves
+    // as both identity and audit reference — a second secondaryRef field would be redundant.
+    // Checker Release here is acknowledgment-only (mirrors plain A3's own UTILIZE pattern exactly) —
+    // the memo stays PENDING so B4 can find and convert it. B4's own compound Release is what actually
+    // finalizes it; skipping B4 leaves it permanently PENDING, same as an unconverted A3.
+    deferSettlement: true,
+    deferSettlementMovementType: 'CREATE',
+    deferSettlementLabel: 'Present Docs',
+    deferSettlementNextStepHint: 'B4 (Honour / Acceptance)',
+    deferSettlementRequiresBackendAck: true,
+    help: 'Physical event only (cs-tf-balance-knowhow D3: "documents arriving... only legal events move balances") — creates a MEMO_ONLY examination earmark; the Confirmation itself stays completely untouched, Sight or Usance alike. Pick the Confirmation LC, type the EB Number for this presentation. Checker Release here is acknowledgment-only — go to B4 (Honour / Acceptance) once the actual Honour/Accept decision is made; skipping B4 leaves this permanently PENDING.' },
+  // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — B4 REBUILT as the
+  // unified legal-event step for BOTH tenors, absorbing what used to be split across the old B3
+  // (Sight/HONOUR, createsIssuingBankReceivableOnHonour) and the old B4 (Usance/ACCEPT's own
+  // Acceptance+Receivable compound, createsAcceptanceReimbReceivableOnCreate) — this is what `CNF_
+  // HONOUR_SIGHT`/`CNF_ACCEPT` actually ARE: the real legal event, not just a follow-up to one. Its
+  // own instrumentType is EPLC_CONFIRMATION (no parent of its own), so — like the old B3 — it picks
+  // its target via the flat Catalog (onSelectContract), NOT a Parent LC picker; movementType is
+  // derived the same way the old B3 did (movementTypeFromContractTenor: SIGHT -> HONOUR, else ->
+  // ACCEPT). settlesDocumentArrival (reused from A6) then shows Step 2: still-PENDING B3 Present Docs
+  // records under whichever Confirmation was picked (payableMovementType: 'CREATE' — B3's own
+  // deferSettlement leaves them PENDING for exactly this); picking one auto-fills EB Number and
+  // Amount. Maker Submit creates the primary req (HONOUR or ACCEPT) plus whichever secondary leg(s)
+  // that tenor needs, all PENDING, linked by one businessEventId:
+  //   Sight:  HONOUR (Confirmation) -> EPLC_DUE_FROM_ISSUING_BANK (asset) — createsIssuingBankReceivableOnHonour
+  //   Usance: ACCEPT (Confirmation) -> EPLC_ACCEPTANCE (liability) -> EPLC_ACCEPTANCE_REIMB_RECEIVABLE (asset) — createsAcceptanceReimbReceivableOnCreate
+  // Checker Release is a single click doing the WHOLE compound: release the picked B3 record FIRST,
+  // then the primary, then whichever secondary leg(s) — once done, that B3 record is gone from this
+  // Index and can never be converted a second time.
+  { code: 'B4', label: 'Honour / Acceptance', side: 'EXPORT', instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR',
+    movementTypeFromContractTenor: true,
+    secondaryRefLabel: 'EB Number',
+    settlesDocumentArrival: true,
+    payableMovementType: 'CREATE',
+    payableMovementInstrumentType: 'EPLC_EXAMINATION',
+    payableMovementRequiresAcknowledgment: true,
+    pendingItemLabel: 'Present Docs',
+    pendingItemSourceHint: 'use B3 (Present Docs) first',
+    pendingItemSourceCode: 'B3',
+    createsIssuingBankReceivableOnHonour: true,
+    createsAcceptanceReimbReceivableOnCreate: true,
+    help: 'The actual Honour/Accept legal event (cs-tf-balance-knowhow §7.4a/§7.6) — Sight vs Usance is read from the picked Confirmation\'s own Tenor Type (declared at B1), not re-asked here. Pick the Confirmation, then the still-PENDING B3 (Present Docs) record under it — EB Number and Amount are carried from it. Sight: Honours, releasing the Confirmation contingent and creating the Due from Issuing Bank asset (rationale §7.4a) — go to B5 to record the actual reimbursement later. Usance: Accepts, releasing the Confirmation contingent and creating BOTH the Acceptance liability AND its Reimbursement Receivable asset (rationale §7.6) — go to B5 at maturity too. Checker: one Release does the entire compound — finalizes the B3 record, the Confirmation Honour/Accept, and whichever secondary leg(s) that tenor needs, together.' },
+  // Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
+  // Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — merges the OLD B5 (Settlement Due Date,
+  // EPLC_ACCEPTANCE FULL_SETTLE/PARTIAL_SETTLE only — paid the beneficiary, but left the matching
+  // Reimbursement Receivable as separate follow-up work) into the OLD B6 (Settlement — Reimbursement
+  // Received). Grounded in the frozen spec's own event table (impl-spec-en.md, the authoritative
+  // event→balance-type catalogue): `CNF_MATURE` | `−CONFIRMED_ACCEPTANCE_DPU_OUTSTANDING` |
+  // `−BENEFICIARY_ACCOUNT; +NOSTRO / −ACCEPTANCE_REIMB_RECEIVABLE_ISSUING_BANK` — ONE event clears BOTH
+  // the Acceptance liability AND its Reimbursement Receivable together; the OLD split (B5 does the
+  // liability, B6 separately does the receivable via `CNF_REIMB`) was wrong — `CNF_REIMB`'s own FROM
+  // clause (`−DUE_FROM_ISSUING_BANK or −EXPORT_BILLS_DISCOUNTED`) never mentions
+  // `ACCEPTANCE_REIMB_RECEIVABLE_ISSUING_BANK` at all; that clearing only ever happens inside
+  // `CNF_MATURE`. Sight keeps its own genuinely-separate `CNF_REIMB` (Due from Issuing Bank has no
+  // paired liability to settle) — dualInstrumentFallback still resolves Sight vs Usance transparently
+  // by the same LC+EB Number, the Maker doesn't need to know which tenor this was.
+  // Business instruction 2026-08-16 ("BALANCE COMPONENT 只負責 CONTINGENT LIABILITY" — Balance
+  // Component only owns the bank's own contingent/liability side; once Sight's Confirmation contingent
+  // converts into a pure receivable (EPLC_DUE_FROM_ISSUING_BANK, an ON_BALANCE_ASSET with NO paired
+  // liability — Sight never creates an Acceptance), collecting it is someone else's job, out of scope
+  // here — B3/B4 still CREATE that asset (untouched, business instruction "只移除 B5 Sight 分支的顯示/
+  // 選取（不動 B3/B4）"), there just isn't a Balance Component function to settle it. Usance held-to-
+  // maturity stays in scope: CNF_MATURE is fundamentally about closing the Acceptance DPU LIABILITY,
+  // and clears its paired EPLC_ACCEPTANCE_REIMB_RECEIVABLE only as a side-effect of that SAME event
+  // (settlesAcceptanceOnMature below) — not a standalone asset-tracking function the way Sight's own
+  // settlement would have been. B5 is Usance-only again (reverses part of §6.9's Sight+Usance merge —
+  // the merge's own Usance-side compound logic is unchanged, only the Sight branch is gone).
+  { code: 'B5', label: 'Settlement — Reimbursement / Maturity', side: 'EXPORT', instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE',
+    settlesAcceptanceOnMature: true,
+    defaultParentInstrumentType: 'EPLC_CONFIRMATION',
+    catalogTenorFilter: 'USANCE',
+    settleableBalanceIndex: true,
+    help: 'Confirm LC Settlement — Usance held-to-maturity only (CNF_MATURE): one compound settles BOTH the Acceptance (this bank\'s own DPU liability, paid to the beneficiary) AND its matching Reimbursement Receivable (the issuing bank\'s own reimbursement to this bank), same amount, in a single Checker Release. Pick the LC (LC Index, Usance only), then the EB Number (EB Index) — a single LC can have multiple Document Presentations. Sight settlement (Due from Issuing Bank) is out of Balance Component\'s own scope — Balance Component only owns the contingent/liability side; B4 still creates that asset, but collecting it happens outside this system. Nego\'d/discounted Usance (EPLC_EXPORT_BILLS_DISCOUNTED) is still follow-up work, not this function.' },
+];

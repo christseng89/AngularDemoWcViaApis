@@ -1,0 +1,68 @@
+/**
+ * Design tokens — matched to lc-payment-wc's established banking palette
+ * (business instruction 2026-08-15: "UI for Functions Import LC, Export LC
+ * then functions should be similar as lc-payment-wc"), so both sibling apps
+ * read as one system rather than two independently-styled tools. Traced
+ * from lc-payment-wc's own web-components/shared.ts (FIELD_STYLE/LBL_STYLE,
+ * card/badge colors) and payment-component/business-case-runner.component.scss
+ * (case-btn/verdict-badge/confirmed-badge/section-label) — not invented here.
+ */
+:root {
+  --navy: #1e3a5f;
+  --blue: #1d4ed8;
+  --blue-dark: #1e40af;
+  --blue-bg: #eff6ff;
+  --blue-bg-soft: #f8fafc;
+  --blue-border: #bfdbfe;
+  --gray-border: #e5e7eb;
+  --gray-input-border: #d1d5db;
+  --gray-body: #374151;
+  --gray-muted: #6b7280;
+  --gray-disabled: #9ca3af;
+  --gray-bg: #f3f4f6;
+  --gray-readonly-bg: #f1f5f9;
+  --green: #16a34a;
+  --green-dark: #15803d;
+  --green-bg: #dcfce7;
+  --amber: #b45309;
+  --amber-dark: #92400e;
+  --amber-bg: #fef3c7;
+  --red: #dc2626;
+  --red-dark: #b91c1c;
+  --red-bg: #fee2e2;
+  --red-bg-soft: #fef2f2;
+  --red-border: #fecaca;
+
+  --font-mono: Consolas, monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+}
+
+body {
+  background: #f5f6f8;
+}
+
+.step-note {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.step-ok {
+  background: #f0fff4;
+}
+
+.step-warn {
+  background: #fff9db;
+}
+
+.step-error {
+  background: #fff0f0;
+}
+
+pre.step-detail {
+  white-space: pre-wrap;
+  margin: 0;
+  font-size: 0.8rem;
+}

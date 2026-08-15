@@ -1,0 +1,707 @@
+/**
+ * Business instruction 2026-08-15 ("UI for Functions Import LC, Export LC
+ * then functions should be similar as lc-payment-wc" / "Stylesheet
+ * expertise" / "professional UI patterns without change the
+ * functionality") — a real, component-scoped stylesheet matched to
+ * lc-payment-wc's own navy/blue banking design tokens (src/styles.scss's
+ * :root vars), replacing the previous purely-inline-Bootstrap look.
+ */
+
+.tb-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.tb-header {
+  margin-bottom: 20px;
+}
+
+.tb-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+
+.tb-subtitle {
+  font-size: 13px;
+  color: var(--gray-muted);
+  max-width: 900px;
+  margin: 0;
+}
+
+// ── Function pickers ─────────────────────────────────────────────────────
+
+.tb-function-picker {
+  margin-bottom: 20px;
+}
+
+.tb-function-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+// Matches lc-payment-wc's own case-btn/module-pills pattern (business-case-runner.component.scss) —
+// a compact, wrapping row of chips instead of a tall vertical list, so the picked function's own
+// Maker/Checker panels get the vertical space (business instruction 2026-08-15).
+.tb-function-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--gray-border);
+  background: #fff;
+  color: var(--gray-body);
+  cursor: pointer;
+
+  // Bug (reviewer-reported 2026-08-15, "when move cursor to the A1-A9 function, the function tab
+  // just blank out"): `&:hover` and `&--active` compile to two SEPARATE single-class selectors
+  // (`.tb-function-chip:hover` at specificity 0-2-0 vs. `.tb-function-chip--active` at 0-1-0) — with
+  // the cursor sitting over an already-selected chip (the normal state right after a click), the
+  // HIGHER-specificity :hover rule silently won the background, leaving --active's `color: #fff`
+  // text on the near-white :hover background instead of blue — invisible, not literally blank.
+  // `:not(--active)` fixes the specificity fight directly instead of just tie-breaking on source
+  // order (which would leave the selected chip losing its own hover feedback entirely).
+  &:hover:not(.tb-function-chip--active) {
+    border-color: var(--blue-border);
+    background: var(--blue-bg-soft);
+  }
+
+  &--active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+
+    .tb-function-chip__code {
+      color: #fff;
+    }
+  }
+}
+
+.tb-function-chip__code {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.tb-function-chip__label {
+  font-weight: 600;
+}
+
+.tb-function-help {
+  font-size: 12px;
+  color: var(--gray-muted);
+  margin: 8px 0 0;
+}
+
+// ── Workspace layout ─────────────────────────────────────────────────────
+
+.tb-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 20px;
+  align-items: start;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.tb-side {
+  min-width: 0;
+}
+
+// ── Sections (Maker / Checker / Look Up) ─────────────────────────────────
+
+.tb-section {
+  background: #fff;
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.tb-section--maker {
+  border-top: 3px solid var(--blue);
+}
+
+.tb-section--checker {
+  border-top: 3px solid var(--green);
+}
+
+.tb-section__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--blue-bg-soft);
+  border-bottom: 1px solid var(--gray-border);
+}
+
+.tb-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+
+.tb-section__body {
+  padding: 18px;
+}
+
+.tb-role-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+
+  &--maker {
+    background: var(--blue-bg);
+    color: var(--blue-dark);
+    border: 1px solid var(--blue-border);
+  }
+
+  &--checker {
+    background: var(--green-bg);
+    color: var(--green-dark);
+    border: 1px solid #86efac;
+  }
+}
+
+// ── Form primitives ───────────────────────────────────────────────────────
+
+.tb-field {
+  margin-bottom: 14px;
+
+  &--inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0;
+
+    .tb-input {
+      width: 120px;
+    }
+  }
+
+  // Checker's own independent LC search (business instruction 2026-08-15) — needs more room than
+  // the 120px Checker-ID field .tb-field--inline was originally sized for.
+  &--search .tb-input {
+    width: 180px;
+  }
+}
+
+.tb-field__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-body);
+  margin-bottom: 4px;
+}
+
+.tb-input,
+.tb-select {
+  border: 1px solid var(--gray-input-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  background: #fff;
+  color: var(--gray-body);
+
+  &:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.12);
+  }
+
+  &:disabled {
+    background: var(--gray-readonly-bg);
+    color: var(--gray-disabled);
+  }
+}
+
+// Mandatory-field visual treatment (UI/UX best practice — business instruction 2026-08-15,
+// "apply different style for mandatory fields for all functions"). Left-accent + tint uses --blue
+// (the app's existing "active/interactive" token) rather than --red, which this stylesheet already
+// reserves for real validation-error state (.tb-error, .has-error) — reusing red here would make
+// "required" indistinguishable from "invalid" at a glance.
+.tb-input--required,
+.tb-select--required {
+  border-left: 3px solid var(--blue);
+  background: var(--blue-bg-soft);
+
+  &:focus {
+    background: #fff;
+  }
+}
+
+.tb-select--inline {
+  width: auto;
+  display: inline-block;
+}
+
+// Same required-field treatment, applied to the Formly-rendered fields (amount/currency/tenorType/
+// eventSeq/createdBy/…) via the className: 'tb-field--required' set in rebuildFields(). formly-field
+// is a child component's host element, outside this component's own template, so ::ng-deep is needed
+// to reach its internal Bootstrap-wrapper markup — scoped under :host so it stays confined to this
+// component's own DOM and can't leak into other Formly usages elsewhere in the app (e.g.
+// business-case-runner).
+:host ::ng-deep formly-field.tb-field--required {
+  .mb-3 {
+    border-left: 3px solid var(--blue);
+    background: var(--blue-bg-soft);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+  }
+
+  .form-label {
+    font-weight: 700;
+
+    // The bootstrap form-field wrapper's own required marker (a bare "*").
+    span[aria-hidden='true'] {
+      color: var(--red);
+      font-weight: 700;
+      margin-left: 2px;
+    }
+  }
+}
+
+.tb-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tb-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tb-grid-lookup {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 8px;
+
+  > *:nth-child(1) {
+    grid-column: 1;
+  }
+}
+
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: var(--blue);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background: var(--blue-dark);
+    }
+  }
+
+  &--outline {
+    background: #fff;
+    border-color: var(--blue);
+    color: var(--blue);
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg);
+    }
+  }
+
+  &--success {
+    background: var(--green);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background: var(--green-dark);
+    }
+  }
+
+  &--danger-outline {
+    background: #fff;
+    border-color: var(--red);
+    color: var(--red);
+
+    &:hover:not(:disabled) {
+      background: var(--red-bg-soft);
+    }
+  }
+}
+
+.tb-hint {
+  font-size: 11px;
+  color: var(--gray-muted);
+  font-style: italic;
+
+  &--ok {
+    color: var(--green-dark);
+    font-style: normal;
+    background: var(--green-bg);
+    border: 1px solid #86efac;
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+  }
+}
+
+.tb-error {
+  font-size: 12px;
+  color: var(--red-dark);
+  background: var(--red-bg-soft);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.tb-subcard {
+  background: var(--blue-bg-soft);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+// Business instruction 2026-08-15 ("confirmedBalance... should be separated by each line") — a proper
+// label/value definition list, one field per row, instead of the old wrapping flex row of bare spans.
+.tb-balance-box {
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--navy);
+
+  &--current {
+    background: var(--gray-bg);
+    border-color: var(--gray-border);
+    color: var(--gray-body);
+  }
+
+  &--asof {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+  }
+
+  &__title {
+    font-family: 'Segoe UI', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+}
+
+.tb-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 3px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed rgba(30, 58, 95, 0.12);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.tb-balance-row__label {
+  color: var(--gray-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tb-balance-row__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: inherit;
+  text-align: right;
+}
+
+// ── Rows shared by IndexPicker's projected templates ─────────────────────
+
+.tb-row-primary {
+  display: block;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.tb-row-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--gray-muted);
+  margin-top: 2px;
+}
+
+.tb-row-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue-dark);
+  margin-top: 2px;
+}
+
+.tb-quick-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tb-quick-pick__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+
+  // Same &:hover/&--active specificity pitfall as .tb-function-chip above (2026-08-15 fix).
+  &:hover:not(.tb-quick-pick__row--active) {
+    background: var(--blue-bg-soft);
+  }
+
+  &--active {
+    background: var(--blue-bg);
+    border-color: var(--blue);
+  }
+}
+
+// ── Maker result banner ──────────────────────────────────────────────────
+
+.tb-result {
+  background: var(--blue-bg-soft);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+}
+
+.tb-result__title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+
+.tb-result__status {
+  font-size: 13px;
+  color: var(--gray-body);
+  margin: 0 0 6px;
+}
+
+.tb-checker-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+// ── Look Up tabs ──────────────────────────────────────────────────────────
+
+.tb-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--gray-border);
+  padding-bottom: 0;
+}
+
+.tb-tab {
+  border: none;
+  background: transparent;
+  color: var(--gray-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+
+  // Harmless today (both rules resolve to the same blue), guarded anyway for consistency with the
+  // fixed pattern above — a future edit to either color alone would otherwise silently reopen it.
+  &:hover:not(.tb-tab--active) {
+    color: var(--blue);
+  }
+
+  &--active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+}
+
+// Import LC / Export LC switch above the function chip row — same tab mechanic as Look Up's own
+// sub-tabs, just larger/bolder since it's a top-level section switch, not a nested detail view.
+.tb-tabs--side .tb-tab {
+  font-size: 14px;
+  padding: 8px 18px;
+}
+
+// ── Event Timeline table ─────────────────────────────────────────────────
+
+.tb-subheading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+
+// Business instruction 2026-08-15 ("Event Timeline does not look pretty") — status badges (color-coded
+// by outcome, not bare text), a type tag, zebra striping, and column-specific alignment/typography
+// instead of six identically-styled plain <td>s.
+.tb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+
+  th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-muted);
+    padding: 8px 10px;
+    background: var(--blue-bg-soft);
+    border-bottom: 1px solid var(--blue-border);
+  }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--gray-border);
+    color: var(--gray-body);
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+
+    // Same &:hover/:nth-child vs. an active-state class specificity pitfall as .tb-function-chip
+    // (fixed 2026-08-15) — :nth-child(even) and :hover both out-specificity a single active class.
+    &:nth-child(even):not(.tb-table__row--active) {
+      background: var(--blue-bg-soft);
+    }
+
+    &:hover:not(.tb-table__row--active) {
+      background: var(--blue-bg);
+    }
+
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  .tb-table__row--active {
+    background: var(--blue-bg);
+    box-shadow: inset 3px 0 0 var(--blue);
+  }
+}
+
+.tb-table__amount {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.tb-table__ref {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.tb-table__time {
+  color: var(--gray-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tb-type-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue-dark);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.tb-status-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--gray-bg);
+  color: var(--gray-body);
+
+  &--pending {
+    background: var(--amber-bg);
+    color: var(--amber-dark);
+  }
+
+  &--approved {
+    background: var(--green-bg);
+    color: var(--green-dark);
+  }
+
+  &--negative {
+    background: var(--red-bg);
+    color: var(--red-dark);
+  }
+
+  &--neutral {
+    background: var(--gray-bg);
+    color: var(--gray-muted);
+  }
+}
+
+.tb-muted {
+  color: var(--gray-muted);
+}

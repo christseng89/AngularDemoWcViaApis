@@ -1,0 +1,14 @@
+{
+  "name": "balance-component-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js 中台 orchestrator — sequences calls into the balance-component microservice per a declarative Business Case Registry (Import Case 1-5, Export Case 1-5) so the Angular UI can run/replay a whole scenario with one click.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}

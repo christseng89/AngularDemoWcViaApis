@@ -1,0 +1,65 @@
+<div class="container py-4">
+  <h1 class="h3 mb-1">Balance Component — Business Case Runner</h1>
+  <p class="text-muted">
+    Runs Import LC Case 1-5 and Export LC Case #1-#5 against the real balance-component microservice,
+    via the Node.js 中台 orchestrator (one HTTP call per movement, per Design doc §7.4).
+  </p>
+
+  <div *ngIf="loadError" class="alert alert-danger">{{ loadError }}</div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form [formGroup]="form">
+        <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
+      </form>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" (click)="run()" [disabled]="!model.caseId || running">
+          {{ running ? 'Running…' : 'Run Selected Case' }}
+        </button>
+        <button class="btn btn-outline-secondary" (click)="runAll()" [disabled]="runningAll || !cases.length">
+          {{ runningAll ? 'Running all…' : 'Run All 10 Cases' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="result" class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">{{ result.title }}</h2>
+      <p class="text-muted">{{ result.description }}</p>
+      <table class="table table-sm">
+        <thead>
+          <tr><th>Step</th><th>Label</th><th>Status</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let step of result.trace" [class]="rowClass(step)">
+            <td>{{ step.type }}</td>
+            <td>{{ step.label }}</td>
+            <td>{{ statusText(step) }}</td>
+            <td><pre class="step-detail">{{ detailText(step) }}</pre></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div *ngFor="let r of allResults" class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">{{ r.title }}</h2>
+      <p class="text-muted">{{ r.description }}</p>
+      <table class="table table-sm">
+        <thead>
+          <tr><th>Step</th><th>Label</th><th>Status</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let step of r.trace" [class]="rowClass(step)">
+            <td>{{ step.type }}</td>
+            <td>{{ step.label }}</td>
+            <td>{{ statusText(step) }}</td>
+            <td><pre class="step-detail">{{ detailText(step) }}</pre></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

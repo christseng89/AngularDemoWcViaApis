@@ -1,0 +1,35 @@
+{
+  "name": "lc-balance-wc",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve --open",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "dev:all": "concurrently -n microservice,backend,angular -c blue,green,magenta \"npm run dev --prefix microservices/balance-component\" \"npm start --prefix backend\" \"ng serve\""
+  },
+  "dependencies": {
+    "@angular/animations": "^17.3.0",
+    "@angular/common": "^17.3.0",
+    "@angular/compiler": "^17.3.0",
+    "@angular/core": "^17.3.0",
+    "@angular/forms": "^17.3.0",
+    "@angular/platform-browser": "^17.3.0",
+    "@angular/platform-browser-dynamic": "^17.3.0",
+    "@angular/router": "^17.3.0",
+    "@ngx-formly/bootstrap": "^6.3.12",
+    "@ngx-formly/core": "^6.3.12",
+    "bootstrap": "^5.3.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.6.0",
+    "zone.js": "~0.14.0"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^17.3.0",
+    "@angular/cli": "^17.3.0",
+    "@angular/compiler-cli": "^17.3.0",
+    "concurrently": "^10.0.4",
+    "typescript": "~5.4.0"
+  }
+}

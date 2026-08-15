@@ -25,8 +25,11 @@ a source-of-truth document under `lc-payment-wc/analysis/`, not an arbitrary com
 that directory) — it carries the Trade Finance/Payments solution-architect persona plus a growing log of
 reviewer-confirmed architecture decisions for that project specifically, most centrally the
 Charge/Balance Component ↔ Payment Component boundary (the `suspenseBridge` mechanism — see below) and a
-planned-but-not-yet-implemented OAS structured Reference/Event model
-(`docs/RDD-oas-reference-event-model.md`). That log records individual decisions (and their supersessions —
+confirmed-but-not-yet-implemented OAS structured Reference/Event model (idempotency key design, `D-1`
+through `D-N` in that file's own decision log — the standalone RDD note that once lived at
+`docs/RDD-oas-reference-event-model.md` was later reverted; the same content is preserved in
+`lc-payment-wc/docs/payment-component-expert-review.md` and inline in the decision-log entry itself, so
+don't go looking for that path). That log records individual decisions (and their supersessions —
 entries get renamed, extended, or removed outright as requirements change) in more granular, dated detail
 than belongs here; treat entries marked "reviewer-confirmed"/"business-requirement-confirmed" there as
 settled, don't re-litigate them without new information from the user, and check that file directly rather

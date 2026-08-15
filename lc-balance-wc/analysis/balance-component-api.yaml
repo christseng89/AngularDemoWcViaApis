@@ -1,0 +1,1041 @@
+openapi: 3.0.3
+info:
+  title: Balance Component Service API
+  description: >
+    Draft OpenAPI contract for the proposed Balance Component microservice —
+    the contingent / off-balance-sheet exposure ledger for LC-related trade
+    finance instruments (LC Balance, Acceptance, Shipping Guarantee, Export
+    Confirmation). Extracted from
+    analysis/COMMON-BalanceComponent-Design-zh.md v0.3 and
+    analysis/COMMON-BalanceComponent-Cross-Reference.md — this file is the
+    machine-readable counterpart to those two design documents; where they
+    disagree, the design documents are authoritative and this file should
+    be corrected to match.
+
+
+    Explicitly OUT OF SCOPE: IBL/EBL and any actual funded/discounted
+    exposure (Loan Component's domain, fronting the external eLoan system —
+    see Design doc §1 and Cross-Reference Finding 3b), interest/accrual
+    calculation (also Loan Component's domain), and GL account mapping
+    (Balance Component only carries caller-supplied accountEntries through
+    to a downstream accounting component — see §2/§3.3 "GL Ownership").
+
+
+    Core model (Design doc §3): a `BalanceContract` is one immutable
+    version-snapshot of a `logicalContractId` (the stable business identity
+    of one LC, one Acceptance, one Shipping Guarantee, or one Export
+    Confirmation). At most one version per logicalContractId is ever
+    `ACTIVE`. A `BalanceMovement` is an append-only, never-deleted record
+    of one exposure-amount change against one specific contract version.
+    Contractual term changes (e.g. tenor amendment) supersede the ACTIVE
+    version and create a new one (Design doc §7.3); they are never
+    expressed as a BalanceMovement.
+
+
+    v0.1.0 (draft, 2026-08-14): initial extraction from the design
+    documents. Not yet implemented, not yet reviewed against a real
+    persistence layer. The LMTS integration mechanism referenced by the
+    Shipping Guarantee (SHGT) flows (Design doc §5, §10) is not yet traced
+    against source and is represented here only as an opaque
+    `lmtsReservationId` passthrough field.
+
+
+    v0.2.0 (draft, 2026-08-14): added the off-balance-sheet exposure
+    two-tier WARNING/ERROR check (Design doc §6.1). A presentation whose
+    amount exceeds Available Balance is still a hard 409 ERROR (unchanged);
+    one that exceeds Available Balance minus the same LC's outstanding
+    SHGT (Pending+Released) now surfaces as a non-blocking `warnings[]`
+    entry on the created (still 201) PENDING movement instead of passing
+    silently. Scope: SHGT only, not Acceptance/Confirmation (see §6.1 for
+    the reasoning); applies to UTILIZE-type movements only, not yet
+    AMEND_DECREASE.
+
+
+    v0.3.0 (draft, 2026-08-14): added Tolerance conversion for
+    IPLC_LC/EPLC_LC face-amount movements (Design doc §6.2).
+    `BalanceContract.tolerancePct` and `BalanceMovement.ceilingAmount` are
+    new; for ISSUE/AMEND_INCREASE/AMEND_DECREASE, `amount` is the
+    caller-typed face-level delta and `ceilingAmount = amount ×
+    (1+tolerancePct/100)` is what the server actually applies against
+    Confirmed Balance and checks AMEND_DECREASE sufficiency against — this
+    closes a gap where comparing a raw face-level decrease directly to
+    Available Balance could let a request that drives the face amount
+    negative pass undetected.
+
+
+    v0.4.0 (draft, 2026-08-14): SHGT's `REDEEM` movementType is replaced by
+    `PARTIAL_REDEEM`/`FULL_REDEEM` (Design doc §5, v0.6) — a redemption may
+    now release less than the SG's full outstanding balance, checked
+    against that SG's own Confirmed Balance as the ceiling (never more than
+    what is still outstanding). Redemption amount is NEVER auto-derived
+    from a UTILIZE/Document-Arrival amount, even when they happen to match
+    — the caller must submit the redemption explicitly, based on the actual
+    Shipping Guarantee return/cancellation amount. This closes the
+    §6.1 WARNING becoming permanently unresolvable for a partially-matched
+    SG (see §6.1's "SHGT 部分贖回的關係" note).
+
+
+    v0.5.0 (draft, 2026-08-14): business override of Design doc §5/§11's
+    original decision (business instruction, same day) — SG `ISSUE` is now
+    hard-capped at its parent LC's current Available Balance, checked at
+    Maker submission (`POST /balance-movements`): `amount > parent LC
+    Available Balance` is a 409 `InsufficientBalanceError`, not merely the
+    existing non-blocking §6.1 WARNING that fires later against the LC's
+    own UTILIZE. The original design (SHGT sufficiency checked against the
+    customer's LMTS Available Limit, not the LC Balance — reasoning: SG is
+    a bank-to-shipping-company guarantee risk, a different risk category
+    from LC-to-beneficiary negotiation risk) is superseded for this check;
+    the LMTS integration mechanism itself remains untraced and unused by
+    this specific check (see v0.1.0 note above, still applicable to any
+    future LMTS-facing work).
+
+
+    v0.6.0 (draft, 2026-08-14): closed a gap in v0.5.0's SG `ISSUE` check —
+    it compared the requested amount against the parent LC's plain Available
+    Balance only, oblivious to any OTHER Shipping Guarantee already
+    outstanding on the same LC, so two overlapping SG issuances (e.g.
+    90,000 + 90,000 against a 100,000-Available LC) could each individually
+    pass. The check now nets out the LC's existing §6.1 off-balance SG
+    exposure first (reusing the same computation that already backs the
+    UTILIZE-side WARNING) — `amount > (parent LC Available Balance − parent
+    LC's other outstanding SG exposure)` is the 409 `InsufficientBalanceError`
+    condition, not plain Available Balance alone. Purely a tightening of the
+    v0.5.0 check's own math; does not change anything else confirmed at
+    v0.4.0/v0.5.0 (SG redemption still never auto-derives from a Document
+    Arrival/UTILIZE amount; the off-balance exposure check on the LC's own
+    UTILIZE side stays a non-blocking WARNING, not an ERROR).
+
+
+    v0.7.0 (draft, 2026-08-14): business-confirmed hardening, off a live UI
+    test — §6.1's off-balance-sheet exposure check on a UTILIZE (Document
+    Arrival) is no longer a non-blocking WARNING (superseding the v0.2.0
+    note above and the last sentence of v0.6.0's note): `amount > (Available
+    Balance − offBalanceExposure)` is now also a 409
+    `InsufficientBalanceError`, same tier as exceeding plain Available
+    Balance. A Document Arrival that is deliberately consuming a SPECIFIC
+    outstanding Shipping Guarantee's reserved capacity is not penalized by
+    this — the caller creates that SG's own `FULL_REDEEM` (still PENDING,
+    not yet Released) BEFORE calling `POST /balance-movements` for the
+    UTILIZE; §6.1's exposure computation already counts a PENDING redemption
+    the same as a RELEASED one, so the SG's contribution is already netted
+    out by the time the UTILIZE's own check runs. No new schema or endpoint
+    — this is purely a client-side call-ordering pattern (`businessEventId`,
+    already in the schema since v0.1.0, links the two calls for audit/query
+    only, not atomicity). SG redemption still never auto-derives from an
+    amount match — the caller must explicitly issue the `FULL_REDEEM` call
+    itself; v0.4.0's rule on that point is unchanged.
+
+
+    v0.8.0 (2026-08-16): catches this contract up to the implemented Export
+    Confirmation (保兌) side — authoritative business detail and browser-
+    verified test evidence live in
+    analysis/COMMON-BalanceComponent-ExportConfirmation-Gap-Analysis-zh.md
+    §6.1–§6.12, not repeated here. `InstrumentType` gains four values this
+    file had never carried even though the implementation already shipped
+    them: `EPLC_EXAMINATION` (Present Docs — MEMO_ONLY, CREATE-only memo
+    earmark that never moves the parent Confirmation's own balance, per
+    cs-tf-balance-knowhow Design Principle D3 — "documents arriving is a
+    physical event, only legal events move balances"), and the three
+    ON_BALANCE_ASSET/liability instruments a Confirmation's own HONOUR/ACCEPT
+    transforms into: `EPLC_DUE_FROM_ISSUING_BANK` (Sight), `EPLC_ACCEPTANCE_
+    REIMB_RECEIVABLE` (Usance, paired with `EPLC_ACCEPTANCE`'s own DPU
+    liability), `EPLC_EXPORT_BILLS_DISCOUNTED` (Nego'd Usance — reclass
+    target only, no consuming endpoint yet, Gap Analysis Row 7 still open).
+
+
+    New endpoint `POST /balance-movements/{movementId}/acknowledge` and new
+    `BalanceMovement.acknowledgedBy`/`acknowledgedAt` fields — a Checker's
+    acknowledgment of a still-PENDING `EPLC_EXAMINATION` CREATE (Present
+    Docs), distinct from `/release`: it sets acknowledgedBy/acknowledgedAt
+    but deliberately never transitions `status` — the movement stays PENDING
+    so a later Honour/Accept step can still find and consume it. This backs
+    a new two-bucket commitment-control model exposed as `BalanceSnapshot.
+    presentDocsEarmarkPending`/`presentDocsEarmarkApproved` (EPLC_CONFIRMATION
+    only, null otherwise, same nullability pattern as offBalanceExposure/
+    tightAvailableBalance) — a presentation moves from Pending to Approved
+    on acknowledge, and out of both once a later step genuinely releases it.
+
+
+    Scope correction, business instruction 2026-08-16 ("Balance Component
+    只負責 Contingent Liability"): `EPLC_DUE_FROM_ISSUING_BANK` (Sight) is a
+    pure receivable with no paired liability — a Confirmation's own HONOUR
+    still creates it, but no endpoint in this contract ever settles/collects
+    it; that is a deliberate, permanent scope boundary, not a gap. `EPLC_
+    ACCEPTANCE_REIMB_RECEIVABLE` (Usance) stays fully in scope because
+    settling it rides along with closing the paired `EPLC_ACCEPTANCE`
+    liability in the same event, not as independent asset-tracking.
+  version: "0.8.0"
+servers:
+  - url: https://api.bank.example/balance-component/v1
+tags:
+  - name: BalanceContracts
+    description: Logical contract resolution, version history, and version supersession (contractual term amendments).
+  - name: BalanceMovements
+    description: Exposure-amount changes — Earmark (PENDING), Maker/Checker release lifecycle, reversal.
+  - name: Balances
+    description: Confirmed/Available balance and movement queries, including as-of historical queries.
+
+paths:
+
+  /balance-contracts:
+    get:
+      tags: [BalanceContracts]
+      summary: Resolve a Logical Contract by natural key, returning its current ACTIVE version
+      description: >
+        Design doc §3.1/§3.3 "呼叫端的實際使用方式" — callers never manage
+        logicalContractId/balanceContractId directly; they always resolve
+        through the natural key (lcNumber, plus ibNumber/sgNumber/legSeq
+        depending on instrumentType — see the natural-key table in §3.1).
+        Returns 404 if no Logical Contract exists yet for this natural key
+        (the caller should then submit an ISSUE/CREATE movement instead).
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          required: true
+          schema: { type: string }
+        - name: ibNumber
+          in: query
+          schema: { type: string }
+          description: Required when instrumentType is IPLC_ACCEPTANCE/EPLC_ACCEPTANCE.
+        - name: sgNumber
+          in: query
+          schema: { type: string }
+          description: Required when instrumentType is SHGT.
+        - name: legSeq
+          in: query
+          schema: { type: string }
+          description: Mixed Tenor LC leg-level contract (Design doc §7.1) — the PaymentTerms DO_INDEX_NO.
+      responses:
+        '200':
+          description: Logical Contract found — its current ACTIVE version is returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceContract' }
+        '404':
+          description: No Logical Contract exists yet for this natural key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{logicalContractId}/history:
+    get:
+      tags: [BalanceContracts]
+      summary: List every version (ACTIVE, SUPERSEDED, CLOSED, CANCELLED) of a Logical Contract
+      description: >
+        Design doc §7.3 audit-trail requirement — a tenor amendment must be
+        traceable as "the 180-day version was superseded by a 120-day
+        version", never as a silently-overwritten field. Ordered by
+        contractVersion ascending.
+      parameters:
+        - name: logicalContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Full version history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceContract' }
+
+  /balance-contracts/{logicalContractId}/versions:
+    post:
+      tags: [BalanceContracts]
+      summary: Supersede the current ACTIVE version with a new version (contractual term amendment)
+      description: >
+        Design doc §7.3 — the ONLY way to change tenorType/tenorDays/
+        maturityDate. Never a BalanceMovement, never a REVERSAL (§4.5 —
+        REVERSAL is reserved for correcting an erroneous movement, not for
+        legitimate contract amendments). Single atomic operation: the
+        current ACTIVE version is marked SUPERSEDED and a new version
+        (contractVersion + 1) is created ACTIVE in the same transaction —
+        both rows share the same logicalContractId, so this is a
+        single-entity transition, not a multi-leg batch (Design doc's
+        "one leg one call" principle, §7.4, does not apply here — that
+        rule is about not sharing a DB transaction across *different*
+        logicalContractIds, not about this single-entity version flip).
+
+
+        openingBalance of the new version is computed server-side per the
+        Opening Balance Carry Forward invariant (§7.3): the superseded
+        version's Confirmed Balance at the moment of transition, optionally
+        adjusted by amendmentAmountDelta if a monetary change is bundled
+        into the same amendment.
+
+
+        404 if the Logical Contract does not exist. 409 if the Logical
+        Contract's current version is not ACTIVE (e.g. already CLOSED or
+        CANCELLED — cannot amend a closed contract).
+      parameters:
+        - name: logicalContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContractVersionSupersedeRequest' }
+      responses:
+        '201':
+          description: New version created ACTIVE; the superseded prior version is returned via supersedesBalanceContractId on the new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceContract' }
+        '404':
+          description: Logical Contract not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Current version is not ACTIVE — cannot amend.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{balanceContractId}/balance:
+    get:
+      tags: [Balances]
+      summary: Confirmed / Available balance for one contract version
+      description: >
+        Design doc §3.3 "查詢用的兩個衍生數字" — Confirmed Balance = sum of
+        RELEASED movements; Available Balance = Confirmed Balance minus/plus
+        the net of currently-PENDING earmarks. Design doc §11 (query API
+        requirements, item c) — the `asOf` parameter answers "what was the
+        balance as of a given COB business date", filtering on
+        BalanceMovement.businessDate rather than the system createdAt
+        timestamp.
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: asOf
+          in: query
+          description: Business date (COB) to compute the historical balance as of. Omit for the live balance.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Balance snapshot.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceSnapshot' }
+        '404':
+          description: Contract version not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{balanceContractId}/movements:
+    get:
+      tags: [Balances]
+      summary: List movements against one contract version, with filters
+      description: >
+        Design doc §11 (query API requirements, item a/d) — required so that
+        REJECTED/PENDING records can be manually investigated instead of
+        relying on an automatic timeout (business decision, §11 — REJECTED
+        timeout was explicitly rejected in favor of always-available query
+        capability).
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/MovementStatus' }
+        - name: legRef
+          in: query
+          schema: { type: string }
+        - name: businessEventId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: businessDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Matching movements, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+
+  /balance-movements:
+    post:
+      tags: [BalanceMovements]
+      summary: Create a movement (Earmark) — PENDING, pending Checker Release
+      description: >
+        Design doc §6 — single atomic operation, lock scoped to the
+        resolved balanceContractId only (different contracts never block
+        each other): compute Available Balance, reject immediately with 409
+        if insufficient for a balance-decreasing movementType (no PENDING
+        record created), otherwise create the PENDING record and earmark
+        the amount out of Available Balance. ISSUE/CREATE-type movements
+        against a natural key that does not yet resolve to a Logical
+        Contract implicitly create the Logical Contract (version 1, ACTIVE)
+        as part of this same call.
+
+
+        Idempotent on (balanceContractId, eventSeq) — Design doc §8:
+        resubmitting the same pair returns the existing record (200)
+        instead of erroring or double-counting; `eventSeq` is caller-
+        supplied specifically to make retries safe.
+
+
+        For a UTILIZE movement against IPLC_LC/EPLC_LC, a second, softer
+        check runs after the hard sufficiency check above passes (Design
+        doc §6.1, v0.2.0): if the amount exceeds Available Balance minus
+        the same LC's outstanding SHGT exposure (Pending+Released), the
+        movement is still created (still 201) but carries a `warnings[]`
+        entry — this never blocks creation, unlike the hard 409 check
+        above.
+
+
+        For IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE, `amount`
+        is the caller-typed face-level delta; the server derives
+        `ceilingAmount = amount × (1+tolerancePct/100)` and — for
+        AMEND_DECREASE specifically — checks *that* derived figure against
+        Available Balance, not the raw `amount` (Design doc §6.2, v0.3.0).
+        This closes a gap where a face-level decrease large enough to drive
+        the LC's face amount negative could otherwise pass an
+        Available-Balance check performed against the raw, un-converted
+        amount.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BalanceMovementCreateRequest' }
+      responses:
+        '201':
+          description: New PENDING movement created (new eventSeq).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '200':
+          description: Already exists — resubmission of the same (balanceContractId, eventSeq) returned unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Request validation failed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Available Balance insufficient for this movementType — no record created (Design doc §6, the core gap this service closes vs. SYF_IPLC_CAL_LC_BAL's silent Math.max(0, ...) clamp).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}:
+    patch:
+      tags: [BalanceMovements]
+      summary: Edit a PENDING or REJECTED movement before it is released
+      description: >
+        Design doc §6 "EDIT PENDING" / §4 state machine — NOT an in-place
+        amount update. Atomically releases the old earmark, re-runs the
+        full sufficiency check against the new amount (an increase is not
+        assumed to still have headroom), and on success creates a new
+        PENDING movement with supersededMovementId pointing back to this
+        one, which itself transitions to SUPERSEDED. On failure the
+        original earmark is restored unchanged (409) — the caller is never
+        left with neither the old nor the new earmark.
+
+
+        Editing a REJECTED movement (§4 "REJECTED→SUPERSEDED" path) skips
+        the "release old earmark" step (already released at Reject time)
+        and goes straight to re-validating the new amount.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BalanceMovementEditRequest' }
+      responses:
+        '201':
+          description: New PENDING movement created; the original transitions to SUPERSEDED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: >
+            Either the movement is not in an editable state (not PENDING/REJECTED),
+            or the new amount fails the sufficiency check — original earmark left untouched.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      tags: [BalanceMovements]
+      summary: Cancel a PENDING or REJECTED movement before it is released
+      description: >
+        Design doc §4/§6 "DELETE PENDING" — releases the earmark (a no-op
+        if the movement is already REJECTED, since Reject already released
+        it) and transitions to CANCELLED. Never a physical delete —
+        CANCELLED rows are retained for audit.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: reasonCode
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Movement cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not in a cancellable state (already RELEASED/CANCELLED/SUPERSEDED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/release:
+    post:
+      tags: [BalanceMovements]
+      summary: Checker releases a PENDING movement (4-eyes)
+      description: >
+        Design doc §4/§9 — should be wired onto the same maker/checker
+        lifecycle the legacy baseline already runs on (SYS_FUNCTION_TYPE ==
+        'RE'), not a parallel mechanism. On success: PENDING → RELEASED,
+        the earmark becomes a permanent Confirmed Balance change, and
+        accountEntries (if present on the movement) become available for a
+        downstream accounting component to consume (§2/§3.3 — this service
+        never posts GL itself).
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [releasedBy]
+              properties:
+                releasedBy: { type: string }
+      responses:
+        '200':
+          description: Movement released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING — illegal state transition, rejected explicitly rather than silently accepted (Design doc §8).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/acknowledge:
+    post:
+      tags: [BalanceMovements]
+      summary: Checker acknowledges a still-PENDING Present Docs earmark (EPLC_EXAMINATION only)
+      description: >
+        v0.8.0, Gap Analysis §6.8 — a Checker's own acknowledgment of a
+        Present Docs (EPLC_EXAMINATION CREATE) earmark, distinct from
+        /release: deliberately does NOT transition status — the movement
+        stays PENDING throughout, so a later Honour/Accept step can still
+        find and consume it (Gap Analysis §6.6's own cross-contract
+        picker only surfaces already-acknowledged records — the two-stage
+        4-eyes this backs). Moves the amount from
+        BalanceSnapshot.presentDocsEarmarkPending to
+        presentDocsEarmarkApproved on the parent Confirmation.
+
+
+        400 if the movement's instrumentType is not EPLC_EXAMINATION or its
+        movementType is not CREATE — this endpoint is specifically the
+        Present Docs earmark acknowledgment, not a generic "acknowledge
+        anything" action. 409 if the movement is not currently PENDING, or
+        if it was already acknowledged (acknowledgedAt already set).
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledgedBy]
+              properties:
+                acknowledgedBy: { type: string }
+      responses:
+        '200':
+          description: Movement acknowledged; status unchanged (still PENDING).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Not an EPLC_EXAMINATION CREATE movement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING, or was already acknowledged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/reject:
+    post:
+      tags: [BalanceMovements]
+      summary: Checker rejects a PENDING movement (4-eyes)
+      description: >
+        Design doc §4 — the earmark is released immediately on reject, not
+        deferred to whatever the Maker does next. reasonCode is required so
+        the Maker's subsequent DELETE-or-EDIT decision (§4 "REJECTED is not
+        a dead end") has something to act on.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [releasedBy, reasonCode]
+              properties:
+                releasedBy: { type: string }
+                reasonCode: { type: string }
+                remarks: { type: string }
+      responses:
+        '200':
+          description: Movement rejected; earmark released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/reversal:
+    post:
+      tags: [BalanceMovements]
+      summary: Create a REVERSAL against a RELEASED movement (error correction only)
+      description: >
+        Design doc §4.5 — strictly for correcting an erroneous RELEASED
+        movement (wrong amount, duplicate submission, a transaction that
+        should never have happened). NOT for legitimate contract amendments
+        — those go through POST /balance-contracts/{id}/versions instead
+        (§7.3). The original movement's status stays RELEASED unchanged
+        (append-only); this creates a new, independent movement with
+        reversalOfMovementId pointing back to it, and accountEntries
+        auto-derived by flipping D/C on the original's accountEntries
+        (caller does not resupply them). The REVERSAL movement itself goes
+        through the full PENDING→RELEASE lifecycle — reversing a live
+        exposure change is not lower-risk than the original entry.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: The RELEASED movement being reversed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventSeq, reasonCode, createdBy]
+              properties:
+                eventSeq: { type: integer, description: This new REVERSAL movement's own idempotency sequence — see BalanceMovementCreateRequest.eventSeq. }
+                reasonCode: { type: string }
+                remarks: { type: string }
+                createdBy: { type: string }
+      responses:
+        '201':
+          description: REVERSAL movement created, PENDING (subject to the same Release lifecycle as any other movement).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Original movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Original movement is not RELEASED — nothing to reverse.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  schemas:
+
+    InstrumentType:
+      type: string
+      description: >
+        Design doc §1/§3.1. IBL/EBL are deliberately absent — out of scope,
+        Loan Component's domain (Cross-Reference Finding 3b).
+
+
+        v0.8.0 additions (Export Confirmation Gap Analysis §6.6/§6.9/§6.11):
+        `EPLC_EXAMINATION` is Present Docs' own MEMO_ONLY earmark — CREATE
+        only, never moves EPLC_CONFIRMATION's own balance. `EPLC_DUE_FROM_
+        ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/`EPLC_EXPORT_BILLS_
+        DISCOUNTED` are the ON_BALANCE_ASSET instruments a Confirmation's own
+        HONOUR/ACCEPT transforms into (Sight/Usance/Nego'd respectively) —
+        `EPLC_DUE_FROM_ISSUING_BANK` is created but deliberately has no
+        settling endpoint in this contract (out of scope, see the v0.8.0
+        changelog note above); `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` settles
+        paired with `EPLC_ACCEPTANCE`'s own FULL_SETTLE/PARTIAL_SETTLE;
+        `EPLC_EXPORT_BILLS_DISCOUNTED` is a reclass target only, no consuming
+        endpoint yet (Gap Analysis Row 7, still open).
+      enum: [IPLC_LC, EPLC_LC, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE, SHGT, EPLC_CONFIRMATION, EPLC_EXAMINATION, EPLC_DUE_FROM_ISSUING_BANK, EPLC_ACCEPTANCE_REIMB_RECEIVABLE, EPLC_EXPORT_BILLS_DISCOUNTED]
+
+    ContractStatus:
+      type: string
+      description: >
+        Design doc §3.1 — a completely separate state machine from
+        MovementStatus. A Contract being SUPERSEDED does not retroactively
+        change the status of movements recorded against it while it was
+        ACTIVE.
+      enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED]
+
+    MovementStatus:
+      type: string
+      description: Design doc §4 — Maker/Checker lifecycle. Every transition into these is a deliberate design decision; see §4's state diagram for exactly which prior state each is reachable from.
+      enum: [PENDING, RELEASED, REJECTED, CANCELLED, SUPERSEDED]
+
+    ExposureNature:
+      type: string
+      description: Design doc §1 — CONTINGENT (undrawn LC/Shipping Guarantee) vs. ACTUAL (Acceptance, Export Confirmation liability once it exists). Never ACTUAL-funded/discounted exposure — that's Loan Component's ACTUAL, a different concept, out of this service's scope.
+      enum: [CONTINGENT, ACTUAL]
+
+    TenorType:
+      type: string
+      description: Design doc §7 — corresponds to legacy CPYT_C_SDA_FLAG. Only meaningful on leg-level and Acceptance contracts.
+      enum: [SIGHT, BUYERS_USANCE, SELLERS_USANCE, DP, DA]
+
+    MonetaryAmount:
+      type: string
+      pattern: '^-?\d{1,18}(\.\d{1,3})?$'
+      description: >
+        Mirrors payment-instructions-post.yaml's convention exactly (same
+        rationale: decimal-string only, never a binary float/JSON number;
+        server-side arithmetic MUST use decimal/BigDecimal). Scale is
+        currency-driven.
+      example: "300000.00"
+
+    NaturalKey:
+      type: object
+      description: Design doc §3.1 natural-key table. Which fields are required depends on instrumentType — see the per-endpoint parameter descriptions.
+      required: [lcNumber]
+      properties:
+        lcNumber: { type: string, description: "C_MAIN_REF of the underlying LC." }
+        ibNumber: { type: string, description: "Required for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE — the presentation/bill reference." }
+        sgNumber: { type: string, description: "Required for SHGT." }
+        legSeq: { type: string, description: "Mixed Tenor LC leg — PaymentTerms DO_INDEX_NO (Design doc §7.1)." }
+
+    AccountEntry:
+      type: object
+      description: >
+        Design doc §3.3 "GL Ownership" — one leg of a Dr/Cr pair. Balance
+        Component stores and passes these through on RELEASE; it never
+        interprets accountRef or decides drCr itself (config-driven,
+        downstream-owned).
+      required: [accountRef, drCr, amount]
+      properties:
+        accountRef: { type: string }
+        drCr: { type: string, enum: [D, C] }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+
+    BalanceContract:
+      type: object
+      description: Design doc §3.1 — one immutable version snapshot of a Logical Contract.
+      properties:
+        balanceContractId: { type: string, format: uuid }
+        logicalContractId: { type: string, format: uuid }
+        contractVersion: { type: integer }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        naturalKey: { $ref: '#/components/schemas/NaturalKey' }
+        parentLogicalContractId:
+          type: string
+          format: uuid
+          nullable: true
+          description: SHGT/Acceptance/Confirmation's underlying LC's logicalContractId — reporting rollup only, per Design doc §11, never used for automatic balance netting.
+        status: { $ref: '#/components/schemas/ContractStatus' }
+        supersedesBalanceContractId: { type: string, format: uuid, nullable: true }
+        supersededByBalanceContractId: { type: string, format: uuid, nullable: true }
+        currency: { type: string }
+        tolerancePct:
+          type: string
+          nullable: true
+          description: >
+            Design doc §6.2 (v0.3.0) — positive tolerance percentage (e.g.
+            UCP600 "about"/"approximately" terms), IPLC_LC/EPLC_LC only.
+            Used to derive BalanceMovement.ceilingAmount from a caller-typed
+            face-level amount. Treated as fixed within a contract version;
+            not expected to change via ordinary movements.
+        tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true }
+        tenorDays: { type: integer, nullable: true }
+        maturityDate: { type: string, format: date, nullable: true }
+        openingBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        sourceAmendmentNo: { type: integer, nullable: true }
+        effectiveFrom: { type: string, format: date-time }
+        effectiveTo: { type: string, format: date-time, nullable: true }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    ContractVersionSupersedeRequest:
+      type: object
+      description: Design doc §7.3 — body for POST /balance-contracts/{logicalContractId}/versions.
+      required: [businessEventId, createdBy]
+      properties:
+        newTenorDays: { type: integer, nullable: true }
+        newMaturityDate: { type: string, format: date, nullable: true }
+        amendmentAmountDelta:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: Optional — only when a monetary amendment is bundled into the same amendment as the term change (Design doc §7.3 Opening Balance Carry Forward formula).
+        businessEventId: { type: string, format: uuid, description: Correlates this version transition with any sibling leg movements from the same LC Amendment (Design doc §3.3) — not a transaction boundary. }
+        sourceAmendmentNo: { type: integer }
+        reasonCode: { type: string }
+        createdBy: { type: string }
+
+    BalanceMovement:
+      type: object
+      description: Design doc §3.2/§3.3 — append-only, never physically deleted.
+      properties:
+        movementId: { type: string, format: uuid }
+        balanceContractId: { type: string, format: uuid }
+        eventSeq: { type: integer }
+        businessEventId: { type: string, format: uuid, nullable: true }
+        movementType: { type: string, description: "Legal values depend on instrumentType — Design doc §5." }
+        exposureNature: { $ref: '#/components/schemas/ExposureNature' }
+        amount:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          description: >
+            For IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE, this is
+            the caller-typed face-level delta — see ceilingAmount (Design
+            doc §6.2, v0.3.0) for the tolerance-adjusted figure actually
+            applied against Confirmed Balance. For every other
+            movementType/instrumentType, amount and ceilingAmount are
+            identical.
+        ceilingAmount:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            Design doc §6.2 (v0.3.0) — amount × (1 + tolerancePct/100) for
+            IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE; equal to
+            amount for every other case. AMEND_DECREASE sufficiency
+            (compared against Available Balance) always uses this field,
+            never the raw amount.
+        currency: { type: string }
+        legRef: { type: string, nullable: true, description: "Mixed Tenor LC leg's logicalContractId — Design doc §7.1." }
+        accountEntries:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        lmtsReservationId:
+          type: string
+          nullable: true
+          description: >
+            SHGT only (Design doc §5/§10) — opaque reference to the LMTS-side
+            reservation, required for the Reserve/Confirm/Release
+            compensation pattern across the Balance Component / LMTS system
+            boundary. The actual LMTS call mechanism is not yet traced
+            against source (Cross-Reference doc) — this field is a
+            placeholder passthrough.
+        status: { $ref: '#/components/schemas/MovementStatus' }
+        supersededMovementId: { type: string, format: uuid, nullable: true }
+        reversalOfMovementId: { type: string, format: uuid, nullable: true }
+        reasonCode: { type: string, nullable: true }
+        remarks: { type: string, nullable: true }
+        transactionDate: { type: string, format: date, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        sourceModule: { type: string, nullable: true }
+        sourceFunction: { type: string, nullable: true }
+        sourceTransactionRef: { type: string, nullable: true }
+        balanceBefore: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        balanceAfter: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        warnings:
+          type: array
+          nullable: true
+          description: >
+            Design doc §6.1 (v0.2.0) — non-blocking advisory findings
+            attached at movement-creation time (e.g. off-balance-sheet
+            exposure from an outstanding SHGT eating into this LC's
+            effective headroom). Presence of a warning never changes the
+            movement's status or the HTTP status code — only a hard
+            sufficiency failure (409) blocks creation.
+          items: { $ref: '#/components/schemas/MovementWarning' }
+        createdBy: { type: string }
+        releasedBy: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        releasedAt: { type: string, format: date-time, nullable: true }
+        acknowledgedBy:
+          type: string
+          nullable: true
+          description: >
+            v0.8.0, EPLC_EXAMINATION only (Gap Analysis §6.8) — set by
+            POST /balance-movements/{id}/acknowledge, a Checker's
+            acknowledgment of a still-PENDING Present Docs earmark. Distinct
+            from releasedBy/releasedAt: acknowledging never transitions
+            status — the movement stays PENDING so a later Honour/Accept
+            step can still find and consume it.
+        acknowledgedAt: { type: string, format: date-time, nullable: true }
+
+    BalanceMovementCreateRequest:
+      type: object
+      description: >
+        Body for POST /balance-movements. Either naturalKey (resolves or,
+        for ISSUE/CREATE, creates the Logical Contract) or an explicit
+        balanceContractId must be supplied — not both.
+      required: [instrumentType, movementType, eventSeq, amount, currency, createdBy]
+      properties:
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        naturalKey: { $ref: '#/components/schemas/NaturalKey' }
+        balanceContractId: { type: string, format: uuid, nullable: true }
+        movementType: { type: string }
+        eventSeq:
+          type: integer
+          description: Caller-supplied, scoped to the resolved balanceContractId. Design doc §8 — the idempotency key is (balanceContractId, eventSeq); resubmitting the same pair is safe.
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        currency: { type: string }
+        legRef: { type: string, nullable: true }
+        accountEntries:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        businessEventId: { type: string, format: uuid, nullable: true }
+        transactionDate: { type: string, format: date, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        sourceModule: { type: string, nullable: true }
+        sourceFunction: { type: string, nullable: true }
+        sourceTransactionRef: { type: string, nullable: true }
+        createdBy: { type: string }
+
+    BalanceMovementEditRequest:
+      type: object
+      required: [amount, createdBy]
+      properties:
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        reasonCode: { type: string }
+        createdBy: { type: string }
+
+    BalanceSnapshot:
+      type: object
+      description: >
+        Design doc §3.3 — the derived balance numbers, never stored
+        directly. confirmedBalance/availableBalance/pendingEarmarkTotal are
+        unchanged since v0.1.0; offBalanceExposure/tightAvailableBalance
+        are new in v0.2.0 (Design doc §6.1) and apply only to
+        IPLC_LC/EPLC_LC contracts that may have an SHGT issued against
+        them — both are null for any other instrumentType.
+        presentDocsEarmarkPending/presentDocsEarmarkApproved are new in
+        v0.8.0 (Gap Analysis §6.8) and apply only to EPLC_CONFIRMATION —
+        null for any other instrumentType.
+      properties:
+        balanceContractId: { type: string, format: uuid }
+        logicalContractId: { type: string, format: uuid }
+        currency: { type: string }
+        confirmedBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        availableBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        pendingEarmarkTotal: { $ref: '#/components/schemas/MonetaryAmount' }
+        offBalanceExposure:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: Design doc §6.1 — sum of PENDING+RELEASED SHGT ISSUE net of PARTIAL_REDEEM/FULL_REDEEM (v0.6), for SHGT contracts whose parentLogicalContractId matches this LC. Null for instrumentTypes other than IPLC_LC/EPLC_LC.
+        tightAvailableBalance:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: availableBalance minus offBalanceExposure — the threshold a UTILIZE amount is checked against to decide whether to attach a WARNING (Design doc §6.1). Null where offBalanceExposure is null.
+        presentDocsEarmarkPending:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            v0.8.0, EPLC_CONFIRMATION only (Gap Analysis §6.8) — sum of
+            still-PENDING, not-yet-Checker-acknowledged EPLC_EXAMINATION
+            CREATE amounts under this Confirmation. Null for every other
+            instrumentType.
+        presentDocsEarmarkApproved:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            v0.8.0, EPLC_CONFIRMATION only (Gap Analysis §6.8) — sum of
+            Checker-acknowledged (acknowledgedAt set) but not-yet-consumed
+            EPLC_EXAMINATION CREATE amounts under this Confirmation. A
+            Present Docs submission's own sufficiency check nets Pending and
+            Approved together against availableBalance. Null for every other
+            instrumentType.
+        asOf: { type: string, format: date, nullable: true, description: Echoes the request's asOf parameter; null means this is the live balance. }
+
+    MovementWarning:
+      type: object
+      description: >
+        Design doc §6.1 (v0.2.0). Attached to a BalanceMovement at creation
+        time; purely advisory — never blocks the movement or changes its
+        status.
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [OFF_BALANCE_EXPOSURE_WARNING]
+        message: { type: string }
+        offBalanceExposureAtCheck:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: The SHGT-derived offBalanceExposure snapshot at the moment this check ran.
+        tightAvailableBalance:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: Available Balance minus offBalanceExposureAtCheck, at the moment this check ran.
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
