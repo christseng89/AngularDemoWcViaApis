@@ -1895,6 +1895,49 @@ returns 2xx, and both final snapshots match their own documented expected values
 Available 71,000, Tight Available 21,000; SG 50,000 still outstanding). Re-ran all 7 Import Case entries
 individually afterward — all succeed cleanly, confirming the fix didn't disturb Case 1/2/3/5/6/7.
 
+## BAL-131 fixed (and BAL-124 closed as a direct side effect) — Export Case #6/#7's own Present-Docs `acknowledge` step now has real orchestrator-level test coverage (2026-08-17, business instruction: "Fix BAL-131 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-131 section): Export Case #6/#7
+(added earlier this session — see the "Business Case Registry gained Export Case #6/#7" entry above)
+each carried a `note`-type step at the exact point B3's own Checker acknowledgment of the Present Docs
+earmark happens, with a comment literally saying the real acknowledge call was "omitted here" — meaning
+`runCase()`'s own `acknowledge` step type (the generic executor's sixth and, until this fix, never-
+actually-exercised-by-the-registry step type) had zero coverage from either registered business case,
+despite the microservice's own `/acknowledge` endpoint being fully implemented and unit-tested at the
+service layer. A structural gap in test *breadth*, not a functional defect — B3's acknowledgment worked
+correctly wherever it was actually called (the Angular UI, and the microservice's own unit suite), it
+just had no live, orchestrator-driven exercise proving the full multi-step B3→B4 chain works end to end
+through `backend/`'s own registry-replay mechanism.
+
+**Fix**: both `note` steps replaced with a real `{ type: 'acknowledge', movementRef: 'examination',
+acknowledgedBy: CHECKER }` step (`backend/data/businessCases.js`, one `replace_all` edit covering both
+cases identically — same acknowledgment step, same position, same movementRef in each). Implementing
+this naively as a third near-identical `if (step.type === 'acknowledge')` block in `runCase()` would
+have reintroduced `Quality-report-balance.md`'s own BAL-124 (Minor, Code Smell — `release`/`makerSubmit`
+step handlers already duplicated the same POST-to-sub-path-with-one-body-key shape) at the exact point
+its own "risk if a third copy lands" language predicted — recognized proactively and avoided by
+consolidating all three (`release`/`makerSubmit`/`acknowledge`) into one `RELEASE_SHAPED_STEP_TYPES`
+dispatch table (`{ subPath, bodyKey }` per step type) plus one shared handler in `runCase()`'s loop,
+closing BAL-124 in the same edit rather than as separate follow-up work.
+
+Verified: `backend/` suite 33/33 (was 32 — `VALID_STEP_TYPES` gained `'acknowledge'`,
+`createGenericFetchMock()` gained an `/acknowledge` branch, and a new HTTP-integration describe block
+proves `export-case-6`'s own acknowledge step returns `{status:'PENDING', acknowledgedBy:'checker1'}`
+and runs before the compound release step; the pre-existing `*Ref` validation test's own type-check
+branch extended to cover `acknowledge` alongside `release`/`makerSubmit`), coverage
+97.29%/95.23%/96.29%/98.01% (all four metrics clear the project's own 95% floor). **Live-verified
+both Export Case #6 and #7 end to end** against the real running microservice (not just the mocked-fetch
+unit suite): both cases' full step sequences return 2xx throughout, the `acknowledge` step itself
+returns `acknowledgedBy: 'checker1'` correctly, and every final snapshot matches its own documented
+expected value exactly (Case #6: CONF LIAB 90,000, Due From Issuing Bank 10,000; Case #7: CONF LIAB
+90,000, Acceptance Liability 10,000→0, Reimbursement Receivable 10,000→0) — zero regression from the
+pre-acknowledge-step version of these two cases. Re-ran all 14 registry entries individually afterward
+(all 12 other cases plus these two) — all succeed cleanly, confirming the `RELEASE_SHAPED_STEP_TYPES`
+consolidation didn't disturb `release`/`makerSubmit`'s own pre-existing behavior anywhere else in the
+registry. Test data from both live-verification passes scoped-cleaned afterward
+(`IMP-C%`/`EXP-C%` — the full 14-case re-run also created fresh Import-side contracts, cleaned up the
+same pass), leaving the user's own 18 S01/S02/U01 records (Import and Export both) untouched.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

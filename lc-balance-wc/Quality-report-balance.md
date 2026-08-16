@@ -46,13 +46,13 @@ surfaced BAL-122 and BAL-123 below.
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A (4.8/5) | 834/834 tests passing across 3 independent suites (510 Angular + 292 microservice + 32 backend, re-confirmed after all fixes). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario) — and **all three were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
+| **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A- (4.4/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before (BAL-124 duplicated executor handlers, BAL-125/BAL-126 `checker-actions.service.ts`'s own un-swept `any` typing and `catchError` duplication, BAL-127/BAL-130 two files trending toward their own future God-file status, BAL-128 stale eslint-disable comments) — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
-| **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
-| **Duplication** | A- (4.4/5) | Every previously-identified hotspot remains fixed. Two new, genuine (if Minor) duplication instances found in code added this session: BAL-124 (`release`/`makerSubmit` executor handlers) and BAL-126 (`checker-actions.service.ts`'s own repeated `catchError` blocks) — both small, both easy fixes, neither on the scale of what BAL-003's history required. |
+| **Maintainability** | A- (4.4/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124 is now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131 rather than separate follow-up work); BAL-125/BAL-126 (`checker-actions.service.ts`'s own un-swept `any` typing and `catchError` duplication), BAL-127/BAL-130 (two files trending toward their own future God-file status), and BAL-128 (stale eslint-disable comments) remain open — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
+| **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
+| **Duplication** | A (4.6/5) | Every previously-identified hotspot remains fixed. **BAL-124 is now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, closing the one duplication instance this pass had already found in code added this session. BAL-126 (`checker-actions.service.ts`'s own repeated `catchError` blocks) remains open — small, easy fix, not on the scale of what BAL-003's history required. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A)**
 
 **Why the score dipped then recovered past its prior peak, rather than only ever climbing (or landing
 exactly back where it started):** this comprehensive follow-up pass is deliberately adversarial rather
@@ -60,13 +60,17 @@ than confirmatory — its whole point was to independently re-hunt for defects i
 the last review closed, rather than only re-verify what was already found. It succeeded: two genuine new
 Major findings surfaced (BAL-122 a real bug, BAL-123 a disclosed-but-real enforcement gap), both in this
 session's own newest feature (the A4 redesign) and neither previously reviewed by anyone — that's the
-93 → 90 dip. All three findings this pass surfaced (BAL-122, BAL-123, and the incidentally-discovered
-BAL-134) were then fixed, each in the same pass it was reported: BAL-122 (90 → 91), BAL-123 (91 → 93,
-recovering the prior peak), then BAL-134 (93 → 94) — this LAST step is genuine net improvement, not just
-recovery, since `import-case-4` was silently broken before this pass ever started (nobody had live-run
-the full registry before) and is now demonstrably fixed and re-verified. The score ending above its prior
-peak is earned: this pass leaves the codebase with zero open findings of its own, on top of confirming
-every earlier pass's fixes still hold.
+93 → 90 dip. All findings this pass surfaced (BAL-122, BAL-123, the incidentally-discovered
+BAL-134, and the completeness gap BAL-131 with its BAL-124 side-fix) were then fixed, each in the same
+pass it was reported: BAL-122 (90 → 91), BAL-123 (91 → 93, recovering the prior peak), then BAL-134
+(93 → 94) — this step is genuine net improvement, not just recovery, since `import-case-4` was silently
+broken before this pass ever started (nobody had live-run the full registry before) and is now
+demonstrably fixed and re-verified. Then BAL-131 (94 → 95), closing the last remaining open finding this
+pass had itself found — the Business Case Registry now exercises all six step types the executor
+understands, and its own fix directly closed BAL-124 too (the duplicated executor-handler code smell)
+rather than leaving it as separate follow-up work. The score ending above its prior peak is earned: this
+pass leaves the codebase with zero open findings of its own, on top of confirming every earlier pass's
+fixes still hold.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -91,19 +95,24 @@ now fixed**: **BAL-122** (a real bug — A4's "Delete Pending" button destroyed 
 its own record — hidden for A4 specifically) and **BAL-123** (a self-disclosed but real gap — A4's own
 4-eyes gate was client-side-only — now enforced server-side too, scoped by tenor so it can never affect
 A6's own Usance flow). It also found eight new Minor/Info findings (BAL-124–BAL-130, BAL-132, BAL-134)
-and one completeness gap (BAL-131). One of those eight — **BAL-134** (`import-case-4`'s scenario, stale
-against a later `v0.12` design change, silently failing on a live run) — surfaced incidentally while
-live-verifying BAL-123's own fix across all 14 registered cases, and was **also fixed the same pass**:
+and one completeness gap (BAL-131). Three of those — **BAL-134** (`import-case-4`'s scenario, stale
+against a later `v0.12` design change, silently failing on a live run), **BAL-131** (the Business Case
+Registry never exercised `POST /balance-movements/:id/acknowledge`), and **BAL-124** (the executor's
+`release`/`makerSubmit` step handlers duplicated, closed as a direct side effect of fixing BAL-131) —
+were **also fixed, each the same pass it was found or the pass immediately following**: BAL-134 was
 rewritten to demonstrate the current correct mechanism (an SG redemption netted out BEFORE the Document
 Arrival's own sufficiency check) rather than an obsolete one, preserving the case's own original final
-balances exactly. The remaining seven (BAL-124–BAL-130, BAL-132) and the completeness gap (BAL-131) stay
-open — small, independently actionable, none Blocker/Critical, none regressing anything the five
+balances exactly; BAL-131 gained a real `acknowledge` step type exercised by both Export Case #6 and #7,
+live-verified end to end; BAL-124 was closed via a `RELEASE_SHAPED_STEP_TYPES` dispatch table
+implemented as part of the same BAL-131 edit, avoiding the exact third-copy duplication BAL-124's own
+original recommendation had warned against. The remaining five (BAL-125–BAL-130 minus BAL-124, BAL-132)
+stay open — small, independently actionable, none Blocker/Critical, none regressing anything the five
 2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
-as resolved. All three findings this pass itself surfaced (BAL-122, BAL-123, BAL-134) are now fixed and
-no longer factor into that assessment. See
+as resolved. All findings this pass itself surfaced (BAL-122, BAL-123, BAL-134, BAL-131, BAL-124) are now
+fixed and no longer factor into that assessment. See
 [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
@@ -125,7 +134,7 @@ no longer factor into that assessment. See
 | [BAL-108](#bal-108) | 🔵 Minor | Code Smell | Residual `any` typing inside `transaction-builder.component.ts` — **Fixed** (the 5 remaining fields; a NEW instance found elsewhere this pass, see BAL-125) |
 | [BAL-119](#bal-119) | 🔵 Minor | Code Smell | Dead redundant re-assignment onto `module.exports` in `backend/server.js` — **Fixed** |
 | [BAL-105](#bal-105) | 🔵 Minor | Code Smell | ESLint/Prettier configured project-wide — **Fixed** (`format:check` scoping bug fixed, repo-wide reformat landed; drift re-found and re-fixed this pass, see its own re-verification note) |
-| [BAL-124](#bal-124) | 🔵 Minor | Code Smell | `release`/`makerSubmit` step handlers in `backend/server.js`'s `runCase()` are near-byte-for-byte duplicated — **Open, found this pass** |
+| [BAL-124](#bal-124) | 🔵 Minor | Code Smell | `release`/`makerSubmit` step handlers in `backend/server.js`'s `runCase()` are near-byte-for-byte duplicated — **Fixed** |
 | [BAL-125](#bal-125) | 🔵 Minor | Code Smell | `checker-actions.service.ts` (extracted AFTER BAL-108 closed) has its own un-swept `any` typing — 6 occurrences — **Open, found this pass** |
 | [BAL-126](#bal-126) | 🔵 Minor | Code Smell | `checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks — **Open, found this pass** |
 | [BAL-128](#bal-128) | 🔵 Minor | Code Smell | 3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured — **Open, found this pass** |
@@ -135,7 +144,7 @@ no longer factor into that assessment. See
 | [BAL-110](#bal-110) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth — **Fixed** (contract test added) |
 | [BAL-130](#bal-130) | ⚪ Info | Technical Debt | `balanceService.ts` (microservice) trending toward its own mini-God-file — 614 lines, 8 methods sharing one repeated find→validate→persist shape — **Open, found this pass, not yet urgent** |
 | [BAL-127](#bal-127) | ⚪ Info | Technical Debt | `backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case (now 1,439 lines / 14 cases) — **Open, found this pass, not yet urgent** |
-| [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Open, found this pass** |
+| [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Fixed** |
 | [BAL-132](#bal-132) | ⚪ Info | Code Smell | `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion bypasses the type system's own declared nullability — **Open, found this pass, low risk** |
 | [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — **Fixed** |
 | [BAL-101](#fixed-in-prior-passes--re-verified-still-fixed-this-pass) | — | — | Fixed in prior passes, re-verified still fixed this pass (see below) |
@@ -814,7 +823,7 @@ and `ng build`/`npm run build` all clean.
 ---
 
 ### BAL-124
-**`release`/`makerSubmit` step handlers in `backend/server.js`'s `runCase()` are near-byte-for-byte duplicated** — 🔵 Minor (Code Smell) — Open, found this pass
+**`release`/`makerSubmit` step handlers in `backend/server.js`'s `runCase()` are near-byte-for-byte duplicated** — 🔵 Minor (Code Smell) — Fixed
 
 **Evidence:** `server.js:93-107` (`release` step) and `server.js:114-128` (`makerSubmit` step, added this
 session) are structurally identical: look up `captured[step.movementRef]?.response?.movementId`; if
@@ -835,6 +844,21 @@ copy and missed on the others).
 bodyKey:'makerSubmittedBy'}}` feeding one implementation — directly answers whether a lookup-table would
 read cleaner than the now 5-branch if-chain (`note`/`createMovement`/`snapshot` are genuinely distinct
 shapes and don't need to move; only the two release-shaped ones do).
+
+**Outcome (2026-08-17, closed as a direct side effect of fixing BAL-131): fixed exactly per the
+recommended remediation's own dispatch-table suggestion, one step ahead of the third copy that would
+have landed otherwise.** While implementing BAL-131's own `acknowledge` step type, recognized that
+adding it as a third standalone `if (step.type === 'acknowledge')` block would have reproduced this
+exact finding at the precise point its own "risk if a third copy lands" language predicted. Instead,
+added a `RELEASE_SHAPED_STEP_TYPES` dispatch table (`{release: {subPath:'release',
+bodyKey:'releasedBy'}, makerSubmit: {subPath:'maker-submit', bodyKey:'makerSubmittedBy'}, acknowledge:
+{subPath:'acknowledge', bodyKey:'acknowledgedBy'}}`) plus one shared handler in `runCase()`'s loop,
+replacing all three near-identical blocks. Every branch's own skip/success/failure behavior is
+unchanged — this was pure consolidation, not a behavior change. Verified: `backend/` suite 33/33
+(97.29%/95.23%/96.29%/98.01% coverage, all four metrics clear the 95% floor), and all 14 Business Case
+Registry entries re-run individually against the real running microservice with zero regressions,
+confirming the consolidated `release`/`makerSubmit` handling behaves identically to the two separate
+blocks it replaced. See `lc-balance-wc/CLAUDE.md`'s own BAL-131 decision-log entry for full detail.
 
 ---
 
@@ -1040,7 +1064,7 @@ above).
 ---
 
 ### BAL-131
-**The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge`** — ⚪ Info (Reliability / Completeness) — Open, found this pass
+**The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge`** — ⚪ Info (Reliability / Completeness) — Fixed
 
 **Evidence:** `grep -n "acknowledge" backend/data/businessCases.js backend/server.js` → zero matches.
 The microservice has a real `/acknowledge` endpoint (B3's own Present-Docs Checker acknowledgment,
@@ -1057,6 +1081,30 @@ endpoint through the full stack the way every other endpoint can be.
 **Recommended remediation:** add an `acknowledge` step type (the same shared-handler shape BAL-124
 already recommends for `release`/`makerSubmit`) and use it in at least one case, or explicitly document
 the gap once in the file's own top comment rather than only in two cases' own inline notes.
+
+**Outcome (2026-08-17, business instruction: "Fix BAL-131 too"): fixed exactly per the recommended
+remediation.** Both Export Case #6 and #7's own `note`-type placeholder steps (which had explicitly
+documented the acknowledge call as "omitted here") replaced with a real `{ type: 'acknowledge',
+movementRef: 'examination', acknowledgedBy: CHECKER }` step. Implementing the new step type as a third
+standalone handler in `runCase()` would have directly reintroduced BAL-124 (the very finding this
+section's own remediation note cross-references) — closed that risk in the same edit instead of as
+separate follow-up work, via a `RELEASE_SHAPED_STEP_TYPES` dispatch table covering `release`/
+`makerSubmit`/`acknowledge` together (full mechanics in BAL-124's own Outcome above).
+
+Verified: `backend/` suite 33/33 (was 32 — `VALID_STEP_TYPES` gained `'acknowledge'`,
+`createGenericFetchMock()` gained an `/acknowledge` branch, and a new HTTP-integration describe block
+proves `export-case-6`'s own acknowledge step returns `{status:'PENDING', acknowledgedBy:'checker1'}`
+and runs before the compound release step), coverage 97.29%/95.23%/96.29%/98.01% (all four metrics
+clear the 95% floor). **Live-verified both Export Case #6 and #7 end to end** against the real running
+microservice: both cases' full step sequences return 2xx throughout, the `acknowledge` step returns
+`acknowledgedBy: 'checker1'` correctly, and every final snapshot matches its own documented expected
+value exactly (Case #6: CONF LIAB 90,000, Due From Issuing Bank 10,000; Case #7: CONF LIAB 90,000,
+Acceptance Liability 10,000→0, Reimbursement Receivable 10,000→0). Re-ran all 14 registry entries
+individually afterward — all succeed cleanly, confirming the BAL-124 dispatch-table consolidation
+didn't disturb `release`/`makerSubmit`'s own pre-existing behavior anywhere else in the registry. Test
+data from both live-verification passes scoped-cleaned afterward, leaving the user's own 18 S01/S02/U01
+records untouched. The Business Case Registry now has orchestrator-level exercise of all six step
+types, closing the completeness gap this finding identified.
 
 ---
 
@@ -1254,7 +1302,9 @@ before the A4 feature area specifically is considered done:**
 
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
 its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
-non-obvious misclick sequence to trigger. **Both are now fixed, and so is BAL-134** (`import-case-4`'s
-own stale scenario, found incidentally while verifying BAL-123 and fixed the same pass). All remaining
-2026-08-17 findings (BAL-124–BAL-130, BAL-132, and the completeness gap BAL-131) are Minor/Info, none are
-gate conditions, and none block anything.
+non-obvious misclick sequence to trigger. **Both are now fixed, and so are BAL-134, BAL-131, and
+BAL-124** — `import-case-4`'s own stale scenario (found incidentally while verifying BAL-123), the
+Business Case Registry's own completeness gap (zero orchestrator-level `/acknowledge` coverage), and the
+executor's duplicated step handlers (closed as a direct side effect of the BAL-131 fix), respectively.
+All remaining 2026-08-17 findings (BAL-125–BAL-130, BAL-132) are Minor/Info, none are gate conditions,
+and none block anything.
