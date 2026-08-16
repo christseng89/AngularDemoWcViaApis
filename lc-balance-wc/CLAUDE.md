@@ -1044,6 +1044,57 @@ suite.
 `api-error.ts` at 100%/100%/100%/100%), `backend/` 28/28 (unaffected, unchanged), microservice 234/234
 (unaffected, unchanged).
 
+## Currency Code now carries from A1/B1 and is protected on every other function (2026-08-16, user-requested — "A1 Currency Code = Input; A2-A9 = Carry from A1 + Protected" / "B1 = Input; B2-B5 = Carry from B1 + Protected")
+
+Previously `currency` was a plain free-typed Formly input on every single function, A1-A9 and B1-B5 alike —
+nothing stopped a Maker from typing a different Currency than the LC/Confirmation actually declared at
+Issue/Confirm when amending, drawing, or settling against it. Same "carry from whichever existing record is
+resolved, protected" shape as the pre-existing Amount/Tenor Type/Tenor Days precedent
+(`rebuildFields()`'s `amountLocked`/`tenorLocked`), extended to Currency and made unconditional across
+every function rather than gated to specific ones — A1/B1 structurally never populate
+`selectedParent`/`selectedContract` at all (they create a brand-new record with no existing target to
+pick), so no function-code allowlist was needed.
+
+**What was added:**
+- `TransactionBuilderComponent.carriedCurrency` — a new getter: `this.selectedParent?.currency ??
+  this.selectedContract?.currency ?? null`. `selectedParent` is checked first because, for a `hasParent`
+  function (A6/A7/A8/A9/B3/B5), it resolves at Step 1 (the Parent LC picker) before any Step-2 child
+  picker/search does — so the field locks in as soon as the LC/Confirmation itself is picked, not only
+  once a specific child record is found. For every non-`hasParent` function (A2/A3/A3S/A4/B2/B4),
+  `selectedParent` stays null and it falls through to `selectedContract` (the flat Catalog picker's own
+  resolved record).
+- `rebuildFields()`'s `currency` field now reads `currencyLocked = !!this.carriedCurrency`, disabling the
+  input and relabeling it `"Currency (carried from the existing record, protected)"` whenever true —
+  mirrors the exact same `amountLocked`/`tenorLocked` shape already used for Amount/Tenor.
+- The actual `model.currency = this.carriedCurrency` write (Formly's `disabled` alone doesn't populate a
+  value) was added at every place a contract/parent gets resolved: `onSelectContract()`,
+  `onSelectParent()`, both success branches of `searchExistingContract()` (the free-text LC+IB/SG manual
+  search fallback that A7/A9/B5 — and, in principle, any hasParent function — can use instead of clicking
+  through the picker), `onSelectIbIndex()`, and `onSelectSettleableBalance()` (the latter two are
+  Step-2 child pickers; the write there is a defensive re-assertion since Step 1 already carries it in
+  the normal flow, kept for correctness regardless of how Step 2 is reached).
+- No changes needed to `selectFunction()`'s own reset block — `model.currency` already resets to
+  `'USD'` and `selectedContract`/`selectedParent` already reset to `null` there, which is sufficient for
+  `carriedCurrency` to naturally re-evaluate to `null` (unlocked) the moment a function switch happens.
+
+**Verification:** 8 new tests in `transaction-builder.component.selection.spec.ts` (new describe block
+`carriedCurrency / Currency carry-and-protect`) — A1/B1 stay plain unlocked Input; A2 (flat-Catalog,
+non-hasParent) and B2 (Export side) carry+lock on `onSelectContract()`; A6 and B5 (Parent-LC-picker,
+hasParent) carry+lock on `onSelectParent()`; `selectedParent` takes precedence when both happen to be
+set; switching back to A1 clears the lock. Full suite 475/475 (467 + 8 new, zero existing tests changed),
+coverage still clears the 95% floor on all four metrics; `tsc --noEmit`/`npm run lint`/`format:check` all
+clean. **Live in-browser verification**: created a real EUR LC via A1, then confirmed A1/A8's Currency
+field is a plain unlocked Input *before* any pick; picked that LC under A2 (flat Catalog) — `model.currency`
+became `'EUR'`, the field disabled, relabeled — and again under A8 (Parent LC picker) with the same
+result. One genuine finding during this pass, not a product bug: driving the component via direct method
+calls from an injected script (rather than real user clicks, which run inside Angular's own zone) left
+the DOM one change-detection tick stale after each direct call — `comp.model.currency`/`comp.fields`
+already showed the correct locked state, but the rendered `<input>` still showed the old value/disabled
+attribute until a manual `ng.applyChanges(comp)` tick, after which the DOM correctly showed
+`Currency (carried from the existing record, protected) *` = `EUR`, disabled. A real user click already
+runs inside Angular's zone and triggers change detection automatically, so this artifact is specific to
+this verification method, not a defect in the shipped behavior.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

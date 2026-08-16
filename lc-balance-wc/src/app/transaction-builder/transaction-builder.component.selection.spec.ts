@@ -665,6 +665,92 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
   });
 
+  // Business instruction 2026-08-16: "A1 Currency Code = Input; A2-A9 = Carry from A1 + Protected" /
+  // "B1 = Input; B2-B5 = Carry from B1 + Protected".
+  describe('carriedCurrency / Currency carry-and-protect (business instruction 2026-08-16)', () => {
+    function currencyFieldProps(comp: TransactionBuilderComponent): { label: string; disabled: boolean } {
+      const field = comp.fields.find((f) => f.key === 'currency');
+      return { label: field?.props?.label as string, disabled: !!field?.props?.disabled };
+    }
+
+    it('A1 (LC Issue): carriedCurrency is null and the Currency field is a plain, editable Input', () => {
+      const comp = makeComponent(getFn('A1'), makeApi());
+
+      expect(comp.carriedCurrency).toBeNull();
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency', disabled: false });
+    });
+
+    it('B1 (Confirm LC): carriedCurrency is null and the Currency field is a plain, editable Input', () => {
+      const comp = makeComponent(getFn('B1'), makeApi());
+
+      expect(comp.carriedCurrency).toBeNull();
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency', disabled: false });
+    });
+
+    it("A2 (flat Catalog, non-hasParent): onSelectContract carries the picked LC's Currency into model.currency and locks the field", () => {
+      const comp = makeComponent(getFn('A2'), makeApi());
+      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', currency: 'EUR' })];
+
+      comp.onSelectContract('C1');
+
+      expect(comp.model.currency).toBe('EUR');
+      expect(comp.carriedCurrency).toBe('EUR');
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency (carried from the existing record, protected)', disabled: true });
+    });
+
+    it("B2 (flat Catalog, non-hasParent, Export side): onSelectContract carries the picked Confirmation's Currency", () => {
+      const comp = makeComponent(getFn('B2'), makeApi());
+      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION', currency: 'GBP' })];
+
+      comp.onSelectContract('C1');
+
+      expect(comp.model.currency).toBe('GBP');
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency (carried from the existing record, protected)', disabled: true });
+    });
+
+    it("A6 (Parent LC picker, hasParent): onSelectParent carries the parent LC's Currency and locks the field, before any Step 2 picker", () => {
+      const comp = makeComponent(getFn('A6'), makeApi());
+      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', currency: 'JPY' })];
+
+      comp.onSelectParent('P1');
+
+      expect(comp.model.currency).toBe('JPY');
+      expect(comp.carriedCurrency).toBe('JPY');
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency (carried from the existing record, protected)', disabled: true });
+    });
+
+    it("B5 (Parent LC picker, hasParent, Export side): onSelectParent carries the Confirmation's Currency", () => {
+      const comp = makeComponent(getFn('B5'), makeApi());
+      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', instrumentType: 'EPLC_CONFIRMATION', currency: 'CNY' })];
+
+      comp.onSelectParent('P1');
+
+      expect(comp.model.currency).toBe('CNY');
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency (carried from the existing record, protected)', disabled: true });
+    });
+
+    it('selectedParent takes precedence over selectedContract when both happen to be set', () => {
+      const comp = makeComponent(getFn('A6'), makeApi());
+      comp.selectedParent = makeContract({ balanceContractId: 'P1', currency: 'JPY' });
+      comp.selectedContract = makeContract({ balanceContractId: 'C1', currency: 'USD' });
+
+      expect(comp.carriedCurrency).toBe('JPY');
+    });
+
+    it('switching back to A1 clears the lock (selectFunction resets selectedContract/selectedParent to null)', () => {
+      const comp = makeComponent(getFn('A2'), makeApi());
+      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', currency: 'EUR' })];
+      comp.onSelectContract('C1');
+      expect(currencyFieldProps(comp).disabled).toBe(true);
+
+      comp.selectFunction(getFn('A1'));
+
+      expect(comp.carriedCurrency).toBeNull();
+      expect(currencyFieldProps(comp)).toEqual({ label: 'Currency', disabled: false });
+      expect(comp.model.currency).toBe('USD'); // selectFunction's own model reset default
+    });
+  });
+
   describe('ibIndexPrevPage / ibIndexNextPage', () => {
     function setup() {
       const api = makeApi();

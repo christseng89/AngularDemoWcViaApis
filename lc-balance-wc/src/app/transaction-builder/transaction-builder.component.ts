@@ -397,6 +397,22 @@ export class TransactionBuilderComponent {
     return this.model.instrumentType ? PARENT_INSTRUMENT_OPTIONS[this.model.instrumentType] : [];
   }
 
+  /**
+   * Business instruction 2026-08-16 ("A1 Currency Code = Input; A2-A9 = Carry from A1 + Protected" /
+   * "B1 = Input; B2-B5 = Carry from B1 + Protected") — every function except LC Issue (A1) / Confirm LC
+   * (B1) operates on an existing LC/Confirmation, or a record that hangs off one, whose own Currency was
+   * already fixed the moment it was first created — never re-typed a second time. Same "carry from
+   * whichever contract is currently resolved, protected" shape as the existing Amount/Tenor precedent
+   * (rebuildFields()'s amountLocked/tenorLocked), just unconditional across every function rather than
+   * gated to specific ones, since A1/B1 structurally never populate selectedParent/selectedContract at
+   * all (they create a brand-new record with no existing target to pick). `selectedParent` is checked
+   * first — for a hasParent function (A6/A7/A8/A9/B3/B5) it resolves at Step 1, before any Step-2 child
+   * picker/search does, so currency locks in as soon as the LC/Confirmation itself is picked.
+   */
+  get carriedCurrency(): string | null {
+    return this.selectedParent?.currency ?? this.selectedContract?.currency ?? null;
+  }
+
   /** Business instruction 2026-08-14 ("two/three tabs...") — whichever tab is active supplies the Event Timeline table. */
   get activeLookupMovements(): any[] {
     if (this.lookupTab === 'ACCEPTANCE') return this.acceptanceMovements;
@@ -989,6 +1005,12 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.movementTypeFromContractTenor && this.selectedContract) {
       this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT';
     }
+    // Business instruction 2026-08-16 ("A2-A9/B2-B5 Currency = Carry from A1/B1 + Protected") — see
+    // carriedCurrency's own doc comment.
+    if (this.carriedCurrency) {
+      this.model.currency = this.carriedCurrency;
+      this.rebuildFields();
+    }
     this.refreshSelectedContractSnapshot();
     // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review — Present Docs must not
     // move the Confirmation, cs-tf-balance-knowhow D3/EX_DOC_RCV) — B4 only. B4's own primary
@@ -1349,12 +1371,22 @@ export class TransactionBuilderComponent {
                 return;
               }
               this.selectedContract = contract;
+              // Business instruction 2026-08-16 ("A2-A9/B2-B5 Currency = Carry from A1/B1 + Protected")
+              // — see carriedCurrency's own doc comment.
+              if (this.carriedCurrency) {
+                this.model.currency = this.carriedCurrency;
+                this.rebuildFields();
+              }
               this.refreshSelectedContractSnapshot();
               this.syncCheckerToContext();
             });
             return;
           }
           this.selectedContract = contract;
+          if (this.carriedCurrency) {
+            this.model.currency = this.carriedCurrency;
+            this.rebuildFields();
+          }
           this.refreshSelectedContractSnapshot();
           this.syncCheckerToContext();
         },
@@ -1368,6 +1400,13 @@ export class TransactionBuilderComponent {
 
   onSelectParent(contractId: string): void {
     this.selectedParent = this.parentCatalog.find((c) => c.balanceContractId === contractId) ?? null;
+    // Business instruction 2026-08-16 ("A2-A9/B2-B5 Currency = Carry from A1/B1 + Protected") — see
+    // carriedCurrency's own doc comment. Fires for every hasParent function (A6/A7/A8/A9/B3/B5) as soon
+    // as the LC/Confirmation itself is picked, before any Step-2 child picker/search.
+    if (this.carriedCurrency) {
+      this.model.currency = this.carriedCurrency;
+      this.rebuildFields();
+    }
     // A6/B4 Acceptance (and A8 SG Issue): the LC Number is NOT a
     // freely-typed part of the new contract's natural key here — it must be
     // the SAME LC the Parent was picked from (an Acceptance/SG can only ever
@@ -1515,6 +1554,13 @@ export class TransactionBuilderComponent {
       status: 'ACTIVE',
       currency: picked.currency,
     } as BalanceContract;
+    // Business instruction 2026-08-16 ("B2-B5 Currency = Carry from B1 + Protected") — already carried
+    // from Step 1's selectedParent (onSelectParent()) in the normal flow; re-asserted here too so it's
+    // correct even if Step 2 is reached some other way. See carriedCurrency's own doc comment.
+    if (this.carriedCurrency) {
+      this.model.currency = this.carriedCurrency;
+      this.rebuildFields();
+    }
     this.searchNaturalKey.ibNumber = picked.ibNumber ?? '';
     this.refreshSelectedContractSnapshot();
     this.syncCheckerToContext();
@@ -1536,6 +1582,13 @@ export class TransactionBuilderComponent {
     if (this.selectedContract) {
       this.searchNaturalKey.ibNumber = this.selectedContract.naturalKey.ibNumber ?? '';
       this.searchNaturalKey.sgNumber = this.selectedContract.naturalKey.sgNumber ?? '';
+    }
+    // Business instruction 2026-08-16 ("A7/A9/B5 Currency = Carry from A1/B1 + Protected") — already
+    // carried from Step 1's selectedParent (onSelectParent()) in the normal flow; re-asserted here too
+    // so it's correct even if Step 2 is reached some other way. See carriedCurrency's own doc comment.
+    if (this.carriedCurrency) {
+      this.model.currency = this.carriedCurrency;
+      this.rebuildFields();
     }
     this.refreshSelectedContractSnapshot();
     this.syncCheckerToContext();
@@ -1885,6 +1938,9 @@ export class TransactionBuilderComponent {
       !!this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && !!this.selectedContractSnapshot;
     const amountLocked = amountFromDocArrival || amountFromFullSettle;
     const tenorLocked = !!this.selectedFunction?.tenorTypeOptions?.length && this.isCreatingMovement && this.hasParent && !!this.selectedParent;
+    // Business instruction 2026-08-16 ("A1/B1 = Input; every other function = Carry from A1/B1 +
+    // Protected") — see carriedCurrency's own doc comment.
+    const currencyLocked = !!this.carriedCurrency;
     this.fields = [
       {
         key: 'amount',
@@ -1921,7 +1977,15 @@ export class TransactionBuilderComponent {
           'props.step': (f: any) => Math.pow(10, -decimalPlacesForCurrency(f.model?.currency)),
         },
       },
-      { key: 'currency', type: 'input', props: { label: 'Currency', required: true } },
+      {
+        key: 'currency',
+        type: 'input',
+        props: {
+          label: currencyLocked ? 'Currency (carried from the existing record, protected)' : 'Currency',
+          required: true,
+          disabled: currencyLocked,
+        },
+      },
       {
         key: 'tolerancePct',
         type: 'input',
