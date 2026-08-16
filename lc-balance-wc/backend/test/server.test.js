@@ -1,11 +1,12 @@
 const request = require('supertest');
-const app = require('../server');
+const { app } = require('../server');
 const { buildRegistry } = require('../data/businessCases');
 
 // server.js is the Node.js 中台 orchestrator (port 4300) — it never talks to a real
 // microservice in this suite; global.fetch is mocked per-test. See lc-balance-wc/CLAUDE.md
 // for domain background. server.js's own require.main guard means `require('../server')` here
-// never binds a real port (module.exports = app).
+// never binds a real port. server.js exports `{ app, runCase, resolveLogicalContractId,
+// callMicroservice }` (Quality-report-balance.md BAL-107) — this suite only needs `app`.
 
 function jsonResponse(status, body) {
   return {

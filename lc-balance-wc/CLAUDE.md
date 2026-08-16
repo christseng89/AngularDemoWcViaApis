@@ -408,6 +408,88 @@ re-Issuing silently double-counted Confirmed Balance instead of being rejected).
   `balanceContractId` first, which meant every movement row's id resolved to its PARENT CONTRACT's id
   instead of its own `movementId`.
 
+## Quality-report-balance.md remediation pass (2026-08-16, user-directed: BAL-003/BAL-101/BAL-102 + related Security Hotspot/Code Smell findings)
+
+User selected, via clarifying questions before this pass started: for **BAL-101**, remove the dead
+`dualInstrumentFallback` code rather than wire it live (removing was the only option that didn't change
+existing business behavior, since the path never executes today); for **BAL-102**, keep it deferred/no
+action (no PostgreSQL instance available in this sandboxed environment — same posture as the prior
+remediation pass).
+
+- **BAL-101 (dead code) — Fixed.** `dualInstrumentFallback` was declared on `TransactionFunction` and
+  described in four doc comments as B5's Sight/Usance retry mechanism, but never assigned on any real
+  registry entry (B5's own entry has always been Usance-only, `instrumentType: 'EPLC_ACCEPTANCE'` fixed,
+  no subChoice) — confirmed dead, not merely under-tested. Removed the field itself
+  (`balance-component.model.ts`), both call sites that read it in
+  `transaction-builder.component.ts` (`searchExistingContract()`'s primary/fallback retry block, and a
+  second, previously-undocumented mirror of the same retry inside `searchCheckerLc()`), and
+  `loadSettleableBalances()`'s two-instrumentType merge (now just `[fn.instrumentType]`). Every doc
+  comment that referenced the field or a "B5 Sight case" was corrected in place — B5's
+  `settlesAcceptanceOnMature`/`settleableBalanceIndex` behavior was never itself the dead part, only the
+  now-gone Sight alternative was. Two spec files updated to match:
+  `transaction-builder.component.gaps.spec.ts`'s coverage-gap test now asserts "exactly one
+  `resolveContract` call, success or failure, no retry"; `transaction-builder.component.selection.spec.ts`
+  had its own synthetic-fallback describe blocks removed (nothing left to exercise).
+- **BAL-102 (SQLite whole-file locking) — Deferred, no action, per user's own explicit choice above.**
+  `db/index.ts`'s doc comment and this file's Database layer section already record the must-replace
+  posture (PostgreSQL row-level locking); nothing further changed.
+- **BAL-103 (CORS allow-any-origin) — Fixed.** `backend/server.js` now passes
+  `cors({ origin: ALLOWED_ORIGINS })`, an explicit allow-list defaulting to `http://localhost:4200`
+  (matches `proxy.conf.json`'s `:4300` target), overridable via a comma-separated `ALLOWED_ORIGINS` env var.
+- **BAL-104 (no security headers/rate limiting) — Fixed.** `helmet()` added to both `backend/server.js`
+  and `microservices/balance-component/src/app.ts`. A rate limiter (`express-rate-limit`, 120 req/min) is
+  scoped to the microservice's `/balance-movements` router only (the Maker/Checker write surface) —
+  deliberately not applied to the read-heavy `/balance-contracts` catalog/lookup/snapshot endpoints.
+- **BAL-105 (no ESLint/Prettier) — Fixed.** Baseline flat-config `eslint.config.js` +
+  `.prettierrc.json` added to all three sub-projects (Angular app: `@typescript-eslint/recommended` +
+  `angular-eslint`; `backend/` and the microservice: `@eslint/js` recommended + TS rules where
+  applicable). `@typescript-eslint/no-explicit-any` is a warning, not an error, so it surfaces BAL-108's
+  residual debt without blocking unrelated work. `npm run lint`/`npm run format:check` scripts added to
+  all three `package.json`s. Not yet wired into CI or `npm test` — closes "tooling exists", not
+  "enforced in the gate."
+- **BAL-106 (hand-rolled migration) — Fixed.** New `microservices/balance-component/src/db/migrations.ts`
+  — a `schema_migrations` tracking table + ordered `Migration[]` array with `up()` functions, replacing
+  the old inline `ALTER TABLE ... IF NOT EXISTS`-style check in `db/index.ts`. The existing
+  `acknowledged_by`/`acknowledged_at` column addition became migration `id: 1`. New
+  `test/unit/db/migrations.test.ts` (3 tests: fresh-run applies + records; second run is a no-op, doesn't
+  re-throw "duplicate column"; backward-compat with a pre-existing db that already has the columns but no
+  tracking table) — `migrations.ts` at 100% coverage.
+- **BAL-107 (test-only internals on the Express app export) — Fixed.** `backend/server.js` now exports
+  `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice }` instead of attaching
+  those three functions as properties onto the `app` function object. `backend/test/server.test.js`'s
+  import updated to `const { app } = require('../server')`; `runCase.test.js` already used destructuring,
+  no change needed there beyond its own header comment.
+- **BAL-108 (residual `any` typing in `transaction-builder.component.ts`) — Partially fixed, by
+  design.** 6 of 11 identified `any`-typed component fields retyped to real domain types with zero test
+  breakage: `lookupResult` (`{ contract: BalanceContract; snapshot: BalanceSnapshot } | null`),
+  `lookupMovements`/`acceptanceMovements`/`sgMovements` (`BalanceMovement[]`), `acceptanceSnapshot`/
+  `sgSnapshot` (`BalanceSnapshot | null`). 5 fields — `catalogPayableMovements`, `payableMovements`,
+  `selectedPayMovement`, `checkerItems`, `selectedCheckerMovement` — were **left as `any`/`any[]`
+  deliberately**: retyping them to `BalanceMovement` broke ~15+ existing test fixtures across
+  `transaction-builder.component.spec.ts` and `transaction-builder.component.selection.spec.ts`, which
+  intentionally construct partial objects (e.g. `{movementId: 'm2'}`) for these specific fields. Rewriting
+  those fixtures was judged out of scope for a "fix the root cause without changing business
+  functionality" pass — an honest scope limitation, not silently dropped. Remaining `any` usage should be
+  retyped incrementally, one field/spec-file at a time, in a follow-up pass.
+- **BAL-003 (God Component, `transaction-builder.component.ts`) — 2 of 3 planned extractions now done.**
+  Extraction 1 (paging state machine → `loadPagedCatalog()`) predates this pass. Extraction 2, done this
+  pass: the Look Up panel's three near-identical "fetch snapshot + fetch/sort movements by eventSeq"
+  pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG) consolidated into a shared `loadSnapshotAndMovements()`
+  private helper, and `runLookup()`'s two near-identical "fetch candidates under this LC, auto-pick if
+  exactly one" catalog calls consolidated into `loadUnderLookupCandidates()` — same "guard/params
+  unchanged, only the fetch/populate body moves" convention as `loadPagedCatalog`, zero template changes,
+  zero test changes needed (behavior byte-for-byte identical, verified by the full existing spec suite
+  passing unchanged). Extraction 3 (Checker actions — submit/release/reject/cancel/acknowledge, the
+  highest-risk ~800+ lines of money-moving logic) stays **deliberately deferred** — not a safe
+  same-behavior consolidation the way the other two were; attempting it without a reviewer sign-off risks
+  the exact kind of regression this pass's own "no business functionality changes" constraint forbids.
+- **Full three-suite verification after all fixes above:** Angular app 439/439 tests passing
+  (99.75%/95.52%/99.66%/99.82% coverage), `ng build --configuration development` clean, `npm run lint`
+  0 errors/227 warnings; microservice 189/189 tests passing (99.35%/96.18%/100%/99.76% coverage, up from
+  186 due to `migrations.test.ts`), `npm run typecheck`/`npm run lint` both clean (0 errors); `backend/`
+  27/27 tests passing (97.95%/97.36%/95.65%/97.75% coverage), `npm run lint` 0 errors. All three clear the
+  95% floor on all four metrics.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

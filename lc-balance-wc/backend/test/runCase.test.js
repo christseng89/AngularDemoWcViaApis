@@ -1,7 +1,8 @@
 const { runCase, resolveLogicalContractId, callMicroservice } = require('../server');
 
-// Direct unit tests against the internal orchestration functions (exported for testability
-// alongside the Express `app` — see server.js's own module.exports tail). These deliberately
+// Direct unit tests against the internal orchestration functions (exported alongside the Express
+// `app` as `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice }` —
+// Quality-report-balance.md BAL-107 — for exactly this kind of direct testability). These deliberately
 // construct minimal synthetic step lists / captured objects rather than going through the real
 // businessCases.js registry or HTTP, to close specific branch gaps that the registry-driven
 // end-to-end tests in server.test.js can't reach cleanly:

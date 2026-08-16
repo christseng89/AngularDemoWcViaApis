@@ -22,19 +22,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import { SCHEMA_SQL } from './schema';
-
-/**
- * Lightweight column migration for a pre-existing DB file created before a
- * column was added to SCHEMA_SQL — `CREATE TABLE IF NOT EXISTS` only helps
- * brand-new files, it does nothing for a table that already exists without
- * the new column. No formal migration framework in this prototype (Design
- * doc scope), so this stays a short, explicit, idempotent list.
- */
-function migrate(db: DatabaseSync): void {
-  const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-  if (!columns.includes('acknowledged_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_by TEXT');
-  if (!columns.includes('acknowledged_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_at TEXT');
-}
+import { runMigrations } from './migrations';
 
 /** Pass ':memory:' for tests. */
 export function createDb(filePath: string): DatabaseSync {
@@ -44,7 +32,8 @@ export function createDb(filePath: string): DatabaseSync {
   }
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA_SQL);
-  migrate(db);
+  // Quality-report-balance.md BAL-106 — see migrations.ts's own doc comment for what changed and why.
+  runMigrations(db);
   return db;
 }
 

@@ -4,7 +4,7 @@ import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { BalanceComponentApiService, BalanceContract, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
 import {
   CREATING_MOVEMENT_TYPES,
@@ -278,11 +278,11 @@ export class TransactionBuilderComponent {
   arrivalApproved = false;
 
   lookup = { instrumentType: 'IPLC_LC' as InstrumentType, lcNumber: '', ibNumber: '', sgNumber: '' };
-  lookupResult: { contract: BalanceContract; snapshot: any } | null = null;
+  lookupResult: { contract: BalanceContract; snapshot: BalanceSnapshot } | null = null;
   lookupError: string | null = null;
 
   /** Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in eventSeq (time) order. */
-  lookupMovements: any[] = [];
+  lookupMovements: BalanceMovement[] = [];
 
   /**
    * Business instruction 2026-08-14 ("`Look Up Current Balance` should be
@@ -297,8 +297,8 @@ export class TransactionBuilderComponent {
   lookupTab: 'LC' | 'ACCEPTANCE' | 'SG' = 'LC';
   acceptancesUnderLookup: BalanceContract[] = [];
   selectedLookupAcceptance: BalanceContract | null = null;
-  acceptanceSnapshot: any = null;
-  acceptanceMovements: any[] = [];
+  acceptanceSnapshot: BalanceSnapshot | null = null;
+  acceptanceMovements: BalanceMovement[] = [];
 
   /**
    * Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC
@@ -311,8 +311,8 @@ export class TransactionBuilderComponent {
    */
   sgsUnderLookup: BalanceContract[] = [];
   selectedLookupSg: BalanceContract | null = null;
-  sgSnapshot: any = null;
-  sgMovements: any[] = [];
+  sgSnapshot: BalanceSnapshot | null = null;
+  sgMovements: BalanceMovement[] = [];
 
   constructor(private readonly api: BalanceComponentApiService) {}
 
@@ -2664,6 +2664,52 @@ export class TransactionBuilderComponent {
     cancelPrimary();
   }
 
+  /**
+   * Quality-report-balance.md BAL-003 (second of three planned extractions — the third,
+   * Checker-actions/submit-release-reject-cancel-acknowledge, stays deferred: it's the highest-risk,
+   * money-moving ~800+ lines and isn't a safe same-behavior consolidation the way this one is). Shared
+   * body behind the Look Up panel's three near-identical "fetch snapshot + fetch/sort movements by
+   * eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG) — only the fetch/populate shape is shared;
+   * each caller still owns its own target fields and its own snapshot-error behavior (Tab 1 surfaces
+   * `lookupError`, Tabs 2/3 just null out their own snapshot), same "guard/params unchanged, only the
+   * body moves" convention as `loadPagedCatalog` above.
+   */
+  private loadSnapshotAndMovements(
+    contractId: string,
+    setSnapshot: (snapshot: BalanceSnapshot) => void,
+    setMovements: (movements: BalanceMovement[]) => void,
+    onSnapshotError: (err: unknown) => void,
+  ): void {
+    this.api.getSnapshot(contractId).subscribe({
+      next: setSnapshot,
+      error: onSnapshotError,
+    });
+    // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per contract.
+    this.api.listMovements(contractId).subscribe({
+      next: (movements) => setMovements([...movements].sort((a, b) => a.eventSeq - b.eventSeq)),
+      error: () => setMovements([]),
+    });
+  }
+
+  /**
+   * Quality-report-balance.md BAL-003 — shared body behind runLookup()'s two near-identical "fetch
+   * candidates under this LC, auto-pick if exactly one" catalog calls (Acceptance tab / SG tab).
+   */
+  private loadUnderLookupCandidates(
+    instrumentType: InstrumentType,
+    lcNumber: string,
+    setCandidates: (items: BalanceContract[]) => void,
+    autoSelect: (contractId: string) => void,
+  ): void {
+    this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).subscribe({
+      next: (result) => {
+        setCandidates(result.items);
+        if (result.items.length === 1) autoSelect(result.items[0].balanceContractId);
+      },
+      error: () => setCandidates([]),
+    });
+  }
+
   runLookup(): void {
     this.lookupError = null;
     this.lookupResult = null;
@@ -2683,15 +2729,12 @@ export class TransactionBuilderComponent {
       sgNumber: this.lookup.sgNumber || null,
     }).subscribe({
       next: (contract) => {
-        this.api.getSnapshot(contract.balanceContractId).subscribe({
-          next: (snapshot) => (this.lookupResult = { contract, snapshot }),
-          error: (err) => (this.lookupError = this.describeApiError(err)),
-        });
-        // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per contract.
-        this.api.listMovements(contract.balanceContractId).subscribe({
-          next: (movements) => (this.lookupMovements = [...movements].sort((a, b) => a.eventSeq - b.eventSeq)),
-          error: () => (this.lookupMovements = []),
-        });
+        this.loadSnapshotAndMovements(
+          contract.balanceContractId,
+          (snapshot) => (this.lookupResult = { contract, snapshot }),
+          (movements) => (this.lookupMovements = movements),
+          (err) => (this.lookupError = this.describeApiError(err)),
+        );
         // Business instruction 2026-08-14 ("two tabs for Usance LC, one for LC Balance and one for Acceptance
         // Balance") — fetch every Acceptance carved out under this LC (one per IB Number, per A6) so the second
         // tab has something to pick from as soon as it's a Usance-tenor LC; harmless no-op for a Sight LC's
@@ -2699,24 +2742,22 @@ export class TransactionBuilderComponent {
         // the tab entirely in that case regardless of whether this fetch found anything.
         const acceptanceType = this.acceptanceInstrumentTypeFor(contract.instrumentType);
         if (acceptanceType) {
-          this.api.catalog(acceptanceType, undefined, undefined, 1, 50, contract.naturalKey.lcNumber).subscribe({
-            next: (result) => {
-              this.acceptancesUnderLookup = result.items;
-              if (result.items.length === 1) this.selectLookupAcceptance(result.items[0].balanceContractId);
-            },
-            error: () => (this.acceptancesUnderLookup = []),
-          });
+          this.loadUnderLookupCandidates(
+            acceptanceType,
+            contract.naturalKey.lcNumber,
+            (items) => (this.acceptancesUnderLookup = items),
+            (contractId) => this.selectLookupAcceptance(contractId),
+          );
         }
         // Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC...
         // three tabs, LC Balance, Acceptance Balance, and SG Balance") — every SHGT under this LC, any tenor.
         if (contract.instrumentType === 'IPLC_LC') {
-          this.api.catalog('SHGT', undefined, undefined, 1, 50, contract.naturalKey.lcNumber).subscribe({
-            next: (result) => {
-              this.sgsUnderLookup = result.items;
-              if (result.items.length === 1) this.selectLookupSg(result.items[0].balanceContractId);
-            },
-            error: () => (this.sgsUnderLookup = []),
-          });
+          this.loadUnderLookupCandidates(
+            'SHGT',
+            contract.naturalKey.lcNumber,
+            (items) => (this.sgsUnderLookup = items),
+            (contractId) => this.selectLookupSg(contractId),
+          );
         }
       },
       error: (err) => (this.lookupError = this.describeApiError(err)),
@@ -2742,14 +2783,12 @@ export class TransactionBuilderComponent {
       this.sgMovements = [];
       return;
     }
-    this.api.getSnapshot(this.selectedLookupSg.balanceContractId).subscribe({
-      next: (snapshot) => (this.sgSnapshot = snapshot),
-      error: () => (this.sgSnapshot = null),
-    });
-    this.api.listMovements(this.selectedLookupSg.balanceContractId).subscribe({
-      next: (movements) => (this.sgMovements = [...movements].sort((a, b) => a.eventSeq - b.eventSeq)),
-      error: () => (this.sgMovements = []),
-    });
+    this.loadSnapshotAndMovements(
+      this.selectedLookupSg.balanceContractId,
+      (snapshot) => (this.sgSnapshot = snapshot),
+      (movements) => (this.sgMovements = movements),
+      () => (this.sgSnapshot = null),
+    );
   }
 
   /** Acceptance tab — business instruction 2026-08-14 ("one for Acceptance Balance"): loads the picked Acceptance's own snapshot + Event Timeline, independent of the LC's own (Tab 1's lookupResult/lookupMovements are untouched). */
@@ -2760,13 +2799,11 @@ export class TransactionBuilderComponent {
       this.acceptanceMovements = [];
       return;
     }
-    this.api.getSnapshot(this.selectedLookupAcceptance.balanceContractId).subscribe({
-      next: (snapshot) => (this.acceptanceSnapshot = snapshot),
-      error: () => (this.acceptanceSnapshot = null),
-    });
-    this.api.listMovements(this.selectedLookupAcceptance.balanceContractId).subscribe({
-      next: (movements) => (this.acceptanceMovements = [...movements].sort((a, b) => a.eventSeq - b.eventSeq)),
-      error: () => (this.acceptanceMovements = []),
-    });
+    this.loadSnapshotAndMovements(
+      this.selectedLookupAcceptance.balanceContractId,
+      (snapshot) => (this.acceptanceSnapshot = snapshot),
+      (movements) => (this.acceptanceMovements = movements),
+      () => (this.acceptanceSnapshot = null),
+    );
   }
 }

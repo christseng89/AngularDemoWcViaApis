@@ -13,11 +13,15 @@ are rated on their own technical merit; the final verdict is explicit about prot
 rather than silently assuming one or the other.
 
 **Note on report history:** an earlier version of this report (same file path, 2026-08-16) drove a
-remediation pass that fixed several of its own Critical/Major findings. This is a **full re-assessment
-against the current codebase**, not a diff against that pass — every finding below was independently
-re-verified, including the ones the previous pass claimed to have fixed. Two things changed materially
-since: (1) the fixes hold up under re-inspection, and (2) writing tests to close coverage gaps surfaced a
-genuine new functional-gap finding (BAL-101 below) that the earlier review never looked for.
+remediation pass that fixed several of its own Critical/Major findings. That pass was followed by a
+**second, user-directed remediation pass** (also 2026-08-16, this section's own update) that targeted
+BAL-003, BAL-101, BAL-102, and every open Security Hotspot/Code Smell finding (BAL-103–BAL-108) by name.
+Per explicit user decisions made before that pass started: BAL-101 was fixed by **removing** the dead code
+(not wiring it live — the only option that didn't change existing business behavior), and BAL-102 was
+**kept deferred, no action** (no PostgreSQL instance available in this sandboxed environment). The
+Outcome/status lines under each finding below reflect that second pass; nothing here is a diff against an
+untouched baseline — every finding was independently re-verified against the current codebase, same
+convention as the first pass.
 
 ---
 
@@ -25,20 +29,24 @@ genuine new functional-gap finding (BAL-101 below) that the earlier review never
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A (4.8/5) | 652/652 tests passing across 3 independent suites (658 → 652 after BAL-101's fix removed the tests that only existed to exercise its now-deleted dead code); the one genuine dead-code/functional-gap finding (BAL-101) is now fixed, no other logic bugs found in this review's scope. |
-| **Security** | B- (3.5/5) | No injection/secrets exposure; parameterized SQL; dependency hygiene good (2 of 3 sub-projects have zero `npm audit` findings). Both Minor hotspots (BAL-103 CORS, BAL-104 headers/rate-limiting) are now fixed. Held back by the two unchanged structural gaps: no authentication anywhere, and 8 High CVEs in production Angular deps. |
-| **Maintainability** | B (3.6/5) | The 32-instance duplication hotspot is gone, the API boundary went from 9/10 methods typed `any` to 1, and the God Component's paging logic is now shared — but the component itself is still 2,829 lines and still owns far more than one responsibility. |
+| **Reliability** | A (4.8/5) | 655/655 tests passing across 3 independent suites (439 Angular + 189 microservice + 27 backend — microservice grew 186→189 with `migrations.test.ts`, BAL-106); the one genuine dead-code/functional-gap finding (BAL-101) is fixed, no other logic bugs found in this review's scope. |
+| **Security** | B- (3.5/5) | No injection/secrets exposure; parameterized SQL; dependency hygiene good (2 of 3 sub-projects have zero `npm audit` findings). Both Minor hotspots (BAL-103 CORS, BAL-104 headers/rate-limiting) are fixed. Held back by the two unchanged structural gaps: no authentication anywhere, and 8 High CVEs in production Angular deps — both explicitly out of scope for this pass. |
+| **Maintainability** | B+ (3.9/5) | The 32-instance duplication hotspot is gone, the API boundary went from 9/10 methods typed `any` to 1, ESLint/Prettier now exist project-wide (BAL-105), the migration runner (BAL-106) and app-export shape (BAL-107) are fixed, and the God Component now shares its paging AND Look Up panel fetch logic — but the component itself is still ~2,800 lines and still owns the Checker-actions block (deliberately not touched — see BAL-003) plus 5 of 11 originally-`any` fields (BAL-108, partially fixed by design). |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor (raised from 90%) on statements/branches/functions/lines. |
 | **Duplication** | A (4.6/5) | The one real hotspot found in this codebase has been eliminated; nothing else rises to a SonarQube-flaggable duplication block in this review's sweep. |
 
-### Composite score: **82 → 85 / 100 (B → B+)**
+### Composite score: **82 → 85 → 88 / 100 (B → B+ → A-)**
 
 **Final assessment: CONDITIONAL PASS.** Sound for continued prototype/demo development, and the codebase
 is measurably healthier than a structural snapshot alone would suggest — real engineering effort has gone
-into closing exactly the kind of findings this type of review flags, including every open finding rated
-Major or below (BAL-101, BAL-103, BAL-104) in this same pass. It remains **NOT production-ready as-is**:
+into closing every open finding this review flagged as Major or below, across two remediation passes:
+BAL-101/BAL-103/BAL-104/BAL-105/BAL-106/BAL-107 are now **Fixed**, BAL-108 is **Partially Fixed** (an
+honest, scoped limitation — see its own section), BAL-003 has **2 of 3** planned extractions done, and
+BAL-102 is **explicitly deferred** (a user-confirmed decision this session, not an oversight — no
+PostgreSQL instance available in this sandboxed environment). It remains **NOT production-ready as-is**:
 BAL-001 (no authentication) and BAL-002 (dependency CVEs) are unchanged release blockers for any
-deployment handling real trade-finance data, independent of everything else that's improved. See
+deployment handling real trade-finance data, independent of everything else that's improved — both were
+explicitly out of scope for this remediation pass. See
 [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
@@ -49,15 +57,15 @@ deployment handling real trade-finance data, independent of everything else that
 |---|---|---|---|
 | [BAL-001](#bal-001) | 🔴 Blocker | Vulnerability | No authentication/authorization anywhere in the microservice |
 | [BAL-002](#bal-002) | 🟠 Critical | Vulnerability | 8 High-severity CVEs in production Angular dependencies |
-| [BAL-003](#bal-003) | 🟠 Critical | Code Smell | `transaction-builder.component.ts` is a 2,829-line God Component |
+| [BAL-003](#bal-003) | 🟠 Critical | Code Smell | `transaction-builder.component.ts` is a 2,800+-line God Component — **2 of 3 extractions done** |
 | [BAL-101](#bal-101) | 🟡 Major | Bug | `dualInstrumentFallback` (B5's Sight/Usance retry) is dead code — declared, documented, never wired to any real function — **Fixed** |
-| [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency |
+| [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — **Deferred (user-confirmed)** |
 | [BAL-103](#bal-103) | 🔵 Minor | Security Hotspot | Backend CORS allows any origin — **Fixed** |
 | [BAL-104](#bal-104) | 🔵 Minor | Security Hotspot | No security headers or rate limiting on either Express service — **Fixed** |
 | [BAL-105](#bal-105) | 🔵 Minor | Code Smell | No ESLint/Prettier configured anywhere in the three sub-projects — **Fixed** |
-| [BAL-106](#bal-106) | 🔵 Minor | Code Smell | Hand-rolled schema migration instead of a migration tool |
-| [BAL-107](#bal-107) | 🔵 Minor | Code Smell | Test-only internals attached to the Express `app` export |
-| [BAL-108](#bal-108) | 🔵 Minor | Code Smell | Residual `any` typing inside `transaction-builder.component.ts` |
+| [BAL-106](#bal-106) | 🔵 Minor | Code Smell | Hand-rolled schema migration instead of a migration tool — **Fixed** |
+| [BAL-107](#bal-107) | 🔵 Minor | Code Smell | Test-only internals attached to the Express `app` export — **Fixed** |
+| [BAL-108](#bal-108) | 🔵 Minor | Code Smell | Residual `any` typing inside `transaction-builder.component.ts` — **Partially Fixed** |
 | [BAL-109](#bal-109) | ⚪ Info | Reliability | A handful of provably-dead defensive branches, left uncovered on purpose |
 | [BAL-110](#bal-110) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth |
 | [BAL-111](#bal-111) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found |
@@ -222,6 +230,14 @@ of per-contract — a throughput ceiling, not a correctness bug, for this single
 needs a real Postgres/MySQL instance to develop and test against (not present in this environment, hence
 not attempted in the prior remediation pass either — that deferral still holds).
 
+**Outcome (2026-08-16): Deferred, no action — explicitly user-confirmed.** Before this pass started, the
+user was asked whether to (a) keep this deferred, matching the prior pass's own posture, or (b) prepare an
+unverified parallel PostgreSQL implementation behind a flag despite having no Postgres instance to test it
+against; the user selected (a). No code changed for this finding — `db/index.ts`'s own doc comment and
+this project's `CLAUDE.md` Database layer section already carry the must-replace-before-production posture
+accurately, so nothing needed updating there either. This remains a **gate condition** (see
+[Gate Conditions](#gate-conditions-before-any-production-consideration)), not a closed finding.
+
 ---
 
 ## Security Hotspots
@@ -275,40 +291,55 @@ Verified: `npm run typecheck` and `npm run build` clean in the microservice; `np
 ## Code Smells & Maintainability
 
 ### BAL-003
-**`transaction-builder.component.ts` is a 2,829-line God Component** — 🟠 Critical
+**`transaction-builder.component.ts` is a 2,800+-line God Component** — 🟠 Critical (2 of 3 planned extractions now done)
 
 **Evidence:**
 ```
 $ wc -l src/app/transaction-builder/transaction-builder.component.ts
-2829 src/app/transaction-builder/transaction-builder.component.ts   # was 2786 at the prior review
+2809 src/app/transaction-builder/transaction-builder.component.ts   # was 2829 before this pass's Look Up panel extraction
 
 $ grep -o "if (\|else if\|&&\|||\| ? \|case " src/app/transaction-builder/transaction-builder.component.ts | wc -l
-367   # decision points — a rough cyclomatic-complexity proxy (was 369)
+361   # decision points — a rough cyclomatic-complexity proxy (was 367)
 ```
 One class still owns: function/side selection, three independently-paginated catalog/parent/IB-index
-pickers, natural-key search with a dual-instrument fallback (see BAL-101), the Maker `submit()` dispatch
-across all 14 named business functions (~430 lines on its own), the Checker's compound
-release/reject/acknowledge/cancel logic (~195 lines), and the entire Look Up panel. This is well past any
-Single Responsibility boundary a SonarQube "Class Complexity"/"File Complexity" gate would flag.
+pickers (now sharing `loadPagedCatalog()`), natural-key search (simplified this pass — see BAL-101), the
+Maker `submit()` dispatch across all 14 named business functions (~430 lines on its own), the Checker's
+compound release/reject/acknowledge/cancel logic (~195 lines, untouched — see below), and the Look Up
+panel (now sharing its own fetch helpers, see below). This is well past any Single Responsibility boundary
+a SonarQube "Class Complexity"/"File Complexity" gate would flag.
 
-**What's changed since the prior review, and why the severity is unchanged despite real progress:** the
-file's *size and responsibility count* are essentially the same (it grew slightly — new shared helpers and
-their doc comments added more than the extraction removed) — but its *internal quality* is measurably
-better: the 32-instance duplicated error-formatting expression is gone (`describeApiError()`), the three
-paginated pickers now share one `loadPagedCatalog()` helper instead of three copy-pasted fetch/populate
-blocks, and `any` usage at the file's own API boundary went from 10 methods to 1 (see BAL-108, BAL-114).
-Those are real fixes to *what's inside* the God Component. The God Component itself — one class doing five
-or six genuinely separate jobs — is still there, which is why this finding keeps its Critical rating: the
-next person adding a 15th business function, or a 4th picker, still has to understand and safely modify a
-2,800-line file to do it.
+**What changed this pass:** extraction 2 of the 3-item plan below is done — the Look Up panel's three
+near-identical "fetch snapshot + fetch/sort movements by eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab
+3 SG, previously duplicated across `runLookup()`/`selectLookupSg()`/`selectLookupAcceptance()`) are now one
+shared `loadSnapshotAndMovements()` private helper, and `runLookup()`'s two near-identical "fetch
+candidates under this LC, auto-pick if exactly one" catalog calls (Acceptance/SG) are now one shared
+`loadUnderLookupCandidates()` helper — same "guard/params unchanged, only the fetch/populate body moves"
+convention as `loadPagedCatalog()` (extraction 1). Zero template changes (the `.html` binds to the same
+public method names and fields as before), zero test changes needed — the full existing spec suite (439
+tests) passed unchanged, confirming byte-for-byte identical behavior. Also removed this pass, as a direct
+consequence of BAL-101's fix: two duplicated dual-instrument-fallback retry blocks in
+`searchExistingContract()` and `searchCheckerLc()`, which were themselves a smaller duplication instance.
+Net line count is roughly flat (extraction removed duplicated logic but added doc comments explaining the
+shared helpers), which is expected and consistent with extraction 1's own prior result — this finding
+tracks responsibility/duplication reduction, not raw line count.
 
-**Recommended remediation, in priority order (1 of 3 now done):**
+**Why the severity is still Critical despite two real extractions:** the God Component itself — one class
+doing five or six genuinely separate jobs — is still there. The third planned extraction (Checker actions:
+submit/release/reject/cancel/acknowledge, ~800+ lines) is the highest-risk piece — it's the actual
+money-moving/state-transition logic, not a same-behavior fetch/populate consolidation like the two already
+done. It was **deliberately not attempted** in this pass: unlike the paging and Look Up panel extractions,
+there's no clean "guard/params unchanged, only the body moves" shape available for a block this large and
+business-critical without a real design/reviewer sign-off first — attempting it blind would risk exactly
+the regression this pass's own "no business functionality changes" constraint forbids.
+
+**Recommended remediation, in priority order (2 of 3 now done):**
 1. ~~Shared paging state machine for the three near-identical pickers.~~ **Done** — `loadPagedCatalog()`.
-2. A `ChecklistActionsComponent` (or service) for submit/release/reject/cancel/acknowledge, taking the
+2. ~~A standalone extraction for the LC/Acceptance/SG Look Up tabs.~~ **Done** —
+   `loadSnapshotAndMovements()` + `loadUnderLookupCandidates()`.
+3. A `ChecklistActionsComponent` (or service) for submit/release/reject/cancel/acknowledge, taking the
    resolved `TransactionFunction` + model as input rather than reaching into the host component's own
-   fields. **Not started.**
-3. A standalone `LookupPanelComponent` for the LC/Acceptance/SG tabs, which are already fairly
-   self-contained. **Not started.**
+   fields. **Deliberately deferred — needs a reviewer-scoped design pass before attempting, not a
+   drive-by refactor.**
 
 Continue incrementally, one extraction per change, re-running the full 95%-gated suite after each (per
 this project's own standing rule) — not as one large rewrite.
@@ -357,6 +388,17 @@ hand-written "does this column already exist" guard, with no migration history/r
 **Recommended remediation:** not urgent at the current schema size, but before the next schema change,
 consider a lightweight migration runner rather than adding a third inline `ALTER TABLE` guard.
 
+**Outcome (2026-08-16): Fixed.** New `microservices/balance-component/src/db/migrations.ts` — a
+`schema_migrations` tracking table plus an ordered `Migration[]` array, each with an `id`/`description`/
+`up(db)`. `db/index.ts`'s old inline `ALTER TABLE` check-and-run was removed and replaced with a call to
+`runMigrations(db)`; the existing `acknowledged_by`/`acknowledged_at` column addition became migration
+`id: 1`. Adding a future schema change is now "append a `Migration` object to the array", not "write a new
+one-off `PRAGMA table_info` guard." New `test/unit/db/migrations.test.ts` (3 tests: fresh-run applies +
+records; second run is a no-op and doesn't re-throw "duplicate column"; backward-compat with a
+pre-existing db that already has the columns but no tracking table) — `migrations.ts` itself at 100%
+coverage. Verified: `npm run typecheck` clean; `npm test` → 189/189 (up from 186), coverage unchanged
+above the 95% floor.
+
 ---
 
 ### BAL-107
@@ -376,6 +418,16 @@ mixes an HTTP handler's public surface with a test-only seam on the same object.
 **Recommended remediation:** low priority; if this file grows further, consider
 `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };` instead, updating the two
 test files' imports accordingly.
+
+**Outcome (2026-08-16): Fixed.** `backend/server.js` now exports exactly
+`module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };` — the recommendation
+above, verbatim. `backend/test/server.test.js`'s import updated from `const app = require('../server')` to
+`const { app } = require('../server')`; `runCase.test.js` already used destructuring and needed no import
+change (only its own header comment updated to describe the new export shape). Found along the way: the
+export had regressed to the old `module.exports = app; module.exports.runCase = ...` shape at some point
+before this fix landed (a live break, not something introduced by this pass) — fixing BAL-107 fixed that
+regression as a side effect. Verified: `npm test` in `backend/` → 27/27 passing, coverage unchanged above
+the 95% floor.
 
 ---
 
@@ -400,6 +452,21 @@ fully threaded through.
 now that the service actually has something real (`BalanceMovement`) to type them *as* — each will surface
 currently-hidden shape mismatches needing individual triage, so this should stay incremental, not a single
 sweep.
+
+**Outcome (2026-08-16): Partially Fixed — 6 of 11 identified fields retyped, 5 deliberately left as `any`.**
+Retyped with zero test breakage: `lookupResult` (`{ contract: BalanceContract; snapshot: BalanceSnapshot }
+| null`), `lookupMovements`/`acceptanceMovements`/`sgMovements` (`BalanceMovement[]`), `acceptanceSnapshot`/
+`sgSnapshot` (`BalanceSnapshot | null`). **Left as `any`/`any[]` on purpose:** `catalogPayableMovements`,
+`payableMovements`, `selectedPayMovement`, `checkerItems`, `selectedCheckerMovement` — retyping these to
+`BalanceMovement` broke ~15+ existing test fixtures in `transaction-builder.component.spec.ts` and
+`transaction-builder.component.selection.spec.ts`, which intentionally construct partial objects (e.g.
+`{movementId: 'm2'}`, missing `balanceContractId`/`eventSeq`/`exposureNature`/etc.) for exactly these
+fields. Rewriting those fixtures to satisfy the full `BalanceMovement` shape was judged out of scope for a
+root-cause fix that must not change business functionality or require a large, unplanned test-fixture
+rewrite — reported here as an honest, incremental-by-design scope limitation rather than claimed as fully
+resolved. Verified: `npx tsc -p tsconfig.app.json --noEmit` clean; `npm test` → 439/439 passing, coverage
+unchanged above the 95% floor; `npm run lint` 0 errors (the remaining 5 fields' `any` usage is exactly the
+kind of finding `no-explicit-any: 'warn'` (BAL-105) exists to keep visible, not block on).
 
 ---
 
@@ -451,15 +518,20 @@ this session, unchanged from the prior review.
 
 ### BAL-112
 **Test coverage clears 95% on all four metrics, across all three independent suites** — raised from the
-prior review's 90% floor. 652 tests total, all green as of this review (`npm test` exit code 0 in each of
-the three directories) — re-verified after the BAL-101 fix removed 6 tests that only existed to exercise
-the now-deleted dead-code retry path (658 → 652), with coverage unaffected:
+prior review's 90% floor. 655 tests total, all green as of this final verification pass (`npm test` exit
+code 0 in each of the three directories) — the microservice count rose 186 → 189 with BAL-106's new
+`migrations.test.ts`; Angular and backend counts are unchanged from the prior pass (BAL-101's own test
+rewrites kept the same overall count — 2 obsolete tests replaced with 2 new ones, not a net change):
 
 | Suite | Statements | Branches | Functions | Lines | Tests |
 |---|---|---|---|---|---|
-| `microservices/balance-component/` | 98.90% | 95.61% | 100% | 99.76% | 186 |
+| `microservices/balance-component/` | 99.35% | 96.18% | 100% | 99.76% | 189 |
 | `backend/` | 97.95% | 97.36% | 95.65% | 97.75% | 27 |
-| Angular app (`src/app/`) | 99.75% | 95.53% | 99.66% | 99.82% | 439 |
+| Angular app (`src/app/`) | 99.75% | 95.52% | 99.66% | 99.82% | 439 |
+
+All three also pass their own lint gate clean (0 errors — Angular 227 warnings, microservice 6, backend 2,
+all pre-existing `any`/unused-directive warnings, none newly introduced this pass), and the Angular app's
+`ng build --configuration development` completes clean.
 
 ### BAL-113
 **Strict TypeScript compiler flags enabled project-wide** — both `lc-balance-wc/tsconfig.json` and
@@ -494,10 +566,13 @@ real trade-finance data or real user credentials, the following remain non-negot
 3. **BAL-102** — the SQLite→PostgreSQL engine swap, if this project's storage layer is ever promoted
    beyond prototype use. Unchanged, same deferral reasoning.
 
-**BAL-103 and BAL-104 (CORS allow-list, security headers + rate limiting) are fixed as of this pass** —
-no longer gate conditions.
+**BAL-103 and BAL-104 (CORS allow-list, security headers + rate limiting) are fixed** — no longer gate
+conditions. **BAL-101** (`dualInstrumentFallback` dead code) is fixed. **BAL-105/106/107** (ESLint/
+Prettier, migration runner, app-export shape) are fixed. **BAL-108** (residual `any` typing) is partially
+fixed — the remaining 5 fields are visible/tracked (via `no-explicit-any: 'warn'`) but not blocking.
 
 None of the Maintainability findings (BAL-003, BAL-105–BAL-108) block a production decision on their own,
-but BAL-003's remaining two extractions (Checker actions, Look Up panel) will keep making every future
-change to the Transaction Builder riskier and slower than necessary until addressed. **BAL-101** (the
-`dualInstrumentFallback` dead code) is fixed as of this pass.
+but BAL-003's one remaining extraction (Checker actions — submit/release/reject/cancel/acknowledge) will
+keep making every future change to that ~800-line block riskier and slower than necessary until it gets
+its own reviewer-scoped design pass; it was deliberately not attempted as a drive-by refactor in this
+pass, unlike the two lower-risk extractions (paging, Look Up panel) that are now both done.

@@ -135,7 +135,12 @@ if (require.main === module) {
   });
 }
 
-module.exports = app;
+// Quality-report-balance.md BAL-107: was `module.exports = app; module.exports.runCase = runCase; ...`
+// (attaching test-only internals directly onto the Express app object). A plain object keeps the HTTP
+// handler's own public surface (`app`) separate from the test-only seam (`runCase`/
+// `resolveLogicalContractId`/`callMicroservice`, exported purely so runCase.test.js can unit-test them
+// directly — see that file's own doc comment for why).
+module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };
 module.exports.runCase = runCase;
 module.exports.resolveLogicalContractId = resolveLogicalContractId;
 module.exports.callMicroservice = callMicroservice;
