@@ -1149,6 +1149,53 @@ silently accepted and overridden). Both new/updated files were validated for YAM
 throwaway `js-yaml` script (no network access or global install needed — `js-yaml` was already present as
 a transitive dependency under `backend/node_modules/`).
 
+## Contingent Liability Ledger added to `analysis/` (2026-08-16, user-requested — account-entry requirements review, then "Put this into Analysis folder")
+
+`analysis/contingent-liability-ledger.html` — a self-contained (fonts embedded, no external requests)
+Dr/Cr account-pair reference for every in-scope contingent-liability scenario: Import LC (Sight/Buyer's
+Usance/Seller's Usance), Shipping Guarantee, Import Acceptance (Buyer's/Seller's Usance), Export
+Confirmation (Sight/Usance), and Export Acceptance (Usance only — Sight is explicitly N/A, a Sight
+confirmed LC never creates an Acceptance instrument). Sourced strictly from
+`analysis/TF_Balance_Component_Spec-en.docx` and `analysis/TF_Contingent_Liability_Lifecycle-en.docx`
+(read via a one-off `pandoc`-to-text conversion, not committed anywhere — the two docx files remain the
+only source of record), cross-checked against `balance-component.model.ts` and `balanceDerivation.ts`
+for current implementation status. Includes a 14-row A1–A9/B1–B5 function-code coverage index (every
+named business function linked to which folio(s) it posts to and its exact contingent GL effect,
+including a "no GL effect — memo only" row for A3/B3 rather than leaving them silently unaccounted for),
+and — Import LC / Export Confirmation folios only, per explicit user direction — collapses the
+per-tenor-duplicated rows using the source document's own `[Tenor]` placeholder convention (its own
+§3.2/§3.9/§7.2/§7.7), cutting Folio 1 from 18 rows to 6 and Folio 4 from 12 to 6 with zero loss of the
+underlying event-code detail (kept inline in each row's own code annotation).
+
+Documents several **confirmed, deliberate divergences** from the source document's own prescribed model
+— not oversights, called out explicitly in the ledger's own appendix: partial SG redemption
+(Balance Component ships the MIN()-based rule the source document explicitly argues against, per a later
+business override), Import Acceptance being offered under Buyer's Usance at all (the source document's
+own derivation matrix routes true Buyer's Usance honour away from the Acceptance/DPU path entirely), and
+the Export tenor collapse (B4 never distinguishes the source document's own "Buyer's Usance honoured at
+sight, no Acceptance" case from the Acceptance-creating one). Also flags Expiry/Cancellation and SG
+Amendment/Claim as spec-defined requirements with no callable Balance Component function today.
+
+Built as a Claude-published Artifact first (design pass: IBM Plex Serif/Sans/Mono trio, embedded via
+base64 `@font-face` after confirming outbound network access; a verdigris/oxblood/gold palette encoding
+establish/release/memo-only as a real structural signal, not decoration), then copied byte-for-byte into
+this file once the user asked for it to live in the project — the published Artifact and this file are
+identical, not two independently-maintained copies.
+
+**Correction (same day, user-caught — "SG Amendment should be SG Issue, right?"):** the ledger's Folio 2
+originally listed "SG Amendment — Increase" as its own row, footnoted as a defined-but-unimplemented
+requirement alongside Decrease/Claim. User correctly pointed out this conflates two different things —
+SG Issue and SG Amendment-Increase post the **identical** Dr/Cr pair (same accounts, same direction), and
+`SHGT` has no `AMEND` movementType at all (unlike LC/Confirmation, there is no A-series "SG Amendment"
+function in the Transaction Builder registry), so a real amount increase is realized as another SG Issue
+(A8), not a distinct amendment event. Merged the two rows into one ("SG Issue — new, or an amount
+increase"); Decrease and Claim remain separate, genuinely-unimplemented rows since they move the pair in
+the *opposite* direction from Issue and have no A8/A9 workaround at all. Also strengthened, per a
+follow-up question, the A3S ↔ A9 cross-reference on the Redemption row: both call the identical
+`shgtRedeem.ts` domain logic (same MIN(Bill Amount, SG Outstanding) derivation of FULL_REDEEM vs.
+PARTIAL_REDEEM) — A3S is a second caller of the same rule, not a separate one, now stated explicitly in
+the footnote rather than left as a parenthetical.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation
