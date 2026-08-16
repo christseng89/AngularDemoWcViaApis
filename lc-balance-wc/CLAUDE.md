@@ -1938,6 +1938,40 @@ registry. Test data from both live-verification passes scoped-cleaned afterward
 (`IMP-C%`/`EXP-C%` — the full 14-case re-run also created fresh Import-side contracts, cleaned up the
 same pass), leaving the user's own 18 S01/S02/U01 records (Import and Export both) untouched.
 
+## BAL-125 fixed — `checker-actions.service.ts`'s own 6 un-swept `any` occurrences retyped to `BalanceMovement` (2026-08-17, business instruction: "Fix BAL-125 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-125 section): `checker-actions.service.ts`
+(extracted from `TransactionBuilderComponent` in the fifth same-day OOD/SOLID remediation pass earlier
+this session — see that entry above) carried `CheckerActionContext.submitResult: any`,
+`CheckerActionOutcome.result: any`, and three private-method parameters (`settleRes`/`honourRes`/
+`acceptRes: any`) — the exact same "misleadingly untyped API boundary" pattern BAL-108 had already fixed
+once in `transaction-builder.component.ts` itself, re-appearing because this file didn't exist yet when
+BAL-108 closed and was never swept for the identical pattern afterward.
+
+**Fix**: `CheckerActionContext.submitResult` retyped `BalanceMovement | null` (it genuinely can be null);
+`CheckerActionOutcome.result` and all three private-method parameters retyped `BalanceMovement` (never
+null at those call sites — each is always the direct response of an `api.release()` call). Tightening
+`submitResult` surfaced 4 real `string | undefined` vs. `string` mismatches at call sites using the
+`ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId` fallback pattern, previously
+masked by `any` — resolved with the same non-null-assertion convention already used one line away for
+`ctx.createdBy!` in `deleteMakerPending()` (both rely on the identical caller-side invariant: the
+component's own `release()`/`reject()`/`deleteMakerPending()` wrappers already guard on
+`!this.submitResult?.movementId` before ever constructing a `CheckerActionContext`). One of the four
+initially asserted directly on an optional-chain expression (`ctx.submitResult?.movementId!`) — caught
+by a genuine ESLint error (`@typescript-eslint/no-non-null-asserted-optional-chain`, not just a warning)
+— fixed by extracting to a local variable first, matching the other three call sites' own style.
+`checker-actions.service.spec.ts` already had a `makeMovement()` fixture-builder helper (BAL-108's own
+established convention) — only 2 of its ~40 call sites used a bare partial-object literal for
+`submitResult`, both converted to `makeMovement({movementId: ...})`.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean; `npm run lint` 0 errors (219 warnings, down
+from 220 — `checker-actions.service.ts` itself now has zero `any`-related warnings); `ng build
+--configuration development` clean; full Angular suite 510/510 with **zero test files needing assertion
+changes** beyond the 2 fixture literals — strong evidence of exact behavior preservation — coverage
+99.63%/95.17%/99.16%/99.67% (unchanged, still clears the 95% floor on all four metrics). Full
+three-suite re-verification per this file's own standing rule: `backend/` 33/33 and microservice
+292/292, both unaffected (Angular-only change).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

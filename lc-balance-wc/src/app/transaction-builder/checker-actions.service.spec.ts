@@ -395,7 +395,7 @@ describe('CheckerActionsService.reject() — prefers selectedCheckerMovement ove
     const service = new CheckerActionsService(api);
     const ctx = makeContext({
       selectedFunction: A1,
-      submitResult: { movementId: 'stale-mv' },
+      submitResult: makeMovement({ movementId: 'stale-mv' }),
       selectedCheckerMovement: makeMovement({ movementId: 'fresh-mv' }),
     });
 
@@ -409,7 +409,7 @@ describe('CheckerActionsService.reject() — prefers selectedCheckerMovement ove
   it('falls back to submitResult.movementId when selectedCheckerMovement is null', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);
-    const ctx = makeContext({ selectedFunction: A1, submitResult: { movementId: 'only-submit-result' }, selectedCheckerMovement: null });
+    const ctx = makeContext({ selectedFunction: A1, submitResult: makeMovement({ movementId: 'only-submit-result' }), selectedCheckerMovement: null });
 
     service.reject(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');

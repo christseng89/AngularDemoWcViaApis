@@ -32,7 +32,7 @@ import { describeApiError } from './api-error';
  * nested `.subscribe()` callbacks, so the exact same sequential-and-conditional shape survives.
  */
 export interface CheckerActionContext {
-  readonly submitResult: any;
+  readonly submitResult: BalanceMovement | null;
   readonly selectedFunction: TransactionFunction | null;
   readonly selectedPayMovement: BalanceMovement | null;
   readonly matchedReceivableMovementId: string | null;
@@ -52,7 +52,7 @@ export interface CheckerActionContext {
 }
 
 export type CheckerActionOutcome =
-  | { kind: 'released'; result: any; syncLookup?: boolean; reloadPayables?: boolean }
+  | { kind: 'released'; result: BalanceMovement; syncLookup?: boolean; reloadPayables?: boolean }
   /** A3S's own acknowledgment-only path (releaseArrivalDocument's old shape) — no API call, no `result`. */
   | { kind: 'documentArrivalAcknowledged' }
   | { kind: 'failed'; message: string };
@@ -144,7 +144,7 @@ export class CheckerActionsService {
             });
           }
           const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
-          return this.api.release(primaryMovementId, checkerId).pipe(
+          return this.api.release(primaryMovementId!, checkerId).pipe(
             switchMap((res) => this.releaseMatchedReceivable(checkerId, res, matchedReceivableMovementId)),
             catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
           );
@@ -152,7 +152,8 @@ export class CheckerActionsService {
       );
     }
 
-    return this.api.release(ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId, checkerId).pipe(
+    const plainMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
+    return this.api.release(plainMovementId!, checkerId).pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
       catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
     );
@@ -164,7 +165,7 @@ export class CheckerActionsService {
     // branches above. Falls back to submitResult for parity with the pre-existing behavior on the one
     // path that still relies on it (A6/B4's settlesDocumentArrival, unchanged by this fix).
     const movementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
-    return this.api.reject(movementId, 'checker1', 'MANUAL_TEST_REJECT').pipe(
+    return this.api.reject(movementId!, 'checker1', 'MANUAL_TEST_REJECT').pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
       catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
     );
@@ -179,7 +180,7 @@ export class CheckerActionsService {
   deleteMakerPending(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
     const cancelledBy = ctx.createdBy!;
     const cancelPrimary = (): Observable<CheckerActionOutcome> =>
-      this.api.cancel(ctx.submitResult.movementId, cancelledBy, 'MAKER_EC').pipe(
+      this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res, syncLookup: true })),
         catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
       );
@@ -253,7 +254,7 @@ export class CheckerActionsService {
   }
 
   /** B5's Usance/CNF_MATURE branch only — second leg, releasing the matching Reimbursement Receivable's REIMBURSE after the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE was already released above. */
-  private releaseMatchedReceivable(checkerId: string, settleRes: any, matchedReceivableMovementId: string): Observable<CheckerActionOutcome> {
+  private releaseMatchedReceivable(checkerId: string, settleRes: BalanceMovement, matchedReceivableMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(matchedReceivableMovementId, checkerId).pipe(
       switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: settleRes, syncLookup: true })),
       catchError((err) =>
@@ -359,7 +360,7 @@ export class CheckerActionsService {
     ids: { dueFromIssuingBankMovementId: string | null; acceptanceMovementId: string | null; acceptanceReimbReceivableMovementId: string | null },
   ): Observable<CheckerActionOutcome> {
     const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
-    return this.api.release(primaryMovementId, checkerId).pipe(
+    return this.api.release(primaryMovementId!, checkerId).pipe(
       switchMap((res) => {
         if (ctx.selectedFunction?.createsIssuingBankReceivableOnHonour && ids.dueFromIssuingBankMovementId) {
           return this.releaseDueFromIssuingBank(checkerId, res, ids.dueFromIssuingBankMovementId);
@@ -381,7 +382,7 @@ export class CheckerActionsService {
   }
 
   /** B4's Sight/HONOUR branch only — final leg, releasing the new Due from Issuing Bank asset after the Confirmation's own Honour (and, before that, the B3 Present Docs record) were already released above. */
-  private releaseDueFromIssuingBank(checkerId: string, honourRes: any, dueFromIssuingBankMovementId: string): Observable<CheckerActionOutcome> {
+  private releaseDueFromIssuingBank(checkerId: string, honourRes: BalanceMovement, dueFromIssuingBankMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(dueFromIssuingBankMovementId, checkerId).pipe(
       switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: honourRes, syncLookup: true, reloadPayables: true })),
       catchError((err) =>
@@ -396,7 +397,7 @@ export class CheckerActionsService {
   /** B4's Usance/ACCEPT branch only — third leg, releasing the new EPLC_ACCEPTANCE liability after the Confirmation's own ACCEPT was already released above. Chains a fourth leg from here once this succeeds. */
   private releaseAcceptanceLiability(
     checkerId: string,
-    acceptRes: any,
+    acceptRes: BalanceMovement,
     acceptanceMovementId: string,
     acceptanceReimbReceivableMovementId: string | null,
   ): Observable<CheckerActionOutcome> {
@@ -414,7 +415,7 @@ export class CheckerActionsService {
   /** B4's Usance/ACCEPT branch only — fourth and final leg, releasing the linked Reimbursement Receivable asset after the Acceptance liability was already released above (Gap Analysis Row 6). */
   private releaseAcceptanceReimbReceivable(
     checkerId: string,
-    acceptRes: any,
+    acceptRes: BalanceMovement,
     acceptanceReimbReceivableMovementId: string | null,
   ): Observable<CheckerActionOutcome> {
     if (!acceptanceReimbReceivableMovementId) {
