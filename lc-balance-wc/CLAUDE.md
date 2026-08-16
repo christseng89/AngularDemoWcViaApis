@@ -1095,6 +1095,60 @@ attribute until a manual `ng.applyChanges(comp)` tick, after which the DOM corre
 runs inside Angular's zone and triggers change detection automatically, so this artifact is specific to
 this verification method, not a defect in the shipped behavior.
 
+## Two OAS specs generated/reconciled: Balance Component Microservice API + a new Web/Mobile Channel API (2026-08-16, user-requested — "generate the corresponding OpenAPI Specification (OAS) YAML files for both Web/Mobile Channel APIs and Balance Component Microservice APIs")
+
+`analysis/balance-component-api.yaml` was bumped to **v1.0.0** and re-grounded against the real, running
+microservice (`microservices/balance-component/src/`) rather than the design-doc draft it had drifted
+from — a background research pass read `types.ts`, `routes/*.ts`, `validation/requestSchema.ts`,
+`domain/*.ts`, `service/balanceService.ts`, and the store layer directly to establish ground truth before
+writing anything. Corrections made: removed `GET .../history`, `POST .../versions` (contract
+supersession), `PATCH .../{movementId}` (edit), and `POST .../reversal` — none are actually implemented,
+despite the prior draft describing all four as live; corrected `DELETE /balance-movements/{id}?reasonCode=`
+to the real `POST .../cancel` with a JSON body (`cancelledBy` required); added the two real,
+previously-undocumented endpoints `GET /balance-contracts/catalog` (paginated picker) and
+`GET /balance-movements/{id}/balance-as-of`; added `MEMO` to `ExposureNature` (real, in use — the prior
+draft only had `CONTINGENT`/`ACTUAL`); removed the `warnings[]`/`MovementWarning` mechanism (the §6.1
+off-balance-sheet check was hardened to a hard 409 in an earlier pass — nothing has populated a warning
+since, so documenting it as live was inaccurate); added the request/response fields and business rules the
+real service already enforces but this file never documented: `parentLogicalContractId` (required for SG
+ISSUE / Present Docs CREATE, 400 if missing), `tenorType`/`tenorDays`/`maturityDate`/`exposureNature`/
+`tolerancePct` on the create request, `409 NATURAL_KEY_ALREADY_EXISTS`, the Acceptance/parent-tenor
+consistency `400`, and per-contract `sourceTransactionRef` uniqueness.
+
+**New rule, not previously enforced anywhere (genuinely new, not a drift correction)**: server-side
+Currency Code derivation. Mirrors, at the microservice's own data-model level, the client-side rule already
+shipped this session ("A1/B1 Currency Code = Input; every other function = Carried forward + Protected") —
+stated generically so the microservice needn't know about named business-function codes at all: (1) a
+request resolving to an EXISTING contract derives `currency` from that contract, rejecting a mismatching
+caller-supplied value with a new `409 CURRENCY_MISMATCH`; (2) a request creating a new child contract with
+`parentLogicalContractId` set derives `currency` from the PARENT; (3) only a genuinely root new Logical
+Contract (no existing resolution, no parent — i.e. IPLC_LC/EPLC_CONFIRMATION ISSUE) accepts caller-supplied
+`currency` as authoritative. This is spec-only, documenting an approved rule for a future implementation
+pass — the microservice's own `service/balanceService.ts` does not yet enforce it (confirmed during the
+research pass: `currency` is currently accepted verbatim with zero cross-check against any resolved
+contract).
+
+New file `analysis/balance-component-channel-api.yaml` (v1.0.0) — the Web/Mobile Channel API, which did not
+exist in any form before this pass. Designed as a thin façade over the microservice contract, in named
+business-function vocabulary (`functionCode`: A1–A9/B1–B5) rather than raw instrumentType/movementType,
+with its own field-requirement catalog (`GET /channel/functions`) mirroring
+`balance-component.model.ts`'s `IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS` registry directly — the same
+data-driven-fields design this project's own Transaction Builder already uses, deliberately preferred over
+hand-authoring 14 rigid `oneOf` request schemas. Two explicit design principles carried through, both
+user-directed: **one movement/one leg per API call** — no batch/compound endpoint anywhere, including for
+Checker Release on a business-approved compound function (A6/A3S/B4) or Maker submission on a 2–4-leg
+function (A3S/B4) — a channel client makes that many separate `POST /channel/transactions` calls, sharing
+one `businessEventId`, in the order `compoundLegs` documents, mirroring exactly how the reference Angular
+client and `backend/data/businessCases.js`'s own declarative step list already operate (neither has ever
+offered a bundled multi-leg call); and **schema-level currency enforcement** — the request body is a
+`oneOf` of two shapes, `ChannelOriginTransactionRequest` (functionCode A1/B1 only, `currency` required) and
+`ChannelDerivedTransactionRequest` (every other functionCode, `additionalProperties: false` and no
+`currency` property at all — submitting one is a `400` schema-validation failure, not a value that gets
+silently accepted and overridden). Both new/updated files were validated for YAML syntax, `$ref` integrity
+(every `$ref` resolves, zero dangling references), and zero orphaned/unused schema definitions via a
+throwaway `js-yaml` script (no network access or global install needed — `js-yaml` was already present as
+a transitive dependency under `backend/node_modules/`).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation
