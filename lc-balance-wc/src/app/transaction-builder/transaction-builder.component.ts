@@ -6,6 +6,9 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
+import { PagedListState } from './paged-list-state';
+import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
+import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   CREATING_MOVEMENT_TYPES,
   DECREASING_MOVEMENT_TYPES,
@@ -87,10 +90,21 @@ export class TransactionBuilderComponent {
 
   naturalKey = { lcNumber: '', ibNumber: '', sgNumber: '' };
   catalogContracts: BalanceContract[] = [];
-  /** Business instruction 2026-08-14 "Page by Page設計". */
-  catalogPage = 1;
-  catalogTotal = 0;
   readonly catalogPageSize = 10;
+  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID): state/boundary-math now owned by PagedListState — see catalogPage/catalogTotal/catalogTotalPages accessors below. */
+  private readonly catalogPaging = new PagedListState(this.catalogPageSize);
+  get catalogPage(): number {
+    return this.catalogPaging.page;
+  }
+  set catalogPage(page: number) {
+    this.catalogPaging.page = page;
+  }
+  get catalogTotal(): number {
+    return this.catalogPaging.total;
+  }
+  set catalogTotal(total: number) {
+    this.catalogPaging.total = total;
+  }
   /**
    * Business-reported gap 2026-08-14 ("Why the U003 does not allow for
    * Amendment?" — it did; it was just on page 2 of 2, alphabetically after
@@ -105,7 +119,7 @@ export class TransactionBuilderComponent {
   /** A4 (Sight Settlement) only — business instruction 2026-08-14: LC Index shows the pending IB Number(s) inline (e.g. "810 — IB00001 — ACTIVE — Pending: 25,000") so the user can identify which Document Arrival is being settled without opening Step 2 first. */
   catalogPayableIbs = new Map<string, string[]>();
   /** Full movement objects backing catalogPayableIbs, keyed the same way — business-reported gap "select S001 IB03 or S001 IB04 separately". */
-  catalogPayableMovements = new Map<string, any[]>();
+  catalogPayableMovements = new Map<string, BalanceMovement[]>();
   selectedContract: BalanceContract | null = null;
   /**
    * Business instruction 2026-08-14: for instrumentTypes whose natural key
@@ -128,9 +142,21 @@ export class TransactionBuilderComponent {
    * the user picks the IB/SG Number instead of typing it.
    */
   ibIndexCatalog: BalanceContract[] = [];
-  ibIndexPage = 1;
-  ibIndexTotal = 0;
   readonly ibIndexPageSize = 10;
+  /** BAL-003 (OOD/SOLID): state/boundary-math now owned by PagedListState — see ibIndexPage/ibIndexTotal/ibIndexTotalPages accessors below. */
+  private readonly ibIndexPaging = new PagedListState(this.ibIndexPageSize);
+  get ibIndexPage(): number {
+    return this.ibIndexPaging.page;
+  }
+  set ibIndexPage(page: number) {
+    this.ibIndexPaging.page = page;
+  }
+  get ibIndexTotal(): number {
+    return this.ibIndexPaging.total;
+  }
+  set ibIndexTotal(total: number) {
+    this.ibIndexPaging.total = total;
+  }
   ibIndexSnapshots = new Map<string, BalanceSnapshot>();
 
   /**
@@ -142,7 +168,13 @@ export class TransactionBuilderComponent {
    * own real balanceContractId/instrumentType/availableBalance so onSelectSettleableBalance() can route
    * correctly.
    */
-  settleableBalances: Array<{ balanceContractId: string; instrumentType: InstrumentType; ibNumber: string | null; availableBalance: string; currency: string }> = [];
+  settleableBalances: Array<{
+    balanceContractId: string;
+    instrumentType: InstrumentType;
+    ibNumber: string | null;
+    availableBalance: string;
+    currency: string;
+  }> = [];
   settleableBalancesLoading = false;
 
   /**
@@ -155,9 +187,9 @@ export class TransactionBuilderComponent {
    * Checker(A4) split — "All those functions will be processed via Maker,
    * Checker").
    */
-  payableMovements: any[] = [];
+  payableMovements: BalanceMovement[] = [];
   payableMovementsLoading = false;
-  selectedPayMovement: any | null = null;
+  selectedPayMovement: BalanceMovement | null = null;
   /**
    * Business instruction 2026-08-15 ("Index Search") — the 2ndary Index (A4/A6's still-PENDING
    * Document Arrival picker, B4's still-PENDING Present Docs picker) can have several entries under
@@ -252,19 +284,30 @@ export class TransactionBuilderComponent {
   checkerContract: BalanceContract | null = null;
   checkerSearching = false;
   checkerSearchError: string | null = null;
-  checkerItems: any[] = [];
+  checkerItems: BalanceMovement[] = [];
   checkerLoading = false;
-  selectedCheckerMovement: any | null = null;
+  selectedCheckerMovement: BalanceMovement | null = null;
   checkerBusy = false;
   checkerError: string | null = null;
   checkerId = 'checker1';
 
   parentInstrumentType: InstrumentType | '' = '';
   parentCatalog: BalanceContract[] = [];
-  /** Business instruction 2026-08-14 "Page by Page設計". */
-  parentPage = 1;
-  parentTotal = 0;
   readonly parentPageSize = 10;
+  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID): state/boundary-math now owned by PagedListState — see parentPage/parentTotal/parentTotalPages accessors below. */
+  private readonly parentPaging = new PagedListState(this.parentPageSize);
+  get parentPage(): number {
+    return this.parentPaging.page;
+  }
+  set parentPage(page: number) {
+    this.parentPaging.page = page;
+  }
+  get parentTotal(): number {
+    return this.parentPaging.total;
+  }
+  set parentTotal(total: number) {
+    this.parentPaging.total = total;
+  }
   /** Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?") — same fix as the flat Catalog picker's catalogSearch. */
   parentSearch = '';
   /** Business instruction 2026-08-14: snapshot per parent candidate, combined with tenorType in filteredParentCatalog() below. */
@@ -316,7 +359,18 @@ export class TransactionBuilderComponent {
   sgSnapshot: BalanceSnapshot | null = null;
   sgMovements: BalanceMovement[] = [];
 
-  constructor(private readonly api: BalanceComponentApiService) {}
+  /**
+   * BAL-003 (Checker Actions extraction): `checkerActions` defaults to a fresh
+   * `CheckerActionsService` bound to the same `api` — preserves every existing `new
+   * TransactionBuilderComponent(mockApi)` test call site (70+ across 4 spec files) unmodified. Angular's
+   * own DI container always resolves BOTH constructor parameters when it constructs this component for
+   * real (default parameter values are never consulted by Angular's DI), so production wiring gets the
+   * real injected singleton exactly as if this were a normal required dependency.
+   */
+  constructor(
+    private readonly api: BalanceComponentApiService,
+    private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
+  ) {}
 
   get isCreatingMovement(): boolean {
     return !!this.model.movementType && CREATING_MOVEMENT_TYPES.has(this.model.movementType);
@@ -463,15 +517,12 @@ export class TransactionBuilderComponent {
     this.parentInstrumentType = fn.defaultParentInstrumentType ?? '';
     this.selectedParent = null;
     this.parentCatalog = [];
-    this.parentPage = 1;
-    this.parentTotal = 0;
+    this.parentPaging.reset();
     this.parentSearch = '';
-    this.catalogPage = 1;
-    this.catalogTotal = 0;
+    this.catalogPaging.reset();
     this.catalogSearch = '';
     this.ibIndexCatalog = [];
-    this.ibIndexPage = 1;
-    this.ibIndexTotal = 0;
+    this.ibIndexPaging.reset();
     this.settleableBalances = [];
     this.settleableBalancesLoading = false;
     this.payableMovements = [];
@@ -555,9 +606,7 @@ export class TransactionBuilderComponent {
   private loadSnapshotsInto(list: BalanceContract[], target: Map<string, BalanceSnapshot>): void {
     target.clear();
     if (!list.length) return;
-    forkJoin(
-      list.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null)))),
-    ).subscribe((snapshots) => {
+    forkJoin(list.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null))))).subscribe((snapshots) => {
       list.forEach((c, i) => {
         const snap = snapshots[i];
         if (snap) target.set(c.balanceContractId, snap);
@@ -654,13 +703,14 @@ export class TransactionBuilderComponent {
     this.catalogPayableIbs.clear();
     this.catalogPayableMovements.clear();
     if (!list.length) return;
-    forkJoin(
-      list.map((c) => this.api.listMovements(c.balanceContractId).pipe(catchError(() => of([] as any[])))),
-    ).subscribe((results) => {
+    forkJoin(list.map((c) => this.api.listMovements(c.balanceContractId).pipe(catchError(() => of([] as any[]))))).subscribe((results) => {
       list.forEach((c, i) => {
         const pending = (results[i] ?? []).filter((m: any) => m.status === 'PENDING' && m.movementType === 'UTILIZE');
         if (pending.length) {
-          this.catalogPayableIbs.set(c.balanceContractId, pending.map((m: any) => m.sourceTransactionRef || '(no IB Number)'));
+          this.catalogPayableIbs.set(
+            c.balanceContractId,
+            pending.map((m: any) => m.sourceTransactionRef || '(no IB Number)'),
+          );
           this.catalogPayableMovements.set(c.balanceContractId, pending);
         }
       });
@@ -720,15 +770,17 @@ export class TransactionBuilderComponent {
   }
 
   get catalogTotalPages(): number {
-    return Math.max(1, Math.ceil(this.catalogTotal / this.catalogPageSize));
+    return this.catalogPaging.totalPages;
   }
 
   catalogPrevPage(): void {
-    if (this.catalogPage > 1) this.reloadCatalog(this.catalogPage - 1);
+    const page = this.catalogPaging.prevTarget();
+    if (page !== null) this.reloadCatalog(page);
   }
 
   catalogNextPage(): void {
-    if (this.catalogPage < this.catalogTotalPages) this.reloadCatalog(this.catalogPage + 1);
+    const page = this.catalogPaging.nextTarget();
+    if (page !== null) this.reloadCatalog(page);
   }
 
   /**
@@ -801,15 +853,17 @@ export class TransactionBuilderComponent {
   }
 
   get parentTotalPages(): number {
-    return Math.max(1, Math.ceil(this.parentTotal / this.parentPageSize));
+    return this.parentPaging.totalPages;
   }
 
   parentPrevPage(): void {
-    if (this.parentPage > 1) this.loadParentPage(this.parentPage - 1);
+    const page = this.parentPaging.prevTarget();
+    if (page !== null) this.loadParentPage(page);
   }
 
   parentNextPage(): void {
-    if (this.parentPage < this.parentTotalPages) this.loadParentPage(this.parentPage + 1);
+    const page = this.parentPaging.nextTarget();
+    if (page !== null) this.loadParentPage(page);
   }
 
   /** Business instruction 2026-08-14 ("A6 => ...", "A7 should filter out LC records Tenor = Sight") — shared by loadParentPage()'s server-side filter and filteredParentCatalog()'s client-side one below. */
@@ -836,9 +890,7 @@ export class TransactionBuilderComponent {
   get filteredParentCatalog(): BalanceContract[] {
     let list = this.parentCatalog;
     if (this.selectedFunction?.tenorTypeOptions?.length) {
-      list = list.filter(
-        (c) => c.tenorType && c.tenorType !== 'SIGHT' && (!this.model.tenorType || c.tenorType === this.model.tenorType),
-      );
+      list = list.filter((c) => c.tenorType && c.tenorType !== 'SIGHT' && (!this.model.tenorType || c.tenorType === this.model.tenorType));
     } else if (this.selectedFunction?.catalogTenorFilter === 'USANCE') {
       list = list.filter((c) => !c.tenorType || c.tenorType !== 'SIGHT');
     }
@@ -915,7 +967,7 @@ export class TransactionBuilderComponent {
    * unchanged; only this shared tail expression moved here.
    */
   private describeApiError(err: any): string {
-    return err?.error?.message ?? String(err);
+    return describeApiErrorShared(err);
   }
 
   /**
@@ -984,9 +1036,7 @@ export class TransactionBuilderComponent {
           this.sgsForArrival = [];
           return;
         }
-        forkJoin(
-          result.items.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null)))),
-        ).subscribe((snapshots) => {
+        forkJoin(result.items.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null))))).subscribe((snapshots) => {
           this.sgsForArrivalLoading = false;
           this.sgsForArrival = result.items.filter((_, i) => {
             const snap = snapshots[i];
@@ -1275,43 +1325,45 @@ export class TransactionBuilderComponent {
       this.searchError = 'SG Number is mandatory to search.';
       return;
     }
-    this.api.resolveContract(this.model.instrumentType, {
-      lcNumber: this.searchNaturalKey.lcNumber,
-      ibNumber: this.searchNaturalKey.ibNumber || null,
-      sgNumber: this.searchNaturalKey.sgNumber || null,
-    }).subscribe({
-      next: (contract) => {
-        // Business instruction 2026-08-15 ("if SG record balance = 0, then it should no longer require
-        // redemption") — same 0-balance exclusion filteredIbIndexCatalog()/filteredCatalogContracts()
-        // already apply to their own pickers, extended to this free-text search entry point too (A9's
-        // "2ndary Index" browse picker below already excludes 0-balance rows; typing the exact LC+SG of
-        // an already-fully-redeemed one bypassed that — this would otherwise only fail at Submit, with a
-        // 409 from the server).
-        if (this.model.movementType && DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) {
-          this.api.getSnapshot(contract.balanceContractId).subscribe((snap) => {
-            if (snap.availableBalance === '0') {
-              const label = this.requiredNaturalKeyFields.includes('sgNumber')
-                ? `SG ${contract.naturalKey.sgNumber}`
-                : `${this.ibNumberLabel} ${contract.naturalKey.ibNumber}`;
-              this.searchError = `${label} already has a 0 Available Balance — nothing left to ${this.model.movementType === 'FULL_REDEEM' || this.model.movementType === 'PARTIAL_REDEEM' ? 'redeem' : 'settle'}.`;
-              return;
-            }
-            this.selectedContract = contract;
-            this.refreshSelectedContractSnapshot();
-            this.syncCheckerToContext();
-          });
-          return;
-        }
-        this.selectedContract = contract;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-      },
-      error: (err) => {
-        this.selectedContract = null;
-        this.selectedContractSnapshot = null;
-        this.searchError = this.describeApiError(err);
-      },
-    });
+    this.api
+      .resolveContract(this.model.instrumentType, {
+        lcNumber: this.searchNaturalKey.lcNumber,
+        ibNumber: this.searchNaturalKey.ibNumber || null,
+        sgNumber: this.searchNaturalKey.sgNumber || null,
+      })
+      .subscribe({
+        next: (contract) => {
+          // Business instruction 2026-08-15 ("if SG record balance = 0, then it should no longer require
+          // redemption") — same 0-balance exclusion filteredIbIndexCatalog()/filteredCatalogContracts()
+          // already apply to their own pickers, extended to this free-text search entry point too (A9's
+          // "2ndary Index" browse picker below already excludes 0-balance rows; typing the exact LC+SG of
+          // an already-fully-redeemed one bypassed that — this would otherwise only fail at Submit, with a
+          // 409 from the server).
+          if (this.model.movementType && DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) {
+            this.api.getSnapshot(contract.balanceContractId).subscribe((snap) => {
+              if (snap.availableBalance === '0') {
+                const label = this.requiredNaturalKeyFields.includes('sgNumber')
+                  ? `SG ${contract.naturalKey.sgNumber}`
+                  : `${this.ibNumberLabel} ${contract.naturalKey.ibNumber}`;
+                this.searchError = `${label} already has a 0 Available Balance — nothing left to ${this.model.movementType === 'FULL_REDEEM' || this.model.movementType === 'PARTIAL_REDEEM' ? 'redeem' : 'settle'}.`;
+                return;
+              }
+              this.selectedContract = contract;
+              this.refreshSelectedContractSnapshot();
+              this.syncCheckerToContext();
+            });
+            return;
+          }
+          this.selectedContract = contract;
+          this.refreshSelectedContractSnapshot();
+          this.syncCheckerToContext();
+        },
+        error: (err) => {
+          this.selectedContract = null;
+          this.selectedContractSnapshot = null;
+          this.searchError = this.describeApiError(err);
+        },
+      });
   }
 
   onSelectParent(contractId: string): void {
@@ -1379,15 +1431,17 @@ export class TransactionBuilderComponent {
   }
 
   get ibIndexTotalPages(): number {
-    return Math.max(1, Math.ceil(this.ibIndexTotal / this.ibIndexPageSize));
+    return this.ibIndexPaging.totalPages;
   }
 
   ibIndexPrevPage(): void {
-    if (this.ibIndexPage > 1) this.loadIbIndexPage(this.ibIndexPage - 1);
+    const page = this.ibIndexPaging.prevTarget();
+    if (page !== null) this.loadIbIndexPage(page);
   }
 
   ibIndexNextPage(): void {
-    if (this.ibIndexPage < this.ibIndexTotalPages) this.loadIbIndexPage(this.ibIndexPage + 1);
+    const page = this.ibIndexPaging.nextTarget();
+    if (page !== null) this.loadIbIndexPage(page);
   }
 
   /**
@@ -1413,9 +1467,7 @@ export class TransactionBuilderComponent {
     forkJoin(
       types.map((instrumentType) =>
         this.api.catalog(instrumentType, 'ACTIVE', undefined, 1, 50, lcNumber).pipe(
-          map((result) =>
-            result.items.map((c) => ({ contract: c, instrumentType })),
-          ),
+          map((result) => result.items.map((c) => ({ contract: c, instrumentType }))),
           catchError(() => of([] as { contract: BalanceContract; instrumentType: InstrumentType }[])),
         ),
       ),
@@ -1436,7 +1488,10 @@ export class TransactionBuilderComponent {
       ).subscribe((results) => {
         this.settleableBalancesLoading = false;
         this.settleableBalances = results
-          .filter((r): r is { cand: { contract: BalanceContract; instrumentType: InstrumentType }; snap: BalanceSnapshot } => !!r && Number(r.snap.availableBalance) > 0)
+          .filter(
+            (r): r is { cand: { contract: BalanceContract; instrumentType: InstrumentType }; snap: BalanceSnapshot } =>
+              !!r && Number(r.snap.availableBalance) > 0,
+          )
           .map((r) => ({
             balanceContractId: r.cand.contract.balanceContractId,
             instrumentType: r.cand.instrumentType,
@@ -1453,7 +1508,13 @@ export class TransactionBuilderComponent {
     const picked = this.settleableBalances.find((s) => s.balanceContractId === balanceContractId);
     if (!picked) return;
     this.model.instrumentType = picked.instrumentType;
-    this.selectedContract = { balanceContractId: picked.balanceContractId, instrumentType: picked.instrumentType, naturalKey: { lcNumber: this.selectedParent?.naturalKey.lcNumber ?? '', ibNumber: picked.ibNumber }, status: 'ACTIVE', currency: picked.currency } as BalanceContract;
+    this.selectedContract = {
+      balanceContractId: picked.balanceContractId,
+      instrumentType: picked.instrumentType,
+      naturalKey: { lcNumber: this.selectedParent?.naturalKey.lcNumber ?? '', ibNumber: picked.ibNumber },
+      status: 'ACTIVE',
+      currency: picked.currency,
+    } as BalanceContract;
     this.searchNaturalKey.ibNumber = picked.ibNumber ?? '';
     this.refreshSelectedContractSnapshot();
     this.syncCheckerToContext();
@@ -1527,15 +1588,11 @@ export class TransactionBuilderComponent {
    * checkerContractId's doc comment above).
    */
   get checkerSecondaryField(): 'ibNumber' | 'sgNumber' | null {
-    return this.selectedFunction?.instrumentType
-      ? NATURAL_KEY_FIELDS_BY_INSTRUMENT[this.selectedFunction.instrumentType][0] ?? null
-      : null;
+    return this.selectedFunction?.instrumentType ? (NATURAL_KEY_FIELDS_BY_INSTRUMENT[this.selectedFunction.instrumentType][0] ?? null) : null;
   }
 
   get checkerSecondaryLabel(): string {
-    return this.checkerSecondaryField === 'ibNumber'
-      ? (this.selectedFunction?.instrumentType === 'EPLC_ACCEPTANCE' ? 'EB Number' : 'IB Number')
-      : 'SG Number';
+    return this.checkerSecondaryField === 'ibNumber' ? (this.selectedFunction?.instrumentType === 'EPLC_ACCEPTANCE' ? 'EB Number' : 'IB Number') : 'SG Number';
   }
 
   /**
@@ -1787,9 +1844,7 @@ export class TransactionBuilderComponent {
     }
     this.checkerBusy = true;
     this.checkerError = null;
-    const obs = action === 'release'
-      ? this.api.release(movementId, this.checkerId)
-      : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
+    const obs = action === 'release' ? this.api.release(movementId, this.checkerId) : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
     obs.subscribe({
       next: () => {
         this.checkerBusy = false;
@@ -1826,7 +1881,8 @@ export class TransactionBuilderComponent {
     // just for B5's own Usance/CNF_MATURE branch (model.instrumentType === 'EPLC_ACCEPTANCE', B5's own
     // fixed registry type — see settlesAcceptanceOnMature's own doc comment for why this is always true
     // for a real B5 submission, not a conditional fallback resolution).
-    const amountCappedAtAcceptance = !!this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && !!this.selectedContractSnapshot;
+    const amountCappedAtAcceptance =
+      !!this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && !!this.selectedContractSnapshot;
     const amountLocked = amountFromDocArrival || amountFromFullSettle;
     const tenorLocked = !!this.selectedFunction?.tenorTypeOptions?.length && this.isCreatingMovement && this.hasParent && !!this.selectedParent;
     this.fields = [
@@ -1835,23 +1891,23 @@ export class TransactionBuilderComponent {
         type: 'input',
         props: {
           label: amountFromFullSettle
-            ? 'Amount (Full Settle — carried from the Acceptance\'s Available Balance, protected)'
+            ? "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)"
             : amountCappedAtSg
-              ? 'Amount (defaults to the Shipping Guarantee\'s Available Balance — reduce for a Partial Redeem, must not exceed it)'
+              ? "Amount (defaults to the Shipping Guarantee's Available Balance — reduce for a Partial Redeem, must not exceed it)"
               : amountCappedAtAcceptance
-                ? 'Amount (defaults to the Acceptance\'s Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)'
+                ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
                 : this.selectedFunction?.documentArrivalWithSg
-                  // Business instruction 2026-08-15 ("Bill Amount = actual Document Arrival amount... SG
-                  // Redemption Amount = system-calculated MIN(Bill Amount, SG Outstanding)") — reverses the
-                  // prior full-match-only design (Bill Amount used to be locked to the SG's outstanding).
-                  ? 'Bill Amount (actual document amount — see SG Redemption Amount below)'
+                  ? // Business instruction 2026-08-15 ("Bill Amount = actual Document Arrival amount... SG
+                    // Redemption Amount = system-calculated MIN(Bill Amount, SG Outstanding)") — reverses the
+                    // prior full-match-only design (Bill Amount used to be locked to the SG's outstanding).
+                    'Bill Amount (actual document amount — see SG Redemption Amount below)'
                   : amountLocked
                     ? 'Amount (carried from the Document Arrival, protected)'
                     : 'Amount (face-level, per Design doc §6.2)',
           required: true,
           type: 'number',
           disabled: amountLocked,
-          max: (amountCappedAtSg || amountCappedAtAcceptance) ? Number(this.selectedContractSnapshot!.availableBalance) : undefined,
+          max: amountCappedAtSg || amountCappedAtAcceptance ? Number(this.selectedContractSnapshot!.availableBalance) : undefined,
           // Keeps the input's own spinner/step granularity in sync with whichever Currency is typed
           // alongside it (e.g. JPY -> step 1, no cents) — see decimalPlacesForCurrency's own doc
           // comment (balance-component.model.ts) for the ISO 4217 minor-unit table this reads.
@@ -1866,7 +1922,12 @@ export class TransactionBuilderComponent {
         },
       },
       { key: 'currency', type: 'input', props: { label: 'Currency', required: true } },
-      { key: 'tolerancePct', type: 'input', props: { label: 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)', type: 'number' }, hide: !this.toleranceApplicable },
+      {
+        key: 'tolerancePct',
+        type: 'input',
+        props: { label: 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)', type: 'number' },
+        hide: !this.toleranceApplicable,
+      },
       {
         key: 'secondaryRef',
         type: 'input',
@@ -1901,8 +1962,7 @@ export class TransactionBuilderComponent {
                 'props.disabled': (f: any) => f.model?.tenorType === 'SIGHT',
                 'props.required': (f: any) => !!f.model?.tenorType && f.model.tenorType !== 'SIGHT',
                 'props.min': (f: any) => (f.model?.tenorType && f.model.tenorType !== 'SIGHT' ? 1 : null),
-                'props.label': (f: any) =>
-                  f.model?.tenorType === 'SIGHT' ? 'Tenor Days (Sight — always 0, protected)' : 'Tenor Days',
+                'props.label': (f: any) => (f.model?.tenorType === 'SIGHT' ? 'Tenor Days (Sight — always 0, protected)' : 'Tenor Days'),
                 className: (f: any) => (f.model?.tenorType && f.model.tenorType !== 'SIGHT' ? 'tb-field--required' : ''),
                 'model.tenorDays': (f: any) => (f.model?.tenorType === 'SIGHT' ? 0 : f.model?.tenorDays),
               },
@@ -1920,26 +1980,41 @@ export class TransactionBuilderComponent {
     }
   }
 
-  submit(): void {
+  /**
+   * Quality-report-balance.md BAL-003, final increment — submit()'s own ~430-line body split into
+   * this validation step, buildSubmitRequest() (request assembly), five named per-shape submission
+   * methods (submitDocumentArrivalWithSg/submitConfirmationHonourWithReceivable/
+   * submitConfirmationAcceptWithReceivable/submitAcceptanceSettleWithReceivable/submitPlain), and
+   * submit() itself, now just a thin dispatcher. Pure code motion — every guard condition, every
+   * business-instruction comment, every error message, and the exact order every API call fires in is
+   * unchanged; only WHERE each piece lives changed. Not a "guard/params unchanged, only a repeated
+   * body moves" consolidation like the extractions above (there's no meaningful duplication here to
+   * remove) — this is a straightforward decompose-one-giant-method-into-named-pieces split, chosen
+   * over moving anything into a separate service/component for the same reason `finishCheckerAction`'s
+   * own doc comment gives: this logic reads/writes deeply into component state
+   * (`selectedContract`/`selectedArrivalSg`/`arrivalSgSnapshot`/`naturalKey`/`model`/etc.) and a
+   * service extraction would just relocate that coupling, not remove it.
+   */
+  private validateSubmit(): boolean {
     if (!this.model.instrumentType || !this.model.movementType || !this.model.amount || !this.model.currency || !this.model.createdBy) {
       this.submitError = 'Fill in amount, currency, createdBy.';
-      return;
+      return false;
     }
     if (amountExceedsCurrencyDecimals(this.model.amount, this.model.currency)) {
       this.submitError = `Amount ${this.model.amount} has more decimal places than ${this.model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(this.model.currency)}).`;
-      return;
+      return false;
     }
     if (this.dynamicSecondaryRefLabel && !this.model.secondaryRef) {
       this.submitError = `${this.dynamicSecondaryRefLabel} is mandatory for ${this.selectedFunction?.code}.`;
-      return;
+      return false;
     }
     if (this.isCreatingMovement && this.model.instrumentType === 'SHGT' && !this.naturalKey.sgNumber) {
       this.submitError = 'SG Number is mandatory when issuing a Shipping Guarantee.';
-      return;
+      return false;
     }
     if (this.lcNumberFromParent && !this.naturalKey.lcNumber) {
-      this.submitError = 'Pick the Parent LC first — that selection supplies this record\'s LC Number.';
-      return;
+      this.submitError = "Pick the Parent LC first — that selection supplies this record's LC Number.";
+      return false;
     }
     // Business-reported gap 2026-08-14: A1/B1 (LC Issue) never had this
     // check — lcNumberFromParent above only covers A6/B4/A8, which get the
@@ -1949,15 +2024,15 @@ export class TransactionBuilderComponent {
     // the Catalog during this session's testing).
     if (this.isCreatingMovement && !this.lcNumberFromParent && !this.naturalKey.lcNumber) {
       this.submitError = 'LC Number is mandatory.';
-      return;
+      return false;
     }
     if (this.requiredNaturalKeyFields.includes('ibNumber') && this.isCreatingMovement && !this.naturalKey.ibNumber) {
       this.submitError = `${this.ibNumberLabel} is mandatory.`;
-      return;
+      return false;
     }
     if (this.selectedFunction?.tenorTypeOptions?.length && !this.model.tenorType) {
       this.submitError = `Tenor Type is mandatory for ${this.selectedFunction.code}.`;
-      return;
+      return false;
     }
     // Business instruction 2026-08-15 ("A1: Sight => Tenor Days = 0, protected; not Sight => Tenor
     // Days must be > 0, mandatory") — the tenorDays field's expressions (rebuildFields()) already
@@ -1968,7 +2043,7 @@ export class TransactionBuilderComponent {
         this.model.tenorDays = 0;
       } else if (!this.model.tenorDays || Number(this.model.tenorDays) <= 0) {
         this.submitError = "Tenor Days must be greater than 0 for Seller's/Buyer's Usance.";
-        return;
+        return false;
       }
     }
     // Business instruction 2026-08-14 ("A6 => Approved LC Balance and Create Acceptance Balance"),
@@ -1976,13 +2051,13 @@ export class TransactionBuilderComponent {
     // SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
     if (this.selectedFunction?.settlesDocumentArrival && !this.selectedPayMovement) {
       this.submitError = `Pick the still-PENDING ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`;
-      return;
+      return false;
     }
     // A3S must be tied to a SPECIFIC Shipping Guarantee — same reasoning as A6 above, just against an
     // outstanding SG record instead of an existing PENDING Document Arrival.
     if (this.selectedFunction?.documentArrivalWithSg && (!this.selectedArrivalSg || !this.arrivalSgSnapshot)) {
       this.submitError = 'Pick the Shipping Guarantee this Document Arrival is against first.';
-      return;
+      return false;
     }
     // Business instruction 2026-08-15 ("no need to select Full or Partial as long as the amount is not
     // greater than the SG Balance. The defaulted amount is the SG Balance and mandatory.", refined same
@@ -1996,12 +2071,12 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.autoRedeemType) {
       if (!this.selectedContractSnapshot) {
         this.submitError = 'Search for the Shipping Guarantee to redeem first.';
-        return;
+        return false;
       }
       const available = this.selectedContractSnapshot.availableBalance;
       if (Number(this.model.amount) > Number(available)) {
         this.submitError = `Amount must not exceed the SG's Available Balance (${available}).`;
-        return;
+        return false;
       }
       this.model.movementType = Number(this.model.amount) === Number(available) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM';
     }
@@ -2017,22 +2092,27 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE') {
       if (!this.selectedContractSnapshot) {
         this.submitError = 'Search for the Acceptance to settle first.';
-        return;
+        return false;
       }
       const available = this.selectedContractSnapshot.availableBalance;
       if (Number(this.model.amount) > Number(available)) {
         this.submitError = `Amount must not exceed the Acceptance's Available Balance (${available}).`;
-        return;
+        return false;
       }
       this.model.movementType = Number(this.model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
     }
+    return true;
+  }
+
+  /** BAL-003 — assembles the base CreateMovementRequest, same field-by-field logic as before this split. Returns null (and sets submitError) only for the "no contract picked" case — every other precondition was already checked by validateSubmit(). */
+  private buildSubmitRequest(): CreateMovementRequest | null {
     const req: CreateMovementRequest = {
-      instrumentType: this.model.instrumentType,
-      movementType: this.model.movementType,
+      instrumentType: this.model.instrumentType!,
+      movementType: this.model.movementType!,
       eventSeq: this.model.eventSeq ?? Date.now(),
       amount: String(this.model.amount),
-      currency: this.model.currency,
-      createdBy: this.model.createdBy,
+      currency: this.model.currency!,
+      createdBy: this.model.createdBy!,
     };
     if (this.toleranceApplicable && this.model.tolerancePct) req.tolerancePct = String(this.model.tolerancePct);
     if (this.model.secondaryRef) req.sourceTransactionRef = this.model.secondaryRef;
@@ -2051,7 +2131,7 @@ export class TransactionBuilderComponent {
       req.balanceContractId = this.selectedContract.balanceContractId;
     } else {
       this.submitError = 'Pick a contract from the Catalog below.';
-      return;
+      return null;
     }
 
     if (this.hasParent && this.selectedParent) {
@@ -2060,220 +2140,219 @@ export class TransactionBuilderComponent {
     if (this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.model.movementType === 'CREATE') {
       req.exposureNature = this.exposureNature;
     }
+    return req;
+  }
 
-    this.submitting = true;
-    this.submitResult = null;
-    this.submitError = null;
-    this.arrivalApproved = false;
-    this.arrivalSgRedeemMovementId = null;
+  // Business instruction 2026-08-14 ("Document Arrival w Shipping Gtee... will also Redemp SG Balance in
+  // Pending via Maker and then Redemp SG Balance in Approved via Checker approved") — A3S only. Creates the
+  // matched SG's own redemption FIRST, still PENDING — src/domain/offBalanceExposure.ts's
+  // computeOffBalanceExposure() counts a PENDING redemption the same as a RELEASED one, so by the time the
+  // second call (the LC's own UTILIZE, req below, for the FULL Bill Amount) runs its sufficiency check
+  // server-side, this SG's exposure is already netted out of Tight Available. Only proceeds to the second
+  // call if the first genuinely succeeds — a failed SG redemption must never leave an orphaned Document
+  // Arrival behind.
+  //
+  // Business instruction 2026-08-15 ("SG Redemption Amount = system-calculated MIN(Bill Amount, SG
+  // Outstanding)... Incremental Exposure = Document Amount − Eligible SG Match") — reverses the prior
+  // full-match-only design (the SG call used to always redeem its full outstanding, forced equal to Bill
+  // Amount). The SG's own redemption is now only ever for the matched portion — never more than its
+  // outstanding — classified FULL_REDEEM/PARTIAL_REDEEM by whether that portion exhausts it. req's own
+  // amount (the LC UTILIZE) is untouched here — it already carries the FULL Bill Amount from model.amount;
+  // any excess above the SG match is ordinary incremental LC exposure, still checked for real against
+  // Tight Available (§6.1 v0.12's hard-409 rule) since only the matched portion was netted out.
+  private submitDocumentArrivalWithSg(req: CreateMovementRequest): void {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const sgOutstanding = Number(this.arrivalSgSnapshot!.confirmedBalance);
+    const sgRedeemAmount = Math.min(Number(this.model.amount), sgOutstanding);
+    const redeemReq: CreateMovementRequest = {
+      instrumentType: 'SHGT',
+      balanceContractId: this.selectedArrivalSg!.balanceContractId,
+      movementType: sgRedeemAmount >= sgOutstanding ? 'FULL_REDEEM' : 'PARTIAL_REDEEM',
+      eventSeq: Date.now(),
+      amount: String(sgRedeemAmount),
+      currency: this.selectedArrivalSg!.currency,
+      createdBy: this.model.createdBy!,
+      businessEventId,
+      sourceTransactionRef: this.model.secondaryRef || undefined,
+    };
+    this.api.createMovement(redeemReq).subscribe({
+      next: (redeemRes: any) => {
+        this.arrivalSgRedeemMovementId = redeemRes.body.movementId;
+        this.api.createMovement(req).subscribe({
+          next: (res: any) => {
+            this.submitting = false;
+            this.submitResult = res.body;
+            this.refreshSelectedContractSnapshot();
+            this.syncCheckerToContext();
+            this.syncLookupToContext();
+          },
+          error: (err) => {
+            this.submitting = false;
+            this.submitError = `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${this.describeApiError(err)}`;
+            this.submitResult = err.error ?? null;
+          },
+        });
+      },
+      error: (err) => {
+        this.submitting = false;
+        this.submitError = `Could not reserve the Shipping Guarantee redemption: ${this.describeApiError(err)}`;
+      },
+    });
+  }
 
-    // Business instruction 2026-08-14 ("Document Arrival w Shipping Gtee... will also Redemp SG Balance in
-    // Pending via Maker and then Redemp SG Balance in Approved via Checker approved") — A3S only. Creates the
-    // matched SG's own redemption FIRST, still PENDING — src/domain/offBalanceExposure.ts's
-    // computeOffBalanceExposure() counts a PENDING redemption the same as a RELEASED one, so by the time the
-    // second call (the LC's own UTILIZE, req below, for the FULL Bill Amount) runs its sufficiency check
-    // server-side, this SG's exposure is already netted out of Tight Available. Only proceeds to the second
-    // call if the first genuinely succeeds — a failed SG redemption must never leave an orphaned Document
-    // Arrival behind.
-    //
-    // Business instruction 2026-08-15 ("SG Redemption Amount = system-calculated MIN(Bill Amount, SG
-    // Outstanding)... Incremental Exposure = Document Amount − Eligible SG Match") — reverses the prior
-    // full-match-only design (the SG call used to always redeem its full outstanding, forced equal to Bill
-    // Amount). The SG's own redemption is now only ever for the matched portion — never more than its
-    // outstanding — classified FULL_REDEEM/PARTIAL_REDEEM by whether that portion exhausts it. req's own
-    // amount (the LC UTILIZE) is untouched here — it already carries the FULL Bill Amount from model.amount;
-    // any excess above the SG match is ordinary incremental LC exposure, still checked for real against
-    // Tight Available (§6.1 v0.12's hard-409 rule) since only the matched portion was netted out.
-    if (this.selectedFunction?.documentArrivalWithSg && this.selectedArrivalSg && this.arrivalSgSnapshot) {
-      const businessEventId = crypto.randomUUID();
-      req.businessEventId = businessEventId;
-      const sgOutstanding = Number(this.arrivalSgSnapshot.confirmedBalance);
-      const sgRedeemAmount = Math.min(Number(this.model.amount), sgOutstanding);
-      const redeemReq: CreateMovementRequest = {
-        instrumentType: 'SHGT',
-        balanceContractId: this.selectedArrivalSg.balanceContractId,
-        movementType: sgRedeemAmount >= sgOutstanding ? 'FULL_REDEEM' : 'PARTIAL_REDEEM',
-        eventSeq: Date.now(),
-        amount: String(sgRedeemAmount),
-        currency: this.selectedArrivalSg.currency,
-        createdBy: this.model.createdBy,
-        businessEventId,
-        sourceTransactionRef: this.model.secondaryRef || undefined,
-      };
-      this.api.createMovement(redeemReq).subscribe({
-        next: (redeemRes: any) => {
-          this.arrivalSgRedeemMovementId = redeemRes.body.movementId;
-          this.api.createMovement(req).subscribe({
-            next: (res: any) => {
-              this.submitting = false;
-              this.submitResult = res.body;
-              this.refreshSelectedContractSnapshot();
-              this.syncCheckerToContext();
-              this.syncLookupToContext();
-            },
-            error: (err) => {
-              this.submitting = false;
-              this.submitError = `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${this.describeApiError(err)}`;
-              this.submitResult = err.error ?? null;
-            },
-          });
-        },
-        error: (err) => {
-          this.submitting = false;
-          this.submitError = `Could not reserve the Shipping Guarantee redemption: ${this.describeApiError(err)}`;
-        },
-      });
-      return;
-    }
+  // Business instruction 2026-08-15 (Gap Analysis Row 5, rationale-en.md §7.4a "paying the exporter
+  // under a confirmation creates an asset against the issuing/reimbursing bank, not another
+  // liability") — B3's Sight/HONOUR branch only. Creates the EPLC_CONFIRMATION's own HONOUR (req)
+  // FIRST — only proceeds to the linked EPLC_DUE_FROM_ISSUING_BANK CREATE if that genuinely
+  // succeeds, so a rejected HONOUR (e.g. insufficient Confirmation balance) never leaves an orphaned
+  // receivable behind. No ordering dependency the other way — CREATE on a brand-new asset contract
+  // is NO_CHECK server-side (no sufficiency check to net against), unlike A3S's SG-first ordering
+  // above.
+  private submitConfirmationHonourWithReceivable(req: CreateMovementRequest): void {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const cnfContract = this.selectedContract!;
+    this.api.createMovement(req).subscribe({
+      next: (res: any) => {
+        this.submitResult = res.body;
+        const receivableReq: CreateMovementRequest = {
+          instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
+          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
+          parentLogicalContractId: cnfContract.logicalContractId,
+          movementType: 'CREATE',
+          eventSeq: Date.now(),
+          amount: String(this.model.amount),
+          // Non-null: submit()'s own mandatory-fields guard already required these before this
+          // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
+          currency: this.model.currency!,
+          createdBy: this.model.createdBy!,
+          businessEventId,
+        };
+        this.api.createMovement(receivableReq).subscribe({
+          next: (receivableRes: any) => {
+            this.submitting = false;
+            this.dueFromIssuingBankMovementId = receivableRes.body.movementId;
+            this.refreshSelectedContractSnapshot();
+            this.syncCheckerToContext();
+            this.syncLookupToContext();
+          },
+          error: (err) => {
+            this.submitting = false;
+            this.submitError = `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${this.describeApiError(err)}`;
+          },
+        });
+      },
+      error: (err) => {
+        this.submitting = false;
+        this.submitError = err.error?.message ?? err.message ?? String(err);
+        this.submitResult = err.error ?? null;
+      },
+    });
+  }
 
-    // Business instruction 2026-08-15 (Gap Analysis Row 5, rationale-en.md §7.4a "paying the exporter
-    // under a confirmation creates an asset against the issuing/reimbursing bank, not another
-    // liability") — B3's Sight/HONOUR branch only. Creates the EPLC_CONFIRMATION's own HONOUR (req)
-    // FIRST — only proceeds to the linked EPLC_DUE_FROM_ISSUING_BANK CREATE if that genuinely
-    // succeeds, so a rejected HONOUR (e.g. insufficient Confirmation balance) never leaves an orphaned
-    // receivable behind. No ordering dependency the other way — CREATE on a brand-new asset contract
-    // is NO_CHECK server-side (no sufficiency check to net against), unlike A3S's SG-first ordering
-    // above.
-    if (this.selectedFunction?.createsIssuingBankReceivableOnHonour && this.model.movementType === 'HONOUR' && this.selectedContract) {
-      const businessEventId = crypto.randomUUID();
-      req.businessEventId = businessEventId;
-      const cnfContract = this.selectedContract;
-      this.api.createMovement(req).subscribe({
-        next: (res: any) => {
-          this.submitResult = res.body;
-          const receivableReq: CreateMovementRequest = {
-            instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
-            naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
-            parentLogicalContractId: cnfContract.logicalContractId,
-            movementType: 'CREATE',
-            eventSeq: Date.now(),
-            amount: String(this.model.amount),
-            // Non-null: submit()'s own mandatory-fields guard already required these before this
-            // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
-            currency: this.model.currency!,
-            createdBy: this.model.createdBy!,
-            businessEventId,
-          };
-          this.api.createMovement(receivableReq).subscribe({
-            next: (receivableRes: any) => {
-              this.submitting = false;
-              this.dueFromIssuingBankMovementId = receivableRes.body.movementId;
-              this.refreshSelectedContractSnapshot();
-              this.syncCheckerToContext();
-              this.syncLookupToContext();
-            },
-            error: (err) => {
-              this.submitting = false;
-              this.submitError = `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${this.describeApiError(err)}`;
-            },
-          });
-        },
-        error: (err) => {
-          this.submitting = false;
-          this.submitError = err.error?.message ?? err.message ?? String(err);
-          this.submitResult = err.error ?? null;
-        },
-      });
-      return;
-    }
+  // Business instruction 2026-08-15 (Gap Analysis Row 6 Critical Gap, then unified into B4's own
+  // Honour/Accept legal-event role by the "Confirm LC Balance 控制" table review — B4 now IS
+  // `CNF_ACCEPT` itself, not just its follow-up) — B4's Usance branch only. req here is the PRIMARY:
+  // the Confirmation's own ACCEPT (movementTypeFromContractTenor already built it as
+  // instrumentType=EPLC_CONFIRMATION/movementType=ACCEPT/balanceContractId=selectedContract, same as
+  // the Sight/HONOUR branch above). On success, creates the EPLC_ACCEPTANCE liability, THEN the
+  // EPLC_ACCEPTANCE_REIMB_RECEIVABLE asset (the piece Row 6 was missing) — each only proceeding if
+  // the previous genuinely succeeded, so a failure never leaves a partial compound behind. Tenor
+  // Type/Days for the new Acceptance are carried from the Confirmation itself (server-enforced they
+  // must match anyway, per B4's own help text).
+  private submitConfirmationAcceptWithReceivable(req: CreateMovementRequest): void {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const cnfContract = this.selectedContract!;
+    this.api.createMovement(req).subscribe({
+      next: (res: any) => {
+        this.submitResult = res.body;
+        const acceptanceReq: CreateMovementRequest = {
+          instrumentType: 'EPLC_ACCEPTANCE',
+          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
+          parentLogicalContractId: cnfContract.logicalContractId,
+          movementType: 'CREATE',
+          eventSeq: Date.now(),
+          amount: String(this.model.amount),
+          // Non-null: submit()'s own mandatory-fields guard already required these before this
+          // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
+          currency: this.model.currency!,
+          createdBy: this.model.createdBy!,
+          businessEventId,
+          exposureNature: 'ACTUAL',
+          tenorType: cnfContract.tenorType ?? undefined,
+          tenorDays: cnfContract.tenorDays ?? undefined,
+        };
+        this.api.createMovement(acceptanceReq).subscribe({
+          next: (acceptanceRes: any) => {
+            this.acceptanceMovementId = acceptanceRes.body.movementId;
+            const receivableReq: CreateMovementRequest = {
+              instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+              naturalKey: {
+                lcNumber: cnfContract.naturalKey.lcNumber,
+                ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null,
+                sgNumber: null,
+              },
+              parentLogicalContractId: cnfContract.logicalContractId,
+              movementType: 'CREATE',
+              eventSeq: Date.now(),
+              amount: String(this.model.amount),
+              currency: this.model.currency!,
+              createdBy: this.model.createdBy!,
+              businessEventId,
+            };
+            this.api.createMovement(receivableReq).subscribe({
+              next: (receivableRes: any) => {
+                this.submitting = false;
+                this.acceptanceReimbReceivableMovementId = receivableRes.body.movementId;
+                this.refreshSelectedContractSnapshot();
+                this.syncCheckerToContext();
+                this.syncLookupToContext();
+              },
+              error: (err) => {
+                this.submitting = false;
+                this.submitError = `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${this.describeApiError(err)}`;
+              },
+            });
+          },
+          error: (err) => {
+            this.submitting = false;
+            this.submitError = `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${this.describeApiError(err)}`;
+          },
+        });
+      },
+      error: (err) => {
+        this.submitting = false;
+        this.submitError = err.error?.message ?? err.message ?? String(err);
+        this.submitResult = err.error ?? null;
+      },
+    });
+  }
 
-    // Business instruction 2026-08-15 (Gap Analysis Row 6 Critical Gap, then unified into B4's own
-    // Honour/Accept legal-event role by the "Confirm LC Balance 控制" table review — B4 now IS
-    // `CNF_ACCEPT` itself, not just its follow-up) — B4's Usance branch only. req here is the PRIMARY:
-    // the Confirmation's own ACCEPT (movementTypeFromContractTenor already built it as
-    // instrumentType=EPLC_CONFIRMATION/movementType=ACCEPT/balanceContractId=selectedContract, same as
-    // the Sight/HONOUR branch above). On success, creates the EPLC_ACCEPTANCE liability, THEN the
-    // EPLC_ACCEPTANCE_REIMB_RECEIVABLE asset (the piece Row 6 was missing) — each only proceeding if
-    // the previous genuinely succeeded, so a failure never leaves a partial compound behind. Tenor
-    // Type/Days for the new Acceptance are carried from the Confirmation itself (server-enforced they
-    // must match anyway, per B4's own help text).
-    if (this.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && this.selectedContract) {
-      const businessEventId = crypto.randomUUID();
-      req.businessEventId = businessEventId;
-      const cnfContract = this.selectedContract;
-      this.api.createMovement(req).subscribe({
-        next: (res: any) => {
-          this.submitResult = res.body;
-          const acceptanceReq: CreateMovementRequest = {
-            instrumentType: 'EPLC_ACCEPTANCE',
-            naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
-            parentLogicalContractId: cnfContract.logicalContractId,
-            movementType: 'CREATE',
-            eventSeq: Date.now(),
-            amount: String(this.model.amount),
-            // Non-null: submit()'s own mandatory-fields guard already required these before this
-            // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
-            currency: this.model.currency!,
-            createdBy: this.model.createdBy!,
-            businessEventId,
-            exposureNature: 'ACTUAL',
-            tenorType: cnfContract.tenorType ?? undefined,
-            tenorDays: cnfContract.tenorDays ?? undefined,
-          };
-          this.api.createMovement(acceptanceReq).subscribe({
-            next: (acceptanceRes: any) => {
-              this.acceptanceMovementId = acceptanceRes.body.movementId;
-              const receivableReq: CreateMovementRequest = {
-                instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-                naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
-                parentLogicalContractId: cnfContract.logicalContractId,
-                movementType: 'CREATE',
-                eventSeq: Date.now(),
-                amount: String(this.model.amount),
-                currency: this.model.currency!,
-                createdBy: this.model.createdBy!,
-                businessEventId,
-              };
-              this.api.createMovement(receivableReq).subscribe({
-                next: (receivableRes: any) => {
-                  this.submitting = false;
-                  this.acceptanceReimbReceivableMovementId = receivableRes.body.movementId;
-                  this.refreshSelectedContractSnapshot();
-                  this.syncCheckerToContext();
-                  this.syncLookupToContext();
-                },
-                error: (err) => {
-                  this.submitting = false;
-                  this.submitError = `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${this.describeApiError(err)}`;
-                },
-              });
-            },
-            error: (err) => {
-              this.submitting = false;
-              this.submitError = `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${this.describeApiError(err)}`;
-            },
-          });
-        },
-        error: (err) => {
-          this.submitting = false;
-          this.submitError = err.error?.message ?? err.message ?? String(err);
-          this.submitResult = err.error ?? null;
-        },
-      });
-      return;
-    }
-
-    // Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
-    // Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5's Usance/CNF_MATURE branch only. req
-    // here is the PRIMARY: the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE (derived above). On success,
-    // resolves the MATCHING EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract (same LC+EB Number natural key —
-    // B4's own compound already created it, linked to the same Acceptance) and creates its REIMBURSE for
-    // the SAME amount, same businessEventId — one Checker Release finalizes both (see release()'s own
-    // settlesAcceptanceOnMature branch). B5's own instrumentType is fixed to EPLC_ACCEPTANCE (Usance —
-    // B5 has no Sight branch of its own, see settlesAcceptanceOnMature's doc comment), so this guard is
-    // always true for a real B5 submission; the plain REIMBURSE path below is reached by other functions
-    // instead (unchanged from the old B6), never by B5 falling through this one.
-    if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContract) {
-      const businessEventId = crypto.randomUUID();
-      req.businessEventId = businessEventId;
-      const acceptanceContract = this.selectedContract;
-      this.api.createMovement(req).subscribe({
-        next: (res: any) => {
-          this.submitResult = res.body;
-          this.api.resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
+  // Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
+  // Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5's Usance/CNF_MATURE branch only. req
+  // here is the PRIMARY: the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE (derived above). On success,
+  // resolves the MATCHING EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract (same LC+EB Number natural key —
+  // B4's own compound already created it, linked to the same Acceptance) and creates its REIMBURSE for
+  // the SAME amount, same businessEventId — one Checker Release finalizes both (see release()'s own
+  // settlesAcceptanceOnMature branch). B5's own instrumentType is fixed to EPLC_ACCEPTANCE (Usance —
+  // B5 has no Sight branch of its own, see settlesAcceptanceOnMature's doc comment), so this guard is
+  // always true for a real B5 submission; the plain REIMBURSE path below is reached by other functions
+  // instead (unchanged from the old B6), never by B5 falling through this one.
+  private submitAcceptanceSettleWithReceivable(req: CreateMovementRequest): void {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const acceptanceContract = this.selectedContract!;
+    this.api.createMovement(req).subscribe({
+      next: (res: any) => {
+        this.submitResult = res.body;
+        this.api
+          .resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
             lcNumber: acceptanceContract.naturalKey.lcNumber,
             ibNumber: acceptanceContract.naturalKey.ibNumber,
-          }).subscribe({
+          })
+          .subscribe({
             next: (receivableContract) => {
               const reimbReq: CreateMovementRequest = {
                 instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
@@ -2306,20 +2385,21 @@ export class TransactionBuilderComponent {
               this.submitError = `Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: ${this.describeApiError(err)}`;
             },
           });
-        },
-        error: (err) => {
-          this.submitting = false;
-          this.submitError = err.error?.message ?? err.message ?? String(err);
-          this.submitResult = err.error ?? null;
-        },
-      });
-      return;
-    }
+      },
+      error: (err) => {
+        this.submitting = false;
+        this.submitError = err.error?.message ?? err.message ?? String(err);
+        this.submitResult = err.error ?? null;
+      },
+    });
+  }
 
-    // Business instruction 2026-08-14 (revised): "When Submit A6, the LC Balance is remain unchanged but
-    // create an Acceptance Balance in Pending." — the Document Arrival release moved OUT of the Maker's
-    // Submit and into the Checker's release() below; a Maker submitting a request must never be able to
-    // unilaterally finalize the LC's own Balance — that needs the same 4-eyes Checker step as everything else.
+  // Business instruction 2026-08-14 (revised): "When Submit A6, the LC Balance is remain unchanged but
+  // create an Acceptance Balance in Pending." — the Document Arrival release moved OUT of the Maker's
+  // Submit and into the Checker's release() below; a Maker submitting a request must never be able to
+  // unilaterally finalize the LC's own Balance — that needs the same 4-eyes Checker step as everything else.
+  // The default/plain path — every function that doesn't need one of the four compound shapes above.
+  private submitPlain(req: CreateMovementRequest): void {
     this.api.createMovement(req).subscribe({
       next: (res: any) => {
         this.submitting = false;
@@ -2336,6 +2416,36 @@ export class TransactionBuilderComponent {
         this.submitResult = err.error ?? null;
       },
     });
+  }
+
+  submit(): void {
+    if (!this.validateSubmit()) return;
+    const req = this.buildSubmitRequest();
+    if (!req) return;
+
+    this.submitting = true;
+    this.submitResult = null;
+    this.submitError = null;
+    this.arrivalApproved = false;
+    this.arrivalSgRedeemMovementId = null;
+
+    if (this.selectedFunction?.documentArrivalWithSg && this.selectedArrivalSg && this.arrivalSgSnapshot) {
+      this.submitDocumentArrivalWithSg(req);
+      return;
+    }
+    if (this.selectedFunction?.createsIssuingBankReceivableOnHonour && this.model.movementType === 'HONOUR' && this.selectedContract) {
+      this.submitConfirmationHonourWithReceivable(req);
+      return;
+    }
+    if (this.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && this.selectedContract) {
+      this.submitConfirmationAcceptWithReceivable(req);
+      return;
+    }
+    if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContract) {
+      this.submitAcceptanceSettleWithReceivable(req);
+      return;
+    }
+    this.submitPlain(req);
   }
 
   /**
@@ -2403,71 +2513,53 @@ export class TransactionBuilderComponent {
     this.submitError = message;
   }
 
+  /**
+   * BAL-003 (Checker Actions extraction, OOD/SOLID) — the compound orchestration this used to own
+   * directly now lives in `CheckerActionsService.release()` (Dependency Inversion: the service depends
+   * on `CheckerActionContext`, never on this component). This wrapper keeps exactly the same guard and
+   * the same `actionBusy`/`submitError` reset the original had, then hands off.
+   */
   release(): void {
     if (!this.submitResult?.movementId) return;
     this.actionBusy = true;
     this.submitError = null;
-    const checkerId = this.model.createdBy === 'maker1' ? 'checker1' : 'checker2';
-
-    // Business instruction 2026-08-14 (revised): "When Checker approve it, then LC Balance will be approved
-    // and Acceptance Balance will be approved too." — A6/B4. The Checker's single Release click on the new
-    // Acceptance is what triggers the compound: release the picked source record FIRST (finalizes it —
-    // A6: LC Balance Pending -> Approved/Utilized; B4: the Confirmation's own ACCEPT reduction), THEN
-    // release the Acceptance itself (releaseAcceptance() — B4 chains a third leg from there, the linked
-    // Reimbursement Receivable asset) — only proceeding if the first genuinely succeeds, so a failed
-    // source release never leaves a falsely-approved Acceptance behind.
-    if (this.selectedFunction?.settlesDocumentArrival && this.selectedPayMovement) {
-      this.api.release(this.selectedPayMovement.movementId, checkerId).subscribe({
-        next: () => this.releaseAcceptance(checkerId),
-        error: (err) =>
-          this.failCheckerAction(
-            `Could not release the ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${this.selectedPayMovement?.sourceTransactionRef}) — Acceptance NOT approved: ${this.describeApiError(err)}`,
-          ),
-      });
-      return;
-    }
-
-    // Business instruction 2026-08-14 ("Redemp SG Balance in Approved via Checker approved") — A3S only. One
-    // Release click releases the SG's FULL_REDEEM/PARTIAL_REDEEM reserved at Submit for real — the
-    // Document Arrival itself is only acknowledged after (releaseArrivalDocument(), NOT a real release
-    // call — see its own doc comment for why: business instruction 2026-08-15, "S001 B01 still in
-    // PENDING" turned out to be the CORRECT/expected state, matching this function's own help text
-    // ("Document Arrival moves to Pending LC Balance, still not finalized — go to A4/A6 next, same as a
-    // plain A3") — go to A4 (Sight) or A6 (Usance) to actually finalize the LC Balance).
-    if (this.selectedFunction?.documentArrivalWithSg && this.arrivalSgRedeemMovementId) {
-      this.api.release(this.arrivalSgRedeemMovementId, checkerId).subscribe({
-        next: () => this.releaseArrivalDocument(),
-        error: (err) => this.failCheckerAction(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${this.describeApiError(err)}`),
-      });
-      return;
-    }
-
-    // B5's Usance/CNF_MATURE branch (settlesAcceptanceOnMature) only — Submit created BOTH the
-    // Acceptance's own FULL_SETTLE/PARTIAL_SETTLE (submitResult) and the matching Reimbursement
-    // Receivable's REIMBURSE (matchedReceivableMovementId), same businessEventId, per the frozen
-    // spec's own CNF_MATURE event (impl-spec-en.md: one event clears BOTH the Acceptance DPU liability
-    // AND the Reimbursement Receivable together — this is not two independent events the way Sight's
-    // CNF_REIMB is). One Release does both.
-    if (this.selectedFunction?.settlesAcceptanceOnMature && this.matchedReceivableMovementId) {
-      this.api.release(this.submitResult.movementId, checkerId).subscribe({
-        next: (res) => this.releaseMatchedReceivable(checkerId, res),
-        error: (err) => this.failCheckerAction(this.describeApiError(err)),
-      });
-      return;
-    }
-
-    this.api.release(this.submitResult.movementId, checkerId).subscribe({
-      next: (res) => this.finishCheckerAction(res),
-      error: (err) => this.failCheckerAction(this.describeApiError(err)),
-    });
+    this.checkerActions.release(this.buildCheckerActionContext()).subscribe((outcome) => this.applyCheckerActionOutcome(outcome));
   }
 
-  /** B5's Usance/CNF_MATURE branch only — second leg, releasing the matching Reimbursement Receivable's REIMBURSE after the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE was already released above. */
-  private releaseMatchedReceivable(checkerId: string, settleRes: any): void {
-    this.api.release(this.matchedReceivableMovementId!, checkerId).subscribe({
-      next: () => this.finishCheckerAction(settleRes, { syncLookup: true }),
-      error: (err) => this.failCheckerAction(`Acceptance settled, but the matching Reimbursement Receivable failed to release: ${this.describeApiError(err)}`),
-    });
+  private buildCheckerActionContext(): CheckerActionContext {
+    return {
+      submitResult: this.submitResult,
+      selectedFunction: this.selectedFunction,
+      selectedPayMovement: this.selectedPayMovement,
+      matchedReceivableMovementId: this.matchedReceivableMovementId,
+      dueFromIssuingBankMovementId: this.dueFromIssuingBankMovementId,
+      acceptanceMovementId: this.acceptanceMovementId,
+      acceptanceReimbReceivableMovementId: this.acceptanceReimbReceivableMovementId,
+      arrivalSgRedeemMovementId: this.arrivalSgRedeemMovementId,
+      createdBy: this.model.createdBy,
+    };
+  }
+
+  /**
+   * The one place `CheckerActionsService`'s outcomes turn back into component state/side effects —
+   * mirrors `finishCheckerAction`/`failCheckerAction` exactly, plus the old `releaseArrivalDocument()`'s
+   * own acknowledgment-only shape for A3S's `documentArrivalAcknowledged` outcome.
+   */
+  private applyCheckerActionOutcome(outcome: CheckerActionOutcome): void {
+    if (outcome.kind === 'failed') {
+      this.failCheckerAction(outcome.message);
+      return;
+    }
+    if (outcome.kind === 'documentArrivalAcknowledged') {
+      this.actionBusy = false;
+      this.arrivalApproved = true;
+      this.refreshSelectedContractSnapshot();
+      this.syncCheckerToContext();
+      // The picked SG's own snapshot is stale otherwise until the user navigates away and back.
+      this.loadSgsForArrival();
+      return;
+    }
+    this.finishCheckerAction(outcome.result, { syncLookup: outcome.syncLookup, reloadPayables: outcome.reloadPayables });
   }
 
   /** Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — refreshes whichever picker (A6's Parent LC, B4's flat Catalog) is actually in play, since B4 no longer has a "parent" of its own (its primary instrumentType is EPLC_CONFIRMATION). */
@@ -2476,82 +2568,11 @@ export class TransactionBuilderComponent {
     else if (this.selectedContract) this.loadPayableMovements(this.selectedContract.balanceContractId);
   }
 
-  /** B4's Sight/HONOUR branch only — final leg of the compound Checker action, releasing the new Due from Issuing Bank asset after the Confirmation's own Honour (and, before that, the B3 Present Docs record) were already released above. */
-  private releaseDueFromIssuingBank(checkerId: string, honourRes: any): void {
-    this.api.release(this.dueFromIssuingBankMovementId!, checkerId).subscribe({
-      next: () => this.finishCheckerAction(honourRes, { syncLookup: true, reloadPayables: true }),
-      error: (err) => this.failCheckerAction(`Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${this.describeApiError(err)}`),
-    });
-  }
-
-  /**
-   * A6/B4 — second leg of the compound Checker action, releasing the primary movement (A6: the newly-
-   * created Acceptance; B4: the Confirmation's own HONOUR or ACCEPT) after its source record (A6:
-   * Document Arrival; B4: B3's Present Docs) was already released above. Branches into whichever third
-   * leg the function needs — B4's Sight branch releases the Due from Issuing Bank asset,B4's Usance
-   * branch releases the Acceptance liability (which itself chains a fourth leg, the Reimbursement
-   * Receivable asset) — A6 has neither, so it just finishes here.
-   */
-  private releaseAcceptance(checkerId: string): void {
-    this.api.release(this.submitResult.movementId, checkerId).subscribe({
-      next: (res) => {
-        if (this.selectedFunction?.createsIssuingBankReceivableOnHonour && this.dueFromIssuingBankMovementId) {
-          this.releaseDueFromIssuingBank(checkerId, res);
-          return;
-        }
-        if (this.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && this.acceptanceMovementId) {
-          this.releaseAcceptanceLiability(checkerId, res);
-          return;
-        }
-        // Both the picked source record and the Parent LC's own hints/snapshots are stale otherwise
-        // until the user navigates away and back.
-        this.finishCheckerAction(res, { reloadPayables: true });
-      },
-      error: (err) => this.failCheckerAction(`${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${this.describeApiError(err)}`),
-    });
-  }
-
-  /** B4's Usance/ACCEPT branch only — third leg, releasing the new EPLC_ACCEPTANCE liability after the Confirmation's own ACCEPT was already released above. Chains a fourth leg from here (releaseAcceptanceReimbReceivable()) once this succeeds. */
-  private releaseAcceptanceLiability(checkerId: string, acceptRes: any): void {
-    this.api.release(this.acceptanceMovementId!, checkerId).subscribe({
-      next: () => this.releaseAcceptanceReimbReceivable(checkerId, acceptRes),
-      error: (err) => this.failCheckerAction(`Confirmation accepted, but the Acceptance liability failed to release: ${this.describeApiError(err)}`),
-    });
-  }
-
-  /** B4's Usance/ACCEPT branch only — fourth and final leg of the compound Checker action, releasing the linked Reimbursement Receivable asset after the Acceptance liability was already released above (Gap Analysis Row 6). Once this succeeds, the B3 record this whole chain started from is gone from B4's own "still-PENDING" 2ndary Index for good. */
-  private releaseAcceptanceReimbReceivable(checkerId: string, acceptRes: any): void {
-    this.api.release(this.acceptanceReimbReceivableMovementId!, checkerId).subscribe({
-      next: () => this.finishCheckerAction(acceptRes, { syncLookup: true, reloadPayables: true }),
-      error: (err) => this.failCheckerAction(`Acceptance released, but the Reimbursement Receivable asset failed to release: ${this.describeApiError(err)}`),
-    });
-  }
-
-  /**
-   * A3S only — second half of the compound Checker action, run after its matched SG's own redemption
-   * was already released for real above. Acknowledgment-only (NOT a real release call), matching plain
-   * A3's own approveArrival() — this function's `help` text always documented this ("Document Arrival
-   * moves to Pending LC Balance, still not finalized — go to A4/A6 next, same as a plain A3"), but the
-   * code here used to call the real release API, contradicting it (bug fixed 2026-08-15, reported live:
-   * "S001 B01 still in PENDING, which is incorrect" — traced and found to be the CORRECT state; the
-   * actually-incorrect part was this method finalizing the LC Balance a step early).
-   */
-  private releaseArrivalDocument(): void {
-    this.actionBusy = false;
-    this.arrivalApproved = true;
-    this.refreshSelectedContractSnapshot();
-    this.syncCheckerToContext();
-    // The picked SG's own snapshot is stale otherwise until the user navigates away and back.
-    this.loadSgsForArrival();
-  }
-
+  /** BAL-003 (Checker Actions extraction) — orchestration moved to `CheckerActionsService.reject()`; unlike `release()`/`deleteMakerPending()`, the original never reset `submitError` here — preserved exactly. */
   reject(): void {
     if (!this.submitResult?.movementId) return;
     this.actionBusy = true;
-    this.api.reject(this.submitResult.movementId, 'checker1', 'MANUAL_TEST_REJECT').subscribe({
-      next: (res) => this.finishCheckerAction(res),
-      error: (err) => this.failCheckerAction(this.describeApiError(err)),
-    });
+    this.checkerActions.reject(this.buildCheckerActionContext()).subscribe((outcome) => this.applyCheckerActionOutcome(outcome));
   }
 
   /**
@@ -2560,78 +2581,14 @@ export class TransactionBuilderComponent {
    * just-submitted item while it's still PENDING, via the /cancel endpoint (PENDING -> CANCELLED,
    * distinct from /reject's Checker-side decline). Works uniformly across every function since it only
    * reads submitResult/model.createdBy, both already set generically by submit() — no function-specific
-   * wiring needed.
-   *
-   * For A3S (documentArrivalWithSg) specifically: also cancels the linked SG redemption FIRST, same
-   * SG-then-primary ordering as the compound release() above — otherwise deleting just the Document
-   * Arrival would leave the SG's own PENDING redemption orphaned, the exact class of commitment-control
-   * bug fixed earlier today (see shgtRedeem.ts's own doc comment). A6 (settlesDocumentArrival) does NOT
-   * need the same handling — its linked Document Arrival (selectedPayMovement) is an EXISTING PENDING
-   * item picked from an earlier, separate submission, not something THIS Submit call created.
+   * wiring needed. BAL-003 (Checker Actions extraction) — the cancel-order branching itself moved to
+   * `CheckerActionsService.deleteMakerPending()`; this wrapper keeps the same guard and busy/error reset.
    */
   deleteMakerPending(): void {
     if (!this.submitResult?.movementId || this.submitResult.status !== 'PENDING') return;
     this.actionBusy = true;
     this.submitError = null;
-    // Non-null: submit() already required model.createdBy before this submission could ever have
-    // produced a submitResult in the first place.
-    const cancelledBy = this.model.createdBy!;
-
-    const cancelPrimary = () => {
-      this.api.cancel(this.submitResult.movementId, cancelledBy, 'MAKER_EC').subscribe({
-        next: (res) => this.finishCheckerAction(res, { syncLookup: true }),
-        error: (err) => this.failCheckerAction(this.describeApiError(err)),
-      });
-    };
-
-    if (this.selectedFunction?.documentArrivalWithSg && this.arrivalSgRedeemMovementId) {
-      this.api.cancel(this.arrivalSgRedeemMovementId, cancelledBy, 'MAKER_EC').subscribe({
-        next: () => cancelPrimary(),
-        error: (err) => this.failCheckerAction(`Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${this.describeApiError(err)}`),
-      });
-      return;
-    }
-
-    // B3 (createsIssuingBankReceivableOnHonour) — same reasoning as A3S above: cancel the linked Due
-    // from Issuing Bank asset FIRST, so an EC on the Confirmation Honour never leaves it orphaned.
-    if (this.selectedFunction?.createsIssuingBankReceivableOnHonour && this.dueFromIssuingBankMovementId) {
-      this.api.cancel(this.dueFromIssuingBankMovementId, cancelledBy, 'MAKER_EC').subscribe({
-        next: () => cancelPrimary(),
-        error: (err) => this.failCheckerAction(`Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${this.describeApiError(err)}`),
-      });
-      return;
-    }
-
-    // B4's Usance/ACCEPT branch (createsAcceptanceReimbReceivableOnCreate) — reverse creation order:
-    // cancel the Reimbursement Receivable asset FIRST, then the Acceptance liability, THEN the primary
-    // Confirmation ACCEPT — so an EC never leaves any later leg orphaned. Does NOT touch the picked B3
-    // record (selectedPayMovement) — B4 only reads it, never created it, so it stays PENDING and still
-    // available in B4's own 2ndary Index for another attempt.
-    if (this.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && this.acceptanceReimbReceivableMovementId && this.acceptanceMovementId) {
-      this.api.cancel(this.acceptanceReimbReceivableMovementId, cancelledBy, 'MAKER_EC').subscribe({
-        next: () => {
-          this.api.cancel(this.acceptanceMovementId!, cancelledBy, 'MAKER_EC').subscribe({
-            next: () => cancelPrimary(),
-            error: (err) => this.failCheckerAction(`Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${this.describeApiError(err)}`),
-          });
-        },
-        error: (err) => this.failCheckerAction(`Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${this.describeApiError(err)}`),
-      });
-      return;
-    }
-
-    // B5's Usance/CNF_MATURE branch (settlesAcceptanceOnMature) — reverse creation order: cancel the
-    // matching Reimbursement Receivable's REIMBURSE FIRST, then the primary Acceptance FULL_SETTLE/
-    // PARTIAL_SETTLE — so an EC never leaves the Receivable leg orphaned.
-    if (this.selectedFunction?.settlesAcceptanceOnMature && this.matchedReceivableMovementId) {
-      this.api.cancel(this.matchedReceivableMovementId, cancelledBy, 'MAKER_EC').subscribe({
-        next: () => cancelPrimary(),
-        error: (err) => this.failCheckerAction(`Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${this.describeApiError(err)}`),
-      });
-      return;
-    }
-
-    cancelPrimary();
+    this.checkerActions.deleteMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => this.applyCheckerActionOutcome(outcome));
   }
 
   /**
@@ -2692,45 +2649,47 @@ export class TransactionBuilderComponent {
     this.selectedLookupSg = null;
     this.sgSnapshot = null;
     this.sgMovements = [];
-    this.api.resolveContract(this.lookup.instrumentType, {
-      lcNumber: this.lookup.lcNumber,
-      ibNumber: this.lookup.ibNumber || null,
-      sgNumber: this.lookup.sgNumber || null,
-    }).subscribe({
-      next: (contract) => {
-        this.loadSnapshotAndMovements(
-          contract.balanceContractId,
-          (snapshot) => (this.lookupResult = { contract, snapshot }),
-          (movements) => (this.lookupMovements = movements),
-          (err) => (this.lookupError = this.describeApiError(err)),
-        );
-        // Business instruction 2026-08-14 ("two tabs for Usance LC, one for LC Balance and one for Acceptance
-        // Balance") — fetch every Acceptance carved out under this LC (one per IB Number, per A6) so the second
-        // tab has something to pick from as soon as it's a Usance-tenor LC; harmless no-op for a Sight LC's
-        // resolveContract() returning tenorType === 'SIGHT' (or unset legacy), since lookupIsUsanceLc() hides
-        // the tab entirely in that case regardless of whether this fetch found anything.
-        const acceptanceType = this.acceptanceInstrumentTypeFor(contract.instrumentType);
-        if (acceptanceType) {
-          this.loadUnderLookupCandidates(
-            acceptanceType,
-            contract.naturalKey.lcNumber,
-            (items) => (this.acceptancesUnderLookup = items),
-            (contractId) => this.selectLookupAcceptance(contractId),
+    this.api
+      .resolveContract(this.lookup.instrumentType, {
+        lcNumber: this.lookup.lcNumber,
+        ibNumber: this.lookup.ibNumber || null,
+        sgNumber: this.lookup.sgNumber || null,
+      })
+      .subscribe({
+        next: (contract) => {
+          this.loadSnapshotAndMovements(
+            contract.balanceContractId,
+            (snapshot) => (this.lookupResult = { contract, snapshot }),
+            (movements) => (this.lookupMovements = movements),
+            (err) => (this.lookupError = this.describeApiError(err)),
           );
-        }
-        // Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC...
-        // three tabs, LC Balance, Acceptance Balance, and SG Balance") — every SHGT under this LC, any tenor.
-        if (contract.instrumentType === 'IPLC_LC') {
-          this.loadUnderLookupCandidates(
-            'SHGT',
-            contract.naturalKey.lcNumber,
-            (items) => (this.sgsUnderLookup = items),
-            (contractId) => this.selectLookupSg(contractId),
-          );
-        }
-      },
-      error: (err) => (this.lookupError = this.describeApiError(err)),
-    });
+          // Business instruction 2026-08-14 ("two tabs for Usance LC, one for LC Balance and one for Acceptance
+          // Balance") — fetch every Acceptance carved out under this LC (one per IB Number, per A6) so the second
+          // tab has something to pick from as soon as it's a Usance-tenor LC; harmless no-op for a Sight LC's
+          // resolveContract() returning tenorType === 'SIGHT' (or unset legacy), since lookupIsUsanceLc() hides
+          // the tab entirely in that case regardless of whether this fetch found anything.
+          const acceptanceType = this.acceptanceInstrumentTypeFor(contract.instrumentType);
+          if (acceptanceType) {
+            this.loadUnderLookupCandidates(
+              acceptanceType,
+              contract.naturalKey.lcNumber,
+              (items) => (this.acceptancesUnderLookup = items),
+              (contractId) => this.selectLookupAcceptance(contractId),
+            );
+          }
+          // Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC...
+          // three tabs, LC Balance, Acceptance Balance, and SG Balance") — every SHGT under this LC, any tenor.
+          if (contract.instrumentType === 'IPLC_LC') {
+            this.loadUnderLookupCandidates(
+              'SHGT',
+              contract.naturalKey.lcNumber,
+              (items) => (this.sgsUnderLookup = items),
+              (contractId) => this.selectLookupSg(contractId),
+            );
+          }
+        },
+        error: (err) => (this.lookupError = this.describeApiError(err)),
+      });
   }
 
   /** Business instruction 2026-08-14 ("two/three tabs...") — switching tabs with only one candidate under it jumps straight to it. */

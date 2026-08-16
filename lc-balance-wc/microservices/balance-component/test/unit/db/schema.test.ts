@@ -68,16 +68,12 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
 
   test('§3.1 — at most one ACTIVE version per logicalContractId (DB-enforced)', () => {
     contracts.insert(makeContract({ balanceContractId: 'bc-1', contractVersion: 1, status: 'ACTIVE' }));
-    expect(() =>
-      contracts.insert(makeContract({ balanceContractId: 'bc-2', contractVersion: 2, status: 'ACTIVE' })),
-    ).toThrow(/UNIQUE constraint failed/);
+    expect(() => contracts.insert(makeContract({ balanceContractId: 'bc-2', contractVersion: 2, status: 'ACTIVE' }))).toThrow(/UNIQUE constraint failed/);
   });
 
   test('§3.1 — (logicalContractId, contractVersion) must be unique', () => {
     contracts.insert(makeContract({ balanceContractId: 'bc-1', contractVersion: 1 }));
-    expect(() =>
-      contracts.insert(makeContract({ balanceContractId: 'bc-2', contractVersion: 1, status: 'SUPERSEDED' })),
-    ).toThrow(/UNIQUE constraint failed/);
+    expect(() => contracts.insert(makeContract({ balanceContractId: 'bc-2', contractVersion: 1, status: 'SUPERSEDED' }))).toThrow(/UNIQUE constraint failed/);
   });
 
   test('§8 — (balanceContractId, eventSeq) idempotency: resubmission returns the existing row instead of erroring', () => {
@@ -95,7 +91,9 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
   test('Catalog query (business instruction 2026-08-14) — filters by instrumentType + status, ordered by Reference (lc_number), paginated', () => {
     contracts.insert(makeContract({ balanceContractId: 'bc-1', logicalContractId: 'lc-1', naturalKey: { lcNumber: 'LC0001' }, status: 'ACTIVE' }));
     contracts.insert(makeContract({ balanceContractId: 'bc-2', logicalContractId: 'lc-2', naturalKey: { lcNumber: 'LC0002' }, status: 'CLOSED' }));
-    contracts.insert(makeContract({ balanceContractId: 'bc-3', logicalContractId: 'lc-3', instrumentType: 'EPLC_LC', naturalKey: { lcNumber: 'LC0003' }, status: 'ACTIVE' }));
+    contracts.insert(
+      makeContract({ balanceContractId: 'bc-3', logicalContractId: 'lc-3', instrumentType: 'EPLC_LC', naturalKey: { lcNumber: 'LC0003' }, status: 'ACTIVE' }),
+    );
 
     const activeIplc = contracts.listCatalog({ instrumentType: 'IPLC_LC', status: 'ACTIVE' });
     expect(activeIplc.items.map((c) => c.naturalKey.lcNumber)).toEqual(['LC0001']);
@@ -134,10 +132,34 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
   });
 
   test('Catalog lcNumber exact-match filter (business instruction 2026-08-14 "LC Index -> IB Index" cascading picker) — never matches a substring like q does', () => {
-    contracts.insert(makeContract({ balanceContractId: 'acc-1', logicalContractId: 'acc-lc-1', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: '001', ibNumber: 'IB-A' }, status: 'ACTIVE' }));
-    contracts.insert(makeContract({ balanceContractId: 'acc-2', logicalContractId: 'acc-lc-2', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: '001', ibNumber: 'IB-B' }, status: 'ACTIVE' }));
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'acc-1',
+        logicalContractId: 'acc-lc-1',
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: '001', ibNumber: 'IB-A' },
+        status: 'ACTIVE',
+      }),
+    );
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'acc-2',
+        logicalContractId: 'acc-lc-2',
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: '001', ibNumber: 'IB-B' },
+        status: 'ACTIVE',
+      }),
+    );
     // Same instrumentType, a DIFFERENT LC whose number contains "001" as a substring — must NOT show up for lcNumber:'001'.
-    contracts.insert(makeContract({ balanceContractId: 'acc-3', logicalContractId: 'acc-lc-3', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: '2001', ibNumber: 'IB-C' }, status: 'ACTIVE' }));
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'acc-3',
+        logicalContractId: 'acc-lc-3',
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: '2001', ibNumber: 'IB-C' },
+        status: 'ACTIVE',
+      }),
+    );
 
     const ibIndex = contracts.listCatalog({ instrumentType: 'IPLC_ACCEPTANCE', status: 'ACTIVE', lcNumber: '001' });
     expect(ibIndex.total).toBe(2);
@@ -155,10 +177,42 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
   });
 
   test('Catalog tenorFamily filter (business-reported gap "Why U002 does not shown A5 — Document Arrival (Usance)?") — filters server-side so pagination reflects the eligible set, never drops legacy contracts with no tenorType recorded', () => {
-    contracts.insert(makeContract({ balanceContractId: 'sight-1', logicalContractId: 'sight-lc-1', naturalKey: { lcNumber: 'SIGHT-1' }, tenorType: 'SIGHT', status: 'ACTIVE' }));
-    contracts.insert(makeContract({ balanceContractId: 'usance-1', logicalContractId: 'usance-lc-1', naturalKey: { lcNumber: 'USANCE-1' }, tenorType: 'SELLERS_USANCE', status: 'ACTIVE' }));
-    contracts.insert(makeContract({ balanceContractId: 'usance-2', logicalContractId: 'usance-lc-2', naturalKey: { lcNumber: 'USANCE-2' }, tenorType: 'BUYERS_USANCE', status: 'ACTIVE' }));
-    contracts.insert(makeContract({ balanceContractId: 'legacy-1', logicalContractId: 'legacy-lc-1', naturalKey: { lcNumber: 'LEGACY-1' }, tenorType: null, status: 'ACTIVE' }));
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'sight-1',
+        logicalContractId: 'sight-lc-1',
+        naturalKey: { lcNumber: 'SIGHT-1' },
+        tenorType: 'SIGHT',
+        status: 'ACTIVE',
+      }),
+    );
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'usance-1',
+        logicalContractId: 'usance-lc-1',
+        naturalKey: { lcNumber: 'USANCE-1' },
+        tenorType: 'SELLERS_USANCE',
+        status: 'ACTIVE',
+      }),
+    );
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'usance-2',
+        logicalContractId: 'usance-lc-2',
+        naturalKey: { lcNumber: 'USANCE-2' },
+        tenorType: 'BUYERS_USANCE',
+        status: 'ACTIVE',
+      }),
+    );
+    contracts.insert(
+      makeContract({
+        balanceContractId: 'legacy-1',
+        logicalContractId: 'legacy-lc-1',
+        naturalKey: { lcNumber: 'LEGACY-1' },
+        tenorType: null,
+        status: 'ACTIVE',
+      }),
+    );
 
     const sightOnly = contracts.listCatalog({ instrumentType: 'IPLC_LC', status: 'ACTIVE', tenorFamily: 'SIGHT' });
     expect(sightOnly.items.map((c) => c.naturalKey.lcNumber).sort()).toEqual(['LEGACY-1', 'SIGHT-1']);
@@ -211,7 +265,9 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     // reject having both versions ACTIVE at once, same ordering a real
     // version-transition transaction must follow.
     contracts.markSuperseded('bc-v1', 'bc-v2', '2026-08-14T01:00:00Z');
-    contracts.insert(makeContract({ balanceContractId: 'bc-v2', logicalContractId: 'lc-1', contractVersion: 2, status: 'ACTIVE', supersedesBalanceContractId: 'bc-v1' }));
+    contracts.insert(
+      makeContract({ balanceContractId: 'bc-v2', logicalContractId: 'lc-1', contractVersion: 2, status: 'ACTIVE', supersedesBalanceContractId: 'bc-v1' }),
+    );
 
     const versions = contracts.listVersions('lc-1');
     expect(versions).toHaveLength(2);
@@ -226,9 +282,9 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     // No matching balance_contracts row for 'no-such-contract' — balance_movements.balance_contract_id
     // REFERENCES balance_contracts(balance_contract_id), and createDb() turns PRAGMA foreign_keys ON,
     // so this trips a FOREIGN KEY constraint failure, not a UNIQUE one.
-    expect(() =>
-      movements.insert(makeMovement({ movementId: 'orphan-mv-1', balanceContractId: 'no-such-contract', eventSeq: 1 })),
-    ).toThrow(/FOREIGN KEY constraint failed/);
+    expect(() => movements.insert(makeMovement({ movementId: 'orphan-mv-1', balanceContractId: 'no-such-contract', eventSeq: 1 }))).toThrow(
+      /FOREIGN KEY constraint failed/,
+    );
   });
 
   test('BalanceMovementStore.updateStatus (Checker Release) records releasedBy/releasedAt/balanceAfter', () => {

@@ -29,11 +29,7 @@ import Decimal from 'decimal.js';
 import { parseMonetaryAmount } from '../money';
 import type { InstrumentType } from '../types';
 
-const TOLERANCE_APPLICABLE_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set([
-  'IPLC_LC',
-  'EPLC_LC',
-  'EPLC_CONFIRMATION',
-]);
+const TOLERANCE_APPLICABLE_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set(['IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION']);
 
 const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
   'ISSUE',
@@ -54,12 +50,7 @@ const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
  *   unchanged, even if movementType happens to be "ISSUE"/"CREATE" and
  *   tolerancePct is non-null.
  */
-export function computeCeilingAmount(
-  amount: string,
-  tolerancePct: string | null | undefined,
-  movementType: string,
-  instrumentType: InstrumentType,
-): Decimal {
+export function computeCeilingAmount(amount: string, tolerancePct: string | null | undefined, movementType: string, instrumentType: InstrumentType): Decimal {
   const faceAmount = parseMonetaryAmount(amount);
 
   if (!TOLERANCE_APPLICABLE_INSTRUMENT_TYPES.has(instrumentType)) {

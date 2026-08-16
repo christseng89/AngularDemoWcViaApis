@@ -152,17 +152,14 @@ export class BalanceContractStore {
   }
 
   findById(balanceContractId: string): BalanceContract | undefined {
-    const row = this.db
-      .prepare(`SELECT * FROM balance_contracts WHERE balance_contract_id = ?`)
-      .get(balanceContractId) as ContractRow | undefined;
+    const row = this.db.prepare(`SELECT * FROM balance_contracts WHERE balance_contract_id = ?`).get(balanceContractId) as ContractRow | undefined;
     return row ? rowToContract(row) : undefined;
   }
 
   /** Design doc §3.1 — at most one ACTIVE version per logicalContractId. */
   findActiveByLogicalContractId(logicalContractId: string): BalanceContract | undefined {
-    const row = this.db
-      .prepare(`SELECT * FROM balance_contracts WHERE logical_contract_id = ? AND status = 'ACTIVE'`)
-      .get(logicalContractId) as ContractRow | undefined;
+    const row = this.db.prepare(`SELECT * FROM balance_contracts WHERE logical_contract_id = ? AND status = 'ACTIVE'`).get(logicalContractId) as
+      ContractRow | undefined;
     return row ? rowToContract(row) : undefined;
   }
 
@@ -175,13 +172,7 @@ export class BalanceContractStore {
            AND lc_number = ?
            AND ib_number IS ? AND sg_number IS ? AND leg_seq IS ?`,
       )
-      .get(
-        instrumentType,
-        naturalKey.lcNumber,
-        naturalKey.ibNumber ?? null,
-        naturalKey.sgNumber ?? null,
-        naturalKey.legSeq ?? null,
-      ) as ContractRow | undefined;
+      .get(instrumentType, naturalKey.lcNumber, naturalKey.ibNumber ?? null, naturalKey.sgNumber ?? null, naturalKey.legSeq ?? null) as ContractRow | undefined;
     return row ? rowToContract(row) : undefined;
   }
 
@@ -227,9 +218,7 @@ export class BalanceContractStore {
     }
     const where = clauses.join(' AND ');
 
-    const totalRow = this.db.prepare(`SELECT COUNT(*) AS n FROM balance_contracts WHERE ${where}`).get(whereParams) as
-      | { n: number }
-      | undefined;
+    const totalRow = this.db.prepare(`SELECT COUNT(*) AS n FROM balance_contracts WHERE ${where}`).get(whereParams) as { n: number } | undefined;
     const total = totalRow?.n ?? 0;
 
     const page = filter.page && filter.page > 0 ? filter.page : 1;

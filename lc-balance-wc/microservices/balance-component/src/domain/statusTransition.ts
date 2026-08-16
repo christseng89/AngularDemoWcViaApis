@@ -47,9 +47,7 @@ export function applyStatusTransition(input: ApplyTransitionInput): MovementStat
 
   const nextStatus = LEGAL_TRANSITIONS[currentStatus][action];
   if (nextStatus === undefined) {
-    throw new IllegalStateTransitionError(
-      `Cannot ${action} a movement currently in status ${currentStatus} — not a legal transition per Design doc §4.`,
-    );
+    throw new IllegalStateTransitionError(`Cannot ${action} a movement currently in status ${currentStatus} — not a legal transition per Design doc §4.`);
   }
   return nextStatus;
 }

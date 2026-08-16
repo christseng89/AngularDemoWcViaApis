@@ -194,9 +194,7 @@ describe('BusinessCaseRunnerComponent', () => {
 
     it('stops on the first error, sets loadError, and never calls runCase for remaining cases', () => {
       const result1: BusinessCaseRunResult = { id: 'import-1', title: 'Import LC Case 1', description: 'd', trace: [] };
-      const runCase = jest.fn((id: string) =>
-        id === 'import-1' ? of(result1) : throwError(() => new Error('case 2 blew up')),
-      );
+      const runCase = jest.fn((id: string) => (id === 'import-1' ? of(result1) : throwError(() => new Error('case 2 blew up'))));
       const api = makeApi({ runCase });
       const component = makeComponent(api);
       component.cases = [...cases, { id: 'import-3', title: 'Import LC Case 3', description: 'd', stepCount: 1 }];
@@ -330,7 +328,7 @@ describe('BusinessCaseRunnerComponent', () => {
       expect(component.detailText({ type: 'note', label: 'n' })).toBe('');
     });
 
-    it("returns the reason for a skipped step", () => {
+    it('returns the reason for a skipped step', () => {
       const step: TraceStep = { type: 'release', label: 'l', skipped: true, reason: 'A3 does not call the real release API' };
       expect(component.detailText(step)).toBe('A3 does not call the real release API');
     });
@@ -374,9 +372,7 @@ describe('BusinessCaseRunnerComponent', () => {
           tightAvailableBalance: '40000',
         },
       };
-      expect(component.detailText(step)).toBe(
-        'confirmed=100000  available=40000  offBalanceExposure=60000  tightAvailable=40000',
-      );
+      expect(component.detailText(step)).toBe('confirmed=100000  available=40000  offBalanceExposure=60000  tightAvailable=40000');
     });
 
     it('formats a createMovement step without warnings', () => {

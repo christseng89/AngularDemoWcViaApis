@@ -20,9 +20,7 @@ function makeService(overrides: { get?: jest.Mock; post?: jest.Mock } = {}) {
 describe('BalanceCaseApiService', () => {
   describe('listCases', () => {
     it('GETs /api/business-cases and returns the emitted list', (done) => {
-      const cases: BusinessCaseSummary[] = [
-        { id: 'case-1', title: 'Import LC Case 1', description: 'desc', stepCount: 3 },
-      ];
+      const cases: BusinessCaseSummary[] = [{ id: 'case-1', title: 'Import LC Case 1', description: 'desc', stepCount: 3 }];
       const get = jest.fn(() => of(cases));
       const { service } = makeService({ get });
 

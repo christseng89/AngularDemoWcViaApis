@@ -6,7 +6,15 @@ module.exports = [
   {
     languageOptions: {
       sourceType: 'commonjs',
-      globals: { require: 'readonly', module: 'writable', process: 'readonly', console: 'readonly', __dirname: 'readonly', global: 'writable', fetch: 'readonly' },
+      globals: {
+        require: 'readonly',
+        module: 'writable',
+        process: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+        global: 'writable',
+        fetch: 'readonly',
+      },
     },
     ignores: ['coverage/**', 'node_modules/**'],
   },

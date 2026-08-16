@@ -11,9 +11,7 @@ import { ZERO, parseMonetaryAmount } from '../money';
 import type { BalanceMovement, MovementWarning } from '../types';
 
 /** §6.1 — Σ PENDING+RELEASED SHGT ISSUE net of PARTIAL_REDEEM/FULL_REDEEM (v0.6), for SHGT contracts under the same parentLogicalContractId. Caller is responsible for having already filtered movements to that SHGT logical contract's own movements. */
-export function computeOffBalanceExposure(
-  shgtMovements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[],
-): Decimal {
+export function computeOffBalanceExposure(shgtMovements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[]): Decimal {
   return shgtMovements
     .filter((m) => m.status === 'PENDING' || m.status === 'RELEASED')
     .reduce((acc, m) => {
@@ -123,7 +121,8 @@ export function checkUtilizeSufficiency(params: {
   if (requestedAmount.greaterThan(tightAvailableBalance)) {
     return {
       ok: false,
-      error: `Requested amount ${requestedAmount.toFixed()} exceeds Tight Available Balance ${tightAvailableBalance.toFixed()} ` +
+      error:
+        `Requested amount ${requestedAmount.toFixed()} exceeds Tight Available Balance ${tightAvailableBalance.toFixed()} ` +
         `(Available Balance ${availableBalance.toFixed()} minus outstanding off-balance-sheet (SHGT) exposure ${offBalanceExposure.toFixed()}). ` +
         `If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use ` +
         `"Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.`,

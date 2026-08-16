@@ -9,7 +9,7 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint server.js data test",
-    "format:check": "prettier --check \"**/*.js\" --ignore-path .gitignore"
+    "format:check": "prettier --check \"*.js\" \"data/**/*.js\" \"test/**/*.js\""
   },
   "dependencies": {
     "cors": "^2.8.5",

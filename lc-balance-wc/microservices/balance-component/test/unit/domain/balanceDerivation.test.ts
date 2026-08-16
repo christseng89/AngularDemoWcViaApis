@@ -25,10 +25,7 @@ describe('computeConfirmedBalance (Design doc §3.3)', () => {
 
 describe('computeAvailableBalance (Design doc §3.3)', () => {
   test('Confirmed minus a PENDING UTILIZE earmark', () => {
-    const movements: M[] = [
-      m('ISSUE', '110000', '110000', 'RELEASED'),
-      m('UTILIZE', '30000', '30000', 'PENDING'),
-    ];
+    const movements: M[] = [m('ISSUE', '110000', '110000', 'RELEASED'), m('UTILIZE', '30000', '30000', 'PENDING')];
     const confirmed = computeConfirmedBalance(movements);
     expect(confirmed.toFixed()).toBe('110000');
     expect(computeAvailableBalance(confirmed, movements).toFixed()).toBe('80000');

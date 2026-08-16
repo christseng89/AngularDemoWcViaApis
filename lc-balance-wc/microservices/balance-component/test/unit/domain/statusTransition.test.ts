@@ -10,15 +10,11 @@ describe('applyStatusTransition (Design doc §4/§8)', () => {
     ['REJECTED', 'CANCEL', 'CANCELLED'],
     ['REJECTED', 'EDIT', 'SUPERSEDED'],
   ] as const)('%s -> %s => %s', (currentStatus, action, expected) => {
-    expect(
-      applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' }),
-    ).toBe(expected);
+    expect(applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' })).toBe(expected);
   });
 
-  test('Maker and Checker being the same user is allowed — not this service\'s concern (business instruction 2026-08-14)', () => {
-    expect(
-      applyStatusTransition({ currentStatus: 'PENDING', action: 'RELEASE', createdBy: 'alice', actingUser: 'alice' }),
-    ).toBe('RELEASED');
+  test("Maker and Checker being the same user is allowed — not this service's concern (business instruction 2026-08-14)", () => {
+    expect(applyStatusTransition({ currentStatus: 'PENDING', action: 'RELEASE', createdBy: 'alice', actingUser: 'alice' })).toBe('RELEASED');
   });
 
   test.each([
@@ -28,8 +24,6 @@ describe('applyStatusTransition (Design doc §4/§8)', () => {
     ['CANCELLED', 'CANCEL'],
     ['SUPERSEDED', 'EDIT'],
   ] as const)('illegal: %s -> %s throws, never silently succeeds', (currentStatus, action) => {
-    expect(() =>
-      applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' }),
-    ).toThrow(IllegalStateTransitionError);
+    expect(() => applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' })).toThrow(IllegalStateTransitionError);
   });
 });

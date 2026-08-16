@@ -40,16 +40,12 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
     it('throws when captured has no entry under the requested ref key', async () => {
       global.fetch = jest.fn();
 
-      await expect(resolveLogicalContractId({}, 'missing-ref')).rejects.toThrow(
-        /Step references unknown captureAs key "missing-ref"/,
-      );
+      await expect(resolveLogicalContractId({}, 'missing-ref')).rejects.toThrow(/Step references unknown captureAs key "missing-ref"/);
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('returns the cached logicalContractId on a second call without calling callMicroservice/fetch again', async () => {
-      global.fetch = jest.fn(async () =>
-        jsonResponse(200, { balanceContractId: 'bc-1', logicalContractId: 'lct-bc-1' }),
-      );
+      global.fetch = jest.fn(async () => jsonResponse(200, { balanceContractId: 'bc-1', logicalContractId: 'lct-bc-1' }));
 
       const captured = { lc: { response: { balanceContractId: 'bc-1' } } };
 

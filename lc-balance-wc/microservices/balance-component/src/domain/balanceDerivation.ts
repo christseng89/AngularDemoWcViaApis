@@ -45,34 +45,22 @@ export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1>> = {
 };
 
 /** movementTypes whose `amount` field represents a face-level delta needing §6.2 Tolerance conversion before it contributes to Confirmed Balance — see domain/tolerance.ts. Confirmed/Available Balance derivation always uses ceilingAmount (already converted), never amount, so this list is informational/for callers assembling movements. */
-export const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
-  'ISSUE',
-  'AMEND_INCREASE',
-  'AMEND_DECREASE',
-]);
+export const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE']);
 
 /** Face-amount-affecting movementTypes — see computeFaceAmount. */
-const FACE_AMOUNT_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
-  'ISSUE',
-  'AMEND_INCREASE',
-  'AMEND_DECREASE',
-]);
+const FACE_AMOUNT_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE']);
 
 function signedAmount(m: Pick<BalanceMovement, 'movementType' | 'ceilingAmount'>): Decimal {
   const direction = MOVEMENT_DIRECTION[m.movementType];
   if (direction === undefined) {
-    throw new Error(
-      `MOVEMENT_DIRECTION has no entry for movementType "${m.movementType}" — extend balanceDerivation.ts before using it here.`,
-    );
+    throw new Error(`MOVEMENT_DIRECTION has no entry for movementType "${m.movementType}" — extend balanceDerivation.ts before using it here.`);
   }
   return parseMonetaryAmount(m.ceilingAmount).times(direction);
 }
 
 /** Design doc §3.3 — Confirmed Balance = Σ RELEASED movements (Ceiling-level, i.e. ceilingAmount not amount). */
 export function computeConfirmedBalance(movements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[]): Decimal {
-  return movements
-    .filter((m) => m.status === 'RELEASED')
-    .reduce((acc, m) => acc.plus(signedAmount(m)), ZERO);
+  return movements.filter((m) => m.status === 'RELEASED').reduce((acc, m) => acc.plus(signedAmount(m)), ZERO);
 }
 
 /** Design doc §3.3 — Available Balance = Confirmed Balance ± Σ PENDING movements. */
@@ -80,9 +68,7 @@ export function computeAvailableBalance(
   confirmedBalance: Decimal,
   movements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[],
 ): Decimal {
-  const pendingDelta = movements
-    .filter((m) => m.status === 'PENDING')
-    .reduce((acc, m) => acc.plus(signedAmount(m)), ZERO);
+  const pendingDelta = movements.filter((m) => m.status === 'PENDING').reduce((acc, m) => acc.plus(signedAmount(m)), ZERO);
   return confirmedBalance.plus(pendingDelta);
 }
 

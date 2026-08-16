@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
-import type { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
+import type { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 
 /**
  * Closes coverage gaps left after the three method-slice agents finished
@@ -39,6 +39,23 @@ function snapshot(overrides: Partial<BalanceSnapshot> = {}): BalanceSnapshot {
     confirmedBalance: '100000',
     availableBalance: '80000',
     pendingEarmarkTotal: '20000',
+    ...overrides,
+  };
+}
+
+function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
+  return {
+    movementId: 'mv-1',
+    balanceContractId: 'bc-1',
+    eventSeq: 1,
+    movementType: 'UTILIZE',
+    exposureNature: 'CONTINGENT',
+    amount: '1000',
+    ceilingAmount: '1000',
+    currency: 'USD',
+    status: 'PENDING',
+    createdBy: 'maker1',
+    createdAt: '2026-08-16T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -234,10 +251,10 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         contract({ balanceContractId: 'b', naturalKey: { lcNumber: 'B001' } }),
         contract({ balanceContractId: 'a', naturalKey: { lcNumber: 'A001' } }),
       ];
-      (c as any).catalogPayableMovements.set('b', [{ movementId: 'm-b2', sourceTransactionRef: 'IB02' }]);
-      (c as any).catalogPayableMovements.set('a', [
-        { movementId: 'm-a2', sourceTransactionRef: 'IB02' },
-        { movementId: 'm-a1', sourceTransactionRef: 'IB01' },
+      c.catalogPayableMovements.set('b', [movement({ movementId: 'm-b2', sourceTransactionRef: 'IB02' })]);
+      c.catalogPayableMovements.set('a', [
+        movement({ movementId: 'm-a2', sourceTransactionRef: 'IB02' }),
+        movement({ movementId: 'm-a1', sourceTransactionRef: 'IB01' }),
       ]);
       const rows = c.flattenedPayableRows;
       expect(rows.map((r) => r.movement.movementId)).toEqual(['m-a1', 'm-a2', 'm-b2']);
@@ -270,11 +287,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('filteredCatalogContracts: a decreasing movementType (A3) excludes 0-available contracts but keeps ones with no snapshot yet', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A3'));
-      c.catalogContracts = [
-        contract({ balanceContractId: 'zero' }),
-        contract({ balanceContractId: 'nonzero' }),
-        contract({ balanceContractId: 'unknown' }),
-      ];
+      c.catalogContracts = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' }), contract({ balanceContractId: 'unknown' })];
       (c as any).catalogSnapshots.set('zero', snapshot({ availableBalance: '0' }));
       (c as any).catalogSnapshots.set('nonzero', snapshot({ availableBalance: '500' }));
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['nonzero', 'unknown'].sort());
@@ -339,17 +352,20 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
   describe('filteredPayableMovements / catalogPendingHint / displayStatus', () => {
     it('filteredPayableMovements passes through with no search text and filters by sourceTransactionRef case-insensitively', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.payableMovements = [{ movementId: '1', sourceTransactionRef: 'IB01' }, { movementId: '2', sourceTransactionRef: 'IB02' }];
+      const m1 = movement({ movementId: '1', sourceTransactionRef: 'IB01' });
+      const m2 = movement({ movementId: '2', sourceTransactionRef: 'IB02' });
+      c.payableMovements = [m1, m2];
       expect(c.filteredPayableMovements.length).toBe(2);
       c.payableMovementSearch = 'ib01';
-      expect(c.filteredPayableMovements).toEqual([{ movementId: '1', sourceTransactionRef: 'IB01' }]);
+      expect(c.filteredPayableMovements).toEqual([m1]);
     });
 
     it('filteredPayableMovements: a movement missing sourceTransactionRef falls back to "" for the search comparison instead of crashing', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.payableMovements = [{ movementId: '1' }, { movementId: '2', sourceTransactionRef: 'IB02' }];
+      const m2 = movement({ movementId: '2', sourceTransactionRef: 'IB02' });
+      c.payableMovements = [movement({ movementId: '1', sourceTransactionRef: null }), m2];
       c.payableMovementSearch = 'ib';
-      expect(c.filteredPayableMovements).toEqual([{ movementId: '2', sourceTransactionRef: 'IB02' }]);
+      expect(c.filteredPayableMovements).toEqual([m2]);
     });
 
     it('catalogPendingHint returns "" outside payExistingUtilize, or with no/zero pending, and formats single vs multiple pending with thousands separators', () => {
@@ -560,7 +576,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
 
       // isCheckerCompoundOwnSubmission: movementId must match submitResult's, and the function must be compound
       c.selectFunction(fn('A3S')); // documentArrivalWithSg
-      (c as any).selectedCheckerMovement = { movementId: 'm-1', movementType: 'UTILIZE' };
+      c.selectedCheckerMovement = movement({ movementId: 'm-1', movementType: 'UTILIZE' });
       (c as any).submitResult = { movementId: 'm-1' };
       expect(c.isCheckerCompoundOwnSubmission).toBe(true);
       expect(c.isArrivalAcknowledgmentStep).toBe(true);
@@ -571,7 +587,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.isCheckerCompoundOwnSubmission).toBe(false);
 
       // no selectedCheckerMovement -> false
-      (c as any).selectedCheckerMovement = null;
+      c.selectedCheckerMovement = null;
       expect(c.isCheckerCompoundOwnSubmission).toBe(false);
 
       // createsIssuingBankReceivableOnHonour's own branch (movementType === 'HONOUR') sits behind the
@@ -583,16 +599,16 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const syntheticB4: TransactionFunction = { ...fn('B4'), settlesDocumentArrival: false, documentArrivalWithSg: false };
       const c2 = new TransactionBuilderComponent(mockApi());
       c2.selectFunction(syntheticB4);
-      (c2 as any).selectedCheckerMovement = { movementId: 'm-2', movementType: 'ACCEPT' };
+      c2.selectedCheckerMovement = movement({ movementId: 'm-2', movementType: 'ACCEPT' });
       (c2 as any).submitResult = { movementId: 'm-2' };
       expect(c2.isCheckerCompoundOwnSubmission).toBe(false);
-      (c2 as any).selectedCheckerMovement = { movementId: 'm-2', movementType: 'HONOUR' };
+      c2.selectedCheckerMovement = movement({ movementId: 'm-2', movementType: 'HONOUR' });
       expect(c2.isCheckerCompoundOwnSubmission).toBe(true);
 
       // plain, non-compound function -> false
       const c3 = new TransactionBuilderComponent(mockApi());
       c3.selectFunction(fn('A1'));
-      (c3 as any).selectedCheckerMovement = { movementId: 'm-3', movementType: 'ISSUE' };
+      c3.selectedCheckerMovement = movement({ movementId: 'm-3', movementType: 'ISSUE' });
       (c3 as any).submitResult = { movementId: 'm-3' };
       expect(c3.isCheckerCompoundOwnSubmission).toBe(false);
       expect(c3.checkerActionButtonLabel).toBe('Release');
@@ -600,7 +616,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // isArrivalAcknowledgmentStep also fires for plain A3 (deferSettlement), independent of compound status
       const c4 = new TransactionBuilderComponent(mockApi());
       c4.selectFunction(fn('A3'));
-      (c4 as any).selectedCheckerMovement = { movementId: 'm-4', movementType: 'UTILIZE' };
+      c4.selectedCheckerMovement = movement({ movementId: 'm-4', movementType: 'UTILIZE' });
       expect(c4.isArrivalAcknowledgmentStep).toBe(true);
       expect(c4.checkerActionButtonLabel).toBe('Approve (acknowledgment only)');
 
@@ -609,7 +625,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // not just short-circuited true by an earlier one as in the A3/A3S cases above.
       const c5 = new TransactionBuilderComponent(mockApi());
       c5.selectFunction(fn('A1'));
-      (c5 as any).selectedCheckerMovement = { movementId: 'm-5', movementType: 'UTILIZE' };
+      c5.selectedCheckerMovement = movement({ movementId: 'm-5', movementType: 'UTILIZE' });
       expect(c5.isArrivalAcknowledgmentStep).toBe(false);
     });
   });
@@ -644,14 +660,14 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('onSelectPayMovement (B4): a picked movement missing sourceTransactionRef falls back to empty-string IB Number / secondaryRef', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('B4')); // settlesDocumentArrival + secondaryRefLabel: 'EB Number'
-      c.payableMovements = [{ movementId: 'm-1', amount: '5000' }]; // no sourceTransactionRef
+      c.payableMovements = [movement({ movementId: 'm-1', amount: '5000', sourceTransactionRef: null })];
       c.onSelectPayMovement('m-1');
       expect(c.naturalKey.ibNumber).toBe('');
       expect(c.model.secondaryRef).toBe('');
       expect(c.model.amount).toBe('5000');
     });
 
-    it('filteredCatalogContracts: the tenorFilter ternary\'s USANCE side (as opposed to A4\'s SIGHT side already covered elsewhere)', () => {
+    it("filteredCatalogContracts: the tenorFilter ternary's USANCE side (as opposed to A4's SIGHT side already covered elsewhere)", () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A7')); // catalogTenorFilter: 'USANCE' — exercised directly against the getter,
       // independent of A7's normal two-field-search flow (which never populates catalogContracts itself).
@@ -696,13 +712,13 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('payExisting(): a release() error lacking err.error.message falls back to String(err)', () => {
       const api = mockApi({ release: jest.fn(() => throwError(() => 'plain string failure')) as any });
       const c = new TransactionBuilderComponent(api);
-      c.selectedPayMovement = { movementId: 'm-1' } as any;
+      c.selectedPayMovement = movement({ movementId: 'm-1' });
       c.payExisting();
       expect(c.submitError).toBe('plain string failure');
     });
   });
 
-  describe('error-callback branches inside onSelectContract\'s helper chain', () => {
+  describe("error-callback branches inside onSelectContract's helper chain", () => {
     it('loadSgsForArrival: a catalog() error clears loading/list state (A3S)', () => {
       const api = mockApi({ catalog: jest.fn(() => throwError(() => new Error('boom'))) as any });
       const c = new TransactionBuilderComponent(api);
@@ -780,8 +796,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     });
   });
 
-  describe('afterResolved()\'s amount-default branches (via onSubChoice, with a contract snapshot already present)', () => {
-    it('FULL_SETTLE branch defaults model.amount to the snapshot\'s Available Balance, not Confirmed (A7)', () => {
+  describe("afterResolved()'s amount-default branches (via onSubChoice, with a contract snapshot already present)", () => {
+    it("FULL_SETTLE branch defaults model.amount to the snapshot's Available Balance, not Confirmed (A7)", () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A7'));
       c.selectedContractSnapshot = snapshot({ confirmedBalance: '1000', availableBalance: '750' });
@@ -790,7 +806,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.model.amount).toBe('750');
     });
 
-    it('autoRedeemType branch defaults model.amount to the snapshot\'s Available Balance (A9-shaped function forced through onSubChoice for direct coverage)', () => {
+    it("autoRedeemType branch defaults model.amount to the snapshot's Available Balance (A9-shaped function forced through onSubChoice for direct coverage)", () => {
       const c = new TransactionBuilderComponent(mockApi());
       // A9 has no subChoice in the real registry (fixed FULL_REDEEM) — afterResolved()'s
       // autoRedeemType branch is normally reached via refreshSelectedContractSnapshot() instead.
@@ -816,7 +832,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     });
   });
 
-  describe('rebuildFields()\'s A1/B1 Tenor Days Formly `expressions` callbacks', () => {
+  describe("rebuildFields()'s A1/B1 Tenor Days Formly `expressions` callbacks", () => {
     function tenorDaysField(c: TransactionBuilderComponent) {
       const field = c.fields.find((f) => f.key === 'tenorDays');
       if (!field?.expressions) throw new Error('tenorDays field has no expressions — check A1 is unlocked');
@@ -856,7 +872,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     });
   });
 
-  describe('rebuildFields()\'s Amount field props.step Formly `expressions` callback (Amount input follows Currency decimal places)', () => {
+  describe("rebuildFields()'s Amount field props.step Formly `expressions` callback (Amount input follows Currency decimal places)", () => {
     it('the initial props.step matches whatever Currency is already typed at rebuild time (default 2dp when none is)', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A1'));
@@ -864,7 +880,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(amountField?.props?.step).toBeCloseTo(0.01);
     });
 
-    it('props.step expression reacts live to the Currency field\'s own value (JPY -> whole-number step, KWD -> 3dp step)', () => {
+    it("props.step expression reacts live to the Currency field's own value (JPY -> whole-number step, KWD -> 3dp step)", () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A1'));
       const amountField = c.fields.find((f) => f.key === 'amount');

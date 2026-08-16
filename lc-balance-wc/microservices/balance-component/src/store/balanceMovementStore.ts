@@ -7,13 +7,7 @@
  * Earmark acknowledgment — see acknowledge() below).
  */
 import type { Db } from '../db';
-import type {
-  AccountEntry,
-  BalanceMovement,
-  ExposureNature,
-  MovementStatus,
-  MovementWarning,
-} from '../types';
+import type { AccountEntry, BalanceMovement, ExposureNature, MovementStatus, MovementWarning } from '../types';
 
 interface MovementRow {
   movement_id: string;
@@ -170,16 +164,13 @@ export class BalanceMovementStore {
   }
 
   findById(movementId: string): BalanceMovement | undefined {
-    const row = this.db.prepare(`SELECT * FROM balance_movements WHERE movement_id = ?`).get(movementId) as
-      | MovementRow
-      | undefined;
+    const row = this.db.prepare(`SELECT * FROM balance_movements WHERE movement_id = ?`).get(movementId) as MovementRow | undefined;
     return row ? rowToMovement(row) : undefined;
   }
 
   findByContractAndEventSeq(balanceContractId: string, eventSeq: number): BalanceMovement | undefined {
-    const row = this.db
-      .prepare(`SELECT * FROM balance_movements WHERE balance_contract_id = ? AND event_seq = ?`)
-      .get(balanceContractId, eventSeq) as MovementRow | undefined;
+    const row = this.db.prepare(`SELECT * FROM balance_movements WHERE balance_contract_id = ? AND event_seq = ?`).get(balanceContractId, eventSeq) as
+      MovementRow | undefined;
     return row ? rowToMovement(row) : undefined;
   }
 

@@ -455,7 +455,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.amount = '1000';
       comp.model.secondaryRef = 'IB01';
       comp.selectedContract = makeContract({ balanceContractId: 'bc-lc' });
-      comp.selectedArrivalSg = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
+      comp.selectedArrivalSg = makeContract({
+        balanceContractId: 'bc-sg',
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null },
+      });
       comp.arrivalSgSnapshot = makeSnapshot({ confirmedBalance: '1000' });
     }
 
@@ -589,7 +593,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.createMovement).toHaveBeenCalledTimes(3);
       expect(lastReq(api, 0)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'ACCEPT' });
-      expect(lastReq(api, 1)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'CREATE', exposureNature: 'ACTUAL', tenorType: 'SELLERS_USANCE', tenorDays: 90 });
+      expect(lastReq(api, 1)).toMatchObject({
+        instrumentType: 'EPLC_ACCEPTANCE',
+        movementType: 'CREATE',
+        exposureNature: 'ACTUAL',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
+      });
       expect(lastReq(api, 2)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', movementType: 'CREATE' });
       expect(comp.submitResult).toEqual({ movementId: 'accept-1', status: 'PENDING' });
       expect(comp.acceptanceMovementId).toBe('acceptance-1');
@@ -630,7 +640,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.submit();
 
-      expect(comp.submitError).toBe('Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: REQUEST_VALIDATION_FAILED');
+      expect(comp.submitError).toBe(
+        'Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: REQUEST_VALIDATION_FAILED',
+      );
     });
   });
 
@@ -654,14 +666,20 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       api.createMovement
         .mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any)
         .mockReturnValueOnce(of({ body: { movementId: 'reimb-1', status: 'PENDING' } }) as any);
-      api.resolveContract.mockReturnValueOnce(of(makeContract({ balanceContractId: 'bc-receivable', instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE' })) as any);
+      api.resolveContract.mockReturnValueOnce(
+        of(makeContract({ balanceContractId: 'bc-receivable', instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE' })) as any,
+      );
       primed(comp);
 
       comp.submit();
 
       expect(lastReq(api, 0)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE', balanceContractId: 'bc-accept', movementType: 'FULL_SETTLE' });
       expect(api.resolveContract).toHaveBeenCalledWith('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', { lcNumber: 'LC001', ibNumber: 'EB01' });
-      expect(lastReq(api, 1)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', balanceContractId: 'bc-receivable', movementType: 'REIMBURSE' });
+      expect(lastReq(api, 1)).toMatchObject({
+        instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+        balanceContractId: 'bc-receivable',
+        movementType: 'REIMBURSE',
+      });
       expect(comp.submitResult).toEqual({ movementId: 'settle-1', status: 'PENDING' });
       expect(comp.matchedReceivableMovementId).toBe('reimb-1');
     });
@@ -1220,7 +1238,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledTimes(2);
-      expect(comp.submitError).toBe('Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ILLEGAL_STATE_TRANSITION');
+      expect(comp.submitError).toBe(
+        'Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ILLEGAL_STATE_TRANSITION',
+      );
     });
 
     it('B5 settlesAcceptanceOnMature: cancels the matching Receivable FIRST, then the primary Settle', () => {
@@ -1447,11 +1467,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('runLookup()', () => {
     it('success: resolves the contract, snapshot, and event timeline (sorted by eventSeq)', () => {
       const { comp, api } = setup();
-      api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } })) as any);
-      api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '750' })) as any);
-      api.listMovements.mockReturnValueOnce(
-        of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any,
+      api.resolveContract.mockReturnValueOnce(
+        of(makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } })) as any,
       );
+      api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '750' })) as any);
+      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
       comp.lookup = { instrumentType: 'SHGT', lcNumber: 'LC001', ibNumber: '', sgNumber: 'SG01' };
 
       comp.runLookup();
@@ -1489,7 +1509,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' })) as any);
       api.catalog
-        .mockReturnValueOnce(of({ items: [makeContract({ balanceContractId: 'bc-acc-1', instrumentType: 'IPLC_ACCEPTANCE' })], total: 1, page: 1, pageSize: 50 }) as any)
+        .mockReturnValueOnce(
+          of({ items: [makeContract({ balanceContractId: 'bc-acc-1', instrumentType: 'IPLC_ACCEPTANCE' })], total: 1, page: 1, pageSize: 50 }) as any,
+        )
         .mockReturnValueOnce(of({ items: [makeContract({ balanceContractId: 'bc-sg-1', instrumentType: 'SHGT' })], total: 1, page: 1, pageSize: 50 }) as any);
       comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
@@ -1530,9 +1552,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('a failed Acceptance-candidates catalog fetch resets acceptancesUnderLookup to empty', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' })) as any);
-      api.catalog
-        .mockReturnValueOnce(apiErr('NOT_FOUND') as any)
-        .mockReturnValueOnce(of({ items: [], total: 0, page: 1, pageSize: 50 }) as any);
+      api.catalog.mockReturnValueOnce(apiErr('NOT_FOUND') as any).mockReturnValueOnce(of({ items: [], total: 0, page: 1, pageSize: 50 }) as any);
       comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
       comp.runLookup();
@@ -1543,9 +1563,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('a failed SG-candidates catalog fetch resets sgsUnderLookup to empty', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' })) as any);
-      api.catalog
-        .mockReturnValueOnce(of({ items: [], total: 0, page: 1, pageSize: 50 }) as any)
-        .mockReturnValueOnce(apiErr('NOT_FOUND') as any);
+      api.catalog.mockReturnValueOnce(of({ items: [], total: 0, page: 1, pageSize: 50 }) as any).mockReturnValueOnce(apiErr('NOT_FOUND') as any);
       comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
       comp.runLookup();
@@ -1635,9 +1653,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '250' })) as any);
-      api.listMovements.mockReturnValueOnce(
-        of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any,
-      );
+      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
 
       comp.selectLookupSg('bc-sg-1');
 
@@ -1682,9 +1698,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
       comp.lookupResult = { contract: makeContract({ balanceContractId: 'bc-lc-1' }), snapshot: makeSnapshot({ availableBalance: '999' }) };
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '400' })) as any);
-      api.listMovements.mockReturnValueOnce(
-        of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any,
-      );
+      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
 
       comp.selectLookupAcceptance('bc-acc-1');
 

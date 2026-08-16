@@ -44,9 +44,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['import-case-1'].title).toBe('Import Case 1 — USD Sight');
     expect(byId['import-case-2'].title).toBe('Import Case 2 — USD Usance 120 days after sight');
     expect(byId['import-case-3'].title).toBe('Import Case 3 — USD Sight + Shipping Guarantee 50,000 + IBL');
-    expect(byId['import-case-4'].title).toBe(
-      'Import Case 4 — USD Sight + Shipping Guarantee 100,000 + IBL (only 50,000 documents arrive)',
-    );
+    expect(byId['import-case-4'].title).toBe('Import Case 4 — USD Sight + Shipping Guarantee 100,000 + IBL (only 50,000 documents arrive)');
     expect(byId['import-case-5'].title).toBe('Import Case 5 — USD Sight, Amendment Decrease 120,000 (expect ERROR)');
     expect(byId['export-case-1'].title).toBe('Export Case #1 — USD Sight + Confirmed');
     expect(byId['export-case-2'].title).toBe('Export Case #2 — USD Usance + Confirmed + No EBL');
@@ -119,9 +117,7 @@ describe('data/businessCases.js buildRegistry()', () => {
 
   it("lcNumberFor()'s generated naturalKey.lcNumber values follow '<PREFIX>-<timestamp>-<random>' (dynamic — asserted by pattern, not exact value)", () => {
     registry.forEach((c) => {
-      const firstWithNaturalKey = c.steps.find(
-        (s) => s.type === 'createMovement' && s.request && s.request.naturalKey && s.request.naturalKey.lcNumber,
-      );
+      const firstWithNaturalKey = c.steps.find((s) => s.type === 'createMovement' && s.request && s.request.naturalKey && s.request.naturalKey.lcNumber);
       expect(firstWithNaturalKey).toBeDefined();
       expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(/^(IMP|EXP)-C\d-\d+-\d+$/);
     });
@@ -144,9 +140,7 @@ describe('data/businessCases.js buildRegistry()', () => {
         description: c.description,
         stepCount: c.steps.length,
         stepTypes: c.steps.map((s) => s.type),
-        createdBy: c.steps
-          .filter((s) => s.type === 'createMovement')
-          .map((s) => s.request.createdBy),
+        createdBy: c.steps.filter((s) => s.type === 'createMovement').map((s) => s.request.createdBy),
         releasedBy: c.steps.filter((s) => s.type === 'release').map((s) => s.releasedBy),
       }));
     expect(strip(registry)).toEqual(strip(registry2));

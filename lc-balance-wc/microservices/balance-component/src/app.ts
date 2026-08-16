@@ -20,10 +20,7 @@ export function createApp(db: Db): Express {
   // the Business Case Runner's own replay-a-whole-scenario flow and the Transaction Builder's pickers)
   // are unaffected. Generous limit (over a real network, a Maker/Checker workflow is nowhere near this
   // busy) — this is basic abuse protection, not a throughput cap on normal use.
-  app.use(
-    '/balance-movements',
-    rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }),
-  );
+  app.use('/balance-movements', rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
   app.use(balanceMovementsRouter(service));
 
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));

@@ -166,7 +166,15 @@ export class BalanceComponentApiService {
    *   a client-side-only filter let a page of 10 raw rows contain almost
    *   none of the tenor actually wanted, hiding eligible LCs on other pages.
    */
-  catalog(instrumentType: InstrumentType, status?: string, q?: string, page = 1, pageSize = 10, lcNumber?: string, tenorFamily?: 'SIGHT' | 'USANCE'): Observable<CatalogPage> {
+  catalog(
+    instrumentType: InstrumentType,
+    status?: string,
+    q?: string,
+    page = 1,
+    pageSize = 10,
+    lcNumber?: string,
+    tenorFamily?: 'SIGHT' | 'USANCE',
+  ): Observable<CatalogPage> {
     const params: Record<string, string | number> = { instrumentType, page, pageSize };
     if (status) params['status'] = status;
     if (q) params['q'] = q;

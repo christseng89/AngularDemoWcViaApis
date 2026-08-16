@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
-import { BalanceComponentApiService, BalanceContract, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, TransactionFunction, InstrumentType } from './balance-component.model';
 
 /**
@@ -48,6 +48,23 @@ function makeSnapshot(overrides: Partial<BalanceSnapshot> = {}): BalanceSnapshot
   };
 }
 
+function makeMovement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
+  return {
+    movementId: 'mv-1',
+    balanceContractId: 'C1',
+    eventSeq: 1,
+    movementType: 'UTILIZE',
+    exposureNature: 'CONTINGENT',
+    amount: '1000',
+    ceilingAmount: '1000',
+    currency: 'USD',
+    status: 'PENDING',
+    createdBy: 'maker1',
+    createdAt: '2026-08-16T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function makeCatalogPage(items: BalanceContract[]): CatalogPage {
   return { items, total: items.length, page: 1, pageSize: 10 };
 }
@@ -80,7 +97,7 @@ function makeComponent(fn: TransactionFunction, api: BalanceComponentApiService,
 
 describe('TransactionBuilderComponent — selection/picker methods', () => {
   describe('onSelectContract', () => {
-    it('loads the picked contract\'s live snapshot (plain function, no special branches)', () => {
+    it("loads the picked contract's live snapshot (plain function, no special branches)", () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '5000' }))) });
       const comp = makeComponent(getFn('A3'), api);
       comp.catalogContracts = [makeContract({ balanceContractId: 'C1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
@@ -145,7 +162,12 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       });
       const comp = makeComponent(getFn('B4'), api);
       comp.catalogContracts = [
-        makeContract({ balanceContractId: 'CNF1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null }, tenorType: 'SIGHT' }),
+        makeContract({
+          balanceContractId: 'CNF1',
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null },
+          tenorType: 'SIGHT',
+        }),
       ];
 
       comp.onSelectContract('CNF1');
@@ -160,7 +182,11 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
 
     it('B4: derives ACCEPT for a Usance Confirmation, and excludes a not-yet-acknowledged B3 record (payableMovementRequiresAcknowledgment)', () => {
-      const examinationContract = makeContract({ balanceContractId: 'EX2', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'EXP2', ibNumber: 'EB02', sgNumber: null } });
+      const examinationContract = makeContract({
+        balanceContractId: 'EX2',
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'EXP2', ibNumber: 'EB02', sgNumber: null },
+      });
       const unacknowledgedCreate = { movementId: 'MX2', status: 'PENDING', movementType: 'CREATE', amount: '3000' }; // no acknowledgedAt
       const api = makeApi({
         catalog: jest.fn((instrumentType: InstrumentType) =>
@@ -170,7 +196,12 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       });
       const comp = makeComponent(getFn('B4'), api);
       comp.catalogContracts = [
-        makeContract({ balanceContractId: 'CNF2', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'EXP2', ibNumber: null, sgNumber: null }, tenorType: 'SELLERS_USANCE' }),
+        makeContract({
+          balanceContractId: 'CNF2',
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: 'EXP2', ibNumber: null, sgNumber: null },
+          tenorType: 'SELLERS_USANCE',
+        }),
       ];
 
       comp.onSelectContract('CNF2');
@@ -179,12 +210,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.payableMovements).toHaveLength(0); // filtered out — not acknowledged
     });
 
-    it('A3S (documentArrivalWithSg): loads the LC\'s outstanding SHGT records and auto-picks/fetches the sole one\'s snapshot', () => {
+    it("A3S (documentArrivalWithSg): loads the LC's outstanding SHGT records and auto-picks/fetches the sole one's snapshot", () => {
       const sgContract = makeContract({ balanceContractId: 'SG1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'SG01' } });
       const api = makeApi({
-        catalog: jest.fn((instrumentType: InstrumentType) =>
-          instrumentType === 'SHGT' ? of(makeCatalogPage([sgContract])) : of(makeCatalogPage([])),
-        ),
+        catalog: jest.fn((instrumentType: InstrumentType) => (instrumentType === 'SHGT' ? of(makeCatalogPage([sgContract])) : of(makeCatalogPage([])))),
         getSnapshot: jest.fn((id: string) => (id === 'SG1' ? of(makeSnapshot({ availableBalance: '3000', confirmedBalance: '3000' })) : of(makeSnapshot()))),
       });
       const comp = makeComponent(getFn('A3S'), api);
@@ -202,11 +231,13 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     function setup() {
       const api = makeApi();
       const comp = makeComponent(getFn('A3S'), api);
-      comp.sgsForArrival = [makeContract({ balanceContractId: 'SG1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'SG01' } })];
+      comp.sgsForArrival = [
+        makeContract({ balanceContractId: 'SG1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'SG01' } }),
+      ];
       return { api, comp };
     }
 
-    it('fetches and stores the picked SG\'s live snapshot', () => {
+    it("fetches and stores the picked SG's live snapshot", () => {
       const { api, comp } = setup();
       (api.getSnapshot as jest.Mock).mockReturnValueOnce(of(makeSnapshot({ availableBalance: '2500', confirmedBalance: '7000' })));
 
@@ -240,7 +271,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('A6 (settlesDocumentArrival, no secondaryRefLabel): carries and locks IB Number + Amount from the picked Document Arrival', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
-      comp.payableMovements = [{ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000', status: 'PENDING', movementType: 'UTILIZE' }];
+      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
 
       comp.onSelectPayMovement('M1');
 
@@ -253,7 +284,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('B4 (settlesDocumentArrival + secondaryRefLabel "EB Number"): also carries the reference into model.secondaryRef', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('B4'), api);
-      comp.payableMovements = [{ movementId: 'MX1', sourceTransactionRef: 'EB01', amount: '2000', status: 'PENDING', movementType: 'CREATE' }];
+      comp.payableMovements = [makeMovement({ movementId: 'MX1', sourceTransactionRef: 'EB01', amount: '2000', movementType: 'CREATE' })];
 
       comp.onSelectPayMovement('MX1');
 
@@ -265,7 +296,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('A4 (no settlesDocumentArrival): sets selectedPayMovement but leaves naturalKey/model untouched', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.payableMovements = [{ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '999', status: 'PENDING', movementType: 'UTILIZE' }];
+      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '999' })];
       comp.naturalKey.ibNumber = '';
 
       comp.onSelectPayMovement('M1');
@@ -277,7 +308,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('sets selectedPayMovement to null when the movementId is not found', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
-      comp.payableMovements = [{ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000', status: 'PENDING', movementType: 'UTILIZE' }];
+      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
 
       comp.onSelectPayMovement('missing');
 
@@ -300,7 +331,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
       comp.selectedContract = makeContract({ balanceContractId: 'C1' });
-      comp.selectedPayMovement = { movementId: 'M1', sourceTransactionRef: 'IB01', amount: '1000', status: 'PENDING', movementType: 'UTILIZE' };
+      comp.selectedPayMovement = makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '1000' });
       comp.model.createdBy = 'maker1';
 
       comp.payExisting();
@@ -316,7 +347,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('uses checker2 when createdBy is not maker1', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = { movementId: 'M2', status: 'PENDING', movementType: 'UTILIZE' };
+      comp.selectedPayMovement = makeMovement({ movementId: 'M2' });
       comp.model.createdBy = 'maker2';
 
       comp.payExisting();
@@ -327,7 +358,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('sets submitError and clears actionBusy on a release failure', () => {
       const api = makeApi({ release: jest.fn(() => throwError(() => ({ error: { message: 'release boom' } }))) });
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = { movementId: 'M1', status: 'PENDING', movementType: 'UTILIZE' };
+      comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
 
       comp.payExisting();
 
@@ -359,7 +390,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.snapshotLoading).toBe(false);
     });
 
-    it('A7 Full Settle: carries and locks Amount from the Acceptance\'s Available Balance', () => {
+    it("A7 Full Settle: carries and locks Amount from the Acceptance's Available Balance", () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '6600' }))) });
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
       comp.selectedContract = makeContract({ balanceContractId: 'IB1', instrumentType: 'IPLC_ACCEPTANCE' });
@@ -369,7 +400,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.model.amount).toBe('6600');
     });
 
-    it('A9 (autoRedeemType): defaults Amount to the SG\'s Available Balance', () => {
+    it("A9 (autoRedeemType): defaults Amount to the SG's Available Balance", () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '999' }))) });
       const comp = makeComponent(getFn('A9'), api);
       comp.selectedContract = makeContract({ balanceContractId: 'SG1', instrumentType: 'SHGT' });
@@ -384,7 +415,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       // wins first in practice (see the method's own branch order) — this synthetic variant (movementType
       // left at B5's documented alternate default, 'REIMBURSE', per this method's own doc comment) exercises
       // the settlesAcceptanceOnMature-specific branch directly for full coverage.
-      const syntheticB5 : TransactionFunction = { ...getFn('B5'), movementType: 'REIMBURSE' };
+      const syntheticB5: TransactionFunction = { ...getFn('B5'), movementType: 'REIMBURSE' };
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '1234' }))) });
       const comp = makeComponent(syntheticB5, api);
       comp.model.instrumentType = 'EPLC_ACCEPTANCE';
@@ -510,7 +541,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
   });
 
   describe('onSelectParent', () => {
-    it('A8 (creating movement, no tenorTypeOptions, no two-field search): auto-fills the new contract\'s LC Number from the picked Parent', () => {
+    it("A8 (creating movement, no tenorTypeOptions, no two-field search): auto-fills the new contract's LC Number from the picked Parent", () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A8'), api);
       comp.parentCatalog = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
@@ -521,10 +552,16 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.naturalKey.lcNumber).toBe('LC1');
     });
 
-    it('A7 (usesTwoFieldSearch): drives Step 2 IB Index off the picked Parent\'s own LC Number', () => {
-      const ibContract = makeContract({ balanceContractId: 'IB1', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null } });
+    it("A7 (usesTwoFieldSearch): drives Step 2 IB Index off the picked Parent's own LC Number", () => {
+      const ibContract = makeContract({
+        balanceContractId: 'IB1',
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null },
+      });
       const api = makeApi({
-        catalog: jest.fn((instrumentType: InstrumentType) => (instrumentType === 'IPLC_ACCEPTANCE' ? of(makeCatalogPage([ibContract])) : of(makeCatalogPage([])))),
+        catalog: jest.fn((instrumentType: InstrumentType) =>
+          instrumentType === 'IPLC_ACCEPTANCE' ? of(makeCatalogPage([ibContract])) : of(makeCatalogPage([])),
+        ),
       });
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
       comp.parentCatalog = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
@@ -544,7 +581,9 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const pendingArrival = { movementId: 'M1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1500' };
       const api = makeApi({ listMovements: jest.fn(() => of([pendingArrival])) });
       const comp = makeComponent(getFn('A6'), api);
-      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, tenorType: 'SELLERS_USANCE', tenorDays: 90 })];
+      comp.parentCatalog = [
+        makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, tenorType: 'SELLERS_USANCE', tenorDays: 90 }),
+      ];
 
       comp.onSelectParent('P1');
 
@@ -554,14 +593,22 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.model.tenorDays).toBe(90);
     });
 
-    it('B5 (settleableBalanceIndex): merges settleable candidates for the picked Confirmation\'s own LC Number', () => {
-      const candidate = makeContract({ balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'EXP1', ibNumber: 'EB01', sgNumber: null } });
+    it("B5 (settleableBalanceIndex): merges settleable candidates for the picked Confirmation's own LC Number", () => {
+      const candidate = makeContract({
+        balanceContractId: 'ACC1',
+        instrumentType: 'EPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: 'EXP1', ibNumber: 'EB01', sgNumber: null },
+      });
       const api = makeApi({
-        catalog: jest.fn((instrumentType: InstrumentType) => (instrumentType === 'EPLC_ACCEPTANCE' ? of(makeCatalogPage([candidate])) : of(makeCatalogPage([])))),
+        catalog: jest.fn((instrumentType: InstrumentType) =>
+          instrumentType === 'EPLC_ACCEPTANCE' ? of(makeCatalogPage([candidate])) : of(makeCatalogPage([])),
+        ),
         getSnapshot: jest.fn((id: string) => (id === 'ACC1' ? of(makeSnapshot({ availableBalance: '4000' })) : of(makeSnapshot({ availableBalance: '0' })))),
       });
       const comp = makeComponent(getFn('B5'), api);
-      comp.parentCatalog = [makeContract({ balanceContractId: 'CNF1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } })];
+      comp.parentCatalog = [
+        makeContract({ balanceContractId: 'CNF1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } }),
+      ];
 
       comp.onSelectParent('CNF1');
 
@@ -586,9 +633,15 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
 
     it('B5 (settleableBalanceIndex): a getSnapshot error for one candidate is swallowed (catchError) and that candidate is excluded', () => {
-      const candidate = makeContract({ balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'EXP1', ibNumber: 'EB01', sgNumber: null } });
+      const candidate = makeContract({
+        balanceContractId: 'ACC1',
+        instrumentType: 'EPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: 'EXP1', ibNumber: 'EB01', sgNumber: null },
+      });
       const api = makeApi({
-        catalog: jest.fn((instrumentType: InstrumentType) => (instrumentType === 'EPLC_ACCEPTANCE' ? of(makeCatalogPage([candidate])) : of(makeCatalogPage([])))),
+        catalog: jest.fn((instrumentType: InstrumentType) =>
+          instrumentType === 'EPLC_ACCEPTANCE' ? of(makeCatalogPage([candidate])) : of(makeCatalogPage([])),
+        ),
         getSnapshot: jest.fn(() => throwError(() => ({ error: { message: 'snapshot boom' } }))),
       });
       const comp = makeComponent(getFn('B5'), api);
@@ -689,7 +742,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
   });
 
   describe('onSelectSettleableBalance', () => {
-    it('routes to the picked candidate\'s own real instrumentType and refreshes its snapshot', () => {
+    it("routes to the picked candidate's own real instrumentType and refreshes its snapshot", () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '4000' }))) });
       const comp = makeComponent(getFn('B5'), api);
       comp.selectedParent = makeContract({ balanceContractId: 'CNF1', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } });
@@ -720,7 +773,9 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('selects the row directly, carries its IB/SG Number into searchNaturalKey, and refreshes the snapshot', () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '3300' }))) });
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
-      comp.ibIndexCatalog = [makeContract({ balanceContractId: 'IB1', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null } })];
+      comp.ibIndexCatalog = [
+        makeContract({ balanceContractId: 'IB1', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null } }),
+      ];
       comp.searchError = 'stale error';
 
       comp.onSelectIbIndex('IB1');
@@ -767,7 +822,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(api.resolveContract).not.toHaveBeenCalled();
     });
 
-    it('requires the secondary ref (IB/SG Number) when the function\'s instrumentType has one', () => {
+    it("requires the secondary ref (IB/SG Number) when the function's instrumentType has one", () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE'); // IPLC_ACCEPTANCE -> ibNumber
       comp.checkerLcNumber = 'LC1';

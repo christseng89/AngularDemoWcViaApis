@@ -83,7 +83,12 @@ async function runCase(businessCase) {
     if (step.type === 'release') {
       const movementId = captured[step.movementRef]?.response?.movementId;
       if (!movementId) {
-        trace.push({ type: 'release', label: step.label, skipped: true, reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).` });
+        trace.push({
+          type: 'release',
+          label: step.label,
+          skipped: true,
+          reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).`,
+        });
         continue;
       }
       const result = await callMicroservice('POST', `/balance-movements/${movementId}/release`, { releasedBy: step.releasedBy });

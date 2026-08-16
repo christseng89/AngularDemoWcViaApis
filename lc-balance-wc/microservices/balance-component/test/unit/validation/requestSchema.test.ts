@@ -71,14 +71,14 @@ describe('createMovementRequestSchema', () => {
     }
   });
 
-  test('accepts an amount at exactly its currency\'s allowed scale', () => {
+  test("accepts an amount at exactly its currency's allowed scale", () => {
     const result = createMovementRequestSchema.safeParse({ ...VALID_BODY, amount: '1000.125', currency: 'KWD' });
     expect(result.success).toBe(true);
   });
 });
 
 describe('firstValidationMessage', () => {
-  test('returns the first issue\'s message when multiple fields are missing', () => {
+  test("returns the first issue's message when multiple fields are missing", () => {
     const result = createMovementRequestSchema.safeParse({});
     expect(result.success).toBe(false);
     if (!result.success) {

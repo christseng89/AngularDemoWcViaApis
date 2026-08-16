@@ -1,10 +1,4 @@
-import {
-  ContractVersionConflictError,
-  IllegalStateTransitionError,
-  InsufficientBalanceError,
-  NotFoundError,
-  RequestValidationError,
-} from '../../src/errors';
+import { ContractVersionConflictError, IllegalStateTransitionError, InsufficientBalanceError, NotFoundError, RequestValidationError } from '../../src/errors';
 import {
   decimalPlaces,
   describeAmountScaleViolation,
@@ -98,16 +92,14 @@ describe('money.ts', () => {
       expect(decimalPlaces(value)).toBe(expected);
     });
 
-    test('describeAmountScaleViolation returns null when the amount is within the currency\'s allowed scale', () => {
+    test("describeAmountScaleViolation returns null when the amount is within the currency's allowed scale", () => {
       expect(describeAmountScaleViolation('10000', 'JPY')).toBeNull();
       expect(describeAmountScaleViolation('100.50', 'USD')).toBeNull();
       expect(describeAmountScaleViolation('100.125', 'KWD')).toBeNull();
     });
 
-    test('describeAmountScaleViolation returns a message when the amount exceeds the currency\'s allowed scale', () => {
-      expect(describeAmountScaleViolation('10000.50', 'JPY')).toBe(
-        'amount "10000.50" has 2 decimal place(s) but currency JPY allows at most 0',
-      );
+    test("describeAmountScaleViolation returns a message when the amount exceeds the currency's allowed scale", () => {
+      expect(describeAmountScaleViolation('10000.50', 'JPY')).toBe('amount "10000.50" has 2 decimal place(s) but currency JPY allows at most 0');
     });
 
     test('describeAmountScaleViolation uppercases the currency in its message, regardless of the input casing', () => {

@@ -1,12 +1,7 @@
 import { FormGroup } from '@angular/forms';
 import { of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
-import type {
-  BalanceComponentApiService,
-  BalanceContract,
-  BalanceSnapshot,
-  CatalogPage,
-} from './balance-component-api.service';
+import type { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, TransactionFunction } from './balance-component.model';
 
 /**
@@ -52,6 +47,23 @@ function mkSnapshot(id: string, overrides: Partial<BalanceSnapshot> = {}): Balan
     confirmedBalance: '100000',
     availableBalance: '100000',
     pendingEarmarkTotal: '0',
+    ...overrides,
+  };
+}
+
+function mkMovement(id: string, overrides: Partial<BalanceMovement> = {}): BalanceMovement {
+  return {
+    movementId: id,
+    balanceContractId: 'c1',
+    eventSeq: 1,
+    movementType: 'UTILIZE',
+    exposureNature: 'CONTINGENT',
+    amount: '1000',
+    ceilingAmount: '1000',
+    currency: 'USD',
+    status: 'PENDING',
+    createdBy: 'maker1',
+    createdAt: '2026-08-16T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -192,9 +204,9 @@ describe('TransactionBuilderComponent', () => {
       comp.ibIndexPage = 2;
       comp.ibIndexTotal = 20;
       comp.settleableBalances = [{ balanceContractId: 'x', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: null, availableBalance: '1', currency: 'USD' }];
-      comp.payableMovements = [{ movementId: 'm1' }];
+      comp.payableMovements = [mkMovement('m1')];
       comp.payableMovementSearch = 'stale';
-      comp.selectedPayMovement = { movementId: 'm1' };
+      comp.selectedPayMovement = mkMovement('m1');
       comp.arrivalApproved = true;
       comp.submitResult = { ok: true };
       comp.submitError = 'boom';
@@ -208,8 +220,8 @@ describe('TransactionBuilderComponent', () => {
       comp.matchedReceivableMovementId = 'mv5';
       comp.checkerContract = mkContract('ck1', '005');
       comp.checkerSearchError = 'stale';
-      comp.checkerItems = [{ movementId: 'm2' }];
-      comp.selectedCheckerMovement = { movementId: 'm2' };
+      comp.checkerItems = [mkMovement('m2')];
+      comp.selectedCheckerMovement = mkMovement('m2');
       comp.checkerError = 'stale';
       comp.checkerLcNumber = 'S001'; // deliberately NOT reset
 
@@ -342,7 +354,7 @@ describe('TransactionBuilderComponent', () => {
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it('calls api.catalog with instrumentType + the function\'s own catalogTenorFilter, and populates catalogContracts/catalogTotal', () => {
+    it("calls api.catalog with instrumentType + the function's own catalogTenorFilter, and populates catalogContracts/catalogTotal", () => {
       const { comp, mockApi } = makeComponent();
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'UTILIZE';
@@ -431,7 +443,7 @@ describe('TransactionBuilderComponent', () => {
       const { comp, mockApi } = makeComponent();
       const c1 = mkContract('c1', '810');
       comp.catalogContracts = [c1];
-      const movement = { movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB00001', amount: '25000' };
+      const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
       comp.catalogPayableMovements.set('c1', [movement]);
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
 
@@ -450,7 +462,7 @@ describe('TransactionBuilderComponent', () => {
       const c1 = mkContract('c1', '810');
       comp.selectedFunction = A6; // settlesDocumentArrival: true
       comp.catalogContracts = [c1];
-      const movement = { movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB00001', amount: '25000' };
+      const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
       comp.catalogPayableMovements.set('c1', [movement]);
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
 
@@ -663,23 +675,18 @@ describe('TransactionBuilderComponent', () => {
   describe('onPayableMovementSearchChange', () => {
     it('sets payableMovementSearch and auto-picks when narrowed to exactly one match', () => {
       const { comp } = makeComponent();
-      comp.payableMovements = [
-        { movementId: 'm1', sourceTransactionRef: 'IB00001' },
-        { movementId: 'm2', sourceTransactionRef: 'IB00002' },
-      ];
+      const m1 = mkMovement('m1', { sourceTransactionRef: 'IB00001' });
+      comp.payableMovements = [m1, mkMovement('m2', { sourceTransactionRef: 'IB00002' })];
 
       comp.onPayableMovementSearchChange('IB00001');
 
       expect(comp.payableMovementSearch).toBe('IB00001');
-      expect(comp.selectedPayMovement).toEqual({ movementId: 'm1', sourceTransactionRef: 'IB00001' });
+      expect(comp.selectedPayMovement).toEqual(m1);
     });
 
     it('does not auto-pick when the search still matches more than one movement', () => {
       const { comp } = makeComponent();
-      comp.payableMovements = [
-        { movementId: 'm1', sourceTransactionRef: 'IB00001' },
-        { movementId: 'm2', sourceTransactionRef: 'IB00002' },
-      ];
+      comp.payableMovements = [mkMovement('m1', { sourceTransactionRef: 'IB00001' }), mkMovement('m2', { sourceTransactionRef: 'IB00002' })];
 
       comp.onPayableMovementSearchChange('IB000');
 
@@ -688,7 +695,7 @@ describe('TransactionBuilderComponent', () => {
 
     it('does not auto-pick when the search matches nothing', () => {
       const { comp } = makeComponent();
-      comp.payableMovements = [{ movementId: 'm1', sourceTransactionRef: 'IB00001' }];
+      comp.payableMovements = [mkMovement('m1', { sourceTransactionRef: 'IB00001' })];
 
       comp.onPayableMovementSearchChange('zzz');
 

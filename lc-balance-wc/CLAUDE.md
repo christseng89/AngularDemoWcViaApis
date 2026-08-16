@@ -53,6 +53,9 @@ You are also a senior solution architect and developer with expertise in:
 - REST APIs
 - OpenAPI / Swagger
 - Microservices
+- Microservices Design Patterns (API Gateway, Circuit Breaker, Saga, Strangler Fig, Service Discovery, CQRS)
+- SOLID Principles (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion)
+- Object-Oriented Design (OOD) Patterns (Gang of Four — Factory, Strategy, Adapter, Decorator, Observer, etc.)
 - Event-driven architecture
 - SonarQube
 - Kubernetes
@@ -114,7 +117,16 @@ When proposing solutions, prefer:
 - idempotency;
 - resilience;
 - observability;
-- security by design.
+- security by design;
+- SOLID principles (a class/module owns one reason to change; extend via new code, not edits to
+  existing working code; depend on abstractions, not concrete implementations) as the default lens for
+  judging whether a proposed class/service boundary is well-formed;
+- the classic OOD/Gang-of-Four patterns (Strategy, Factory, Adapter, Decorator, Observer, etc.) where
+  they genuinely fit the problem shape — not applied for their own sake, and never preferred over a
+  simpler solution when the pattern's own structure isn't earning its complexity;
+- established Microservices Design Patterns (API Gateway, Circuit Breaker, Saga, Strangler Fig, Service
+  Discovery, CQRS) when reviewing or proposing service boundaries, inter-service communication, or
+  resilience/consistency strategies across this repo's own microservices.
 
 Always challenge requirements when they conflict with banking, accounting, contingent liability / balance, or architectural best practices.
 
@@ -775,6 +787,262 @@ shared by every other consolidated call site.
 **Full three-suite verification after this whole remediation pass:** Angular app 455/455
 (99.75%/95.61%/99.67%/99.81% coverage), `backend/` 28/28 (97.97%/97.36%/95.65%/97.77%), microservice
 234/234 (98.98%/95.95%/100%/99.34%) — all three clear their own 95% floor on all four metrics.
+
+### BAL-001/BAL-002 status corrected: **Deferred, user-confirmed** (2026-08-16, user-requested — "BAL-001 BAL-002 change to defferrd")
+Documentation-only change to `Quality-report-balance.md` — no code touched. BAL-001 (no authentication)
+and BAL-002 (8 High Angular CVEs) were already excluded from this session's own remediation scope (the
+user's own instruction), but the report itself still described them only as unresolved
+Blocker/Critical findings rather than recording that exclusion as a deliberate decision — inconsistent
+with how BAL-102 (the SQLite→PostgreSQL swap, also excluded, also its own dedicated piece of work) was
+already framed. Both findings' own sections, the findings table, the Overall Quality Score summary, and
+the Gate Conditions section were updated to add **"Deferred, user-confirmed"** and an `Outcome:` note
+matching BAL-102's own wording exactly — real authentication and a major Angular version upgrade are
+each their own dedicated piece of work, correctly out of scope for an incremental code-quality
+remediation pass. **This does not change their severity, does not remove them as gate conditions before
+any production deployment, and does not imply the underlying risk is reduced** — "deferred" describes
+the decision not to attempt them in this pass, not a change to the actual exposure. Composite score
+unchanged by this edit (90/100, A-) — this was a status/framing correction, not a new fix.
+
+## Third same-day remediation pass (2026-08-16, user-directed by priority — "Fix those 3 items": P1 BAL-003 submit()-split, P2 BAL-108 remaining `any` fields, P2 BAL-105 Prettier format:check)
+
+### BAL-105 — Fixed for real this time (was "tooling exists, not applied" since it was first closed)
+`backend/`'s own `format:check` script used `prettier --check "**/*.js" --ignore-path .gitignore` — the
+`--ignore-path .gitignore` pointed at a file that doesn't exist in `backend/` (only a root-level
+`.gitignore` exists), so nothing was actually excluded and the auto-generated `coverage/lcov-report/`
+files showed up as formatting failures alongside real source. Rescoped to
+`prettier --check "*.js" "data/**/*.js" "test/**/*.js"` (matching the `lint` script's own scope, and the
+Angular app's/microservice's own already-correctly-scoped `src/**/*.ts` patterns) — coverage output
+naturally excluded, no `.prettierignore` file needed. Then ran `prettier --write` across all three
+sub-projects for real (previously flagged as "still open" — tooling existed and gated CI-adjacent
+checks, but no repo-wide reformat had actually landed) — a pure formatting-only change (quotes, spacing,
+line-wrapping), zero logic touched. Verified: `format:check` now passes clean in all three sub-projects;
+full three-suite re-run (455/28/234 tests) confirms the reformat changed nothing observable — `tsc
+--noEmit`/`npm run typecheck`, `npm run lint` (0 errors in all three), and `ng build`/`npm run build` all
+clean.
+
+### BAL-108 — the remaining 5 `any`-typed fields now retyped (previously left `any` after retyping broke test fixtures)
+`catalogPayableMovements` (`Map<string, any[]>` → `Map<string, BalanceMovement[]>`), `payableMovements`
+(`any[]` → `BalanceMovement[]`), `selectedPayMovement` (`any | null` → `BalanceMovement | null`),
+`checkerItems` (`any[]` → `BalanceMovement[]`), `selectedCheckerMovement` (`any | null` →
+`BalanceMovement | null`). The blocker from the prior attempt (bare partial-object test fixtures like
+`{movementId: 'm1'}` failing `TS2740` against the full `BalanceMovement` shape) was resolved by adding a
+`makeMovement()`/`movement()`/`mkMovement()` fixture-builder helper to each of the three affected spec
+files (`transaction-builder.component.spec.ts`, `.selection.spec.ts`, `.gaps.spec.ts` — matching the
+naming convention each file already used for its own `makeContract`/`mkContract`-style helpers, and
+mirroring `actions.spec.ts`'s own pre-existing `makeMovement()`), supplying sensible defaults for every
+required `BalanceMovement` field (`exposureNature`, `ceilingAmount`, `createdBy`, `createdAt` were the
+ones the old bare literals were missing) so each test site only needs to override what it actually cares
+about, same "shorthand fixture builder" pattern this codebase already used for `BalanceContract`/
+`BalanceSnapshot`. All ~30 affected fixture call sites across the three files updated to use the new
+helper instead of bare object literals (including several that were previously silently cast via
+`(c as any).selectedCheckerMovement = ...`/`... as any`, now genuinely typed, closing those too).
+Verified: `npm test` → 455/455 passing (no new tests added — this was a pure fixture-shape fix, not new
+coverage), `tsc --noEmit` clean, `ng build` clean, `npm run lint` 0 errors (216 warnings, down from 231 —
+the removed fixture-level `as any` casts are gone; the remaining warnings are `any` usage this finding's
+own prior pass already explained is out of scope — `submitResult`/callback params like `res: any`/
+`settleRes: any` throughout the release/reject/submit chain, a larger, separate piece of work).
+
+### BAL-003 — submit()'s own ~430-line body split into 7 named methods; submit() itself now 29 lines
+Previously deferred alongside the release/reject/cancel chain extraction as the harder, still-untouched
+piece — re-scoped the same way that extraction was: not a service extraction (this logic reads/writes
+deeply into `selectedContract`/`selectedArrivalSg`/`arrivalSgSnapshot`/`naturalKey`/`model`/etc.,
+so moving it elsewhere would just relocate the coupling), but a straightforward decompose-into-named-
+methods split. On closer reading, `submit()`'s actual shape wasn't "14 per-function branches" as
+originally guessed — it's generic validation (mostly shared across all 14 functions, with a few
+embedded function-specific checks) + generic request assembly + exactly 4 special-case compound
+submission shapes (gated by function flags) + 1 generic default path covering everything else. Split
+into:
+- `validateSubmit(): boolean` — the ~105-line validation block, guard conditions and error messages
+  unchanged, `return;` → `return false;`/`return true;`.
+- `buildSubmitRequest(): CreateMovementRequest | null` — the ~34-line request-assembly block, `return;` →
+  `return null;`/`return req;`.
+- `submitDocumentArrivalWithSg()` / `submitConfirmationHonourWithReceivable()` /
+  `submitConfirmationAcceptWithReceivable()` / `submitAcceptanceSettleWithReceivable()` — the four
+  compound shapes (A3S's SG-first 2-step; B3 Sight/HONOUR's 2-step; B4 Usance/ACCEPT's 3-step; B5's
+  settle-then-resolve-then-reimburse 3-step), each taking `req: CreateMovementRequest` as its only
+  parameter, everything else still read from `this` exactly as before.
+- `submitPlain()` — the default single-`createMovement()` path used by every function that doesn't need
+  one of the four special shapes.
+- `submit()` itself — now just: validate → build request → reset busy/result state → dispatch to
+  whichever of the 5 methods the same `selectedFunction?.xxx` flag conditions (unchanged) select.
+
+Pure code motion: every guard condition, every business-instruction comment, every error message string,
+and the exact order every API call fires in is byte-for-byte unchanged — only WHERE each piece of code
+lives changed. `submit()` itself: ~423 lines → 29 lines. File total: 2,778 → 2,850 lines (net growth from
+new method signatures/doc comments — expected, this was never a line-count exercise, same posture as the
+two prior BAL-003 extractions).
+
+**Verification, given the stakes (this dispatches all 14 Maker business functions' own money-moving
+Submit):** full Angular suite 455/455 with **zero test files needing changes** — the pre-existing suite
+was written against the original single-method implementation and still passes completely unmodified,
+strong evidence of exact behavior preservation — plus `tsc --noEmit`/`ng build`/`npm run lint` all clean.
+**Live in-browser end-to-end verification**, not just unit tests, given the stakes:
+- A1 (LC Issue) submitted successfully via `submitPlain()` — PENDING ISSUE movement created, Look Up
+  panel correctly synced.
+- That same LC released via the Checker queue, then an A8 (Shipping Guarantee Issue) submitted and
+  released against it as parent — both plain-path submits, both correct.
+- A3S (Document Arrival w/ Shipping Gtee) submitted against that LC+SG pair, exercising
+  `submitDocumentArrivalWithSg()`'s first leg: the SG's own FULL_REDEEM (30000, MIN(Bill Amount, SG
+  Outstanding) correctly derived) fired first, correctly tagged with `sourceTransactionRef: 'IB01'` from
+  the typed IB Number — confirmed directly via the SG's own Event Timeline
+  (`ISSUE 30000 Approved` → `FULL_REDEEM 30000 IB01 PENDING`) and the Off-Balance Exposure figure
+  dropping from 30000 to 0 (the PENDING redemption correctly netting out, per the documented "PENDING
+  counts the same as RELEASED for this calculation" rule). The chain's *second* leg (the LC's own
+  UTILIZE) hit an idempotency collision from reusing `eventSeq: 1` across every test submission on the
+  same LC in this manual verification session (a test-setup artifact — the server correctly returned the
+  pre-existing ISSUE record via its own `(balanceContractId, eventSeq)` idempotency handling, exactly as
+  designed, rather than creating a duplicate) — not a defect in the refactor. The three remaining compound
+  shapes (B3/B4/B5) require an Export Confirmation + B3 presentation to set up and weren't separately
+  live-verified this pass; they're structurally identical in shape to the one that was (a
+  `createMovement().subscribe()` chain moved verbatim, same as the already-verified one), and are covered
+  by the unchanged, still-passing unit test suite.
+
+**Full three-suite verification after this whole remediation pass:** Angular app 455/455
+(99.75%/95.62%/99.68%/99.81% coverage), `backend/` 28/28 (97.97%/97.36%/95.65%/97.77%), microservice
+234/234 (98.98%/95.95%/100%/99.33%) — all three clear their own 95% floor on all four metrics.
+
+## BAL-120 status corrected: **Deferred, user-confirmed** (2026-08-16, user-requested — "BAL-120 Deferred")
+Same treatment/framing as BAL-001/BAL-002/BAL-102 above — a documentation-only change, no code touched.
+`balanceMovementStore.ts`'s idempotency-collision detection (`/UNIQUE constraint failed/.test(message)`)
+stays as message-text matching because `node:sqlite` (`DatabaseSync`) doesn't currently expose a stable
+error code/type for constraint violations to switch to instead — there's no better mechanism available
+today, not unaddressed work sitting on the shelf. Revisit if/when `node:sqlite` adds one, or as part of
+the already-planned SQLite→PostgreSQL swap (BAL-102), whichever comes first. Severity unchanged at Info;
+this was never a gate condition and remains non-blocking either way.
+
+## Fourth same-day remediation pass (2026-08-16, user-directed — "BAL-003 God Component ~2,850 lines... 目前最值得繼續改善" then "BAL-003 使用OOD SOLID原則 避免重複代碼")
+
+### BAL-003 — paginated-picker state/boundary-math extracted into a new `PagedListState` class (OOD/SOLID)
+The 3rd-and-done framing from the prior two passes undersold one remaining, genuine duplication the
+report's own evidence block already named: the catalog LC Index, Parent LC picker, and IB/SG Index each
+carried their **own** copy of the same `page`/`total`/`pageSize` field trio, the same
+`Math.max(1, Math.ceil(total / pageSize))` totalPages formula, and the same "am I already at the
+first/last page" boundary check in their own `xxxPrevPage()`/`xxxNextPage()` methods — three literal
+copies of identical navigation math, independent of (and in addition to) the already-shared
+`loadPagedCatalog()` fetch helper. User's own framing ("OOD SOLID原則 避免重複代碼" — apply OOD/SOLID
+principles, avoid duplicate code) named exactly this.
+
+**What was done:** new `src/app/transaction-builder/paged-list-state.ts` — a small, framework-agnostic
+`PagedListState` class owning `page`/`total`/`pageSize`, a `totalPages` getter (the one formula, now
+written once), `reset()`, and `prevTarget()`/`nextTarget()` (return the target page number, or `null` at
+a boundary) — Single Responsibility (this class's only job is paging state + boundary math) and
+Open/Closed (a future 4th paginated picker instantiates it, no new copy-pasted math). Three private
+instances added to `TransactionBuilderComponent` (`catalogPaging`/`parentPaging`/`ibIndexPaging`).
+
+**Deliberately preserved the existing public surface** rather than renaming it: `catalogPage`/
+`catalogTotal` (and the `parent`/`ibIndex` equivalents) are now getter/setter *accessor pairs* delegating
+to the new `PagedListState` instance, not a breaking rename — chosen because ~96 existing test call sites
+across the 3 spec files and 8 template bindings read AND (in ~30 cases) directly *write*
+(`comp.catalogPage = 5`) these properties by name; accessors keep every one of those working completely
+unmodified while still moving the actual state storage and math to one shared, independently-tested
+place. The 3 `xxxTotalPages` getters now delegate to `paging.totalPages`; the 6 `xxxPrevPage()`/
+`xxxNextPage()` methods now call `paging.prevTarget()`/`paging.nextTarget()` and only decide whether to
+fire the actual reload — identical to the pre-existing pattern of `loadPagedCatalog()`'s own callback-
+based design, just applied one layer up. The interleaved reset block (`selectFunction()`'s state-clearing
+section) now calls `xxxPaging.reset()` instead of the previous two-line-per-picker assignment.
+
+**Verification:** new `paged-list-state.spec.ts` (10 tests: default state, totalPages — zero/partial/exact-
+multiple, `reset()`, `prevTarget()`/`nextTarget()` at and away from boundaries, including the `total: 0`
+single-page edge case) — 100% coverage on the new file. Full Angular suite 465/465 (455 pre-existing +
+10 new) with **zero existing test files needing any changes** — the strongest evidence available that the
+public behavior is unchanged, since the pre-existing 96 read/write call sites across
+`transaction-builder.component.spec.ts`/`.selection.spec.ts`/`.gaps.spec.ts` were written against the old
+plain-field implementation and still pass completely unmodified against the new accessor-backed one.
+`tsc --noEmit`, `npm run lint` (0 errors — pre-existing `any` warnings elsewhere untouched), and
+`format:check` all clean. **Live in-browser verification**: A4 (Sight Settlement)'s LC Index picker
+rendered correctly against real data ("Page 1 / 1 (8 total, ordered by Reference)"); then, directly against
+the live running component instance (`ng.getComponent`), simulated a 25-record/3-page scenario and drove
+`catalogNextPage()`/`catalogPrevPage()` through the full boundary sequence (1→2→3, correctly refused to
+advance past page 3, back to 2) — exercising the exact same code path the template's Prev/Next buttons
+call, end to end through the real running app, not just the unit suite. Zero console errors.
+
+File size: 2,850 → 2,888 lines (net growth from the getter/setter pairs' own signatures — the pattern
+established every extraction pass so far: this was never a line-count exercise, the win is one shared,
+tested implementation instead of three duplicated ones). **BAL-003 stays open at Major** — this closes a
+real, previously-uncredited duplication finding, but doesn't reduce the *number of jobs* the class does;
+a genuine architectural decomposition (separate components/services) remains the separate, larger future
+work already on record in `Quality-report-balance.md`.
+
+**Full three-suite re-verification after this pass:** Angular app 465/465
+(99.68%/95.65%/99.39%/99.73% coverage — new `paged-list-state.ts` at 100%/100%/100%/100%), `backend/`
+28/28 (unaffected, unchanged), microservice 234/234 (unaffected, unchanged).
+
+## Fifth same-day remediation pass (2026-08-16, user-directed — BAL-003 "8/10, 下一個主要改善目標" + BAL-110 "7/10, 建議現在就做，成本低")
+
+### BAL-110 — contract test added, catches real InstrumentType/movementType drift between the Angular model and the microservice
+New `src/app/transaction-builder/instrument-type-contract.spec.ts` — reads both
+`balance-component.model.ts` (Angular) and the microservice's `types.ts`/`domain/balanceDerivation.ts`
+as **plain text** (`fs.readFileSync`, never `import`/compile) specifically so it can never cross the two
+projects' separate tsconfigs/Jest configs (see this file's own "never let the two Jest configs cross"
+caveat above). Regex-extracts (1) `InstrumentType`'s own quoted union literals from both sides and
+asserts set equality, (2) the flattened set of movementType values in Angular's
+`MOVEMENT_TYPES_BY_INSTRUMENT` against the bare keys of the microservice's `MOVEMENT_DIRECTION` (the
+microservice has no per-instrument table of its own — `MOVEMENT_DIRECTION`'s keys are the true "server
+knows a legal movementType" set). Both currently match exactly (10 instrument types, 14 movementTypes).
+**Verified the test isn't a tautology**: manually injected a fake `'FAKE_DRIFTED_TYPE'` into the
+microservice's `types.ts`, confirmed the test fails with a clear diff, then restored the file (confirmed
+clean via `git diff` — zero net change). 2 new tests, both green; full suite 467/467 (465 + 2), same
+coverage floor cleared; `tsc --noEmit`/`npm run lint`/`format:check` all clean.
+
+### BAL-003 — Checker Actions extracted into `CheckerActionsService` via genuine Dependency Inversion
+This directly reverses the "not worth it" decision recorded in the 2nd same-day pass's `finishCheckerAction`
+doc comment — re-examined at the user's explicit direction and found the reasoning still held for a
+*naive* move (the compound release()/reject()/deleteMakerPending() chain — 10 methods, ~230 lines —
+reads/writes `submitResult`/`submitError`/`actionBusy` plus 5 movementId fields, and calls back into 5
+other component methods), so this was NOT done as a plain cut-and-paste. Instead:
+- New `checker-actions.service.ts` — `CheckerActionsService` (`@Injectable({ providedIn: 'root' })`)
+  depends only on a new `CheckerActionContext` interface (Interface Segregation — exactly the 9 read-only
+  fields these 3 flows need) and its own injected `BalanceComponentApiService`, never on
+  `TransactionBuilderComponent`. It owns exactly the API-orchestration decisions (which release/reject/
+  cancel call, in what order, under what business condition) and resolves every flow to one
+  `CheckerActionOutcome` (`'released' | 'documentArrivalAcknowledged' | 'failed'`) — it never mutates
+  component state itself (Single Responsibility: decide *what happened*, not *what the UI does about
+  it*). Every guard condition, branch order, and error-message string is unchanged from the 10 methods it
+  replaces — pure code motion re-expressed as RxJS `switchMap`/`catchError` chains instead of nested
+  `.subscribe()` callbacks.
+- New `api-error.ts` — the existing `describeApiError` HTTP-error formatter (`err?.error?.message ??
+  String(err)`, BAL-005) pulled out to a standalone pure function so the new service can use the exact
+  same formatting without depending on the component; the component's own `describeApiError` method now
+  delegates to it (all ~30 existing call sites unchanged).
+- `TransactionBuilderComponent.release()`/`reject()`/`deleteMakerPending()` are now thin wrappers (same
+  guard + same `actionBusy`/`submitError` reset as before — including the subtle asymmetry that `reject()`
+  alone never resets `submitError`, preserved exactly) that build a `CheckerActionContext` and subscribe,
+  routing the outcome through a new `applyCheckerActionOutcome()` — the one place outcomes turn into
+  `actionBusy`/`submitResult`/`submitError`/`arrivalApproved` writes and the `refreshSelectedContractSnapshot()`/
+  `syncCheckerToContext()`/`syncLookupToContext()`/`reloadPayableMovementsAfterCompound()`/
+  `loadSgsForArrival()` callbacks — mirroring `finishCheckerAction`/`failCheckerAction`/the old
+  `releaseArrivalDocument()` exactly. The 6 private leg methods (`releaseMatchedReceivable`,
+  `releaseDueFromIssuingBank`, `releaseAcceptance`, `releaseAcceptanceLiability`,
+  `releaseAcceptanceReimbReceivable`, `releaseArrivalDocument`) are gone from the component entirely.
+- **Constructor-injection risk avoided**: `CheckerActionsService` is added as a constructor parameter
+  with a **default value** — `checkerActions: CheckerActionsService = new CheckerActionsService(api)` —
+  specifically because 70+ existing test call sites across all 4 spec files construct the component via
+  `new TransactionBuilderComponent(mockApi)` with exactly one argument. Angular's own DI container always
+  resolves every constructor parameter when it builds this component for real (default values are never
+  consulted by Angular's DI), so production gets the real injected singleton; every test call site needed
+  zero changes.
+
+**Verification:** full Angular suite 467/467 (467 unchanged — 0 new tests needed since every branch is
+already covered by the existing `release()`/`reject()`/`deleteMakerPending()` describe blocks in
+`transaction-builder.component.actions.spec.ts`, ~280+185+... lines/tests, all passing completely
+unmodified against the new service-backed implementation); coverage still clears the 95% floor on all
+four metrics (branches dipped slightly, 95.65% → 95.53%, from two pre-existing `pendingItemLabel ??
+'Document Arrival'` fallback branches that were already only partially exercised before the extraction —
+moved verbatim, not a new gap); `tsc --noEmit`, `npm run lint` (0 errors), `format:check` all clean.
+**Live in-browser verification**, given the stakes (this is the actual money-moving Maker/Checker release
+chain): drove the real running component instance through all 3 entry points against the live
+microservice — a fresh A1 submit → `release()` (PENDING → RELEASED, plain path), a second fresh submit →
+`deleteMakerPending()` (PENDING → CANCELLED, default `cancelPrimary()` path), a third fresh submit →
+`reject()` (PENDING → REJECTED) — all three correct, `submitError` null, `actionBusy` false after each,
+zero console errors. The 4 compound branches (A3S/A6/B4/B5) were not separately live-driven this pass
+(same scope-limitation disclosure as the `submit()` split pass) — they're structurally unchanged code
+motion from methods already live-verified in an earlier pass, and are fully covered by the unchanged unit
+suite.
+
+**Full three-suite re-verification after this pass:** Angular app 467/467
+(99.68%/95.53%/99.41%/99.73% coverage — new `checker-actions.service.ts` at 100%/94.11%/100%/100%,
+`api-error.ts` at 100%/100%/100%/100%), `backend/` 28/28 (unaffected, unchanged), microservice 234/234
+(unaffected, unchanged).
 
 ## Test coverage (confirms the above; see for worked examples)
 

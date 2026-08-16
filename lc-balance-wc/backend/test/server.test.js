@@ -137,9 +137,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
 
       expect(res.status).toBe(200);
 
-      const acceptanceCreate = res.body.trace.find(
-        (t) => t.type === 'createMovement' && t.label.startsWith('Create Acceptance'),
-      );
+      const acceptanceCreate = res.body.trace.find((t) => t.type === 'createMovement' && t.label.startsWith('Create Acceptance'));
       expect(acceptanceCreate).toBeDefined();
       expect(acceptanceCreate.request.parentLogicalContractId).toMatch(/^lct-bc-/);
       expect(acceptanceCreate.request.parentLogicalContractIdRef).toBeUndefined();
@@ -279,7 +277,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('POST /api/business-cases/:id/run — orchestration failure (outer try/catch -> 500)', () => {
-    it('returns a generic 500 ORCHESTRATION_ERROR (BAL-117: never the thrown Error\'s own raw message) and logs the detail server-side', async () => {
+    it("returns a generic 500 ORCHESTRATION_ERROR (BAL-117: never the thrown Error's own raw message) and logs the detail server-side", async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = jest.fn(() => Promise.reject(new Error('microservice unreachable')));
 

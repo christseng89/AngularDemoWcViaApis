@@ -261,7 +261,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('every fixed movementType is legal for that function\'s own instrumentType', () => {
+    it("every fixed movementType is legal for that function's own instrumentType", () => {
       for (const f of IMPORT_FUNCTIONS) {
         if (f.movementType) {
           expect(MOVEMENT_TYPES_BY_INSTRUMENT[f.instrumentType]).toContain(f.movementType);
@@ -322,7 +322,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('A6 is the only IMPORT function with settlesDocumentArrival, sourced from A3\'s own UTILIZE', () => {
+    it("A6 is the only IMPORT function with settlesDocumentArrival, sourced from A3's own UTILIZE", () => {
       for (const f of IMPORT_FUNCTIONS) {
         if (f.code === 'A6') {
           expect(f.settlesDocumentArrival).toBe(true);
@@ -361,7 +361,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('every function except A1 carries a secondaryRefLabel OR relies on documentArrivalWithSg/payExistingUtilize/autoRedeemType\'s own natural-key flow', () => {
+    it("every function except A1 carries a secondaryRefLabel OR relies on documentArrivalWithSg/payExistingUtilize/autoRedeemType's own natural-key flow", () => {
       // A1 (LC Issue) is the sole function creating a brand-new natural key with nothing to
       // reference yet, per the interface's own doc comment ("every function except LC Issue (A1/B1)
       // requires ONE generic secondary reference").
@@ -395,7 +395,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('every fixed movementType is legal for that function\'s own instrumentType', () => {
+    it("every fixed movementType is legal for that function's own instrumentType", () => {
       for (const f of EXPORT_FUNCTIONS) {
         if (f.movementType) {
           expect(MOVEMENT_TYPES_BY_INSTRUMENT[f.instrumentType]).toContain(f.movementType);
@@ -441,7 +441,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('B4 (Honour / Acceptance) is the unified legal-event step: movementTypeFromContractTenor, settlesDocumentArrival against B3\'s CREATE, and both compound-creation flags', () => {
+    it("B4 (Honour / Acceptance) is the unified legal-event step: movementTypeFromContractTenor, settlesDocumentArrival against B3's CREATE, and both compound-creation flags", () => {
       const b4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4') as TransactionFunction;
       expect(b4.instrumentType).toBe('EPLC_CONFIRMATION');
       expect(b4.movementType).toBe('HONOUR');
@@ -533,7 +533,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('defaultParentInstrumentType, where present, is itself a valid parent option for that function\'s own instrumentType', () => {
+    it("defaultParentInstrumentType, where present, is itself a valid parent option for that function's own instrumentType", () => {
       for (const f of ALL_FUNCTIONS) {
         if (f.defaultParentInstrumentType) {
           expect(PARENT_INSTRUMENT_OPTIONS[f.instrumentType]).toContain(f.defaultParentInstrumentType);
@@ -541,7 +541,7 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it('payableMovementType, where present, is a legal movementType for wherever it actually lives (payableMovementInstrumentType when set — e.g. B4\'s EPLC_EXAMINATION — else the parent instrument it\'s browsed from, e.g. A6\'s IPLC_LC — else its own instrumentType)', () => {
+    it("payableMovementType, where present, is a legal movementType for wherever it actually lives (payableMovementInstrumentType when set — e.g. B4's EPLC_EXAMINATION — else the parent instrument it's browsed from, e.g. A6's IPLC_LC — else its own instrumentType)", () => {
       for (const f of ALL_FUNCTIONS) {
         if (f.payableMovementType) {
           const sourceInstrument = f.payableMovementInstrumentType ?? f.defaultParentInstrumentType ?? f.instrumentType;
@@ -574,7 +574,7 @@ describe('balance-component.model data invariants', () => {
       expect(decimalPlacesForCurrency('')).toBe(2);
     });
 
-    it('every CURRENCY_DECIMALS entry is 0, 2, or 3 (the only minor-unit counts this project\'s own MONETARY_AMOUNT_PATTERN ceiling allows)', () => {
+    it("every CURRENCY_DECIMALS entry is 0, 2, or 3 (the only minor-unit counts this project's own MONETARY_AMOUNT_PATTERN ceiling allows)", () => {
       for (const decimals of Object.values(CURRENCY_DECIMALS)) {
         expect([0, 2, 3]).toContain(decimals);
       }

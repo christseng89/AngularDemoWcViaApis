@@ -37,7 +37,7 @@ describe('computeOffBalanceExposure (Design doc §6.1)', () => {
     expect(computeOffBalanceExposure(shgt).toFixed()).toBe('100000');
   });
 
-  test('defensive guard: throws on a movementType that is not ISSUE/PARTIAL_REDEEM/FULL_REDEEM — the caller is responsible for pre-filtering to one SHGT logical contract\'s own movements, but this function still refuses to silently ignore an unexpected shape', () => {
+  test("defensive guard: throws on a movementType that is not ISSUE/PARTIAL_REDEEM/FULL_REDEEM — the caller is responsible for pre-filtering to one SHGT logical contract's own movements, but this function still refuses to silently ignore an unexpected shape", () => {
     const shgt: M[] = [{ movementType: 'AMEND', ceilingAmount: '1000', status: 'RELEASED' } as M];
     expect(() => computeOffBalanceExposure(shgt)).toThrow(/unexpected SHGT movementType "AMEND"/);
   });

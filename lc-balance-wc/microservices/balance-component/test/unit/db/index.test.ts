@@ -24,7 +24,7 @@ describe('createDb — real file path (src/db/index.ts)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test('a real file path takes the WAL branch (filePath !== \':memory:\') and produces a usable, on-disk database', () => {
+  test("a real file path takes the WAL branch (filePath !== ':memory:') and produces a usable, on-disk database", () => {
     const filePath = join(dir, 'balance-component-test.sqlite');
     const db = createDb(filePath);
     try {

@@ -105,15 +105,16 @@ export interface CreateMovementRequest {
   createdBy: string;
 }
 
-export type CreateMovementResult =
-  | { created: true; movement: BalanceMovement }
-  | { created: false; existing: BalanceMovement };
+export type CreateMovementResult = { created: true; movement: BalanceMovement } | { created: false; existing: BalanceMovement };
 
 export class BalanceService {
   private readonly contracts: BalanceContractStore;
   private readonly movements: BalanceMovementStore;
 
-  constructor(db: Db, private readonly now: () => string = () => new Date().toISOString()) {
+  constructor(
+    db: Db,
+    private readonly now: () => string = () => new Date().toISOString(),
+  ) {
     this.contracts = new BalanceContractStore(db);
     this.movements = new BalanceMovementStore(db);
   }
@@ -220,9 +221,7 @@ export class BalanceService {
     if (!contract) {
       if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
       if (!CREATING_MOVEMENT_TYPES.has(req.movementType)) {
-        throw new NotFoundError(
-          `No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`,
-        );
+        throw new NotFoundError(`No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`);
       }
 
       // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
@@ -273,7 +272,7 @@ export class BalanceService {
       // ever return OTHER SGs' movements — no need to exclude "self".
       if (req.instrumentType === 'SHGT' && req.movementType === 'ISSUE') {
         if (!req.parentLogicalContractId) {
-          throw new RequestValidationError('parentLogicalContractId is required to check SG Issue against the parent LC\'s Available Balance.');
+          throw new RequestValidationError("parentLogicalContractId is required to check SG Issue against the parent LC's Available Balance.");
         }
         const parentLc = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
         if (!parentLc) {
@@ -319,7 +318,9 @@ export class BalanceService {
       // no separate bookkeeping needed, it falls out of computePresentDocsEarmark's own PENDING-only filter.
       if (req.instrumentType === 'EPLC_EXAMINATION' && req.movementType === 'CREATE') {
         if (!req.parentLogicalContractId) {
-          throw new RequestValidationError('parentLogicalContractId is required to check a Present Docs amount against the parent Confirmation\'s Available Balance.');
+          throw new RequestValidationError(
+            "parentLogicalContractId is required to check a Present Docs amount against the parent Confirmation's Available Balance.",
+          );
         }
         const parentConfirmation = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
         if (!parentConfirmation) {
@@ -442,9 +443,7 @@ export class BalanceService {
     const releasedAt = this.now();
     // Compute the after-figure by simulating this one movement flipping to RELEASED,
     // rather than a second DB round-trip — cheaper and avoids a two-write window.
-    const after = before.plus(
-      computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]),
-    );
+    const after = before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
     this.movements.updateStatus({
       movementId,
       status: 'RELEASED',

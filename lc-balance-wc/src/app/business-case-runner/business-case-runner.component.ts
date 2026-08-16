@@ -118,8 +118,11 @@ export class BusinessCaseRunnerComponent implements OnInit {
     const r = step.response;
     if (!r) return '';
     if (r.code) return `${r.code}: ${r.message}`;
-    if (step.type === 'snapshot') return `confirmed=${r.confirmedBalance}  available=${r.availableBalance}` +
-      (r.offBalanceExposure ? `  offBalanceExposure=${r.offBalanceExposure}  tightAvailable=${r.tightAvailableBalance}` : '');
+    if (step.type === 'snapshot')
+      return (
+        `confirmed=${r.confirmedBalance}  available=${r.availableBalance}` +
+        (r.offBalanceExposure ? `  offBalanceExposure=${r.offBalanceExposure}  tightAvailable=${r.tightAvailableBalance}` : '')
+      );
     if (step.type === 'createMovement') {
       const w = r.warnings?.length ? `  ⚠ ${r.warnings[0].message}` : '';
       return `${r.movementType} amount=${r.amount} ceilingAmount=${r.ceilingAmount} status=${r.status}${w}`;

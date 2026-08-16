@@ -7,9 +7,5 @@ import { FormlyBootstrapModule } from '@ngx-formly/bootstrap';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
-  providers: [
-    provideRouter(routes),
-    provideHttpClient(),
-    importProvidersFrom(ReactiveFormsModule, FormlyModule.forRoot(), FormlyBootstrapModule),
-  ]
+  providers: [provideRouter(routes), provideHttpClient(), importProvidersFrom(ReactiveFormsModule, FormlyModule.forRoot(), FormlyBootstrapModule)],
 };
