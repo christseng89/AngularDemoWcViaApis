@@ -380,6 +380,10 @@
                 <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
               </form>
 
+              <div class="tb-error mt-2" *ngIf="amountDecimalMismatch">
+                ⚠ Amount ({{ model.amount }}) has more decimal places than {{ model.currency }} allows ({{ currencyDecimalPlaces }}) — this will be rejected.
+              </div>
+
               <!-- Business instruction 2026-08-15 ("按Submit...後 Button 直接灰掉 不要重複提交") — stays
                    disabled once submitResult is set (a successful Submit already happened) too, not just
                    while submitting is true, so a second click can't fire a duplicate movement for the same

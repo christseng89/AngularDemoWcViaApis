@@ -16,6 +16,8 @@ import {
   NATURAL_KEY_FIELDS_BY_INSTRUMENT,
   PARENT_INSTRUMENT_OPTIONS,
   TransactionFunction,
+  amountExceedsCurrencyDecimals,
+  decimalPlacesForCurrency,
   isToleranceApplicable,
 } from './balance-component.model';
 
@@ -409,6 +411,15 @@ export class TransactionBuilderComponent {
 
   get toleranceApplicable(): boolean {
     return !!this.model.instrumentType && !!this.model.movementType && isToleranceApplicable(this.model.instrumentType, this.model.movementType);
+  }
+
+  /** True once the typed Amount has more decimal places than the typed Currency allows (e.g. "10000.5 JPY") — mirrors the same check submit() blocks on. */
+  get amountDecimalMismatch(): boolean {
+    return amountExceedsCurrencyDecimals(this.model.amount, this.model.currency);
+  }
+
+  get currencyDecimalPlaces(): number {
+    return decimalPlacesForCurrency(this.model.currency);
   }
 
   /** True once the function is fully resolved (no pending subChoice) and ready to show the rest of the form. */
@@ -1841,6 +1852,17 @@ export class TransactionBuilderComponent {
           type: 'number',
           disabled: amountLocked,
           max: (amountCappedAtSg || amountCappedAtAcceptance) ? Number(this.selectedContractSnapshot!.availableBalance) : undefined,
+          // Keeps the input's own spinner/step granularity in sync with whichever Currency is typed
+          // alongside it (e.g. JPY -> step 1, no cents) — see decimalPlacesForCurrency's own doc
+          // comment (balance-component.model.ts) for the ISO 4217 minor-unit table this reads.
+          step: Math.pow(10, -decimalPlacesForCurrency(this.model.currency)),
+        },
+        // Currency is a free-typed sibling field (no fixed dropdown to hook a (change) event off of),
+        // so — same as tenorDays' own props.min/props.disabled above — this uses Formly's expressions
+        // to keep props.step live as the user types a Currency, rather than rebuildFields() (which
+        // would reassign the whole `this.fields` array on every keystroke and risk input-focus loss).
+        expressions: {
+          'props.step': (f: any) => Math.pow(10, -decimalPlacesForCurrency(f.model?.currency)),
         },
       },
       { key: 'currency', type: 'input', props: { label: 'Currency', required: true } },
@@ -1901,6 +1923,10 @@ export class TransactionBuilderComponent {
   submit(): void {
     if (!this.model.instrumentType || !this.model.movementType || !this.model.amount || !this.model.currency || !this.model.createdBy) {
       this.submitError = 'Fill in amount, currency, createdBy.';
+      return;
+    }
+    if (amountExceedsCurrencyDecimals(this.model.amount, this.model.currency)) {
+      this.submitError = `Amount ${this.model.amount} has more decimal places than ${this.model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(this.model.currency)}).`;
       return;
     }
     if (this.dynamicSecondaryRefLabel && !this.model.secondaryRef) {

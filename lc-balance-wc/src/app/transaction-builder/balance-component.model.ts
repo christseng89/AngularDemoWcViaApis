@@ -115,6 +115,44 @@ export function isToleranceApplicable(instrumentType: InstrumentType, movementTy
 }
 
 /**
+ * ISO 4217 minor-unit (decimal place) count per currency code — keeps the Amount input's own
+ * granularity in step with whichever Currency is typed alongside it (e.g. "JPY 10000" has no cents).
+ * Mirrors lc-payment-wc/backend/data/currencies.json's own JPY/TWD/IDR=0 entries for consistency
+ * across the two sibling demo projects, extended with the standard 3-decimal ISO 4217 exceptions
+ * (BHD/IQD/JOD/KWD/OMR/TND) since this project's own Currency field is free-typed (no fixed
+ * dropdown/backend currency master to source this from, unlike lc-payment-wc's CurrencyService).
+ * Unlisted currencies default to 2 (the common case, matching both that same JSON's own entries and
+ * the microservice's own MONETARY_AMOUNT_PATTERN ceiling of 3).
+ */
+export const CURRENCY_DECIMALS: Record<string, number> = {
+  JPY: 0,
+  TWD: 0,
+  IDR: 0,
+  KRW: 0,
+  VND: 0,
+  CLP: 0,
+  ISK: 0,
+  BHD: 3,
+  IQD: 3,
+  JOD: 3,
+  KWD: 3,
+  OMR: 3,
+  TND: 3,
+};
+
+/** Falls back to 2 decimal places for any currency not listed above (or not yet typed). */
+export function decimalPlacesForCurrency(currency: string | null | undefined): number {
+  return CURRENCY_DECIMALS[(currency ?? '').trim().toUpperCase()] ?? 2;
+}
+
+/** True if `amount`'s own typed decimal-place count exceeds what `currency` allows (Design doc §6.2 face-level amount). */
+export function amountExceedsCurrencyDecimals(amount: string | null | undefined, currency: string | null | undefined): boolean {
+  if (!amount) return false;
+  const frac = amount.split('.')[1];
+  return !!frac && frac.length > decimalPlacesForCurrency(currency);
+}
+
+/**
  * Business instruction 2026-08-14: "還有相關BALANCE為0的交易過濾" — mirrors
  * src/domain/balanceDerivation.ts's MOVEMENT_DIRECTION on the microservice
  * (movementTypes with direction -1). Used to filter existing-contract

@@ -490,6 +490,45 @@ remediation pass).
   27/27 tests passing (97.95%/97.36%/95.65%/97.75% coverage), `npm run lint` 0 errors. All three clear the
   95% floor on all four metrics.
 
+## Amount input follows the typed Currency's own decimal places (2026-08-16, user-requested — "JPY 10000 without cents")
+
+The Transaction Builder's Amount field is Formly `type: 'number'`, and Currency is a free-typed sibling
+field (no fixed dropdown/backend currency master — unlike `lc-payment-wc`'s own `CurrencyService`/
+`GET /api/currencies`, whose `backend/data/currencies.json` shape this mirrors). New
+`CURRENCY_DECIMALS`/`decimalPlacesForCurrency()`/`amountExceedsCurrencyDecimals()`
+(`src/app/transaction-builder/balance-component.model.ts`) — a small ISO 4217 minor-unit lookup (JPY/
+TWD/IDR/KRW/VND/CLP/ISK = 0; BHD/IQD/JOD/KWD/OMR/TND = 3; everything else defaults to 2, matching both
+`lc-payment-wc`'s own currencies.json entries and this project's own microservice
+`MONETARY_AMOUNT_PATTERN` ceiling of 3dp).
+
+Three integration points in `transaction-builder.component.ts`, all reading the same helper — no
+duplicated decimal-place logic:
+- `rebuildFields()`'s `amount` field gets `props.step` set at rebuild time AND kept live via a Formly
+  `expressions['props.step']` callback reading the sibling `currency` field's own live value — same
+  "reactive `expressions`, not a `rebuildFields()` re-run" convention the A1/B1 Tenor Days field already
+  uses (a full `rebuildFields()` call on every keystroke risks input-focus loss on a live `*ngFor`).
+- New `amountDecimalMismatch`/`currencyDecimalPlaces` getters back a template warning
+  (`.tb-error`, same severity class as the pre-existing "exceeds Available Balance" warning) shown right
+  under the `<formly-form>`, visible regardless of which business function is selected.
+- `submit()` gained a hard guard (`amountExceedsCurrencyDecimals(...)`) right after the existing
+  required-fields check — blocks submission with a clear message
+  (`Amount 10000.5 has more decimal places than JPY allows (0).`) rather than silently rounding or
+  truncating what the user typed, matching this file's own domain-review posture (validate at the
+  boundary, don't guess).
+
+Deliberately **not** mirrored into the microservice's own `money.ts`/`MONETARY_AMOUNT_PATTERN` in this
+pass — that pattern is still currency-agnostic (accepts up to 3dp for any currency) by design; scoping a
+server-side currency-aware amount check was out of scope for this UI-focused request. Whether the server
+boundary should also enforce this is a separate decision, not assumed here.
+
+See `balance-component.model.spec.ts`'s "decimalPlacesForCurrency / amountExceedsCurrencyDecimals"
+describe block (JPY 0dp, the 3dp ISO exceptions, the 2dp default fallback, and the boundary/empty-input
+cases) and `transaction-builder.component.gaps.spec.ts`'s "Amount field props.step Formly `expressions`"
++ "currencyDecimalPlaces / amountDecimalMismatch" describe blocks, plus
+`transaction-builder.component.actions.spec.ts`'s new `submit()` guard test — 454/454 Angular tests
+passing (15 new), 99.76%/95.57%/99.67%/99.82% coverage, `ng build --configuration development` and
+`npm run lint` (0 errors) both clean.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

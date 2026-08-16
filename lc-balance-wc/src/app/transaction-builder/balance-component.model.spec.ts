@@ -13,6 +13,9 @@ import {
   IMPORT_FUNCTIONS,
   EXPORT_FUNCTIONS,
   TransactionFunction,
+  CURRENCY_DECIMALS,
+  decimalPlacesForCurrency,
+  amountExceedsCurrencyDecimals,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -545,6 +548,62 @@ describe('balance-component.model data invariants', () => {
           expect(MOVEMENT_TYPES_BY_INSTRUMENT[sourceInstrument]).toContain(f.payableMovementType);
         }
       }
+    });
+  });
+
+  describe('decimalPlacesForCurrency / amountExceedsCurrencyDecimals (Amount input follows Currency decimal places)', () => {
+    it('returns 0 for JPY (the reported example: "JPY 10000 without cents")', () => {
+      expect(decimalPlacesForCurrency('JPY')).toBe(0);
+    });
+
+    it('is case-insensitive and trims whitespace', () => {
+      expect(decimalPlacesForCurrency('jpy')).toBe(0);
+      expect(decimalPlacesForCurrency(' JPY ')).toBe(0);
+    });
+
+    it('returns 3 for the standard ISO 4217 3-decimal exceptions (e.g. KWD, BHD)', () => {
+      expect(decimalPlacesForCurrency('KWD')).toBe(3);
+      expect(decimalPlacesForCurrency('BHD')).toBe(3);
+    });
+
+    it('falls back to 2 for an unlisted currency and for null/undefined/empty', () => {
+      expect(decimalPlacesForCurrency('USD')).toBe(2);
+      expect(decimalPlacesForCurrency('XYZ')).toBe(2);
+      expect(decimalPlacesForCurrency(null)).toBe(2);
+      expect(decimalPlacesForCurrency(undefined)).toBe(2);
+      expect(decimalPlacesForCurrency('')).toBe(2);
+    });
+
+    it('every CURRENCY_DECIMALS entry is 0, 2, or 3 (the only minor-unit counts this project\'s own MONETARY_AMOUNT_PATTERN ceiling allows)', () => {
+      for (const decimals of Object.values(CURRENCY_DECIMALS)) {
+        expect([0, 2, 3]).toContain(decimals);
+      }
+    });
+
+    it('amountExceedsCurrencyDecimals: true for "10000.5" against JPY (0dp)', () => {
+      expect(amountExceedsCurrencyDecimals('10000.5', 'JPY')).toBe(true);
+    });
+
+    it('amountExceedsCurrencyDecimals: false for a whole-number amount against JPY', () => {
+      expect(amountExceedsCurrencyDecimals('10000', 'JPY')).toBe(false);
+    });
+
+    it('amountExceedsCurrencyDecimals: false for "100.12" against USD (2dp, exactly at the limit)', () => {
+      expect(amountExceedsCurrencyDecimals('100.12', 'USD')).toBe(false);
+    });
+
+    it('amountExceedsCurrencyDecimals: true for "100.123" against USD (3dp, over the 2dp limit)', () => {
+      expect(amountExceedsCurrencyDecimals('100.123', 'USD')).toBe(true);
+    });
+
+    it('amountExceedsCurrencyDecimals: false for "100.123" against KWD (3dp, exactly at the limit)', () => {
+      expect(amountExceedsCurrencyDecimals('100.123', 'KWD')).toBe(false);
+    });
+
+    it('amountExceedsCurrencyDecimals: false for an empty/undefined amount (nothing typed yet, no false-positive warning)', () => {
+      expect(amountExceedsCurrencyDecimals('', 'JPY')).toBe(false);
+      expect(amountExceedsCurrencyDecimals(undefined, 'JPY')).toBe(false);
+      expect(amountExceedsCurrencyDecimals(null, 'JPY')).toBe(false);
     });
   });
 });

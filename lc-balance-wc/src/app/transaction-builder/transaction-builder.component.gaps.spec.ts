@@ -107,6 +107,25 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c2.selectFunction(fn('A8'));
       expect(c2.toleranceApplicable).toBe(false);
     });
+
+    it('currencyDecimalPlaces / amountDecimalMismatch follow the typed Currency (JPY 0dp) and Amount', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      expect(c.currencyDecimalPlaces).toBe(2); // no currency typed yet -> default fallback
+      expect(c.amountDecimalMismatch).toBe(false); // no amount typed yet -> never a false-positive warning
+
+      c.model.currency = 'JPY';
+      expect(c.currencyDecimalPlaces).toBe(0);
+
+      c.model.amount = '10000';
+      expect(c.amountDecimalMismatch).toBe(false);
+
+      c.model.amount = '10000.5';
+      expect(c.amountDecimalMismatch).toBe(true);
+
+      c.model.currency = 'USD';
+      expect(c.currencyDecimalPlaces).toBe(2);
+      expect(c.amountDecimalMismatch).toBe(false); // "10000.5" is within USD's own 2dp
+    });
   });
 
   describe('activeLookup* getters — LC vs ACCEPTANCE vs SG tab', () => {
@@ -834,6 +853,28 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectFunction(fn('B1'));
       const exprs = tenorDaysField(c);
       expect(exprs['props.disabled']({ model: { tenorType: 'SIGHT' } })).toBe(true);
+    });
+  });
+
+  describe('rebuildFields()\'s Amount field props.step Formly `expressions` callback (Amount input follows Currency decimal places)', () => {
+    it('the initial props.step matches whatever Currency is already typed at rebuild time (default 2dp when none is)', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      const amountField = c.fields.find((f) => f.key === 'amount');
+      expect(amountField?.props?.step).toBeCloseTo(0.01);
+    });
+
+    it('props.step expression reacts live to the Currency field\'s own value (JPY -> whole-number step, KWD -> 3dp step)', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      const amountField = c.fields.find((f) => f.key === 'amount');
+      if (!amountField?.expressions) throw new Error('amount field has no expressions — check A1 is unlocked');
+      const exprs = amountField.expressions as Record<string, (f: any) => any>;
+
+      expect(exprs['props.step']({ model: { currency: 'JPY' } })).toBe(1);
+      expect(exprs['props.step']({ model: { currency: 'KWD' } })).toBeCloseTo(0.001);
+      expect(exprs['props.step']({ model: { currency: 'USD' } })).toBeCloseTo(0.01);
+      expect(exprs['props.step']({ model: {} })).toBeCloseTo(0.01); // no currency typed yet -> default fallback
     });
   });
 

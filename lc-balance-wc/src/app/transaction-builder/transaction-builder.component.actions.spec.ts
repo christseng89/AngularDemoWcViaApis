@@ -118,6 +118,18 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.createMovement).not.toHaveBeenCalled();
     });
 
+    it('rejects an Amount with more decimal places than the typed Currency allows (e.g. JPY has no cents)', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A1);
+      comp.naturalKey.lcNumber = 'LC001';
+      comp.model.amount = '10000.5';
+      comp.model.currency = 'JPY';
+      comp.model.createdBy = 'maker1';
+      comp.submit();
+      expect(comp.submitError).toBe('Amount 10000.5 has more decimal places than JPY allows (0).');
+      expect(api.createMovement).not.toHaveBeenCalled();
+    });
+
     it('requires the dynamic secondary reference label (A2)', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
