@@ -144,6 +144,16 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     expect(ibIndex.items.map((c) => c.naturalKey.ibNumber).sort()).toEqual(['IB-A', 'IB-B']);
   });
 
+  test('Catalog q filter (typeahead) — case-insensitive substring match against lc_number, distinct from the exact-match lcNumber filter tested above', () => {
+    contracts.insert(makeContract({ balanceContractId: 'q-1', logicalContractId: 'q-lc-1', naturalKey: { lcNumber: 'ABC-0001' }, status: 'ACTIVE' }));
+    contracts.insert(makeContract({ balanceContractId: 'q-2', logicalContractId: 'q-lc-2', naturalKey: { lcNumber: 'XYZ-0002' }, status: 'ACTIVE' }));
+    contracts.insert(makeContract({ balanceContractId: 'q-3', logicalContractId: 'q-lc-3', naturalKey: { lcNumber: 'ABC-0003' }, status: 'ACTIVE' }));
+
+    const found = contracts.listCatalog({ instrumentType: 'IPLC_LC', q: 'ABC' });
+    expect(found.items.map((c) => c.naturalKey.lcNumber).sort()).toEqual(['ABC-0001', 'ABC-0003']);
+    expect(found.total).toBe(2);
+  });
+
   test('Catalog tenorFamily filter (business-reported gap "Why U002 does not shown A5 — Document Arrival (Usance)?") — filters server-side so pagination reflects the eligible set, never drops legacy contracts with no tenorType recorded', () => {
     contracts.insert(makeContract({ balanceContractId: 'sight-1', logicalContractId: 'sight-lc-1', naturalKey: { lcNumber: 'SIGHT-1' }, tenorType: 'SIGHT', status: 'ACTIVE' }));
     contracts.insert(makeContract({ balanceContractId: 'usance-1', logicalContractId: 'usance-lc-1', naturalKey: { lcNumber: 'USANCE-1' }, tenorType: 'SELLERS_USANCE', status: 'ACTIVE' }));
@@ -210,6 +220,15 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     expect(versions[0]?.effectiveTo).toBe('2026-08-14T01:00:00Z');
     expect(versions[1]?.status).toBe('ACTIVE');
     expect(contracts.findActiveByLogicalContractId('lc-1')?.balanceContractId).toBe('bc-v2');
+  });
+
+  test('BalanceMovementStore.insert rethrows a non-UNIQUE-constraint DB error unchanged (e.g. a FOREIGN KEY violation from a bogus balanceContractId) — the UNIQUE-violation resubmission path in insert() must not swallow every kind of DB error, only genuine idempotent resubmissions', () => {
+    // No matching balance_contracts row for 'no-such-contract' — balance_movements.balance_contract_id
+    // REFERENCES balance_contracts(balance_contract_id), and createDb() turns PRAGMA foreign_keys ON,
+    // so this trips a FOREIGN KEY constraint failure, not a UNIQUE one.
+    expect(() =>
+      movements.insert(makeMovement({ movementId: 'orphan-mv-1', balanceContractId: 'no-such-contract', eventSeq: 1 })),
+    ).toThrow(/FOREIGN KEY constraint failed/);
   });
 
   test('BalanceMovementStore.updateStatus (Checker Release) records releasedBy/releasedAt/balanceAfter', () => {

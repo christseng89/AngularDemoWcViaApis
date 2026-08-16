@@ -122,7 +122,14 @@ app.get('/healthz', (_req, res) => res.json({ status: 'ok', balanceServiceUrl: B
 // `npm run dev:all` (backend + ng serve started together) could never bind
 // both. proxy.conf.json's "/api" target must stay in sync with this.
 const PORT = process.env.PORT || 4300;
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`balance-component-backend (中台) listening on :${PORT} -> ${BALANCE_SERVICE_URL}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    // eslint-disable-next-line no-console
+    console.log(`balance-component-backend (中台) listening on :${PORT} -> ${BALANCE_SERVICE_URL}`);
+  });
+}
+
+module.exports = app;
+module.exports.runCase = runCase;
+module.exports.resolveLogicalContractId = resolveLogicalContractId;
+module.exports.callMicroservice = callMicroservice;

@@ -12,6 +12,7 @@ relevant project before running any command.
 |---|---|---|
 | `lc-issue-angular/` | yes | Angular 17 + Formly demo for LC (Letter of Credit) **Issue** — charge calculation, balance/tolerance commission. |
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
+| `lc-balance-wc/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`. |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
@@ -34,6 +35,24 @@ entries get renamed, extended, or removed outright as requirements change) in mo
 than belongs here; treat entries marked "reviewer-confirmed"/"business-requirement-confirmed" there as
 settled, don't re-litigate them without new information from the user, and check that file directly rather
 than assuming a specific past decision is still current — it changes frequently.
+
+`lc-balance-wc/` has an analogous nested `CLAUDE.md` of its own (same solution-architect persona,
+same "reviewer-confirmed" decision-log convention), covering the Balance Component's own domain model
+(`InstrumentType`/`MovementStatus`/`ExposureNature`), balance-derivation direction table, Tolerance
+conversion, off-balance-sheet exposure hardening (incl. the Present Docs Earmark), SHGT/Acceptance
+redemption, and the Maker/Checker service-layer guards (re-ISSUE, tenor routing, SG issue cap,
+idempotency) — check that file directly before touching anything under `lc-balance-wc/`, same caveats
+as above (entries supersede each other; don't assume a decision is still current without checking). It
+does **not** have its own leg-allocator or an OAS Reference/Event model decision log (both are
+`lc-payment-wc/`-specific — the Balance Component has no per-leg split grid, and no analogous D-1…D-N
+idempotency-key redesign has been proposed for it); its design docs
+(`analysis/COMMON-BalanceComponent-Design-zh.md`, an Export Confirmation Gap Analysis, `impl-spec-en.md`)
+are cited by section number throughout the microservice's source but, like `lc-payment-wc/`'s reverted
+RDD note, were never committed as files — the nested `CLAUDE.md`'s own decision log is the only
+place that captures them.
+
+Also relevant to trade finance accounting entries/exposure-transformation questions in general
+(not tied to either project's specific code): the `cs-tf-balance-knowhow` skill.
 
 ---
 
@@ -234,3 +253,77 @@ touching this logic):
   `Σ creditLegs[].amountTxCcy`, optional tolerance) rather than replicating the legacy
   `Debit_Chk_Total_Pct()` screen check verbatim, because the single-POST request shape has no equivalent
   shared total field.
+
+## `lc-balance-wc/` — LC Balance Component demo
+
+**Three-process** dev setup, same shape as `lc-payment-wc/`:
+
+| Process | Port | Serves |
+|---|---|---|
+| `ng serve` (this project) | 4200 | The Angular app itself |
+| `backend/` (Express) | 4300 | Node.js 中台 orchestrator — sequences calls into the microservice per a declarative Business Case Registry (Import Case 1-5, Export Case 1-5, `backend/data/businessCases.js`) so the UI can run/replay a whole scenario in one click (`GET /api/business-cases`, `POST /api/business-cases/:id/run`) |
+| `microservices/balance-component/` (Express/TS) | 4100 | `POST /balance-movements` + `GET /balance-contracts/*` — the actual Balance Component ledger |
+
+`proxy.conf.json` forwards `/api/*` → `:4300` and `/balance-component/*` → `:4100` (rewriting the prefix
+away). Same failure mode as `lc-payment-wc/`: if a backend isn't running, the corresponding UI tab 400s
+or hangs with no obvious hint — check the process before assuming a bug.
+
+```bash
+cd lc-balance-wc
+npm install
+cd backend && npm install && cd ..
+cd microservices/balance-component && npm install && cd ../..
+
+npm run dev:all   # runs all three concurrently (concurrently, color-coded per process)
+```
+
+Or individually: `microservices/balance-component && npm run dev` (Terminal 1, `node --watch -r
+ts-node/register src/server.ts` — auto-restarts on save), `backend && npm start` (Terminal 2), `npm
+start` i.e. `ng serve --open` (Terminal 3).
+
+### Testing
+
+Only `microservices/balance-component/` has a test suite (own `jest.config.js`) — the Angular app
+itself and `backend/` have **no test runner configured** (no `test` script in either `package.json`),
+same posture as `lc-issue-angular/`.
+
+```bash
+cd lc-balance-wc/microservices/balance-component
+npm run typecheck        # tsc --noEmit
+npm test                  # Jest (test/unit/) — domain logic, schema, and full case-walkthrough tests
+npm run test:coverage
+npm run build              # tsc -p tsconfig.build.json → dist/
+```
+
+Same single-test syntax as `lc-payment-wc/`'s microservice (`npm test -- <file-or--t-pattern>`).
+
+### Source layout
+
+- `src/app/business-case-runner/` — runs a whole registered Business Case (via `backend/`'s
+  orchestrator) with one click; `balance-case-api.service.ts` is its backend client.
+- `src/app/transaction-builder/` — a lower-level form for posting individual `BalanceMovement`s
+  straight against the microservice (`balance-component-api.service.ts`, `balance-component.model.ts`,
+  `index-picker.component.ts`), bypassing the Business Case Registry.
+- `backend/server.js` — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
+  declarative registry of Import/Export cases it replays.
+- `microservices/balance-component/` — the real Balance Component microservice:
+  - `src/service/balanceService.ts` — orchestrates the routes; `src/routes/balanceContracts.ts` /
+    `balanceMovements.ts` are the two Express routers (contract lookup/catalog/balance/movements-history
+    vs. movement post/release/reject/cancel/acknowledge — a maker-checker-style lifecycle per movement).
+  - `src/domain/` — `balanceDerivation.ts`, `tolerance.ts`, `statusTransition.ts`, `amendDecrease.ts`,
+    `offBalanceExposure.ts` — the actual accounting/exposure logic, cited to
+    `analysis/TF_Balance_Component_Spec-{en,zh}.docx` / `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`
+    the same way `lc-payment-wc/`'s microservice cites its own FSD.
+  - `src/db/` — **Node's built-in `node:sqlite` (`DatabaseSync`)**, not `better-sqlite3` (this machine
+    has no C++ build toolchain for native modules) — `':memory:'` for tests, a real file otherwise.
+    `db/index.ts`'s own doc comment records a known limitation worth knowing before touching concurrency
+    logic: SQLite locks at the whole-database-file level (even under WAL), so it cannot demonstrate true
+    per-instrument (per-`logicalContractId`) non-blocking concurrency the way the design doc's §6
+    requires — safe/over-conservative for this single-process prototype, but flagged as a **must-replace**
+    (PostgreSQL row-level locking) before that requirement is actually validated in production.
+  - `src/store/` — `balanceContractStore.ts` / `balanceMovementStore.ts`, the SQL-backed persistence
+    layer the service reads/writes through.
+- `analysis/` — source-of-truth spec documents: `balance-component-api.yaml` (OAS),
+  `TF_Balance_Component_Spec-{en,zh}.docx`, `TF_Balance_Component_Mapping-{en,zh}.xlsx`,
+  `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`. Code comments citing a spec section refer here,
+  same convention as `lc-payment-wc/analysis/`.

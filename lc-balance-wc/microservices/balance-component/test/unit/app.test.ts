@@ -955,4 +955,244 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
       .expect(400);
     expect(res.body.message).toMatch(/acknowledge\(\) only applies to an EPLC_EXAMINATION CREATE movement/);
   });
+
+  test('POST /balance-movements/:id/acknowledge: rejects an already-RELEASED movement -> 409, ILLEGAL_STATE_TRANSITION (acknowledge() only applies to a still-PENDING Present Docs earmark)', async () => {
+    // dfibCreateMovementId was RELEASED earlier in this describe block, and (as proven just above) it's
+    // also the wrong instrumentType — reuse examEb03MovementId instead, releasing it first so it's a
+    // legitimate EPLC_EXAMINATION/CREATE movement that is simply no longer PENDING.
+    await request(app).post(`/balance-movements/${examEb03MovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const res = await request(app)
+      .post(`/balance-movements/${examEb03MovementId}/acknowledge`)
+      .send({ acknowledgedBy: 'checker2' })
+      .expect(409);
+    expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    expect(res.body.message).toMatch(/not PENDING/);
+  });
+});
+
+describe('HTTP integration — app.ts bootstrap: /healthz and the generic (non-ApiError) 500 fallback handler', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('GET /healthz -> 200 {status: "ok"}', async () => {
+    const res = await request(app).get('/healthz').expect(200);
+    expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  test('a non-ApiError thrown deep in the domain layer (InvalidMonetaryAmountError from money.ts, NOT an ApiError subclass) falls through to the generic 500 handler — the route layer only checks `amount` is truthy, not that it matches MonetaryAmount\'s pattern, so a malformed-but-non-empty amount reaches computeCeilingAmount()/parseMonetaryAmount() unvalidated', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'BAD-AMOUNT-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: 'not-a-number', // truthy, so passes the route's own !body.amount check
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(500);
+    expect(res.body.code).toBe('INTERNAL_ERROR');
+    expect(res.body.message).toMatch(/is not a valid MonetaryAmount/);
+  });
+});
+
+describe('HTTP integration — route-layer request validation gaps not otherwise exercised (routes/balanceContracts.ts, routes/balanceMovements.ts)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('GET /balance-contracts without lcNumber -> 400', async () => {
+    const res = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC' }).expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/instrumentType and lcNumber are required/);
+  });
+
+  test('GET /balance-contracts without instrumentType -> 400', async () => {
+    const res = await request(app).get('/balance-contracts').query({ lcNumber: 'LC0001' }).expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+  });
+
+  test('GET /balance-contracts/catalog with an invalid tenorFamily -> 400', async () => {
+    const res = await request(app)
+      .get('/balance-contracts/catalog')
+      .query({ instrumentType: 'IPLC_LC', tenorFamily: 'BOGUS' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/tenorFamily must be SIGHT or USANCE/);
+  });
+
+  test('POST /balance-movements missing a required field (currency) -> 400', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'VALID-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        createdBy: 'maker1',
+        // currency deliberately omitted
+      })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+  });
+});
+
+describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.reject() previously had zero test coverage', () => {
+  const app = createApp(createDb(':memory:'));
+  let lcId: string;
+
+  test('setup: Issue LC0006 for 100,000', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC0006' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    lcId = lc.body.balanceContractId;
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+  });
+
+  test('POST /balance-movements/:id/reject without releasedBy -> 400', async () => {
+    const amend = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_INCREASE', eventSeq: 2, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    const res = await request(app)
+      .post(`/balance-movements/${amend.body.movementId}/reject`)
+      .send({ reasonCode: 'DOC_MISMATCH' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/releasedBy and reasonCode are required/);
+
+    // Clean up so it doesn't linger PENDING and pollute later tests' balance assertions on this same LC.
+    await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({ cancelledBy: 'maker1' }).expect(200);
+  });
+
+  test('POST /balance-movements/:id/reject without reasonCode -> 400', async () => {
+    const amend = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_INCREASE', eventSeq: 3, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    const res = await request(app)
+      .post(`/balance-movements/${amend.body.movementId}/reject`)
+      .send({ releasedBy: 'checker1' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+
+    // Clean up so it doesn't linger PENDING and pollute later tests' balance assertions on this same LC.
+    await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({ cancelledBy: 'maker1' }).expect(200);
+  });
+
+  test('POST /balance-movements/:id/reject with both fields -> 200, REJECTED, and the rejected movement never contributes to Confirmed/Available Balance', async () => {
+    const amend = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_INCREASE', eventSeq: 4, amount: '25000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+
+    const res = await request(app)
+      .post(`/balance-movements/${amend.body.movementId}/reject`)
+      .send({ releasedBy: 'checker1', reasonCode: 'DOC_MISMATCH', remarks: 'Amount does not match the amendment advice' })
+      .expect(200);
+    expect(res.body.status).toBe('REJECTED');
+    expect(res.body.releasedBy).toBe('checker1');
+    expect(res.body.reasonCode).toBe('DOC_MISMATCH');
+    expect(res.body.remarks).toBe('Amount does not match the amendment advice');
+
+    const snapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(snapshot.body.confirmedBalance).toBe('100000');
+    expect(snapshot.body.availableBalance).toBe('100000');
+  });
+
+  test('rejecting an already-RELEASED movement -> 409, illegal transition', async () => {
+    const amend = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_INCREASE', eventSeq: 5, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${amend.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app)
+      .post(`/balance-movements/${amend.body.movementId}/reject`)
+      .send({ releasedBy: 'checker1', reasonCode: 'TOO_LATE' })
+      .expect(409);
+    expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+  });
+});
+
+describe('HTTP integration — balanceService.ts createMovement() error branches not otherwise exercised', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('a non-creating movementType (e.g. UTILIZE) against a naturalKey that resolves to NO contract yet -> 404, "only ISSUE/CREATE may implicitly create one"', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'NEVER-ISSUED-001' }, movementType: 'UTILIZE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+    expect(res.body.message).toMatch(/only ISSUE\/CREATE may implicitly create one/);
+  });
+
+  test('SHGT ISSUE without parentLogicalContractId -> 400', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC-NOPARENT', sgNumber: 'SG-NOPARENT' }, movementType: 'ISSUE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/parentLogicalContractId is required to check SG Issue/);
+  });
+
+  test('SHGT ISSUE with a parentLogicalContractId that does not resolve to any ACTIVE contract -> 400', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'LC-BADPARENT', sgNumber: 'SG-BADPARENT' },
+        parentLogicalContractId: 'does-not-exist',
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/not found or not ACTIVE/);
+  });
+
+  test('EPLC_EXAMINATION CREATE without parentLogicalContractId -> 400', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'E-NOPARENT', ibNumber: 'EB-NOPARENT' }, movementType: 'CREATE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/parentLogicalContractId is required to check a Present Docs amount/);
+  });
+
+  test('EPLC_EXAMINATION CREATE with a parentLogicalContractId that does not resolve to any ACTIVE Confirmation -> 400', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'E-BADPARENT', ibNumber: 'EB-BADPARENT' },
+        parentLogicalContractId: 'does-not-exist',
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/not found or not ACTIVE/);
+  });
+
+  test('an unrecognized movementType against an EXISTING contract -> 400, "Unrecognized movementType" (falls through every NO_CHECK/AMEND_DECREASE/UTILIZE_SHAPED/OUTSTANDING_CAPPED bucket)', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BOGUSTYPE' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'BOGUS_TYPE', eventSeq: 2, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/Unrecognized movementType "BOGUS_TYPE"/);
+  });
 });

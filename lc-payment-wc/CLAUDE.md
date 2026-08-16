@@ -4,7 +4,6 @@ In addition to deep knowledge of **Trade Finance, Payments, Accounting, Settleme
 
 You are capable of evaluating requirements from both **banking business and technical architecture perspectives**, translating complex Trade Finance and Payment requirements into robust, scalable, auditable, and implementation-ready solutions aligned with banking industry best practices.
 
-
 # AI Role
 
 Always act as a senior Trade Finance and Payment Solution Architect.
@@ -12,6 +11,7 @@ Always act as a senior Trade Finance and Payment Solution Architect.
 You are a professional Trade Finance and Payment expert with strong knowledge of:
 
 ## Banking / Trade Finance Expertise
+
 - Import LC
 - Export LC
 - Collections
@@ -54,6 +54,7 @@ You are also a senior solution architect and developer with expertise in:
 - OpenAPI / Swagger
 - Microservices
 - Event-driven architecture
+- SonarQube
 - Kubernetes
 - Docker
 - CKA
@@ -83,6 +84,7 @@ For every requirement, analyze it from both:
 Do not evaluate a requirement purely as a software developer.
 
 When reviewing accounting logic:
+
 - Verify Debit = Credit.
 - Verify balancing by currency.
 - Identify FX conversion legs.
@@ -92,6 +94,7 @@ When reviewing accounting logic:
 - Consider reversal and exception scenarios.
 
 When reviewing requirements or FSDs:
+
 - Identify business rule gaps.
 - Identify ambiguous requirements.
 - Identify accounting risks.
@@ -101,6 +104,7 @@ When reviewing requirements or FSDs:
 - Assign priorities where appropriate: Critical / High / Medium / Low.
 
 When proposing solutions, prefer:
+
 - clear separation of business logic and integration logic;
 - API-first architecture;
 - reusable components;
@@ -117,6 +121,43 @@ Always challenge requirements when they conflict with banking, accounting, payme
 ---
 
 # Confirmed Architecture Decisions (reviewer-confirmed — do not re-ask)
+
+## Standing rule: keep tests + docs in sync with every code change, and all unit tests must pass before a change is done (user-confirmed 2026-08-16)
+
+**Any code change under `lc-payment-wc/` (Angular app, `backend/`, or `microservices/payment-component/`)
+must be accompanied by updates to whatever this repo's own conventions say tracks that code** — the
+relevant Jest spec file(s) (new/changed behavior needs new/changed test cases, not just "still passes"),
+and any Markdown/documentation/specification/other supporting artifact that describes it: this file's own
+decision log below (dates/versions/business quotes, same format as existing entries — don't leave a
+change undocumented here), the microservice's own `README.md` (the source of truth this file repeatedly
+points to for server-side detail — e.g. the Balance/Charge Component bridge and Extended usage scenarios
+sections), `docs/` (the bilingual EN/zh-TW user manuals — see the §6.6 staleness fix above for what
+happens when these drift), the root `CLAUDE.md`'s `lc-payment-wc/` section if a described command/port/
+file-layout fact changes, and `analysis/` only if it's the actual source-of-truth spec being revised (the
+OAS YAML/FSD/calculation-validation `.docx` — rare, and per this file's own note the OAS `info.version`
+already lags the implementation, so don't let a code change widen that gap further without at least
+flagging it). This is the same standing-verification posture as this file's own "always `ng build` after
+touching `.html`" rule above — not a one-off reminder, apply it to every change.
+
+**Before calling any change complete, run every test surface the change could plausibly touch, and
+confirm each exits clean at its own enforced coverage floor where one exists** (statements/branches/
+functions/lines — none may be lowered to make a change easier):
+
+```bash
+cd lc-payment-wc/microservices/payment-component && npm test          # 90% floor, gated
+cd lc-payment-wc/microservices/payment-component && npm run test:regression  # FSD-verified vectors — separate from, not superseded by, npm test
+cd lc-payment-wc/backend && npm test                                  # legacy Import/Export LC mock API — passing required, no coverage floor currently enforced
+cd lc-payment-wc && npm test                                          # 90% floor, gated (Angular app / Payment Component Simulator)
+```
+
+Also run `npx tsc -p tsconfig.app.json --noEmit` and, whenever the change touched an `.html` template,
+`npx ng build --configuration development` — per this file's own existing rule, `tsc --noEmit` alone
+cannot catch a template-scoping break. A change confined to one surface (e.g. a microservice-only fix)
+still only strictly requires that surface's own suite, but running the others costs little and catches a
+cross-cutting break (e.g. a microservice response-shape change the Angular API service silently assumed)
+that a single suite would miss — default to running all of them unless there's a specific reason not to.
+Never mix the two Jest configs (`lc-payment-wc`'s own vs. the microservice's) while doing this — see this
+file's existing "Never let the two Jest configs cross" rule.
 
 ## Charge Component ↔ Payment Component boundary (margin / commission / charges, incl. LC Issue)
 
@@ -154,8 +195,7 @@ Dr  Customer A/C
 `Suspense - Credit` is the clearing/bridge account between the two components — it must net to zero
 once both sides have posted.
 
-**This is already fully implemented, not a gap.** The caller submits `debitLegs: [{accountNo:
-'Customer A/C', currency, amountTxCcy: totalCharge}]`, `creditLegs: []` (no real credit leg needed),
+**This is already fully implemented, not a gap.** The caller submits `debitLegs: [{accountNo: 'Customer A/C', currency, amountTxCcy: totalCharge}]`, `creditLegs: []` (no real credit leg needed),
 and `suspenseBridge.creditEntries: [{amount: totalCharge, currency, sourceComponent: 'CHARGE'}]`.
 `expandSuspenseBridge`/`buildSuspenseBridgeLeg`
 (`microservices/payment-component/src/domain/suspenseBridge.ts`) generates the offsetting
@@ -284,8 +324,7 @@ scale exactly, closing the same gap for the actual POST body, not just the on-sc
 **Follow-on bug to the section above** — fixing the ROW-level scale bug wasn't sufficient for a
 **Full pay in JPY** scenario: Transaction Currency USD, Amount 10000, and the customer pays 100% in
 JPY (the sole Debit leg's own "Leg Currency" switched to JPY, Transaction Currency USD unchanged).
-Reported symptom: `[400] REQUEST_VALIDATION_FAILED: debitLegs.0.amountTxCcy: amount "10000.00" has
-2 decimal place(s) but currency JPY allows at most 0` — on BOTH debitLegs.0 AND creditLegs.0.
+Reported symptom: `[400] REQUEST_VALIDATION_FAILED: debitLegs.0.amountTxCcy: amount "10000.00" has 2 decimal place(s) but currency JPY allows at most 0` — on BOTH debitLegs.0 AND creditLegs.0.
 
 **Root cause, traced to the server, not the client:** the microservice's hard, pre-v1.10.0 rule
 defined "the transaction currency" as `debitLegs[0].currency` — a leg's OWN settlement currency
@@ -308,6 +347,7 @@ Currency then Transaction Currency 應該不變" (must not change).
 
 **Actual fix — `PaymentInstructionConfirmRequest.transactionCurrency` (v1.10.0, new optional wire
 field, server + client):**
+
 - Server (`microservices/payment-component/`): `types.ts` adds the field; `requestSchema.ts`'s H-2
   check and `confirmPaymentInstruction.ts`'s `transactionCurrency` derivation both switched from
   `debitLegs[0]!.currency` to `request.transactionCurrency ?? request.debitLegs[0]!.currency` —
@@ -336,8 +376,7 @@ the USD transaction currency, Confirm succeeds with no error).
 ## `creditLegs` may be empty when `suspenseBridge` contributes its own credit-side leg (v1.10.1, business-requirement-confirmed 2026-08-11)
 
 **Bug, surfaced while validating the fee-collection pattern documented above ("Charge Component ↔
-Payment Component boundary"):** that pattern's own worked example (`creditLegs: []`, offsetting `Cr
-Suspense - Credit` generated entirely from `suspenseBridge.creditEntries`) no longer validated —
+Payment Component boundary"):** that pattern's own worked example (`creditLegs: []`, offsetting `Cr Suspense - Credit` generated entirely from `suspenseBridge.creditEntries`) no longer validated —
 `requestSchema.ts` required `creditLegs.min(1)` **unconditionally**, so the documented "already fully
 implemented" example actually 400'd. Fixed: `creditLegs` may now be empty specifically when
 `suspenseBridge` (`debitEntries` OR `creditEntries`, either non-empty) will contribute its own
@@ -381,6 +420,7 @@ even though the request side already accepts a rate per leg (`PaymentLegInput.dr
 the request and silently never came back out.
 
 **Fix — two independent, clearly-separated data sources, not one collapsed into the other:**
+
 - **Server (real OAS data):** `microservices/payment-component/src/domain/accountEntries.ts`'s
   `buildSettlementEntries` now sets `exchangeRate1` from whichever of the leg's own rate fields
   matches its side (`drRate ?? drBuyRate` for DEBIT, `crBuyRate ?? sellRate` for CREDIT) — one code
@@ -403,8 +443,7 @@ the request and silently never came back out.
 See `microservices/payment-component/test/unit/domain/accountEntries.test.ts`'s "exchangeRate1
 echo-back" describe block and `confirmPaymentInstruction.test.ts`'s `REF-SB-RATE-1` test for the
 server-side worked examples (including the suspenseBridge-generated FX Exchange pair carrying the
-caller's own `crossRate`), and `leg-allocator.component.spec.ts`'s `fxPairs`/`response-viewer
-.component.spec.ts`'s currencyGroups tests for the client-side column wiring.
+caller's own `crossRate`), and `leg-allocator.component.spec.ts`'s `fxPairs`/`response-viewer .component.spec.ts`'s currencyGroups tests for the client-side column wiring.
 
 **Follow-up layout refinement, same session (reviewer-confirmed 2026-08-11) — final column order
 is Amount → Exchange Rate/Rate → Description/Site, not Amount → Description/Site → Exchange
@@ -430,8 +469,7 @@ passthrough.** Root cause: `money.ts`'s `formatMonetaryAmount(value, scale)` lea
 existing precision alone when `scale` is omitted, and `accountEntries.ts`'s `makeEntry` calls it with
 no scale — so a whole-number USD amount round-tripped as `"10000"`, not `"10000.00"`, and
 `FxPairEntry.amount` (a plain client-side JS `number`) drops trailing zeros on template interpolation
-the same way. Fixed display-only, client-side, via a new `ResponseViewerComponent.formatAmount(amount,
-currency)` (`response-viewer.component.ts`) that rounds/pads to `currencyDecimals[currency] ?? 2`
+the same way. Fixed display-only, client-side, via a new `ResponseViewerComponent.formatAmount(amount, currency)` (`response-viewer.component.ts`) that rounds/pads to `currencyDecimals[currency] ?? 2`
 (the same map `currencyGroups`'s own Balanced/Unbalanced precision already uses) — applied at every
 Amount cell across all three tables. Deliberately does NOT touch the wire contract or
 `AccountEntry.amount`/`FxPairEntry.amount` themselves — this is presentation only, same posture as
@@ -453,6 +491,7 @@ money only ever moves between rows already in the array, so Σ Amount (Tx Ccy) a
 never need separate re-verification. Three boundary cases the literal rule left unstated were
 explicitly put to the reviewer; two were confirmed as first proposed, the third (rule 1) was
 revised the same day per reviewer follow-up:
+
 1. Decreasing the LAST leg (no N+1 to receive the difference) — **first attempt** rejected the
    edit outright (the recommended/safe option offered at the time). **Superseded same day**: the
    reviewer's follow-up ("最後一筆 - A. 調小金額增加新的一筆 B. 調大金額 往上一筆減少") asks for a
@@ -605,8 +644,7 @@ threshold is exactly the same repeating-fraction drift this fix targets — for 
 thirds example, `remaining` reads as `0.01` (`100 − 99.99`), which is `> 0.001`, so the OLD code
 would spawn a **phantom remainder row holding `0.00`** (since `totalAmount − Σfixed amounts` is
 genuinely `0` — the amounts already balance exactly) even though nothing is actually missing.
-Switched the routing decision to be **amount-based** instead (`amountRemaining = totalAmount −
-Σfixed amounts`, exact since every amount is already scale-rounded): spawn/keep a real remainder row
+Switched the routing decision to be **amount-based** instead (`amountRemaining = totalAmount − Σfixed amounts`, exact since every amount is already scale-rounded): spawn/keep a real remainder row
 only when `amountRemaining > 0`; otherwise take the "fully allocated" branch and apply the %
 correction above. This is the same amount-is-truth principle applied one level up, and required
 because the reviewer's own %-is-reference-only principle above applies to ROUTING decisions too, not
@@ -632,6 +670,7 @@ mathematically inconsistent with a total INCREASE — see below): when the **Tot
 field itself** changes (not an individual leg edit) and the split is fully amount-driven (no
 floating remainder row — the normal state after using the per-leg waterfall), the ENTIRE delta
 lands on the LAST row specifically:
+
 - **Increase**: adds directly to the last row. No cascading/drawing — growing the total is new
   money, it doesn't need to come from anywhere else. (An earlier proposed reading — "increase draws
   from the previous leg, same as the per-leg rule" — was walked through with a concrete worked
@@ -732,8 +771,7 @@ Allocated stayed exactly 100% throughout, no errors.
 
 ## Business-case-runner: a stale Confirm error now clears itself once the form is corrected; leg-allocator's ordinary row-split path also defaults the new row's Account No. (two small reviewer-reported fixes, 2026-08-11)
 
-**Fix 1 — stale `confirmError` never self-cleared.** A failed Confirm click (e.g. `⚠ [400]
-REQUEST_VALIDATION_FAILED: debitLegs.1.accountNo: String must contain at least 1 character(s)`) set
+**Fix 1 — stale `confirmError` never self-cleared.** A failed Confirm click (e.g. `⚠ [400] REQUEST_VALIDATION_FAILED: debitLegs.1.accountNo: String must contain at least 1 character(s)`) set
 `confirmError`, but nothing cleared it afterward except clicking Confirm again or switching business
 case — so correcting the underlying field (typing in the missing Account No.) left the old error
 banner on screen indefinitely even after the form was valid again. Reviewer: "當交易修正成功 把上次的
@@ -778,8 +816,7 @@ exact quotient is `134.15389…`). `accountCcyAmount()` (the display) and `emit(
 typed. Exactly the A=1/B=3/.33×3=.99 pattern: re-deriving the source field from its own already-rounded
 derivative loses information, every time the two currencies' minor-unit scales don't line up evenly.
 
-**Fix — store the exact typed figure instead of re-deriving it.** New `Row.accountCcyOverride: Decimal
-| null`, set by `onAccountAmountInput` to the raw typed account-ccy amount whenever the edit wasn't
+**Fix — store the exact typed figure instead of re-deriving it.** New `Row.accountCcyOverride: Decimal | null`, set by `onAccountAmountInput` to the raw typed account-ccy amount whenever the edit wasn't
 capped by the waterfall (a capped edit's real `amountTxCcy` is smaller than what the raw figure would
 imply, so the derivation is correct there instead — see the field's own doc comment). New private
 `accountCcyAmountDecimal()` prefers the override when present; both `accountCcyAmount()` (display) and
@@ -820,8 +857,7 @@ had used until now. Four rules, directly mirroring the Amount waterfall's own fo
    amount (capped at whatever the last row currently has); a decrease increases the last row's % by
    the exact freed amount (always fully absorbed).
 2. **Last row, % decrease → auto-creates a new trailing row** holding exactly the freed % difference,
-   Account No. defaulting to the account TYPE's own placeholder (`DEFAULT_ACCOUNT_NO_BY_TYPE
-   [defaultAccountType]`) — reviewer: "最後一筆調降 % 新增一筆 Account Number 根據 Account Type
+   Account No. defaulting to the account TYPE's own placeholder (`DEFAULT_ACCOUNT_NO_BY_TYPE [defaultAccountType]`) — reviewer: "最後一筆調降 % 新增一筆 Account Number 根據 Account Type
    Default Account Number", same convention as the Amount waterfall's own rule 3.
 3. **Last row, % increase → draws from the row immediately before it**, cascading further back if one
    row alone can't cover it — reviewer: "最後一筆調升% 減少上一筆%比例 不足再繼續往上調降", same shape
@@ -894,8 +930,7 @@ describe block's own `buildRows` fixture helper switched from `onPctInput`-based
 field assignment (since `%` editing itself can now waterfall mid-fixture-setup); two `onTotalChange`
 tests that used a fractional `onPctInput(row, 99.56)` call purely as a fixture-construction shorthand
 switched to the equivalent integer `99`; and the three over-allocation tests noted above. All 336
-project-wide tests pass (18 new, zero regressions); `tsc --noEmit` and `ng build --configuration
-development` are both clean.
+project-wide tests pass (18 new, zero regressions); `tsc --noEmit` and `ng build --configuration development` are both clean.
 
 ## Leg-allocator: a row is auto-deleted the instant it settles at 0% AND 0 amount (business-requirement-confirmed 2026-08-12, applies to both the % and Amount waterfalls)
 
@@ -909,6 +944,7 @@ A dangling empty leg conveyed no information on the wire even before this change
 the microservice — so this is a **UI-only grid-cleanliness fix**, not a wire-contract change.
 
 **Where a row can settle at 0%/0 and gets pruned:**
+
 - A donor row fully drained by rule 4's backward cascade (last-row increase, both waterfalls).
 - The LAST row itself, when a non-last row's increase (rule 1) caps it down to exactly 0 (its own
   cap coincides with fully draining it) — the row before it becomes the new LAST row for any
@@ -928,8 +964,7 @@ Both `onPctInput`/`onAmountInput`/`onAccountAmountInput` guard the edited-row pr
 **Never prunes below 1 row** — same guard `removeRow()` already uses; a side must always show at
 least one row even if every other row drains to 0.
 
-**Implementation:** new private `pruneZeroRow(row)` (checks `row.pct.isZero() && row.amountTxCcy
-.isZero()`, `this.rows.length > 1`, splices `row` out of `this.rows` **in place** — deliberately not
+**Implementation:** new private `pruneZeroRow(row)` (checks `row.pct.isZero() && row.amountTxCcy .isZero()`, `this.rows.length > 1`, splices `row` out of `this.rows` **in place** — deliberately not
 a reassigned `[...]` copy, since it's called from inside `applyAmountWaterfall`'s/
 `applyPctWaterfall`'s own rule-4 loops, which capture `const rows = this.rows` once at the top of the
 method; an in-place splice keeps that local reference correctly synced for the loop's remaining
@@ -941,14 +976,12 @@ See `leg-allocator.component.spec.ts`'s "auto-delete a row once it settles at 0%
 describe blocks (mirrored under both the "% waterfall" and "amount waterfall" sections, 5 tests
 each): donor-drained-by-cascade removal, last-row-capped-to-zero removal (new LAST row becomes the
 row before it), edited-row-decreased-to-zero removal, the never-below-1-row guard, and the
-single-row-bypass exemption. All 345 project-wide tests pass; `tsc --noEmit` and `ng build
---configuration development` are both clean.
+single-row-bypass exemption. All 345 project-wide tests pass; `tsc --noEmit` and `ng build --configuration development` are both clean.
 
 ## User Manual: §6.6 corrected (was describing the pre-v1.4.0 client-side Suspense bridge, now stale), plus new §6.6.1/§6.6.2 usage-guidance subsections (2026-08-12)
 
 While adding user-manual documentation for the Amount/% waterfall's auto-delete-on-zero rule
-above, a **separate, pre-existing staleness bug** was found and fixed in `docs/LC-Payment-WC-User-
-Manual-{en,cn}.docx`'s §6.6 ("Suspense Debit / Suspense Credit — the Charge Component bridge"): it
+above, a **separate, pre-existing staleness bug** was found and fixed in `docs/LC-Payment-WC-User- Manual-{en,cn}.docx`'s §6.6 ("Suspense Debit / Suspense Credit — the Charge Component bridge"): it
 still described the **pre-v1.4.0** behavior — "these are ordinary PaymentLegInput entries sent
 through the normal debitLegs/creditLegs arrays — no backend changes were needed for this feature"
 — and cited `business-case-runner.component.ts`'s own `suspenseBridgeLeg()`/`fxExchangePairLegs()`/
@@ -963,9 +996,7 @@ accurately, in both languages.
 
 **Also added, both languages:** a plain-language semantics sentence in §6.6's intro (Suspense Debit
 = bank collects MORE from the customer, adds to the Debit side's total; Suspense Credit = bank pays
-the customer LESS, reduces the Credit side's total — verified against `business-case-runner
-.component.ts`'s own `total = side === 'DEBIT' ? total.plus(trxEquivalent) : total.minus
-(trxEquivalent)` line, not assumed); and two new subsections citing the microservice README's
+the customer LESS, reduces the Credit side's total — verified against `business-case-runner .component.ts`'s own `total = side === 'DEBIT' ? total.plus(trxEquivalent) : total.minus (trxEquivalent)` line, not assumed); and two new subsections citing the microservice README's
 "Extended usage scenarios" section verbatim in structure — **§6.6.1 LC Issue/LC Amendment customer
 fee collection** (the `creditLegs: []` + `suspenseBridge.creditEntries` pattern) and **§6.6.2
 IBL/EBL Takedown & Repayment** (real `accountType: 'SUSPENSE'` legs, never `suspenseBridge`-
@@ -1008,6 +1039,7 @@ the OTHER side — making the leg-allocator ROW conversion agree with the per-en
 is what actually unifies the two without touching a decision already proven load-bearing for V8.
 
 **Implementation:**
+
 - `business-case-runner.component.ts`: `suspenseAdjustment()` now delegates its per-entry
   conversion/rounding to a new private `suspenseCurrencyBuckets(entries, trxCurrency)`, which
   groups the SAME per-entry-rounded trx-equivalents by currency instead of collapsing them
@@ -1051,6 +1083,7 @@ RELEASED (finalized) instruction — the PENDING drafting loop and the 4-eyes re
 out of this service's scope (consistent with FSD §6.1's "既有的已確認結果" wording).
 
 Confirmed decisions:
+
 - **D-1** Add a structured `transactionReference` / `event` block to the OAS (NOT flat extra string fields).
 - **D-2** Idempotency key = `(originModule, bankContractRef, eventSeq)`. Primary ref = the **bank-internal
   contract number** (行内合约号), NOT the customer LC number (customer LC numbers are not globally unique).

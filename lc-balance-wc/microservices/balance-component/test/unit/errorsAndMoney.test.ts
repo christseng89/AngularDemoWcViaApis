@@ -42,4 +42,9 @@ describe('money.ts', () => {
   test('sumMonetaryAmounts sums exactly via Decimal, not binary floats', () => {
     expect(sumMonetaryAmounts(['0.1', '0.2']).toFixed()).toBe('0.3');
   });
+
+  test('formatMonetaryAmount throws InvalidMonetaryAmountError when the requested scale itself produces an out-of-pattern string (MONETARY_AMOUNT_PATTERN allows at most 3 decimal digits — a scale of 4 rounds to a genuine 4-decimal-digit figure, which the pattern then rejects)', () => {
+    expect(() => formatMonetaryAmount(new Decimal('100.12345'), 4)).toThrow(InvalidMonetaryAmountError);
+    expect(() => formatMonetaryAmount(new Decimal('100.12345'), 4)).toThrow(/is not a valid MonetaryAmount/);
+  });
 });
