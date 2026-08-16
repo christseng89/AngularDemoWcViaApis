@@ -22,7 +22,7 @@ const EXPECTED_IDS = [
   'export-case-7',
 ];
 
-const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
+const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'acknowledge', 'snapshot'];
 
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
@@ -48,7 +48,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['import-case-1'].title).toBe('Import Case 1 — USD Sight');
     expect(byId['import-case-2'].title).toBe('Import Case 2 — USD Usance 120 days after sight');
     expect(byId['import-case-3'].title).toBe('Import Case 3 — USD Sight + Shipping Guarantee 50,000 + IBL');
-    expect(byId['import-case-4'].title).toBe('Import Case 4 — USD Sight + Shipping Guarantee 100,000 + IBL (only 50,000 documents arrive)');
+    expect(byId['import-case-4'].title).toBe('Import Case 4 — USD Sight + Shipping Guarantee 100,000, partial match via Document Arrival w/ SG (A3S)');
     expect(byId['import-case-5'].title).toBe('Import Case 5 — USD Sight, Amendment Decrease 120,000 (expect ERROR)');
     expect(byId['import-case-6'].title).toBe('Import Case 6 — USD Sight + two Shipping Guarantees (full + partial redeem) + A4 real Maker Submit');
     expect(byId['import-case-7'].title).toBe('Import Case 7 — USD Sellers Usance 120 days + Shipping Guarantee + two Acceptances (A6/A7)');
@@ -63,7 +63,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     );
   });
 
-  it('every step has a type from the five the generic executor understands', () => {
+  it('every step has a type from the six the generic executor understands', () => {
     registry.forEach((c) => {
       c.steps.forEach((step) => {
         expect(VALID_STEP_TYPES).toContain(step.type);
@@ -82,7 +82,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     });
   });
 
-  it('every *Ref (balanceContractIdRef / parentLogicalContractIdRef / referencedTransactionIdRef / movementRef / contractRef) points at a captureAs key already defined earlier in the SAME case, for both release and makerSubmit steps', () => {
+  it('every *Ref (balanceContractIdRef / parentLogicalContractIdRef / referencedTransactionIdRef / movementRef / contractRef) points at a captureAs key already defined earlier in the SAME case, for release/makerSubmit/acknowledge steps alike', () => {
     registry.forEach((c) => {
       const defined = new Set();
       c.steps.forEach((step, idx) => {
@@ -103,7 +103,7 @@ describe('data/businessCases.js buildRegistry()', () => {
             expect(step.captureAs === req.balanceContractIdRef).toBe(false);
             defined.add(step.captureAs);
           }
-        } else if (step.type === 'release' || step.type === 'makerSubmit') {
+        } else if (step.type === 'release' || step.type === 'makerSubmit' || step.type === 'acknowledge') {
           expect(step.movementRef).toBeTruthy();
           expect(defined.has(step.movementRef)).toBe(true);
         } else if (step.type === 'snapshot') {

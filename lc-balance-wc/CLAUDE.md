@@ -1868,6 +1868,33 @@ back-ported into this specific registry case's own comment or amount choice. Fla
 fixed here — out of scope for BAL-123, a separate pre-existing registry-data staleness issue worth its
 own follow-up.
 
+## BAL-134 fixed — Import Case 4 rewritten to demonstrate the CURRENT correct usage instead of an obsolete one (2026-08-17, business instruction: "Fix BAL-134 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-134 section): `importCase4`'s scenario
+predates Design doc §6.1 v0.12 ("A3 now hard-rejects past Tight Available") and, run live, failed on its
+own plain "Document Arrival 50,000" step with a genuine 409 — not a false positive, v0.12 correctly
+hard-rejects an UNMATCHED plain-A3-style Document Arrival past Tight Available. Deeper than a stale
+number: `checkUtilizeSufficiency()`'s own doc comment confirms v0.12 REMOVED the warning branch entirely
+("hardened from WARNING to ERROR") — the case's own premise ("WARNING fires, not an ERROR") is now
+architecturally impossible to reach via a plain UTILIZE, not just numerically off.
+
+**Fix**: rewritten to use the CURRENT correct mechanism for this exact scenario — the SG's own
+`PARTIAL_REDEEM` movement is now created FIRST (still PENDING, sharing a `businessEventId` with the
+Document Arrival that follows, the real "Document Arrival w/ Shipping Gtee" / A3S ordering).
+`computeOffBalanceExposure()` counts PENDING redemptions the same as RELEASED ones, so by the time the
+Document Arrival's own sufficiency check runs, the SG's 50,000 contribution is already netted out and the
+SAME 50,000 presentation succeeds cleanly — no warning, no error. Final balances are UNCHANGED from the
+original case (LC 71,000, SG 50,000 still outstanding) — those numbers were never wrong, only the call
+ordering/mechanism reaching them was obsolete. Title/description updated to describe what the case now
+demonstrates (A3S nets the SG's own reservation out of Tight Available) rather than the now-impossible
+"warning" framing.
+
+Verified: `backend/` suite 32/32 (title assertion updated to match), `npm run lint`/`format:check`
+unaffected. **Live-verified end to end** against the real microservice: every step of the rewritten case
+returns 2xx, and both final snapshots match their own documented expected values exactly (LC Confirmed/
+Available 71,000, Tight Available 21,000; SG 50,000 still outstanding). Re-ran all 7 Import Case entries
+individually afterward — all succeed cleanly, confirming the fix didn't disturb Case 1/2/3/5/6/7.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

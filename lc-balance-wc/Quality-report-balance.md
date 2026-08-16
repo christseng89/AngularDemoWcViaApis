@@ -46,26 +46,27 @@ surfaced BAL-122 and BAL-123 below.
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A (4.7/5) | 834/834 tests passing across 3 independent suites (510 Angular + 292 microservice + 32 backend, re-confirmed after both fixes). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — and **both were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation. One low-severity, unrelated pre-existing gap (**BAL-134**, `import-case-4`'s stale scenario) surfaced incidentally while live-verifying BAL-123 and remains open. |
+| **Reliability** | A (4.8/5) | 834/834 tests passing across 3 independent suites (510 Angular + 292 microservice + 32 backend, re-confirmed after all fixes). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario) — and **all three were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
 | **Maintainability** | A- (4.4/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before (BAL-124 duplicated executor handlers, BAL-125/BAL-126 `checker-actions.service.ts`'s own un-swept `any` typing and `catchError` duplication, BAL-127/BAL-130 two files trending toward their own future God-file status, BAL-128 stale eslint-disable comments) — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A- (4.4/5) | Every previously-identified hotspot remains fixed. Two new, genuine (if Minor) duplication instances found in code added this session: BAL-124 (`release`/`makerSubmit` executor handlers) and BAL-126 (`checker-actions.service.ts`'s own repeated `catchError` blocks) — both small, both easy fixes, neither on the scale of what BAL-003's history required. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A)**
 
-**Why the score dipped then fully recovered, rather than only ever climbing:** this comprehensive
-follow-up pass is deliberately adversarial rather than confirmatory — its whole point was to
-independently re-hunt for defects in code that shipped *after* the last review closed, rather than only
-re-verify what was already found. It succeeded: two genuine new Major findings surfaced (BAL-122 a real
-bug, BAL-123 a disclosed-but-real enforcement gap), both in this session's own newest feature (the A4
-redesign) and neither previously reviewed by anyone — that's the 93 → 90 dip. Both were then fixed, each
-in the same pass it was reported, immediately after the assessment surfaced it — first BAL-122 (90 → 91),
-then BAL-123 (91 → 93), fully recovering to this report's own prior peak. Recovering to the SAME number
-(93) rather than exceeding it is deliberate, not a rounding coincidence: fixing two newly-found defects
-restores the codebase to "as good as previously believed," it doesn't make it better than that — the one
-new low-severity finding surfaced along the way (BAL-134, unrelated and still open) is why the score
-isn't simply reported as "back to normal" without qualification.
+**Why the score dipped then recovered past its prior peak, rather than only ever climbing (or landing
+exactly back where it started):** this comprehensive follow-up pass is deliberately adversarial rather
+than confirmatory — its whole point was to independently re-hunt for defects in code that shipped *after*
+the last review closed, rather than only re-verify what was already found. It succeeded: two genuine new
+Major findings surfaced (BAL-122 a real bug, BAL-123 a disclosed-but-real enforcement gap), both in this
+session's own newest feature (the A4 redesign) and neither previously reviewed by anyone — that's the
+93 → 90 dip. All three findings this pass surfaced (BAL-122, BAL-123, and the incidentally-discovered
+BAL-134) were then fixed, each in the same pass it was reported: BAL-122 (90 → 91), BAL-123 (91 → 93,
+recovering the prior peak), then BAL-134 (93 → 94) — this LAST step is genuine net improvement, not just
+recovery, since `import-case-4` was silently broken before this pass ever started (nobody had live-run
+the full registry before) and is now demonstrably fixed and re-verified. The score ending above its prior
+peak is earned: this pass leaves the codebase with zero open findings of its own, on top of confirming
+every earlier pass's fixes still hold.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -89,17 +90,21 @@ through a quality pass before today. That review found **two new Major findings,
 now fixed**: **BAL-122** (a real bug — A4's "Delete Pending" button destroyed upstream A3/A3S work, not
 its own record — hidden for A4 specifically) and **BAL-123** (a self-disclosed but real gap — A4's own
 4-eyes gate was client-side-only — now enforced server-side too, scoped by tenor so it can never affect
-A6's own Usance flow). It also found eight new Minor/Info findings (BAL-124–BAL-130, BAL-132, BAL-134),
-all small and independently actionable — BAL-134 (a pre-existing, unrelated Business Case Registry
-staleness issue in `import-case-4`) surfaced incidentally while live-verifying BAL-123's own fix across
-all 14 registered cases — and one completeness gap (BAL-131). None of the new findings are
-Blocker/Critical, and none regress anything the five 2026-08-16 passes fixed.
+A6's own Usance flow). It also found eight new Minor/Info findings (BAL-124–BAL-130, BAL-132, BAL-134)
+and one completeness gap (BAL-131). One of those eight — **BAL-134** (`import-case-4`'s scenario, stale
+against a later `v0.12` design change, silently failing on a live run) — surfaced incidentally while
+live-verifying BAL-123's own fix across all 14 registered cases, and was **also fixed the same pass**:
+rewritten to demonstrate the current correct mechanism (an SG redemption netted out BEFORE the Document
+Arrival's own sufficiency check) rather than an obsolete one, preserving the case's own original final
+balances exactly. The remaining seven (BAL-124–BAL-130, BAL-132) and the completeness gap (BAL-131) stay
+open — small, independently actionable, none Blocker/Critical, none regressing anything the five
+2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
-as resolved. Both new Major findings from this pass (BAL-122, BAL-123) are now fixed and no longer factor
-into that assessment. See [Gate Conditions](#gate-conditions-before-any-production-consideration) at the
-end.
+as resolved. All three findings this pass itself surfaced (BAL-122, BAL-123, BAL-134) are now fixed and
+no longer factor into that assessment. See
+[Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
 
@@ -132,7 +137,7 @@ end.
 | [BAL-127](#bal-127) | ⚪ Info | Technical Debt | `backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case (now 1,439 lines / 14 cases) — **Open, found this pass, not yet urgent** |
 | [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Open, found this pass** |
 | [BAL-132](#bal-132) | ⚪ Info | Code Smell | `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion bypasses the type system's own declared nullability — **Open, found this pass, low risk** |
-| [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — fails on a live run, unrelated to BAL-122/BAL-123 — **Open, found while verifying BAL-123** |
+| [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — **Fixed** |
 | [BAL-101](#fixed-in-prior-passes--re-verified-still-fixed-this-pass) | — | — | Fixed in prior passes, re-verified still fixed this pass (see below) |
 | [BAL-111](#bal-111) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found, in either store layer |
 | [BAL-112](#bal-112) | ⚪ Info (positive) | — | Test coverage clears 95% on all four metrics, all three suites |
@@ -241,8 +246,8 @@ unaffected, not just that the happy path works), `tsc --noEmit`/`npm run build` 
 affected pre-existing test (`app.test.ts`'s "AMEND_DECREASE reverses the pair..." fixture, a real
 Sight-tenor contract) needed one added `/maker-submit` call. **Live-verified all 14 Business Case
 Registry entries individually** via the running Business Case Runner (not just mocked unit tests) — 13
-unaffected; `import-case-4` fails, but on an unrelated `createMovement()` call this fix never touches
-(see BAL-134, a new Info finding logged from this same verification pass). OAS bumped to v1.5.0. Does not
+unaffected; `import-case-4` failed at the time, but on an unrelated `createMovement()` call this fix never
+touches (logged and separately fixed as BAL-134, its own section below). OAS bumped to v1.5.0. Does not
 block continued prototype use, and never did.
 
 ---
@@ -912,7 +917,7 @@ graph.
 ---
 
 ### BAL-134
-**`import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change** — ⚪ Info (Bug / Technical Debt) — Open, found while verifying BAL-123
+**`import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change** — ⚪ Info (Bug / Technical Debt) — **Fixed**
 
 **Evidence:** discovered incidentally while live-running all 14 Business Case Registry entries end to
 end (not just their own mocked unit tests) to confirm BAL-123's fix didn't break anything. 13 cases
@@ -944,8 +949,25 @@ to fit within Tight Available, or explicitly change the case to demonstrate and 
 hard-reject behavior with `expectError: true`, matching `importCase5`'s own existing pattern for an
 expected-rejection scenario) — out of scope for BAL-123, flagged here for its own separate follow-up.
 
-**Outcome:** Not remediated this pass — reported as a newly-found, open, low-severity finding. Does not
-block anything; unrelated to the two Major findings this reassessment set out to review.
+**Outcome (2026-08-17, fixed immediately after being reported): neither of the two recommended options
+above — a third, more faithful fix.** Investigating further revealed the case's own premise wasn't just
+numerically stale but architecturally impossible to reach at all: `checkUtilizeSufficiency()`'s own doc
+comment confirms v0.12 REMOVED the warning branch entirely ("hardened from WARNING to ERROR") — no amount
+choice for a PLAIN UTILIZE could ever reproduce "warning, not error" again. Reducing the Document Arrival
+to fit within Tight Available (option 1) would have silently changed the scenario's own headline numbers
+(no longer "only half the SG-covered goods arrive"); switching to `expectError: true` (option 2) would
+have thrown away the case's own actual teaching value (demonstrating a partial-match presentation
+succeeding, and the SG's own `PARTIAL_REDEEM`). Instead: rewritten to use the CURRENT correct mechanism
+for this exact scenario — the SG's own `PARTIAL_REDEEM` is now created FIRST (still PENDING, sharing a
+`businessEventId` with the Document Arrival that follows, the real "Document Arrival w/ Shipping Gtee"
+ordering) — `computeOffBalanceExposure()` counts PENDING redemptions the same as RELEASED ones, so the
+SG's 50,000 is already netted out by the time the Document Arrival's own check runs, and the SAME 50,000
+presentation now succeeds cleanly. Final balances are UNCHANGED from the original case (LC 71,000, SG
+50,000 still outstanding) — those numbers were never wrong, only the call ordering reaching them was
+obsolete. Title/description updated to describe what the case now demonstrates. Verified: `backend/`
+suite 32/32 (title assertion updated), and **live-verified end to end** against the real microservice —
+every step 2xx, both final snapshots match exactly; all 7 Import Case entries re-run individually
+afterward confirm the fix disturbed nothing else in the registry.
 
 ---
 
@@ -1232,6 +1254,7 @@ before the A4 feature area specifically is considered done:**
 
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
 its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
-non-obvious misclick sequence to trigger. **Both are now fixed.** All other 2026-08-17 findings
-(BAL-124–BAL-130, BAL-132, BAL-134, and the completeness gap BAL-131) are Minor/Info, none are gate
-conditions, and none block anything.
+non-obvious misclick sequence to trigger. **Both are now fixed, and so is BAL-134** (`import-case-4`'s
+own stale scenario, found incidentally while verifying BAL-123 and fixed the same pass). All remaining
+2026-08-17 findings (BAL-124–BAL-130, BAL-132, and the completeness gap BAL-131) are Minor/Info, none are
+gate conditions, and none block anything.

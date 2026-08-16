@@ -15,12 +15,16 @@
  *     for Export Case #6/#7's own B3->B4 compound shape — resolves to an
  *     earlier captureAs step's own movementId, same as balanceContractIdRef
  *     but targeting movementId instead of balanceContractId).
- *   release — POST /balance-movements/:id/release, `movementRef` points at
- *     a captured createMovement step.
- *   makerSubmit — POST /balance-movements/:id/maker-submit (added 2026-08-16
- *     for Import Case #6's own A4 real-Maker-Submit step — IPLC_LC/UTILIZE
- *     only), `movementRef` + `makerSubmittedBy`, same shape as `release`
- *     but hitting the maker-submit sub-path/body key instead.
+ *   release / makerSubmit / acknowledge — all POST /balance-movements/:id/<sub-path>
+ *     with one body key, `movementRef` pointing at a captured createMovement
+ *     step; server.js's own RELEASE_SHAPED_STEP_TYPES dispatch table drives
+ *     all three through one shared handler (Quality-report-balance.md
+ *     BAL-124). `release` — Checker releases a PENDING movement.
+ *     `makerSubmit` (added 2026-08-16 for Import Case #6's own A4 real-
+ *     Maker-Submit step — IPLC_LC/UTILIZE only) — `movementRef` +
+ *     `makerSubmittedBy`. `acknowledge` (added 2026-08-17, BAL-131 — B3's
+ *     own Present-Docs Checker acknowledgment; EPLC_EXAMINATION/CREATE
+ *     only, never transitions status) — `movementRef` + `acknowledgedBy`.
  *   snapshot — GET /balance-contracts/:id/balance, `contractRef` points at
  *     a captured createMovement step (its balanceContractId).
  *   note — no API call; an informational line in the trace (e.g. EBL/IBL
@@ -284,11 +288,29 @@ function importCase3(lc, sg) {
   };
 }
 
+// Business instruction 2026-08-17 ("Fix BAL-134 too" — Quality-report-balance.md): this case's own
+// scenario predated Design doc §6.1 v0.12 ("A3 now hard-rejects past Tight Available" — see
+// domain/offBalanceExposure.ts's own checkUtilizeSufficiency doc comment) and, run live, now fails on
+// its own "Document Arrival 50,000" step with a genuine 409 INSUFFICIENT_AVAILABLE_BALANCE — not a
+// false positive, the v0.12 rule is correctly rejecting an UNMATCHED plain-A3-style Document Arrival
+// past Tight Available, exactly as designed. The case's own original premise (a plain UTILIZE past
+// Tight Available producing a non-blocking WARNING) is now architecturally impossible:
+// checkUtilizeSufficiency() no longer has a warning branch at all (v0.12 removed it, hardening WARNING
+// to ERROR). Rewritten below to demonstrate the CURRENT, correct way to handle this exact scenario
+// instead: create the SG's own PARTIAL_REDEEM movement FIRST (still PENDING, matching the SAME
+// businessEventId as the Document Arrival that follows — the real "Document Arrival w/ Shipping Gtee"
+// (A3S) ordering) — computeOffBalanceExposure() counts PENDING redemptions the same as RELEASED ones,
+// so by the time the Document Arrival's own sufficiency check runs, this SG's contribution is already
+// netted out and the SAME 50,000 presentation succeeds cleanly, no warning and no error. Final balances
+// (LC 71,000, SG 50,000 outstanding) are UNCHANGED from the original case — only the ordering/mechanism
+// that gets there is fixed, since those numbers were never wrong, just reached via a call sequence the
+// current design no longer permits.
 function importCase4(lc, sg) {
   return {
     id: 'import-case-4',
-    title: 'Import Case 4 — USD Sight + Shipping Guarantee 100,000 + IBL (only 50,000 documents arrive)',
-    description: 'SG covers the full LC but only half the documents arrive — WARNING fires, and SG can only be PARTIAL_REDEEM-ed.',
+    title: 'Import Case 4 — USD Sight + Shipping Guarantee 100,000, partial match via Document Arrival w/ SG (A3S)',
+    description:
+      "SG covers the full LC but only half the documents arrive — Document Arrival w/ Shipping Gtee (A3S) nets the SG's own reserved capacity out of the Tight Available check BEFORE the Document Arrival's own sufficiency check runs, so the partial presentation succeeds cleanly (no warning, no error); SG itself can only be PARTIAL_REDEEM-ed for the matched amount, leaving the rest outstanding.",
     steps: [
       {
         type: 'createMovement',
@@ -339,23 +361,7 @@ function importCase4(lc, sg) {
       { type: 'release', label: 'Checker releases SG Issue', movementRef: 'sg', releasedBy: CHECKER },
       {
         type: 'createMovement',
-        label: 'Document Arrival 50,000 (only half the SG-covered goods)',
-        captureAs: 'utilize',
-        request: {
-          instrumentType: 'IPLC_LC',
-          balanceContractIdRef: 'lc',
-          movementType: 'UTILIZE',
-          eventSeq: 3,
-          amount: '50000',
-          currency: 'USD',
-          createdBy: MAKER,
-        },
-      },
-      { type: 'note', label: 'Expect a WARNING here — Tight Available (21,000) < 50,000, but not an ERROR (LC Available itself is 121,000)' },
-      { type: 'release', label: 'IBL/Pay 50,000 (120 days)', movementRef: 'utilize', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'SG can only be PARTIAL_REDEEM-ed 50,000 (documents for the other half have not arrived)',
+        label: 'SG Redemption Amount = MIN(Bill 50,000, SG Outstanding 100,000) -> PARTIAL_REDEEM 50,000 (created FIRST — still PENDING, nets out of the Document Arrival\'s own Tight Available check below)',
         captureAs: 'redeem',
         request: {
           instrumentType: 'SHGT',
@@ -364,10 +370,33 @@ function importCase4(lc, sg) {
           eventSeq: 2,
           amount: '50000',
           currency: 'USD',
+          businessEventId: `${lc}-arrival`,
           createdBy: MAKER,
         },
       },
-      { type: 'release', label: 'Checker releases partial SG Redemption', movementRef: 'redeem', releasedBy: CHECKER },
+      {
+        type: 'createMovement',
+        label: 'Document Arrival w/ SG 50,000 (A3S — matches the SG\'s own reserved capacity; only half the SG-covered goods have arrived)',
+        captureAs: 'utilize',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'UTILIZE',
+          eventSeq: 3,
+          amount: '50000',
+          currency: 'USD',
+          businessEventId: `${lc}-arrival`,
+          createdBy: MAKER,
+        },
+      },
+      {
+        type: 'note',
+        label:
+          "No warning and no error here — the SG Redemption above (still PENDING) already nets its own 50,000 out of Off-Balance Exposure before this check runs, so Tight Available is correctly 71,000 (121,000 Available minus 50,000 remaining SG exposure), comfortably covering this 50,000 Document Arrival. An UNMATCHED plain Document Arrival for the same 50,000 against the same LC would instead hard-reject (Design doc §6.1 v0.12) — that's exactly the case this scenario used to (incorrectly) demonstrate as a warning; matching against the SG via A3S is the current, correct way to handle it.",
+      },
+      { type: 'release', label: 'Checker releases SG Redemption', movementRef: 'redeem', releasedBy: CHECKER },
+      { type: 'release', label: 'IBL/Pay 50,000 (120 days)', movementRef: 'utilize', releasedBy: CHECKER },
+      { type: 'note', label: 'IBL itself is a Loan Component ASSET — no Balance Component call' },
       { type: 'snapshot', label: 'LC Balance (expect 71,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'SG Balance (expect 50,000 still outstanding)', contractRef: 'sg' },
       { type: 'note', label: 'Settlement Due Date 50,000 — pure Loan Component (IBL maturity), no Balance Component call' },
@@ -1220,9 +1249,10 @@ function exportCase6(lc) {
         },
       },
       {
-        type: 'note',
-        label:
-          "Checker Release on Present Docs is acknowledgment-only in the reference Transaction Builder client (stays PENDING) — omitted here as a separate call since it never gates B4; B4's own compound Release below resolves and releases this earmark directly via referencedTransactionId.",
+        type: 'acknowledge',
+        label: "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
+        movementRef: 'examination',
+        acknowledgedBy: CHECKER,
       },
       {
         type: 'createMovement',
@@ -1311,9 +1341,10 @@ function exportCase7(lc, ib) {
         },
       },
       {
-        type: 'note',
-        label:
-          "Checker Release on Present Docs is acknowledgment-only in the reference Transaction Builder client (stays PENDING) — omitted here as a separate call since it never gates B4; B4's own compound Release below resolves and releases this earmark directly via referencedTransactionId.",
+        type: 'acknowledge',
+        label: "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
+        movementRef: 'examination',
+        acknowledgedBy: CHECKER,
       },
       {
         type: 'createMovement',

@@ -39,6 +39,9 @@ function createGenericFetchMock() {
     if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
       return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
     }
+    if (method === 'POST' && /\/balance-movements\/[^/]+\/acknowledge$/.test(url)) {
+      return jsonResponse(200, { status: 'PENDING', acknowledgedBy: 'checker1' });
+    }
     if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
       const [, contractId] = url.match(/\/balance-contracts\/([^/]+)\/balance$/);
       return jsonResponse(200, {
@@ -197,6 +200,30 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       const b01ReleaseIdx = case6.steps.findIndex((s) => s.type === 'release' && s.label.includes('B01 (Sight Settlement'));
       expect(b01SubmitIdx).toBeGreaterThanOrEqual(0);
       expect(b01SubmitIdx).toBeLessThan(b01ReleaseIdx);
+    });
+  });
+
+  // Quality-report-balance.md BAL-131 (2026-08-17): the Business Case Registry used to never exercise
+  // POST /balance-movements/:id/acknowledge at all — the one microservice write endpoint with zero
+  // orchestrator-level coverage. Export Case #6/#7 now both model B3's own Checker acknowledgment of
+  // the Present Docs earmark for real, via the new 'acknowledge' step type.
+  describe('POST /api/business-cases/export-case-6/run — acknowledge step (B3 Present Docs Checker acknowledgment)', () => {
+    it('POSTs to .../acknowledge for the Present Docs earmark, distinct from release, before B4\'s own compound release', async () => {
+      global.fetch = createGenericFetchMock();
+
+      const res = await request(app).post('/api/business-cases/export-case-6/run').send({});
+
+      expect(res.status).toBe(200);
+
+      const acknowledges = res.body.trace.filter((t) => t.type === 'acknowledge');
+      expect(acknowledges).toHaveLength(1);
+      expect(acknowledges[0]).toMatchObject({ ok: true, status: 200, response: { status: 'PENDING', acknowledgedBy: 'checker1' } });
+
+      const case6 = buildRegistry().find((c) => c.id === 'export-case-6');
+      const acknowledgeIdx = case6.steps.findIndex((s) => s.type === 'acknowledge');
+      const honourReleaseIdx = case6.steps.findIndex((s) => s.type === 'release' && s.label.includes('Present Docs'));
+      expect(acknowledgeIdx).toBeGreaterThanOrEqual(0);
+      expect(acknowledgeIdx).toBeLessThan(honourReleaseIdx);
     });
   });
 

@@ -45,6 +45,18 @@ async function resolveLogicalContractId(captured, ref) {
   return entry.logicalContractId;
 }
 
+// Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release', 'makerSubmit'
+// (Import Case #6's own A4 real Maker Submit), and 'acknowledge' (BAL-131's own fix, below) are all
+// the identical shape — POST to a per-movement sub-path with one body key, same "skipped" handling
+// when the referenced createMovement step never captured a movementId. Consolidated into one dispatch
+// table + shared handler in runCase() below instead of three near-copies, closing BAL-124 at the exact
+// point a 3rd copy would otherwise have landed (the finding's own predicted risk).
+const RELEASE_SHAPED_STEP_TYPES = {
+  release: { subPath: 'release', bodyKey: 'releasedBy' },
+  makerSubmit: { subPath: 'maker-submit', bodyKey: 'makerSubmittedBy' },
+  acknowledge: { subPath: 'acknowledge', bodyKey: 'acknowledgedBy' },
+};
+
 /** Runs one business case's step list against the microservice, returning a full trace for the UI. */
 async function runCase(businessCase) {
   const captured = {}; // captureAs key -> { response, logicalContractId? }
@@ -90,40 +102,20 @@ async function runCase(businessCase) {
       continue;
     }
 
-    if (step.type === 'release') {
+    if (RELEASE_SHAPED_STEP_TYPES[step.type]) {
+      const { subPath, bodyKey } = RELEASE_SHAPED_STEP_TYPES[step.type];
       const movementId = captured[step.movementRef]?.response?.movementId;
       if (!movementId) {
         trace.push({
-          type: 'release',
+          type: step.type,
           label: step.label,
           skipped: true,
           reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).`,
         });
         continue;
       }
-      const result = await callMicroservice('POST', `/balance-movements/${movementId}/release`, { releasedBy: step.releasedBy });
-      trace.push({ type: 'release', label: step.label, status: result.status, ok: result.ok, response: result.body });
-      continue;
-    }
-
-    // Import Case #6 (2026-08-16, A4's own real Maker Submit — see types.ts's own
-    // BalanceMovement.makerSubmittedAt doc comment): POST /balance-movements/:id/maker-submit,
-    // IPLC_LC/UTILIZE only. Mirrors the 'release' step above exactly, just a different sub-path/body
-    // key — same "skipped" handling when the referenced createMovement step never captured a
-    // movementId (an expected-error step upstream).
-    if (step.type === 'makerSubmit') {
-      const movementId = captured[step.movementRef]?.response?.movementId;
-      if (!movementId) {
-        trace.push({
-          type: 'makerSubmit',
-          label: step.label,
-          skipped: true,
-          reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).`,
-        });
-        continue;
-      }
-      const result = await callMicroservice('POST', `/balance-movements/${movementId}/maker-submit`, { makerSubmittedBy: step.makerSubmittedBy });
-      trace.push({ type: 'makerSubmit', label: step.label, status: result.status, ok: result.ok, response: result.body });
+      const result = await callMicroservice('POST', `/balance-movements/${movementId}/${subPath}`, { [bodyKey]: step[bodyKey] });
+      trace.push({ type: step.type, label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }
 
