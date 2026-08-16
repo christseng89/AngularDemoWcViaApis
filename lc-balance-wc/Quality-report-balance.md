@@ -20,7 +20,8 @@ findings from earlier versions of this report — dead code removal, CORS/securi
 a proper migration runner, a God Component paging + Look Up panel extraction. This pass independently
 re-verifies every one of those fixes still holds, and separately swept all three sub-projects from scratch
 for anything not previously found. Six new findings surfaced (BAL-115–BAL-120), most notably a real
-contract-invariant violation in the microservice's own monetary-amount handling (BAL-115).
+contract-invariant violation in the microservice's own monetary-amount handling (BAL-115) — **fixed the
+same day this report was written**, immediately after being found (see BAL-115's own section for detail).
 
 ---
 
@@ -28,19 +29,19 @@ contract-invariant violation in the microservice's own monetary-amount handling 
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | B+ (4.2/5) | 655/655 tests passing across 3 independent suites. One genuine, newly-found Major defect this pass (BAL-115 — `money.ts`'s own "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites). No other logic bugs found. |
+| **Reliability** | A- (4.5/5) | 701/701 tests passing across 3 independent suites (454 Angular + 220 microservice + 27 backend). The one genuine defect this pass found (BAL-115 — `money.ts`'s own "only module allowed to construct a Decimal from a wire string" invariant bypassed at 3 call sites) was fixed same-day. No other logic bugs found. |
 | **Security** | B- (3.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold. Two new Minor hotspots found this pass (BAL-117 raw error echoing, BAL-118 no rate limit on the orchestrator). Held back by the two unchanged structural gaps: no authentication anywhere, and 8 High CVEs in production Angular deps. |
 | **Maintainability** | B+ (3.8/5) | Duplication hotspots fixed and re-verified clean; the God Component now shares paging AND Look Up panel fetch logic (2 of 3 planned extractions done) but is still ~2,800 lines; two new small code smells found (BAL-116 unused `zod` dependency, BAL-119 dead redundant export re-assignment). |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines. |
 | **Duplication** | A (4.6/5) | Every previously-identified hotspot remains fixed; no new SonarQube-flaggable duplication block found in this pass's fresh sweep of all three sub-projects. |
 
-### Composite score: **86 / 100 (B+)**
+### Composite score: **86 → 88 / 100 (B+ → A-)**
 
 **Final assessment: CONDITIONAL PASS.** The codebase continues to improve on maintainability, security
-hygiene, and duplication — every finding this review can independently confirm was fixed in a prior pass
-(BAL-101, BAL-103, BAL-104, BAL-106, BAL-107) still holds under fresh re-verification. Set against that,
-this pass's own independent sweep found a real, previously-undetected Major reliability defect (BAL-115)
-and several new Minor issues, which is why the composite score did not simply continue climbing. It
+hygiene, duplication, and now reliability — every finding this review can independently confirm was
+fixed in a prior pass (BAL-101, BAL-103, BAL-104, BAL-106, BAL-107) still holds under fresh
+re-verification, and this pass's own newly-found Major defect (BAL-115) was fixed the same day, not left
+open. Several new Minor issues (BAL-116–BAL-120) remain, which is why the score isn't higher still. It
 remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data. See
 [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
@@ -53,7 +54,7 @@ unchanged release blockers for any deployment handling real trade-finance data. 
 |---|---|---|---|
 | [BAL-001](#bal-001) | 🔴 Blocker | Vulnerability | No authentication/authorization anywhere in the microservice |
 | [BAL-002](#bal-002) | 🟠 Critical | Vulnerability | 8 High-severity CVEs in production Angular dependencies |
-| [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites |
+| [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites — **Fixed** |
 | [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` is still a 2,809-line God Component (2 of 3 extractions done) |
 | [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — deferred, user-confirmed |
 | [BAL-116](#bal-116) | 🔵 Minor | Code Smell | `zod` is a declared dependency but never used — request validation is manual presence checks only |
@@ -117,7 +118,7 @@ across every prior remediation pass as too large/risky for a drive-by fix; that 
 ## Bugs
 
 ### BAL-115
-**`money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites** — 🟡 Major
+**`money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites** — 🟡 Major — **Fixed**
 
 **Evidence:** `money.ts`'s own doc comment states it is the only module allowed to construct a `Decimal`
 from a wire string, via `parseMonetaryAmount()`, which validates the input against
@@ -147,6 +148,23 @@ if it never gets re-serialized before being written to `BalanceMovement.ceilingA
 
 **Recommended remediation:** replace all three call sites with `parseMonetaryAmount(req.amount)`, matching
 the convention every other call site in the domain layer already follows.
+
+**Outcome (2026-08-16): Fixed, same day as the finding, user-requested ("Fix BAL-115 too").** All three
+call sites (SG Issue vs. parent LC Tight Available Balance, Present Docs earmark vs. parent Confirmation,
+AMEND_DECREASE sufficiency) now call `parseMonetaryAmount(req.amount)` instead of `new Decimal(req.amount)`
+— a new `import { parseMonetaryAmount } from '../money';` in `balanceService.ts`. `new Decimal(0)`
+(zero-initializing `offBalanceExposure`, not derived from any wire string) was correctly left alone —
+out of scope for this finding. New `test/unit/service/balanceService.test.ts` (previously no dedicated
+direct-service-call test file existed) proves the invariant holds even for a caller that constructs
+`BalanceService` directly and bypasses `routes/balanceMovements.ts`'s own request-boundary validation
+entirely — a separate, earlier same-day fix already added a currency-decimal-place + pattern check at
+that HTTP boundary (see `lc-balance-wc/CLAUDE.md`'s decision log), but that only protects real HTTP
+traffic; this closes the identical gap at the service layer itself, for any caller (test or otherwise)
+that skips the route — 3 new tests, one per call site, each asserting
+`InvalidMonetaryAmountError` where a malformed amount used to silently construct a `Decimal`. Verified:
+`npm run typecheck`/`npm run build` clean; `npm test` → 220/220 passing (3 new),
+98.97%/95.75%/100%/99.33% coverage; `npm run lint` 0 errors. Full three-suite re-verification: Angular
+app 454/454 and `backend/` 27/27, both unaffected (microservice-only change).
 
 ---
 
@@ -216,15 +234,21 @@ $ grep -n "amount" microservices/balance-component/src/routes/balanceMovements.t
 `zod` is paid for in `package.json` but never imported anywhere in `src/`; there is no
 `src/validation/requestSchema.ts` or equivalent. Request validation is a single hand-rolled
 property-presence check — it catches missing fields but not wrong-shaped ones (a numeric `eventSeq` typed
-as a string, a malformed `amount`, an enum field with a value outside its legal set all pass this check and
-reach domain code, related to BAL-115 above).
+as a string, an enum field with a value outside its legal set, etc. — all still pass this check and reach
+domain code). The specific `amount`-shape gap this originally flagged (alongside BAL-115) is now closed:
+the route since gained explicit `MONETARY_AMOUNT_PATTERN`/currency-decimal-place checks of its own (see
+`lc-balance-wc/CLAUDE.md`'s decision log) and BAL-115's fix closed the same gap again at the service
+layer — but those are two hand-rolled checks bolted onto the route, not a schema, so this finding (no
+actual validation layer exists, just accumulating one-off checks) still stands on its own merits.
 
 **Impact:** no direct risk from the unused dependency itself, but it's misleading — a reader reasonably
-assumes `zod` is the validation layer given it's declared as a dependency, and it isn't.
+assumes `zod` is the validation layer given it's declared as a dependency, and it isn't. The accumulating
+hand-rolled checks in `balanceMovements.ts` are exactly the kind of growth a real schema would consolidate.
 
 **Recommended remediation:** either wire an actual `zod` schema (the dependency is already paid for, and
-would also close BAL-115 at the boundary rather than deep inside `balanceService.ts`), or remove it from
-`package.json` if manual checks are the deliberate, permanent choice.
+would also consolidate the route's now-several hand-rolled checks — presence, pattern, currency-scale —
+into one declarative place), or remove it from `package.json` if manual checks are the deliberate,
+permanent choice.
 
 ---
 
@@ -407,14 +431,15 @@ dynamically-assembled `WHERE` clause in `balanceContractStore.ts`'s `listCatalog
 *fragments* are hardcoded literals from a fixed set, never derived from caller input.
 
 ### BAL-112
-**Test coverage clears 95% on all four metrics, across all three independent suites.** 655 tests total,
-all green as of this review:
+**Test coverage clears 95% on all four metrics, across all three independent suites.** 701 tests total,
+all green as of this review (microservice count includes the currency-decimal-place and BAL-115 fixes'
+own new tests, landed the same review date):
 
 | Suite | Statements | Branches | Functions | Lines | Tests |
 |---|---|---|---|---|---|
-| `microservices/balance-component/` | 99.35% | 96.18% | 100% | 99.76% | 189 |
+| `microservices/balance-component/` | 98.97% | 95.75% | 100% | 99.33% | 220 |
 | `backend/` | 97.95% | 97.36% | 95.65% | 97.75% | 27 |
-| Angular app (`src/app/`) | 99.75% | 95.52% | 99.66% | 99.82% | 439 |
+| Angular app (`src/app/`) | 99.76% | 95.57% | 99.67% | 99.82% | 454 |
 
 All three also pass their own lint gate clean (0 errors) and typecheck/build clean
 (`tsc --noEmit`, `npm run build` for the microservice; `ng build --configuration development` for the
@@ -452,8 +477,8 @@ credentials, the following remain non-negotiable, in this order:
 2. **BAL-002** — Angular upgraded off the CVE-affected 17.3.x line.
 3. **BAL-102** — the SQLite→PostgreSQL engine swap, if this project's storage layer is ever promoted
    beyond prototype use.
-4. **BAL-115** — the monetary-amount parsing bypass, since it undermines a boundary invariant the rest of
-   the money-handling code (correctly) assumes holds everywhere.
+
+**BAL-115 (the monetary-amount parsing bypass) is fixed as of this pass** — no longer a gate condition.
 
 None of the remaining Maintainability/Minor/Info findings (BAL-003, BAL-105, BAL-108, BAL-116–BAL-120)
 block a production decision on their own, but BAL-003's one remaining extraction (Checker actions) will

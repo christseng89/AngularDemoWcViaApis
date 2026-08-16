@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { RequestValidationError } from '../errors';
 import type { CreateMovementRequest } from '../service/balanceService';
+import { MONETARY_AMOUNT_PATTERN, describeAmountScaleViolation } from '../money';
 
 export function balanceMovementsRouter(service: BalanceService): Router {
   const router = Router();
@@ -11,6 +12,19 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     const body = req.body as CreateMovementRequest;
     if (!body.instrumentType || !body.movementType || body.eventSeq === undefined || !body.amount || !body.currency || !body.createdBy) {
       throw new RequestValidationError('instrumentType, movementType, eventSeq, amount, currency, createdBy are required.');
+    }
+    // Business requirement 2026-08-16 ("JPY 10000 without cents" -> "must be enforced server-side
+    // based on the currency code and its configured currency decimal place"). The pattern check comes
+    // first, deliberately — decimalPlaces()/describeAmountScaleViolation() assume an already
+    // pattern-valid string, and this also closes a pre-existing gap where a malformed (but non-empty)
+    // amount used to fall through unvalidated to computeCeilingAmount()/parseMonetaryAmount() deep in
+    // the service layer, surfacing as a generic 500 INTERNAL_ERROR instead of a proper 400 here.
+    if (!MONETARY_AMOUNT_PATTERN.test(body.amount)) {
+      throw new RequestValidationError(`amount "${body.amount}" is not a valid MonetaryAmount (expected ${MONETARY_AMOUNT_PATTERN}).`);
+    }
+    const scaleViolation = describeAmountScaleViolation(body.amount, body.currency);
+    if (scaleViolation) {
+      throw new RequestValidationError(scaleViolation);
     }
     const result = service.createMovement(body);
     res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);

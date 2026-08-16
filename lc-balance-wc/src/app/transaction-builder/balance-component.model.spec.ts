@@ -605,5 +605,22 @@ describe('balance-component.model data invariants', () => {
       expect(amountExceedsCurrencyDecimals(undefined, 'JPY')).toBe(false);
       expect(amountExceedsCurrencyDecimals(null, 'JPY')).toBe(false);
     });
+
+    // Live bug, reviewer-reported 2026-08-16 ("All the Submit functions are not working in UI"): every
+    // test above passes a genuine string literal, which is exactly why the whole suite missed this —
+    // the Amount field is a native <input type="number">, and Angular's own NumberValueAccessor
+    // coerces its value to a real JS `number` before it ever reaches model.amount, regardless of the
+    // `amount?: string` compile-time type. `amount.split('.')` threw TypeError on a number, and since
+    // this function backs a template getter evaluated every change-detection cycle, the error re-fired
+    // continuously and froze the whole form for every business function, not just ones with a real
+    // violation. These prove the fix's `String(amount)` coercion makes it robust to a number, matching
+    // what the DOM/Formly layer actually passes in a live browser.
+    it('amountExceedsCurrencyDecimals: handles a NUMBER (not just a string) — the actual runtime shape a native <input type="number"> passes via Angular\'s NumberValueAccessor', () => {
+      expect(amountExceedsCurrencyDecimals(10000, 'JPY')).toBe(false);
+      expect(amountExceedsCurrencyDecimals(10000.5, 'JPY')).toBe(true);
+      expect(amountExceedsCurrencyDecimals(100.12, 'USD')).toBe(false);
+      expect(amountExceedsCurrencyDecimals(100.123, 'USD')).toBe(true);
+      expect(amountExceedsCurrencyDecimals(0, 'JPY')).toBe(false);
+    });
   });
 });

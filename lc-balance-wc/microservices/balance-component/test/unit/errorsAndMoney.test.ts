@@ -5,7 +5,15 @@ import {
   NotFoundError,
   RequestValidationError,
 } from '../../src/errors';
-import { formatMonetaryAmount, InvalidMonetaryAmountError, parseMonetaryAmount, sumMonetaryAmounts } from '../../src/money';
+import {
+  decimalPlaces,
+  describeAmountScaleViolation,
+  formatMonetaryAmount,
+  InvalidMonetaryAmountError,
+  minorUnitsForCurrency,
+  parseMonetaryAmount,
+  sumMonetaryAmounts,
+} from '../../src/money';
 import Decimal from 'decimal.js';
 
 describe('errors.ts', () => {
@@ -46,5 +54,64 @@ describe('money.ts', () => {
   test('formatMonetaryAmount throws InvalidMonetaryAmountError when the requested scale itself produces an out-of-pattern string (MONETARY_AMOUNT_PATTERN allows at most 3 decimal digits — a scale of 4 rounds to a genuine 4-decimal-digit figure, which the pattern then rejects)', () => {
     expect(() => formatMonetaryAmount(new Decimal('100.12345'), 4)).toThrow(InvalidMonetaryAmountError);
     expect(() => formatMonetaryAmount(new Decimal('100.12345'), 4)).toThrow(/is not a valid MonetaryAmount/);
+  });
+
+  // Business requirement 2026-08-16 ("JPY 10000 without cents" -> "must be enforced server-side based
+  // on the currency code and its configured currency decimal place") — mirrors
+  // src/app/transaction-builder/balance-component.model.ts's own CURRENCY_DECIMALS table exactly.
+  describe('minorUnitsForCurrency / decimalPlaces / describeAmountScaleViolation', () => {
+    test.each([
+      ['JPY', 0],
+      ['TWD', 0],
+      ['IDR', 0],
+      ['KRW', 0],
+      ['VND', 0],
+      ['CLP', 0],
+      ['ISK', 0],
+      ['BHD', 3],
+      ['IQD', 3],
+      ['JOD', 3],
+      ['KWD', 3],
+      ['OMR', 3],
+      ['TND', 3],
+      ['USD', 2],
+      ['EUR', 2],
+    ])('minorUnitsForCurrency(%s) -> %i', (currency, expected) => {
+      expect(minorUnitsForCurrency(currency)).toBe(expected);
+    });
+
+    test('minorUnitsForCurrency falls back to 2 for a currency not in the table (never skips the check, unlike the sibling payment-component project)', () => {
+      expect(minorUnitsForCurrency('XYZ')).toBe(2);
+    });
+
+    test('minorUnitsForCurrency is case-insensitive and trims whitespace', () => {
+      expect(minorUnitsForCurrency('jpy')).toBe(0);
+      expect(minorUnitsForCurrency(' Jpy ')).toBe(0);
+    });
+
+    test.each([
+      ['100', 0],
+      ['100.5', 1],
+      ['100.50', 2],
+      ['100.500', 3],
+    ])('decimalPlaces(%s) -> %i', (value, expected) => {
+      expect(decimalPlaces(value)).toBe(expected);
+    });
+
+    test('describeAmountScaleViolation returns null when the amount is within the currency\'s allowed scale', () => {
+      expect(describeAmountScaleViolation('10000', 'JPY')).toBeNull();
+      expect(describeAmountScaleViolation('100.50', 'USD')).toBeNull();
+      expect(describeAmountScaleViolation('100.125', 'KWD')).toBeNull();
+    });
+
+    test('describeAmountScaleViolation returns a message when the amount exceeds the currency\'s allowed scale', () => {
+      expect(describeAmountScaleViolation('10000.50', 'JPY')).toBe(
+        'amount "10000.50" has 2 decimal place(s) but currency JPY allows at most 0',
+      );
+    });
+
+    test('describeAmountScaleViolation uppercases the currency in its message, regardless of the input casing', () => {
+      expect(describeAmountScaleViolation('10000.50', 'jpy')).toMatch(/currency JPY allows/);
+    });
   });
 });

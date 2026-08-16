@@ -970,7 +970,7 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
   });
 });
 
-describe('HTTP integration — app.ts bootstrap: /healthz and the generic (non-ApiError) 500 fallback handler', () => {
+describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amount validation', () => {
   const app = createApp(createDb(':memory:'));
 
   test('GET /healthz -> 200 {status: "ok"}', async () => {
@@ -978,7 +978,7 @@ describe('HTTP integration — app.ts bootstrap: /healthz and the generic (non-A
     expect(res.body).toEqual({ status: 'ok' });
   });
 
-  test('a non-ApiError thrown deep in the domain layer (InvalidMonetaryAmountError from money.ts, NOT an ApiError subclass) falls through to the generic 500 handler — the route layer only checks `amount` is truthy, not that it matches MonetaryAmount\'s pattern, so a malformed-but-non-empty amount reaches computeCeilingAmount()/parseMonetaryAmount() unvalidated', async () => {
+  test('a malformed (but non-empty) amount now -> 400 REQUEST_VALIDATION_FAILED at the route layer, not a 500 (Quality-report-balance.md BAL-115/BAL-117-adjacent gap, closed as part of the 2026-08-16 currency-decimal-place fix below: routes/balanceMovements.ts now pattern-checks `amount` before it ever reaches computeCeilingAmount()/parseMonetaryAmount() deep in the service layer, so an unparseable string can no longer fall through to the generic (non-ApiError) 500 handler)', async () => {
     const res = await request(app)
       .post('/balance-movements')
       .send({
@@ -986,13 +986,82 @@ describe('HTTP integration — app.ts bootstrap: /healthz and the generic (non-A
         naturalKey: { lcNumber: 'BAD-AMOUNT-001' },
         movementType: 'ISSUE',
         eventSeq: 1,
-        amount: 'not-a-number', // truthy, so passes the route's own !body.amount check
+        amount: 'not-a-number', // truthy, so passes the route's own !body.amount check, but now caught by the pattern check right after it
         currency: 'USD',
         createdBy: 'maker1',
       })
-      .expect(500);
-    expect(res.body.code).toBe('INTERNAL_ERROR');
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
     expect(res.body.message).toMatch(/is not a valid MonetaryAmount/);
+  });
+
+  // Business requirement 2026-08-16 ("JPY 10000 without cents" -> "must be enforced server-side based
+  // on the currency code and its configured currency decimal place"). See src/money.ts's
+  // CURRENCY_MINOR_UNITS/describeAmountScaleViolation for the table and the pure-function unit tests
+  // (test/unit/errorsAndMoney.test.ts) — these are the HTTP-layer wiring tests only.
+  test('POST /balance-movements with a JPY amount carrying decimals -> 400 REQUEST_VALIDATION_FAILED (JPY allows 0 decimal places)', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'JPY-DP-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000.50',
+        currency: 'JPY',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/has 2 decimal place\(s\) but currency JPY allows at most 0/);
+  });
+
+  test('POST /balance-movements with a whole-number JPY amount -> 201 (0 decimal places is exactly JPY\'s own configured scale)', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'JPY-DP-002' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'JPY',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(res.body.amount).toBe('10000');
+  });
+
+  test('POST /balance-movements with a KWD amount carrying its allowed 3rd decimal place -> 201 (KWD is a configured 3dp currency)', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'KWD-DP-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000.125',
+        currency: 'KWD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(res.body.amount).toBe('1000.125');
+  });
+
+  test('POST /balance-movements with an unrecognized currency defaults to 2 decimal places allowed, same as the Angular UI\'s own fallback', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'XYZ-DP-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000.999',
+        currency: 'XYZ',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+    expect(res.body.message).toMatch(/has 3 decimal place\(s\) but currency XYZ allows at most 2/);
   });
 });
 

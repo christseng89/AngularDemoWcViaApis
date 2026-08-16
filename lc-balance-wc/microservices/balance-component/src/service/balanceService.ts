@@ -14,6 +14,7 @@
  */
 import { randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
+import { parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
@@ -284,7 +285,13 @@ export class BalanceService {
         const existingShgtMovements = this.movements.listShgtMovementsForParent(parentLc.logicalContractId);
         const existingShgtExposure = computeOffBalanceExposure(existingShgtMovements);
         const tightAvailable = parentAvailable.minus(existingShgtExposure);
-        const requestedAmount = new Decimal(req.amount);
+        // Quality-report-balance.md BAL-115: was `new Decimal(req.amount)`, bypassing money.ts's own
+        // "only module allowed to construct a Decimal from a wire string" invariant — parseMonetaryAmount()
+        // both enforces MONETARY_AMOUNT_PATTERN and constructs the Decimal in one step. The HTTP route
+        // (routes/balanceMovements.ts) already validates this before calling createMovement(), but this
+        // service method is also called directly from tests/other callers that bypass the route, so the
+        // invariant is worth enforcing here too, not just at the HTTP boundary.
+        const requestedAmount = parseMonetaryAmount(req.amount);
         if (requestedAmount.greaterThan(tightAvailable)) {
           throw new InsufficientBalanceError(
             `SG Issue amount ${requestedAmount.toFixed()} exceeds parent LC's Tight Available Balance ${tightAvailable.toFixed()} ` +
@@ -324,7 +331,8 @@ export class BalanceService {
         const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
         const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
         const tightAvailable = parentAvailable.minus(presentDocsEarmark);
-        const requestedAmount = new Decimal(req.amount);
+        // Quality-report-balance.md BAL-115 — see the identical SG Issue check's own comment above.
+        const requestedAmount = parseMonetaryAmount(req.amount);
         if (requestedAmount.greaterThan(tightAvailable)) {
           throw new InsufficientBalanceError(
             `Present Docs amount ${requestedAmount.toFixed()} exceeds the parent Confirmation's Present Earmark-adjusted Available Balance ` +
@@ -372,7 +380,8 @@ export class BalanceService {
       // inside the "creating a new contract" branch above (before createContract()), not here — see that
       // comment for why: a rejected check must never leave an orphaned, empty BalanceContract row behind.
     } else if (req.movementType === 'AMEND_DECREASE') {
-      const check = checkAmendDecreaseSufficiency({ amount: new Decimal(req.amount), ceilingAmount, availableBalance: available });
+      // Quality-report-balance.md BAL-115 — see the SG Issue check's own comment above.
+      const check = checkAmendDecreaseSufficiency({ amount: parseMonetaryAmount(req.amount), ceilingAmount, availableBalance: available });
       if (!check.ok) throw new InsufficientBalanceError(check.error!);
     } else if (UTILIZE_SHAPED_MOVEMENT_TYPES.has(req.movementType)) {
       let offBalanceExposure = new Decimal(0);

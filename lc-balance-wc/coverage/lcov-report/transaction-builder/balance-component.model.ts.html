@@ -32,7 +32,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -775,7 +775,21 @@
 <a name='L710'></a><a href='#L710'>710</a>
 <a name='L711'></a><a href='#L711'>711</a>
 <a name='L712'></a><a href='#L712'>712</a>
-<a name='L713'></a><a href='#L713'>713</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L713'></a><a href='#L713'>713</a>
+<a name='L714'></a><a href='#L714'>714</a>
+<a name='L715'></a><a href='#L715'>715</a>
+<a name='L716'></a><a href='#L716'>716</a>
+<a name='L717'></a><a href='#L717'>717</a>
+<a name='L718'></a><a href='#L718'>718</a>
+<a name='L719'></a><a href='#L719'>719</a>
+<a name='L720'></a><a href='#L720'>720</a>
+<a name='L721'></a><a href='#L721'>721</a>
+<a name='L722'></a><a href='#L722'>722</a>
+<a name='L723'></a><a href='#L723'>723</a>
+<a name='L724'></a><a href='#L724'>724</a>
+<a name='L725'></a><a href='#L725'>725</a>
+<a name='L726'></a><a href='#L726'>726</a>
+<a name='L727'></a><a href='#L727'>727</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -919,14 +933,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">224x</span>
+<span class="cline-any cline-yes">227x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">49x</span>
-<span class="cline-any cline-yes">45x</span>
-<span class="cline-any cline-yes">45x</span>
+<span class="cline-any cline-yes">54x</span>
+<span class="cline-any cline-yes">50x</span>
+<span class="cline-any cline-yes">50x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1634,10 +1662,24 @@ export function decimalPlacesForCurrency(currency: string | null | undefined): n
   return CURRENCY_DECIMALS[(currency ?? '').trim().toUpperCase()] ?? 2;
 }
 &nbsp;
-/** True if `amount`'s own typed decimal-place count exceeds what `currency` allows (Design doc §6.2 face-level amount). */
-export function amountExceedsCurrencyDecimals(amount: string | null | undefined, currency: string | null | undefined): boolean {
-  if (!amount) return false;
-  const frac = amount.split('.')[1];
+/**
+ * True if `amount`'s own typed decimal-place count exceeds what `currency` allows (Design doc §6.2
+ * face-level amount).
+ *
+ * Live bug, reviewer-reported 2026-08-16 ("All the Submit functions are not working in UI"): `amount`
+ * is typed `string` on TransactionModel, but the Amount field is Formly `type: 'number'` — a native
+ * `&lt;input type="number"&gt;` — and Angular's own built-in NumberValueAccessor coerces that input's value
+ * to a real JS `number` (or `null` when empty) before it ever reaches `model.amount`, regardless of the
+ * compile-time type. The old `amount.split('.')` call assumed a string and threw
+ * `TypeError: amount.split is not a function` the instant any digits were typed — and since this
+ * function backs the `amountDecimalMismatch` template getter (evaluated on every change-detection
+ * cycle, not just on submit), the error re-fired continuously, freezing the whole form for every
+ * business function (A1-A9/B1-B5 alike), not just ones that actually hit a real decimal-place
+ * violation. `String(amount)` first makes this robust to either runtime shape.
+ */
+export function amountExceedsCurrencyDecimals(amount: string | number | null | undefined, currency: string | null | undefined): boolean {
+  if (amount === null || amount === undefined || amount === '') return false;
+  const frac = String(amount).split('.')[1];
   return !!frac &amp;&amp; frac.length &gt; decimalPlacesForCurrency(currency);
 }
 &nbsp;
@@ -2206,7 +2248,7 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-16T05:10:30.963Z
+                at 2026-08-16T06:01:47.667Z
             </div>
         <script src="../prettify.js"></script>
         <script>

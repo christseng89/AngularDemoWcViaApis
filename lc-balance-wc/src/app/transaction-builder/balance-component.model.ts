@@ -145,10 +145,24 @@ export function decimalPlacesForCurrency(currency: string | null | undefined): n
   return CURRENCY_DECIMALS[(currency ?? '').trim().toUpperCase()] ?? 2;
 }
 
-/** True if `amount`'s own typed decimal-place count exceeds what `currency` allows (Design doc §6.2 face-level amount). */
-export function amountExceedsCurrencyDecimals(amount: string | null | undefined, currency: string | null | undefined): boolean {
-  if (!amount) return false;
-  const frac = amount.split('.')[1];
+/**
+ * True if `amount`'s own typed decimal-place count exceeds what `currency` allows (Design doc §6.2
+ * face-level amount).
+ *
+ * Live bug, reviewer-reported 2026-08-16 ("All the Submit functions are not working in UI"): `amount`
+ * is typed `string` on TransactionModel, but the Amount field is Formly `type: 'number'` — a native
+ * `<input type="number">` — and Angular's own built-in NumberValueAccessor coerces that input's value
+ * to a real JS `number` (or `null` when empty) before it ever reaches `model.amount`, regardless of the
+ * compile-time type. The old `amount.split('.')` call assumed a string and threw
+ * `TypeError: amount.split is not a function` the instant any digits were typed — and since this
+ * function backs the `amountDecimalMismatch` template getter (evaluated on every change-detection
+ * cycle, not just on submit), the error re-fired continuously, freezing the whole form for every
+ * business function (A1-A9/B1-B5 alike), not just ones that actually hit a real decimal-place
+ * violation. `String(amount)` first makes this robust to either runtime shape.
+ */
+export function amountExceedsCurrencyDecimals(amount: string | number | null | undefined, currency: string | null | undefined): boolean {
+  if (amount === null || amount === undefined || amount === '') return false;
+  const frac = String(amount).split('.')[1];
   return !!frac && frac.length > decimalPlacesForCurrency(currency);
 }
 

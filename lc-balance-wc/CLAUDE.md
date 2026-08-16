@@ -516,10 +516,12 @@ duplicated decimal-place logic:
   truncating what the user typed, matching this file's own domain-review posture (validate at the
   boundary, don't guess).
 
-Deliberately **not** mirrored into the microservice's own `money.ts`/`MONETARY_AMOUNT_PATTERN` in this
-pass — that pattern is still currency-agnostic (accepts up to 3dp for any currency) by design; scoping a
-server-side currency-aware amount check was out of scope for this UI-focused request. Whether the server
-boundary should also enforce this is a separate decision, not assumed here.
+Initially **not** mirrored into the microservice's own `money.ts`/`MONETARY_AMOUNT_PATTERN` in this same
+pass — that pattern was still currency-agnostic (accepted up to 3dp for any currency) by design at the
+time; scoping a server-side currency-aware amount check was out of scope for this first, UI-focused
+request. **Superseded the same day** — see the section immediately below — once the user explicitly
+asked for server-side enforcement too ("the number of decimal places must be enforced server-side based
+on the currency code and its configured currency decimal place").
 
 See `balance-component.model.spec.ts`'s "decimalPlacesForCurrency / amountExceedsCurrencyDecimals"
 describe block (JPY 0dp, the 3dp ISO exceptions, the 2dp default fallback, and the boundary/empty-input
@@ -528,6 +530,138 @@ cases) and `transaction-builder.component.gaps.spec.ts`'s "Amount field props.st
 `transaction-builder.component.actions.spec.ts`'s new `submit()` guard test — 454/454 Angular tests
 passing (15 new), 99.76%/95.57%/99.67%/99.82% coverage, `ng build --configuration development` and
 `npm run lint` (0 errors) both clean.
+
+### Live regression, reviewer-reported 2026-08-16 ("All the Submit functions are not working in UI") — `amountExceedsCurrencyDecimals` crashed on the Amount field's actual runtime value, fixed
+
+**Root cause:** `TransactionModel.amount` is typed `string` in TypeScript, but the Amount field is Formly
+`type: 'number'` — a native `<input type="number">` — and Angular's own built-in `NumberValueAccessor`
+coerces that input's value to a real JS `number` (or `null` when empty) before it ever reaches
+`model.amount`, regardless of the compile-time type. `amountExceedsCurrencyDecimals`'s original body
+called `amount.split('.')` directly, which throws `TypeError: amount.split is not a function` on a
+number. Because this function backs the `amountDecimalMismatch` getter — read from the template on
+*every* Angular change-detection cycle, not just on submit, and rendered unconditionally under
+`<formly-form>` regardless of which business function is selected — the error re-fired continuously the
+instant any digit was typed into Amount, on every single function (A1–A9/B1–B5 alike). This froze the
+whole form (confirmed live: `Submit` clicks stopped doing anything, `submit()` itself throws the
+identical error at its own `amountExceedsCurrencyDecimals(...)` guard before ever reaching the API call)
+— explaining the "all Submit functions" symptom precisely, since the break was in shared
+template/guard code, not in any one function's own logic. Every unit test that exercised this helper
+passed a genuine string literal, which is exactly why the whole 455-test suite never caught it — this
+class of bug (DOM/valueAccessor coercion) is structurally invisible to this project's own
+direct-instantiation test convention; only a live browser check (`ng serve`, not just `tsc --noEmit`/
+`npm test`) surfaces it, same lesson `lc-payment-wc/CLAUDE.md`'s own "always verify live in browser"
+rule already captures for template-scoping bugs.
+
+**Fix:** `amountExceedsCurrencyDecimals` (`balance-component.model.ts`) now coerces via `String(amount)`
+before calling `.split('.')`, and its parameter type widened to `string | number | null | undefined` to
+match what Angular actually passes at runtime. New test asserting the function handles a genuine `number`
+input (not just a string literal) — `decimalPlacesForCurrency` itself was never affected (it never
+touches `amount`). Verified: `npx tsc -p tsconfig.app.json --noEmit` clean; `npm test` → 455/455 passing
+(1 new); live in-browser re-verification (not just unit tests, per the lesson above) — A1 (Import LC
+Issue) and B1 (Export Confirm LC) both submitted successfully end-to-end against the real microservice
+after the fix, with the currency-decimal-place warning banner itself re-confirmed still correctly firing
+for a genuine violation (JPY + a fractional amount) and no longer crashing the renderer.
+
+## Microservice now enforces the SAME currency-decimal-place rule server-side (2026-08-16, user-requested follow-up — "must be enforced server-side based on the currency code and its configured currency decimal place")
+
+`microservices/balance-component/src/money.ts` gained a server-side mirror of the Angular model's own
+`CURRENCY_DECIMALS` table — same currency codes, same values, same 2dp default fallback, kept in exact
+sync deliberately (so a value the UI's own warning/`submit()` guard already accepts is never rejected
+here, and vice versa):
+
+- `CURRENCY_MINOR_UNITS` — the table itself (JPY/TWD/IDR/KRW/VND/CLP/ISK = 0; BHD/IQD/JOD/KWD/OMR/TND =
+  3; else 2).
+- `minorUnitsForCurrency(currency)` — case-insensitive/trimmed lookup, falls back to 2 for anything not
+  listed.
+- `decimalPlaces(value)` — counts literal fractional digits in an already-pattern-valid wire string
+  (mirrors `lc-payment-wc/microservices/payment-component/src/money.ts`'s own helper of the same name
+  exactly).
+- `describeAmountScaleViolation(amount, currency)` — pure/non-throwing; returns a human-readable message
+  or `null`. Deliberately doesn't decide the HTTP mapping itself (money.ts stays a parsing/formatting
+  module, not an HTTP-aware one) — that's the route's job, same separation `parseMonetaryAmount`/
+  `formatMonetaryAmount` already keep.
+
+**Deliberate divergence from `lc-payment-wc`'s own sibling convention, explained in `CURRENCY_MINOR_UNITS`'s
+own doc comment:** that project's `knownMinorUnitsForCurrency()` SKIPS the scale check entirely for a
+currency it has no data for, since Currency there is backed by a real Currency-API master and "no data"
+genuinely means "don't guess." This project's Currency field is free-typed with no master-data source at
+all (same fact the Angular-side section above already establishes) — skipping the check for an unlisted
+code here would mean an unrecognized currency gets NO server-side scale enforcement whatsoever, which is
+worse than falling back to the 2dp common case. So, unlike the sibling project, an unlisted currency here
+defaults to 2dp rather than being skipped — matching the Angular UI's own fallback exactly, on purpose.
+
+**Wired into `routes/balanceMovements.ts`'s `POST /balance-movements` handler** (the only endpoint that
+accepts an `amount`+`currency` pair together), right after the existing required-fields presence check,
+in two steps:
+1. `MONETARY_AMOUNT_PATTERN.test(body.amount)` — the general shape check that was previously never run
+   at the request boundary at all (see the closed-gap note below).
+2. `describeAmountScaleViolation(body.amount, body.currency)` — the new currency-scale check itself.
+
+Both throw `RequestValidationError` (400 `REQUEST_VALIDATION_FAILED`), the same error class every other
+validation failure on this route already uses — no new error code introduced.
+
+**Side effect: closes a pre-existing, previously-documented gap**, not a new one introduced by this fix.
+`test/unit/app.test.ts` already had a test proving a malformed-but-non-empty `amount` (e.g.
+`"not-a-number"`) fell through the route's old presence-only check, reached
+`computeCeilingAmount()`/`parseMonetaryAmount()` deep in the service layer, and surfaced as a generic 500
+`INTERNAL_ERROR` instead of a proper 400 — because `InvalidMonetaryAmountError` (from `money.ts`) is not
+an `ApiError` subclass, so it never hit the route-level 400 path. Adding the pattern check as a
+precondition for the new scale check (decimal-place counting is meaningless on an unparseable string)
+closes this specific case at the same time: that same request now returns 400
+`REQUEST_VALIDATION_FAILED`, not 500. The test was updated in place to assert the new (correct) status,
+title rewritten to describe the closed gap rather than an open one. The deeper, separate issue this
+doesn't touch — `balanceService.ts`'s own internal `new Decimal(req.amount)` call sites bypassing
+`parseMonetaryAmount()` even after this route-level check — was `Quality-report-balance.md`'s BAL-115;
+**fixed the same day, see the section immediately below.**
+
+See `test/unit/errorsAndMoney.test.ts`'s "minorUnitsForCurrency / decimalPlaces /
+describeAmountScaleViolation" describe block (pure-function coverage: every table entry, the 2dp
+fallback, case-insensitivity, and both the pass/violation shapes of `describeAmountScaleViolation`) and
+`test/unit/app.test.ts`'s "HTTP integration — app.ts bootstrap: /healthz and request-layer amount
+validation" describe block (the malformed-amount 400 rewrite, a JPY-with-decimals 400, a whole-number
+JPY 201, a KWD-with-3dp 201, and an unrecognized-currency-defaults-to-2dp 400) — 217/217 microservice
+tests passing (7 new), 98.96%/95.75%/100%/99.33% coverage (global threshold; `app.ts`'s own generic
+500-fallback branch dropped to locally uncovered as an expected consequence of the malformed-amount case
+no longer reaching it, but the project's `jest.config.js` gate is a global, not per-file, threshold, and
+all four metrics clear it comfortably), `npm run typecheck`/`npm run build`/`npm run lint` (0 errors, same
+pre-existing warnings) all clean. Full three-suite verification re-run after this change per this file's
+own standing rule: Angular app 454/454 (unaffected, microservice-only change), `backend/` 27/27
+(unaffected).
+
+## BAL-115 fixed — `balanceService.ts`'s three internal `new Decimal(req.amount)` call sites now go through `parseMonetaryAmount()` (2026-08-16, user-requested — "Fix BAL-115 too")
+
+`Quality-report-balance.md`'s BAL-115 (Major/Bug): `money.ts`'s own doc comment states it is "the only
+module allowed to construct a Decimal from a wire string", enforced via `parseMonetaryAmount()`
+(validates `MONETARY_AMOUNT_PATTERN` before constructing). Three call sites in
+`service/balanceService.ts`'s `createMovement()` bypassed this — `new Decimal(req.amount)` directly, at
+the SG Issue vs. parent LC Tight Available Balance check, the Present Docs earmark vs. parent
+Confirmation check, and the AMEND_DECREASE sufficiency check. The section above (routes-level
+enforcement) already closes this at the HTTP boundary for real traffic, but `createMovement()` is a
+public method any caller can invoke directly — including this project's own tests
+(`caseWalkthroughs.test.ts`'s domain-only walkthroughs aside, `app.test.ts` and any future
+non-HTTP caller of `BalanceService` would skip the route's validation entirely) — so the invariant
+needed enforcing at this layer too, not just at the one current HTTP entry point.
+
+**Fix:** all three call sites now call `parseMonetaryAmount(req.amount)` instead of
+`new Decimal(req.amount)` — a new `import { parseMonetaryAmount } from '../money';` at the top of the
+file. `new Decimal(0)` (zero-initializing `offBalanceExposure`, not derived from any wire string) is
+unaffected — out of scope for BAL-115, which is specifically about constructing a Decimal *from a wire
+string* outside money.ts, not about zero-construction.
+
+New `test/unit/service/balanceService.test.ts` (previously no dedicated direct-service-call test file
+existed — coverage of `BalanceService` was otherwise only exercised indirectly via `app.test.ts`'s HTTP
+integration tests) — 3 tests, one per fixed call site, each constructing a `BalanceService` directly
+(no HTTP/supertest) and asserting `InvalidMonetaryAmountError` is thrown for a malformed amount at
+exactly the point that used to silently construct a `Decimal` from unvalidated input. This is
+deliberately a *different* proof than the route-level tests added in the section above: those prove the
+HTTP boundary rejects a bad request before ever reaching `createMovement()`; these prove `createMovement()`
+itself is now safe even when called directly, bypassing that boundary entirely.
+
+Verified: `npm run typecheck`/`npm run build` clean; `npm test` → 220/220 passing (3 new),
+98.97%/95.75%/100%/99.33% coverage (global threshold, unchanged from the section above — still clears
+95% on all four metrics); `npm run lint` 0 errors, same pre-existing warnings. Full three-suite
+re-verification per this file's own standing rule: Angular app 454/454 and `backend/` 27/27, both
+unaffected (microservice-only change).
 
 ## Test coverage (confirms the above; see for worked examples)
 
