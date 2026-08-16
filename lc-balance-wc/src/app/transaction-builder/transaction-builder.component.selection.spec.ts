@@ -496,7 +496,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.searchError).toBeNull();
     });
 
-    it('resolve error, no dualInstrumentFallback: clears the selection and shows the server message', () => {
+    it('resolve error: clears the selection and shows the server message', () => {
       const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ error: { message: 'not found' } }))) });
       const comp = makeComponent(getFn('A9'), api);
       comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: '', sgNumber: 'SG01' };
@@ -506,78 +506,6 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.selectedContract).toBeNull();
       expect(comp.selectedContractSnapshot).toBeNull();
       expect(comp.searchError).toBe('not found');
-    });
-
-    describe('dualInstrumentFallback (B6 CNF_REIMB-style, synthetic — no current registry function sets this flag)', () => {
-      const fallbackFn: TransactionFunction = {
-        ...getFn('B5'),
-        instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
-        movementType: 'REIMBURSE',
-        dualInstrumentFallback: 'EPLC_ACCEPTANCE',
-      };
-
-      it('primary resolve fails, fallback resolve succeeds with a nonzero balance: switches model.instrumentType to the fallback and selects it', () => {
-        const fallbackContract = makeContract({ balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC1', ibNumber: 'EB01', sgNumber: null } });
-        const api = makeApi({
-          resolveContract: jest.fn((instrumentType: InstrumentType) =>
-            instrumentType === 'EPLC_DUE_FROM_ISSUING_BANK' ? throwError(() => ({ error: { message: 'primary miss' } })) : of(fallbackContract),
-          ),
-          getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '777' }))),
-        });
-        const comp = makeComponent(fallbackFn, api);
-        comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: 'EB01', sgNumber: '' };
-
-        comp.searchExistingContract();
-
-        expect(comp.model.instrumentType).toBe('EPLC_ACCEPTANCE');
-        expect(comp.selectedContract?.balanceContractId).toBe('ACC1');
-        expect(comp.searchError).toBeNull();
-      });
-
-      it('primary resolve fails, fallback resolve succeeds but 0 Available Balance: shows the "nothing left to settle" error', () => {
-        const fallbackContract = makeContract({ balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC1', ibNumber: 'EB01', sgNumber: null } });
-        const api = makeApi({
-          resolveContract: jest.fn((instrumentType: InstrumentType) =>
-            instrumentType === 'EPLC_DUE_FROM_ISSUING_BANK' ? throwError(() => ({ error: { message: 'primary miss' } })) : of(fallbackContract),
-          ),
-          getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '0' }))),
-        });
-        const comp = makeComponent(fallbackFn, api);
-        comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: 'EB01', sgNumber: '' };
-
-        comp.searchExistingContract();
-
-        expect(comp.searchError).toContain('already has a 0 Available Balance');
-        expect(comp.selectedContract).toBeNull();
-      });
-
-      it('both primary and fallback resolve fail: clears the selection and shows the fallback\'s own error message', () => {
-        const api = makeApi({
-          resolveContract: jest.fn(() => throwError(() => ({ error: { message: 'still not found' } }))),
-        });
-        const comp = makeComponent(fallbackFn, api);
-        comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: 'EB01', sgNumber: '' };
-
-        comp.searchExistingContract();
-
-        expect(comp.selectedContract).toBeNull();
-        expect(comp.searchError).toBe('still not found');
-      });
-
-      it('always restarts from the function\'s own declared primary instrumentType before searching, even if a previous search left model.instrumentType on the fallback', () => {
-        const fallbackContract = makeContract({ balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE' });
-        const api = makeApi({
-          resolveContract: jest.fn(() => of(fallbackContract)),
-        });
-        const comp = makeComponent(fallbackFn, api);
-        comp.model.instrumentType = 'EPLC_ACCEPTANCE'; // simulate a stale fallback from a prior search
-        comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: 'EB01', sgNumber: '' };
-
-        comp.searchExistingContract();
-
-        // The very first resolveContract call this time must be against the PRIMARY type again, not the stale fallback.
-        expect((api.resolveContract as jest.Mock).mock.calls[0][0]).toBe('EPLC_DUE_FROM_ISSUING_BANK');
-      });
     });
   });
 
@@ -880,7 +808,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(api.resolveContract).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null });
     });
 
-    it('sets checkerSearchError from the server message on a resolve failure with no dualInstrumentFallback', () => {
+    it('sets checkerSearchError from the server message on a resolve failure', () => {
       const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ error: { message: 'no such SG' } }))) });
       const comp = makeComponent(getFn('A8'), api); // SHGT -> sgNumber
       comp.checkerLcNumber = 'LC1';
@@ -891,46 +819,6 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.checkerSearchError).toBe('no such SG');
       expect(comp.checkerSearching).toBe(false);
       expect(comp.checkerContract).toBeNull();
-    });
-
-    describe('dualInstrumentFallback (synthetic, same shape as searchExistingContract\'s own B6 CNF_REIMB fixture)', () => {
-      const fallbackFn: TransactionFunction = {
-        ...getFn('B5'),
-        instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
-        movementType: 'REIMBURSE',
-        dualInstrumentFallback: 'EPLC_ACCEPTANCE',
-      };
-
-      it('retries against the fallback instrumentType and succeeds', () => {
-        const fallbackContract = makeContract({ balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE' });
-        const api = makeApi({
-          resolveContract: jest.fn((instrumentType: InstrumentType) =>
-            instrumentType === 'EPLC_DUE_FROM_ISSUING_BANK' ? throwError(() => ({ error: { message: 'primary miss' } })) : of(fallbackContract),
-          ),
-        });
-        const comp = makeComponent(fallbackFn, api);
-        comp.checkerLcNumber = 'LC1';
-        comp.checkerSecondaryRef = 'EB01';
-
-        comp.searchCheckerLc();
-
-        expect(comp.checkerContract?.balanceContractId).toBe('ACC1');
-        expect(comp.checkerSearching).toBe(false);
-        expect(comp.checkerSearchError).toBeNull();
-      });
-
-      it('shows the fallback\'s own error message when both primary and fallback resolves fail', () => {
-        const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ error: { message: 'still missing' } }))) });
-        const comp = makeComponent(fallbackFn, api);
-        comp.checkerLcNumber = 'LC1';
-        comp.checkerSecondaryRef = 'EB01';
-
-        comp.searchCheckerLc();
-
-        expect(comp.checkerSearchError).toBe('still missing');
-        expect(comp.checkerSearching).toBe(false);
-        expect(comp.checkerContract).toBeNull();
-      });
     });
   });
 });

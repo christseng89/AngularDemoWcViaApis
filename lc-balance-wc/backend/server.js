@@ -9,10 +9,16 @@
  */
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { buildRegistry } = require('./data/businessCases');
 
 const app = express();
-app.use(cors());
+app.use(helmet());
+// Quality-report-balance.md BAL-103: was `cors()` with no options, reflecting/allowing every Origin.
+// Explicit allow-list instead — defaults to the Angular dev server's own origin (matches proxy.conf.json's
+// own hardcoded :4300 target); override via ALLOWED_ORIGINS (comma-separated) for any other deployment.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:4200').split(',').map((o) => o.trim());
+app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json());
 
 const BALANCE_SERVICE_URL = process.env.BALANCE_SERVICE_URL || 'http://localhost:4100';

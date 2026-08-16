@@ -4,7 +4,7 @@ import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { BalanceComponentApiService, BalanceContract, BalanceSnapshot, CatalogPage, CreateMovementRequest } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
 import {
   CREATING_MOVEMENT_TYPES,
@@ -135,11 +135,10 @@ export class TransactionBuilderComponent {
    * Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB Index —
    * Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5's own "EB Index"
    * Step 2, once its Parent LC (Step 1) is picked. Unlike ibIndexCatalog above (single instrumentType,
-   * model.instrumentType's own catalog), this merges candidates across BOTH of B5's own possible types
-   * (selectedFunction.instrumentType + dualInstrumentFallback — EPLC_DUE_FROM_ISSUING_BANK for Sight,
-   * EPLC_ACCEPTANCE for Usance) under the same picked Confirmation, since the Maker doesn't know in
-   * advance which tenor a given EB Number was. Each entry carries its own real balanceContractId/
-   * instrumentType/availableBalance so onSelectSettleableBalance() can route correctly either way.
+   * model.instrumentType's own catalog), this is populated from selectedFunction.instrumentType
+   * (EPLC_ACCEPTANCE, B5's own fixed type) under the same picked Confirmation. Each entry carries its
+   * own real balanceContractId/instrumentType/availableBalance so onSelectSettleableBalance() can route
+   * correctly.
    */
   settleableBalances: Array<{ balanceContractId: string; instrumentType: InstrumentType; ibNumber: string | null; availableBalance: string; currency: string }> = [];
   settleableBalancesLoading = false;
@@ -328,9 +327,9 @@ export class TransactionBuilderComponent {
   /** IPLC_ACCEPTANCE uses Import Bill terminology (IB); EPLC_ACCEPTANCE uses Export Bill terminology (EB) — same underlying `ibNumber` field, different real-world label. */
   get ibNumberLabel(): string {
     // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — generalized from
-    // checking EPLC_ACCEPTANCE specifically to activeFunctionSide, since B3 (EPLC_EXAMINATION) and B6
-    // (EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE via dualInstrumentFallback) both
-    // need "EB Number" too — every Export instrumentType uses EB terminology, not just EPLC_ACCEPTANCE.
+    // checking EPLC_ACCEPTANCE specifically to activeFunctionSide, since B3 (EPLC_EXAMINATION) and
+    // B4's own EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE asset creation both need
+    // "EB Number" too — every Export instrumentType uses EB terminology, not just EPLC_ACCEPTANCE.
     return this.activeFunctionSide === 'EXPORT' ? 'EB Number' : 'IB Number';
   }
 
@@ -1209,9 +1208,13 @@ export class TransactionBuilderComponent {
         } else if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE') {
           // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance>0的EB交易") — same
           // "default to Available, freely editable down to Partial, capped at it" shape as autoRedeemType
-          // below, just reached via dualInstrumentFallback resolving to EPLC_ACCEPTANCE instead of a
-          // dedicated flag+movementType check (model.movementType is still 'REIMBURSE' here, B5's own
-          // declared default — it only becomes FULL_SETTLE/PARTIAL_SETTLE at submit() time).
+          // below. NOTE: since B5's own registry entry now declares movementType: 'FULL_SETTLE' directly
+          // (not 'REIMBURSE'), this branch is currently redundant with the FULL_SETTLE branch above for
+          // any real B5 submission — both assign the identical `snap.availableBalance` — kept as its own
+          // branch rather than merged/removed here since that's outside this fix's scope (Quality-report-
+          // balance.md BAL-101 was specifically about the removed `dualInstrumentFallback` field this
+          // comment used to describe reaching this branch through; it did not claim this branch itself
+          // was dead, and merging/removing it needs its own separate verification pass).
           this.model.amount = snap.availableBalance;
           this.rebuildFields();
         } else if (this.selectedFunction?.autoRedeemType) {
@@ -1242,13 +1245,6 @@ export class TransactionBuilderComponent {
    */
   searchExistingContract(): void {
     if (!this.model.instrumentType) return;
-    // Business instruction 2026-08-15 (CNF_REIMB dual-instrument fallback) — B6 only. A previous
-    // search on this same screen may have already switched model.instrumentType to the fallback type
-    // (see below); always restart from the function's own declared primary type, or a Sight search
-    // right after a Usance one would wrongly try the fallback-type twice and never try Sight again.
-    if (this.selectedFunction?.dualInstrumentFallback) {
-      this.model.instrumentType = this.selectedFunction.instrumentType;
-    }
     this.searchError = null;
     if (!this.searchNaturalKey.lcNumber) {
       this.searchError = 'LC Number is mandatory to search.';
@@ -1300,45 +1296,6 @@ export class TransactionBuilderComponent {
         this.syncCheckerToContext();
       },
       error: (err) => {
-        // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review, CNF_REIMB) — B6
-        // only. The same LC+EB Number could be either a Sight (EPLC_DUE_FROM_ISSUING_BANK) or Usance
-        // held-to-maturity (EPLC_ACCEPTANCE_REIMB_RECEIVABLE) reimbursement — try the fallback type
-        // before giving up, so the Maker never has to know which tenor this presentation was.
-        const fallback = this.selectedFunction?.dualInstrumentFallback;
-        if (fallback) {
-          this.api.resolveContract(fallback, {
-            lcNumber: this.searchNaturalKey.lcNumber,
-            ibNumber: this.searchNaturalKey.ibNumber || null,
-            sgNumber: this.searchNaturalKey.sgNumber || null,
-          }).subscribe({
-            next: (contract) => {
-              // Must match selectedContract's own real instrumentType — submit()'s req.instrumentType
-              // comes from model.instrumentType, not from selectedContract, so leaving it at B6's
-              // default (EPLC_DUE_FROM_ISSUING_BANK) here would silently send the wrong instrumentType
-              // for a Usance reimbursement even though balanceContractId correctly pointed at it.
-              this.model.instrumentType = fallback;
-              // Business instruction 2026-08-16 ("選資料為有Acceptance Balance>0的EB交易") — B5's own
-              // fallback (EPLC_ACCEPTANCE) needs the same 0-balance exclusion the primary-type branch
-              // above already applies (an already-fully-settled Acceptance has nothing left for CNF_MATURE
-              // to settle) — the primary branch's own check never runs for a fallback resolution.
-              this.api.getSnapshot(contract.balanceContractId).subscribe((snap) => {
-                if (snap.availableBalance === '0') {
-                  this.searchError = `${this.ibNumberLabel} ${contract.naturalKey.ibNumber} already has a 0 Available Balance — nothing left to settle.`;
-                  return;
-                }
-                this.selectedContract = contract;
-                this.refreshSelectedContractSnapshot();
-                this.syncCheckerToContext();
-              });
-            },
-            error: (fallbackErr) => {
-              this.selectedContract = null;
-              this.selectedContractSnapshot = null;
-              this.searchError = this.describeApiError(fallbackErr);
-            },
-          });
-          return;
-        }
         this.selectedContract = null;
         this.selectedContractSnapshot = null;
         this.searchError = this.describeApiError(err);
@@ -1423,13 +1380,16 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * B5's own "EB Index" Step 2 (business instruction 2026-08-16) — merges still-outstanding candidates
-   * across BOTH of B5's possible instrumentTypes (selectedFunction.instrumentType/dualInstrumentFallback
-   * — EPLC_DUE_FROM_ISSUING_BANK for Sight, EPLC_ACCEPTANCE for Usance) under the given Confirmation's
-   * own LC Number, since the Maker doesn't know in advance which tenor a given EB Number was. Unlike
-   * loadIbIndexPage() above (single type, server-paginated), this loads both catalogs unpaginated (up to
-   * 50 each, same cap as loadPayableMovementsAcrossChildContracts()) and filters to Available > 0 —
-   * nothing left to settle isn't worth offering as a target.
+   * B5's own "EB Index" Step 2 (business instruction 2026-08-16) — still-outstanding candidates of
+   * selectedFunction.instrumentType (EPLC_ACCEPTANCE, B5's own fixed type) under the given
+   * Confirmation's own LC Number. Unlike loadIbIndexPage() above (single type, server-paginated), this
+   * loads its one catalog unpaginated (up to 50, same cap as loadPayableMovementsAcrossChildContracts())
+   * and filters to Available > 0 — nothing left to settle isn't worth offering as a target. `types`
+   * stays an array (rather than a single instrumentType) purely so the forkJoin below can stay written
+   * generically — earlier in B5's history (when it briefly also covered the Sight case) this merged in
+   * a second instrumentType via a `dualInstrumentFallback` field; removed as dead code
+   * (Quality-report-balance.md BAL-101) once B5 reverted to Usance-only and the field was left
+   * permanently unset.
    */
   private loadSettleableBalances(lcNumber: string): void {
     const fn = this.selectedFunction;
@@ -1437,7 +1397,7 @@ export class TransactionBuilderComponent {
       this.settleableBalances = [];
       return;
     }
-    const types: InstrumentType[] = [fn.instrumentType, ...(fn.dualInstrumentFallback ? [fn.dualInstrumentFallback] : [])];
+    const types: InstrumentType[] = [fn.instrumentType];
     this.settleableBalancesLoading = true;
     forkJoin(
       types.map((instrumentType) =>
@@ -1477,7 +1437,7 @@ export class TransactionBuilderComponent {
     });
   }
 
-  /** Pick handler for the "EB Index" picker above — routes to whichever real instrumentType that specific candidate actually is (mirrors what a free-text dualInstrumentFallback search resolves to, just via a click). */
+  /** Pick handler for the "EB Index" picker above — routes to whichever real instrumentType that specific candidate actually is (currently always EPLC_ACCEPTANCE, B5's own fixed type — see loadSettleableBalances' own doc comment). */
   onSelectSettleableBalance(balanceContractId: string): void {
     const picked = this.settleableBalances.find((s) => s.balanceContractId === balanceContractId);
     if (!picked) return;
@@ -1671,7 +1631,6 @@ export class TransactionBuilderComponent {
       ibNumber: secondaryField === 'ibNumber' ? this.checkerSecondaryRef : null,
       sgNumber: secondaryField === 'sgNumber' ? this.checkerSecondaryRef : null,
     };
-    const fallback = this.selectedFunction.dualInstrumentFallback;
     this.api.resolveContract(this.selectedFunction.instrumentType, naturalKey).subscribe({
       next: (contract) => {
         this.checkerSearching = false;
@@ -1679,27 +1638,8 @@ export class TransactionBuilderComponent {
         this.loadCheckerQueue();
       },
       error: (err) => {
-        if (!fallback) {
-          this.checkerSearching = false;
-          this.checkerSearchError = this.describeApiError(err);
-          return;
-        }
-        // B6's dualInstrumentFallback (Sight EPLC_DUE_FROM_ISSUING_BANK vs Usance
-        // EPLC_ACCEPTANCE_REIMB_RECEIVABLE) — the Checker's own search is independent
-        // of the Maker's model.instrumentType, so it needs the same primary-then-fallback
-        // retry the Maker's searchExistingContract() already does, or a Usance REIMBURSE
-        // never resolves ("No Logical Contract exists yet for this natural key").
-        this.api.resolveContract(fallback, naturalKey).subscribe({
-          next: (contract) => {
-            this.checkerSearching = false;
-            this.checkerContract = contract;
-            this.loadCheckerQueue();
-          },
-          error: (fallbackErr) => {
-            this.checkerSearching = false;
-            this.checkerSearchError = this.describeApiError(fallbackErr);
-          },
-        });
+        this.checkerSearching = false;
+        this.checkerSearchError = this.describeApiError(err);
       },
     });
   }
@@ -1872,7 +1812,9 @@ export class TransactionBuilderComponent {
     const amountCappedAtSg = !!this.selectedFunction?.autoRedeemType && !!this.selectedContractSnapshot;
     // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance>0的EB交易") — same
     // default-to-Available/freely-editable-down-to-Partial/capped-at-it shape as amountCappedAtSg above,
-    // just for B5's own Usance/CNF_MATURE branch (dualInstrumentFallback resolved to EPLC_ACCEPTANCE).
+    // just for B5's own Usance/CNF_MATURE branch (model.instrumentType === 'EPLC_ACCEPTANCE', B5's own
+    // fixed registry type — see settlesAcceptanceOnMature's own doc comment for why this is always true
+    // for a real B5 submission, not a conditional fallback resolution).
     const amountCappedAtAcceptance = !!this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && !!this.selectedContractSnapshot;
     const amountLocked = amountFromDocArrival || amountFromFullSettle;
     const tenorLocked = !!this.selectedFunction?.tenorTypeOptions?.length && this.isCreatingMovement && this.hasParent && !!this.selectedParent;
@@ -2039,10 +1981,10 @@ export class TransactionBuilderComponent {
     }
     // Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
     // Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5 only, same "derive Full/Partial from
-    // amount vs Available" shape as autoRedeemType above, just targeting SETTLE instead of REDEEM. Only
-    // applies once dualInstrumentFallback has actually resolved to the Usance-side EPLC_ACCEPTANCE (the
-    // Sight-side EPLC_DUE_FROM_ISSUING_BANK case stays a plain REIMBURSE, model.movementType already
-    // correct and untouched). Grounded in the frozen spec's own event table (impl-spec-en.md CNF_MATURE
+    // amount vs Available" shape as autoRedeemType above, just targeting SETTLE instead of REDEEM. B5's
+    // own instrumentType is fixed to EPLC_ACCEPTANCE (Usance held-to-maturity — B5 has no Sight branch
+    // of its own, see settlesAcceptanceOnMature's own doc comment), so this condition is always true for
+    // a real B5 submission. Grounded in the frozen spec's own event table (impl-spec-en.md CNF_MATURE
     // row): "−CONFIRMED_ACCEPTANCE_DPU_OUTSTANDING | −BENEFICIARY_ACCOUNT; +NOSTRO / −ACCEPTANCE_REIMB_
     // RECEIVABLE_ISSUING_BANK" — ONE event clearing both the Acceptance liability and its matching
     // Reimbursement Receivable together, not two independent ones the way CNF_REIMB (Sight/Nego'd) is.
@@ -2291,9 +2233,10 @@ export class TransactionBuilderComponent {
     // resolves the MATCHING EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract (same LC+EB Number natural key —
     // B4's own compound already created it, linked to the same Acceptance) and creates its REIMBURSE for
     // the SAME amount, same businessEventId — one Checker Release finalizes both (see release()'s own
-    // settlesAcceptanceOnMature branch). The Sight case (model.instrumentType stayed EPLC_DUE_FROM_
-    // ISSUING_BANK — dualInstrumentFallback never fired) falls through to the plain REIMBURSE path below,
-    // unchanged from the old B6.
+    // settlesAcceptanceOnMature branch). B5's own instrumentType is fixed to EPLC_ACCEPTANCE (Usance —
+    // B5 has no Sight branch of its own, see settlesAcceptanceOnMature's doc comment), so this guard is
+    // always true for a real B5 submission; the plain REIMBURSE path below is reached by other functions
+    // instead (unchanged from the old B6), never by B5 falling through this one.
     if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContract) {
       const businessEventId = crypto.randomUUID();
       req.businessEventId = businessEventId;

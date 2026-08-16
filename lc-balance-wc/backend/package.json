@@ -7,14 +7,20 @@
   "scripts": {
     "start": "node server.js",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "lint": "eslint server.js data test",
+    "format:check": "prettier --check \"**/*.js\" --ignore-path .gitignore"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "helmet": "^8.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
     "jest": "^29.7.0",
+    "prettier": "^3.9.6",
     "supertest": "^6.3.4"
   }
 }

@@ -283,11 +283,26 @@ start` i.e. `ng serve --open` (Terminal 3).
 
 ### Testing
 
-Only `microservices/balance-component/` has a test suite (own `jest.config.js`) — the Angular app
-itself and `backend/` have **no test runner configured** (no `test` script in either `package.json`),
-same posture as `lc-issue-angular/`.
+Unlike `lc-issue-angular/`, **all three processes have their own Jest suite here** — the Angular app and
+`backend/` were bootstrapped later (jest-preset-angular / plain Jest respectively, mirroring
+`lc-payment-wc/`'s own setup) specifically to close that gap. All three are gated at a **95%**
+`coverageThreshold` (statements/branches/functions/lines) in their own `jest.config.js` — higher than
+`lc-payment-wc/`'s 90% floor; a change that drops any of the four metrics below 95% in any of the three
+fails `npm test`, and per `lc-balance-wc/CLAUDE.md`'s own standing rule, all three must be re-run and
+green (not just the one you touched) before a change counts as complete.
 
 ```bash
+# Angular app (from lc-balance-wc/)
+npm test                    # jest — src/app/**/*.ts
+npm run test:coverage       # jest --coverage
+npx tsc -p tsconfig.app.json --noEmit   # typecheck (no dedicated "typecheck" npm script for this project)
+
+# backend/ (中台 orchestrator)
+cd lc-balance-wc/backend
+npm test
+npm run test:coverage
+
+# microservices/balance-component/
 cd lc-balance-wc/microservices/balance-component
 npm run typecheck        # tsc --noEmit
 npm test                  # Jest (test/unit/) — domain logic, schema, and full case-walkthrough tests
@@ -295,7 +310,23 @@ npm run test:coverage
 npm run build              # tsc -p tsconfig.build.json → dist/
 ```
 
-Same single-test syntax as `lc-payment-wc/`'s microservice (`npm test -- <file-or--t-pattern>`).
+Same single-test syntax as `lc-payment-wc/` throughout (`npm test -- <file-or--t-pattern>`), and the same
+**never let the two Jest configs cross** caveat applies between the Angular app and the microservice
+(this project's `tsconfig.json` also sets `noPropertyAccessFromIndexSignature`) — always `cd` into
+`microservices/balance-component` before running its own Jest commands.
+
+The Angular app's test suite is split across multiple spec files per source file where the source is
+large — most notably `transaction-builder.component.ts` (2,800+ lines; see Source layout below), which is
+covered by four separate spec files (`transaction-builder.component.spec.ts` for function/catalog
+selection, `.selection.spec.ts` for contract/movement selection, `.actions.spec.ts` for
+submit/release/reject/checker actions, and `.gaps.spec.ts` for the ~30 plain `get` accessors and
+leftover branch edge cases the other three didn't target) rather than one file per component — a
+convention specific to this file's size, not a project-wide pattern.
+
+`lc-balance-wc/Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of
+this project (bugs, vulnerabilities, code smells, duplication, coverage) with prioritized findings and a
+remediation log — check it before assuming an area is unreviewed; it records what's already been fixed
+(and what was deliberately deferred, and why) rather than needing to be re-derived from scratch.
 
 ### Source layout
 
@@ -303,7 +334,17 @@ Same single-test syntax as `lc-payment-wc/`'s microservice (`npm test -- <file-o
   orchestrator) with one click; `balance-case-api.service.ts` is its backend client.
 - `src/app/transaction-builder/` — a lower-level form for posting individual `BalanceMovement`s
   straight against the microservice (`balance-component-api.service.ts`, `balance-component.model.ts`,
-  `index-picker.component.ts`), bypassing the Business Case Registry.
+  `index-picker.component.ts`), bypassing the Business Case Registry. `balance-component-api.service.ts`
+  exports a `BalanceMovement` interface mirroring the microservice's own `src/types.ts` shape by hand
+  (kept in sync manually, same convention `balance-component.model.ts`'s own design-doc field tables
+  already use) — every mutating/listing method is typed against it rather than `Observable<any>`.
+  `transaction-builder.component.ts` is the single largest file in this repo (2,800+ lines — it owns
+  function/side selection, three paginated catalog/parent/IB-index pickers, the Maker `submit()`
+  dispatch across all 14 named business functions, Checker release/reject/cancel/acknowledge, and the
+  Look Up panel); its three paginated-picker state machines share one private `loadPagedCatalog()`
+  helper and its ~30 API-calling methods share one `describeApiError()` helper — both extracted to close
+  duplication findings in `Quality-report-balance.md`, worth reusing rather than reintroducing the
+  pattern they replaced if you're adding a fourth picker or another API-calling method.
 - `backend/server.js` — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
   declarative registry of Import/Export cases it replays.
 - `microservices/balance-component/` — the real Balance Component microservice:

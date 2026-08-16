@@ -643,44 +643,35 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['usance']);
     });
 
-    it('searchExistingContract (B5): a truthy searchNaturalKey.ibNumber is sent as-is, not defaulted to null (the PRIMARY resolveContract call)', () => {
-      const resolveContractSpy: jest.Mock = jest.fn(() => throwError(() => ({ error: { message: 'primary miss' } })));
+    it('searchExistingContract (B5): a truthy searchNaturalKey.ibNumber is sent as-is, not defaulted to null', () => {
+      // Errors deliberately, not a success — a success `next:` path also calls syncCheckerToContext()
+      // (a separate, unrelated resolveContract call via searchCheckerLc()), which would inflate the
+      // call count this test is checking; the error path keeps this test focused on the one call under
+      // test, same convention the rest of this describe block already uses.
+      const resolveContractSpy: jest.Mock = jest.fn(() => throwError(() => ({ error: { message: 'miss' } })));
       const api = mockApi({ resolveContract: resolveContractSpy as any });
       const c = new TransactionBuilderComponent(api);
-      // B5's own registry entry does NOT currently set dualInstrumentFallback (despite the model.ts
-      // interface field and doc comments describing it as "B5 only") — confirmed by grepping the
-      // registry for an actual `dualInstrumentFallback:` assignment and finding none. This test only
-      // needs the PRIMARY call's own shape, so B5's real (fallback-less) entry is fine here.
       c.selectFunction(fn('B5'));
       c.searchNaturalKey = { lcNumber: 'S001', ibNumber: 'IB-PRESENT', sgNumber: '' };
       c.searchExistingContract();
-      expect(resolveContractSpy.mock.calls.length).toBe(1); // no dualInstrumentFallback set -> no retry
+      expect(resolveContractSpy.mock.calls.length).toBe(1);
       const naturalKeyArg = resolveContractSpy.mock.calls[0][1];
       expect(naturalKeyArg.ibNumber).toBe('IB-PRESENT');
     });
 
-    it('searchExistingContract, dualInstrumentFallback retry path: the FALLBACK resolveContract call sends the same natural key, and its own error path clears selectedContract/snapshot and sets searchError (currently unreachable via any real registry function — dualInstrumentFallback is declared on the TransactionFunction interface and described in several doc comments as "B5 only" but is never actually assigned on B5\'s or any function\'s real registry entry; exercised here via a synthetic B5 variant, same pattern already used elsewhere in this file for other doc-comment-confirmed gaps between what\'s designed and what\'s currently wired into the registry)', () => {
-      const resolveContractSpy: jest.Mock = jest
-        .fn()
-        .mockReturnValueOnce(throwError(() => ({ error: { message: 'primary miss' } })))
-        .mockReturnValueOnce(throwError(() => ({ error: { message: 'fallback also misses' } })));
+    it('searchExistingContract: a resolveContract error clears selectedContract/snapshot and sets searchError, with no retry (Quality-report-balance.md BAL-101 — a previously-implemented dual-instrument-fallback retry was removed as dead code, since no registry function ever set the field it depended on; searchExistingContract() now always has exactly one resolveContract call, success or failure)', () => {
+      const resolveContractSpy: jest.Mock = jest.fn(() => throwError(() => ({ error: { message: 'not found' } })));
       const api = mockApi({ resolveContract: resolveContractSpy as any });
       const c = new TransactionBuilderComponent(api);
-      const syntheticB5: TransactionFunction = { ...fn('B5'), dualInstrumentFallback: 'IPLC_ACCEPTANCE' };
-      c.selectFunction(syntheticB5);
+      c.selectFunction(fn('B5'));
       c.searchNaturalKey = { lcNumber: 'S001', ibNumber: 'IB01', sgNumber: '' };
-      c.selectedContract = contract(); // must be cleared by the fallback's own error handler
+      c.selectedContract = contract(); // must be cleared by the error handler
       c.searchExistingContract();
 
-      expect(resolveContractSpy.mock.calls.length).toBe(2);
-      expect(resolveContractSpy.mock.calls[1][0]).toBe('IPLC_ACCEPTANCE');
-      const fallbackNaturalKeyArg = resolveContractSpy.mock.calls[1][1];
-      expect(fallbackNaturalKeyArg.lcNumber).toBe('S001');
-      expect(fallbackNaturalKeyArg.ibNumber).toBe('IB01');
-      expect(fallbackNaturalKeyArg.sgNumber).toBeNull();
+      expect(resolveContractSpy.mock.calls.length).toBe(1);
       expect(c.selectedContract).toBeNull();
       expect(c.selectedContractSnapshot).toBeNull();
-      expect(c.searchError).toBe('fallback also misses');
+      expect(c.searchError).toBe('not found');
     });
 
     it('payExisting(): a release() error lacking err.error.message falls back to String(err)', () => {

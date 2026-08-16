@@ -270,38 +270,33 @@ export interface TransactionFunction {
    */
   pendingItemSourceCode?: string;
   /**
-   * Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review), REVISED 2026-08-16 ("從
-   * Balance Component角度來看B5不需要，B6改成B5") — B5 only (formerly B6). Resolves whichever
-   * instrumentType the LC's own tenor actually produced under B4: `EPLC_DUE_FROM_ISSUING_BANK` (Sight)
-   * or `EPLC_ACCEPTANCE` (Usance held-to-maturity, the liability itself — NOT `EPLC_ACCEPTANCE_REIMB_
-   * RECEIVABLE`, since settlesAcceptanceOnMature below settles that as a linked second leg once the
-   * Acceptance is found) — same LC+EB Number natural key either way, so B5 doesn't need to ask which.
-   * searchExistingContract() tries the function's own primary instrumentType first, then this fallback,
-   * before giving up.
-   */
-  dualInstrumentFallback?: InstrumentType;
-  /**
    * Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
-   * Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5 only. When dualInstrumentFallback
-   * above resolves to EPLC_ACCEPTANCE (Usance held-to-maturity), Submit derives FULL_SETTLE/
-   * PARTIAL_SETTLE from Amount vs the Acceptance's own Available Balance (same shape as autoRedeemType,
-   * see its own doc comment), then creates a linked REIMBURSE for the SAME amount against the matching
-   * EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract (found via the same LC+EB Number) — one Checker Release
-   * finalizes both. Grounded in impl-spec-en.md's own CNF_MATURE event row, which clears both balance
-   * types together, not two independent events. The Sight case (resolved type stays EPLC_DUE_FROM_
-   * ISSUING_BANK) is unaffected — a plain REIMBURSE, no second leg.
+   * Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5 only, and — since B5's own
+   * instrumentType is fixed to EPLC_ACCEPTANCE (Usance held-to-maturity; B5 has no subChoice and no
+   * Sight branch of its own, see the registry entry below) — always true for a real B5 submission, not
+   * a conditional/fallback path. Submit derives FULL_SETTLE/PARTIAL_SETTLE from Amount vs the
+   * Acceptance's own Available Balance (same shape as autoRedeemType, see its own doc comment), then
+   * creates a linked REIMBURSE for the SAME amount against the matching EPLC_ACCEPTANCE_REIMB_RECEIVABLE
+   * contract (found via the same LC+EB Number) — one Checker Release finalizes both. Grounded in
+   * impl-spec-en.md's own CNF_MATURE event row, which clears both balance types together, not two
+   * independent events.
+   *
+   * (B5 used to also cover the Sight case, EPLC_DUE_FROM_ISSUING_BANK, via a `dualInstrumentFallback`
+   * field that let one B5 function serve both tenors — removed as dead code per
+   * Quality-report-balance.md BAL-101, since B5 was later split back into "Usance-only" per the registry
+   * entry's own history comment below, leaving that field permanently unset. This flag's own Usance
+   * check was never the dead part — it's B5's everyday behavior — only the now-gone Sight alternative
+   * was.)
    */
   settlesAcceptanceOnMature?: boolean;
   /**
    * Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB Index —
    * Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5 only. Adds a
    * genuine "EB Index" Step-2 picker after the Parent LC ("LC Index") Step 1 — same two-step shape A6/
-   * B4 already have, but merging candidates across BOTH of B5's own possible instrumentTypes
-   * (instrumentType + dualInstrumentFallback) instead of one, since the picked Confirmation could have
-   * either a Sight Due-from-Issuing-Bank asset or a Usance Acceptance still outstanding under the same
-   * EB Number, and the Maker doesn't know which in advance. Only 0-Available candidates are excluded
-   * (nothing left to settle). Does not replace the existing free-text LC+EB search — that stays as a
-   * manual fallback, same precedent as every other Parent-LC-picker function.
+   * B4 already have, surfacing still-outstanding EPLC_ACCEPTANCE (B5's own instrumentType) candidates
+   * under the picked Confirmation's own LC Number. Only 0-Available candidates are excluded (nothing
+   * left to settle). Does not replace the existing free-text LC+EB search — that stays as a manual
+   * fallback, same precedent as every other Parent-LC-picker function.
    */
   settleableBalanceIndex?: boolean;
   /**
@@ -655,8 +650,10 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
   // clause (`−DUE_FROM_ISSUING_BANK or −EXPORT_BILLS_DISCOUNTED`) never mentions
   // `ACCEPTANCE_REIMB_RECEIVABLE_ISSUING_BANK` at all; that clearing only ever happens inside
   // `CNF_MATURE`. Sight keeps its own genuinely-separate `CNF_REIMB` (Due from Issuing Bank has no
-  // paired liability to settle) — dualInstrumentFallback still resolves Sight vs Usance transparently
-  // by the same LC+EB Number, the Maker doesn't need to know which tenor this was.
+  // paired liability to settle) — at this point in B5's history (before being reverted to Usance-only
+  // below), a `dualInstrumentFallback` field let one B5 function resolve Sight vs Usance transparently
+  // by the same LC+EB Number without the Maker needing to know which tenor this was; that field was
+  // later removed as dead code (Quality-report-balance.md BAL-101) once B5 stopped needing it.
   // Business instruction 2026-08-16 ("BALANCE COMPONENT 只負責 CONTINGENT LIABILITY" — Balance
   // Component only owns the bank's own contingent/liability side; once Sight's Confirmation contingent
   // converts into a pure receivable (EPLC_DUE_FROM_ISSUING_BANK, an ON_BALANCE_ASSET with NO paired

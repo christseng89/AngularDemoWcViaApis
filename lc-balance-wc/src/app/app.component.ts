@@ -10,8 +10,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       <div class="container">
         <span class="navbar-brand">Balance Component</span>
         <div class="navbar-nav">
-          <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Business Case Runner</a>
           <a class="nav-link" routerLink="/transactions" routerLinkActive="active">Transaction Builder</a>
+          <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Business Case Runner</a>
         </div>
       </div>
     </nav>
