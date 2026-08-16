@@ -432,8 +432,19 @@
         <p class="tb-hint" *ngIf="submitResult?.status === 'PENDING'">Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.</p>
         <!-- Business instruction 2026-08-15 ("option for Maker to Delete Pending, i.e. EC... for all
              functions") — Maker-side withdrawal of their own still-PENDING entry, distinct from the
-             Checker's Reject below. Same panel/condition for every function (A1-A9/B1-B5). -->
-        <button type="button" class="tb-btn tb-btn--danger-outline mt-2" *ngIf="submitResult?.status === 'PENDING'" (click)="deleteMakerPending()" [disabled]="actionBusy">
+             Checker's Reject below. Same panel/condition for every function (A1-A9/B1-B5) EXCEPT A4.
+
+             Bug fixed 2026-08-17 (Quality-report-balance.md BAL-122, reviewer-found): A4 has no movement
+             of its own to withdraw — submitA4() never calls createMovement(), it only marks A3/A3S's own
+             PRE-EXISTING UTILIZE as maker-submitted, so submitResult here IS that earlier movement.
+             Before this fix, this generic button stayed visible for A4 too (gated only on
+             submitResult?.status === 'PENDING', true for A4's own submitResult), so clicking it called
+             deleteMakerPending() -> api.cancel(submitResult.movementId, ...) against A3/A3S's own
+             Document Arrival — silently destroying upstream work under a label ("Delete Pending") that,
+             for every OTHER function, means "withdraw only my own just-created record". A4 offers no
+             correct "delete my own pending thing" action at all (there is no such record), so hiding it
+             is the fix, not relabeling it. -->
+        <button type="button" class="tb-btn tb-btn--danger-outline mt-2" *ngIf="submitResult?.status === 'PENDING' && !selectedFunction?.payExistingUtilize" (click)="deleteMakerPending()" [disabled]="actionBusy">
           {{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
         </button>
       </div>
