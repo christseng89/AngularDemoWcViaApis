@@ -1809,6 +1809,65 @@ after both Acceptances, Acceptance B01/B02 20,000/25,000 → 0/0 after Settlemen
 afterward (`IMP-C6-*`/`IMP-C7-*` only), leaving the user's own S01/S02/U01 records (Import and Export
 both) untouched.
 
+## BAL-122 and BAL-123 fixed — two Major findings from a full `Quality-report-balance.md` reassessment, both in A4's own redesign (2026-08-17, business instruction: "Fix BAL-122 now" then "Fix BAL-123 too")
+
+A comprehensive, adversarial SonarQube-style reassessment of the whole `lc-balance-wc` codebase (three
+parallel deep-review forks, one per sub-project) surfaced 12 new findings; two were Major and both were
+in this session's own A4 (Sight Settlement) redesign — code that had never been through a dedicated
+quality pass before that reassessment. Both are now fixed. Full finding detail, evidence, and severity
+reasoning lives in `Quality-report-balance.md` (BAL-122/BAL-123's own sections) — this entry covers the
+fix mechanics and verification.
+
+**BAL-122 — A4's generic "Delete Pending (EC)" button was cancelling the upstream A3/A3S Document
+Arrival, not an A4-specific record.** Root cause: `submitA4()` sets `submitResult` to the response of
+`api.submitByMaker()`, which — since A4 creates no movement of its own — IS A3/A3S's own pre-existing
+UTILIZE record. The generic "Delete Pending (EC)" button (`*ngIf="submitResult?.status === 'PENDING'"`,
+no exclusion for `payExistingUtilize`) therefore appeared after Submit A4 exactly as after every other
+function's own Submit, and clicking it called `deleteMakerPending()` → `api.cancel(ctx.submitResult.
+movementId, ...)` — i.e. cancelled A3/A3S's own already-approved earmark, not some A4-specific PENDING
+entry (none exists). **Fix**: `&& !selectedFunction?.payExistingUtilize` added to the button's own
+`*ngIf` — hidden, not relabeled, since A4 genuinely has nothing of its own to delete. Every other
+function is unaffected (the condition is purely additive). Verified: `tsc --noEmit`/`ng build`
+(strict templates) clean, full suite 510/510 unaffected (this codebase's own established convention —
+direct-instantiation component tests that never render the DOM — means template-visibility-only changes
+were never covered by a test either before or after this fix). Live in-browser click-through was
+attempted twice (fresh tabs both times) but blocked by an unresponsive browser extension — reported
+honestly rather than fabricated; static verification (typecheck + strict-template build + full suite) is
+strong evidence the fix is structurally correct, but a human should still click through A1 (button
+present) and A4 (button gone) to fully close the loop.
+
+**BAL-123 — A4's own Maker/Checker 4-eyes gate (`makerSubmittedAt`) was enforced ONLY by the Angular
+client, never by the microservice's own `/release`.** Any other caller (curl, a future second UI, an
+integration test) could release an A4-type UTILIZE that was never Maker-submitted, defeating the entire
+point of the A4 redesign. **Fix**: `balanceService.ts`'s `release()` now throws
+`IllegalStateTransitionError` (409) for a Sight-tenor `IPLC_LC`/`UTILIZE` movement whose
+`makerSubmittedAt` is unset — scoped by the movement's own parent contract `tenorType === 'SIGHT'`,
+deliberately NOT just instrumentType/movementType, because a Usance LC's own UTILIZE is released through
+the exact SAME endpoint via A6's compound `referencedTransactionId` flow, which never calls
+`/maker-submit` by design (A4's gate is Sight-only). A blanket "any IPLC_LC/UTILIZE requires
+makerSubmittedAt" rule would have incorrectly broken every Usance Acceptance release; the tenorType check
+cannot, since it's never `'SIGHT'` for a Usance LC. A movement whose parent contract never declared an
+explicit `tenorType` at all (the Business Case Runner's own older Import Case #1/#3/#4/#5, which predate
+this fix) is likewise unaffected — `null === 'SIGHT'` is false — so this is purely additive for genuine
+Sight LCs, never a behavior change for anything that isn't one. OAS bumped to v1.5.0 (both the
+`/release` endpoint's own description and its 409 response now document the new precondition).
+
+Verified: microservice `tsc --noEmit`/`npm run build` clean, 292/292 tests (4 new: blocks-without-
+maker-submit, allows-with-maker-submit, does-NOT-block-Usance, does-NOT-block-null-tenorType — the last
+two specifically proving the scoping is correct, not just that the happy path works), coverage
+99.13%/96.38%/100%/99.42%. One pre-existing test (`app.test.ts`'s own "AMEND_DECREASE reverses the
+pair..." — a genuine Sight-tenor `CAE-LC1` fixture releasing a UTILIZE without ever calling
+`/maker-submit`) needed a `/maker-submit` call added before its own `/release` call — a real gap the new
+gate correctly caught, not a false positive. **Live-verified all 14 Business Case Registry entries**
+individually via the running Business Case Runner (not just unit tests) — 13 succeed cleanly unaffected;
+`import-case-4` fails, but on a `createMovement()` call (SHGT sufficiency check), a code path this fix
+never touches — confirmed pre-existing and unrelated: the case's own inline comment expects a WARNING
+("Tight Available 21,000 < 50,000, but not an ERROR"), but current validation correctly hard-rejects per
+a later, undated `v0.12` design change ("A3 now hard-rejects past Tight Available") that was never
+back-ported into this specific registry case's own comment or amount choice. Flagged for the user, not
+fixed here — out of scope for BAL-123, a separate pre-existing registry-data staleness issue worth its
+own follow-up.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

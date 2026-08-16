@@ -1960,6 +1960,89 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
     expect(res.body.message).toMatch(/makerSubmittedBy is required/);
   });
+
+  // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found): A4's own Maker/Checker 4-eyes gate
+  // used to be enforced ONLY by the reference Transaction Builder client, never here — any other caller
+  // (curl, a future second UI) could release a Sight LC's own UTILIZE without ever calling
+  // /maker-submit first, defeating the point of the gate. release() now requires makerSubmittedAt for
+  // Sight-tenor IPLC_LC/UTILIZE specifically — scoped narrowly so it can never affect a Usance LC's own
+  // UTILIZE (released via A6's compound flow, which never calls /maker-submit by design).
+  describe('release(): A4 (Sight Settlement) 4-eyes gate — Sight-tenor IPLC_LC/UTILIZE only', () => {
+    test('blocks release of a Sight LC UTILIZE that was never Maker-submitted -> 409, ILLEGAL_STATE_TRANSITION', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-SIGHT' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .expect(201);
+
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(409);
+      expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+      expect(res.body.message).toMatch(/requires a Maker Submit/);
+
+      const stillPending = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+      expect(stillPending.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId).status).toBe('PENDING');
+    });
+
+    test('allows release of a Sight LC UTILIZE once Maker-submitted', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-SIGHT-OK' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      expect(res.body.status).toBe('RELEASED');
+    });
+
+    test('does NOT block a Usance LC UTILIZE — the gate is Sight-only, since Usance settles via A6 (referencedTransactionId), never /maker-submit', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: 'LC-BAL123-USANCE' },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          createdBy: 'maker1',
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .expect(201);
+
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      expect(res.body.status).toBe('RELEASED');
+    });
+
+    test('does NOT block an IPLC_LC UTILIZE whose parent contract never declared an explicit tenorType (null) — backward compatible with the Business Case Runner\'s own older Import Case #1/#3/#4/#5', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-NOTENOR' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .expect(201);
+
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      expect(res.body.status).toBe('RELEASED');
+    });
+  });
 });
 
 describe('HTTP integration — contingent-liability account entries (analysis/contingent-liability-ledger.html, business-requested 2026-08-16)', () => {
@@ -2029,6 +2112,10 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
     const utilizeInTimeline = timeline.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
     expect(decreaseInTimeline.contingentAccountEntry).toEqual(decrease.body.contingentAccountEntry);
     expect(utilizeInTimeline.contingentAccountEntry).toEqual(utilize.body.contingentAccountEntry);
+
+    // BAL-123 fix (2026-08-17): CAE-LC1 is a genuine Sight-tenor IPLC_LC (declared `tenorType: 'SIGHT'`
+    // at ISSUE, above) — release() now requires a real Maker Submit before releasing its own UTILIZE.
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
 
     // Releasing a movement does not regenerate or touch its stored entry.
     await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);

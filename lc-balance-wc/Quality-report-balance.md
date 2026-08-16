@@ -46,25 +46,26 @@ surfaced BAL-122 and BAL-123 below.
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A- (4.5/5) | 830/830 tests passing across 3 independent suites (510 Angular + 288 microservice + 32 backend, re-confirmed after the BAL-122 fix). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found one genuine NEW Major defect — **BAL-122** (A4's "Delete Pending (EC)" cancelling the upstream A3/A3S Document Arrival) — and it was **fixed the same pass it was found**, restoring this report's established pattern of same-pass remediation; static verification (typecheck/strict-template build/full suite) is strong but live in-browser click-through is still recommended (blocked at fix time by a tooling issue, not a code issue — see BAL-122's own Outcome). |
-| **Security** | B (3.7/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. Held back by the two unchanged structural gaps (BAL-001 no auth, BAL-002 8 High CVEs, both deferred/user-confirmed) **plus one newly-logged Major**: **BAL-123** — A4's own Maker/Checker 4-eyes gate is enforced client-side only, a self-disclosed but real integrity gap in this session's own new feature. |
-| **Maintainability** | A- (4.4/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Five new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before (BAL-124 duplicated executor handlers, BAL-125/BAL-126 `checker-actions.service.ts`'s own un-swept `any` typing and `catchError` duplication, BAL-127/BAL-130 two files trending toward their own future God-file status, BAL-128 stale eslint-disable comments) — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
-| **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass. BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
+| **Reliability** | A (4.7/5) | 834/834 tests passing across 3 independent suites (510 Angular + 292 microservice + 32 backend, re-confirmed after both fixes). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — and **both were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation. One low-severity, unrelated pre-existing gap (**BAL-134**, `import-case-4`'s stale scenario) surfaced incidentally while live-verifying BAL-123 and remains open. |
+| **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
+| **Maintainability** | A- (4.4/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before (BAL-124 duplicated executor handlers, BAL-125/BAL-126 `checker-actions.service.ts`'s own un-swept `any` typing and `catchError` duplication, BAL-127/BAL-130 two files trending toward their own future God-file status, BAL-128 stale eslint-disable comments) — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
+| **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A- (4.4/5) | Every previously-identified hotspot remains fixed. Two new, genuine (if Minor) duplication instances found in code added this session: BAL-124 (`release`/`makerSubmit` executor handlers) and BAL-126 (`checker-actions.service.ts`'s own repeated `catchError` blocks) — both small, both easy fixes, neither on the scale of what BAL-003's history required. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 / 100 (B+ → A- → A- → A- → A- → A → A- → A-)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A)**
 
-**Why the score dipped then partially recovered, rather than only ever climbing:** this comprehensive
+**Why the score dipped then fully recovered, rather than only ever climbing:** this comprehensive
 follow-up pass is deliberately adversarial rather than confirmatory — its whole point was to
 independently re-hunt for defects in code that shipped *after* the last review closed, rather than only
 re-verify what was already found. It succeeded: two genuine new Major findings surfaced (BAL-122 a real
 bug, BAL-123 a disclosed-but-real enforcement gap), both in this session's own newest feature (the A4
-redesign) and neither previously reviewed by anyone — that's the 93 → 90 dip. BAL-122 was then fixed in
-the same pass it was reported, immediately after the assessment surfaced it — that's the 90 → 91 partial
-recovery. BAL-123 remains open (Security stays held back by it), which is why the score doesn't fully
-return to 93: a composite score that only ever goes up would imply new code is reviewed with less rigor
-than old code, and one that snaps straight back to its prior peak the instant one of two findings is
-fixed would understate the one that isn't.
+redesign) and neither previously reviewed by anyone — that's the 93 → 90 dip. Both were then fixed, each
+in the same pass it was reported, immediately after the assessment surfaced it — first BAL-122 (90 → 91),
+then BAL-123 (91 → 93), fully recovering to this report's own prior peak. Recovering to the SAME number
+(93) rather than exceeding it is deliberate, not a rounding coincidence: fixing two newly-found defects
+restores the codebase to "as good as previously believed," it doesn't make it better than that — the one
+new low-severity finding surfaced along the way (BAL-134, unrelated and still open) is why the score
+isn't simply reported as "back to normal" without qualification.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -84,19 +85,21 @@ holds (all do), refreshed every stale quantitative claim (test counts, coverage,
 audit — all re-run fresh, not carried forward), and dedicated a full adversarial review to all the feature
 work that shipped between the two review dates (the A4 real-Maker-Submit redesign, `referencedTransactionId`
 correlation, and the Business Case Registry's growth from 10 to 14 cases) — code that had never been
-through a quality pass before today. That review found **two new Major findings, both genuine**:
-**BAL-122** (a real bug — A4's "Delete Pending" button destroyed upstream A3/A3S work, not its own
-record) — **fixed immediately, same pass, upon being reported** — and **BAL-123** (a self-disclosed but
-real gap — A4's own 4-eyes gate is client-side-only), which remains open. It also found seven new
-Minor/Info findings (BAL-124–BAL-130, BAL-132), all small and independently actionable, and one
-completeness gap (BAL-131). None of the new findings are Blocker/Critical, and none regress anything the
-five 2026-08-16 passes fixed.
+through a quality pass before today. That review found **two new Major findings, both genuine, and both
+now fixed**: **BAL-122** (a real bug — A4's "Delete Pending" button destroyed upstream A3/A3S work, not
+its own record — hidden for A4 specifically) and **BAL-123** (a self-disclosed but real gap — A4's own
+4-eyes gate was client-side-only — now enforced server-side too, scoped by tenor so it can never affect
+A6's own Usance flow). It also found eight new Minor/Info findings (BAL-124–BAL-130, BAL-132, BAL-134),
+all small and independently actionable — BAL-134 (a pre-existing, unrelated Business Case Registry
+staleness issue in `import-case-4`) surfaced incidentally while live-verifying BAL-123's own fix across
+all 14 registered cases — and one completeness gap (BAL-131). None of the new findings are
+Blocker/Critical, and none regress anything the five 2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
-as resolved — and BAL-123 is a new reason to close before treating the A4 feature area as fully settled,
-even though it doesn't block continued prototype use today (BAL-122 no longer applies to this list — it's
-fixed). See [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
+as resolved. Both new Major findings from this pass (BAL-122, BAL-123) are now fixed and no longer factor
+into that assessment. See [Gate Conditions](#gate-conditions-before-any-production-consideration) at the
+end.
 
 ---
 
@@ -107,7 +110,7 @@ fixed). See [Gate Conditions](#gate-conditions-before-any-production-considerati
 | [BAL-001](#bal-001) | 🔴 Blocker | Vulnerability | No authentication/authorization anywhere in the microservice — deferred, user-confirmed |
 | [BAL-002](#bal-002) | 🟠 Critical | Vulnerability | 8 High-severity CVEs in production Angular dependencies — deferred, user-confirmed |
 | [BAL-122](#bal-122) | 🟡 Major | Bug | A4's generic "Delete Pending (EC)" button cancels the **upstream A3/A3S Document Arrival**, not an A4-specific record — **Fixed** |
-| [BAL-123](#bal-123) | 🟡 Major | Vulnerability / Design Risk | A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY client-side — the microservice's own `/release` never checks it — **Open, deliberate trade-off, formally logged this pass** |
+| [BAL-123](#bal-123) | 🟡 Major | Vulnerability / Design Risk | A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY client-side — the microservice's own `/release` never checks it — **Fixed** |
 | [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites — **Fixed** |
 | [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — **submit() split, paging state/math unified, Checker Actions extracted into `CheckerActionsService` via Dependency Inversion; still open — now 2,923 lines, grew further this pass with A4's own Maker-side logic, real decomposition remains future work** |
 | [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — deferred, user-confirmed |
@@ -129,6 +132,7 @@ fixed). See [Gate Conditions](#gate-conditions-before-any-production-considerati
 | [BAL-127](#bal-127) | ⚪ Info | Technical Debt | `backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case (now 1,439 lines / 14 cases) — **Open, found this pass, not yet urgent** |
 | [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Open, found this pass** |
 | [BAL-132](#bal-132) | ⚪ Info | Code Smell | `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion bypasses the type system's own declared nullability — **Open, found this pass, low risk** |
+| [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — fails on a live run, unrelated to BAL-122/BAL-123 — **Open, found while verifying BAL-123** |
 | [BAL-101](#fixed-in-prior-passes--re-verified-still-fixed-this-pass) | — | — | Fixed in prior passes, re-verified still fixed this pass (see below) |
 | [BAL-111](#bal-111) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found, in either store layer |
 | [BAL-112](#bal-112) | ⚪ Info (positive) | — | Test coverage clears 95% on all four metrics, all three suites |
@@ -193,7 +197,7 @@ condition** for any deployment beyond prototype use, not a closed finding — se
 ---
 
 ### BAL-123
-**A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY in the Angular Transaction Builder client — the microservice's own `/release` never checks it** — 🟡 Major (Vulnerability / Design Risk) — Open, deliberate trade-off, formally logged this pass
+**A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY in the Angular Transaction Builder client — the microservice's own `/release` never checks it** — 🟡 Major (Vulnerability / Design Risk) — **Fixed**
 
 **Evidence:** `src/app/transaction-builder/transaction-builder.component.ts:2001` blocks
 `checkerAct('release')` client-side when `!selectedCheckerMovement.makerSubmittedAt`, with an explicit
@@ -219,9 +223,27 @@ convenience, enforce it server-side scoped narrowly (IPLC_LC/UTILIZE only, mirro
 Import Case #1/#6 to call `/maker-submit` before `/release`, closing the gap on both sides at once
 rather than leaving one caller exempt.
 
-**Outcome:** Not remediated this pass — reported as a formally-logged, open finding per this report's
-own SonarQube-style posture (a deliberate trade-off is still an open risk until closed, per BAL-001's
-own "deferred is not the same as resolved" framing). Does not block continued prototype use.
+**Outcome (2026-08-17, fixed immediately after being reported): enforced server-side, scoped by
+`tenorType` rather than the recommendation's own plain instrumentType/movementType guard.** On
+implementation, a plain "any IPLC_LC/UTILIZE requires makerSubmittedAt" rule (as the recommendation above
+literally reads) turned out to be WRONG, not just narrow — it would have blocked every Usance LC's own
+UTILIZE release too, since a Usance UTILIZE is released through the exact same `/release` endpoint via
+A6's own compound `referencedTransactionId` flow, which never calls `/maker-submit` by design (A4's gate
+is Sight-only). The actual fix checks the movement's own parent contract `tenorType === 'SIGHT'` in
+addition to instrumentType/movementType — this is what correctly distinguishes "A4's own Sight
+Settlement domain" from "A6's own Usance Acceptance domain" at the server, where both share the identical
+`(IPLC_LC, UTILIZE)` shape. Also contrary to this finding's own recommendation, the Business Case
+Runner's Import Case #1/#6 needed NO update: Case #1 never declares an explicit `tenorType` (so the
+`=== 'SIGHT'` check is false for it, same as it would be for any Usance contract), and Case #6 already
+calls `/maker-submit` before `/release` by construction (built with this exact gate in mind). Verified:
+microservice 292/292 tests (4 new, specifically proving the Usance and null-tenorType cases are
+unaffected, not just that the happy path works), `tsc --noEmit`/`npm run build` clean. One genuinely
+affected pre-existing test (`app.test.ts`'s "AMEND_DECREASE reverses the pair..." fixture, a real
+Sight-tenor contract) needed one added `/maker-submit` call. **Live-verified all 14 Business Case
+Registry entries individually** via the running Business Case Runner (not just mocked unit tests) — 13
+unaffected; `import-case-4` fails, but on an unrelated `createMovement()` call this fix never touches
+(see BAL-134, a new Info finding logged from this same verification pass). OAS bumped to v1.5.0. Does not
+block continued prototype use, and never did.
 
 ---
 
@@ -889,6 +911,44 @@ graph.
 
 ---
 
+### BAL-134
+**`import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change** — ⚪ Info (Bug / Technical Debt) — Open, found while verifying BAL-123
+
+**Evidence:** discovered incidentally while live-running all 14 Business Case Registry entries end to
+end (not just their own mocked unit tests) to confirm BAL-123's fix didn't break anything. 13 cases
+succeed cleanly; `import-case-4` reproducibly fails on its own "Document Arrival 50,000 (only half the
+SG-covered goods)" step:
+```
+409 INSUFFICIENT_AVAILABLE_BALANCE — "Requested amount 50000 exceeds Tight Available Balance 21000
+(Available Balance 121000 minus outstanding off-balance-sheet (SHGT) exposure 100000). If this Document
+Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use
+'Document Arrival w/ Shipping Gtee' instead..."
+```
+The case's own inline comment (`backend/data/businessCases.js`, `importCase4`) reads: `"Expect a WARNING
+here — Tight Available (21,000) < 50,000, but not an ERROR (LC Available itself is 121,000)"` — but
+current validation hard-rejects instead of warning. This is NOT caused by BAL-122 or BAL-123 (both fixes
+are scoped to `release()`; this failure happens inside `createMovement()`'s own SHGT sufficiency check, a
+code path neither fix touches — confirmed by reproducing the failure in isolation, with fresh contract
+data, no rate-limiting or cross-case interference). The likely root cause: `lc-balance-wc/CLAUDE.md`'s
+own decision log documents "A3 now hard-rejects past Tight Available (Design doc §6.1 v0.12)" as a real,
+dated design change — `importCase4`'s own scenario and comment predate that change and were never updated
+to match, so it's exercising a WARNING-shaped test against what is now correctly ERROR-shaped validation.
+
+**Impact:** low — this is a Business Case Registry data/comment staleness issue, not a defect in the
+microservice's own validation logic (which is behaving correctly per the more recent v0.12 rule). But it
+means `import-case-4` currently cannot be run to completion via the Business Case Runner, which defeats
+its own purpose as a one-click regression-style smoke test.
+
+**Recommended remediation:** update `importCase4`'s own amount choice (e.g. reduce the Document Arrival
+to fit within Tight Available, or explicitly change the case to demonstrate and assert the CURRENT
+hard-reject behavior with `expectError: true`, matching `importCase5`'s own existing pattern for an
+expected-rejection scenario) — out of scope for BAL-123, flagged here for its own separate follow-up.
+
+**Outcome:** Not remediated this pass — reported as a newly-found, open, low-severity finding. Does not
+block anything; unrelated to the two Major findings this reassessment set out to review.
+
+---
+
 ## Reliability & Design Risk
 
 ### BAL-120
@@ -1164,14 +1224,14 @@ before the A4 feature area specifically is considered done:**
    (attempted but blocked by a browser-extension issue at fix time — see BAL-122's own Outcome) before
    treating this as fully closed, but the static verification (typecheck, strict-template build, full
    test suite) is strong evidence the fix is correct.
-5. **BAL-123** *(Open, deliberate trade-off, not yet closed)* — A4's own 4-eyes gate needs server-side
-   enforcement (scoped to IPLC_LC/UTILIZE) before "genuine Maker/Checker separation" can be considered a
-   fully real control rather than a client-side convention; the Business Case Runner's own Import Case
-   #1/#6 would need one added `/maker-submit` call each to stay compatible.
+5. **BAL-123** *(Fixed, 2026-08-17)* — A4's own 4-eyes gate is now enforced server-side too, scoped by
+   the movement's own parent contract `tenorType === 'SIGHT'` (not a blanket IPLC_LC/UTILIZE rule, which
+   would have incorrectly broken A6's own Usance compound-release flow). "Genuine Maker/Checker
+   separation" for A4 is now a real, server-enforced control, not just a client-side convention. OAS
+   bumped to v1.5.0.
 
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
-its own intended interactive-UI use case even before BAL-122 was fixed, and BAL-122 required a specific,
-non-obvious misclick sequence to trigger. **BAL-122 is now fixed** (see its own Outcome); BAL-123 remains
-open and is cheaper to close now than after more code builds on top of the current A4 implementation. All
-other 2026-08-17 findings (BAL-124–BAL-130, BAL-132, and the completeness gap BAL-131) are Minor/Info,
-none are gate conditions, and none block anything.
+its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
+non-obvious misclick sequence to trigger. **Both are now fixed.** All other 2026-08-17 findings
+(BAL-124–BAL-130, BAL-132, BAL-134, and the completeness gap BAL-131) are Minor/Info, none are gate
+conditions, and none block anything.

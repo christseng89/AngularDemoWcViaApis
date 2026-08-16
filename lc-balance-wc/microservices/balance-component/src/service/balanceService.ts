@@ -466,6 +466,29 @@ export class BalanceService {
     applyStatusTransition({ currentStatus: movement.status, action: 'RELEASE', createdBy: movement.createdBy, actingUser: releasedBy });
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
+
+    // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found): A4 (Sight Settlement)'s own
+    // Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be enforced ONLY by
+    // the reference Transaction Builder client's own checkerAct(), never here, so any other caller
+    // (curl, a future second UI, an integration test) could release an A4-type UTILIZE that was never
+    // Maker-submitted, defeating the whole point of the gate. Scoped to Sight-tenor IPLC_LC/UTILIZE
+    // ONLY — checking contract.tenorType, not just instrumentType/movementType — because a Usance LC's
+    // own UTILIZE is released through the EXACT SAME endpoint via A6's own compound flow
+    // (referencedTransactionId-based), which never calls submitByMaker() and was never meant to: A4's
+    // gate is Sight-only by design (catalogTenorFilter: 'SIGHT' on the client, mirrored here). A
+    // blanket "any IPLC_LC/UTILIZE requires makerSubmittedAt" rule would have incorrectly blocked every
+    // Usance Acceptance release; this narrower check cannot, since contract.tenorType is never 'SIGHT'
+    // for a Usance LC. Movements whose parent contract never declared an explicit tenorType (e.g. the
+    // Business Case Runner's own older Import Case #1/#3/#4/#5, which predate this fix and don't set
+    // one) are also unaffected — `contract.tenorType === 'SIGHT'` is false for `null` too, so this is
+    // purely additive for genuine Sight LCs, never a behavior change for anything that isn't one.
+    if (movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType === 'SIGHT' && !movement.makerSubmittedAt) {
+      throw new IllegalStateTransitionError(
+        `Cannot release movement ${movementId} — A4 (Sight Settlement) requires a Maker Submit ` +
+          `(POST /balance-movements/${movementId}/maker-submit) before the Checker can Release it.`,
+      );
+    }
+
     const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
     const releasedAt = this.now();
     // Compute the after-figure by simulating this one movement flipping to RELEASED,
