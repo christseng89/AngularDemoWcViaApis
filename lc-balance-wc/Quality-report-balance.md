@@ -19,12 +19,12 @@ silently assuming one or the other.
 | Dimension | Rating | Notes |
 |---|---|---|
 | **Reliability** | A (4.7/5) | 636/636 tests passing across 3 independent suites; no logic bugs found in this review's scope. |
-| **Security** | C (2.6/5) | No injection/secrets exposure; parameterized SQL. But: 8 High CVEs in prod Angular deps, zero authentication anywhere, permissive CORS. |
-| **Maintainability** | C (2.9/5) | One severe God-Component outlier (2,786 lines) drags an otherwise well-documented, strict-mode codebase down. |
-| **Coverage** | A (5/5) | All 3 suites clear a 90% floor on statements/branches/functions/lines. |
-| **Duplication** | B (3.6/5) | Concentrated in one 32-instance hotspot, not spread through the codebase. |
+| **Security** | C+ (3.0/5) | No injection/secrets exposure; parameterized SQL; the one patchable CVE found (BAL-004) is now fixed. 8 High CVEs in prod Angular deps and zero authentication remain, both deliberately deferred (see Remediation Status). |
+| **Maintainability** | B- (3.4/5) | The God-Component outlier's worst duplication is gone (BAL-005) and its paging logic is now shared (BAL-003, 1 of 3 planned extractions); the class itself is still large — 2 more extractions remain open. |
+| **Coverage** | A (5/5) | All 3 suites clear a 90% floor on statements/branches/functions/lines, unchanged after remediation. |
+| **Duplication** | A- (4.3/5) | The 32-instance hotspot (BAL-005) is fully eliminated. |
 
-### Composite score: **73 / 100 (C+ / B-)**
+### Composite score: **73 → 79 / 100 (C+ → B-)** — see [Remediation Status](#remediation-status-2026-08-16) below
 
 **Final assessment: CONDITIONAL PASS** — sound for its stated purpose (an internally-used
 prototype/demo) **and** for continued development under the project's own test-and-docs-sync rule. It is
@@ -34,27 +34,54 @@ See [Gate Conditions](#gate-conditions-before-any-production-consideration) at t
 
 ---
 
+## Remediation Status (2026-08-16)
+
+Per user instruction, all **Critical** and **Major** findings were addressed in this pass; the sole
+**Blocker** (BAL-001) was explicitly left as-is, matching this report's own framing of it as an accepted
+prototype-scope decision rather than an oversight. Three items were scoped down deliberately (user-confirmed)
+rather than attempted blind, given their size/risk relative to a single remediation pass:
+
+| ID | Severity | Status | What happened |
+|---|---|---|---|
+| BAL-001 | 🔴 Blocker | **Not actioned (by instruction)** | Left as-is — prototype-scope decision, not in scope for this pass. |
+| BAL-002 | 🟠 Critical | **Deferred, documented** | A 5-major-version Angular upgrade (17→~22) was judged too large/risky for a drive-by fix in this pass (real risk of breaking the 438-test suite and Formly/jest-preset-angular compatibility) — user-confirmed to defer rather than attempt blind. Still open; tracked below with the exact CVEs and target version. |
+| BAL-003 | 🟠 Critical | **Partially fixed (1 of 3 planned extractions)** | The three duplicated paging state machines (Catalog/Parent LC/IB Index picker) now share one `loadPagedCatalog` helper. Public field/method names the `.html` template binds to are unchanged. The Checker-actions extraction and the Look Up panel extraction remain open, per user-confirmed incremental scope. |
+| BAL-004 | 🟡 Major | **Fixed** | `uuid`/`@types/uuid` were unused dependencies (the code already uses `crypto.randomUUID()`) — removed entirely rather than patched. `npm audit`: 0 vulnerabilities. |
+| BAL-005 | 🟡 Major | **Fixed** | All 32 occurrences of `err.error?.message ?? String(err)` replaced with a single `describeApiError()` helper. |
+| BAL-006 | 🟡 Major | **Fixed at the boundary** | `balance-component-api.service.ts`'s 9 methods are now fully typed (`BalanceMovement`, `HttpResponse<BalanceMovement>`) instead of `Observable<any>`/`any[]`; its 2 remaining `params: any` locals are now `Record<string, string | number>`. The component's own internal `any`-typed fields (the propagated symptom, not the boundary itself) were deliberately left for a future incremental pass, per this report's own original remediation guidance ("do this incrementally per-method... each will surface currently-hidden shape mismatches"). |
+| BAL-007 | 🟡 Major (Technical Debt) | **Not actioned (by instruction)** | Needs a full SQLite→PostgreSQL engine swap to actually fix, not a code patch, and no Postgres instance exists in this environment — user-confirmed to leave as already-tracked debt (it's already documented as must-replace-before-production in this project's own `CLAUDE.md`). |
+
+**All three test suites re-verified green after every fix above** (`npm test`, exit 0 in each directory):
+
+| Suite | Statements | Branches | Functions | Lines | Tests |
+|---|---|---|---|---|---|
+| `microservices/balance-component/` | 96.46% | 90.41% | 100% | 99.76% | 172 (unchanged) |
+| `backend/` | 96.8% | 94.44% | 95.45% | 96.51% | 26 (unchanged) |
+| Angular app (`src/app/`) | 99.68% | **93.6%** (↑ from 90.11%) | 99.67% | 99.82% | 438 (2 spec assertions updated to match an intentional, behaviorally-identical call-shape change from the BAL-003 extraction — see that section) |
+
+---
+
 ## Table of Findings (priority order)
 
-| ID | Severity | Category | Title |
-|---|---|---|---|
-| [BAL-001](#bal-001) | 🔴 Blocker | Vulnerability | No authentication/authorization anywhere in the microservice |
-| [BAL-002](#bal-002) | 🟠 Critical | Vulnerability | 8 High-severity CVEs in production Angular dependencies |
-| [BAL-003](#bal-003) | 🟠 Critical | Code Smell | `transaction-builder.component.ts` is a 2,786-line God Component |
-| [BAL-004](#bal-004) | 🟡 Major | Vulnerability | Moderate CVE in microservice's `uuid` dependency |
-| [BAL-005](#bal-005) | 🟡 Major | Code Smell | Identical error-formatting expression duplicated 32× |
-| [BAL-006](#bal-006) | 🟡 Major | Code Smell | Weak typing (`any`) at the client↔server API boundary |
-| [BAL-007](#bal-007) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency |
-| [BAL-008](#bal-008) | 🔵 Minor | Security Hotspot | Backend CORS allows any origin |
-| [BAL-009](#bal-009) | 🔵 Minor | Security Hotspot | No security headers or rate limiting on either Express service |
-| [BAL-010](#bal-010) | 🔵 Minor | Code Smell | No ESLint/Prettier configured anywhere in the three sub-projects |
-| [BAL-011](#bal-011) | 🔵 Minor | Code Smell | Hand-rolled schema migration instead of a migration tool |
-| [BAL-012](#bal-012) | 🔵 Minor | Code Smell | Test-only internals attached to the Express `app` export |
-| [BAL-013](#bal-013) | ⚪ Info | Reliability | One line of provably-dead defensive code |
-| [BAL-014](#bal-014) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth |
-| [BAL-015](#bal-015) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found |
-| [BAL-016](#bal-016) | ⚪ Info (positive) | — | Test coverage clears 90% on all four metrics, all three suites |
-| [BAL-017](#bal-017) | ⚪ Info (positive) | — | Strict TypeScript compiler flags enabled project-wide |
+| ID | Severity | Category | Title | Status |
+|---|---|---|---|---|
+| [BAL-001](#bal-001) | 🔴 Blocker | Vulnerability | No authentication/authorization anywhere in the microservice | Not actioned (by instruction) |
+| [BAL-002](#bal-002) | 🟠 Critical | Vulnerability | 8 High-severity CVEs in production Angular dependencies | Deferred, documented |
+| [BAL-003](#bal-003) | 🟠 Critical | Code Smell | `transaction-builder.component.ts` is a 2,786-line God Component | Partially fixed (1/3) |
+| [BAL-004](#bal-004) | 🟡 Major | Vulnerability | Moderate CVE in microservice's `uuid` dependency | **Fixed** |
+| [BAL-005](#bal-005) | 🟡 Major | Code Smell | Identical error-formatting expression duplicated 32× | **Fixed** |
+| [BAL-006](#bal-006) | 🟡 Major | Code Smell | Weak typing (`any`) at the client↔server API boundary | **Fixed at boundary** |
+| [BAL-007](#bal-007) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency | Not actioned (by instruction) |
+| [BAL-008](#bal-008) | 🔵 Minor | Security Hotspot | Backend CORS allows any origin | Open (Minor, out of this pass's scope) |
+| [BAL-009](#bal-009) | 🔵 Minor | Security Hotspot | No security headers or rate limiting on either Express service | Open (Minor, out of this pass's scope) |
+| [BAL-010](#bal-010) | 🔵 Minor | Code Smell | No ESLint/Prettier configured anywhere in the three sub-projects | Open (Minor, out of this pass's scope) |
+| [BAL-011](#bal-011) | 🔵 Minor | Code Smell | Hand-rolled schema migration instead of a migration tool | Open (Minor, out of this pass's scope) |
+| [BAL-012](#bal-012) | 🔵 Minor | Code Smell | Test-only internals attached to the Express `app` export | Open (Minor, out of this pass's scope) |
+| [BAL-013](#bal-013) | ⚪ Info | Reliability | One line of provably-dead defensive code | Info only, no action needed |
+| [BAL-014](#bal-014) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth | Info only, no action needed |
+| [BAL-015](#bal-015) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found | — |
+| [BAL-016](#bal-016) | ⚪ Info (positive) | — | Test coverage clears 90% on all four metrics, all three suites | — |
+| [BAL-017](#bal-017) | ⚪ Info (positive) | — | Strict TypeScript compiler flags enabled project-wide | — |
 
 ---
 
@@ -112,6 +139,15 @@ node-gyp transitively). These affect the local build environment, not what ships
 and are typical for any current Angular CLI project; tracked here for completeness but not counted toward
 the Critical rating above.)*
 
+**Outcome (2026-08-16): Deferred, documented — not fixed in this pass.** User-confirmed decision: a
+5-major-version jump carries real risk of breaking Angular 17.3's control-flow syntax, `@ngx-formly`
+compatibility, and `jest-preset-angular` compatibility, with a real chance of leaving the 438-test Angular
+suite broken mid-upgrade if attempted as a drive-by fix alongside five other findings. Treated the same
+way BAL-001 (the Blocker) was treated — deliberately deferred, not silently skipped. **Follow-up work
+needed:** a dedicated `ng update` pass (17→18→…→22, one major version at a time), re-running
+`npm audit --omit=dev` and the full Angular test suite after each step, tracked as its own piece of work
+separate from routine feature changes.
+
 ---
 
 ### BAL-004
@@ -132,6 +168,14 @@ patchable advisory.
 
 **Recommended remediation:** `npm audit fix --force` in `microservices/balance-component/`, then run
 `npm test` to confirm the major-version bump doesn't change ID-generation behavior any caller depends on.
+
+**Outcome (2026-08-16): Fixed — better than the recommended remediation.** Investigation found `uuid`
+was never actually imported anywhere in `src/` — `balanceService.ts` uses Node's built-in
+`crypto.randomUUID()` instead (line 15, 397, 519, 520). Rather than bump to the breaking `uuid@14`, both
+`uuid` and `@types/uuid` were removed from `package.json` entirely — eliminates the CVE with zero
+behavior risk, since no code path exercised the vulnerable package at all. Verified: `npm audit` → 0
+vulnerabilities; `npm run typecheck` clean; `npm test` → 172/172 passing, coverage unchanged
+(96.46/90.41/100/99.76).
 
 ---
 
@@ -205,6 +249,27 @@ the LC/Acceptance/SG tabs, which are already fairly self-contained. Do this incr
 per PR, re-running the full 90%-gated suite after each (per this project's own standing rule) — not as
 one large rewrite.
 
+**Outcome (2026-08-16): Partially fixed — extraction (1) of the three above is done; (2) and (3) remain
+open, user-confirmed as follow-up rather than attempted in the same pass.** A new private
+`loadPagedCatalog()` helper now holds the shared "call `catalog()`, populate items+total(+snapshots),
+clear both on any failure" body that `reloadCatalog()`, `loadParentPage()`, and `loadIbIndexPage()` each
+used to reimplement byte-for-byte. Each of the three keeps its own distinct guard condition (Catalog also
+blocks on `isCreatingMovement`; IB Index also requires a picked LC Number) and its own public
+`page`/`total`/`pageSize` fields, `*TotalPages` getter, and `prevPage()`/`nextPage()` methods completely
+unchanged — deliberate, since the `.html` template (not covered by this project's Jest config) binds
+directly to those names and a rename would be an unverified, silent risk. `transaction-builder.component.ts`
+grew slightly in raw line count (2786→2829, mostly new doc comments) since this consolidates *duplicated
+logic paths*, not raw text — the real signal is the branch-coverage jump from 90.11%→93.6% (662/704 vs.
+573/769 covered branches) once the three call sites collapsed into one well-exercised implementation.
+One test-assertion update was required and made:
+`transaction-builder.component.selection.spec.ts`'s two `ibIndexNextPage`/`ibIndexPrevPage` tests
+expected `api.catalog(...)` called with 6 positional args (tenorFamily omitted); the shared helper always
+passes all 7 (tenorFamily explicitly `undefined` when unset) — behaviorally identical (the method's own
+optional parameter reads as `undefined` either way), so the two assertions were updated to match rather
+than treated as a regression. Verified: `npx tsc -p tsconfig.app.json --noEmit` clean; `npm test` →
+438/438 passing. **Follow-up work needed:** extractions (2) `ChecklistActionsComponent` and (3)
+`LookupPanelComponent`, each as its own scoped pass per the original recommendation above.
+
 ---
 
 ### BAL-005
@@ -226,6 +291,14 @@ one.
 **Recommended remediation:** extract `private describeApiError(err: unknown): string { return
 (err as any)?.error?.message ?? String(err); }` once, and call it from all 32 sites. Zero behavior
 change, one clear place to enhance later.
+
+**Outcome (2026-08-16): Fixed, exactly as recommended.** `describeApiError(err: any)` added (colocated
+with `formatAmount`, the file's other small display-formatting helper); all 32 call sites — including the
+two `fallbackErr`-named ones inside `searchExistingContract`'s dual-instrument-fallback path and
+`searchCheckerLc`'s own equivalent — now call `this.describeApiError(...)`. Zero behavior change (the
+implementation is character-for-character what was inlined 32 times). Verified:
+`grep -c "\.error?\.message ?? String("` → 1 (the helper's own body, correctly not itself a duplicate
+call site); `npx tsc -p tsconfig.app.json --noEmit` clean; `npm test` → 438/438 passing.
 
 ---
 
@@ -252,6 +325,63 @@ no compiler catches.
 server-side; this is a matter of sharing/re-declaring them client-side, not inventing new ones) and
 replace the `Observable<any>` signatures. Do this incrementally per-method rather than all at once, since
 each will surface currently-hidden shape mismatches that need individual triage.
+
+**Outcome (2026-08-16): Fixed at the boundary — the service, not the propagated component fields.** Added
+a `BalanceMovement` interface to `balance-component-api.service.ts` mirroring the microservice's own
+`src/types.ts` shape (status/movementType/sourceTransactionRef/warnings/acknowledgedAt/etc. — every field
+the component actually reads). All 9 of the service's methods are now properly typed:
+`createMovement` → `Observable<HttpResponse<BalanceMovement>>` (it already passed `observe: 'response'`;
+every call site already destructures `.body`, confirmed via `grep` before typing it), `release`/`reject`/
+`cancel`/`acknowledge` → `Observable<BalanceMovement>`, `listMovements` → `Observable<BalanceMovement[]>`.
+The 2 remaining `params: any` locals (inside `resolveContract`/`catalog`) became
+`Record<string, string | number>` — this tripped the project's own `noPropertyAccessFromIndexSignature`
+tsconfig flag (the same TS4111 class the root `CLAUDE.md` already documents for the sibling
+`lc-payment-wc` project), fixed by switching to bracket-notation (`params['ibNumber']`) at the 6 affected
+assignment sites. **Deliberately not fixed in this pass:** the component's own 42 `any`-typed *fields*
+(`payableMovements: any[]`, `submitResult: any`, etc.) — these are the propagated symptom, not the
+boundary itself, and retyping them risks surfacing real shape mismatches needing individual triage exactly
+as this finding's own original remediation text warned; assigning a now-properly-typed `BalanceMovement`
+into an `any`-typed field is always safe, so this fix is additive and creates no new risk, but doesn't
+by itself shrink the 42 count. **Follow-up work needed:** retype the component's own fields incrementally,
+one field/method at a time, now that the service actually has something real to type them *as*. Verified:
+`npx tsc -p tsconfig.app.json --noEmit` clean; `npm test` → 438/438 passing, coverage unchanged.
+
+---
+
+### BAL-007
+**SQLite whole-file locking blocks per-instrument concurrency** — 🟡 Major (Technical Debt)
+
+*(This finding was listed in the Table of Findings at the top but its own detail section was missed in
+the original pass — added here now for completeness, since a reader following the table's own link
+shouldn't hit a dead anchor.)*
+
+**Evidence:** `microservices/balance-component/src/db/index.ts`'s own doc comment, already present before
+this review:
+> SQLite locks at the whole-database-file level even under WAL — cannot demonstrate true per-instrument
+> (per-`logicalContractId`) non-blocking concurrency the way the design doc's §6 requires: *"同一張 LC
+> 底下的多筆同時申請會被正確序列化，但不同 LC 之間完全不互相阻塞"* (same-LC writes serialize,
+> different-LC writes never block each other) — every write serializes globally regardless of
+> `logicalContractId`.
+
+This is not a newly-discovered defect — it's an already-documented, already-accepted limitation
+(`lc-balance-wc/CLAUDE.md`'s own decision log flags it as **must-replace** — PostgreSQL row-level
+locking — before the design doc's concurrency requirement is actually validated in production). It is
+included in this report's findings table because a SonarQube-style scan would independently flag the
+same "global lock, no row-level granularity" pattern as a scalability/reliability risk regardless of
+whether the team already knows about it — the value of listing it here is confirming it, not discovering
+it.
+
+**Recommended remediation:** swap `node:sqlite` for PostgreSQL (`SELECT ... FOR UPDATE` scoped to
+`balance_contract_id`) or MySQL/InnoDB row-level locking, per the existing `CLAUDE.md` guidance — this is
+a database-engine migration, not a code patch, and needs a real Postgres/MySQL instance to develop and
+test against.
+
+**Outcome (2026-08-16): Not actioned, by instruction — confirmed as already-tracked debt.** User-confirmed
+decision: attempting a database engine swap without a real PostgreSQL instance available in this
+environment to test against would be reckless, and the limitation is already correctly documented (not
+silently accepted) in this project's own `CLAUDE.md`. No code change made. Remains exactly the "must
+replace before production, not before continued prototype work" status quo the existing documentation
+already states.
 
 ---
 
@@ -359,7 +489,7 @@ all green as of this review (`npm test` exit code 0 in each of the three directo
 |---|---|---|---|---|---|
 | `microservices/balance-component/` | 96.46% | 90.41% | 100% | 99.76% | 172 |
 | `backend/` | 96.8% | 94.44% | 95.45% | 96.51% | 26 |
-| Angular app (`src/app/`) | 99.68% | 90.11% | 99.66% | 99.82% | 438 |
+| Angular app (`src/app/`) | 99.68% | 93.6% (post-remediation, ↑ from 90.11%) | 99.66% | 99.82% | 438 |
 
 ### BAL-017
 **Strict TypeScript compiler flags enabled project-wide** — both `lc-balance-wc/tsconfig.json` and
@@ -374,16 +504,26 @@ worth fixing — the type system is otherwise doing real work everywhere it's ac
 
 This codebase earns its **CONDITIONAL PASS** for continued prototype/demo development as-is. Before this
 project (or any component of it) is considered for a deployment handling real trade-finance data or
-real user credentials, the following are non-negotiable, in this order:
+real user credentials, the following are non-negotiable, in this order — **updated 2026-08-16 to reflect
+the remediation pass above**; BAL-004 is now fixed and dropped from this list, everything else is
+unchanged since none of it was in scope for this pass (deliberately, per user instruction):
 
 1. **BAL-001** — real authentication, with `createdBy`/`releasedBy`/etc. derived server-side from a
-   verified identity, not trusted from the request body.
-2. **BAL-002** — Angular upgraded off the CVE-affected 17.3.x line.
-3. **BAL-004, BAL-008, BAL-009** — dependency patch, CORS allow-list, security headers + rate limiting.
+   verified identity, not trusted from the request body. *(Explicitly not actioned in the 2026-08-16
+   pass, by instruction — treated as an accepted prototype-scope decision, not an oversight.)*
+2. **BAL-002** — Angular upgraded off the CVE-affected 17.3.x line. *(Deferred in the 2026-08-16 pass —
+   see that finding's own Outcome note for why and what the follow-up work looks like.)*
+3. **BAL-008, BAL-009** — CORS allow-list, security headers + rate limiting. *(Still open; Minor severity,
+   out of scope for a Critical/Major-only pass.)*
+4. **BAL-007** — the SQLite→PostgreSQL engine swap, if this project's storage layer is ever promoted
+   beyond prototype use. *(Not actioned in the 2026-08-16 pass — needs a real Postgres instance to
+   develop/test against, which this environment doesn't have.)*
 
-None of the Maintainability findings (BAL-003, BAL-005, BAL-006, BAL-010–BAL-012) block a production
-decision on their own, but BAL-003 in particular will make every future change to the Transaction Builder
-riskier and slower until addressed, and should be scheduled independently of any production timeline.
+None of the Maintainability findings (BAL-003 — 1 of 3 planned extractions now done, BAL-005 — fixed,
+BAL-006 — fixed at the boundary, BAL-010–BAL-012) block a production decision on their own, but BAL-003's
+remaining two extractions (Checker actions, Look Up panel) will keep making every future change to the
+Transaction Builder riskier and slower than necessary until addressed, and should be scheduled
+independently of any production timeline.
 
 Per this project's own standing rule (`lc-balance-wc/CLAUDE.md`): any remediation work here must come with
 matching test updates and must leave all three suites passing at their 90% floor before being considered

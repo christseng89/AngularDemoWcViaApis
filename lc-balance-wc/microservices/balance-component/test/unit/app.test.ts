@@ -1196,3 +1196,137 @@ describe('HTTP integration — balanceService.ts createMovement() error branches
     expect(res.body.message).toMatch(/Unrecognized movementType "BOGUS_TYPE"/);
   });
 });
+
+describe('HTTP integration — coverage-closing pass (raising the branch floor from 90% to 95%)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('GET /balance-contracts/:balanceContractId/balance with an unknown id -> 404 (getBalanceSnapshot\'s own NotFoundError, not otherwise exercised — every other test in this suite always uses a real id)', async () => {
+    const res = await request(app).get('/balance-contracts/does-not-exist/balance').expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('GET /balance-contracts/:balanceContractId/movements with an unknown id -> 404 (listMovements\' own NotFoundError)', async () => {
+    const res = await request(app).get('/balance-contracts/does-not-exist/movements').expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('GET /balance-movements/:movementId/balance-as-of with an unknown movementId -> 404 (getBalanceSnapshotAsOfMovement\'s own NotFoundError)', async () => {
+    const res = await request(app).get('/balance-movements/does-not-exist/balance-as-of').expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('POST /balance-movements with neither naturalKey nor balanceContractId -> 400 ("naturalKey or balanceContractId is required")', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', movementType: 'ISSUE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/naturalKey or balanceContractId is required/);
+  });
+
+  test('re-ISSUE guard on EPLC_CONFIRMATION mentions the AMEND alternative (the re-ISSUE describe block above only exercised IPLC_LC/IPLC_ACCEPTANCE, whose error message omits "/AMEND")', async () => {
+    await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF-REISSUE' }, movementType: 'ISSUE', eventSeq: 1, amount: '50000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF-REISSUE' }, movementType: 'ISSUE', eventSeq: 1, amount: '50000', currency: 'USD', createdBy: 'maker1' })
+      .expect(409);
+    expect(res.body.message).toMatch(/AMEND_INCREASE\/AMEND_DECREASE\/AMEND to change it instead/);
+  });
+
+  test('POST /balance-movements/:movementId/release with an unknown movementId -> 404', async () => {
+    const res = await request(app).post('/balance-movements/does-not-exist/release').send({ releasedBy: 'checker1' }).expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('POST /balance-movements/:movementId/reject with an unknown movementId -> 404', async () => {
+    const res = await request(app)
+      .post('/balance-movements/does-not-exist/reject')
+      .send({ releasedBy: 'checker1', reasonCode: 'BAD' })
+      .expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('POST /balance-movements/:movementId/cancel with an unknown movementId -> 404', async () => {
+    const res = await request(app).post('/balance-movements/does-not-exist/cancel').send({ cancelledBy: 'maker1' }).expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('POST /balance-movements/:movementId/acknowledge with an unknown movementId -> 404', async () => {
+    const res = await request(app).post('/balance-movements/does-not-exist/acknowledge').send({ acknowledgedBy: 'checker1' }).expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  test('a movement created with an explicit accountEntries array round-trips through storage (JSON.stringify on insert, JSON.parse on read) — every other test in this suite omits accountEntries entirely', async () => {
+    const createRes = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-ACCTENTRIES' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        accountEntries: [{ accountRef: 'CUST-ACC', drCr: 'D', amount: '1000' }],
+      })
+      .expect(201);
+    expect(createRes.body.accountEntries).toEqual([{ accountRef: 'CUST-ACC', drCr: 'D', amount: '1000' }]);
+
+    const movements = await request(app).get(`/balance-contracts/${createRes.body.balanceContractId}/movements`).expect(200);
+    expect(movements.body[0].accountEntries).toEqual([{ accountRef: 'CUST-ACC', drCr: 'D', amount: '1000' }]);
+  });
+
+  test('GET /balance-contracts/catalog without instrumentType -> 400 (the catalog route\'s own check, distinct from GET /balance-contracts\' — that one is already covered above)', async () => {
+    const res = await request(app).get('/balance-contracts/catalog').expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/instrumentType is required/);
+  });
+
+  test('GET /balance-contracts/catalog with explicit page and pageSize query params converts both to Number (every other catalog test in this suite omits them, relying on the service\'s own defaults)', async () => {
+    await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-PAGETEST' }, movementType: 'ISSUE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    const res = await request(app).get('/balance-contracts/catalog').query({ instrumentType: 'IPLC_LC', page: '1', pageSize: '5' }).expect(200);
+    expect(res.body.page).toBe(1);
+    expect(res.body.pageSize).toBe(5);
+  });
+
+  test('POST /balance-movements/:movementId/release without releasedBy -> 400', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-NORELEASEDBY' }, movementType: 'ISSUE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({}).expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/releasedBy is required/);
+  });
+
+  test('POST /balance-movements/:movementId/acknowledge without acknowledgedBy -> 400', async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF-NOACK' }, movementType: 'ISSUE', eventSeq: 1, amount: '50000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'CNF-NOACK' }).expect(200);
+    const exam = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'CNF-NOACK', ibNumber: 'EB01' },
+        parentLogicalContractId: cnfContract.body.logicalContractId,
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${exam.body.movementId}/acknowledge`).send({}).expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/acknowledgedBy is required/);
+  });
+});

@@ -555,24 +555,67 @@ export class TransactionBuilderComponent {
     });
   }
 
-  /** Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計" — page defaults to 1 (a fresh search), pass an explicit page to page through an already-loaded list. */
-  reloadCatalog(page = 1): void {
-    if (!this.model.instrumentType || this.isCreatingMovement) {
-      this.catalogContracts = [];
-      this.catalogTotal = 0;
+  /**
+   * Quality-report-balance.md BAL-003 (first of three planned extractions — see that report's
+   * "one real extraction now" scope note): shared body behind the Catalog/Parent LC/IB Index pickers'
+   * three near-identical "call catalog(), populate items+total(+snapshots), clear both on any failure"
+   * state machines. Each picker's own public page/total/pageSize fields, `prevPage()`/`nextPage()`, and
+   * `*TotalPages` getter are all UNCHANGED below — this only consolidates the internal fetch/populate
+   * logic, since the `.html` template (not covered by this project's Jest config) binds directly to
+   * those public names and must not need to change. Each picker's own DIFFERENT guard condition (e.g.
+   * Catalog also blocks on `isCreatingMovement`, IB Index also requires a picked LC Number) is still
+   * evaluated by that picker's own thin wrapper below, not hidden in here — only the fetch/populate
+   * shape that was byte-for-byte identical three times over is shared.
+   */
+  private loadPagedCatalog(args: {
+    guardFails: boolean;
+    instrumentType: InstrumentType;
+    search?: string;
+    page: number;
+    pageSize: number;
+    lcNumber?: string;
+    tenorFamily?: 'SIGHT' | 'USANCE';
+    setPage: (page: number) => void;
+    setContracts: (items: BalanceContract[]) => void;
+    setTotal: (total: number) => void;
+    snapshots?: Map<string, BalanceSnapshot>;
+    onSuccess?: (items: BalanceContract[]) => void;
+  }): void {
+    args.setPage(args.page);
+    if (args.guardFails) {
+      args.setContracts([]);
+      args.setTotal(0);
       return;
     }
-    this.catalogPage = page;
-    this.api.catalog(this.model.instrumentType, 'ACTIVE', this.catalogSearch || undefined, page, this.catalogPageSize, undefined, this.selectedFunction?.catalogTenorFilter).subscribe({
+    this.api.catalog(args.instrumentType, 'ACTIVE', args.search || undefined, args.page, args.pageSize, args.lcNumber, args.tenorFamily).subscribe({
       next: (result) => {
-        this.catalogContracts = result.items;
-        this.catalogTotal = result.total;
-        this.loadSnapshotsInto(result.items, this.catalogSnapshots);
-        if (this.selectedFunction?.payExistingUtilize) this.loadPayableIbHints(result.items);
+        args.setContracts(result.items);
+        args.setTotal(result.total);
+        if (args.snapshots) this.loadSnapshotsInto(result.items, args.snapshots);
+        args.onSuccess?.(result.items);
       },
       error: () => {
-        this.catalogContracts = [];
-        this.catalogTotal = 0;
+        args.setContracts([]);
+        args.setTotal(0);
+      },
+    });
+  }
+
+  /** Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計" — page defaults to 1 (a fresh search), pass an explicit page to page through an already-loaded list. */
+  reloadCatalog(page = 1): void {
+    this.loadPagedCatalog({
+      guardFails: !this.model.instrumentType || this.isCreatingMovement,
+      instrumentType: this.model.instrumentType!,
+      search: this.catalogSearch,
+      page,
+      pageSize: this.catalogPageSize,
+      tenorFamily: this.selectedFunction?.catalogTenorFilter,
+      setPage: (p) => (this.catalogPage = p),
+      setContracts: (items) => (this.catalogContracts = items),
+      setTotal: (total) => (this.catalogTotal = total),
+      snapshots: this.catalogSnapshots,
+      onSuccess: (items) => {
+        if (this.selectedFunction?.payExistingUtilize) this.loadPayableIbHints(items);
       },
     });
   }
@@ -715,40 +758,31 @@ export class TransactionBuilderComponent {
     this.loadParentPage(1);
   }
 
-  /** Business instruction 2026-08-14 "Page by Page設計" — fetches one page without resetting the current parent selection. */
+  /**
+   * Business instruction 2026-08-14 "Page by Page設計" — fetches one page without resetting the
+   * current parent selection. See `loadPagedCatalog`'s own doc comment (BAL-003) for why this is now
+   * a thin wrapper — the guard condition and every parameter below are unchanged from before the
+   * extraction, only the fetch/populate/error body moved into the shared helper.
+   *
+   * Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?", "A7 should filter out LC
+   * records Tenor = Sight") — same class of bug as A5's flat Catalog picker: filtering client-side AFTER
+   * server pagination let a page of raw rows contain almost none of the eligible (Usance) tenor. A6/B4
+   * (tenorTypeOptions set) and A7/B5 (catalogTenorFilter — an Acceptance never exists under a Sight LC) both
+   * filter server-side; A8's SHGT parent (neither) stays unfiltered, same as before.
+   */
   private loadParentPage(page: number): void {
-    this.parentPage = page;
-    if (!this.parentInstrumentType) {
-      this.parentCatalog = [];
-      this.parentTotal = 0;
-      return;
-    }
-    // Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?", "A7 should filter out LC
-    // records Tenor = Sight") — same class of bug as A5's flat Catalog picker: filtering client-side AFTER
-    // server pagination let a page of raw rows contain almost none of the eligible (Usance) tenor. A6/B4
-    // (tenorTypeOptions set) and A7/B5 (catalogTenorFilter — an Acceptance never exists under a Sight LC) both
-    // filter server-side; A8's SHGT parent (neither) stays unfiltered, same as before.
-    this.api
-      .catalog(
-        this.parentInstrumentType,
-        'ACTIVE',
-        this.parentSearch || undefined,
-        page,
-        this.parentPageSize,
-        undefined,
-        this.parentTenorFamily,
-      )
-      .subscribe({
-        next: (result) => {
-          this.parentCatalog = result.items;
-          this.parentTotal = result.total;
-          this.loadSnapshotsInto(result.items, this.parentSnapshots);
-        },
-        error: () => {
-          this.parentCatalog = [];
-          this.parentTotal = 0;
-        },
-      });
+    this.loadPagedCatalog({
+      guardFails: !this.parentInstrumentType,
+      instrumentType: this.parentInstrumentType as InstrumentType,
+      search: this.parentSearch,
+      page,
+      pageSize: this.parentPageSize,
+      tenorFamily: this.parentTenorFamily,
+      setPage: (p) => (this.parentPage = p),
+      setContracts: (items) => (this.parentCatalog = items),
+      setTotal: (total) => (this.parentTotal = total),
+      snapshots: this.parentSnapshots,
+    });
   }
 
   /** Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?") — search resets to page 1. */
@@ -861,6 +895,17 @@ export class TransactionBuilderComponent {
     const [whole, frac] = amount.split('.');
     const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return frac ? `${withCommas}.${frac}` : withCommas;
+  }
+
+  /**
+   * Quality-report-balance.md BAL-005: single place to turn an HTTP error into a display string —
+   * previously this exact `this.describeApiError(err)` expression was duplicated 32 times
+   * across every API-calling method below. Every call site's own error message/context (e.g. "Could
+   * not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: …") is
+   * unchanged; only this shared tail expression moved here.
+   */
+  private describeApiError(err: any): string {
+    return err?.error?.message ?? String(err);
   }
 
   /**
@@ -1135,7 +1180,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = err.error?.message ?? String(err);
+        this.submitError = this.describeApiError(err);
       },
     });
   }
@@ -1289,14 +1334,14 @@ export class TransactionBuilderComponent {
             error: (fallbackErr) => {
               this.selectedContract = null;
               this.selectedContractSnapshot = null;
-              this.searchError = fallbackErr.error?.message ?? String(fallbackErr);
+              this.searchError = this.describeApiError(fallbackErr);
             },
           });
           return;
         }
         this.selectedContract = null;
         this.selectedContractSnapshot = null;
-        this.searchError = err.error?.message ?? String(err);
+        this.searchError = this.describeApiError(err);
       },
     });
   }
@@ -1346,24 +1391,22 @@ export class TransactionBuilderComponent {
     }
   }
 
-  /** Step 2 of the "LC Index -> IB Index" cascading picker (business instruction 2026-08-14) — one page of IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows under the exact LC picked in Step 1. */
+  /**
+   * Step 2 of the "LC Index -> IB Index" cascading picker (business instruction 2026-08-14) — one page
+   * of IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows under the exact LC picked in Step 1. See
+   * `loadPagedCatalog`'s own doc comment (BAL-003) — thin wrapper, guard/params unchanged.
+   */
   private loadIbIndexPage(page: number): void {
-    this.ibIndexPage = page;
-    if (!this.model.instrumentType || !this.searchNaturalKey.lcNumber) {
-      this.ibIndexCatalog = [];
-      this.ibIndexTotal = 0;
-      return;
-    }
-    this.api.catalog(this.model.instrumentType, 'ACTIVE', undefined, page, this.ibIndexPageSize, this.searchNaturalKey.lcNumber).subscribe({
-      next: (result) => {
-        this.ibIndexCatalog = result.items;
-        this.ibIndexTotal = result.total;
-        this.loadSnapshotsInto(result.items, this.ibIndexSnapshots);
-      },
-      error: () => {
-        this.ibIndexCatalog = [];
-        this.ibIndexTotal = 0;
-      },
+    this.loadPagedCatalog({
+      guardFails: !this.model.instrumentType || !this.searchNaturalKey.lcNumber,
+      instrumentType: this.model.instrumentType!,
+      page,
+      pageSize: this.ibIndexPageSize,
+      lcNumber: this.searchNaturalKey.lcNumber,
+      setPage: (p) => (this.ibIndexPage = p),
+      setContracts: (items) => (this.ibIndexCatalog = items),
+      setTotal: (total) => (this.ibIndexTotal = total),
+      snapshots: this.ibIndexSnapshots,
     });
   }
 
@@ -1638,7 +1681,7 @@ export class TransactionBuilderComponent {
       error: (err) => {
         if (!fallback) {
           this.checkerSearching = false;
-          this.checkerSearchError = err.error?.message ?? String(err);
+          this.checkerSearchError = this.describeApiError(err);
           return;
         }
         // B6's dualInstrumentFallback (Sight EPLC_DUE_FROM_ISSUING_BANK vs Usance
@@ -1654,7 +1697,7 @@ export class TransactionBuilderComponent {
           },
           error: (fallbackErr) => {
             this.checkerSearching = false;
-            this.checkerSearchError = fallbackErr.error?.message ?? String(fallbackErr);
+            this.checkerSearchError = this.describeApiError(fallbackErr);
           },
         });
       },
@@ -1804,7 +1847,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.checkerBusy = false;
-        this.checkerError = err.error?.message ?? String(err);
+        this.checkerError = this.describeApiError(err);
       },
     });
   }
@@ -2102,14 +2145,14 @@ export class TransactionBuilderComponent {
             },
             error: (err) => {
               this.submitting = false;
-              this.submitError = `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${err.error?.message ?? String(err)}`;
+              this.submitError = `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${this.describeApiError(err)}`;
               this.submitResult = err.error ?? null;
             },
           });
         },
         error: (err) => {
           this.submitting = false;
-          this.submitError = `Could not reserve the Shipping Guarantee redemption: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not reserve the Shipping Guarantee redemption: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2153,7 +2196,7 @@ export class TransactionBuilderComponent {
             },
             error: (err) => {
               this.submitting = false;
-              this.submitError = `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${err.error?.message ?? String(err)}`;
+              this.submitError = `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${this.describeApiError(err)}`;
             },
           });
         },
@@ -2223,13 +2266,13 @@ export class TransactionBuilderComponent {
                 },
                 error: (err) => {
                   this.submitting = false;
-                  this.submitError = `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${err.error?.message ?? String(err)}`;
+                  this.submitError = `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${this.describeApiError(err)}`;
                 },
               });
             },
             error: (err) => {
               this.submitting = false;
-              this.submitError = `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${err.error?.message ?? String(err)}`;
+              this.submitError = `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${this.describeApiError(err)}`;
             },
           });
         },
@@ -2285,13 +2328,13 @@ export class TransactionBuilderComponent {
                 },
                 error: (err) => {
                   this.submitting = false;
-                  this.submitError = `Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: ${err.error?.message ?? String(err)}`;
+                  this.submitError = `Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: ${this.describeApiError(err)}`;
                 },
               });
             },
             error: (err) => {
               this.submitting = false;
-              this.submitError = `Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: ${err.error?.message ?? String(err)}`;
+              this.submitError = `Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: ${this.describeApiError(err)}`;
             },
           });
         },
@@ -2354,7 +2397,7 @@ export class TransactionBuilderComponent {
         },
         error: (err) => {
           this.checkerBusy = false;
-          this.checkerError = err.error?.message ?? String(err);
+          this.checkerError = this.describeApiError(err);
         },
       });
       return;
@@ -2380,7 +2423,7 @@ export class TransactionBuilderComponent {
         next: () => this.releaseAcceptance(checkerId),
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = `Could not release the ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${this.selectedPayMovement?.sourceTransactionRef}) — Acceptance NOT approved: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not release the ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${this.selectedPayMovement?.sourceTransactionRef}) — Acceptance NOT approved: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2398,7 +2441,7 @@ export class TransactionBuilderComponent {
         next: () => this.releaseArrivalDocument(),
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = `Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2415,7 +2458,7 @@ export class TransactionBuilderComponent {
         next: (res) => this.releaseMatchedReceivable(checkerId, res),
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = err.error?.message ?? String(err);
+          this.submitError = this.describeApiError(err);
         },
       });
       return;
@@ -2430,7 +2473,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = err.error?.message ?? String(err);
+        this.submitError = this.describeApiError(err);
       },
     });
   }
@@ -2447,7 +2490,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = `Acceptance settled, but the matching Reimbursement Receivable failed to release: ${err.error?.message ?? String(err)}`;
+        this.submitError = `Acceptance settled, but the matching Reimbursement Receivable failed to release: ${this.describeApiError(err)}`;
       },
     });
   }
@@ -2471,7 +2514,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = `Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${err.error?.message ?? String(err)}`;
+        this.submitError = `Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${this.describeApiError(err)}`;
       },
     });
   }
@@ -2505,7 +2548,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = `${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${err.error?.message ?? String(err)}`;
+        this.submitError = `${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${this.describeApiError(err)}`;
       },
     });
   }
@@ -2516,7 +2559,7 @@ export class TransactionBuilderComponent {
       next: () => this.releaseAcceptanceReimbReceivable(checkerId, acceptRes),
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = `Confirmation accepted, but the Acceptance liability failed to release: ${err.error?.message ?? String(err)}`;
+        this.submitError = `Confirmation accepted, but the Acceptance liability failed to release: ${this.describeApiError(err)}`;
       },
     });
   }
@@ -2534,7 +2577,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = `Acceptance released, but the Reimbursement Receivable asset failed to release: ${err.error?.message ?? String(err)}`;
+        this.submitError = `Acceptance released, but the Reimbursement Receivable asset failed to release: ${this.describeApiError(err)}`;
       },
     });
   }
@@ -2569,7 +2612,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.actionBusy = false;
-        this.submitError = err.error?.message ?? String(err);
+        this.submitError = this.describeApiError(err);
       },
     });
   }
@@ -2608,7 +2651,7 @@ export class TransactionBuilderComponent {
         },
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = err.error?.message ?? String(err);
+          this.submitError = this.describeApiError(err);
         },
       });
     };
@@ -2618,7 +2661,7 @@ export class TransactionBuilderComponent {
         next: () => cancelPrimary(),
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = `Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2631,7 +2674,7 @@ export class TransactionBuilderComponent {
         next: () => cancelPrimary(),
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = `Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2649,13 +2692,13 @@ export class TransactionBuilderComponent {
             next: () => cancelPrimary(),
             error: (err) => {
               this.actionBusy = false;
-              this.submitError = `Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${err.error?.message ?? String(err)}`;
+              this.submitError = `Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${this.describeApiError(err)}`;
             },
           });
         },
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = `Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2669,7 +2712,7 @@ export class TransactionBuilderComponent {
         next: () => cancelPrimary(),
         error: (err) => {
           this.actionBusy = false;
-          this.submitError = `Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${err.error?.message ?? String(err)}`;
+          this.submitError = `Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${this.describeApiError(err)}`;
         },
       });
       return;
@@ -2699,7 +2742,7 @@ export class TransactionBuilderComponent {
       next: (contract) => {
         this.api.getSnapshot(contract.balanceContractId).subscribe({
           next: (snapshot) => (this.lookupResult = { contract, snapshot }),
-          error: (err) => (this.lookupError = err.error?.message ?? String(err)),
+          error: (err) => (this.lookupError = this.describeApiError(err)),
         });
         // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per contract.
         this.api.listMovements(contract.balanceContractId).subscribe({
@@ -2733,7 +2776,7 @@ export class TransactionBuilderComponent {
           });
         }
       },
-      error: (err) => (this.lookupError = err.error?.message ?? String(err)),
+      error: (err) => (this.lookupError = this.describeApiError(err)),
     });
   }
 

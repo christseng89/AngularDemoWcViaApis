@@ -702,7 +702,11 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.ibIndexPrevPage();
 
       expect(comp.ibIndexPage).toBe(1);
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 10, 'LC1');
+      // BAL-003 (Quality-report-balance.md): loadIbIndexPage now delegates to the shared
+      // loadPagedCatalog helper, which always passes all 7 catalog() positional args (tenorFamily
+      // explicitly undefined when unset) rather than omitting a trailing one — behaviorally identical
+      // (catalog()'s own tenorFamily param is undefined either way), just a visible arg-count change.
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 10, 'LC1', undefined);
     });
 
     it('ibIndexPrevPage is a no-op on page 1', () => {
@@ -724,7 +728,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.ibIndexNextPage();
 
       expect(comp.ibIndexPage).toBe(2);
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 2, 10, 'LC1');
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 2, 10, 'LC1', undefined);
     });
 
     it('ibIndexNextPage is a no-op on the last page', () => {

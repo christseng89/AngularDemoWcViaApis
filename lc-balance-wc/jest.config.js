@@ -24,13 +24,13 @@ module.exports = {
     '!src/app/app.routes.ts',
   ],
   coverageReporters: ['text', 'text-summary', 'lcov'],
-  // Same 90% floor convention as lc-payment-wc/jest.config.js.
+  // Raised from the original 90% floor (lc-payment-wc/jest.config.js's own convention) to 95%.
   coverageThreshold: {
     global: {
-      branches: 90,
-      functions: 90,
-      lines: 90,
-      statements: 90,
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
     },
   },
 };

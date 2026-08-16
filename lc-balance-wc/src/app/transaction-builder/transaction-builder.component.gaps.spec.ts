@@ -172,6 +172,12 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.activeLookupLabel).toBe('LC TYPED01');
     });
 
+    it('activeLookupSnapshot/activeLookupContract fall back to null on the default (LC) tab before any lookup has run', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      expect(c.activeLookupSnapshot).toBeNull();
+      expect(c.activeLookupContract).toBeNull();
+    });
+
     it('lookupIsUsanceLc is false with no lookupResult, false for a non-LC/non-Confirmation contract, false for Sight, true for Usance', () => {
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.lookupIsUsanceLc).toBe(false);
@@ -320,6 +326,13 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.filteredPayableMovements).toEqual([{ movementId: '1', sourceTransactionRef: 'IB01' }]);
     });
 
+    it('filteredPayableMovements: a movement missing sourceTransactionRef falls back to "" for the search comparison instead of crashing', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.payableMovements = [{ movementId: '1' }, { movementId: '2', sourceTransactionRef: 'IB02' }];
+      c.payableMovementSearch = 'ib';
+      expect(c.filteredPayableMovements).toEqual([{ movementId: '2', sourceTransactionRef: 'IB02' }]);
+    });
+
     it('catalogPendingHint returns "" outside payExistingUtilize, or with no/zero pending, and formats single vs multiple pending with thousands separators', () => {
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.catalogPendingHint(contract())).toBe('');
@@ -446,6 +459,31 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c3.selectedContract = contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB-RESOLVED' } });
       expect(c3.contextSecondaryRef).toBe('IB-RESOLVED');
 
+      // usesTwoFieldSearch branch, empty searchNaturalKey.ibNumber and no selectedContract resolved yet
+      // -> the inner `|| null` fallback, not just the outer `??` one exercised above.
+      const c3b = new TransactionBuilderComponent(mockApi());
+      c3b.selectFunction(fn('A7'));
+      c3b.subChoiceValue = 'FULL_SETTLE';
+      c3b.onSubChoice();
+      c3b.searchNaturalKey.ibNumber = '';
+      expect(c3b.contextSecondaryRef).toBeNull();
+    });
+
+    it('searchExistingContract (A7, Acceptance Settlement): a resolved Acceptance with 0 Available Balance reports "<IB label> ... nothing left to settle" (confirmed via the raw branch-hit-count JSON, not just the summary table, that the SG-label/redeem-wording sides were already covered elsewhere and it was specifically the IB-label/settle-wording sides still missing)', () => {
+      const foundAcceptance = contract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
+      const api = mockApi({
+        resolveContract: jest.fn(() => of(foundAcceptance)) as any,
+        getSnapshot: jest.fn(() => of(snapshot({ availableBalance: '0' }))) as any,
+      });
+      const c = new TransactionBuilderComponent(api);
+      c.selectFunction(fn('A7'));
+      c.subChoiceValue = 'FULL_SETTLE';
+      c.onSubChoice();
+      c.searchNaturalKey = { lcNumber: 'S001', ibNumber: 'IB01', sgNumber: '' };
+      c.searchExistingContract();
+      expect(c.searchError).toBe('IB Number IB01 already has a 0 Available Balance — nothing left to settle.');
+      expect(c.selectedContract).toBeNull();
+
       // Final fallback branch: checkerSecondaryField reads selectedFunction.instrumentType (available
       // immediately on selection), but usesTwoFieldSearch reads model.instrumentType (still unset for
       // a subChoice function like A7 until onSubChoice() resolves it) — so right after selectFunction(),
@@ -546,6 +584,14 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       (c4 as any).selectedCheckerMovement = { movementId: 'm-4', movementType: 'UTILIZE' };
       expect(c4.isArrivalAcknowledgmentStep).toBe(true);
       expect(c4.checkerActionButtonLabel).toBe('Approve (acknowledgment only)');
+
+      // Neither deferSettlement nor documentArrivalWithSg set (A1) -> false, even with a UTILIZE-typed
+      // selectedCheckerMovement — both `||` operands must actually be evaluated and found falsy here,
+      // not just short-circuited true by an earlier one as in the A3/A3S cases above.
+      const c5 = new TransactionBuilderComponent(mockApi());
+      c5.selectFunction(fn('A1'));
+      (c5 as any).selectedCheckerMovement = { movementId: 'm-5', movementType: 'UTILIZE' };
+      expect(c5.isArrivalAcknowledgmentStep).toBe(false);
     });
   });
 
@@ -597,15 +643,44 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['usance']);
     });
 
-    it('searchExistingContract (B5, dualInstrumentFallback): a truthy searchNaturalKey.ibNumber is sent as-is, not defaulted to null', () => {
+    it('searchExistingContract (B5): a truthy searchNaturalKey.ibNumber is sent as-is, not defaulted to null (the PRIMARY resolveContract call)', () => {
       const resolveContractSpy: jest.Mock = jest.fn(() => throwError(() => ({ error: { message: 'primary miss' } })));
       const api = mockApi({ resolveContract: resolveContractSpy as any });
       const c = new TransactionBuilderComponent(api);
-      c.selectFunction(fn('B5')); // has dualInstrumentFallback set
+      // B5's own registry entry does NOT currently set dualInstrumentFallback (despite the model.ts
+      // interface field and doc comments describing it as "B5 only") — confirmed by grepping the
+      // registry for an actual `dualInstrumentFallback:` assignment and finding none. This test only
+      // needs the PRIMARY call's own shape, so B5's real (fallback-less) entry is fine here.
+      c.selectFunction(fn('B5'));
       c.searchNaturalKey = { lcNumber: 'S001', ibNumber: 'IB-PRESENT', sgNumber: '' };
       c.searchExistingContract();
+      expect(resolveContractSpy.mock.calls.length).toBe(1); // no dualInstrumentFallback set -> no retry
       const naturalKeyArg = resolveContractSpy.mock.calls[0][1];
       expect(naturalKeyArg.ibNumber).toBe('IB-PRESENT');
+    });
+
+    it('searchExistingContract, dualInstrumentFallback retry path: the FALLBACK resolveContract call sends the same natural key, and its own error path clears selectedContract/snapshot and sets searchError (currently unreachable via any real registry function — dualInstrumentFallback is declared on the TransactionFunction interface and described in several doc comments as "B5 only" but is never actually assigned on B5\'s or any function\'s real registry entry; exercised here via a synthetic B5 variant, same pattern already used elsewhere in this file for other doc-comment-confirmed gaps between what\'s designed and what\'s currently wired into the registry)', () => {
+      const resolveContractSpy: jest.Mock = jest
+        .fn()
+        .mockReturnValueOnce(throwError(() => ({ error: { message: 'primary miss' } })))
+        .mockReturnValueOnce(throwError(() => ({ error: { message: 'fallback also misses' } })));
+      const api = mockApi({ resolveContract: resolveContractSpy as any });
+      const c = new TransactionBuilderComponent(api);
+      const syntheticB5: TransactionFunction = { ...fn('B5'), dualInstrumentFallback: 'IPLC_ACCEPTANCE' };
+      c.selectFunction(syntheticB5);
+      c.searchNaturalKey = { lcNumber: 'S001', ibNumber: 'IB01', sgNumber: '' };
+      c.selectedContract = contract(); // must be cleared by the fallback's own error handler
+      c.searchExistingContract();
+
+      expect(resolveContractSpy.mock.calls.length).toBe(2);
+      expect(resolveContractSpy.mock.calls[1][0]).toBe('IPLC_ACCEPTANCE');
+      const fallbackNaturalKeyArg = resolveContractSpy.mock.calls[1][1];
+      expect(fallbackNaturalKeyArg.lcNumber).toBe('S001');
+      expect(fallbackNaturalKeyArg.ibNumber).toBe('IB01');
+      expect(fallbackNaturalKeyArg.sgNumber).toBeNull();
+      expect(c.selectedContract).toBeNull();
+      expect(c.selectedContractSnapshot).toBeNull();
+      expect(c.searchError).toBe('fallback also misses');
     });
 
     it('payExisting(): a release() error lacking err.error.message falls back to String(err)', () => {
@@ -629,6 +704,19 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.onSelectContract('bc-1');
       expect(c.sgsForArrivalLoading).toBe(false);
       expect(c.sgsForArrival).toEqual([]);
+    });
+
+    it('loadSgsForArrival: no lcNumber to search on (selectedContract never resolved) -> early return, no catalog() call at all', () => {
+      const catalogSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 50 }));
+      const api = mockApi({ catalog: catalogSpy as any });
+      const c = new TransactionBuilderComponent(api);
+      c.selectFunction(fn('A3S'));
+      catalogSpy.mockClear(); // selectFunction()'s own reloadCatalog() already called it once, unrelated to this guard
+      c.catalogContracts = []; // picking an id that matches nothing leaves selectedContract null
+      c.onSelectContract('does-not-exist');
+      expect(c.sgsForArrivalLoading).toBe(false);
+      expect(c.sgsForArrival).toEqual([]);
+      expect(catalogSpy).not.toHaveBeenCalled();
     });
 
     it('loadPayableMovements: a listMovements() error clears loading/list state (A4)', () => {
@@ -755,6 +843,26 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectFunction(fn('B1'));
       const exprs = tenorDaysField(c);
       expect(exprs['props.disabled']({ model: { tenorType: 'SIGHT' } })).toBe(true);
+    });
+  });
+
+  describe('remaining ??-fallback branches found in a follow-up combined-coverage pass (raising the floor from 90% to 95%)', () => {
+    it('onSelectParent (A6, tenorTypeOptions): a parent LC with no declared tenorType/tenorDays falls back to undefined, not carrying over a stale value', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A6'));
+      c.parentCatalog = [contract({ balanceContractId: 'p1', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } })]; // no tenorType/tenorDays set
+      c.onSelectParent('p1');
+      expect(c.model.tenorType).toBeUndefined();
+      expect(c.model.tenorDays).toBeUndefined();
+    });
+
+    it('onSelectIbIndex: a found contract with no ibNumber on its natural key (e.g. an SHGT row, A8) falls back to "" rather than undefined', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A8'));
+      c.ibIndexCatalog = [contract({ balanceContractId: 'ib1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } })];
+      c.onSelectIbIndex('ib1');
+      expect(c.searchNaturalKey.ibNumber).toBe('');
+      expect(c.searchNaturalKey.sgNumber).toBe('SG01');
     });
   });
 });

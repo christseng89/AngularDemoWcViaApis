@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import type { InstrumentType } from './balance-component.model';
 
@@ -66,6 +66,47 @@ export interface BalanceSnapshot {
   presentDocsEarmarkApproved?: string | null;
 }
 
+export interface MovementWarning {
+  code: 'OFF_BALANCE_EXPOSURE_WARNING';
+  message: string;
+  offBalanceExposureAtCheck?: string | null;
+  tightAvailableBalance?: string | null;
+}
+
+/**
+ * Quality-report-balance.md BAL-006: mirrors the microservice's own `src/types.ts` BalanceMovement
+ * shape (kept in sync by hand, same convention `balance-component.model.ts`'s own doc comment already
+ * uses for the design-doc field/rule tables) — replaces the `Observable<any>`/`Observable<any[]>`
+ * return types every mutating/listing method below used to have. Deliberately permissive on fields this
+ * client never reads (index-signature-free, but every field the component actually touches — status,
+ * movementType, sourceTransactionRef, amount, ceilingAmount, warnings, acknowledgedAt, etc. — is here),
+ * and deliberately does NOT try to type the synthetic-field-merge some component call sites do (e.g.
+ * loadPayableMovementsAcrossChildContracts's `{ ...m, sourceTransactionRef: ... }`) differently from a
+ * real one — spreading a typed object and overriding one already-optional field stays type-compatible.
+ */
+export interface BalanceMovement {
+  movementId: string;
+  balanceContractId: string;
+  eventSeq: number;
+  businessEventId?: string | null;
+  movementType: string;
+  exposureNature: 'CONTINGENT' | 'ACTUAL' | 'MEMO';
+  amount: string;
+  ceilingAmount: string;
+  currency: string;
+  status: 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED' | 'SUPERSEDED';
+  reasonCode?: string | null;
+  remarks?: string | null;
+  sourceTransactionRef?: string | null;
+  warnings?: MovementWarning[] | null;
+  createdBy: string;
+  releasedBy?: string | null;
+  createdAt: string;
+  releasedAt?: string | null;
+  acknowledgedBy?: string | null;
+  acknowledgedAt?: string | null;
+}
+
 /**
  * Talks DIRECTLY to the balance-component microservice (via the
  * /balance-component proxy path) — same posture as lc-payment-wc's own
@@ -80,32 +121,32 @@ export class BalanceComponentApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  createMovement(req: CreateMovementRequest): Observable<any> {
-    return this.http.post(`${this.base}/balance-movements`, req, { observe: 'response' }) as any;
+  createMovement(req: CreateMovementRequest): Observable<HttpResponse<BalanceMovement>> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements`, req, { observe: 'response' });
   }
 
-  release(movementId: string, releasedBy: string): Observable<any> {
-    return this.http.post(`${this.base}/balance-movements/${movementId}/release`, { releasedBy });
+  release(movementId: string, releasedBy: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/release`, { releasedBy });
   }
 
-  reject(movementId: string, releasedBy: string, reasonCode: string, remarks?: string): Observable<any> {
-    return this.http.post(`${this.base}/balance-movements/${movementId}/reject`, { releasedBy, reasonCode, remarks });
+  reject(movementId: string, releasedBy: string, reasonCode: string, remarks?: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/reject`, { releasedBy, reasonCode, remarks });
   }
 
   /** Business instruction 2026-08-15 ("option for Maker to Delete Pending, i.e. EC") — Maker-initiated withdrawal of their own still-PENDING entry, distinct from reject() (a Checker's 4-eyes decline). */
-  cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): Observable<any> {
-    return this.http.post(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
+  cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
   }
 
   /** Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — B3's own Checker Release; a real backend acknowledgment (status stays PENDING — B4 still finds/consumes it), not the plain release() transition. */
-  acknowledge(movementId: string, acknowledgedBy: string): Observable<any> {
-    return this.http.post(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
+  acknowledge(movementId: string, acknowledgedBy: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
   }
 
   resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): Observable<BalanceContract> {
-    const params: any = { instrumentType, lcNumber: naturalKey.lcNumber };
-    if (naturalKey.ibNumber) params.ibNumber = naturalKey.ibNumber;
-    if (naturalKey.sgNumber) params.sgNumber = naturalKey.sgNumber;
+    const params: Record<string, string> = { instrumentType, lcNumber: naturalKey.lcNumber };
+    if (naturalKey.ibNumber) params['ibNumber'] = naturalKey.ibNumber;
+    if (naturalKey.sgNumber) params['sgNumber'] = naturalKey.sgNumber;
     return this.http.get<BalanceContract>(`${this.base}/balance-contracts`, { params });
   }
 
@@ -126,11 +167,11 @@ export class BalanceComponentApiService {
    *   none of the tenor actually wanted, hiding eligible LCs on other pages.
    */
   catalog(instrumentType: InstrumentType, status?: string, q?: string, page = 1, pageSize = 10, lcNumber?: string, tenorFamily?: 'SIGHT' | 'USANCE'): Observable<CatalogPage> {
-    const params: any = { instrumentType, page, pageSize };
-    if (status) params.status = status;
-    if (q) params.q = q;
-    if (lcNumber) params.lcNumber = lcNumber;
-    if (tenorFamily) params.tenorFamily = tenorFamily;
+    const params: Record<string, string | number> = { instrumentType, page, pageSize };
+    if (status) params['status'] = status;
+    if (q) params['q'] = q;
+    if (lcNumber) params['lcNumber'] = lcNumber;
+    if (tenorFamily) params['tenorFamily'] = tenorFamily;
     return this.http.get<CatalogPage>(`${this.base}/balance-contracts/catalog`, { params });
   }
 
@@ -139,7 +180,7 @@ export class BalanceComponentApiService {
   }
 
   /** Event timeline (business instruction 2026-08-14) — every movement against one contract, in eventSeq (time) order. */
-  listMovements(balanceContractId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.base}/balance-contracts/${balanceContractId}/movements`);
+  listMovements(balanceContractId: string): Observable<BalanceMovement[]> {
+    return this.http.get<BalanceMovement[]>(`${this.base}/balance-contracts/${balanceContractId}/movements`);
   }
 }

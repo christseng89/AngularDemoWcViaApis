@@ -8,8 +8,12 @@ const { runCase, resolveLogicalContractId, callMicroservice } = require('../serv
 //   1. resolveLogicalContractId's `if (!entry) throw ...` (unknown captureAs key)
 //   2. resolveLogicalContractId's cache-hit branch (entry.logicalContractId already set)
 //   3. runCase's `if (step.captureAs)` false branch (a createMovement step with no captureAs)
-// ("Unknown step type" and the require.main === module guard are left deliberately uncovered —
-// pre-approved, see the task write-up for this suite.)
+//   4. runCase's `throw new Error('Unknown step type ...')` (a step.type outside note/
+//      createMovement/release/snapshot — never happens via the real businessCases.js registry,
+//      whose own step types are exhaustively covered by businessCases.test.js, but is directly
+//      reachable via the exported runCase() with a synthetic step, same technique as #1-#3 above)
+// (the require.main === module guard remains deliberately uncovered — structurally only true when
+// server.js is run directly, never when required by a test; see server.js's own top-level comment.)
 
 function jsonResponse(status, body) {
   return {
@@ -84,6 +88,18 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       // Nothing downstream depends on a captured key here; confirm the step just ran cleanly
       // with no thrown error and no captured-side effect to assert against (captureAs was falsy).
       expect(trace[0].response).toEqual({ movementId: 'mv-1', balanceContractId: 'bc-1' });
+    });
+
+    it('throws "Unknown step type" for a step.type outside note/createMovement/release/snapshot', async () => {
+      global.fetch = jest.fn();
+
+      const businessCase = {
+        id: 'synthetic-bad-step',
+        steps: [{ type: 'bogus-step-type', label: 'Not a real step' }],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(/Unknown step type "bogus-step-type"/);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 
