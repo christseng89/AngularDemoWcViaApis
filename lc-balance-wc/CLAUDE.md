@@ -663,6 +663,119 @@ Verified: `npm run typecheck`/`npm run build` clean; `npm test` → 220/220 pass
 re-verification per this file's own standing rule: Angular app 454/454 and `backend/` 27/27, both
 unaffected (microservice-only change).
 
+## Second Quality-report-balance.md remediation pass (2026-08-16, user-directed by priority — P1 BAL-003, P2 BAL-116/117/118/119; P0 BAL-001/BAL-002 and P1 BAL-102 explicitly excluded — no auth/Angular-upgrade work here, BAL-102 stays deferred for the same no-PostgreSQL-instance reason as before)
+
+### BAL-119 (Minor, Code Smell) — Fixed
+`backend/server.js`'s `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };`
+followed by three redundant `module.exports.X = X` re-assignments (a no-op leftover from the BAL-107 fix)
+— the three lines were deleted; the object literal already assigns everything they duplicated.
+
+### BAL-117 (Minor, Security Hotspot) — Fixed, both services
+Both Express services' generic 500 handlers used to echo the raw internal error message into the
+response body (readable by any caller — neither service has authentication):
+- `backend/server.js`'s `POST /api/business-cases/:id/run` catch block now logs the detailed message via
+  `console.error('[business-cases/run] orchestration error for "<id>":', detail)` and returns a fixed
+  generic message (`'An internal error occurred while running this business case.'`) instead of `detail`
+  itself. Three existing tests in `test/server.test.js` that asserted the old leaked-message behavior
+  were updated to assert the new generic message AND that `console.error` was called with the real
+  detail (spied via `jest.spyOn(console, 'error').mockImplementation(...)`), so server-side loggability
+  is still verified, just no longer client-visible.
+- `microservices/balance-component/src/app.ts`'s generic (non-`ApiError`) fallback handler — same fix,
+  generic message `'An internal error occurred.'`, `console.error(err)` (already present) is what
+  captures the detail server-side now. No existing test asserted the old leaked message here (this
+  branch had no live test coverage before or after — see BAL-109-style "known uncovered branch" posture,
+  global coverage threshold unaffected).
+
+### BAL-118 (Minor, Security Hotspot) — Fixed
+`backend/server.js`'s `POST /api/business-cases/:id/run` — the orchestrator's own highest-amplification
+endpoint (one request can fan out into a multi-step cascade of downstream microservice calls via
+`runCase()`) — had no rate limiting of its own. Added a scoped `express-rate-limit` limiter (120 req/min,
+`standardHeaders: true`, `legacyHeaders: false`), mirroring the microservice's own existing
+`/balance-movements` limiter exactly (same window/limit shape, same "basic abuse protection, not a
+throughput cap on normal use" posture). `express-rate-limit@^8.6.2` added to `backend/package.json`
+(same version already used by the microservice). New test in `server.test.js` asserts the
+`ratelimit-limit: '120'` response header is present and no legacy `x-ratelimit-*` headers leak through,
+confirming the limiter is actually wired to this specific route.
+
+### BAL-116 (Minor, Code Smell) — Fixed
+`zod` was a declared dependency in `microservices/balance-component/package.json` but never imported —
+request validation was a single hand-rolled property-presence `if` check in
+`routes/balanceMovements.ts`, with the BAL-115/currency-decimal-place fixes bolting two more hand-rolled
+checks onto it (pattern, currency-scale). New `src/validation/requestSchema.ts` —
+`createMovementRequestSchema`, a zod object schema covering exactly the 6 fields that were already
+required (`instrumentType`/`movementType`/`eventSeq`/`amount`/`currency`/`createdBy`) plus a
+`.superRefine()` reproducing the pattern + currency-scale checks verbatim (calling the same
+`MONETARY_AMOUNT_PATTERN`/`describeAmountScaleViolation` from `money.ts`, unchanged) — and, critically,
+`.passthrough()` on the schema so every OTHER `CreateMovementRequest` field (`naturalKey`,
+`balanceContractId`, `tolerancePct`, `tenorType`, `parentLogicalContractId`, `sourceTransactionRef`, etc.)
+is preserved untouched rather than stripped, since zod's default `z.object()` behavior strips unrecognized
+keys — this was the one real risk in this fix (getting `.passthrough()` wrong would have silently dropped
+every optional field the service actually reads, breaking most business functions) and is covered by its
+own dedicated test. `routes/balanceMovements.ts`'s handler now calls
+`createMovementRequestSchema.safeParse(req.body)` and throws `RequestValidationError` with the first
+issue's message (`firstValidationMessage()`) on failure — same single-message-at-a-time convention the
+hand-rolled checks it replaced already had. New `test/unit/validation/requestSchema.test.ts` (13 tests:
+valid body, passthrough proof, each required field missing, `eventSeq` type/zero-is-valid edge cases,
+pattern violation, scale violation, scale-exactly-at-limit, first-issue-message selection) — all 17
+pre-existing HTTP-layer tests in `app.test.ts` covering this route's validation (presence, pattern,
+currency-scale, KWD/JPY/unknown-currency cases) pass **unchanged**, with no test edits needed, confirming
+the schema is exactly behavior-preserving.
+
+### BAL-003 (Major, Code Smell) — third of three planned extractions now done: the Checker release/reject/cancel chain's shared success/failure tail, consolidated (submit()'s own 430-line Maker dispatch stays untouched — see below)
+Previously deferred as "the highest-risk, money-moving ~800+ lines... isn't a safe same-behavior
+consolidation" — re-scoped rather than attempted whole. A full "move this business logic into a separate
+service" extraction was rejected as too risky: the compound release/reject/cancel chain
+(`release()`/`releaseMatchedReceivable()`/`releaseDueFromIssuingBank()`/`releaseAcceptance()`/
+`releaseAcceptanceLiability()`/`releaseAcceptanceReimbReceivable()`/`reject()`/`deleteMakerPending()`)
+reads and writes ~10 pieces of component state (`actionBusy`, `submitResult`, `submitError`,
+`selectedFunction`, `selectedContract`, `selectedPayMovement`, `arrivalSgRedeemMovementId`,
+`matchedReceivableMovementId`, `dueFromIssuingBankMovementId`, `acceptanceMovementId`,
+`acceptanceReimbReceivableMovementId`) and calls back into 4 other component methods
+(`refreshSelectedContractSnapshot()`, `syncCheckerToContext()`, `syncLookupToContext()`,
+`reloadPayableMovementsAfterCompound()`) — moving it to a service would mean passing all of that back and
+forth for no real benefit, and a mistake in a 4-leg financial release chain is exactly the kind of
+regression this fix's own "no business functionality changes" constraint forbids.
+
+**What was actually done, matching the SAME "guard/branch logic unchanged, only the repeated body moves"
+convention as the two prior extractions** (`loadPagedCatalog`/`loadSnapshotAndMovements`): every leg of
+the release/reject/cancel chain shared one of two exact literal shapes —
+- Success tail: `actionBusy=false; submitResult=res; refreshSelectedContractSnapshot();
+  syncCheckerToContext();` (+ optionally `syncLookupToContext()`/`reloadPayableMovementsAfterCompound()`)
+- Failure tail: `actionBusy=false; submitError=<unique business-context message>;`
+
+New `finishCheckerAction(res, opts?)` / `failCheckerAction(message)` private helpers consolidate exactly
+those two shapes — 6 call sites now use `finishCheckerAction` (`release()`'s plain path,
+`releaseMatchedReceivable`, `releaseDueFromIssuingBank`, `releaseAcceptance`'s own tail,
+`releaseAcceptanceReimbReceivable`, `reject()`, `deleteMakerPending`'s own `cancelPrimary`) and ~10 call
+sites now use `failCheckerAction`. WHICH release/reject/cancel call to make, in what order, under what
+business condition, and every error message string, is completely unchanged — every `if` branch, every
+comment explaining WHY a given leg exists, is untouched; only the identical trailing state-mutation lines
+were factored out. File size: 2,835 → 2,778 lines (a modest reduction — this was never primarily a
+line-count exercise, the point was removing ~15 duplicate 3-6 line blocks).
+
+**`submit()` itself (the ~430-line Maker dispatch across all 14 named business functions) was
+deliberately NOT touched in this pass** — it's a fundamentally different kind of complexity (building a
+function-specific request object across 14 branches, not a chain of near-identical API calls), and a safe
+extraction strategy for it (most likely: splitting into 14 named private per-function methods, still on
+the component, dispatched by a switch) is a larger, separate piece of work than this pass's scope. BAL-003
+therefore remains open at Major severity — the God Component is smaller and its release/reject/cancel
+logic is now DRY, but the class still does five or six separate jobs.
+
+**Verification, given the stakes:** full Angular suite (455/455, zero test files needed changes — strong
+evidence of exact behavior preservation, since the pre-existing suite was written against the original
+implementation) + `tsc --noEmit` clean + `ng build` clean + `npm run lint` (0 errors, same warnings) +
+**live in-browser end-to-end verification** (not just unit tests, given this touches money-moving
+Maker/Checker logic): a fresh A1 (LC Issue) submitted and then released via the Checker queue — Available
+Balance/Confirmed Balance/Tight Available Balance all correctly reflected the release
+(0 → 50,000) — and `deleteMakerPending()` (Maker EC) separately verified end-to-end on a different LC,
+correctly cancelling the movement, zeroing the balance, and clearing the Checker queue
+(`finishCheckerAction(res, {syncLookup: true})`'s own exact path). Both exercise the plain-path shape
+shared by every other consolidated call site.
+
+**Full three-suite verification after this whole remediation pass:** Angular app 455/455
+(99.75%/95.61%/99.67%/99.81% coverage), `backend/` 28/28 (97.97%/97.36%/95.65%/97.77%), microservice
+234/234 (98.98%/95.95%/100%/99.34%) — all three clear their own 95% floor on all four metrics.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

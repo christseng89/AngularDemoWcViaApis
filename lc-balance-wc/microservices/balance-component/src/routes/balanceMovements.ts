@@ -2,30 +2,22 @@ import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { RequestValidationError } from '../errors';
 import type { CreateMovementRequest } from '../service/balanceService';
-import { MONETARY_AMOUNT_PATTERN, describeAmountScaleViolation } from '../money';
+import { createMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 
 export function balanceMovementsRouter(service: BalanceService): Router {
   const router = Router();
 
   // POST /balance-movements
   router.post('/balance-movements', (req, res) => {
-    const body = req.body as CreateMovementRequest;
-    if (!body.instrumentType || !body.movementType || body.eventSeq === undefined || !body.amount || !body.currency || !body.createdBy) {
-      throw new RequestValidationError('instrumentType, movementType, eventSeq, amount, currency, createdBy are required.');
+    // Quality-report-balance.md BAL-116: was a sequence of hand-rolled `if` checks (presence, the
+    // MONETARY_AMOUNT_PATTERN shape, the currency-decimal-scale rule) — now one declarative schema. See
+    // requestSchema.ts's own doc comment for exactly what's validated here vs. passed through untouched
+    // (`.passthrough()` — every other CreateMovementRequest field is unchanged from before this fix).
+    const parsed = createMovementRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new RequestValidationError(firstValidationMessage(parsed.error));
     }
-    // Business requirement 2026-08-16 ("JPY 10000 without cents" -> "must be enforced server-side
-    // based on the currency code and its configured currency decimal place"). The pattern check comes
-    // first, deliberately — decimalPlaces()/describeAmountScaleViolation() assume an already
-    // pattern-valid string, and this also closes a pre-existing gap where a malformed (but non-empty)
-    // amount used to fall through unvalidated to computeCeilingAmount()/parseMonetaryAmount() deep in
-    // the service layer, surfacing as a generic 500 INTERNAL_ERROR instead of a proper 400 here.
-    if (!MONETARY_AMOUNT_PATTERN.test(body.amount)) {
-      throw new RequestValidationError(`amount "${body.amount}" is not a valid MonetaryAmount (expected ${MONETARY_AMOUNT_PATTERN}).`);
-    }
-    const scaleViolation = describeAmountScaleViolation(body.amount, body.currency);
-    if (scaleViolation) {
-      throw new RequestValidationError(scaleViolation);
-    }
+    const body = parsed.data as CreateMovementRequest;
     const result = service.createMovement(body);
     res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
   });

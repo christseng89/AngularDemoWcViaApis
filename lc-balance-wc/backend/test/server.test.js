@@ -249,7 +249,8 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('POST /api/business-cases/import-case-2/run — resolveLogicalContractId failure path', () => {
-    it('throws (-> 500 ORCHESTRATION_ERROR) when the snapshot GET used to resolve logicalContractId is not ok', async () => {
+    it('throws (-> 500 ORCHESTRATION_ERROR) when the snapshot GET used to resolve logicalContractId is not ok — the detailed message is logged server-side (BAL-117), not echoed to the client', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = jest.fn(async (url, opts = {}) => {
         const method = opts.method || 'GET';
         if (method === 'POST' && url.endsWith('/balance-movements')) {
@@ -268,28 +269,38 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       const res = await request(app).post('/api/business-cases/import-case-2/run').send({});
 
       expect(res.status).toBe(500);
-      expect(res.body.code).toBe('ORCHESTRATION_ERROR');
-      expect(res.body.message).toMatch(/Could not resolve logicalContractId for "lc"/);
+      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('import-case-2'),
+        expect.stringMatching(/Could not resolve logicalContractId for "lc"/),
+      );
+      consoleErrorSpy.mockRestore();
     });
   });
 
   describe('POST /api/business-cases/:id/run — orchestration failure (outer try/catch -> 500)', () => {
-    it('returns 500 ORCHESTRATION_ERROR carrying a thrown Error\'s own message', async () => {
+    it('returns a generic 500 ORCHESTRATION_ERROR (BAL-117: never the thrown Error\'s own raw message) and logs the detail server-side', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = jest.fn(() => Promise.reject(new Error('microservice unreachable')));
 
       const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
 
       expect(res.status).toBe(500);
-      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'microservice unreachable' });
+      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('import-case-1'), 'microservice unreachable');
+      consoleErrorSpy.mockRestore();
     });
 
-    it('stringifies a thrown non-Error value (err instanceof Error is false)', async () => {
+    it('stringifies a thrown non-Error value (err instanceof Error is false) for the server-side log, still returns the generic client message', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = jest.fn(() => Promise.reject('boom'));
 
       const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
 
       expect(res.status).toBe(500);
-      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'boom' });
+      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('import-case-1'), 'boom');
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -303,6 +314,18 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(res.body.status).toBe('ok');
       expect(typeof res.body.balanceServiceUrl).toBe('string');
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/business-cases/:id/run — rate limiting (Quality-report-balance.md BAL-118)', () => {
+    it('carries standard RateLimit-* response headers, confirming the limiter is actually wired to this route', async () => {
+      global.fetch = createGenericFetchMock();
+
+      const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
+
+      expect(res.status).toBe(200);
+      expect(res.headers['ratelimit-limit']).toBe('120');
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit'); // legacyHeaders: false
     });
   });
 });

@@ -34,9 +34,13 @@ export function createApp(db: Db): Express {
       res.status(err.httpStatus).json(err.toBody());
       return;
     }
+    // Quality-report-balance.md BAL-117: was echoing `err.message` straight into the response body —
+    // any caller (this service has no authentication) could read back internal error detail (e.g. a
+    // driver-level error, an internal object shape). Log the detail server-side, return a generic
+    // message to the client.
     // eslint-disable-next-line no-console
     console.error(err);
-    res.status(500).json({ code: 'INTERNAL_ERROR', message: err instanceof Error ? err.message : 'Unknown error' });
+    res.status(500).json({ code: 'INTERNAL_ERROR', message: 'An internal error occurred.' });
   });
 
   return app;

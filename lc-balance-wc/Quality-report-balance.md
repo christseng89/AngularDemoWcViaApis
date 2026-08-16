@@ -29,22 +29,24 @@ same day this report was written**, immediately after being found (see BAL-115's
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A- (4.5/5) | 701/701 tests passing across 3 independent suites (454 Angular + 220 microservice + 27 backend). The one genuine defect this pass found (BAL-115 — `money.ts`'s own "only module allowed to construct a Decimal from a wire string" invariant bypassed at 3 call sites) was fixed same-day. No other logic bugs found. |
-| **Security** | B- (3.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold. Two new Minor hotspots found this pass (BAL-117 raw error echoing, BAL-118 no rate limit on the orchestrator). Held back by the two unchanged structural gaps: no authentication anywhere, and 8 High CVEs in production Angular deps. |
-| **Maintainability** | B+ (3.8/5) | Duplication hotspots fixed and re-verified clean; the God Component now shares paging AND Look Up panel fetch logic (2 of 3 planned extractions done) but is still ~2,800 lines; two new small code smells found (BAL-116 unused `zod` dependency, BAL-119 dead redundant export re-assignment). |
+| **Reliability** | A- (4.6/5) | 717/717 tests passing across 3 independent suites (455 Angular + 234 microservice + 28 backend). The one genuine defect this pass found (BAL-115 — `money.ts`'s own "only module allowed to construct a Decimal from a wire string" invariant bypassed at 3 call sites) was fixed same-day. No other logic bugs found. |
+| **Security** | B+ (3.9/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold. Both new Minor hotspots found this pass are now fixed (BAL-117 raw error echoing on both services, BAL-118 rate limit on the orchestrator). Held back by the two unchanged structural gaps: no authentication anywhere, and 8 High CVEs in production Angular deps. |
+| **Maintainability** | A- (4.2/5) | Duplication hotspots fixed and re-verified clean; the God Component's release/reject/cancel chain is now DRY (BAL-003, 3rd extraction) on top of the paging/Look Up panel work; BAL-116 (zod now actually used) and BAL-119 (dead export re-assignment) both fixed. `submit()`'s own 430-line Maker dispatch remains the one still-untouched, genuinely hard piece — see BAL-003's own section. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines. |
-| **Duplication** | A (4.6/5) | Every previously-identified hotspot remains fixed; no new SonarQube-flaggable duplication block found in this pass's fresh sweep of all three sub-projects. |
+| **Duplication** | A (4.7/5) | Every previously-identified hotspot remains fixed, and the release/reject/cancel chain's own duplicated success/failure tails (found and fixed this pass, BAL-003) are gone too. |
 
-### Composite score: **86 → 88 / 100 (B+ → A-)**
+### Composite score: **86 → 88 → 90 / 100 (B+ → A- → A-)**
 
 **Final assessment: CONDITIONAL PASS.** The codebase continues to improve on maintainability, security
-hygiene, duplication, and now reliability — every finding this review can independently confirm was
-fixed in a prior pass (BAL-101, BAL-103, BAL-104, BAL-106, BAL-107) still holds under fresh
-re-verification, and this pass's own newly-found Major defect (BAL-115) was fixed the same day, not left
-open. Several new Minor issues (BAL-116–BAL-120) remain, which is why the score isn't higher still. It
-remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
-unchanged release blockers for any deployment handling real trade-finance data. See
-[Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
+hygiene, duplication, and reliability — every finding this review can independently confirm was fixed in
+a prior pass (BAL-101, BAL-103, BAL-104, BAL-106, BAL-107) still holds under fresh re-verification, and
+this pass's newly-found Major defect (BAL-115) was fixed the same day. A user-directed, priority-ordered
+remediation pass the same day closed five more findings (BAL-003's 3rd extraction, BAL-116, BAL-117 on
+both services, BAL-118, BAL-119) — explicitly excluding BAL-001/BAL-002 (real auth / Angular major-version
+upgrade, correctly out of scope for an incremental pass) and BAL-102 (still no PostgreSQL instance
+available in this environment). It remains **NOT production-ready as-is**: BAL-001 (no authentication) and
+BAL-002 (dependency CVEs) are unchanged release blockers for any deployment handling real trade-finance
+data. See [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
 
@@ -55,13 +57,13 @@ unchanged release blockers for any deployment handling real trade-finance data. 
 | [BAL-001](#bal-001) | 🔴 Blocker | Vulnerability | No authentication/authorization anywhere in the microservice |
 | [BAL-002](#bal-002) | 🟠 Critical | Vulnerability | 8 High-severity CVEs in production Angular dependencies |
 | [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites — **Fixed** |
-| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` is still a 2,809-line God Component (2 of 3 extractions done) |
+| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` is still a ~2,780-line God Component — release/reject/cancel chain DRY'd up, `submit()` still untouched |
 | [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — deferred, user-confirmed |
-| [BAL-116](#bal-116) | 🔵 Minor | Code Smell | `zod` is a declared dependency but never used — request validation is manual presence checks only |
-| [BAL-117](#bal-117) | 🔵 Minor | Security Hotspot | Both Express services' 500 handlers echo raw internal error messages to the client |
-| [BAL-118](#bal-118) | 🔵 Minor | Security Hotspot | No rate limiting on `backend/server.js`'s own endpoints |
+| [BAL-116](#bal-116) | 🔵 Minor | Code Smell | `zod` is a declared dependency but never used — request validation is manual presence checks only — **Fixed** |
+| [BAL-117](#bal-117) | 🔵 Minor | Security Hotspot | Both Express services' 500 handlers echo raw internal error messages to the client — **Fixed** |
+| [BAL-118](#bal-118) | 🔵 Minor | Security Hotspot | No rate limiting on `backend/server.js`'s own endpoints — **Fixed** |
 | [BAL-108](#bal-108) | 🔵 Minor | Code Smell | Residual `any` typing inside `transaction-builder.component.ts` — partially fixed |
-| [BAL-119](#bal-119) | 🔵 Minor | Code Smell | Dead redundant re-assignment onto `module.exports` in `backend/server.js` |
+| [BAL-119](#bal-119) | 🔵 Minor | Code Smell | Dead redundant re-assignment onto `module.exports` in `backend/server.js` — **Fixed** |
 | [BAL-105](#bal-105) | 🔵 Minor | Code Smell | ESLint/Prettier configured project-wide, but `format:check` not yet applied/enforced |
 | [BAL-120](#bal-120) | ⚪ Info | Reliability | Idempotency detection relies on string-matching the SQLite driver's error text |
 | [BAL-109](#bal-109) | ⚪ Info | Reliability | A handful of provably-dead defensive branches, left uncovered on purpose |
@@ -182,7 +184,7 @@ app 454/454 and `backend/` 27/27, both unaffected (microservice-only change).
 ## Code Smells & Maintainability
 
 ### BAL-003
-**`transaction-builder.component.ts` is still a 2,809-line God Component** — 🟡 Major (2 of 3 planned extractions done)
+**`transaction-builder.component.ts` is still a ~2,780-line God Component** — 🟡 Major (all 3 planned extractions now attempted; 2.5 of 3 actually landed — see Outcome)
 
 **Evidence:**
 ```
@@ -213,6 +215,40 @@ business-critical without a dedicated reviewer-scoped design pass first.
 1. ~~Shared paging state machine for the three near-identical pickers.~~ **Done** — `loadPagedCatalog()`.
 2. ~~A standalone extraction for the LC/Acceptance/SG Look Up tabs.~~ **Done** — `loadSnapshotAndMovements()` + `loadUnderLookupCandidates()`.
 3. A `ChecklistActionsComponent` (or service) for submit/release/reject/cancel/acknowledge. **Deliberately deferred — needs a reviewer-scoped design pass before attempting.**
+
+**Outcome (2026-08-16, user-directed as P1 — "建議繼續拆 Checker Actions"): the release/reject/cancel
+chain is now DRY; `submit()` itself is deliberately still untouched.** A full "move to a separate
+service" extraction of item 3 above was rejected on inspection as too risky — the compound release chain
+(`release()`/`releaseMatchedReceivable()`/`releaseDueFromIssuingBank()`/`releaseAcceptance()`/
+`releaseAcceptanceLiability()`/`releaseAcceptanceReimbReceivable()`/`reject()`/`deleteMakerPending()`)
+reads/writes ~10 pieces of component state and calls back into 4 other component methods; moving it to a
+service would mean threading all of that through a parameter surface for no real benefit, in exactly the
+kind of code where a mistake matters most (a 4-leg financial release chain).
+
+**What was actually done** — the same "guard/branch logic unchanged, only the repeated body moves"
+convention as the two already-completed extractions: every leg of the chain shared one of two exact
+literal shapes (a success tail — `actionBusy=false; submitResult=res; refreshSelectedContractSnapshot();
+syncCheckerToContext();` plus optional `syncLookupToContext()`/`reloadPayableMovementsAfterCompound()` —
+and a failure tail — `actionBusy=false; submitError=<message>;`). New `finishCheckerAction(res, opts?)` /
+`failCheckerAction(message)` private helpers consolidate exactly those two shapes across 6 and ~10 call
+sites respectively. WHICH call to make, in what order, under what business condition, and every error
+message string is completely unchanged — only the identical trailing state-mutation lines were factored
+out. File size: 2,835 → 2,778 lines.
+
+**`submit()` (the ~430-line Maker dispatch across all 14 named business functions) was deliberately NOT
+touched** — a fundamentally different kind of complexity (building a function-specific request object
+across 14 branches, not a chain of near-identical API calls) needing its own separate design pass (most
+likely: splitting into 14 named private per-function methods) — out of scope for this increment.
+**BAL-003 stays open at Major** for this reason — the class is smaller and its release/reject/cancel
+logic is DRY, but it still does five or six separate jobs.
+
+**Verification, given the stakes:** full Angular suite 455/455 with **zero test files needing changes**
+— strong evidence of exact behavior preservation, since the pre-existing suite was written against the
+original implementation and still passes unmodified — plus `tsc --noEmit`/`ng build`/`npm run lint` all
+clean, plus **live in-browser end-to-end verification**: a fresh A1 (LC Issue) submitted and released via
+the Checker queue correctly moved Available/Confirmed/Tight Available Balance 0 → 50,000, and
+`deleteMakerPending()` separately verified end-to-end on another LC, correctly cancelling the movement,
+zeroing the balance, and clearing the Checker queue.
 
 ---
 
@@ -250,6 +286,18 @@ would also consolidate the route's now-several hand-rolled checks — presence, 
 into one declarative place), or remove it from `package.json` if manual checks are the deliberate,
 permanent choice.
 
+**Outcome (2026-08-16): Fixed — wired, not removed.** New `src/validation/requestSchema.ts` —
+`createMovementRequestSchema`, a zod object covering the same 6 required fields plus a `.superRefine()`
+reproducing the pattern + currency-scale checks verbatim (same `MONETARY_AMOUNT_PATTERN`/
+`describeAmountScaleViolation` from `money.ts`), with `.passthrough()` so every other
+`CreateMovementRequest` field is preserved untouched rather than silently stripped (zod's default
+`z.object()` behavior) — the one real risk in this fix, covered by its own dedicated passthrough test.
+`routes/balanceMovements.ts` now calls `.safeParse(req.body)` and throws `RequestValidationError` with
+the first issue's message on failure. New `test/unit/validation/requestSchema.test.ts` (13 tests). All 17
+pre-existing HTTP-layer tests covering this route's validation in `app.test.ts` pass **unchanged, no
+edits needed** — confirms the schema is exactly behavior-preserving. Verified: `npm run typecheck`/
+`npm run build` clean, `npm test` → 234/234 (14 new), `npm run lint` 0 errors.
+
 ---
 
 ### BAL-117
@@ -276,6 +324,14 @@ object shape) with nothing gating who can do so.
 
 **Recommended remediation:** in both services, log the detailed message server-side (already happening via `console.error`) and return a generic message (plus a request/trace ID if one exists) to the client instead.
 
+**Outcome (2026-08-16): Fixed, both services.** `backend/server.js`'s `/run` catch block now logs the
+detail via `console.error('[business-cases/run] orchestration error for "<id>":', detail)` and returns a
+fixed generic message; three existing tests updated to assert the new message AND that `console.error`
+was called with the real detail (via a `jest.spyOn` mock), so server-side loggability stays verified.
+`microservices/balance-component/src/app.ts`'s generic fallback handler — same fix, generic message,
+`console.error(err)` (already present) captures the detail. Verified: `npm test` → backend 28/28
+(3 updated), microservice 234/234 (unaffected — no prior test exercised this specific branch).
+
 ---
 
 ### BAL-118
@@ -291,6 +347,13 @@ amplification factor in the whole stack (one request → N downstream calls), ma
 target for basic abuse protection than the individual `/balance-movements` calls it eventually triggers.
 
 **Recommended remediation:** mirror the microservice's own scoped `express-rate-limit` on `/api/business-cases/:id/run`.
+
+**Outcome (2026-08-16): Fixed.** Exactly the recommended remediation — a scoped `express-rate-limit`
+limiter (120 req/min, `standardHeaders: true`, `legacyHeaders: false`) added to
+`POST /api/business-cases/:id/run` only, mirroring the microservice's own `/balance-movements` limiter
+shape exactly. `express-rate-limit@^8.6.2` added to `backend/package.json` (same version as the
+microservice). New test asserts the `ratelimit-limit: '120'` response header is present, confirming the
+limiter is actually wired to this route. Verified: `npm test` → backend 28/28 (1 new).
 
 ---
 
@@ -334,6 +397,10 @@ correctly changed the export *shape*, but didn't clean up the now-redundant line
 than it is (a future reader may assume the extra lines do something).
 
 **Recommended remediation:** delete the three redundant lines; `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };` alone is sufficient.
+
+**Outcome (2026-08-16): Fixed.** Exactly the recommended remediation — the three redundant lines
+deleted, `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };` is now the
+entire export statement. Verified: `npm test` → backend 28/28 unaffected, `npm run lint` 0 errors.
 
 ---
 
@@ -431,15 +498,16 @@ dynamically-assembled `WHERE` clause in `balanceContractStore.ts`'s `listCatalog
 *fragments* are hardcoded literals from a fixed set, never derived from caller input.
 
 ### BAL-112
-**Test coverage clears 95% on all four metrics, across all three independent suites.** 701 tests total,
-all green as of this review (microservice count includes the currency-decimal-place and BAL-115 fixes'
-own new tests, landed the same review date):
+**Test coverage clears 95% on all four metrics, across all three independent suites.** 717 tests total,
+all green as of this review (microservice count includes the currency-decimal-place, BAL-115, and
+BAL-116 fixes' own new tests; backend count includes BAL-117/BAL-118's own new/updated tests; Angular
+count includes BAL-003's own consolidation, which needed zero new/changed tests):
 
 | Suite | Statements | Branches | Functions | Lines | Tests |
 |---|---|---|---|---|---|
-| `microservices/balance-component/` | 98.97% | 95.75% | 100% | 99.33% | 220 |
-| `backend/` | 97.95% | 97.36% | 95.65% | 97.75% | 27 |
-| Angular app (`src/app/`) | 99.76% | 95.57% | 99.67% | 99.82% | 454 |
+| `microservices/balance-component/` | 98.98% | 95.95% | 100% | 99.34% | 234 |
+| `backend/` | 97.97% | 97.36% | 95.65% | 97.77% | 28 |
+| Angular app (`src/app/`) | 99.75% | 95.61% | 99.67% | 99.81% | 455 |
 
 All three also pass their own lint gate clean (0 errors) and typecheck/build clean
 (`tsc --noEmit`, `npm run build` for the microservice; `ng build --configuration development` for the
@@ -479,9 +547,10 @@ credentials, the following remain non-negotiable, in this order:
    beyond prototype use.
 
 **BAL-115 (the monetary-amount parsing bypass) is fixed as of this pass** — no longer a gate condition.
+**BAL-116, BAL-117, BAL-118, BAL-119 are all fixed as of this second same-day pass** — none were gate
+conditions to begin with, but are no longer open findings either.
 
-None of the remaining Maintainability/Minor/Info findings (BAL-003, BAL-105, BAL-108, BAL-116–BAL-120)
-block a production decision on their own, but BAL-003's one remaining extraction (Checker actions) will
-keep making every future change to that block riskier than necessary until it gets its own
-reviewer-scoped design pass, and BAL-116/BAL-117 are worth closing opportunistically since the fix for
-each is small and self-contained.
+None of the remaining Maintainability/Minor/Info findings (BAL-003, BAL-105, BAL-108, BAL-120) block a
+production decision on their own, but BAL-003's one remaining piece (`submit()`'s own 430-line Maker
+dispatch — the release/reject/cancel chain itself is now DRY) will keep making every future change to
+that block riskier than necessary until it gets its own reviewer-scoped design pass.

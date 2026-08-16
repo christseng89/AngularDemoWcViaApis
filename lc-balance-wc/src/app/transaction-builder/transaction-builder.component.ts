@@ -2374,6 +2374,35 @@ export class TransactionBuilderComponent {
     this.arrivalApproved = true;
   }
 
+  /**
+   * Quality-report-balance.md BAL-003 (third of three planned extractions, previously deferred as
+   * "the highest-risk, money-moving ~800+ lines... isn't a safe same-behavior consolidation the way
+   * [the first two] are" — re-scoped, not attempted whole: rather than moving this compound
+   * release/reject/cancel chain's business logic into a separate service (which would need to pass
+   * ~10 pieces of component state back and forth for no real benefit), this consolidates only the
+   * mechanical success-tail shape every leg of the chain already shared byte-for-byte —
+   * `actionBusy=false; submitResult=res; refreshSelectedContractSnapshot(); syncCheckerToContext();`,
+   * plus two call sites' worth of optional follow-up (`syncLookupToContext()`/
+   * `reloadPayableMovementsAfterCompound()`) — same "guard/branch logic unchanged, only the repeated
+   * body moves" convention as `loadPagedCatalog`/`loadSnapshotAndMovements` above. WHICH release/
+   * reject/cancel call to make, in what order, and under what business condition is completely
+   * untouched by this helper — every `if` branch below still decides that for itself.
+   */
+  private finishCheckerAction(res: any, opts: { syncLookup?: boolean; reloadPayables?: boolean } = {}): void {
+    this.actionBusy = false;
+    this.submitResult = res;
+    this.refreshSelectedContractSnapshot();
+    this.syncCheckerToContext();
+    if (opts.syncLookup) this.syncLookupToContext();
+    if (opts.reloadPayables) this.reloadPayableMovementsAfterCompound();
+  }
+
+  /** BAL-003 — the release/reject/cancel chain's other shared shape: every failed leg sets `actionBusy` false and surfaces its own (always distinct, business-context-specific) message via `submitError`. The message itself is still composed at each call site — only the two-field assignment is shared. */
+  private failCheckerAction(message: string): void {
+    this.actionBusy = false;
+    this.submitError = message;
+  }
+
   release(): void {
     if (!this.submitResult?.movementId) return;
     this.actionBusy = true;
@@ -2390,10 +2419,10 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.settlesDocumentArrival && this.selectedPayMovement) {
       this.api.release(this.selectedPayMovement.movementId, checkerId).subscribe({
         next: () => this.releaseAcceptance(checkerId),
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = `Could not release the ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${this.selectedPayMovement?.sourceTransactionRef}) — Acceptance NOT approved: ${this.describeApiError(err)}`;
-        },
+        error: (err) =>
+          this.failCheckerAction(
+            `Could not release the ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${this.selectedPayMovement?.sourceTransactionRef}) — Acceptance NOT approved: ${this.describeApiError(err)}`,
+          ),
       });
       return;
     }
@@ -2408,10 +2437,7 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.documentArrivalWithSg && this.arrivalSgRedeemMovementId) {
       this.api.release(this.arrivalSgRedeemMovementId, checkerId).subscribe({
         next: () => this.releaseArrivalDocument(),
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = `Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${this.describeApiError(err)}`;
-        },
+        error: (err) => this.failCheckerAction(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${this.describeApiError(err)}`),
       });
       return;
     }
@@ -2425,42 +2451,22 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.settlesAcceptanceOnMature && this.matchedReceivableMovementId) {
       this.api.release(this.submitResult.movementId, checkerId).subscribe({
         next: (res) => this.releaseMatchedReceivable(checkerId, res),
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = this.describeApiError(err);
-        },
+        error: (err) => this.failCheckerAction(this.describeApiError(err)),
       });
       return;
     }
 
     this.api.release(this.submitResult.movementId, checkerId).subscribe({
-      next: (res) => {
-        this.actionBusy = false;
-        this.submitResult = res;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-      },
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = this.describeApiError(err);
-      },
+      next: (res) => this.finishCheckerAction(res),
+      error: (err) => this.failCheckerAction(this.describeApiError(err)),
     });
   }
 
   /** B5's Usance/CNF_MATURE branch only — second leg, releasing the matching Reimbursement Receivable's REIMBURSE after the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE was already released above. */
   private releaseMatchedReceivable(checkerId: string, settleRes: any): void {
     this.api.release(this.matchedReceivableMovementId!, checkerId).subscribe({
-      next: () => {
-        this.actionBusy = false;
-        this.submitResult = settleRes;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-        this.syncLookupToContext();
-      },
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = `Acceptance settled, but the matching Reimbursement Receivable failed to release: ${this.describeApiError(err)}`;
-      },
+      next: () => this.finishCheckerAction(settleRes, { syncLookup: true }),
+      error: (err) => this.failCheckerAction(`Acceptance settled, but the matching Reimbursement Receivable failed to release: ${this.describeApiError(err)}`),
     });
   }
 
@@ -2473,18 +2479,8 @@ export class TransactionBuilderComponent {
   /** B4's Sight/HONOUR branch only — final leg of the compound Checker action, releasing the new Due from Issuing Bank asset after the Confirmation's own Honour (and, before that, the B3 Present Docs record) were already released above. */
   private releaseDueFromIssuingBank(checkerId: string, honourRes: any): void {
     this.api.release(this.dueFromIssuingBankMovementId!, checkerId).subscribe({
-      next: () => {
-        this.actionBusy = false;
-        this.submitResult = honourRes;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-        this.syncLookupToContext();
-        this.reloadPayableMovementsAfterCompound();
-      },
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = `Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${this.describeApiError(err)}`;
-      },
+      next: () => this.finishCheckerAction(honourRes, { syncLookup: true, reloadPayables: true }),
+      error: (err) => this.failCheckerAction(`Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${this.describeApiError(err)}`),
     });
   }
 
@@ -2507,18 +2503,11 @@ export class TransactionBuilderComponent {
           this.releaseAcceptanceLiability(checkerId, res);
           return;
         }
-        this.actionBusy = false;
-        this.submitResult = res;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
         // Both the picked source record and the Parent LC's own hints/snapshots are stale otherwise
         // until the user navigates away and back.
-        this.reloadPayableMovementsAfterCompound();
+        this.finishCheckerAction(res, { reloadPayables: true });
       },
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = `${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${this.describeApiError(err)}`;
-      },
+      error: (err) => this.failCheckerAction(`${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${this.describeApiError(err)}`),
     });
   }
 
@@ -2526,28 +2515,15 @@ export class TransactionBuilderComponent {
   private releaseAcceptanceLiability(checkerId: string, acceptRes: any): void {
     this.api.release(this.acceptanceMovementId!, checkerId).subscribe({
       next: () => this.releaseAcceptanceReimbReceivable(checkerId, acceptRes),
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = `Confirmation accepted, but the Acceptance liability failed to release: ${this.describeApiError(err)}`;
-      },
+      error: (err) => this.failCheckerAction(`Confirmation accepted, but the Acceptance liability failed to release: ${this.describeApiError(err)}`),
     });
   }
 
   /** B4's Usance/ACCEPT branch only — fourth and final leg of the compound Checker action, releasing the linked Reimbursement Receivable asset after the Acceptance liability was already released above (Gap Analysis Row 6). Once this succeeds, the B3 record this whole chain started from is gone from B4's own "still-PENDING" 2ndary Index for good. */
   private releaseAcceptanceReimbReceivable(checkerId: string, acceptRes: any): void {
     this.api.release(this.acceptanceReimbReceivableMovementId!, checkerId).subscribe({
-      next: () => {
-        this.actionBusy = false;
-        this.submitResult = acceptRes;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-        this.syncLookupToContext();
-        this.reloadPayableMovementsAfterCompound();
-      },
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = `Acceptance released, but the Reimbursement Receivable asset failed to release: ${this.describeApiError(err)}`;
-      },
+      next: () => this.finishCheckerAction(acceptRes, { syncLookup: true, reloadPayables: true }),
+      error: (err) => this.failCheckerAction(`Acceptance released, but the Reimbursement Receivable asset failed to release: ${this.describeApiError(err)}`),
     });
   }
 
@@ -2573,16 +2549,8 @@ export class TransactionBuilderComponent {
     if (!this.submitResult?.movementId) return;
     this.actionBusy = true;
     this.api.reject(this.submitResult.movementId, 'checker1', 'MANUAL_TEST_REJECT').subscribe({
-      next: (res) => {
-        this.actionBusy = false;
-        this.submitResult = res;
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-      },
-      error: (err) => {
-        this.actionBusy = false;
-        this.submitError = this.describeApiError(err);
-      },
+      next: (res) => this.finishCheckerAction(res),
+      error: (err) => this.failCheckerAction(this.describeApiError(err)),
     });
   }
 
@@ -2611,27 +2579,15 @@ export class TransactionBuilderComponent {
 
     const cancelPrimary = () => {
       this.api.cancel(this.submitResult.movementId, cancelledBy, 'MAKER_EC').subscribe({
-        next: (res) => {
-          this.actionBusy = false;
-          this.submitResult = res;
-          this.refreshSelectedContractSnapshot();
-          this.syncCheckerToContext();
-          this.syncLookupToContext();
-        },
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = this.describeApiError(err);
-        },
+        next: (res) => this.finishCheckerAction(res, { syncLookup: true }),
+        error: (err) => this.failCheckerAction(this.describeApiError(err)),
       });
     };
 
     if (this.selectedFunction?.documentArrivalWithSg && this.arrivalSgRedeemMovementId) {
       this.api.cancel(this.arrivalSgRedeemMovementId, cancelledBy, 'MAKER_EC').subscribe({
         next: () => cancelPrimary(),
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = `Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${this.describeApiError(err)}`;
-        },
+        error: (err) => this.failCheckerAction(`Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${this.describeApiError(err)}`),
       });
       return;
     }
@@ -2641,10 +2597,7 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.createsIssuingBankReceivableOnHonour && this.dueFromIssuingBankMovementId) {
       this.api.cancel(this.dueFromIssuingBankMovementId, cancelledBy, 'MAKER_EC').subscribe({
         next: () => cancelPrimary(),
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = `Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${this.describeApiError(err)}`;
-        },
+        error: (err) => this.failCheckerAction(`Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${this.describeApiError(err)}`),
       });
       return;
     }
@@ -2659,16 +2612,10 @@ export class TransactionBuilderComponent {
         next: () => {
           this.api.cancel(this.acceptanceMovementId!, cancelledBy, 'MAKER_EC').subscribe({
             next: () => cancelPrimary(),
-            error: (err) => {
-              this.actionBusy = false;
-              this.submitError = `Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${this.describeApiError(err)}`;
-            },
+            error: (err) => this.failCheckerAction(`Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${this.describeApiError(err)}`),
           });
         },
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = `Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${this.describeApiError(err)}`;
-        },
+        error: (err) => this.failCheckerAction(`Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${this.describeApiError(err)}`),
       });
       return;
     }
@@ -2679,10 +2626,7 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.settlesAcceptanceOnMature && this.matchedReceivableMovementId) {
       this.api.cancel(this.matchedReceivableMovementId, cancelledBy, 'MAKER_EC').subscribe({
         next: () => cancelPrimary(),
-        error: (err) => {
-          this.actionBusy = false;
-          this.submitError = `Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${this.describeApiError(err)}`;
-        },
+        error: (err) => this.failCheckerAction(`Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${this.describeApiError(err)}`),
       });
       return;
     }
@@ -2691,9 +2635,8 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * Quality-report-balance.md BAL-003 (second of three planned extractions — the third,
-   * Checker-actions/submit-release-reject-cancel-acknowledge, stays deferred: it's the highest-risk,
-   * money-moving ~800+ lines and isn't a safe same-behavior consolidation the way this one is). Shared
+   * Quality-report-balance.md BAL-003 (second of three planned extractions — see
+   * `finishCheckerAction`'s own doc comment, above `release()`, for the third/final one). Shared
    * body behind the Look Up panel's three near-identical "fetch snapshot + fetch/sort movements by
    * eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG) — only the fetch/populate shape is shared;
    * each caller still owns its own target fields and its own snapshot-error behavior (Tab 1 surfaces

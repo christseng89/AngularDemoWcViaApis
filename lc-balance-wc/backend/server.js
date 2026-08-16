@@ -10,6 +10,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { rateLimit } = require('express-rate-limit');
 const { buildRegistry } = require('./data/businessCases');
 
 const app = express();
@@ -107,7 +108,14 @@ app.get('/api/business-cases', (_req, res) => {
   res.json(buildRegistry().map(({ id, title, description, steps }) => ({ id, title, description, stepCount: steps.length })));
 });
 
-app.post('/api/business-cases/:id/run', async (req, res) => {
+// Quality-report-balance.md BAL-118: this is the orchestrator's own highest-amplification endpoint —
+// one incoming request can fan out into a multi-step cascade of downstream microservice calls (see
+// runCase() above) — so it gets its own rate limit, mirroring the microservice's own scoped limiter on
+// /balance-movements (same window/limit shape, same "basic abuse protection, not a throughput cap on
+// normal use" posture).
+const runLimiter = rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false });
+
+app.post('/api/business-cases/:id/run', runLimiter, async (req, res) => {
   const registry = buildRegistry(); // fresh natural keys each run — re-runnable against the same DB
   const businessCase = registry.find((c) => c.id === req.params.id);
   if (!businessCase) {
@@ -118,7 +126,14 @@ app.post('/api/business-cases/:id/run', async (req, res) => {
     const trace = await runCase(businessCase);
     res.json({ id: businessCase.id, title: businessCase.title, description: businessCase.description, trace });
   } catch (err) {
-    res.status(500).json({ code: 'ORCHESTRATION_ERROR', message: err instanceof Error ? err.message : String(err) });
+    const detail = err instanceof Error ? err.message : String(err);
+    // Quality-report-balance.md BAL-117: was echoing `detail` straight into the response body — any
+    // caller (this endpoint has no authentication) could read back internal error detail (e.g. a
+    // downstream microservice's own raw error body, re-serialized into this message by
+    // resolveLogicalContractId()). Log the detail server-side, return a generic message to the client.
+    // eslint-disable-next-line no-console
+    console.error(`[business-cases/run] orchestration error for "${req.params.id}":`, detail);
+    res.status(500).json({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
   }
 });
 
@@ -141,6 +156,3 @@ if (require.main === module) {
 // `resolveLogicalContractId`/`callMicroservice`, exported purely so runCase.test.js can unit-test them
 // directly — see that file's own doc comment for why).
 module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };
-module.exports.runCase = runCase;
-module.exports.resolveLogicalContractId = resolveLogicalContractId;
-module.exports.callMicroservice = callMicroservice;
