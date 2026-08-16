@@ -24,6 +24,16 @@ export interface CreateMovementRequest {
   sourceTransactionRef?: string | null;
   /** A3S only (Design doc §3.3) — links a Document Arrival's own UTILIZE to its matched SG's FULL_REDEEM for audit/query purposes; not an atomicity guarantee (§3.3's own documented scope). */
   businessEventId?: string | null;
+  /**
+   * Bug fixed 2026-08-16 ("A6/B4 也修一下") — A6/B4 only: the movementId of the pre-existing source
+   * Document Arrival/Present Docs record this movement converts/finalizes (this.selectedPayMovement at
+   * Submit time). Distinct from businessEventId above (which only links movements CREATED TOGETHER in
+   * one submission) — the source record here was created by an earlier, separate submission and never
+   * shares a businessEventId with this one. Lets a genuinely independent Checker session resolve and
+   * release the source record without needing the Maker's own in-memory selectedPayMovement — see
+   * checker-actions.service.ts's own doc comment for the full mechanism.
+   */
+  referencedTransactionId?: string | null;
   /** Design doc §7 Tenor Type Routing (v0.7) — only for Acceptance (A6/B4). SELLERS_USANCE/BUYERS_USANCE share identical Balance mechanics; this is audit/reporting only. */
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
   tenorDays?: number | null;
@@ -74,6 +84,21 @@ export interface MovementWarning {
 }
 
 /**
+ * analysis/contingent-liability-ledger.html — the Dr/Cr contingent-liability account-entry pair the
+ * microservice derives once, server-side, at movement creation (domain/contingentAccountEntry.ts), and
+ * persists immutably with the movement. Null when the movement's own instrumentType is outside the
+ * Balance Component's contingent/off-balance-sheet scope (the ON_BALANCE_ASSET instruments a
+ * Confirmation's own Honour/Accept transforms into) — on-balance-sheet liability is never populated
+ * here, by design.
+ */
+export interface ContingentAccountEntry {
+  drAccount: string;
+  crAccount: string;
+  currency: string;
+  amount: string;
+}
+
+/**
  * Quality-report-balance.md BAL-006: mirrors the microservice's own `src/types.ts` BalanceMovement
  * shape (kept in sync by hand, same convention `balance-component.model.ts`'s own doc comment already
  * uses for the design-doc field/rule tables) — replaces the `Observable<any>`/`Observable<any[]>`
@@ -98,13 +123,24 @@ export interface BalanceMovement {
   reasonCode?: string | null;
   remarks?: string | null;
   sourceTransactionRef?: string | null;
+  /** Bug fixed 2026-08-16 ("A6/B4 也修一下") — see CreateMovementRequest.referencedTransactionId's own doc comment for the full rule. */
+  referencedTransactionId?: string | null;
   warnings?: MovementWarning[] | null;
+  contingentAccountEntry?: ContingentAccountEntry | null;
   createdBy: string;
   releasedBy?: string | null;
   createdAt: string;
   releasedAt?: string | null;
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
+  /**
+   * A4 (Sight Settlement) only (2026-08-16, business instruction "Add real Maker Submit, then have
+   * Checker to Release it. Exactly the same as A1."). Set via submitByMaker() below — see the
+   * microservice's own BalanceMovement.makerSubmittedAt doc comment for the full rationale (mirrors
+   * acknowledgedBy/acknowledgedAt's shape, but on the Maker side; status stays PENDING either way).
+   */
+  makerSubmittedBy?: string | null;
+  makerSubmittedAt?: string | null;
 }
 
 /**
@@ -141,6 +177,11 @@ export class BalanceComponentApiService {
   /** Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — B3's own Checker Release; a real backend acknowledgment (status stays PENDING — B4 still finds/consumes it), not the plain release() transition. */
   acknowledge(movementId: string, acknowledgedBy: string): Observable<BalanceMovement> {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
+  }
+
+  /** Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it. Exactly the same as A1.") — A4's own real Maker action; a genuine backend acknowledgment (status stays PENDING — the Checker's own release() below is still the real finalizing transition), not a new movement. */
+  submitByMaker(movementId: string, makerSubmittedBy: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/maker-submit`, { makerSubmittedBy });
   }
 
   resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): Observable<BalanceContract> {
@@ -190,5 +231,16 @@ export class BalanceComponentApiService {
   /** Event timeline (business instruction 2026-08-14) — every movement against one contract, in eventSeq (time) order. */
   listMovements(balanceContractId: string): Observable<BalanceMovement[]> {
     return this.http.get<BalanceMovement[]>(`${this.base}/balance-contracts/${balanceContractId}/movements`);
+  }
+
+  /**
+   * Bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG entries was not
+   * shown") — lets checker-actions.service.ts resolve a compound submission's linked leg(s) (A3S's SG
+   * redemption, B5's Reimbursement Receivable) by their shared businessEventId, independent of the
+   * Maker's own in-memory submitResult. Cross-contract by design (the SG's own balanceContractId
+   * differs from the LC's) — see the microservice's own store.findByBusinessEventId doc comment.
+   */
+  findByBusinessEventId(businessEventId: string): Observable<BalanceMovement[]> {
+    return this.http.get<BalanceMovement[]>(`${this.base}/balance-movements`, { params: { businessEventId } });
   }
 }

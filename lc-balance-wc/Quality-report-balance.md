@@ -23,13 +23,29 @@ for anything not previously found. Six new findings surfaced (BAL-115–BAL-120)
 contract-invariant violation in the microservice's own monetary-amount handling (BAL-115) — **fixed the
 same day this report was written**, immediately after being found (see BAL-115's own section for detail).
 
+**Note on later same-day feature work (figures refreshed, not a new findings sweep):** a substantial
+amount of *feature* work landed after this report's findings above were closed — none of it prompted by
+this report, and none of it a code-quality defect in the BAL-XXX sense, so it is deliberately **not**
+written up as new findings here; the full narrative (business instructions, design reasoning, live
+verification) lives in `lc-balance-wc/CLAUDE.md`'s own decision log, which is this project's source of
+truth for feature history. In outline: A4 (Sight Settlement) redesigned twice the same day for genuine
+Maker/Checker (4-eyes) separation — first a browse-only picker, then a real backend-persisted
+`POST /balance-movements/{id}/maker-submit` step (new `makerSubmittedBy`/`makerSubmittedAt` fields,
+OAS bumped to v1.4.0) after user feedback that browse-only wasn't a real Maker action; and the Business
+Case Registry (`backend/data/businessCases.js`) grew from 10 to 14 cases (Import #6/#7, Export #6/#7),
+transcribed from the user's own live-tested S01/U01 scenarios, adding a `referencedTransactionIdRef`
+step-resolution capability and a `makerSubmit` step type to the orchestrator's own generic executor.
+This section exists solely so the quantitative figures elsewhere in this report (test counts, coverage,
+lint/format status) — refreshed by re-running every check fresh, not carried forward — make sense against
+the current codebase; it is not a substitute for CLAUDE.md's own detailed record.
+
 ---
 
 ## Overall Quality Score
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A- (4.6/5) | 729/729 tests passing across 3 independent suites (467 Angular + 234 microservice + 28 backend). The one genuine defect this pass found (BAL-115 — `money.ts`'s own "only module allowed to construct a Decimal from a wire string" invariant bypassed at 3 call sites) was fixed same-day. No other logic bugs found. |
+| **Reliability** | A- (4.6/5) | 830/830 tests passing across 3 independent suites (510 Angular + 288 microservice + 32 backend — grown from 729 the same day via the feature work noted above, not new bug-fix tests). The one genuine defect this pass found (BAL-115 — `money.ts`'s own "only module allowed to construct a Decimal from a wire string" invariant bypassed at 3 call sites) was fixed same-day. No other logic bugs found. |
 | **Security** | B+ (3.9/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold. Both new Minor hotspots found this pass are now fixed (BAL-117 raw error echoing on both services, BAL-118 rate limit on the orchestrator). Held back by the two unchanged structural gaps — no authentication anywhere (BAL-001), and 8 High CVEs in production Angular deps (BAL-002) — both explicitly deferred, user-confirmed, not oversights. |
 | **Maintainability** | A (4.6/5) | Duplication hotspots fixed and re-verified clean; `submit()` is split (~423 lines → 29-line dispatcher + named methods); the 3 paginated pickers' own state/boundary-math duplication is unified into one `PagedListState` class; and as of this fifth same-day pass Checker Actions (release/reject/deleteMakerPending) is extracted into a dedicated `CheckerActionsService` via genuine Dependency Inversion (Interface Segregation + Single Responsibility) — the first BAL-003 fix that actually reduces the God Component's *job count*, not just its internal duplication. BAL-108's remaining `any` fields are all genuinely typed; BAL-105's `format:check` passes clean repo-wide; BAL-110 now has a drift-catching contract test; BAL-116 (zod now actually used) and BAL-119 (dead export re-assignment) both fixed. The class itself is still a God Component (function/side selection, three picker state machines, Look Up panel, Maker submit dispatch), which is why BAL-003 stays open at Major rather than closing outright. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines. |
@@ -507,6 +523,11 @@ exactly those fields (see the prior remediation pass's own notes in this project
 **Recommended remediation:** retype the remaining 5 fields incrementally, one field + its fixture rewrites
 at a time, rather than as a single sweep.
 
+**Re-verified later the same day:** `any` usage in `transaction-builder.component.ts` dropped further,
+37 → 30 (`grep -c ": any\|<any>\|as any\|any\[\]"`), as a side effect of the A4 redesign's own code
+removal (`payExisting()` deleted outright) — no new `any` typing was introduced by any of the later
+feature work. Both API service boundary files remain at 1 `any` each, unchanged.
+
 **Outcome (2026-08-16, user-directed as P2 — "逐欄位改善"): all 5 remaining fields retyped.** The prior
 blocker (bare partial-object fixtures like `{movementId: 'm1'}` failing `TS2740` against the full
 `BalanceMovement` shape) was resolved by adding a `makeMovement()`-style fixture-builder helper to each
@@ -565,6 +586,13 @@ BAL-105 was first "Fixed."
 **Recommended remediation:** run `prettier --write` across all three sub-projects as its own isolated
 commit (so it doesn't obscure a real code change in a mass-reformat diff), then optionally wire
 `lint`/`format:check` into CI.
+
+**Re-verified later the same day, after the feature work noted above:** `format:check` had drifted again
+— 5 Angular files, 4 microservice files, 2 backend files, all from the same day's later edits (never
+run through `prettier --write` before this refresh) — re-confirming this finding's own standing caveat:
+the gate is real and catches drift correctly, but doesn't run itself; `prettier --write` needed a fresh
+pass. Re-applied across all three sub-projects; `format:check` passes clean again, and the reformat
+changed zero observable behavior (full three-suite re-run afterward, all green, coverage unchanged).
 
 **Outcome (2026-08-16, user-directed as P2 — "很容易處理"): both halves closed.** A root-cause bug was
 found first: `backend/`'s own `format:check` script used
@@ -674,25 +702,30 @@ dynamically-assembled `WHERE` clause in `balanceContractStore.ts`'s `listCatalog
 *fragments* are hardcoded literals from a fixed set, never derived from caller input.
 
 ### BAL-112
-**Test coverage clears 95% on all four metrics, across all three independent suites.** 729 tests total,
-all green as of this review (microservice count includes the currency-decimal-place, BAL-115, and
-BAL-116 fixes' own new tests; backend count includes BAL-117/BAL-118's own new/updated tests; Angular
-count includes BAL-003's Checker Actions consolidation, `submit()` split, `PagedListState`'s own 10 new
-tests, and the Checker Actions service extraction (0 new tests needed — the existing describe blocks
-covered every branch already), plus BAL-108's retyping and BAL-110's 2 new contract-test cases):
+**Test coverage clears 95% on all four metrics, across all three independent suites.** 830 tests total,
+all green as of this refresh (microservice count includes the currency-decimal-place, BAL-115, and
+BAL-116 fixes' own new tests plus the later same-day A4/`referencedTransactionId`/Business-Case-Registry
+feature work's own new tests; backend count includes BAL-117/BAL-118's own new/updated tests plus the
+`referencedTransactionIdRef`/`makerSubmit` executor-capability tests; Angular count includes BAL-003's
+Checker Actions consolidation, `submit()` split, `PagedListState`'s own 10 new tests, the Checker Actions
+service extraction, BAL-108's retyping, BAL-110's 2 new contract-test cases, and the later same-day A4
+real-Maker-Submit redesign's own new tests):
 
 | Suite | Statements | Branches | Functions | Lines | Tests |
 |---|---|---|---|---|---|
-| `microservices/balance-component/` | 98.98% | 95.95% | 100% | 99.33% | 234 |
-| `backend/` | 97.97% | 97.36% | 95.65% | 97.77% | 28 |
-| Angular app (`src/app/`) | 99.68% | 95.53% | 99.41% | 99.73% | 467 |
+| `microservices/balance-component/` | 99.12% | 96.33% | 100% | 99.41% | 288 |
+| `backend/` | 97.43% | 95.65% | 96.29% | 98.13% | 32 |
+| Angular app (`src/app/`) | 99.63% | 95.17% | 99.16% | 99.67% | 510 |
 
-(Figures above are from the fifth same-day pass's final full three-suite re-run, confirming BAL-110's
-contract test and BAL-003's Checker Actions extraction — on top of the earlier `submit()` split,
-`PagedListState`, BAL-105's repo-wide reformat, and BAL-108's remaining retyping — changed zero observable
-behavior in any pre-existing test. The Angular branch figure dips slightly, 95.65% → 95.53%, from two
-pre-existing `pendingItemLabel ?? 'Document Arrival'` fallback branches moved verbatim into the new
-`checker-actions.service.ts` — not a new coverage gap, still comfortably above the 95% floor.)
+(Figures above are from a full three-suite re-run performed as part of this same-day `.md` refresh —
+after the A4 real-Maker-Submit redesign and the Business Case Registry's Import/Export Case #6/#7
+additions, and after re-applying `prettier --write` per BAL-105's own re-verification note above — all
+three suites still clear the 95% floor on every metric; none of the later feature work introduced a
+coverage regression serious enough to need a targeted test add-back beyond what was already added
+alongside each feature at the time. The Angular branch figure moved further, 95.53% → 95.17%, mostly from
+the A4 redesign's own removed `payExisting()` method taking several previously-well-covered branches out
+of the denominator entirely, offset by new tests for the redesign's own branches — still comfortably
+above the 95% floor throughout, never dipped below it at any point this session.)
 
 All three also pass their own lint gate clean (0 errors) and typecheck/build clean
 (`tsc --noEmit`, `npm run build` for the microservice; `ng build --configuration development` for the

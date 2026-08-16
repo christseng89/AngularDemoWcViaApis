@@ -10,9 +10,13 @@ const { runCase, resolveLogicalContractId, callMicroservice } = require('../serv
 //   2. resolveLogicalContractId's cache-hit branch (entry.logicalContractId already set)
 //   3. runCase's `if (step.captureAs)` false branch (a createMovement step with no captureAs)
 //   4. runCase's `throw new Error('Unknown step type ...')` (a step.type outside note/
-//      createMovement/release/snapshot — never happens via the real businessCases.js registry,
-//      whose own step types are exhaustively covered by businessCases.test.js, but is directly
-//      reachable via the exported runCase() with a synthetic step, same technique as #1-#3 above)
+//      createMovement/release/makerSubmit/snapshot — never happens via the real businessCases.js
+//      registry, whose own step types are exhaustively covered by businessCases.test.js, but is
+//      directly reachable via the exported runCase() with a synthetic step, same technique as #1-#3
+//      above)
+//   5. runCase's makerSubmit step (2026-08-16, Import Case #6's own A4 real-Maker-Submit) — both its
+//      happy path and its "skipped" branch (no movementId captured under movementRef), mirroring the
+//      existing release-skipped coverage in server.test.js but isolated here as a direct unit test
 // (the require.main === module guard remains deliberately uncovered — structurally only true when
 // server.js is run directly, never when required by a test; see server.js's own top-level comment.)
 
@@ -87,7 +91,7 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       expect(trace[0].response).toEqual({ movementId: 'mv-1', balanceContractId: 'bc-1' });
     });
 
-    it('throws "Unknown step type" for a step.type outside note/createMovement/release/snapshot', async () => {
+    it('throws "Unknown step type" for a step.type outside note/createMovement/release/makerSubmit/snapshot', async () => {
       global.fetch = jest.fn();
 
       const businessCase = {
@@ -97,6 +101,55 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
 
       await expect(runCase(businessCase)).rejects.toThrow(/Unknown step type "bogus-step-type"/);
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('makerSubmit step: POSTs to .../maker-submit with makerSubmittedBy, distinct from release', async () => {
+      const businessCase = {
+        id: 'synthetic-maker-submit',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Document Arrival',
+            captureAs: 'utilize',
+            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1000' },
+          },
+          { type: 'makerSubmit', label: 'A4 real Maker Submit', movementRef: 'utilize', makerSubmittedBy: 'maker1' },
+        ],
+      };
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockImplementationOnce(async (url, opts) => {
+          expect(url).toMatch(/\/balance-movements\/mv-1\/maker-submit$/);
+          expect(JSON.parse(opts.body)).toEqual({ makerSubmittedBy: 'maker1' });
+          return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
+        });
+
+      const trace = await runCase(businessCase);
+
+      expect(trace).toHaveLength(2);
+      expect(trace[1]).toMatchObject({ type: 'makerSubmit', label: 'A4 real Maker Submit', ok: true, status: 200 });
+      expect(trace[1].response).toEqual({ status: 'PENDING', makerSubmittedBy: 'maker1' });
+    });
+
+    it('makerSubmit step: marks itself skipped (no fetch call) when the referenced createMovement returned no movementId', async () => {
+      global.fetch = jest.fn();
+
+      const businessCase = {
+        id: 'synthetic-maker-submit-skipped',
+        steps: [{ type: 'makerSubmit', label: 'A4 real Maker Submit', movementRef: 'never-captured', makerSubmittedBy: 'maker1' }],
+      };
+
+      const trace = await runCase(businessCase);
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(trace).toHaveLength(1);
+      expect(trace[0]).toEqual({
+        type: 'makerSubmit',
+        label: 'A4 real Maker Submit',
+        skipped: true,
+        reason: expect.stringContaining('No movementId captured under "never-captured"'),
+      });
     });
   });
 

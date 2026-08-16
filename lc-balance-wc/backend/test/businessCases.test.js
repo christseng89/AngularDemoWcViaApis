@@ -11,20 +11,24 @@ const EXPECTED_IDS = [
   'import-case-3',
   'import-case-4',
   'import-case-5',
+  'import-case-6',
+  'import-case-7',
   'export-case-1',
   'export-case-2',
   'export-case-3',
   'export-case-4',
   'export-case-5',
+  'export-case-6',
+  'export-case-7',
 ];
 
-const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'snapshot'];
+const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
 
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 10 business cases, Import Case 1-5 then Export Case #1-#5, in order', () => {
-    expect(registry).toHaveLength(10);
+  it('returns exactly 14 business cases, Import Case 1-7 then Export Case #1-#7, in order', () => {
+    expect(registry).toHaveLength(14);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -46,14 +50,20 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['import-case-3'].title).toBe('Import Case 3 — USD Sight + Shipping Guarantee 50,000 + IBL');
     expect(byId['import-case-4'].title).toBe('Import Case 4 — USD Sight + Shipping Guarantee 100,000 + IBL (only 50,000 documents arrive)');
     expect(byId['import-case-5'].title).toBe('Import Case 5 — USD Sight, Amendment Decrease 120,000 (expect ERROR)');
+    expect(byId['import-case-6'].title).toBe('Import Case 6 — USD Sight + two Shipping Guarantees (full + partial redeem) + A4 real Maker Submit');
+    expect(byId['import-case-7'].title).toBe('Import Case 7 — USD Sellers Usance 120 days + Shipping Guarantee + two Acceptances (A6/A7)');
     expect(byId['export-case-1'].title).toBe('Export Case #1 — USD Sight + Confirmed');
     expect(byId['export-case-2'].title).toBe('Export Case #2 — USD Usance + Confirmed + No EBL');
     expect(byId['export-case-3'].title).toBe('Export Case #3 — USD Usance + Confirmed + EBL');
     expect(byId['export-case-4'].title).toBe('Export Case #4 — USD Usance + Unconfirmed + No EBL');
     expect(byId['export-case-5'].title).toBe('Export Case #5 — USD Usance + Unconfirmed + EBL');
+    expect(byId['export-case-6'].title).toBe('Export Case #6 — USD Sight + Confirmed + Present Docs (B3) -> Honour (B4) -> Due From Issuing Bank');
+    expect(byId['export-case-7'].title).toBe(
+      'Export Case #7 — USD Sellers Usance 120 days + Confirmed + Present Docs (B3) -> Accept (B4) -> Acceptance + Reimbursement Receivable -> Settlement (B5)',
+    );
   });
 
-  it('every step has a type from the four the generic executor understands', () => {
+  it('every step has a type from the five the generic executor understands', () => {
     registry.forEach((c) => {
       c.steps.forEach((step) => {
         expect(VALID_STEP_TYPES).toContain(step.type);
@@ -72,7 +82,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     });
   });
 
-  it('every *Ref (balanceContractIdRef / parentLogicalContractIdRef / movementRef / contractRef) points at a captureAs key already defined earlier in the SAME case', () => {
+  it('every *Ref (balanceContractIdRef / parentLogicalContractIdRef / referencedTransactionIdRef / movementRef / contractRef) points at a captureAs key already defined earlier in the SAME case, for both release and makerSubmit steps', () => {
     registry.forEach((c) => {
       const defined = new Set();
       c.steps.forEach((step, idx) => {
@@ -84,13 +94,16 @@ describe('data/businessCases.js buildRegistry()', () => {
           if (req.parentLogicalContractIdRef) {
             expect(defined.has(req.parentLogicalContractIdRef)).toBe(true);
           }
+          if (req.referencedTransactionIdRef) {
+            expect(defined.has(req.referencedTransactionIdRef)).toBe(true);
+          }
           if (step.captureAs) {
             // A step must not "define" a key it also references as its own ref (sanity check —
             // would indicate a self-referential, unresolvable step).
             expect(step.captureAs === req.balanceContractIdRef).toBe(false);
             defined.add(step.captureAs);
           }
-        } else if (step.type === 'release') {
+        } else if (step.type === 'release' || step.type === 'makerSubmit') {
           expect(step.movementRef).toBeTruthy();
           expect(defined.has(step.movementRef)).toBe(true);
         } else if (step.type === 'snapshot') {

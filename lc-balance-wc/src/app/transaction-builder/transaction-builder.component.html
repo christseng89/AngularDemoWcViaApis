@@ -370,8 +370,18 @@
                 <div class="tb-balance-row"><span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ selectedPayMovement.sourceTransactionRef || '(none)' }}</span></div>
                 <div class="tb-balance-row"><span class="tb-balance-row__label">Amount (captured at Document Arrival, read-only)</span><span class="tb-balance-row__value">{{ selectedPayMovement.amount }} {{ selectedPayMovement.currency }}</span></div>
               </div>
-              <button class="tb-btn tb-btn--primary mt-2" (click)="payExisting()" [disabled]="!selectedPayMovement || actionBusy">
-                {{ actionBusy ? 'Paying…' : 'Pay (Release)' }}
+              <!-- Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release
+                   it. Exactly the same as A1.") — A4's own dedicated "Pay (Release)" button (which
+                   called payExisting(), a direct single-actor release) was removed by an earlier
+                   same-day change in favor of a browse-only picker with no Maker action at all; per
+                   this explicit follow-up instruction that went too far — A4 now gets a REAL Submit
+                   button (submitA4()), a genuine backend maker-submit action distinct from A3's own
+                   earlier createMovement(), so the same two-actor Submit/Release shape every other
+                   function has (A1-A9/B1-B5) applies here too, not just a "go release it yourself"
+                   hint. Disabled-once-submitResult-set convention matches the generic Submit button
+                   below exactly (business instruction 2026-08-15, "按Submit...後 Button 直接灰掉"). -->
+              <button class="tb-btn tb-btn--primary mt-2" (click)="submitA4()" [disabled]="!selectedPayMovement || submitting || !!submitResult">
+                {{ submitting ? 'Submitting…' : 'Submit A4' }}
               </button>
             </div>
 
@@ -402,6 +412,23 @@
         <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
         <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
         <p class="tb-result__status" *ngIf="submitResult?.status"><strong>Status:</strong> {{ displayStatus(submitResult.status) }}</p>
+        <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
+             this event actually has a contingent-scope entry (null for an on-balance-sheet instrumentType,
+             e.g. the DUE_FROM_ISSUING_BANK/ACCEPTANCE_REIMB_RECEIVABLE legs a B4 compound also creates). -->
+        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="submitResult?.contingentAccountEntry" (click)="openAccountEntryDialog(submitResult)">
+          Account Entries
+        </button>
+        <!-- Bug fixed 2026-08-16 (reviewer-reported — "A3S does not generate the related SG redemption
+             entries in Pending"): A3S's own SG FULL_REDEEM/PARTIAL_REDEEM leg is a separate, EARLIER API
+             call than submitResult (which holds A3S's own LC UTILIZE) — its own contingentAccountEntry
+             was being silently dropped. Same root cause also affected B4 Usance's own new Acceptance
+             liability leg (acceptanceMovement below); both now get their own button. -->
+        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="arrivalSgRedeemMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(arrivalSgRedeemMovement!)">
+          Account Entries — SG Redemption
+        </button>
+        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="acceptanceMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(acceptanceMovement!)">
+          Account Entries — Acceptance
+        </button>
         <p class="tb-hint" *ngIf="submitResult?.status === 'PENDING'">Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.</p>
         <!-- Business instruction 2026-08-15 ("option for Maker to Delete Pending, i.e. EC... for all
              functions") — Maker-side withdrawal of their own still-PENDING entry, distinct from the
@@ -418,7 +445,20 @@
            search (searchCheckerLc()), not a passive follower of whatever the Maker's own Direction/Parent-picker/
            natural-key flow happens to have resolved. Auto-fills from that context as a convenience
            (syncCheckerToContext(), fired after a Submit or a contract pick) but works entirely on its own too —
-           a Checker can search LC S001 here and act on it without ever touching the Maker form above. -->
+           a Checker can search LC S001 here and act on it without ever touching the Maker form above.
+
+           Bug fixed 2026-08-16, then superseded the SAME day (reviewer-reported — "A4 SUBMIT THEN
+           RELEASE Get error message => Cannot RELEASE a movement currently in status RELEASED"): the
+           root cause was A4 having TWO independent, unsynced release paths — its own dedicated
+           "Pay (Release)" button above, plus this generic panel. The first fix hid this panel for A4
+           entirely, which stopped the error but left A4 as the one function with no real Maker/Checker
+           (4-eyes) separation — a single actor's own button both submitted intent and released it.
+           Per explicit business instruction the same day ("A4 Need Maker and Checker feature (4 eyes
+           principle) i.e. Submit by Maker, then Release by Checker" / "A1-A9 B1-B5 all functions need
+           maker and checker features as standard Trade Finance business requirement"), A4's own button
+           was removed instead (see A4's subcard above) so THIS panel is now A4's only release path —
+           the same standard pattern every other function already uses, with no dual-path trap possible
+           since there is only one path. -->
       <section class="tb-section tb-section--checker">
         <div class="tb-section__header">
           <span class="tb-role-badge tb-role-badge--checker">Checker</span>
@@ -576,15 +616,17 @@
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
                    visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
-              <thead><tr><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th></tr></thead>
+              <thead><tr><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th><th>Entries</th></tr></thead>
               <tbody>
                 <!-- Business instruction 2026-08-14 "Lookup should show the 2ndary reference number" — sourceTransactionRef
                      (Amendment No./Times, IB/EB Number, …); ISSUE/CREATE have none, shown as an em dash.
                      Business instruction 2026-08-16 ("Event Timeline 上一行已經顯示了 不需再多選取") — Balance
                      After (the movement's own balanceAfter, set once it's RELEASED — see release()'s own
-                     before/after computation) is now a plain column here, so the separate click-to-fetch
-                     "Balance as of event" panel below (selectEvent()) is redundant and removed; rows are no
-                     longer clickable/highlighted. -->
+                     before/after computation) is a plain column here, so the earlier separate click-to-fetch
+                     "Balance as of event" panel (selectEvent()) stays removed. Rows themselves are still not
+                     clickable — the "Entries" column button below (business-requested 2026-08-16,
+                     analysis/contingent-liability-ledger.html) is a deliberately separate, explicit
+                     interaction, not a re-introduction of whole-row click. -->
                 <tr *ngFor="let m of activeLookupMovements">
                   <td><span class="tb-type-tag">{{ m.movementType }}</span></td>
                   <td class="tb-table__amount">{{ m.amount }} <span class="tb-muted" *ngIf="m.ceilingAmount !== m.amount">(ceiling {{ m.ceilingAmount }})</span></td>
@@ -592,6 +634,10 @@
                   <td><span class="tb-status-badge" [class.tb-status-badge--pending]="m.status === 'PENDING'" [class.tb-status-badge--approved]="m.status === 'RELEASED'" [class.tb-status-badge--negative]="m.status === 'REJECTED' || m.status === 'CANCELLED'" [class.tb-status-badge--neutral]="m.status === 'SUPERSEDED'">{{ displayStatus(m.status) }}</span></td>
                   <td class="tb-table__amount">{{ m.balanceAfter ?? '—' }}</td>
                   <td class="tb-table__time">{{ m.createdAt | date:'short' }}</td>
+                  <td>
+                    <button type="button" class="tb-btn tb-btn--tiny" *ngIf="m.contingentAccountEntry" (click)="openAccountEntryDialog(m)">Account Entries</button>
+                    <span class="tb-muted" *ngIf="!m.contingentAccountEntry">—</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -615,6 +661,44 @@
           </div>
         </div>
       </section>
+    </div>
+  </div>
+
+  <!-- ══════ Account Entries pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html) ══════
+       Opened from either the Maker Result panel (right after Submit) or an Event Timeline row's own
+       "Account Entries" button — both pass in the exact BalanceMovement object already returned by the
+       API, so this dialog only ever displays the historical entries stored WITH that event, never a
+       recalculation against the current balance. -->
+  <div class="tb-dialog-overlay" *ngIf="accountEntryDialogMovement" (click)="closeAccountEntryDialog()">
+    <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="Account Entries" (click)="$event.stopPropagation()">
+      <div class="tb-dialog__header">
+        <h3 class="tb-dialog__title">Account Entries</h3>
+        <button type="button" class="tb-dialog__close" (click)="closeAccountEntryDialog()" aria-label="Close">×</button>
+      </div>
+      <div class="tb-dialog__meta">
+        <span class="tb-type-tag">{{ accountEntryDialogMovement.movementType }}</span>
+        <span class="tb-muted">{{ accountEntryDialogMovement.sourceTransactionRef || ('eventSeq ' + accountEntryDialogMovement.eventSeq) }}</span>
+        <span class="tb-status-badge" [class.tb-status-badge--pending]="accountEntryDialogMovement.status === 'PENDING'" [class.tb-status-badge--approved]="accountEntryDialogMovement.status === 'RELEASED'" [class.tb-status-badge--negative]="accountEntryDialogMovement.status === 'REJECTED' || accountEntryDialogMovement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="accountEntryDialogMovement.status === 'SUPERSEDED'">{{ displayStatus(accountEntryDialogMovement.status) }}</span>
+      </div>
+      <table class="tb-table tb-table--static mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry as entry">
+        <thead><tr><th>Dr/Cr</th><th>Account Name</th><th>Currency</th><th>Amount</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
+            <td>{{ entry.drAccount }}</td>
+            <td>{{ entry.currency }}</td>
+            <td class="tb-table__amount">{{ entry.amount }}</td>
+          </tr>
+          <tr>
+            <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
+            <td>{{ entry.crAccount }}</td>
+            <td>{{ entry.currency }}</td>
+            <td class="tb-table__amount">{{ entry.amount }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="tb-hint mt-2">Historical entries recorded with this event — never recalculated from the current balance.</p>
+      <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closeAccountEntryDialog()">Close</button>
     </div>
   </div>
 </div>

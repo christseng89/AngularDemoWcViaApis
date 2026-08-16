@@ -101,3 +101,76 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
     ).toThrow(InvalidMonetaryAmountError);
   });
 });
+
+/**
+ * Bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG entries was not
+ * shown"): a Checker session independent of the Maker's own in-memory submitResult had no way to
+ * resolve A3S's own linked SG redemption movement, so it silently never got released — see
+ * BalanceMovementStore.findByBusinessEventId's own doc comment for the full root cause.
+ */
+describe('BalanceService.findByBusinessEventId', () => {
+  test('returns every movement sharing a businessEventId, across different contracts, oldest first', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lcIssue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'BEID-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!lcIssue.created) throw new Error('expected a new movement');
+    service.release(lcIssue.movement.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber: 'BEID-001' });
+    if (!lc) throw new Error('expected the just-issued LC to resolve');
+    const sgIssue = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'BEID-001', sgNumber: 'SG01' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '20000',
+      currency: 'USD',
+      parentLogicalContractId: lc.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!sgIssue.created) throw new Error('expected a new movement');
+    service.release(sgIssue.movement.movementId, 'checker1');
+
+    const businessEventId = '11111111-1111-1111-1111-111111111111';
+    const sgRedeem = service.createMovement({
+      instrumentType: 'SHGT',
+      balanceContractId: sgIssue.movement.balanceContractId,
+      movementType: 'FULL_REDEEM',
+      eventSeq: 2,
+      amount: '20000',
+      currency: 'USD',
+      businessEventId,
+      createdBy: 'maker1',
+    });
+    if (!sgRedeem.created) throw new Error('expected a new movement');
+    const lcUtilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: 2,
+      amount: '20000',
+      currency: 'USD',
+      businessEventId,
+      createdBy: 'maker1',
+    });
+    if (!lcUtilize.created) throw new Error('expected a new movement');
+
+    const linked = service.findByBusinessEventId(businessEventId);
+
+    expect(linked.map((m) => m.movementId)).toEqual([sgRedeem.movement.movementId, lcUtilize.movement.movementId]);
+    expect(linked.map((m) => m.movementType)).toEqual(['FULL_REDEEM', 'UTILIZE']);
+    // The LC's own earlier ISSUE (no businessEventId) and the SG's own ISSUE are NOT included.
+    expect(linked.every((m) => m.movementType !== 'ISSUE')).toBe(true);
+  });
+
+  test('returns an empty array for a businessEventId no movement carries', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(service.findByBusinessEventId('99999999-9999-9999-9999-999999999999')).toEqual([]);
+  });
+});

@@ -70,6 +70,11 @@ describe('BalanceComponentApiService', () => {
     expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/acknowledge', { acknowledgedBy: 'checker2' });
   });
 
+  it('submitByMaker() POSTs to the /maker-submit sub-path with makerSubmittedBy', () => {
+    service.submitByMaker('MV-1', 'maker1');
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/maker-submit', { makerSubmittedBy: 'maker1' });
+  });
+
   describe('resolveContract()', () => {
     it('GETs balance-contracts with only instrumentType + lcNumber when ibNumber/sgNumber are absent', () => {
       const nk: NaturalKey = { lcNumber: 'S001' };

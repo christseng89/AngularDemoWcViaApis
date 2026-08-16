@@ -29,6 +29,7 @@ const A1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1')!;
 const A2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2')!;
 const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
 const A3S = IMPORT_FUNCTIONS.find((f) => f.code === 'A3S')!;
+const A4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!;
 const A6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6')!;
 const A8 = IMPORT_FUNCTIONS.find((f) => f.code === 'A8')!;
 const A9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9')!;
@@ -89,6 +90,7 @@ function makeApi() {
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(() => of(makeSnapshot())),
     listMovements: jest.fn(() => of([] as any[])),
+    findByBusinessEventId: jest.fn(() => of([] as any[])),
   };
 }
 
@@ -482,6 +484,30 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.submitting).toBe(false);
     });
 
+    // Bug fixed 2026-08-16, reviewer-reported ("A3S does not generate the related SG redemption
+    // entries in Pending"): the SG's own FULL_REDEEM/PARTIAL_REDEEM is a REAL, in-scope contingent
+    // account family, but its entry was silently dropped since submitResult only ever tracked the
+    // second (LC UTILIZE) call. arrivalSgRedeemMovement now carries the FULL first-leg response
+    // (not just its movementId) so the Account Entries button can be offered for this leg too.
+    it("captures the SG redemption leg's own full response (including its contingentAccountEntry) separately from submitResult", () => {
+      const { comp, api } = setup();
+      const sgEntry = {
+        drAccount: 'Shipping Guarantees Outstanding',
+        crAccount: "Customers' Liability under Shipping Guarantees",
+        currency: 'USD',
+        amount: '1000',
+      };
+      api.createMovement
+        .mockReturnValueOnce(of({ body: { movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry } }) as any)
+        .mockReturnValueOnce(of({ body: { movementId: 'utilize-1', status: 'PENDING', contingentAccountEntry: null } }) as any);
+      primed(comp);
+
+      comp.submit();
+
+      expect(comp.arrivalSgRedeemMovement).toEqual({ movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry });
+      expect(comp.submitResult.contingentAccountEntry).toBeNull();
+    });
+
     it('a failed SG reservation never attempts the Document Arrival call', () => {
       const { comp, api } = setup();
       api.createMovement.mockReturnValueOnce(apiErr('INSUFFICIENT_AVAILABLE_BALANCE') as any);
@@ -604,6 +630,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.submitResult).toEqual({ movementId: 'accept-1', status: 'PENDING' });
       expect(comp.acceptanceMovementId).toBe('acceptance-1');
       expect(comp.acceptanceReimbReceivableMovementId).toBe('receivable-1');
+    });
+
+    // Same fix and reasoning as the A3S SG-redemption test above, applied to this compound's own
+    // second leg (the new EPLC_ACCEPTANCE CREATE) — a real, in-scope contingent account family whose
+    // entry was also being silently dropped, same root cause.
+    it("captures the Acceptance liability leg's own full response (including its contingentAccountEntry) separately from submitResult", () => {
+      const { comp, api } = setup();
+      const acceptanceEntry = {
+        drAccount: "Customers' Liability under Acceptances & DPU",
+        crAccount: 'Acceptances & DPU Outstanding',
+        currency: 'USD',
+        amount: '3000',
+      };
+      api.createMovement
+        .mockReturnValueOnce(of({ body: { movementId: 'accept-1', status: 'PENDING', contingentAccountEntry: null } }) as any)
+        .mockReturnValueOnce(of({ body: { movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry } }) as any)
+        .mockReturnValueOnce(of({ body: { movementId: 'receivable-1', status: 'PENDING' } }) as any);
+      primed(comp);
+
+      comp.submit();
+
+      expect(comp.acceptanceMovement).toEqual({ movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry });
+      expect(comp.submitResult.contingentAccountEntry).toBeNull();
     });
 
     it('a failed ACCEPT never creates the Acceptance', () => {
@@ -1290,7 +1339,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('dispatches to release() when isCheckerCompoundOwnSubmission and action=release', () => {
       const { comp } = setup();
       comp.selectFunction(A6);
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1' });
+      // referencedTransactionId is required since the 2026-08-16 fix — a real A6 CREATE always carries
+      // one (see isCheckerCompoundOwnSubmission's own doc comment); submitResult no longer needs to match.
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', referencedTransactionId: 'mv-source' });
       comp.submitResult = { movementId: 'mv-1' };
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
       const rejectSpy = jest.spyOn(comp, 'reject').mockImplementation(() => undefined);
@@ -1304,7 +1355,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('dispatches to reject() when isCheckerCompoundOwnSubmission and action=reject', () => {
       const { comp } = setup();
       comp.selectFunction(A3S);
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1' });
+      // businessEventId is required since the 2026-08-16 fix — a real A3S UTILIZE always carries one
+      // (see isCheckerCompoundOwnSubmission's own doc comment); submitResult is no longer needed to match.
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', businessEventId: 'be-1' });
       comp.submitResult = { movementId: 'mv-1' };
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
       const rejectSpy = jest.spyOn(comp, 'reject').mockImplementation(() => undefined);
@@ -1365,6 +1418,53 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenCalledWith('mv-4', 'checker7');
       expect(comp.checkerBusy).toBe(false);
+    });
+
+    // 4-eyes redesign 2026-08-16 ("A4 Need Maker and Checker feature... Submit by Maker, then Release
+    // by Checker"): A4's own dedicated payExisting() release method was removed; A4's UTILIZE now
+    // relies on this SAME plain fallback path, same as A2 above — no special-casing needed since A4
+    // has none of the compound/defer flags either. Real Maker Submit redesign, same day ("Add real
+    // Maker Submit, then have Checker to Release it"): the plain path is now gated on
+    // makerSubmittedAt (see checkerAct()'s own doc comment) — a real A4 Submit always sets it, so a
+    // genuinely Maker-submitted item releases exactly as before.
+    it('plain path (A4, no defer/compound flags): a Checker-picked, Maker-submitted UTILIZE releases via api.release directly', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A4);
+      comp.checkerId = 'checker9';
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-a4', movementType: 'UTILIZE', makerSubmittedAt: '2026-08-16T00:00:00.000Z' });
+      comp.submitResult = null;
+
+      comp.checkerAct('release');
+
+      expect(api.release).toHaveBeenCalledWith('mv-a4', 'checker9');
+      expect(comp.checkerBusy).toBe(false);
+    });
+
+    // Real Maker Submit redesign 2026-08-16 ("Add real Maker Submit, then have Checker to Release
+    // it"): the real gate this whole feature exists for — without it, a Checker could release A4's
+    // own picked item before any Maker ever used the new Submit A4 button, reproducing the original
+    // "no genuine 4-eyes separation" gap this session's own A4 redesign set out to close.
+    it("A4: release is BLOCKED with a clear checkerError when the picked item's makerSubmittedAt is not set (Maker never clicked Submit A4)", () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A4);
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-a4-unsubmitted', movementType: 'UTILIZE', makerSubmittedAt: null });
+      comp.submitResult = null;
+
+      comp.checkerAct('release');
+
+      expect(api.release).not.toHaveBeenCalled();
+      expect(comp.checkerError).toMatch(/has not been Submitted by a Maker yet/);
+    });
+
+    it('A4: reject is NOT gated by makerSubmittedAt — a Checker may decline an unsubmitted item directly', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A4);
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-a4-unsubmitted', movementType: 'UTILIZE', makerSubmittedAt: null });
+      comp.submitResult = null;
+
+      comp.checkerAct('reject');
+
+      expect(api.reject).toHaveBeenCalledWith('mv-a4-unsubmitted', comp.checkerId, 'MANUAL_QUEUE_REJECT');
     });
 
     it('plain path: reject calls api.reject with MANUAL_QUEUE_REJECT', () => {

@@ -70,6 +70,23 @@ export interface AccountEntry {
   amount: string;
 }
 
+/**
+ * analysis/contingent-liability-ledger.html — the Dr/Cr contingent-liability account-entry pair for
+ * ONE event, server-derived once at movement-creation time (domain/contingentAccountEntry.ts) and
+ * persisted immutably with the movement. Distinct from `AccountEntry`/`accountEntries` above: that
+ * field is caller-supplied, general-purpose GL passthrough for a downstream accounting component
+ * (Design doc §2/§3.3 "GL Ownership") and stays untouched by this feature; `contingentAccountEntry` is
+ * this service's own, server-generated, contingent/off-balance-sheet-only pair — on-balance-sheet
+ * liability is explicitly out of scope and never populates it (null for the ON_BALANCE_ASSET
+ * instrumentTypes and any movementType the ledger has no pair for).
+ */
+export interface ContingentAccountEntry {
+  drAccount: string;
+  crAccount: string;
+  currency: string;
+  amount: string;
+}
+
 export interface MovementWarning {
   code: 'OFF_BALANCE_EXPOSURE_WARNING';
   message: string;
@@ -115,6 +132,8 @@ export interface BalanceMovement {
   currency: string;
   legRef?: string | null;
   accountEntries?: AccountEntry[] | null;
+  /** Server-derived, immutable — see ContingentAccountEntry's own doc comment. Null when out of contingent scope (e.g. an ON_BALANCE_ASSET instrumentType). */
+  contingentAccountEntry?: ContingentAccountEntry | null;
   lmtsReservationId?: string | null;
   status: MovementStatus;
   supersededMovementId?: string | null;
@@ -127,6 +146,20 @@ export interface BalanceMovement {
   sourceModule?: string | null;
   sourceFunction?: string | null;
   sourceTransactionRef?: string | null;
+  /**
+   * Bug fixed 2026-08-16, reviewer-reported ("A6/B4 也修一下" — extending the same-day
+   * businessEventId fix to A6/B4) — the movementId of a PRE-EXISTING record this movement converts/
+   * finalizes (A6/B4's own "still-PENDING source Document Arrival/Present Docs" picked at Submit
+   * time). Distinct from businessEventId (which only ever links movements CREATED TOGETHER in the
+   * same submission): the source record here was created by an earlier, separate submission, so it
+   * never shares a businessEventId with this one — this field is the only correlation between them.
+   * Lets a genuinely independent Checker session resolve and release the source record without
+   * needing the Maker's own in-memory `selectedPayMovement` — same reasoning as businessEventId's own
+   * v1.2.0 fix, for the one correlation shape businessEventId can't cover. Passthrough only — this
+   * service never validates that it resolves to a real movement (same posture as sourceTransactionRef/
+   * businessEventId, both also caller-supplied correlation-only fields).
+   */
+  referencedTransactionId?: string | null;
   balanceBefore?: string | null;
   balanceAfter?: string | null;
   warnings?: MovementWarning[] | null;
@@ -144,6 +177,20 @@ export interface BalanceMovement {
    */
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
+  /**
+   * A4 (Sight Settlement) only (2026-08-16, business instruction "Add real Maker Submit, then have
+   * Checker to Release it. Exactly the same as A1."). A4 has no movement of its own to create — it
+   * settles the PRE-EXISTING UTILIZE A3/A3S already earmarked — so this is the genuine,
+   * backend-persisted Maker action standing in for A1's own createMovement()-as-Submit step. Mirrors
+   * acknowledgedBy/acknowledgedAt's own shape (a second, non-finalizing actor action recorded on the
+   * SAME movement) but on the MAKER side: status stays PENDING either way. Set via
+   * POST /balance-movements/{id}/maker-submit — see service.submitByMaker()'s own doc comment for
+   * why /release itself does not hard-require this (would break the Business Case Runner's own
+   * orchestrated Import Case 1/2, which release a UTILIZE directly with no separate maker-submit
+   * step); the Transaction Builder's own A4 Checker flow enforces it client-side instead.
+   */
+  makerSubmittedBy?: string | null;
+  makerSubmittedAt?: string | null;
 }
 
 export interface BalanceSnapshot {

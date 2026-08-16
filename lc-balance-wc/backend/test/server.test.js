@@ -36,6 +36,9 @@ function createGenericFetchMock() {
     if (method === 'POST' && /\/balance-movements\/[^/]+\/release$/.test(url)) {
       return jsonResponse(200, { status: 'RELEASED' });
     }
+    if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
+      return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
+    }
     if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
       const [, contractId] = url.match(/\/balance-contracts\/([^/]+)\/balance$/);
       return jsonResponse(200, {
@@ -61,13 +64,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('GET /api/business-cases', () => {
-    it('lists all 10 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
+    it('lists all 14 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
       global.fetch = jest.fn();
 
       const res = await request(app).get('/api/business-cases');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(10);
+      expect(res.body).toHaveLength(14);
 
       const registry = buildRegistry();
       res.body.forEach((c, i) => {
@@ -145,6 +148,55 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       const case2 = buildRegistry().find((c) => c.id === 'import-case-2');
       // +1 for the extra snapshot GET used purely to resolve logicalContractId.
       expect(global.fetch).toHaveBeenCalledTimes(case2.steps.length + 1);
+    });
+  });
+
+  describe('POST /api/business-cases/export-case-6/run — referencedTransactionIdRef resolution', () => {
+    it("resolves to the earlier-captured Present Docs step's own movementId, inline, no extra fetch call", async () => {
+      global.fetch = createGenericFetchMock();
+
+      const res = await request(app).post('/api/business-cases/export-case-6/run').send({});
+
+      expect(res.status).toBe(200);
+
+      const creates = res.body.trace.filter((t) => t.type === 'createMovement');
+      const examination = creates.find((t) => t.label.startsWith('Present Docs'));
+      const honour = creates.find((t) => t.label.startsWith('Issuing Bank Honour'));
+      expect(examination).toBeDefined();
+      expect(honour).toBeDefined();
+      expect(honour.request.referencedTransactionId).toBe(examination.response.movementId);
+      expect(honour.request.referencedTransactionIdRef).toBeUndefined();
+
+      const case6 = buildRegistry().find((c) => c.id === 'export-case-6');
+      // referencedTransactionIdRef resolves inline from already-captured data (no extra GET, unlike
+      // parentLogicalContractIdRef above). parentLogicalContractIdRef itself is used TWICE in this case
+      // ('examination' and 'dueFromIssuingBank' both reference 'conf') but resolveLogicalContractId()
+      // caches on the captured entry — only the FIRST use triggers a GET .../balance call, so +1 here,
+      // not +2.
+      const fetchableSteps = case6.steps.filter((s) => s.type !== 'note').length;
+      expect(global.fetch).toHaveBeenCalledTimes(fetchableSteps + 1);
+    });
+  });
+
+  describe('POST /api/business-cases/import-case-6/run — makerSubmit step (A4 real Maker Submit)', () => {
+    it('POSTs to .../maker-submit for each Document Arrival, distinct from release, before its own release call', async () => {
+      global.fetch = createGenericFetchMock();
+
+      const res = await request(app).post('/api/business-cases/import-case-6/run').send({});
+
+      expect(res.status).toBe(200);
+
+      const makerSubmits = res.body.trace.filter((t) => t.type === 'makerSubmit');
+      expect(makerSubmits).toHaveLength(3);
+      makerSubmits.forEach((s) => {
+        expect(s).toMatchObject({ ok: true, status: 200, response: { status: 'PENDING', makerSubmittedBy: 'maker1' } });
+      });
+
+      const case6 = buildRegistry().find((c) => c.id === 'import-case-6');
+      const b01SubmitIdx = case6.steps.findIndex((s) => s.type === 'makerSubmit' && s.label.endsWith('B01'));
+      const b01ReleaseIdx = case6.steps.findIndex((s) => s.type === 'release' && s.label.includes('B01 (Sight Settlement'));
+      expect(b01SubmitIdx).toBeGreaterThanOrEqual(0);
+      expect(b01SubmitIdx).toBeLessThan(b01ReleaseIdx);
     });
   });
 

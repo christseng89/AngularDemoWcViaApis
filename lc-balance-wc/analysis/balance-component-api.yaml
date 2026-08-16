@@ -205,7 +205,78 @@ info:
         query filters (`status`/`legRef`/`businessEventId`/`businessDate`)
         — the real endpoint takes none; every filter currently happens
         client-side on the full result set.
-  version: "1.0.0"
+
+
+    v1.1.0 (2026-08-16, business-requested — "implement the related
+    contingent liability account entries across A1-A9/B1-B5... persist the
+    generated Dr/Cr account entries as part of that event/movement"): ADDED
+    `BalanceMovement.contingentAccountEntry` (new `ContingentAccountEntry`
+    schema) — a single, server-derived Dr/Cr contingent-liability account
+    pair (`drAccount`/`crAccount`/`currency`/`amount`), computed once at
+    movement creation from `(instrumentType, movementType, amount's own
+    sign, the resolved contract's tenorType)` per
+    analysis/contingent-liability-ledger.html, and persisted immutably with
+    the movement — never recalculated from the current balance, including
+    when the same movement is later fetched via the Event Timeline
+    (`GET .../movements`). Null for the three ON_BALANCE_ASSET instruments
+    (`EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/
+    `EPLC_EXPORT_BILLS_DISCOUNTED`) and for any unrecognized movementType —
+    on-balance-sheet liability stays out of scope for this field, same
+    boundary as the rest of this contract. Deliberately a DIFFERENT concept
+    from the pre-existing `accountEntries`/`AccountEntry` array (a
+    caller-supplied, downstream-accounting-owned Dr/Cr leg list this
+    service only stores/passes through, per §3.3 "GL Ownership") —
+    `contingentAccountEntry` is server-derived, contingent-ledger-specific,
+    and always exactly zero-or-one pair, never caller-supplied and never an
+    array.
+
+
+    v1.2.0 (2026-08-16, bug fixed, reviewer-reported — "A1 -> A8 -> A3S -> A4, the related SG entries
+    was not shown"): ADDED `GET /balance-movements?businessEventId=`. Root cause: the reference Angular
+    Transaction Builder client's own Checker Release for a linked-movement submission (A3S's SG
+    redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement Receivable REIMBURSE) used to
+    resolve the linked leg's own movementId purely from the Maker's own in-memory client state —
+    correct only when the SAME browser session that submitted also performs the release, never true
+    for a genuinely separate Checker session (the whole point of Maker/Checker 4-eyes separation). This
+    endpoint gives any caller a server-side way to resolve that correlation independently, via the
+    businessEventId every linked-movement submission already shared but was never queryable by. No
+    change to `POST /balance-movements` itself — `businessEventId` was already an accepted request
+    field (this document's own "ONE MOVEMENT, ONE LEG, ONE CALL" principle above already describes it
+    as "correlation only, never a transaction boundary"); this only adds a way to query BY it afterward.
+
+
+    v1.3.0 (2026-08-16, bug fixed, reviewer-directed — "A6/B4 也修一下" i.e. "fix A6/B4 too", extending
+    v1.2.0's fix to the two named business functions it explicitly left out of scope): ADDED
+    `BalanceMovementCreateRequest.referencedTransactionId` / `BalanceMovement.referencedTransactionId`.
+    v1.2.0's `businessEventId` lookup only resolves movements CREATED TOGETHER in one submission — A6
+    (Acceptance, Usance) and B4 (Honour/Acceptance) instead convert a PRE-EXISTING record (A3's own
+    Document Arrival, or B3's own Present Docs) picked at submission time from an EARLIER, separate
+    submission, which never shares a businessEventId with the new one at all. `referencedTransactionId`
+    is the direct, unambiguous correlation businessEventId can't provide for this shape — the new
+    movement simply carries the source record's own movementId. Same passthrough posture as
+    businessEventId/sourceTransactionRef: accepted and persisted, never validated to resolve to a real
+    movement. `A6`/`B4`'s downstream legs CREATED alongside the new primary (B4's own Acceptance
+    liability + Reimbursement Receivable, or the Due from Issuing Bank asset) still resolve via v1.2.0's
+    `businessEventId` lookup — only the "source record predates this submission" correlation needed a
+    new mechanism.
+
+
+    v1.4.0 (2026-08-16, business-directed — "Add real Maker Submit, then have Checker to Release it.
+    Exactly the same as A1."): ADDED `POST /balance-movements/{movementId}/maker-submit` and
+    `BalanceMovement.makerSubmittedBy`/`makerSubmittedAt`. A4 (Sight Settlement) has no movement of its
+    own to create at Submit time — it settles the PRE-EXISTING UTILIZE A3/A3S already earmarked (and
+    already gave its own contingentAccountEntry at that earlier stage) — so there was no
+    `createMovement()` call to stand in as "the Maker submitted," leaving A4 as the only function where
+    a Checker could act before any Maker had done anything at all. This endpoint is that missing,
+    genuinely backend-persisted Maker action: same shape as v0.8.0's own `/acknowledge` (IPLC_LC/UTILIZE
+    only here rather than EPLC_EXAMINATION/CREATE; 400 otherwise), and — same posture as `/acknowledge`
+    — deliberately does NOT transition status; the movement stays PENDING throughout (`/release` is
+    still the real PENDING -> RELEASED transition). Deliberately NOT enforced as a precondition inside
+    `/release` itself — the reference Business Case Runner client releases a UTILIZE directly with no
+    separate maker-submit call (an already-working, separately-tested orchestrated flow this feature was
+    never meant to constrain); the reference Angular Transaction Builder client enforces the gate itself,
+    client-side, before ever calling `/release` for an unsubmitted A4 item.
+  version: "1.4.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -471,6 +542,38 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+    get:
+      tags: [BalanceMovements]
+      summary: Every movement sharing a businessEventId, across contracts
+      description: >
+        v1.2.0 — bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG
+        entries was not shown"): lets a caller independently resolve the linked leg(s) of a compound
+        submission (A3S's SG redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement
+        Receivable REIMBURSE) by their shared businessEventId, without needing to have been the same
+        caller/session that originally submitted them — the whole point of Maker/Checker 4-eyes
+        separation being genuinely two different actors. Cross-contract by design (the SG's own
+        balanceContractId differs from the LC's) — businessEventId is the only correlation the two
+        linked legs actually share server-side. Returns every movement carrying this businessEventId,
+        oldest first (creation order), or an empty array if none do — never 404.
+      parameters:
+        - name: businessEventId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Every movement sharing this businessEventId, oldest first (possibly empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: businessEventId query parameter is missing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /balance-movements/{movementId}/balance-as-of:
     get:
       tags: [Balances]
@@ -597,6 +700,61 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: Movement is not PENDING, or was already acknowledged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/maker-submit:
+    post:
+      tags: [BalanceMovements]
+      summary: A4 (Sight Settlement)'s own real Maker Submit on a pre-existing IPLC_LC UTILIZE
+      description: >
+        v1.4.0 — A4 has no movement of its own to create at Submit time; it
+        settles the PRE-EXISTING UTILIZE A3/A3S already earmarked. This is
+        the genuine, backend-persisted Maker action standing in for the
+        createMovement()-as-Submit step every other function has, gating
+        the Checker's own /release the same way. Deliberately does NOT
+        transition status — the movement stays PENDING throughout (same
+        posture as /acknowledge above, on the Maker side instead of the
+        Checker side).
+
+
+        400 if the movement's instrumentType is not IPLC_LC or its
+        movementType is not UTILIZE. 409 if the movement is not currently
+        PENDING, or if it was already submitted (makerSubmittedAt already
+        set).
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [makerSubmittedBy]
+              properties:
+                makerSubmittedBy: { type: string }
+      responses:
+        '200':
+          description: Movement submitted by Maker; status unchanged (still PENDING).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Not an IPLC_LC UTILIZE movement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING, or was already submitted.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -781,6 +939,24 @@ components:
         drCr: { type: string, enum: [D, C] }
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
 
+    ContingentAccountEntry:
+      type: object
+      description: >
+        v1.1.0 — analysis/contingent-liability-ledger.html's Dr/Cr
+        contingent-liability account pair, derived server-side once at
+        movement creation (domain/contingentAccountEntry.ts) and persisted
+        immutably on the movement. Exactly one Dr/Cr pair per movement
+        (never a caller-supplied array like `AccountEntry`/`accountEntries`
+        above) — `drAccount`/`crAccount` already carry any applicable tenor
+        suffix (e.g. "Documentary Credits Outstanding — Sight") baked in,
+        so no separate tenor field is needed on this schema.
+      required: [drAccount, crAccount, currency, amount]
+      properties:
+        drAccount: { type: string }
+        crAccount: { type: string }
+        currency: { type: string }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+
     BalanceContract:
       type: object
       description: Design doc §3.1 — one immutable version snapshot of a Logical Contract.
@@ -854,6 +1030,14 @@ components:
           type: array
           nullable: true
           items: { $ref: '#/components/schemas/AccountEntry' }
+        contingentAccountEntry:
+          allOf: [{ $ref: '#/components/schemas/ContingentAccountEntry' }]
+          nullable: true
+          description: >
+            v1.1.0 — see this document's top-level v1.1.0 changelog entry.
+            Server-derived at creation, persisted immutably; null for the
+            three ON_BALANCE_ASSET instruments and for any unrecognized
+            movementType.
         lmtsReservationId:
           type: string
           nullable: true
@@ -874,6 +1058,18 @@ components:
         sourceModule: { type: string, nullable: true }
         sourceFunction: { type: string, nullable: true }
         sourceTransactionRef: { type: string, nullable: true, description: "Unique per balanceContractId (server-enforced, 400 on reuse against the same contract with a new eventSeq)." }
+        referencedTransactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            v1.3.0 — the movementId of a pre-existing record (created by an earlier, separate
+            submission) this movement converts/finalizes — A6/B4's own "still-PENDING source Document
+            Arrival/Present Docs" picked at submission time. Distinct from businessEventId (which only
+            ever links movements created TOGETHER in the same submission): the source record here
+            predates this one and never shares a businessEventId with it, so this field is the only
+            server-side correlation between them. Passthrough only, same posture as
+            sourceTransactionRef/businessEventId — never validated to resolve to a real movement.
         balanceBefore: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
         balanceAfter: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
         createdBy: { type: string }
@@ -891,6 +1087,18 @@ components:
             status — the movement stays PENDING so a later Honour/Accept
             step can still find and consume it.
         acknowledgedAt: { type: string, format: date-time, nullable: true }
+        makerSubmittedBy:
+          type: string
+          nullable: true
+          description: >
+            v1.4.0, IPLC_LC/UTILIZE only — set by
+            POST /balance-movements/{id}/maker-submit, A4 (Sight
+            Settlement)'s own real Maker action on the PRE-EXISTING UTILIZE
+            A3/A3S already earmarked (A4 creates no movement of its own).
+            Distinct from createdBy (the ORIGINAL A3/A3S submission) and
+            from releasedBy/releasedAt: submitting never transitions status
+            — the movement stays PENDING until the Checker's own /release.
+        makerSubmittedAt: { type: string, format: date-time, nullable: true }
 
     BalanceMovementCreateRequest:
       type: object
@@ -956,6 +1164,7 @@ components:
         sourceModule: { type: string, nullable: true }
         sourceFunction: { type: string, nullable: true }
         sourceTransactionRef: { type: string, nullable: true, description: Must be unique per resolved balanceContractId (400 on reuse). }
+        referencedTransactionId: { type: string, format: uuid, nullable: true, description: "v1.3.0 — A6/B4 only: the movementId of the pre-existing source Document Arrival/Present Docs record this movement converts/finalizes. See BalanceMovement.referencedTransactionId's own description for the full rule." }
         createdBy: { type: string }
 
     BalanceMovementCancelRequest:

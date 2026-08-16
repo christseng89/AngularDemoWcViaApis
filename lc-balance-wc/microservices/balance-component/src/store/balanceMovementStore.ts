@@ -7,7 +7,7 @@
  * Earmark acknowledgment — see acknowledge() below).
  */
 import type { Db } from '../db';
-import type { AccountEntry, BalanceMovement, ExposureNature, MovementStatus, MovementWarning } from '../types';
+import type { AccountEntry, BalanceMovement, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
 
 interface MovementRow {
   movement_id: string;
@@ -21,6 +21,7 @@ interface MovementRow {
   currency: string;
   leg_ref: string | null;
   account_entries: string | null;
+  contingent_account_entry: string | null;
   lmts_reservation_id: string | null;
   status: MovementStatus;
   superseded_movement_id: string | null;
@@ -33,6 +34,7 @@ interface MovementRow {
   source_module: string | null;
   source_function: string | null;
   source_transaction_ref: string | null;
+  referenced_transaction_id: string | null;
   balance_before: string | null;
   balance_after: string | null;
   warnings: string | null;
@@ -42,6 +44,8 @@ interface MovementRow {
   released_at: string | null;
   acknowledged_by: string | null;
   acknowledged_at: string | null;
+  maker_submitted_by: string | null;
+  maker_submitted_at: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -57,6 +61,7 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     currency: row.currency,
     legRef: row.leg_ref,
     accountEntries: row.account_entries ? (JSON.parse(row.account_entries) as AccountEntry[]) : null,
+    contingentAccountEntry: row.contingent_account_entry ? (JSON.parse(row.contingent_account_entry) as ContingentAccountEntry) : null,
     lmtsReservationId: row.lmts_reservation_id,
     status: row.status,
     supersededMovementId: row.superseded_movement_id,
@@ -69,6 +74,7 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     sourceModule: row.source_module,
     sourceFunction: row.source_function,
     sourceTransactionRef: row.source_transaction_ref,
+    referencedTransactionId: row.referenced_transaction_id,
     balanceBefore: row.balance_before,
     balanceAfter: row.balance_after,
     warnings: row.warnings ? (JSON.parse(row.warnings) as MovementWarning[]) : null,
@@ -78,6 +84,8 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     releasedAt: row.released_at,
     acknowledgedBy: row.acknowledged_by,
     acknowledgedAt: row.acknowledged_at,
+    makerSubmittedBy: row.maker_submitted_by,
+    makerSubmittedAt: row.maker_submitted_at,
   };
 }
 
@@ -97,16 +105,20 @@ export class BalanceMovementStore {
           `INSERT INTO balance_movements (
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry,
             lmts_reservation_id, status, superseded_movement_id, reversal_of_movement_id,
             reason_code, remarks, transaction_date, business_date, value_date,
-            source_module, source_function, source_transaction_ref, balance_before,
+            source_module, source_function, source_transaction_ref, referenced_transaction_id,
+            balance_before,
             balance_after, warnings, created_by, released_by, created_at, released_at
           ) VALUES (
             @movementId, @balanceContractId, @eventSeq, @businessEventId, @movementType,
             @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
+            @contingentAccountEntry,
             @lmtsReservationId, @status, @supersededMovementId, @reversalOfMovementId,
             @reasonCode, @remarks, @transactionDate, @businessDate, @valueDate,
-            @sourceModule, @sourceFunction, @sourceTransactionRef, @balanceBefore,
+            @sourceModule, @sourceFunction, @sourceTransactionRef, @referencedTransactionId,
+            @balanceBefore,
             @balanceAfter, @warnings, @createdBy, @releasedBy, @createdAt, @releasedAt
           )`,
         )
@@ -122,6 +134,7 @@ export class BalanceMovementStore {
           currency: movement.currency,
           legRef: movement.legRef ?? null,
           accountEntries: movement.accountEntries ? JSON.stringify(movement.accountEntries) : null,
+          contingentAccountEntry: movement.contingentAccountEntry ? JSON.stringify(movement.contingentAccountEntry) : null,
           lmtsReservationId: movement.lmtsReservationId ?? null,
           status: movement.status,
           supersededMovementId: movement.supersededMovementId ?? null,
@@ -134,6 +147,7 @@ export class BalanceMovementStore {
           sourceModule: movement.sourceModule ?? null,
           sourceFunction: movement.sourceFunction ?? null,
           sourceTransactionRef: movement.sourceTransactionRef ?? null,
+          referencedTransactionId: movement.referencedTransactionId ?? null,
           balanceBefore: movement.balanceBefore ?? null,
           balanceAfter: movement.balanceAfter ?? null,
           warnings: movement.warnings ? JSON.stringify(movement.warnings) : null,
@@ -172,6 +186,23 @@ export class BalanceMovementStore {
     const row = this.db.prepare(`SELECT * FROM balance_movements WHERE balance_contract_id = ? AND event_seq = ?`).get(balanceContractId, eventSeq) as
       MovementRow | undefined;
     return row ? rowToMovement(row) : undefined;
+  }
+
+  /**
+   * Bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG entries was not
+   * shown"): the Checker's own compound release for a linked-movement submission (A3S's SG redemption
+   * + LC UTILIZE, B5's Acceptance FULL_SETTLE/PARTIAL_SETTLE + Reimbursement Receivable REIMBURSE) used
+   * to resolve the linked leg's own movementId purely from the Maker's own in-memory component state —
+   * correct only when the SAME browser session that submitted also does the release, never true for a
+   * genuinely separate Checker session (the whole point of Maker/Checker 4-eyes separation). Cross-
+   * contract (the SG's own balance_contract_id differs from the LC's), so this can't be a listByContract
+   * filter — businessEventId is the only correlation the two linked legs actually share.
+   */
+  findByBusinessEventId(businessEventId: string): BalanceMovement[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM balance_movements WHERE business_event_id = ? ORDER BY created_at ASC`)
+      .all(businessEventId) as unknown as MovementRow[];
+    return rows.map(rowToMovement);
   }
 
   /** Design doc §3.3 — everything needed to derive Confirmed/Available Balance for one contract version. */
@@ -249,6 +280,13 @@ export class BalanceMovementStore {
   acknowledge(params: { movementId: string; acknowledgedBy: string; acknowledgedAt: string }): void {
     this.db
       .prepare('UPDATE balance_movements SET acknowledged_by = @acknowledgedBy, acknowledged_at = @acknowledgedAt WHERE movement_id = @movementId')
+      .run(params);
+  }
+
+  /** A4's own real Maker Submit (2026-08-16) — sets maker_submitted_by/maker_submitted_at only, never touches status. Mirrors acknowledge() above, on the Maker side. */
+  submitByMaker(params: { movementId: string; makerSubmittedBy: string; makerSubmittedAt: string }): void {
+    this.db
+      .prepare('UPDATE balance_movements SET maker_submitted_by = @makerSubmittedBy, maker_submitted_at = @makerSubmittedAt WHERE movement_id = @movementId')
       .run(params);
   }
 }

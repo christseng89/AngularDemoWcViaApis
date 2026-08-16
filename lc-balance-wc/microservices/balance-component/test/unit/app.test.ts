@@ -1711,6 +1711,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(res.body.code).toBe('NOT_FOUND');
   });
 
+  test('POST /balance-movements/:movementId/maker-submit with an unknown movementId -> 404', async () => {
+    const res = await request(app).post('/balance-movements/does-not-exist/maker-submit').send({ makerSubmittedBy: 'maker1' }).expect(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
   test('a movement created with an explicit accountEntries array round-trips through storage (JSON.stringify on insert, JSON.parse on read) — every other test in this suite omits accountEntries entirely', async () => {
     const createRes = await request(app)
       .post('/balance-movements')
@@ -1804,5 +1809,498 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     const res = await request(app).post(`/balance-movements/${exam.body.movementId}/acknowledge`).send({}).expect(400);
     expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
     expect(res.body.message).toMatch(/acknowledgedBy is required/);
+  });
+
+  // Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
+  // Exactly the same as A1.") — A4's own real Maker action, mirroring the acknowledge() tests above
+  // on the Maker side. See service.submitByMaker()'s own doc comment for why this never touches status.
+  test('POST /balance-movements/:id/maker-submit: sets makerSubmittedBy/makerSubmittedAt, status stays PENDING (A4 real Maker Submit)', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-MAKERSUBMIT' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const submitted = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+    expect(submitted.body.status).toBe('PENDING');
+    expect(submitted.body.makerSubmittedBy).toBe('maker1');
+    expect(submitted.body.makerSubmittedAt).toBeTruthy();
+  });
+
+  test('POST /balance-movements/:id/maker-submit: submitting the same movement twice -> 409, rejected', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-MAKERSUBMIT2' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+
+    const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(409);
+    expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    expect(res.body.message).toMatch(/already submitted by maker1/);
+  });
+
+  test('POST /balance-movements/:id/maker-submit: rejects a non-IPLC_LC/UTILIZE movement -> 400', async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'CNF-MAKERSUBMIT' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '50000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${cnf.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(400);
+    expect(res.body.message).toMatch(/submitByMaker\(\) only applies to an IPLC_LC UTILIZE movement/);
+  });
+
+  test('POST /balance-movements/:id/maker-submit: rejects an already-RELEASED movement -> 409, ILLEGAL_STATE_TRANSITION', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-MAKERSUBMIT3' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(409);
+    expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    expect(res.body.message).toMatch(/not PENDING/);
+  });
+
+  test('POST /balance-movements/:movementId/maker-submit without makerSubmittedBy -> 400', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-NOMAKERSUBMITBY' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '500',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({}).expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/makerSubmittedBy is required/);
+  });
+});
+
+describe('HTTP integration — contingent-liability account entries (analysis/contingent-liability-ledger.html, business-requested 2026-08-16)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('IPLC_LC ISSUE (Sight) — create response carries the correct Dr/Cr pair', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'CAE-LC1' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(res.body.contingentAccountEntry).toEqual({
+      drAccount: "Customers' Liability under DC — Sight",
+      crAccount: 'Documentary Credits Outstanding — Sight',
+      currency: 'USD',
+      amount: '100000',
+    });
+  });
+
+  test('IPLC_LC AMEND_DECREASE reverses the pair; UTILIZE (Honour) reverses it again — both persisted, both retrievable unmodified via the Event Timeline', async () => {
+    const issueContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'CAE-LC1' }).expect(200);
+    const balanceContractId = issueContract.body.balanceContractId;
+
+    const decrease = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId,
+        movementType: 'AMEND_DECREASE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(decrease.body.contingentAccountEntry).toEqual({
+      drAccount: 'Documentary Credits Outstanding — Sight',
+      crAccount: "Customers' Liability under DC — Sight",
+      currency: 'USD',
+      amount: '10000',
+    });
+    await request(app).post(`/balance-movements/${decrease.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId, movementType: 'UTILIZE', eventSeq: 3, amount: '30000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    expect(utilize.body.contingentAccountEntry).toEqual({
+      drAccount: 'Documentary Credits Outstanding — Sight',
+      crAccount: "Customers' Liability under DC — Sight",
+      currency: 'USD',
+      amount: '30000',
+    });
+
+    // Event-Level Relationship requirement: the Event Timeline's own copy of each movement carries the
+    // exact same entry it was created with — not recalculated from the (by-now-different) live balance.
+    const timeline = await request(app).get(`/balance-contracts/${balanceContractId}/movements`).expect(200);
+    const decreaseInTimeline = timeline.body.find((m: { movementId: string }) => m.movementId === decrease.body.movementId);
+    const utilizeInTimeline = timeline.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
+    expect(decreaseInTimeline.contingentAccountEntry).toEqual(decrease.body.contingentAccountEntry);
+    expect(utilizeInTimeline.contingentAccountEntry).toEqual(utilize.body.contingentAccountEntry);
+
+    // Releasing a movement does not regenerate or touch its stored entry.
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const afterRelease = await request(app).get(`/balance-contracts/${balanceContractId}/movements`).expect(200);
+    const utilizeAfterRelease = afterRelease.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
+    expect(utilizeAfterRelease.contingentAccountEntry).toEqual(utilize.body.contingentAccountEntry);
+  });
+
+  test('EPLC_CONFIRMATION ISSUE (Usance) then AMEND with a negative amount — Sight/Usance label and Increase/Decrease direction both correct', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'CAE-CNF1' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '80000',
+        currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(issue.body.contingentAccountEntry).toEqual({
+      drAccount: 'Issuing Bank Confirmation Exposure — Usance',
+      crAccount: 'Confirmation Undertakings Outstanding — Usance',
+      currency: 'USD',
+      amount: '80000',
+    });
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const decrease = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'AMEND',
+        eventSeq: 2,
+        amount: '-5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(decrease.body.contingentAccountEntry).toEqual({
+      drAccount: 'Confirmation Undertakings Outstanding — Usance',
+      crAccount: 'Issuing Bank Confirmation Exposure — Usance',
+      currency: 'USD',
+      amount: '5000',
+    });
+  });
+
+  test('SHGT ISSUE then FULL_REDEEM — no tenor suffix on either leg', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'CAE-LC1', sgNumber: 'CAE-SG1' },
+        parentLogicalContractId: (await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'CAE-LC1' })).body
+          .logicalContractId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '20000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(issue.body.contingentAccountEntry).toEqual({
+      drAccount: "Customers' Liability under Shipping Guarantees",
+      crAccount: 'Shipping Guarantees Outstanding',
+      currency: 'USD',
+      amount: '20000',
+    });
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const redeem = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'FULL_REDEEM',
+        eventSeq: 2,
+        amount: '20000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(redeem.body.contingentAccountEntry).toEqual({
+      drAccount: 'Shipping Guarantees Outstanding',
+      crAccount: "Customers' Liability under Shipping Guarantees",
+      currency: 'USD',
+      amount: '20000',
+    });
+  });
+
+  test("EPLC_DUE_FROM_ISSUING_BANK (on-balance-sheet asset) — contingentAccountEntry is null, both at creation and via the Event Timeline, per the ledger's own Scope boundary", async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'CAE-CNF2' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '50000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'CAE-CNF2' }).expect(200);
+
+    const dfib = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
+        naturalKey: { lcNumber: 'CAE-CNF2', ibNumber: 'EB01' },
+        parentLogicalContractId: cnfContract.body.logicalContractId,
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '30000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(dfib.body.contingentAccountEntry).toBeNull();
+
+    const timeline = await request(app).get(`/balance-contracts/${dfib.body.balanceContractId}/movements`).expect(200);
+    expect(timeline.body[0].contingentAccountEntry).toBeNull();
+  });
+});
+
+describe('HTTP integration — GET /balance-movements?businessEventId= (bug fixed 2026-08-16, reviewer-reported — "A1 -> A8 -> A3S -> A4, the related SG entries was not shown")', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('400 REQUEST_VALIDATION_FAILED when businessEventId is missing', async () => {
+    const res = await request(app).get('/balance-movements').expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+  });
+
+  test('returns every movement sharing a businessEventId, across different contracts (LC + SHGT), oldest first', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'BEID-LC1' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'BEID-LC1' }).expect(200);
+    const sgIssue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'BEID-LC1', sgNumber: 'BEID-SG1' },
+        parentLogicalContractId: lcContract.body.logicalContractId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '20000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${sgIssue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const businessEventId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const redeem = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        balanceContractId: sgIssue.body.balanceContractId,
+        movementType: 'FULL_REDEEM',
+        eventSeq: 2,
+        amount: '20000',
+        currency: 'USD',
+        businessEventId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '20000',
+        currency: 'USD',
+        businessEventId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const linked = await request(app).get('/balance-movements').query({ businessEventId }).expect(200);
+    expect(linked.body.map((m: { movementId: string }) => m.movementId)).toEqual([redeem.body.movementId, utilize.body.movementId]);
+    expect(linked.body.map((m: { movementType: string }) => m.movementType)).toEqual(['FULL_REDEEM', 'UTILIZE']);
+  });
+
+  test('returns an empty array for a businessEventId no movement carries', async () => {
+    const res = await request(app).get('/balance-movements').query({ businessEventId: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }).expect(200);
+    expect(res.body).toEqual([]);
+  });
+});
+
+describe('HTTP integration — referencedTransactionId passthrough (bug fixed 2026-08-16, "A6/B4 也修一下" — extending the businessEventId fix to A6/B4)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('accepted on create, persisted, and still present when the movement is later re-fetched via the Event Timeline', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'RTID-LC1' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'BUYERS_USANCE',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const arrival = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '30000',
+        currency: 'USD',
+        sourceTransactionRef: 'IB-RTID-1',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const acceptance = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: 'RTID-LC1', ibNumber: 'IB-RTID-1' },
+        parentLogicalContractId: lc.body.balanceContractId,
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '30000',
+        currency: 'USD',
+        tenorType: 'BUYERS_USANCE',
+        referencedTransactionId: arrival.body.movementId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(acceptance.body.referencedTransactionId).toBe(arrival.body.movementId);
+
+    const timeline = await request(app).get(`/balance-contracts/${acceptance.body.balanceContractId}/movements`).expect(200);
+    expect(timeline.body[0].referencedTransactionId).toBe(arrival.body.movementId);
+  });
+
+  test('null (not required) when omitted', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'RTID-LC2' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '50000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(res.body.referencedTransactionId).toBeNull();
   });
 });

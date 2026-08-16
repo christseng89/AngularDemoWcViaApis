@@ -1196,6 +1196,619 @@ follow-up question, the A3S ↔ A9 cross-reference on the Redemption row: both c
 PARTIAL_REDEEM) — A3S is a second caller of the same rule, not a separate one, now stated explicitly in
 the footnote rather than left as a parenthetical.
 
+## Contingent liability account entries implemented end-to-end: A1–A9/B1–B5 generation, persistence, Event Timeline linkage, and an Account Entries button/pop-up dialog (2026-08-16, user-requested — "Implement the related contingent liability account entries across A1–A9 (Import LC) and B1–B5 (Export Confirmed LC)", then revised mid-implementation to "a button + pop-up dialog rather than displaying the account entries directly in the Event Timeline")
+
+Turns `analysis/contingent-liability-ledger.html` from a documentation-only reference (see the section
+above) into live, persisted behavior: every movement created against an in-scope contingent instrument
+now carries its own Dr/Cr contingent-liability account pair, generated once server-side at creation and
+stored immutably with that movement — never recalculated from the current balance, including when
+re-fetched later via the Event Timeline. Scope, per the user's own explicit statement: contingent/
+off-balance-sheet account entries only; on-balance-sheet liability remains out of scope for the Balance
+Component (same permanent boundary "Balance Component 只負責 Contingent Liability" already established
+elsewhere in this file).
+
+**Microservice (`microservices/balance-component/`):**
+- New `src/domain/contingentAccountEntry.ts` — `deriveContingentAccountEntry({instrumentType,
+  movementType, amount, currency, tenorType})`, a pure function mapping the ledger's 6 account
+  families (LC, SG, Import Acceptance, Export Confirmation, Export Acceptance, Export Examination —
+  the last three folios collapsed to a `null` account-entries.ts return for the three
+  ON_BALANCE_ASSET instruments, out of scope) to a single `{drAccount, crAccount, currency, amount}`
+  pair. Reuses the existing `MOVEMENT_DIRECTION` table from `domain/balanceDerivation.ts` rather than
+  duplicating direction logic (SOLID/DRY, per this file's own standing SonarQube posture) — the only new
+  logic is the account-family lookup and tenor-suffix formatting (`lcTenorLabel`/
+  `confirmationTenorLabel`, mirroring the ledger's own `[Tenor]` placeholder convention). Handles
+  `EPLC_CONFIRMATION`'s one asymmetric case: a single `AMEND` movementType covers both Increase and
+  Decrease (no `AMEND_INCREASE`/`AMEND_DECREASE` split exists for Confirmation, unlike LC), so direction
+  is derived from the signed `amount`'s own sign rather than the movementType string alone.
+- `src/types.ts` — new `ContingentAccountEntry` interface and `BalanceMovement.contingentAccountEntry?:
+  ContingentAccountEntry | null` field, with a doc comment distinguishing it from the pre-existing
+  caller-supplied `AccountEntry`/`accountEntries` (§3.3 "GL Ownership" — a different concept entirely:
+  server-derived vs. caller-supplied, always zero-or-one vs. an array).
+- `src/db/schema.ts` / `src/db/migrations.ts` — `contingent_account_entry TEXT` column on
+  `balance_movements`, added as migration `id: 2` (per this project's own `schema_migrations`-tracked
+  migration convention, BAL-106) rather than an inline `ALTER TABLE` check.
+- `src/store/balanceMovementStore.ts` — round-trips the new column (JSON-serialized) through
+  `rowToMovement`/the INSERT statement, same pattern as every other JSON-blob column already there.
+- `src/service/balanceService.ts` — `createMovement()` calls `deriveContingentAccountEntry()` once,
+  using the **resolved contract's own `tenorType`** (not `req.tenorType`, which is only populated on the
+  one ISSUE call that creates a contract) — so a later movement against an already-existing LC/
+  Confirmation still gets the correct tenor suffix baked into its own entry at creation time.
+- New `test/unit/domain/contingentAccountEntry.test.ts` (exhaustive `test.each` over all 6 account
+  families, tenor-label resolution, AMEND sign-folding both directions, out-of-scope instrumentTypes →
+  null, unrecognized movementType → null) and a new HTTP-integration describe block in
+  `test/unit/app.test.ts` (IPLC_LC ISSUE Sight shape; AMEND_DECREASE + UTILIZE reversal shapes plus an
+  Event Timeline round-trip proving immutability across release; EPLC_CONFIRMATION ISSUE(Usance)+
+  AMEND(negative amount) Sight/Usance label and Increase/Decrease direction; SHGT ISSUE+FULL_REDEEM
+  no-tenor-suffix; EPLC_DUE_FROM_ISSUING_BANK → `contingentAccountEntry: null` both at creation and via
+  the Event Timeline). Verified: 275/275 tests passing, 99.07%/96.33%/100%/99.38% coverage (all four
+  metrics clear the 95% floor), `npm run build`/`npm run typecheck`/`npm run lint` all clean (0 errors).
+
+**Angular (`src/app/transaction-builder/`) — revised mid-implementation to a button + pop-up dialog,
+not inline Event Timeline display, per the user's own explicit UI/UX direction:**
+- `balance-component-api.service.ts` — mirrors the microservice's `ContingentAccountEntry` interface by
+  hand (same manual-sync convention this file already used for `BalanceMovement` itself) and adds
+  `contingentAccountEntry?: ContingentAccountEntry | null` to the `BalanceMovement` interface.
+- `transaction-builder.component.ts` — new `accountEntryDialogMovement: BalanceMovement | null` state
+  field plus `openAccountEntryDialog(movement)`/`closeAccountEntryDialog()`, and an
+  `@HostListener('document:keydown.escape') onEscapeKey()` that closes the dialog if one is open (a
+  no-op otherwise). Reset alongside every other piece of per-function/per-lookup state:
+  `selectFunction()` and `runLookup()` both null it out, same convention `submitResult`/`lookupResult`
+  etc. already follow.
+- `transaction-builder.component.html` — an **Account Entries** button appears (a) in the Submit Result
+  panel immediately after a Maker submission, only `*ngIf="submitResult?.contingentAccountEntry"`, and
+  (b) as a small per-row button in the Event Timeline table's new "Entries" column, only for rows that
+  actually have one (a plain `—` otherwise) — never a whole-row-click affordance, deliberately distinct
+  from (and not a reintroduction of) an earlier removed whole-row-click pattern noted elsewhere in this
+  file. Clicking either opens a custom-built modal (no CDK/Material dialog dependency exists in this
+  project — confirmed via `package.json`; built from scratch with plain CSS matching the existing design
+  system) showing a static 2-row Dr/Cr table (Dr/Cr tag, Account Name, Currency, Amount) plus a hint line
+  ("Historical entries recorded with this event — never recalculated from the current balance"). Closes
+  via the × button, a Close button, backdrop click, or Escape.
+- `transaction-builder.component.scss` — new `.tb-dialog-overlay`/`.tb-dialog`/`.tb-drcr-tag`/etc.
+  block. One CSS-specificity fix during this pass: the static Dr/Cr table's own hover-suppression rule
+  (`.tb-table--static tbody tr:hover { background: inherit; }`) was initially LOWER specificity than the
+  pickable-table hover rule it needed to override (`.tb-table tbody tr:hover:not(...)`, which counts its
+  own `:not()` argument toward specificity) — the picker's blue hover highlight would have silently won
+  despite `.tb-table--static` appearing later in the file. Fixed by matching both classes in the
+  selector (`.tb-table.tb-table--static tbody tr:hover:not(...)`), tying specificity and relying on
+  source order to win, rather than reaching for `!important`.
+- New tests in `transaction-builder.component.gaps.spec.ts` (`Account Entries dialog` describe block —
+  open/close, Escape-when-open vs. Escape-when-closed no-op, and the `selectFunction()`/`runLookup()`
+  reset behavior). Full suite verified: 481/481 tests passing (6 new), 99.69%/95.60%/99.42%/99.74%
+  coverage (all four metrics clear the 95% floor — the new dialog methods themselves are now 100%
+  covered; the two small pre-existing gaps that remain, `transaction-builder.component.ts:1498,1526-1527`,
+  predate this change and are unrelated), `npx tsc -p tsconfig.app.json --noEmit` clean,
+  `ng build --configuration development` clean, `npm run lint` 0 errors (218 warnings, consistent with
+  this file's own already-documented `any`-typing debt — BAL-108 — not new debt from this change).
+  **Live in-browser verification** (full click-through, not just the button rendering): submitted a real
+  A1 (LC Issue, 50000 USD Sight) end-to-end against the running microservice. Confirmed, against the
+  actual DOM: the Submit Result panel's own **Account Entries** button opens the dialog showing the
+  correct historical pair (`Dr Customers' Liability under DC — Sight` / `Cr Documentary Credits
+  Outstanding — Sight`, both USD 50000 — matching `contingent-liability-ledger.html` Folio 1 exactly);
+  the Event Timeline row's own **Account Entries** button, for the same movement, opens the identical
+  dialog with the same data (proving the event-level linkage — not a coincidence of both reading the
+  same live `submitResult`, since the Event Timeline reads from the separately-fetched movements list);
+  Escape closes it; a backdrop click closes it; a click on content genuinely inside the dialog (a table
+  cell) does NOT close it, confirming `$event.stopPropagation()` is wired correctly. Zero console errors
+  observed across the whole session. (One inconclusive intermediate step during this same live pass: a
+  raw-coordinate click that appeared inside the dialog's visual bounds in a screenshot closed it anyway —
+  traced to a screenshot/viewport coordinate-scaling artifact of the browser automation tool itself, not
+  a product bug, since the same click executed via the DOM element's own reference id, not raw pixel
+  coordinates, correctly stayed open; every click reported in this paragraph used element references, not
+  raw coordinates, to avoid that ambiguity.)
+
+**`backend/` (中台 orchestrator)** — no changes needed; confirmed via inspection that `backend/server.js`
+passes through the microservice's raw JSON response verbatim with no field allowlisting, so the new
+`contingentAccountEntry` field already flows through untouched.
+
+**OAS specs** — both `analysis/balance-component-api.yaml` and `analysis/balance-component-channel-api.yaml`
+bumped to v1.1.0 with a new `ContingentAccountEntry` schema and `contingentAccountEntry` field on
+`BalanceMovement`/`ChannelTransaction` respectively (the channel API's version is a straight passthrough,
+never independently derived) — both re-validated clean (parse, `$ref` integrity, zero orphaned schemas)
+via the same local `js-yaml` script used for the original v1.0.0 authoring pass.
+
+**Full three-suite re-verification, per this file's own standing rule, after the whole feature (domain
+function, DB migration, service wiring, Angular dialog UI, OAS updates):** microservice 275/275
+(99.07%/96.33%/100%/99.38% coverage), `backend/` 28/28 (97.97%/97.36%/95.65%/97.77%, unaffected —
+no code changes), Angular app 481/481 (99.69%/95.60%/99.42%/99.74%) — all three clear their own 95%
+floor on all four metrics.
+
+## Bug fixed same day — A3S's own SG redemption leg (and B4 Usance's own Acceptance leg) never got an Account Entries button (2026-08-16, reviewer-reported — "A3S does not generate the related SG redemption entries in Pending")
+
+Root cause: every compound Submit method (`submitDocumentArrivalWithSg`/`submitConfirmationHonourWithReceivable`/
+`submitConfirmationAcceptWithReceivable`/`submitAcceptanceSettleWithReceivable`) only ever assigned
+`submitResult` from ONE of its 2-3 linked `createMovement()` calls — every other leg's own full response
+body was discarded, only its `movementId` kept (for the Checker release/cancel chain's own correlation
+needs, per each field's existing doc comment). For A3S specifically, `submitResult` tracks the SECOND
+call (the LC's own UTILIZE, `req`) — the FIRST call (the SG's own `FULL_REDEEM`/`PARTIAL_REDEEM`, a real,
+in-scope `SHGT` account family per `contingent-liability-ledger.html` Folio 2) was silently dropped from
+the UI entirely, even though the server had already generated and persisted a correct
+`contingentAccountEntry` for it. The existing doc comment on the Maker Result panel's button
+(`transaction-builder.component.html`) had actually already anticipated *some* secondary legs being
+null/out-of-scope (the B4 asset-side legs) but wrongly generalized that to "every secondary leg" — it
+missed that A3S's SG leg, and B4 Usance's own new `EPLC_ACCEPTANCE` liability leg
+(`submitConfirmationAcceptWithReceivable`'s second call), are BOTH real in-scope families whose entries
+were being dropped the exact same way. The other three "dropped" legs across all four compound methods
+(`EPLC_DUE_FROM_ISSUING_BANK`, `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` ×2) are genuinely out of scope
+(`accountFamilyFor()` returns `null` for them) — those were never a bug.
+
+**Fix**: two new component fields, `arrivalSgRedeemMovement`/`acceptanceMovement` (full
+`BalanceMovement | null`, not just a `movementId` like their sibling correlation fields), populated
+alongside the existing `*MovementId` assignment at the exact same point in each compound method, reset
+alongside them in `selectFunction()`'s state-clearing block (plus `submit()`'s own top-of-method reset,
+matching `submitResult`'s own convention there). Two new conditional buttons added to the Maker Result
+panel template (`*ngIf="arrivalSgRedeemMovement?.contingentAccountEntry"` /
+`*ngIf="acceptanceMovement?.contingentAccountEntry"`), labeled "Account Entries — SG Redemption" /
+"Account Entries — Acceptance" to distinguish them from the primary leg's own plain "Account Entries"
+button when both render side by side. Deliberately did NOT generalize this into a single
+`submittedMovements: BalanceMovement[]` array covering every current and future compound leg — the two
+fixed fields directly close the two real gaps found; a broader refactor touching all five secondary-leg
+fields (three of which are correctly null and don't need this) was judged out of scope for a targeted
+bug fix.
+
+New tests in `transaction-builder.component.actions.spec.ts` (one in the A3S describe block, one in the
+B4 Usance/ACCEPT describe block) — each asserts the new field captures the full leg response including a
+non-null `contingentAccountEntry`, independent of `submitResult`'s own (correctly null, for these
+specific legs) value. Verified: Angular suite 483/483 (2 new), 99.69%/95.60%/99.42%/99.74% coverage (same
+floor-clearing margin as before — the two new lines are covered by the new tests), `tsc --noEmit` and
+`ng build --configuration development` both clean.
+
+**Live in-browser verification against the real running stack** (A1 Issue LC A3STEST 50000 USD → release
+→ A8 Issue SG SG01 20000 against it → release → A3S Document Arrival Bill Amount 20000/IB01, a full
+match against the SG's own 20000 Outstanding): confirmed via the live component instance that
+`submitResult.contingentAccountEntry` held the LC's own UTILIZE entry (`Dr Documentary Credits
+Outstanding — Sight` / `Cr Customers' Liability under DC — Sight`) exactly as before, while the NEW
+`arrivalSgRedeemMovement.contingentAccountEntry` now separately held the SG's own FULL_REDEEM entry
+(`Dr Shipping Guarantees Outstanding` / `Cr Customers' Liability under Shipping Guarantees`) — both
+present in the Maker Result panel as two distinct buttons ("Account Entries" and "Account Entries — SG
+Redemption"), and clicking the SG Redemption one opened the dialog showing exactly that pair, tagged
+`FULL_REDEEM` / `IB01` / `PENDING`. Zero console errors. `backend/` and the microservice were unaffected
+(no code changes) — their own suites (275/275, 28/28) still hold from this session's earlier run.
+
+## Deeper bug found and fixed the SAME day, continuing the A3S investigation above — A3S's (and B5's) Checker compound release only ever worked in the SAME browser session that Submitted (2026-08-16, reviewer-reported — "A1 -> A8 -> A3S -> A4, the related SG entries was not shown", then "出帳與Balance計算是配套的" — posting/release and Balance calculation must be a paired, consistent operation)
+
+The fix immediately above this entry closed the UI-display half of the reported gap (the "Account
+Entries — SG Redemption" button), but investigating further live (submitting A1→A8→A3S fresh, then
+independently searching the Checker queue rather than reusing the same session's own state) surfaced
+the REAL root cause: A3S's own Checker Release, which is supposed to release the SG's own
+FULL_REDEEM/PARTIAL_REDEEM for real (per this function's own help text, "one Release click does BOTH"),
+only ever reached that real release call when `selectedCheckerMovement.movementId ===
+submitResult?.movementId` — i.e., only when the SAME browser session that just Submitted A3S was ALSO
+the one clicking Release. A genuinely separate Checker session (the normal, expected case for real
+Maker/Checker 4-eyes separation — a different person, a different login, or even the same person after
+navigating to A4 or reloading the page) always has `submitResult` null/stale, so this check silently
+failed and the whole compound branch was skipped — the Checker's click fell back to A3's own
+"acknowledgment only" path (correct for a *plain* A3, wrong here), leaving the SG's own redemption
+PENDING **forever**, with no other UI path to release it. Confirmed live via a direct API check before
+any fix: after an independent Checker search-and-Approve, the SG's `FULL_REDEEM` was still `PENDING`,
+never `RELEASED`.
+
+**Deeper still**: `B5` (`settlesAcceptanceOnMature`, the Export "Settlement — Reimbursement / Maturity"
+function) had the SAME class of bug but in a more severe form — `isCheckerCompoundOwnSubmission` never
+checked for `settlesAcceptanceOnMature` at all, meaning B5's own compound release (Acceptance
+FULL_SETTLE/PARTIAL_SETTLE + the matching Reimbursement Receivable's REIMBURSE) was **unreachable via
+any UI path, same-session or not** — dead code in `checker-actions.service.ts`, confirmed by direct
+inspection, not yet reviewer-reported.
+
+**Root cause, precisely**: the two linked legs of an A3S/B5 compound submission share one
+`businessEventId`, generated fresh at Submit time — but the server had no endpoint to query "every
+movement sharing this businessEventId." The Angular client's only way to find the linked leg was to
+still be holding onto the id from its own in-memory Submit response, which is fundamentally a
+same-session-only mechanism, not a real correlation.
+
+**Fix, in two parts:**
+
+1. **Microservice (`microservices/balance-component/`)**: new `GET /balance-movements?businessEventId=`
+   — `BalanceMovementStore.findByBusinessEventId()` (a plain `WHERE business_event_id = ?` query,
+   already indexed via the pre-existing `idx_movements_business_event`) + a thin `BalanceService`
+   wrapper + the route itself (400 if the query param is missing). Cross-contract by design — the SG's
+   own `balanceContractId` differs from the LC's, so this couldn't be a `listByContract`-style filter.
+   New tests: `test/unit/service/balanceService.test.ts` (direct-service, two contracts sharing a
+   businessEventId, oldest-first ordering, empty-array-for-unknown-id) and a new HTTP-integration
+   describe block in `app.test.ts` (400 without the param, the same cross-contract scenario end-to-end,
+   empty array). 280/280 tests passing, 99.08%/96.35%/100%/99.39% coverage, `typecheck`/`build`/`lint`
+   all clean. OAS (`analysis/balance-component-api.yaml`) bumped to v1.2.0 documenting the new `GET`
+   under the existing `/balance-movements` path (re-validated clean via the same local `js-yaml` script).
+
+2. **Angular (`src/app/transaction-builder/`)**:
+   - `balance-component-api.service.ts` — new `findByBusinessEventId()` client method.
+   - `checker-actions.service.ts` — new private `resolveLinkedMovementId(ctx, ...movementTypes)`:
+     prefers the Maker's own in-memory id when present (the fast, zero-extra-HTTP-call same-session
+     path, unchanged), falls back to a `findByBusinessEventId` lookup keyed off
+     `selectedCheckerMovement.businessEventId` when it's missing, matching by `movementType` alone
+     (`FULL_REDEEM`/`PARTIAL_REDEEM` for A3S, `REIMBURSE` for B5 — each exclusive to its own instrument
+     in `MOVEMENT_DIRECTION`'s vocabulary, confirmed by inspection, so no `instrumentType` field was
+     needed on the movement DTO). `release()`'s A3S and B5 branches now route through this resolver
+     before their own release call; `reject()` and the (previously dead/unreachable) generic fallback in
+     `release()` now prefer `selectedCheckerMovement.movementId` over `submitResult.movementId` too,
+     for the same reason.
+   - `transaction-builder.component.ts`'s `isCheckerCompoundOwnSubmission` — the actual routing gate —
+     rewritten for A3S/B5 to key off the picked item's own shape (`movementType` + a real
+     `businessEventId`) instead of requiring a `submitResult` match, so a cross-session Checker action
+     now correctly routes into the compound release. The `businessEventId` check is the disambiguator
+     that keeps this safe: a plain A3's own UTILIZE (no SG involved, submitted via `submitPlain()`)
+     never carries one, so it still correctly falls through to the pre-existing acknowledgment-only path
+     rather than wrongly attempting (and failing) a compound release. **A6 and B4's own
+     `settlesDocumentArrival`/`createsIssuingBankReceivableOnHonour` branches were deliberately left
+     UNCHANGED** — they depend on `selectedPayMovement` (the picked source Document Arrival/Present
+     Docs record), which has no server-side `businessEventId` correlation to the NEW compound at all (it
+     was created by an earlier, unrelated submission) — fixing that would need a genuinely different
+     mechanism (e.g. a `referencedTransactionId`-style field on the create request, already anticipated
+     in `analysis/balance-component-channel-api.yaml`'s own schema but never implemented in the real
+     microservice contract) — a separate, larger piece of work, confirmed but explicitly out of scope
+     for this fix.
+
+   New `checker-actions.service.spec.ts` (direct `CheckerActionsService` tests, no component
+   involved) — fast-path (known id, zero `findByBusinessEventId` calls), cross-session fallback (id
+   resolved via lookup) for both A3S and B5, PARTIAL_REDEEM matching, a RELEASED sibling movement not
+   mistaken for the still-PENDING one, no-businessEventId and lookup-API-error graceful failure, and
+   `reject()`'s own `selectedCheckerMovement`-preference. Updated two pre-existing tests
+   (`transaction-builder.component.gaps.spec.ts`'s `isCheckerCompoundOwnSubmission` test,
+   `transaction-builder.component.actions.spec.ts`'s "dispatches to reject()" test) that had asserted
+   the OLD submitResult-matching behavior — both now assert the new, correct behavior instead. Full
+   suite: 495/495 passing (12 new), 99.62%/95.58%/99.14%/99.66% coverage (clears the 95% floor on all
+   four metrics), `tsc --noEmit`/`ng build --configuration development`/`npm run lint` (0 errors) all
+   clean.
+
+**Live verification, both via direct REST calls (deliberately simulating a genuinely separate Checker
+session — zero shared browser/Angular state) and via the real Angular UI reading the same backend**:
+issued a fresh LC, issued and released an SG against it, submitted the A3S compound (SG FULL_REDEEM +
+LC UTILIZE, PENDING, sharing one `businessEventId`) — confirmed `GET /balance-movements?businessEventId=`
+returns both legs correctly ordered — then, using ONLY the LC UTILIZE's own id and its businessEventId
+(exactly what an independent Checker session would have), resolved and released the SG's own
+`FULL_REDEEM` directly. Confirmed the release response's own `balanceBefore`/`balanceAfter` (20000→0)
+and the SG's own `GET .../balance` snapshot (Confirmed/Available Balance 20000→0) were immediately
+consistent — directly confirming 出帳 (the release/posting action) and Balance calculation are correctly
+paired, not just that an account-entries display happened to look right. The LC's own balance was
+correctly UNCHANGED at this point (still PENDING, per A3S's own "Document Arrival moves to Pending LC
+Balance, not yet finalized" rule) until a subsequent A4-equivalent release, after which the LC's own
+Confirmed/Available Balance updated to 30000 with the exact `balanceBefore: 50000 / balanceAfter: 30000`
+expected. Re-confirmed the same end state through the real Angular UI's Look Up panel (SG Balance tab):
+the SG's own Event Timeline correctly showed both ISSUE and FULL_REDEEM as `Approved` (RELEASED), and
+the FULL_REDEEM row's own Account Entries dialog showed the correct, immutable historical pair (`Dr
+Shipping Guarantees Outstanding` / `Cr Customers' Liability under Shipping Guarantees`, USD 20000, tag
+`IBCURL01`/`Approved`) — the account-entries display and the underlying balance math agree throughout.
+
+**Known gap at the time this entry was first written — since CLOSED, same day, see the section
+immediately below**: A6 and B4 still depended on the Maker's own in-memory `selectedPayMovement`/
+`submitResult` for their own compound Checker release. Fixed via a new `referencedTransactionId` field,
+exactly as anticipated in the paragraph this replaces.
+
+## A6/B4 fixed too, same day, completing full A1–A9/B1–B5 coverage of this bug class (2026-08-16, user-directed — "A6/B4 也修一下,看看有多大工程" i.e. "fix A6/B4 too, see how big the effort is")
+
+Closes the gap the section immediately above explicitly left open. A systematic re-check of all 14 named
+business functions confirmed only A6 and B4 actually needed this: A1/A2/A8/A9/B1/B2 are plain
+single-movement functions with no compound release at all; A3/B3 never call the real release API by
+design (acknowledgment-only); A4/A7's own release paths already resolve fresh, session-independent data
+(A4's `payExisting()` reads straight from its own freshly-loaded IB Index picker, never cached Maker
+state); A3S/B5 were already fixed in the section above. That leaves exactly A6 (Acceptance, Usance) and
+B4 (Honour/Acceptance, both Sight and Usance branches) — both of which convert a **pre-existing** source
+record (A3's own Document Arrival, or B3's own Present Docs) picked at Submit time, a fundamentally
+different correlation shape than A3S/B5's "two legs created together" shape: the source record predates
+the new compound submission entirely, so it never shares a `businessEventId` with it — v1.2.0's lookup
+genuinely cannot resolve it.
+
+**Fix — new correlation field, `referencedTransactionId`:**
+
+1. **Microservice**: `BalanceMovementCreateRequest.referencedTransactionId` / `BalanceMovement.referencedTransactionId`
+   (new, in `types.ts`/`service/balanceService.ts`) — the movementId of the pre-existing source record,
+   stamped on the NEW primary movement at Submit time and persisted immutably (new
+   `referenced_transaction_id` column, migration id 3, store INSERT/read). Same passthrough posture as
+   `businessEventId`/`sourceTransactionRef` — accepted and returned, never validated to resolve to a
+   real movement. OAS bumped to v1.3.0 (both the field itself and a top-level changelog entry explaining
+   why v1.2.0's businessEventId mechanism can't cover this shape). New tests:
+   `test/unit/app.test.ts`'s own describe block (accepted-on-create + persisted-through-the-Event-
+   Timeline, and null-when-omitted). 282/282 microservice tests passing, 99.09%/96.4%/100%/99.39%
+   coverage, `typecheck`/`build`/`lint` all clean.
+
+2. **Angular**:
+   - `CreateMovementRequest.referencedTransactionId` / `BalanceMovement.referencedTransactionId` — new
+     fields, `balance-component-api.service.ts`.
+   - `buildSubmitRequest()` — stamps `req.referencedTransactionId = this.selectedPayMovement.movementId`
+     for `settlesDocumentArrival` functions (A6/B4) right before returning the built request.
+   - `checker-actions.service.ts` — new `resolveSettlesDocumentArrivalIds(ctx)`: resolves the SOURCE via
+     `selectedPayMovement?.movementId ?? selectedCheckerMovement?.referencedTransactionId` (no extra API
+     call — a direct field read either way), and, for B4 specifically, its downstream leg(s) CREATED
+     ALONGSIDE the new primary (Sight: one Due from Issuing Bank CREATE; Usance: an Acceptance liability
+     CREATE then its Reimbursement Receivable CREATE) via v1.2.0's `businessEventId` lookup — reusing
+     the existing mechanism, since those two legs genuinely are "created together" with the primary,
+     unlike the source. **Found and fixed a real bug while building this**: B4's `createsIssuingBankReceivableOnHonour`
+     and `createsAcceptanceReimbReceivableOnCreate` flags are BOTH unconditionally true on B4 (covering
+     its Sight and Usance branches respectively), so an early version of this resolver computed BOTH
+     the Sight and Usance downstream ids from the same lookup result regardless of which branch was
+     actually in play — confirmed live by a failing unit test (a Usance/ACCEPT release wrongly took the
+     Sight/HONOUR branch, silently skipping the real Usance chain). Fixed by branching on the PRIMARY's
+     own `movementType` (`selectedCheckerMovement.movementType`: `'HONOUR'` vs `'ACCEPT'`, always
+     exactly one) before deciding which shape to even look for — this is also why the Usance pair
+     (Acceptance liability + Reimbursement Receivable, both literally `movementType: 'CREATE'`, not
+     distinguishable from each other by type at all) is resolved by creation order instead
+     (`findByBusinessEventId`'s own oldest-first ordering, guaranteed to match
+     `submitConfirmationAcceptWithReceivable`'s own fixed creation sequence) rather than by shape.
+   - `isCheckerCompoundOwnSubmission` (`transaction-builder.component.ts`) — A6/B4's own
+     `settlesDocumentArrival` branch now routes on `!!selectedCheckerMovement.referencedTransactionId`
+     instead of a `submitResult` match, mirroring A3S/B5's own `businessEventId`-presence disambiguator
+     — safe because `referencedTransactionId` is ONLY ever stamped by A6/B4's own
+     `settlesDocumentArrival`-gated `buildSubmitRequest()` path, never by B1/B2's plain ISSUE/AMEND, so
+     a genuine non-compound item picked while on B4's own tab is never mistaken for one.
+   - `release()`'s `settlesDocumentArrival` branch, `releaseAcceptance()`, `releaseDueFromIssuingBank()`,
+     `releaseAcceptanceLiability()`, `releaseAcceptanceReimbReceivable()` — reworked to thread the
+     resolved ids through as explicit parameters instead of each reading `ctx.xxxMovementId!` directly;
+     `releaseAcceptanceReimbReceivable()` gained an explicit "could not be found" failed outcome instead
+     of assuming the id is always present (`!`-asserted before this fix).
+   - New tests in `checker-actions.service.spec.ts` (8 new: A6 fast-path + cross-session via
+     `referencedTransactionId`, A6 no-source-resolvable failure, A6 source-release-fails and
+     primary-release-fails compound errors, B4 Sight cross-session lookup, B4 Sight
+     no-businessEventId-on-the-picked-item fallback, B4 Usance cross-session order-based dual
+     resolution, B4 Usance receivable-unresolvable failure) plus one updated pre-existing test
+     (`transaction-builder.component.actions.spec.ts`'s "dispatches to release()" test — needed a
+     `referencedTransactionId` on its fixture, same pattern as the A3S/B5 fix's own test updates). Full
+     suite: 503/503 passing (11 new), 99.63%/95.14%/99.15%/99.66% coverage (clears the 95% floor on all
+     four metrics, though branches at 95.14% is a thinner margin than usual — the remaining uncovered
+     branches are cosmetic nullish-coalescing permutations inside error-message string construction, not
+     untested business logic), `tsc --noEmit`/`ng build --configuration development`/`npm run lint`
+     (0 errors) all clean.
+
+**Live verification, via direct REST calls simulating a genuinely independent Checker session** (issued
+a Seller's Usance LC, released it, submitted a plain Document Arrival UTILIZE as the "source", then
+submitted an A6-style `IPLC_ACCEPTANCE` CREATE with `referencedTransactionId` pointing at that source's
+own movementId): confirmed the Acceptance's own `GET .../movements` response carries
+`referencedTransactionId` correctly, persisted and readable by a session that never saw the original
+Submit. Using ONLY that field (fetched fresh, exactly as an independent Checker's own search would),
+released the source FIRST (`balanceBefore: 80000` → `balanceAfter: 50000`, correctly reducing the LC's
+own Confirmed Balance) then the primary Acceptance (`balanceBefore: 0` → `balanceAfter: 30000`) — both
+balance snapshots confirmed consistent afterward (LC: 50000/50000, Acceptance: 30000/30000). B4's own
+2-leg (Sight) and 4-leg (Usance) chains were not separately live-driven this pass (same scope-limitation
+disclosure convention this file already uses elsewhere) — they share the identical resolution mechanism
+already proven live for A6, and are covered by the 8 new dedicated unit tests above, including the
+specific Sight/Usance cross-contamination bug this same pass found and fixed.
+
+## A4's own generic Checker panel could reproduce a false "already RELEASED" error — hidden, since A4's own Pay (Release) button already IS the complete release (2026-08-16, reviewer-reported — "A4 SUBMIT THEN RELEASE Get error message => Cannot RELEASE a movement currently in status RELEASED — not a legal transition per Design doc §4. Why?")
+
+Root cause, found live: A4 (Sight Settlement, `payExistingUtilize`) has no separate Maker submission
+step at all — its own "Pay (Release)" button (`payExisting()`) already performs the complete,
+single-call release end to end, correctly disabling itself and clearing `selectedPayMovement` the
+instant it succeeds (confirmed via direct DOM inspection — `disabled: true`, `selectedPayMovement:
+null` — a single Pay click, done normally, does NOT reproduce this error). The actual trap: the
+generic `<section class="tb-section tb-section--checker">` "Pending Approvals" panel — the standalone,
+independently-searchable Release/Reject box every OTHER function (A1/A2/A6/A7/A8/A9/B1-B5) relies on as
+its OWN real release mechanism — was rendered UNCONDITIONALLY, for every function including A4, with no
+`*ngIf` excluding it. Since `payExisting()` never calls `syncCheckerToContext()` (unlike every other
+function's own compound/plain release path), this panel is never kept in sync with what A4's own button
+does. A user who — reasonably, since this IS the pattern for every other function — searches this panel
+for the same LC (either before or after using A4's own Pay (Release) button) can end up holding a STALE
+cached PENDING row; clicking "Release" on it after A4's own button already finalized the identical
+movement reproduces exactly the reported `409 ILLEGAL_STATE_TRANSITION` (the server's own Design doc §4
+guard correctly rejecting a second release on an already-RELEASED movement — the error message itself is
+correct, expected server behavior; the bug is that the UI ever let a user reach a stale second attempt).
+
+**Fix**: `*ngIf="!selectedFunction.payExistingUtilize"` added to the Checker section's own root element
+(`transaction-builder.component.html`) — A4 offers no legitimate use for this second, redundant release
+path, so hiding it removes the trap entirely rather than attempting to keep two independent surfaces in
+sync (which the codebase already tries to avoid elsewhere — e.g. `isCheckerCompoundOwnSubmission`'s own
+whole reason for existing is preventing exactly this class of "two paths to the same action" ambiguity).
+No `.ts` logic changed — `checkerContract`/`checkerItems`/`selectedCheckerMovement` etc. simply stay in
+their default/empty state for A4, unread by anything else. Verified: `tsc --noEmit` (strict templates)
+and `ng build --configuration development` both clean; full suite unaffected (503/503, this project's
+own convention of direct-instantiation component tests never renders the DOM, so no test exercised this
+panel's visibility either way). **Live-verified** both sides: A4's own page now ends cleanly after its
+LC Index panel (Checker section absent), while A1's own page still shows it exactly as before (confirming
+the fix is correctly scoped to `payExistingUtilize` alone, not a regression for the other 13 functions).
+
+## A4 redesigned for real Maker/Checker (4-eyes) separation, superseding the entry above — SAME DAY (2026-08-16, business instruction: "A4 Need Maker and Checker feature (4 eyes principle) i.e. Submit by Maker, then Release by Checker. OK?", followed immediately by "A1 - A9 B1 - B5 all functions need maker and checker features as standard Trade Finance business requirement.")
+
+The entry directly above fixed A4's reported false "already RELEASED" error by hiding the generic
+Checker panel for A4 — correct as a bug fix, but it left A4 as the ONE function (of all 14) with no real
+4-eyes separation: A4's own `payExisting()` button let a single actor both identify AND release the same
+movement in one call, unlike every other function's genuine Maker-submits/Checker-releases split. Per
+explicit business instruction, re-solved the same underlying problem ("two paths to the same release
+action, unsynced") the OTHER way: instead of keeping A4's own button and removing the shared panel,
+removed A4's own button and restored the shared panel — standardizing A4 on the identical pattern
+A1/A2/A3/A3S/A6/A7/A8/A9/B1-B5 already use, rather than keeping A4 as a permanent, documented exception.
+
+**Changes** (`transaction-builder.component.ts`/`.html`, `balance-component.model.ts` — no backend/OAS
+changes needed; `balance-component-channel-api.yaml` already documented this exact target design for A4,
+see its own existing "Checker acts on it via POST /channel/transactions/{id}/release directly" language):
+- `payExisting()` method removed entirely from the component.
+- A4's own "2ndary Index" subcard (Step 2 picker) is now browse-only: identifies which still-PENDING
+  Document Arrival to act on (still auto-fills the read-only IB Number/Amount box), but its own
+  release button is replaced with a plain hint — `Go to the Checker section below to Release or Reject
+  this Document Arrival.` — pointing at the SAME generic panel every other function's own hint already
+  points to.
+- The Checker `<section>`'s own `*ngIf="!selectedFunction.payExistingUtilize"` (added by the entry
+  above) is removed — the panel is unconditionally visible again, now A4's ONLY release path, so the
+  original staleness trap (two independently-actable surfaces for the same movement) cannot recur: there
+  is only one surface.
+- `onSelectFlattenedPayable()` (A4's own one-click "Quick Pick" row, which deliberately bypasses
+  `onSelectContract()` per its own pre-existing doc comment, to avoid an async re-fetch race) gained an
+  explicit `syncCheckerToContext()` call of its own — `onSelectContract()`'s own existing unconditional
+  call already covered the LC Index picker path for free, but Quick Pick needed the same convenience
+  added by hand so the Checker panel's search box pre-fills regardless of which of A4's two pickers the
+  Maker used.
+- A4's own registry `help:` text (`balance-component.model.ts`) reworded to describe Maker
+  (browse-only) / Checker (searches independently, Releases — the only step that finalizes it), replacing
+  the old "Checker (Pay): moves the LC Balance..." language that referenced the now-removed button.
+- `checkerAct()`/`isCheckerCompoundOwnSubmission` needed NO changes — A4 has none of the
+  compound/defer/settlesDocumentArrival flags any other function's special routing depends on, so a
+  Checker-picked A4 UTILIZE was already confirmed (by code reading, then live) to fall straight through
+  to the same plain `api.release(movementId, checkerId)` fallback A2 already uses.
+
+**Verified**: `tsc -p tsconfig.app.json --noEmit` and `ng build --configuration development` both clean;
+full Angular suite 501/501 (removed the 4 `payExisting()`-specific tests, added a `checkerAct()` "plain
+path (A4, no defer/compound flags)" test mirroring the existing A2 one, plus one `loadPayableMovements`
+branch test to hold the 95% branch floor — settled at 95.12%, up from a 94.99% dip immediately after
+removing `payExisting()`'s own well-covered branches). Both other sub-projects re-run unaffected and
+green (`backend/`: 28/28; `microservices/balance-component/`: 282/282, typecheck/build clean) per this
+file's own standing "re-run all three" rule. **Live-verified end to end**: A1 (Issue, LC A4TEST01) →
+Checker Release → A3 (Document Arrival, Sight, IB-A4TEST 40000) → Checker Approve (acknowledgment only,
+per A3's own semantics) → A4 Maker (Quick Pick, confirmed browse-only — no release button, just the
+read-only IB Number/Amount box and the "Go to the Checker section below" hint) → Checker Release (the
+ONLY release action taken for this movement) → LC Balance correctly transitioned Confirmed
+100000→60000, Available stayed 60000, Pending Earmark Total 40000→0, movement status PENDING→Approved
+— posting and Balance calculation stayed correctly paired throughout (出帳與Balance計算是配套的, per the
+same live-verification standard this file's own Phase-3 A3S/B5 entry above already established), with no
+recurrence of the original stale-second-release trap since there is now only one release surface.
+
+## A4 gained a REAL Maker Submit, superseding the entry above's "browse-only" design — SAME DAY (2026-08-16, business instruction: "There is no Submit button available for maker in A4 — Sight Settlement. Fix it.", then "Add real Maker Submit, then have Checker to Release it.", then "Exactly the same as A1. OK?")
+
+The entry directly above gave A4 a browse-only Maker picker (no Submit action at all, just a hint
+pointing at the Checker panel) — correct in that it removed A4's old single-actor "Pay (Release)"
+button, but it went one step too far: A4 ended up the only function with NO Maker action whatsoever,
+which read as a missing button rather than a deliberate design. Per this explicit same-day follow-up,
+A4 now gets a genuine, backend-persisted Maker Submit step — not a client-side flag, not a return to
+directly releasing — closing the gap the browse-only design left open (nothing previously stopped a
+Checker from releasing A4's own picked item before any Maker had done anything at all with it).
+
+**The core design constraint, worked through carefully before implementing**: A4 (Sight Settlement)
+has no movement of its own to create at Submit time — per `另外A3 A3S(沖SG帳務)可以設計成Earmark
+Balance by Document Arrival。到A4 再出帳` (business instruction, same day) and `A3 A3S 只是幫A4先出
+ACCOUNT ENTRIES` (e.g. A3/A3S processed 2026/5/2 as the document-arrival earmark; A4's actual
+出帳/settlement happens later, 2026/5/5, once the bank's own document examination completes), A3/A3S
+already earmarks the exposure (PENDING UTILIZE) AND already generates its own Account Entries at that
+earlier stage — A4 settles that SAME pre-existing record later, it does not create a second one. A
+first design instinct (mirror A6/B4's settlesDocumentArrival exactly: Submit creates a NEW movement
+with `referencedTransactionId` pointing at the source, Checker-release compound-releases both) was
+rejected after checking `domain/balanceDerivation.ts`: Confirmed Balance sums ALL RELEASED movements
+by `MOVEMENT_DIRECTION`, so a second RELEASED UTILIZE on the SAME LC contract would double-count the
+exposure (-40000 twice instead of once) — safe for A6/B4 only because their new movement posts to a
+genuinely SEPARATE contract (the Acceptance), not the same LC. A4 has no such separate contract to
+absorb a second movement into.
+
+**Resolved design**: mirrors this codebase's own existing `acknowledgedBy`/`acknowledgedAt` precedent
+(B3's Present-Docs-earmark Checker acknowledgment, 2026-08-15) but on the MAKER side — a new
+`makerSubmittedBy`/`makerSubmittedAt` pair on `BalanceMovement`, set via a dedicated
+`POST /balance-movements/{id}/maker-submit` (IPLC_LC/UTILIZE only; 400 otherwise), which — same
+posture as `acknowledge()` — deliberately does NOT call `applyStatusTransition`: status stays PENDING
+throughout, exactly like every other "second actor confirms without finalizing" action in this
+service. No new movement, no new contingentAccountEntry, no change to `balanceDerivation.ts` at all.
+
+- `transaction-builder.component.ts`'s new `submitA4()` calls `api.submitByMaker()` (not
+  `createMovement()`) and sets `submitResult` exactly like the generic `submit()` does — so the SAME
+  "MAKER RESULT" panel (Status/Account Entries/"Go to the Checker section" hint/Delete Pending) renders
+  for A4 identically to A1, fulfilling "exactly the same as A1" from the Maker's own point of view even
+  though the underlying call is genuinely different (no new movement created).
+- The Checker-side gate — the actual point of this feature — lives in `checkerAct()`'s own plain
+  fallback: for `payExistingUtilize` functions (A4 only), a release is blocked with a clear
+  `checkerError` (`"...has not been Submitted by a Maker yet (A4)..."`) unless
+  `selectedCheckerMovement.makerSubmittedAt` is already set. Reject is deliberately NOT gated — a
+  Checker may decline an unsubmitted item outright, same as declining anything else.
+- **Deliberately NOT enforced inside `release()` itself, server-side** — `backend/data/businessCases.js`
+  (the Business Case Runner's own Import Case 1/2) releases a UTILIZE directly with no separate
+  maker-submit call at all; hard-requiring `makerSubmittedAt` there would have broken that
+  already-working, separately-tested orchestrated flow for a feature it was never asked to participate
+  in. The gate is enforced where the interactive 4-eyes workflow actually lives — the Transaction
+  Builder's own `checkerAct()` — not globally.
+- `onSelectPayMovement()` gained an A4-only reset (`payExistingUtilize` guarded) clearing any stale
+  `submitResult`/`submitError` when a Maker picks a DIFFERENT Document Arrival, so a leftover MAKER
+  RESULT panel from a previous pick can't be mistaken for the newly-selected item's own state — A6/B4
+  are unaffected (not `payExistingUtilize`), preserving their own existing behavior exactly.
+- `analysis/balance-component-api.yaml` bumped v1.3.0 → v1.4.0: new `/balance-movements/{id}/maker-submit`
+  path (mirrors `/acknowledge`'s own documented shape) and `BalanceMovement.makerSubmittedBy`/
+  `makerSubmittedAt` schema fields, both with a full changelog entry. Re-validated via the same local
+  `js-yaml` parse-and-check script this file's other OAS bumps have used all session.
+
+**Verified**: microservice — `tsc --noEmit`/`build` clean, 288/288 tests (13 suites), coverage
+99.12%/96.33%/100%/99.41%, all ≥95% floor. Angular app — `tsc --noEmit`/`ng build` clean, 510/510
+tests (12 suites), coverage 99.63%/95.17%/99.16%/99.67%. `backend/` re-run unaffected and green
+(28/28) confirming the Business Case Runner's own Import Case 1/2 genuinely still releases a UTILIZE
+with no maker-submit step required, exactly as designed. **Live-verified end to end**, including the
+gate itself: A1 (Issue, LC A4V2TEST) → Checker Release → A3 (Document Arrival, Sight, IB-A4V2 40000,
+own Account Entries generated) → A4 Maker picks the item (real "Submit A4" button now visible, not
+just a hint) → attempted Checker Release BEFORE clicking Submit A4 → correctly BLOCKED with the exact
+gate message, movement stayed PENDING, balance unchanged → clicked Submit A4 → MAKER RESULT panel
+appeared (Status: PENDING, Account Entries, "Go to the Checker section" hint — same shape as A1's own)
+→ Checker Release (now succeeds) → LC Balance correctly transitioned Confirmed 100000→60000, Pending
+Earmark Total -40000→0, movement status PENDING→Approved.
+
+## Business Case Registry gained Export Case #6/#7 — the CURRENT B3/B4 architecture, alongside the older #1-#5 (2026-08-16, business instruction: "DB裡面 EXPORT LC => S01 & U01 all test events 加入測試案例" — transcribe the user's own live S01 (Sight)/U01 (Usance) runs against the microservice into the registry)
+
+`backend/data/businessCases.js`'s existing Export Case #1-#5 model "Present Docs" as directly creating
+the Confirmation's own HONOUR/ACCEPT movement, with no separate earmark step — this predates the B3
+(Present Docs, `EPLC_EXAMINATION` memo earmark, no GL/contingent effect) / B4 (unified Honour/Accept
+legal event, absorbing what used to be a split B3/B4) redesign the Transaction Builder's own Export tab
+has used since. Left #1-#5 as-is (still internally consistent, no B3/B4 split) rather than rewriting
+them — this instruction was to ADD, not replace — and added `exportCase6`/`exportCase7` instead,
+transcribed field-for-field from a direct SQLite dump of the user's own S01/U01 contracts+movements
+(amounts, tenorType/tenorDays, businessEventId/referencedTransactionId linkage) after confirming their
+live test data was still intact (it was — created after this session's own last DB cleanup, nothing
+lost).
+
+**New executor capability required**: `backend/server.js`'s generic step executor (`runCase()`) only
+resolved `balanceContractIdRef`/`parentLogicalContractIdRef` on a `createMovement` step — nothing
+resolved a `referencedTransactionId` to an EARLIER step's own server-generated `movementId` (needed for
+B4's own compound-release correlation to the B3 earmark it settles). Added `referencedTransactionIdRef`
+resolution, mirroring `balanceContractIdRef`'s exact pattern (inline from already-`captureAs`-captured
+response data, no extra HTTP call — unlike `parentLogicalContractIdRef`, which needs its own GET
+`.../balance` call to learn `logicalContractId`).
+
+**Case #6** (Sight): Confirm LC 100,000 → Present Docs 10,000 (B3, `EPLC_EXAMINATION`, stays PENDING) →
+Issuing Bank Honour 10,000 (B4, `referencedTransactionId` → the B3 earmark, shares a `businessEventId`
+with the linked Due From Issuing Bank leg) → three explicit `/release` calls (the B3 earmark, the
+Honour, the Due From Issuing Bank — the orchestrator makes each call itself; the microservice's own
+`/release` never cascades to linked movements, that correlation-following is entirely a caller
+responsibility, same posture documented on `referencedTransactionId`/`businessEventId` themselves).
+**Case #7** (Sellers Usance 120d): same B3 shape, then B4 Accept compound-creates BOTH Acceptance
+Liability and Acceptance Reimbursement Receivable (three-way shared `businessEventId`), then B5
+compound-releases Acceptance FULL_SETTLE + Reimbursement Receivable REIMBURSE (a second, separate
+`businessEventId`).
+
+**Verified**: `backend/` suite green, 29/29 (was 28 — one new test: a `referencedTransactionIdRef`
+resolution test mirroring the existing `parentLogicalContractIdRef` one; existing registry-shape
+assertions extended in place to cover 12 cases rather than gaining new test cases of their own),
+coverage 97.19%/95.23%/96%/97.93%. **Live-verified end to end** against the real
+microservice (not just the unit tests' mocked fetch): both new cases run their full step sequence with
+every `createMovement`/`release` returning 2xx, `referencedTransactionId` resolving to the real
+`examination` movementId, and every snapshot matching its own documented expected value exactly —
+Case #6: CONF LIAB 90,000, Due From Issuing Bank 10,000; Case #7: CONF LIAB 90,000, Acceptance Liability
+10,000→0, Reimbursement Receivable 10,000→0. Test data from this live run cleaned up afterward,
+carefully scoped to only the `EXP-C6-*`/`EXP-C7-*` contracts this pass created — the user's own S01/S02/
+U01 records (and an unrelated Import-side S01 IPLC_LC+SHGT scenario spotted alongside them) were left
+untouched.
+
+## Business Case Registry gained Import Case #6/#7, same day, same convention (2026-08-16, business instruction: "DB裡面 IMPORT LC => S01 & U01 all test events 加入測試案例" — the Import-side counterpart to the Export Case #6/#7 entry above)
+
+Same transcription approach as Export Case #6/#7 — a direct SQLite dump of the user's own live Import
+S01 (Sight)/U01 (Sellers Usance 120d) runs, spotted sitting alongside the Export S01/U01 contracts
+during that pass's own cleanup (same lc_number by coincidence, different instrumentType — natural keys
+are scoped per instrumentType, so no collision). Unlike Export's #6/#7, these needed no executor
+rewrite of an OLD architecture (Import Case #1-#5 already use the CURRENT A3/A3S/A4/A6/A7 shapes) — the
+gap was narrower: A4's own real Maker Submit (this session's earlier redesign) had no `runCase()` step
+type to invoke it at all.
+
+**Case #6** (Sight, `IPLC_LC`): Issue 100,000 → two Shipping Guarantees (10,000/20,000) → THREE Document
+Arrivals — B01 (A3S, Bill 12,000 exactly matches SG1's 10,000 outstanding → `FULL_REDEEM` 10,000, per
+`MIN(Bill, SG Outstanding)`), B02 (A3S, Bill 12,000 against SG2's 20,000 outstanding →
+`PARTIAL_REDEEM` 12,000), B03 (plain A3, no SG, 30,000) — then A4's own real Maker Submit + Checker
+Release on EACH of the three UTILIZE movements (the actual feature under test: `makerSubmittedBy` is
+set on all three in the source data, confirming the just-shipped A4 redesign was genuinely exercised,
+not bypassed). **Case #7** (Sellers Usance 120d, same instrumentType): Issue 100,000 → Document Arrival
+B01 (plain, 20,000) → Shipping Guarantee 20,000 → Document Arrival B02 (A3S, exact match →
+`FULL_REDEEM` 20,000) → A6 Acceptance for EACH of B01/B02 (`referencedTransactionId` → the Document
+Arrival, compound-released source-then-primary, same pattern as A6/B4 throughout this file) → A7
+Acceptance Settlement for both. Confirms live why Usance UTILIZE never carries `makerSubmittedBy` in the
+real data (unlike Sight) — A6's own `referencedTransactionId` compound release finalizes it instead;
+`submitByMaker()`'s own IPLC_LC/UTILIZE service-layer scoping was never meant to gate a Usance flow,
+only A4's Sight-only Checker path does that client-side.
+
+**New executor capability required**: a `makerSubmit` step type (mirrors `release` exactly — POST
+`/balance-movements/:id/maker-submit` instead of `/release`, `movementRef` + `makerSubmittedBy` instead
+of `releasedBy`, same "skipped" handling when its own referenced createMovement never captured a
+movementId). `createGenericFetchMock()` in `server.test.js` extended to answer this new sub-path too.
+
+**Verified**: `backend/` suite green, 32/32 (was 29 — three new tests: a `makerSubmit` happy-path unit
+test and its own "skipped" branch, both in `runCase.test.js` alongside this file's existing
+synthetic-step technique for exactly this kind of branch gap, plus one HTTP-integration test in
+`server.test.js` confirming `import-case-6` POSTs to `.../maker-submit` for each Document Arrival
+BEFORE its own `.../release`; registry-shape assertions in `businessCases.test.js` extended in place —
+`EXPECTED_IDS` reordered to insert `import-case-6`/`#7` between `import-case-5` and `export-case-1`,
+`VALID_STEP_TYPES` gained `makerSubmit`, title assertions added), coverage 97.43%/95.65%/96.29%/98.13%.
+**Live-verified end to end** against the real microservice: both cases ran their full step sequence
+with every call returning 2xx and every snapshot matching its own documented expected value exactly —
+Case #6: LC Available 46,000 (Confirmed catches up to 46,000 only once ALL THREE A4 Settlements
+release), SG1 0/SG1 fully redeemed, SG2 8,000 still outstanding; Case #7: LC Confirmed/Available 55,000
+after both Acceptances, Acceptance B01/B02 20,000/25,000 → 0/0 after Settlement. Test data scoped-cleaned
+afterward (`IMP-C6-*`/`IMP-C7-*` only), leaving the user's own S01/S02/U01 records (Import and Export
+both) untouched.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

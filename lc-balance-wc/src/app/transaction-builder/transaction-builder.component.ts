@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
@@ -227,6 +227,16 @@ export class TransactionBuilderComponent {
   /** Set once Submit's first call (the SG's own FULL_REDEEM) succeeds — Release then needs it for the compound Checker action. */
   arrivalSgRedeemMovementId: string | null = null;
   /**
+   * Bug fixed 2026-08-16, reviewer-reported ("A3S does not generate the related SG redemption entries
+   * in Pending"): the SG's own FULL_REDEEM/PARTIAL_REDEEM movement DOES get a real, in-scope
+   * contingentAccountEntry from the server (SHGT is a real account family — see
+   * analysis/contingent-liability-ledger.html Folio 2) — it was just never surfaced anywhere in the
+   * UI, since submitResult only ever holds Submit's SECOND call (the LC's own UTILIZE, req) for A3S.
+   * Holds the full first-leg response (not just its movementId, unlike arrivalSgRedeemMovementId above)
+   * specifically so the Maker Result panel can offer its own Account Entries button for this leg too.
+   */
+  arrivalSgRedeemMovement: BalanceMovement | null = null;
+  /**
    * B3 (createsIssuingBankReceivableOnHonour) only — set once Submit's second call (the new
    * EPLC_DUE_FROM_ISSUING_BANK CREATE) succeeds. Same role as arrivalSgRedeemMovementId above: Release
    * and Delete Pending (EC) both need it for their own compound actions.
@@ -247,6 +257,13 @@ export class TransactionBuilderComponent {
    * now has three linked legs instead of two.
    */
   acceptanceMovementId: string | null = null;
+  /**
+   * Same fix and reasoning as arrivalSgRedeemMovement above, applied to B4 Usance's own second leg
+   * (the new EPLC_ACCEPTANCE CREATE) — IPLC_ACCEPTANCE/EPLC_ACCEPTANCE is a real, in-scope account
+   * family (analysis/contingent-liability-ledger.html Folio 5), so this leg's own contingentAccountEntry
+   * was also being silently dropped, same root cause as the A3S bug, just not yet reviewer-reported.
+   */
+  acceptanceMovement: BalanceMovement | null = null;
   /**
    * B5 (settlesAcceptanceOnMature, Usance/CNF_MATURE branch) only — set once Submit's second call (the
    * matching EPLC_ACCEPTANCE_REIMB_RECEIVABLE's REIMBURSE, found via the same LC+EB natural key as the
@@ -319,6 +336,15 @@ export class TransactionBuilderComponent {
   submitResult: any = null;
   submitError: string | null = null;
   actionBusy = false;
+  /**
+   * analysis/contingent-liability-ledger.html (business-requested 2026-08-16, "Account Entries button +
+   * pop-up dialog") — whichever movement's own contingentAccountEntry is currently shown in the dialog,
+   * or null when the dialog is closed. Set by an explicit "Account Entries" button click, from either
+   * the Maker Result panel (submitResult) or an Event Timeline row — deliberately NOT a fetch: the
+   * movement object already carries its own server-derived, immutable entry (Design doc "Event-Level
+   * Relationship" requirement — never recalculated from the current balance at inquiry time).
+   */
+  accountEntryDialogMovement: BalanceMovement | null = null;
   /** A3 (Document Arrival (Sight)) only — set by approveArrival(), a Checker acknowledgment that does NOT call the backend release API. */
   arrivalApproved = false;
 
@@ -547,13 +573,16 @@ export class TransactionBuilderComponent {
     this.arrivalApproved = false;
     this.submitResult = null;
     this.submitError = null;
+    this.accountEntryDialogMovement = null;
     this.sgsForArrival = [];
     this.selectedArrivalSg = null;
     this.arrivalSgSnapshot = null;
     this.arrivalSgRedeemMovementId = null;
+    this.arrivalSgRedeemMovement = null;
     this.dueFromIssuingBankMovementId = null;
     this.acceptanceReimbReceivableMovementId = null;
     this.acceptanceMovementId = null;
+    this.acceptanceMovement = null;
     this.matchedReceivableMovementId = null;
     // checkerLcNumber is deliberately NOT reset here — a Checker moving from one function to
     // another (e.g. A2 to A9) very plausibly wants to keep checking the SAME LC; only the resolved
@@ -767,6 +796,11 @@ export class TransactionBuilderComponent {
     this.payableMovements = this.catalogPayableMovements.get(contractId) ?? [];
     this.payableMovementsLoading = false;
     this.onSelectPayMovement(movementId);
+    // 4-eyes redesign 2026-08-16: unlike onSelectContract() above (which this deliberately doesn't
+    // call, see doc comment), this one-click path never pre-fills the Checker panel's own search box
+    // on its own — add the same convenience explicitly so a Maker's Quick Pick click behaves like
+    // every other picker in this component.
+    this.syncCheckerToContext();
   }
 
   /**
@@ -995,6 +1029,21 @@ export class TransactionBuilderComponent {
    */
   displayStatus(status: string): string {
     return status === 'RELEASED' ? 'Approved' : status;
+  }
+
+  /** analysis/contingent-liability-ledger.html — opens the Account Entries pop-up for one specific movement. The movement's own contingentAccountEntry is already loaded (Submit response / Event Timeline list) — this never issues its own fetch. */
+  openAccountEntryDialog(movement: BalanceMovement): void {
+    this.accountEntryDialogMovement = movement;
+  }
+
+  closeAccountEntryDialog(): void {
+    this.accountEntryDialogMovement = null;
+  }
+
+  /** Escape closes the Account Entries dialog, same as the backdrop click / Close button. */
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.accountEntryDialogMovement) this.closeAccountEntryDialog();
   }
 
   onSelectContract(contractId: string): void {
@@ -1242,26 +1291,38 @@ export class TransactionBuilderComponent {
       this.model.amount = this.selectedPayMovement.amount;
       this.rebuildFields();
     }
+    // A4 only (business instruction 2026-08-16, real Maker Submit): picking a NEW Document Arrival
+    // clears any PREVIOUS Submit result so the Maker isn't left looking at a stale MAKER RESULT panel
+    // for a DIFFERENT movement.
+    if (this.selectedFunction?.payExistingUtilize) {
+      this.submitResult = null;
+      this.submitError = null;
+    }
   }
 
-  /** Releases the picked PENDING movement directly — no createMovement call, Amount is whatever A3 already recorded. */
-  payExisting(): void {
+  /**
+   * A4 (Sight Settlement)'s own real Maker Submit — business instruction 2026-08-16 ("Add real Maker
+   * Submit, then have Checker to Release it. Exactly the same as A1."). Unlike every other function,
+   * A4 has no movement of its own to create — it settles the PRE-EXISTING UTILIZE A3/A3S already
+   * earmarked (and already gave its own Account Entries — see A3's own submit() flow) — so this calls
+   * the dedicated backend maker-submit action instead of createMovement(). Sets `submitResult` exactly
+   * like the generic submit() does, so the SAME "MAKER RESULT" panel below (Status/Account
+   * Entries/"Go to the Checker section" hint/Delete Pending) renders identically to every other
+   * function — checkerAct()'s own doc comment covers the matching Checker-side gate.
+   */
+  submitA4(): void {
     if (!this.selectedPayMovement) return;
-    this.actionBusy = true;
+    this.submitting = true;
+    this.submitResult = null;
     this.submitError = null;
-    this.api.release(this.selectedPayMovement.movementId, this.model.createdBy === 'maker1' ? 'checker1' : 'checker2').subscribe({
+    this.api.submitByMaker(this.selectedPayMovement.movementId, this.model.createdBy || 'maker1').subscribe({
       next: (res) => {
-        this.actionBusy = false;
+        this.submitting = false;
         this.submitResult = res;
-        this.refreshSelectedContractSnapshot();
-        this.loadPayableMovements(this.selectedContract?.balanceContractId);
-        // Business instruction 2026-08-14: "once the Sight Settlement is approved... the LC Index must be
-        // refreshed immediately to reflect the latest balance status" — the LC Index's own "Pending: N" / IB
-        // hints (catalogSnapshots/catalogPayableIbs) are stale otherwise until the user navigates away and back.
-        this.reloadCatalog(this.catalogPage);
+        this.syncCheckerToContext();
       },
       error: (err) => {
-        this.actionBusy = false;
+        this.submitting = false;
         this.submitError = this.describeApiError(err);
       },
     });
@@ -1656,8 +1717,41 @@ export class TransactionBuilderComponent {
    */
   get isCheckerCompoundOwnSubmission(): boolean {
     if (!this.selectedCheckerMovement) return false;
+    // Bug fixed 2026-08-16 (reviewer-reported — "A1 -> A8 -> A3S -> A4, the related SG entries was
+    // not shown"): A3S (documentArrivalWithSg) and B5 (settlesAcceptanceOnMature) route here based on
+    // the picked item's OWN shape — movementType plus a real businessEventId — instead of requiring a
+    // match against THIS session's own submitResult. Their linked leg (A3S's SG redemption, B5's
+    // Reimbursement Receivable) is now resolved server-side via businessEventId
+    // (checker-actions.service.ts's resolveLinkedMovementId) regardless of which browser session is
+    // acting — the whole point of Maker/Checker 4-eyes separation. The businessEventId check is the
+    // disambiguator for A3S specifically: a plain A3's own UTILIZE (no matched SG, submitted via
+    // submitPlain()) never has one, so it correctly falls through to the existing deferSettlement/
+    // acknowledgment-only path below instead of wrongly attempting (and failing) a compound release.
+    if (this.selectedFunction?.documentArrivalWithSg) {
+      return this.selectedCheckerMovement.movementType === 'UTILIZE' && !!this.selectedCheckerMovement.businessEventId;
+    }
+    if (this.selectedFunction?.settlesAcceptanceOnMature) {
+      return (
+        (this.selectedCheckerMovement.movementType === 'FULL_SETTLE' || this.selectedCheckerMovement.movementType === 'PARTIAL_SETTLE') &&
+        !!this.selectedCheckerMovement.businessEventId
+      );
+    }
+    // Bug fixed 2026-08-16 ("A6/B4 也修一下", extending the A3S/B5 fix above): A6/B4 (settlesDocumentArrival)
+    // now ALSO route here based on the picked item's own shape — a real referencedTransactionId
+    // (stamped on the primary movement at Submit time, pointing at the picked source Document Arrival/
+    // Present Docs record — see CreateMovementRequest.referencedTransactionId's own doc comment) —
+    // instead of requiring a submitResult match. Presence alone is a safe disambiguator:
+    // referencedTransactionId is ONLY ever stamped by A6/B4's own settlesDocumentArrival-gated
+    // buildSubmitRequest() path, never by B1/B2's plain ISSUE/AMEND, so a genuine ISSUE/AMEND item
+    // picked while on B4's own tab is never mistaken for a compound one.
+    if (this.selectedFunction?.settlesDocumentArrival) {
+      return !!this.selectedCheckerMovement.referencedTransactionId;
+    }
+    // B4's own Sight/HONOUR (createsIssuingBankReceivableOnHonour) — UNCHANGED, still requires the
+    // SAME session's own submitResult; kept for completeness even though, per the doc comment just
+    // below, this branch is unreachable via any real function object today (settlesDocumentArrival,
+    // unconditional on B4, always matches first).
     if (this.selectedCheckerMovement.movementId !== this.submitResult?.movementId) return false;
-    if (this.selectedFunction?.settlesDocumentArrival || this.selectedFunction?.documentArrivalWithSg) return true;
     // Business instruction 2026-08-15 ("B4 should index records from B3") — B3 now shares one function
     // across both HONOUR (its own real compound, createsIssuingBankReceivableOnHonour) and ACCEPT (a
     // DIFFERENT, deferSettlement-based acknowledgment-only path — see checkerAct()'s own doc comment).
@@ -1895,6 +1989,20 @@ export class TransactionBuilderComponent {
       this.approveArrival();
       return;
     }
+
+    // Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
+    // Exactly the same as A1.") — A4 only. Its own target UTILIZE is a PRE-EXISTING record (A3/A3S's
+    // own earmark, already earning its Account Entries at that earlier stage — see A3's own submit()
+    // flow), so nothing else stops a Checker from finding and releasing it before any Maker has
+    // actually used A4's own new Submit button (submitA4()). makerSubmittedAt is the real,
+    // backend-persisted gate that closes that gap — visible to any independent Checker session, not
+    // just a same-session flag. Server-side release() deliberately does NOT enforce this itself (see
+    // service.submitByMaker()'s own doc comment for why) — this client-side check is the real gate.
+    if (action === 'release' && this.selectedFunction?.payExistingUtilize && !this.selectedCheckerMovement.makerSubmittedAt) {
+      this.checkerError = 'This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.';
+      return;
+    }
+
     this.checkerBusy = true;
     this.checkerError = null;
     const obs = action === 'release' ? this.api.release(movementId, this.checkerId) : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
@@ -2204,6 +2312,14 @@ export class TransactionBuilderComponent {
     if (this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.model.movementType === 'CREATE') {
       req.exposureNature = this.exposureNature;
     }
+    // Bug fixed 2026-08-16 ("A6/B4 也修一下") — A6/B4 only: stamps the picked source Document
+    // Arrival/Present Docs record's own movementId onto the new primary movement, so a genuinely
+    // independent Checker session can later resolve and release it without needing this Maker's own
+    // in-memory selectedPayMovement — see CreateMovementRequest.referencedTransactionId's own doc
+    // comment for the full rule.
+    if (this.selectedFunction?.settlesDocumentArrival && this.selectedPayMovement) {
+      req.referencedTransactionId = this.selectedPayMovement.movementId;
+    }
     return req;
   }
 
@@ -2243,6 +2359,7 @@ export class TransactionBuilderComponent {
     this.api.createMovement(redeemReq).subscribe({
       next: (redeemRes: any) => {
         this.arrivalSgRedeemMovementId = redeemRes.body.movementId;
+        this.arrivalSgRedeemMovement = redeemRes.body;
         this.api.createMovement(req).subscribe({
           next: (res: any) => {
             this.submitting = false;
@@ -2351,6 +2468,7 @@ export class TransactionBuilderComponent {
         this.api.createMovement(acceptanceReq).subscribe({
           next: (acceptanceRes: any) => {
             this.acceptanceMovementId = acceptanceRes.body.movementId;
+            this.acceptanceMovement = acceptanceRes.body;
             const receivableReq: CreateMovementRequest = {
               instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
               naturalKey: {
@@ -2492,6 +2610,8 @@ export class TransactionBuilderComponent {
     this.submitError = null;
     this.arrivalApproved = false;
     this.arrivalSgRedeemMovementId = null;
+    this.arrivalSgRedeemMovement = null;
+    this.acceptanceMovement = null;
 
     if (this.selectedFunction?.documentArrivalWithSg && this.selectedArrivalSg && this.arrivalSgSnapshot) {
       this.submitDocumentArrivalWithSg(req);
@@ -2601,6 +2721,7 @@ export class TransactionBuilderComponent {
       acceptanceReimbReceivableMovementId: this.acceptanceReimbReceivableMovementId,
       arrivalSgRedeemMovementId: this.arrivalSgRedeemMovementId,
       createdBy: this.model.createdBy,
+      selectedCheckerMovement: this.selectedCheckerMovement,
     };
   }
 
@@ -2704,6 +2825,7 @@ export class TransactionBuilderComponent {
     this.lookupError = null;
     this.lookupResult = null;
     this.lookupMovements = [];
+    this.accountEntryDialogMovement = null;
     this.lookupTab = 'LC';
     this.acceptancesUnderLookup = [];
     this.selectedLookupAcceptance = null;

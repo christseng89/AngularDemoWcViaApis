@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   currency                TEXT NOT NULL,
   leg_ref                 TEXT,
   account_entries         TEXT, -- JSON
+  -- analysis/contingent-liability-ledger.html — server-derived Dr/Cr contingent-liability pair for
+  -- this event, distinct from account_entries above (caller-supplied GL passthrough). JSON:
+  -- {drAccount, crAccount, currency, amount}. Null when out of contingent scope.
+  contingent_account_entry TEXT,
   lmts_reservation_id     TEXT,
   status                  TEXT NOT NULL,
   superseded_movement_id  TEXT,
@@ -87,6 +91,10 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   source_module           TEXT,
   source_function         TEXT,
   source_transaction_ref  TEXT,
+  -- Bug fixed 2026-08-16 ("A6/B4 也修一下") — see types.ts's BalanceMovement.referencedTransactionId
+  -- doc comment for the full rule: the movementId of a pre-existing record (created by an earlier,
+  -- separate submission) this movement converts/finalizes.
+  referenced_transaction_id TEXT,
   balance_before          TEXT,
   balance_after           TEXT,
   warnings                TEXT, -- JSON
@@ -99,7 +107,15 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- finalizing it (status stays PENDING — B4 still needs to find and consume it later). Distinct
   -- from released_by/released_at, which mark the real PENDING->RELEASED/REJECTED transition.
   acknowledged_by         TEXT,
-  acknowledged_at         TEXT
+  acknowledged_at         TEXT,
+  -- Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
+  -- Exactly the same as A1.") — A4 (Sight Settlement) only. A4 has no movement of its own to
+  -- create (it settles the PRE-EXISTING UTILIZE A3/A3S already earmarked), so this is the genuine,
+  -- backend-persisted Maker action standing in for A1's own createMovement()-as-Submit step. Mirrors
+  -- acknowledged_by/acknowledged_at's own shape (a second, non-finalizing actor action recorded on
+  -- the SAME movement) but on the MAKER side — status stays PENDING either way.
+  maker_submitted_by      TEXT,
+  maker_submitted_at      TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

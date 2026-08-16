@@ -365,6 +365,21 @@
       background: var(--red-bg-soft);
     }
   }
+
+  // Business-requested 2026-08-16 (analysis/contingent-liability-ledger.html) — the Event Timeline's
+  // own "Account Entries" button, sized to sit inside a table cell without inflating row height.
+  &--tiny {
+    padding: 3px 9px;
+    font-size: 11px;
+    background: #fff;
+    border-color: var(--blue-border);
+    color: var(--blue-dark);
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg-soft);
+      border-color: var(--blue);
+    }
+  }
 }
 
 .tb-hint {
@@ -704,4 +719,96 @@
 
 .tb-muted {
   color: var(--gray-muted);
+}
+
+// ── Account Entries pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html)
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+.tb-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.tb-dialog {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.28);
+  width: 100%;
+  max-width: 460px;
+  padding: 18px 20px;
+}
+
+.tb-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.tb-dialog__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+
+.tb-dialog__close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--gray-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    background: var(--gray-bg);
+    color: var(--gray-body);
+  }
+}
+
+.tb-dialog__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+// A static 2-row Dr/Cr table, not a pickable list — override .tb-table's own clickable-row affordance.
+// Matches .tb-table's own selector specificity exactly (both classes present in the template together)
+// so this wins on source order rather than needing !important.
+.tb-table.tb-table--static tbody tr {
+  cursor: default;
+
+  &:hover:not(.tb-table__row--active) {
+    background: inherit;
+  }
+}
+
+.tb-drcr-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+
+  &--dr {
+    background: var(--blue-bg);
+    color: var(--blue-dark);
+  }
+
+  &--cr {
+    background: var(--green-bg);
+    color: var(--green-dark);
+  }
 }

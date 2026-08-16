@@ -592,8 +592,18 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     // amount that doesn't match the documents actually presented.
     // payExistingUtilize (component.ts) makes this the Checker step:
     // search-and-release ONLY — no createMovement call, unlike A3.
+    // Business instruction 2026-08-16, revised twice the same day. First: "A4 Need Maker and Checker
+    // feature (4 eyes principle) i.e. Submit by Maker, then Release by Checker" — A4 used to have its
+    // own dedicated "Pay (Release)" button that released directly, a single actor doing both steps;
+    // removed in favor of a browse-only picker + the standard Checker panel. Then, immediately: "Add
+    // real Maker Submit, then have Checker to Release it. Exactly the same as A1." — browse-only
+    // wasn't enough; A4 needed a REAL Maker action too, not just a "go release it yourself" hint. A4
+    // still creates no new movement (component.ts's submitA4() calls the dedicated maker-submit
+    // backend action on A3's own already-earmarked UTILIZE, not createMovement()) — but it IS now a
+    // genuine, backend-persisted Maker step (visible to any independent Checker session) that gates
+    // the Checker's own Release, exactly like every other function's Submit does.
     payExistingUtilize: true,
-    help: 'Sight only — pick the LC (LC Index), then the still-PENDING IB record under it (IB Index) that A3 recorded; Amount is shown read-only from that record, never re-typed. Maker: no LC Balance update. Checker (Pay): moves the LC Balance from Pending to Approved/Utilized — this is the only step that finalizes it. If nothing is PENDING yet, use A3 (Document Arrival) first.',
+    help: 'Sight only — pick the LC (LC Index), then the still-PENDING IB record under it (IB Index) that A3 recorded; Amount is shown read-only from that record, never re-typed. Maker: Submit A4 — a real action confirming this Document Arrival for settlement (no LC Balance change yet). Checker: search the same LC in the Checker panel below and Release — this moves the LC Balance from Pending to Approved/Utilized and is the only step that finalizes it. If nothing is PENDING yet, use A3 (Document Arrival) first.',
   },
   {
     code: 'A6',

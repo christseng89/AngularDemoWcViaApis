@@ -33,6 +33,33 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('acknowledged_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_at TEXT');
     },
   },
+  {
+    id: 2,
+    description: 'Add contingent_account_entry to balance_movements (2026-08-16, analysis/contingent-liability-ledger.html account-entry generation)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('contingent_account_entry')) db.exec('ALTER TABLE balance_movements ADD COLUMN contingent_account_entry TEXT');
+    },
+  },
+  {
+    id: 3,
+    description:
+      'Add referenced_transaction_id to balance_movements (2026-08-16, A6/B4 Checker-release cross-session fix — see types.ts BalanceMovement.referencedTransactionId)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('referenced_transaction_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN referenced_transaction_id TEXT');
+    },
+  },
+  {
+    id: 4,
+    description:
+      'Add maker_submitted_by/maker_submitted_at to balance_movements (2026-08-16, A4 real Maker Submit step — see types.ts BalanceMovement.makerSubmittedAt)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('maker_submitted_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_by TEXT');
+      if (!columns.includes('maker_submitted_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_at TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

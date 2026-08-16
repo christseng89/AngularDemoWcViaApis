@@ -80,6 +80,7 @@ function makeApi(overrides: Partial<Record<string, jest.Mock>> = {}) {
     reject: jest.fn(() => of({})),
     cancel: jest.fn(() => of({})),
     acknowledge: jest.fn(() => of({})),
+    submitByMaker: jest.fn(() => of({ movementId: 'M1', status: 'PENDING' })),
     createMovement: jest.fn(() => of({ body: { movementId: 'NEW1' } })),
   };
   return { ...defaults, ...overrides } as unknown as BalanceComponentApiService;
@@ -316,54 +317,88 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
   });
 
-  describe('payExisting', () => {
+  // 4-eyes redesign 2026-08-16 ("A4 Need Maker and Checker feature... Submit by Maker, then Release
+  // by Checker"): payExisting() (A4's own dedicated single-actor release method) was REMOVED — A4's
+  // picker (onSelectPayMovement, covered above) became browse-only, and release happens exclusively
+  // via the generic Checker panel's checkerAct('release'), covered in
+  // transaction-builder.component.actions.spec.ts's checkerAct() describe block (the "plain path (A4,
+  // no defer/compound flags)" case).
+  //
+  // Revised the SAME day ("Add real Maker Submit, then have Checker to Release it. Exactly the same
+  // as A1."): browse-only wasn't enough — submitA4() is A4's own real, genuinely backend-persisted
+  // Maker action (calls api.submitByMaker(), not api.release() or createMovement()).
+  describe('submitA4', () => {
     it('does nothing when no movement is selected', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
       comp.selectedPayMovement = null;
 
-      comp.payExisting();
+      comp.submitA4();
 
-      expect(api.release).not.toHaveBeenCalled();
+      expect(api.submitByMaker).not.toHaveBeenCalled();
     });
 
-    it('releases the exact selected movement (never creates a new one) and refreshes dependent state', () => {
-      const api = makeApi();
+    it('calls api.submitByMaker() with the picked movement and model.createdBy, sets submitResult exactly like the generic submit() does', () => {
+      const api = makeApi({ submitByMaker: jest.fn(() => of({ movementId: 'M1', status: 'PENDING', makerSubmittedBy: 'maker1' })) });
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
-      comp.selectedPayMovement = makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '1000' });
+      comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
       comp.model.createdBy = 'maker1';
 
-      comp.payExisting();
+      comp.submitA4();
 
+      expect(api.submitByMaker).toHaveBeenCalledWith('M1', 'maker1');
       expect(api.createMovement).not.toHaveBeenCalled();
-      expect(api.release).toHaveBeenCalledWith('M1', 'checker1');
-      expect(comp.submitResult).toEqual({ movementId: 'REL1', status: 'RELEASED' });
-      expect(comp.actionBusy).toBe(false);
-      expect(api.getSnapshot).toHaveBeenCalledWith('C1'); // refreshSelectedContractSnapshot()
-      expect(api.catalog).toHaveBeenCalled(); // reloadCatalog(catalogPage)
+      expect(comp.submitResult).toEqual({ movementId: 'M1', status: 'PENDING', makerSubmittedBy: 'maker1' });
+      expect(comp.submitting).toBe(false);
     });
 
-    it('uses checker2 when createdBy is not maker1', () => {
+    it('falls back to maker1 when model.createdBy is falsy', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = makeMovement({ movementId: 'M2' });
-      comp.model.createdBy = 'maker2';
+      comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
+      comp.model.createdBy = '';
 
-      comp.payExisting();
+      comp.submitA4();
 
-      expect(api.release).toHaveBeenCalledWith('M2', 'checker2');
+      expect(api.submitByMaker).toHaveBeenCalledWith('M1', 'maker1');
     });
 
-    it('sets submitError and clears actionBusy on a release failure', () => {
-      const api = makeApi({ release: jest.fn(() => throwError(() => ({ error: { message: 'release boom' } }))) });
+    it('sets submitError and clears submitting on a submitByMaker() failure', () => {
+      const api = makeApi({ submitByMaker: jest.fn(() => throwError(() => ({ error: { message: 'submit boom' } }))) });
       const comp = makeComponent(getFn('A4'), api);
       comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
 
-      comp.payExisting();
+      comp.submitA4();
 
-      expect(comp.submitError).toBe('release boom');
-      expect(comp.actionBusy).toBe(false);
+      expect(comp.submitError).toBe('submit boom');
+      expect(comp.submitting).toBe(false);
+      expect(comp.submitResult).toBeNull();
+    });
+  });
+
+  describe('onSelectPayMovement clears a stale submitResult (A4 only)', () => {
+    it('resets submitResult/submitError when a NEW Document Arrival is picked for A4', () => {
+      const api = makeApi();
+      const comp = makeComponent(getFn('A4'), api);
+      comp.payableMovements = [makeMovement({ movementId: 'M1' }), makeMovement({ movementId: 'M2' })];
+      comp.submitResult = { movementId: 'M1', status: 'PENDING' };
+      comp.submitError = 'stale error';
+
+      comp.onSelectPayMovement('M2');
+
+      expect(comp.submitResult).toBeNull();
+      expect(comp.submitError).toBeNull();
+    });
+
+    it('does NOT reset submitResult for a non-A4 function (A6) — settlesDocumentArrival keeps its own existing behavior', () => {
+      const api = makeApi();
+      const comp = makeComponent(getFn('A6'), api);
+      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
+      comp.submitResult = { movementId: 'OLD', status: 'PENDING' };
+
+      comp.onSelectPayMovement('M1');
+
+      expect(comp.submitResult).toEqual({ movementId: 'OLD', status: 'PENDING' });
     });
   });
 

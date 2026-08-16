@@ -574,21 +574,44 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.checkerActionInFlight).toBe(true);
       (c as any).actionBusy = false;
 
-      // isCheckerCompoundOwnSubmission: movementId must match submitResult's, and the function must be compound
+      // isCheckerCompoundOwnSubmission (A3S/documentArrivalWithSg): bug fixed 2026-08-16 — routes on
+      // the picked item's OWN shape (UTILIZE + a real businessEventId), no submitResult match required,
+      // so a genuinely separate Checker session (submitResult null/stale) still routes correctly.
       c.selectFunction(fn('A3S')); // documentArrivalWithSg
-      c.selectedCheckerMovement = movement({ movementId: 'm-1', movementType: 'UTILIZE' });
-      (c as any).submitResult = { movementId: 'm-1' };
+      c.selectedCheckerMovement = movement({ movementId: 'm-1', movementType: 'UTILIZE', businessEventId: 'be-1' });
       expect(c.isCheckerCompoundOwnSubmission).toBe(true);
       expect(c.isArrivalAcknowledgmentStep).toBe(true);
       expect(c.checkerActionButtonLabel).toBe('Release (Shipping Guarantee redemption)');
 
-      // mismatched movementId -> false
+      // submitResult mismatch/absence no longer matters for A3S — confirms the cross-session fix.
       (c as any).submitResult = { movementId: 'other' };
+      expect(c.isCheckerCompoundOwnSubmission).toBe(true);
+      (c as any).submitResult = null;
+      expect(c.isCheckerCompoundOwnSubmission).toBe(true);
+
+      // no businessEventId (e.g. a plain A3 UTILIZE, never compound) -> false — the disambiguator that
+      // keeps a stray non-A3S pending item from wrongly attempting a compound release.
+      c.selectedCheckerMovement = movement({ movementId: 'm-1', movementType: 'UTILIZE', businessEventId: null });
       expect(c.isCheckerCompoundOwnSubmission).toBe(false);
 
       // no selectedCheckerMovement -> false
       c.selectedCheckerMovement = null;
       expect(c.isCheckerCompoundOwnSubmission).toBe(false);
+
+      // isCheckerCompoundOwnSubmission (B5/settlesAcceptanceOnMature): bug fixed 2026-08-16 — same
+      // shape as A3S above, previously entirely unreachable (this flag was never even checked here, so
+      // checkerAct() could never route a B5 Release into the real compound at all, same or cross
+      // session alike).
+      const cB5 = new TransactionBuilderComponent(mockApi());
+      cB5.selectFunction(fn('B5'));
+      cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'FULL_SETTLE', businessEventId: 'be-2' });
+      expect(cB5.isCheckerCompoundOwnSubmission).toBe(true);
+      cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'PARTIAL_SETTLE', businessEventId: 'be-2' });
+      expect(cB5.isCheckerCompoundOwnSubmission).toBe(true);
+      cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'PARTIAL_SETTLE', businessEventId: null });
+      expect(cB5.isCheckerCompoundOwnSubmission).toBe(false);
+      cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'CREATE', businessEventId: 'be-2' });
+      expect(cB5.isCheckerCompoundOwnSubmission).toBe(false);
 
       // createsIssuingBankReceivableOnHonour's own branch (movementType === 'HONOUR') sits behind the
       // settlesDocumentArrival/documentArrivalWithSg check above, which always wins first. In the real
@@ -709,12 +732,19 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.searchError).toBe('not found');
     });
 
-    it('payExisting(): a release() error lacking err.error.message falls back to String(err)', () => {
+    // payExisting() (A4's own dedicated release method) was removed in the 2026-08-16 4-eyes redesign
+    // — A4 now releases exclusively via the generic Checker panel's checkerAct('release'), same as
+    // every other function, so the describeApiError fallback is exercised through that path instead.
+    // makerSubmittedAt must be set (the real Maker Submit redesign, same day) or checkerAct() blocks
+    // before ever reaching api.release() — see transaction-builder.component.actions.spec.ts's own
+    // dedicated gate tests for that branch.
+    it("checkerAct('release'): a release() error lacking err.error.message falls back to String(err)", () => {
       const api = mockApi({ release: jest.fn(() => throwError(() => 'plain string failure')) as any });
       const c = new TransactionBuilderComponent(api);
-      c.selectedPayMovement = movement({ movementId: 'm-1' });
-      c.payExisting();
-      expect(c.submitError).toBe('plain string failure');
+      c.selectFunction(fn('A4'));
+      c.selectedCheckerMovement = movement({ movementId: 'm-1', makerSubmittedAt: '2026-08-16T00:00:00.000Z' });
+      c.checkerAct('release');
+      expect(c.checkerError).toBe('plain string failure');
     });
   });
 
@@ -756,6 +786,18 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.onSelectContract('bc-1');
       expect(c.payableMovementsLoading).toBe(false);
       expect(c.payableMovements).toEqual([]);
+    });
+
+    it('loadPayableMovements: no contractId at all (unresolved pick) -> clears payableMovements without calling listMovements (A4)', () => {
+      const listMovementsSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 }));
+      const api = mockApi({ listMovements: listMovementsSpy as any });
+      const c = new TransactionBuilderComponent(api);
+      c.selectFunction(fn('A4'));
+      c.catalogContracts = []; // picking an id that matches nothing leaves selectedContract null
+      c.payableMovements = [movement({ movementId: 'stale' })]; // must be cleared, not left stale
+      c.onSelectContract('does-not-exist');
+      expect(c.payableMovements).toEqual([]);
+      expect(listMovementsSpy).not.toHaveBeenCalled();
     });
 
     it('loadPayableMovementsAcrossChildContracts (B4): no lcNumber at all -> clears payableMovements without calling the API', () => {
@@ -911,6 +953,60 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.onSelectIbIndex('ib1');
       expect(c.searchNaturalKey.ibNumber).toBe('');
       expect(c.searchNaturalKey.sgNumber).toBe('SG01');
+    });
+  });
+
+  describe('Account Entries dialog (analysis/contingent-liability-ledger.html — button + pop-up dialog, business instruction 2026-08-16)', () => {
+    it('openAccountEntryDialog sets accountEntryDialogMovement to the exact movement passed in', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      const m = movement({
+        movementId: 'mv-9',
+        contingentAccountEntry: {
+          drAccount: "Customers' Liability under DC",
+          crAccount: 'Documentary Credits Outstanding — Sight',
+          currency: 'USD',
+          amount: '1000',
+        },
+      });
+      expect(c.accountEntryDialogMovement).toBeNull();
+      c.openAccountEntryDialog(m);
+      expect(c.accountEntryDialogMovement).toBe(m);
+    });
+
+    it('closeAccountEntryDialog resets accountEntryDialogMovement to null', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.openAccountEntryDialog(movement());
+      c.closeAccountEntryDialog();
+      expect(c.accountEntryDialogMovement).toBeNull();
+    });
+
+    it('onEscapeKey closes the dialog when one is open', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.openAccountEntryDialog(movement());
+      c.onEscapeKey();
+      expect(c.accountEntryDialogMovement).toBeNull();
+    });
+
+    it('onEscapeKey is a no-op when no dialog is open', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      expect(c.accountEntryDialogMovement).toBeNull();
+      expect(() => c.onEscapeKey()).not.toThrow();
+      expect(c.accountEntryDialogMovement).toBeNull();
+    });
+
+    it('selectFunction() resets an open dialog when the Maker switches business function', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      c.openAccountEntryDialog(movement());
+      c.selectFunction(fn('A2'));
+      expect(c.accountEntryDialogMovement).toBeNull();
+    });
+
+    it('runLookup() resets an open dialog before reloading the Event Timeline', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.openAccountEntryDialog(movement());
+      c.runLookup();
+      expect(c.accountEntryDialogMovement).toBeNull();
     });
   });
 });

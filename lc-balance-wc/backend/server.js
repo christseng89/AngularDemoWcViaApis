@@ -66,6 +66,16 @@ async function runCase(businessCase) {
         request.parentLogicalContractId = await resolveLogicalContractId(captured, request.parentLogicalContractIdRef);
         delete request.parentLogicalContractIdRef;
       }
+      // Export Case #6/#7 (2026-08-16, B3->B4 compound release shape — see types.ts's own
+      // BalanceMovement.referencedTransactionId doc comment): resolves to the REAL movementId of an
+      // earlier captureAs step, only known once that step's own createMovement response comes back —
+      // same resolution pattern as balanceContractIdRef above, just targeting movementId instead.
+      if (request.referencedTransactionIdRef) {
+        const entry = captured[request.referencedTransactionIdRef];
+        if (!entry) throw new Error(`Step references unknown captureAs key "${request.referencedTransactionIdRef}" — check step ordering in businessCases.js.`);
+        request.referencedTransactionId = entry.response.movementId;
+        delete request.referencedTransactionIdRef;
+      }
       const result = await callMicroservice('POST', '/balance-movements', request);
       if (step.captureAs) captured[step.captureAs] = { response: result.body };
       trace.push({
@@ -93,6 +103,27 @@ async function runCase(businessCase) {
       }
       const result = await callMicroservice('POST', `/balance-movements/${movementId}/release`, { releasedBy: step.releasedBy });
       trace.push({ type: 'release', label: step.label, status: result.status, ok: result.ok, response: result.body });
+      continue;
+    }
+
+    // Import Case #6 (2026-08-16, A4's own real Maker Submit — see types.ts's own
+    // BalanceMovement.makerSubmittedAt doc comment): POST /balance-movements/:id/maker-submit,
+    // IPLC_LC/UTILIZE only. Mirrors the 'release' step above exactly, just a different sub-path/body
+    // key — same "skipped" handling when the referenced createMovement step never captured a
+    // movementId (an expected-error step upstream).
+    if (step.type === 'makerSubmit') {
+      const movementId = captured[step.movementRef]?.response?.movementId;
+      if (!movementId) {
+        trace.push({
+          type: 'makerSubmit',
+          label: step.label,
+          skipped: true,
+          reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).`,
+        });
+        continue;
+      }
+      const result = await callMicroservice('POST', `/balance-movements/${movementId}/maker-submit`, { makerSubmittedBy: step.makerSubmittedBy });
+      trace.push({ type: 'makerSubmit', label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }
 

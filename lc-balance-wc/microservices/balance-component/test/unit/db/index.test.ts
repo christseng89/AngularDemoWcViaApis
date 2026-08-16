@@ -76,7 +76,7 @@ describe('createDb — real file path (src/db/index.ts)', () => {
     const db2 = createDb(filePath);
     try {
       const columns = (db2.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      expect(columns).toEqual(expect.arrayContaining(['acknowledged_by', 'acknowledged_at']));
+      expect(columns).toEqual(expect.arrayContaining(['acknowledged_by', 'acknowledged_at', 'maker_submitted_by', 'maker_submitted_at']));
     } finally {
       db2.close();
     }

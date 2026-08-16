@@ -30,7 +30,7 @@ describe('runMigrations (src/db/migrations.ts)', () => {
       expect(rows.map((r) => r.id)).toEqual(MIGRATIONS.map((m) => m.id));
 
       const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      expect(columns).toEqual(expect.arrayContaining(['acknowledged_by', 'acknowledged_at']));
+      expect(columns).toEqual(expect.arrayContaining(['acknowledged_by', 'acknowledged_at', 'maker_submitted_by', 'maker_submitted_at']));
     } finally {
       db.close();
     }

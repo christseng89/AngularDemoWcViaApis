@@ -19,6 +19,7 @@ import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
 import { applyStatusTransition } from '../domain/statusTransition';
+import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
 import { computeAvailableBalance, computeConfirmedBalance } from '../domain/balanceDerivation';
 import {
@@ -102,6 +103,8 @@ export interface CreateMovementRequest {
   sourceModule?: string | null;
   sourceFunction?: string | null;
   sourceTransactionRef?: string | null;
+  /** See BalanceMovement.referencedTransactionId's own doc comment in types.ts for the full rule. */
+  referencedTransactionId?: string | null;
   createdBy: string;
 }
 
@@ -194,6 +197,15 @@ export class BalanceService {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
     return this.getBalanceSnapshot(movement.balanceContractId, movement.eventSeq);
+  }
+
+  /**
+   * Bug fixed 2026-08-16 — see BalanceMovementStore.findByBusinessEventId's own doc comment for the
+   * full root cause. Every movement sharing this businessEventId, across every contract, oldest first
+   * (creation order — the order the linked legs were originally submitted in).
+   */
+  findByBusinessEventId(businessEventId: string): BalanceMovement[] {
+    return this.movements.findByBusinessEventId(businessEventId);
   }
 
   createMovement(req: CreateMovementRequest): CreateMovementResult {
@@ -403,6 +415,19 @@ export class BalanceService {
       throw new RequestValidationError(`Unrecognized movementType "${req.movementType}" for instrumentType ${req.instrumentType}.`);
     }
 
+    // analysis/contingent-liability-ledger.html — server-derived once, here, at creation time; never
+    // recomputed later (Event-Level Relationship requirement). Uses the RESOLVED contract's own
+    // tenorType (its declared Sight/Buyer's Usance/Seller's Usance, set at Issue) — not req.tenorType,
+    // which is only ever supplied when THIS call is itself the one creating that contract; for every
+    // other movement against an already-existing contract, contract.tenorType is the only source.
+    const contingentAccountEntry = deriveContingentAccountEntry({
+      instrumentType: req.instrumentType,
+      movementType: req.movementType,
+      amount: req.amount,
+      currency: req.currency,
+      tenorType: contract.tenorType,
+    });
+
     const movement: BalanceMovement = {
       movementId: randomUUID(),
       balanceContractId: contract.balanceContractId,
@@ -415,6 +440,7 @@ export class BalanceService {
       currency: req.currency,
       legRef: req.legRef ?? null,
       accountEntries: req.exposureNature === 'MEMO' ? null : (req.accountEntries ?? null),
+      contingentAccountEntry,
       status: 'PENDING',
       transactionDate: req.transactionDate ?? null,
       businessDate: req.businessDate ?? null,
@@ -422,6 +448,7 @@ export class BalanceService {
       sourceModule: req.sourceModule ?? null,
       sourceFunction: req.sourceFunction ?? null,
       sourceTransactionRef: req.sourceTransactionRef ?? null,
+      referencedTransactionId: req.referencedTransactionId ?? null,
       warnings,
       createdBy: req.createdBy,
       createdAt: this.now(),
@@ -518,6 +545,46 @@ export class BalanceService {
     }
 
     this.movements.acknowledge({ movementId, acknowledgedBy, acknowledgedAt: this.now() });
+    return this.movements.findById(movementId)!;
+  }
+
+  /**
+   * Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
+   * Exactly the same as A1.") — A4 (Sight Settlement)'s own real Maker action. Unlike every other
+   * function, A4 has no movement of its own to create at Submit time — it settles the PRE-EXISTING
+   * UTILIZE A3/A3S already earmarked — so there is no createMovement() call to stand in as "the
+   * Maker submitted." This is that missing, genuinely backend-persisted step: sets
+   * makerSubmittedBy/makerSubmittedAt, but — same posture as acknowledge() above — deliberately does
+   * NOT call applyStatusTransition or touch status; the movement stays PENDING (release() is still
+   * the real PENDING -> RELEASED transition). IPLC_LC/UTILIZE only, the exact movement shape A4's own
+   * picker ever targets.
+   *
+   * Deliberately NOT enforced inside release() itself: the Business Case Runner's own orchestrated
+   * Import Case 1/2 (backend/data/businessCases.js) release a UTILIZE directly with no separate
+   * maker-submit call, and hard-requiring makerSubmittedAt there would break that already-working,
+   * separately-tested flow for no benefit (it isn't driven through the interactive Transaction
+   * Builder this feature concerns). The Transaction Builder's own A4 Checker flow enforces the gate
+   * client-side instead — see transaction-builder.component.ts checkerAct()'s own doc comment.
+   */
+  submitByMaker(movementId: string, makerSubmittedBy: string): BalanceMovement {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+
+    const contract = this.contracts.findById(movement.balanceContractId);
+    if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+      throw new RequestValidationError(
+        `submitByMaker() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
+          `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+      );
+    }
+    if (movement.status !== 'PENDING') {
+      throw new IllegalStateTransitionError(`Cannot submit movement ${movementId} — its status is ${movement.status}, not PENDING.`);
+    }
+    if (movement.makerSubmittedAt) {
+      throw new IllegalStateTransitionError(`Movement ${movementId} was already submitted by ${movement.makerSubmittedBy} at ${movement.makerSubmittedAt}.`);
+    }
+
+    this.movements.submitByMaker({ movementId, makerSubmittedBy, makerSubmittedAt: this.now() });
     return this.movements.findById(movementId)!;
   }
 

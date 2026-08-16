@@ -34,6 +34,17 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     res.json(service.getBalanceSnapshotAsOfMovement(req.params.movementId));
   });
 
+  // GET /balance-movements?businessEventId= — bug fixed 2026-08-16 (reviewer-reported, "A1 -> A8 ->
+  // A3S -> A4, the related SG entries was not shown"): lets a Checker session independently resolve
+  // the linked leg(s) of a compound submission (A3S's SG redemption, B5's Reimbursement Receivable)
+  // by their shared businessEventId, instead of requiring the Maker's own in-memory submitResult to
+  // still be present — see BalanceMovementStore.findByBusinessEventId's own doc comment.
+  router.get('/balance-movements', (req, res) => {
+    const { businessEventId } = req.query as { businessEventId?: string };
+    if (!businessEventId) throw new RequestValidationError('businessEventId query parameter is required.');
+    res.json(service.findByBusinessEventId(businessEventId));
+  });
+
   // POST /balance-movements/:movementId/reject
   router.post('/balance-movements/:movementId/reject', (req, res) => {
     const { releasedBy, reasonCode, remarks } = req.body as { releasedBy?: string; reasonCode?: string; remarks?: string };
@@ -56,6 +67,16 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     const { acknowledgedBy } = req.body as { acknowledgedBy?: string };
     if (!acknowledgedBy) throw new RequestValidationError('acknowledgedBy is required.');
     res.json(service.acknowledge(req.params.movementId, acknowledgedBy));
+  });
+
+  // POST /balance-movements/:movementId/maker-submit — A4's own real Maker Submit (business
+  // instruction 2026-08-16, "Add real Maker Submit, then have Checker to Release it. Exactly the
+  // same as A1."); IPLC_LC/UTILIZE only, never changes status (see service.submitByMaker()'s own
+  // doc comment).
+  router.post('/balance-movements/:movementId/maker-submit', (req, res) => {
+    const { makerSubmittedBy } = req.body as { makerSubmittedBy?: string };
+    if (!makerSubmittedBy) throw new RequestValidationError('makerSubmittedBy is required.');
+    res.json(service.submitByMaker(req.params.movementId, makerSubmittedBy));
   });
 
   return router;

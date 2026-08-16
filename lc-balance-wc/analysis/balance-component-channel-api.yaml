@@ -86,7 +86,17 @@ info:
     resolved contract, makes retrying a `POST /channel/transactions` call
     safe (resubmitting the same pair returns the existing transaction, 200,
     rather than creating a duplicate).
-  version: "1.0.0"
+
+
+    v1.1.0 (2026-08-16) — mirrors the Microservice API's own v1.1.0:
+    `ChannelTransaction.contingentAccountEntry` (new `ContingentAccountEntry`
+    schema, identical shape) passes through the underlying
+    `BalanceMovement.contingentAccountEntry` unchanged — see
+    balance-component-api.yaml's own v1.1.0 changelog entry for the full
+    rule. A channel client's "Account Entries" button/pop-up (the reference
+    Transaction Builder client's own UI pattern) reads this field directly;
+    it is never recomputed by this channel layer.
+  version: "1.1.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -706,6 +716,16 @@ components:
         presentDocsEarmarkPending: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
         presentDocsEarmarkApproved: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
 
+    ContingentAccountEntry:
+      type: object
+      description: Identical shape to the Microservice API's own ContingentAccountEntry (balance-component-api.yaml) — see that schema's own description for the full rule. This channel layer never derives or recomputes it; it is always a straight passthrough of the underlying BalanceMovement's own field.
+      required: [drAccount, crAccount, currency, amount]
+      properties:
+        drAccount: { type: string }
+        crAccount: { type: string }
+        currency: { type: string }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+
     ChannelTransaction:
       type: object
       description: Channel-facing projection of the Microservice API's own BalanceMovement, plus the originating functionCode for display/audit.
@@ -727,6 +747,10 @@ components:
         releasedAt: { type: string, format: date-time, nullable: true }
         acknowledgedBy: { type: string, nullable: true }
         acknowledgedAt: { type: string, format: date-time, nullable: true }
+        contingentAccountEntry:
+          allOf: [{ $ref: '#/components/schemas/ContingentAccountEntry' }]
+          nullable: true
+          description: v1.1.0 — see this document's own top-level v1.1.0 changelog entry. Null for functions whose underlying instrumentType is one of the three ON_BALANCE_ASSET instruments (EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED — B4/B5's own asset-side legs).
 
     ChannelOriginTransactionRequest:
       type: object
