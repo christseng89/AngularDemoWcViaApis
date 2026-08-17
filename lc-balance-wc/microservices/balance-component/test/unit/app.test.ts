@@ -518,6 +518,91 @@ describe('HTTP integration — event timeline (business instruction 2026-08-14)'
     expect(asOf.body.confirmedBalance).toBe('50000');
     expect(asOf.body.confirmedBalance).toBe(live.body.confirmedBalance);
   });
+
+  // Bug fixed 2026-08-17, user-reported (two concrete A1/A8 snapshot examples: Off-Balance Exposure 0
+  // for the LC Issue event, 20000 once a 20000 Shipping Guarantee is issued afterward) — offBalanceExposure/
+  // tightAvailableBalance used to always reflect the SHGT side's CURRENT/live state regardless of which
+  // event was selected. Issues a Shipping Guarantee AFTER every event above already captured its own
+  // movementId, then re-checks those SAME already-captured events still show pre-SG figures.
+  test('offBalanceExposure/tightAvailableBalance are ALSO point-in-time: an SHGT issued after this LC\'s own earlier events must not retroactively appear in their own balance-as-of', async () => {
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'TIMELINE-001' }).expect(200);
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'TIMELINE-001', sgNumber: 'SG-TIMELINE-001' },
+        parentLogicalContractId: lcContract.body.logicalContractId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '20000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${sg.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    // The three events captured BEFORE the SG existed must still show 0 exposure — not today's 20000.
+    for (const movementId of [issueMovementId, amendMovementId, utilizeMovementId]) {
+      const asOf = await request(app).get(`/balance-movements/${movementId}/balance-as-of`).expect(200);
+      expect(asOf.body.offBalanceExposure).toBe('0');
+      expect(asOf.body.tightAvailableBalance).toBe(asOf.body.availableBalance);
+    }
+
+    // The LC's own LIVE snapshot (as of now, after the SG exists) correctly shows the new exposure —
+    // offBalanceExposure itself is only ever populated on the IPLC_LC/EPLC_LC side, never on SHGT's own.
+    const live = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(live.body.offBalanceExposure).toBe('20000');
+    expect(live.body.tightAvailableBalance).toBe('30000');
+  });
+});
+
+describe('HTTP integration — presentDocsEarmarkPending/Approved are ALSO point-in-time (2026-08-17, same fix as offBalanceExposure above, EPLC_CONFIRMATION/EPLC_EXAMINATION side)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('an EPLC_EXAMINATION (B3) created after a Confirmation\'s own Issue event does not retroactively appear in that Issue event\'s own balance-as-of', async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'PIT-CNF-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const cnfIssueMovementId = cnf.body.movementId;
+    await request(app).post(`/balance-movements/${cnfIssueMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const issueAsOfBeforeExam = await request(app).get(`/balance-movements/${cnfIssueMovementId}/balance-as-of`).expect(200);
+    expect(issueAsOfBeforeExam.body.presentDocsEarmarkPending).toBe('0');
+    expect(issueAsOfBeforeExam.body.presentDocsEarmarkApproved).toBe('0');
+
+    const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'PIT-CNF-001' }).expect(200);
+    await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'PIT-CNF-001', ibNumber: 'EB01' },
+        parentLogicalContractId: cnfContract.body.logicalContractId,
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '30000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    // Re-checking the SAME already-captured Issue event must still show 0 — not today's 30000.
+    const issueAsOfAfterExam = await request(app).get(`/balance-movements/${cnfIssueMovementId}/balance-as-of`).expect(200);
+    expect(issueAsOfAfterExam.body.presentDocsEarmarkPending).toBe('0');
+    expect(issueAsOfAfterExam.body.presentDocsEarmarkApproved).toBe('0');
+
+    // The live snapshot (as of now, after the presentation exists) correctly shows it.
+    const live = await request(app).get(`/balance-contracts/${cnf.body.balanceContractId}/balance`).expect(200);
+    expect(live.body.presentDocsEarmarkPending).toBe('30000');
+  });
 });
 
 describe('HTTP integration — Tenor Type Routing (business instruction 2026-08-14, Design doc §7 v0.7)', () => {

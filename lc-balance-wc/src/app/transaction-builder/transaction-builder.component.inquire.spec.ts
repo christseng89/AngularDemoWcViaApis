@@ -52,6 +52,7 @@ function mockApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(),
     listMovements: jest.fn(() => of([])),
+    getBalanceAsOfMovement: jest.fn(() => of({ balanceContractId: 'bc-1', logicalContractId: 'lc-1', currency: 'USD', confirmedBalance: '50000', availableBalance: '50000', pendingEarmarkTotal: '0' })),
     ...overrides,
   } as unknown as BalanceComponentApiService;
 }

@@ -131,16 +131,28 @@ export class BalanceService {
   }
 
   /**
-   * @param asOfEventSeq — when set (business instruction 2026-08-14, event
-   *   timeline lookup), only movements with eventSeq <= this value are
-   *   included in confirmedBalance/availableBalance/pendingEarmarkTotal —
-   *   i.e. "the balance right after this specific event", not the current
-   *   live balance. offBalanceExposure/tightAvailableBalance are
-   *   deliberately NOT point-in-time (they always reflect the SHGT
-   *   contract's CURRENT movements) — the SHGT side has its own
-   *   independent eventSeq sequence, and reconstructing a true joint
-   *   point-in-time view across two contracts is out of scope for this
-   *   prototype; documented here rather than silently approximated.
+   * @param asOfEventSeq — when set (business instruction 2026-08-14, event timeline lookup), only
+   *   movements with eventSeq <= this value are included in confirmedBalance/availableBalance/
+   *   pendingEarmarkTotal — i.e. "the balance right after this specific event", not the current live
+   *   balance. offBalanceExposure/tightAvailableBalance/presentDocsEarmarkPending/
+   *   presentDocsEarmarkApproved are cut at the SAME moment too (2026-08-17, user-reported — these four
+   *   used to always reflect today's LIVE SHGT/EPLC_EXAMINATION state regardless of which event was
+   *   selected), via a real TIMESTAMP cutoff (`cutoffMovement.createdAt` below, from the LAST movement
+   *   actually included in the eventSeq-filtered `movements` list — listByContract() guarantees eventSeq
+   *   order, so that's exactly the movement asOfEventSeq refers to) rather than eventSeq itself — SHGT/
+   *   EPLC_EXAMINATION each have their own independent eventSeq sequence, not comparable to this
+   *   contract's own, but createdAt is a real wall-clock timestamp comparable across every contract.
+   *
+   *   Known, accepted approximation (same class already implicit in the confirmed/available computation
+   *   above): a sibling movement's own `status` field reflects its CURRENT status, not necessarily what
+   *   it was exactly at the historical cutoff — e.g. a SHGT ISSUE created before the cutoff but only
+   *   released after is still read as "RELEASED" (this domain's exposure formula treats PENDING and
+   *   RELEASED identically, so this specific approximation is actually exact for exposure); a SHGT later
+   *   REJECTED or CANCELLED after the cutoff would drop out of today's exposure total entirely, even if
+   *   it should have still counted as outstanding exposure AT that historical moment. No historical
+   *   status-transition log exists in this data model to close that gap — acceptable for this
+   *   prototype's own event-inquiry use case (auditing what a Maker/Checker actually saw), not a general
+   *   point-in-time ledger replay.
    */
   getBalanceSnapshot(balanceContractId: string, asOfEventSeq?: number): BalanceSnapshot {
     const contract = this.contracts.findById(balanceContractId);
@@ -151,24 +163,32 @@ export class BalanceService {
     const confirmed = computeConfirmedBalance(movements);
     const available = computeAvailableBalance(confirmed, movements);
 
+    // undefined -> "no cutoff" (the live snapshot route never passes asOfEventSeq). Otherwise the last
+    // (eventSeq-order-guaranteed) entry in the already-filtered `movements` list above — normally the
+    // exact movement asOfEventSeq refers to, since the only current caller (getBalanceSnapshotAsOfMovement)
+    // derives asOfEventSeq from a real movement on this same contract.
+    const cutoffMovement = asOfEventSeq === undefined ? undefined : movements[movements.length - 1];
+
     let offBalanceExposure: string | null = null;
     let tightAvailableBalance: string | null = null;
     if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
       const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
-      const exposure = computeOffBalanceExposure(shgtMovements);
+      const cutShgtMovements = cutoffMovement === undefined ? shgtMovements : shgtMovements.filter((m) => m.createdAt <= cutoffMovement.createdAt);
+      const exposure = computeOffBalanceExposure(cutShgtMovements);
       offBalanceExposure = exposure.toFixed();
       tightAvailableBalance = available.minus(exposure).toFixed();
     }
 
     // Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION
-    // only. Deliberately NOT point-in-time (same reasoning as offBalanceExposure/tightAvailableBalance
-    // above — EPLC_EXAMINATION has its own independent eventSeq sequence).
+    // only. Point-in-time via the same cutoffMovement.createdAt cut as offBalanceExposure above.
     let presentDocsEarmarkPending: string | null = null;
     let presentDocsEarmarkApproved: string | null = null;
     if (contract.instrumentType === 'EPLC_CONFIRMATION') {
       const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
-      presentDocsEarmarkPending = computePresentDocsEarmarkPending(examinationMovements).toFixed();
-      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements).toFixed();
+      const cutExaminationMovements =
+        cutoffMovement === undefined ? examinationMovements : examinationMovements.filter((m) => m.createdAt <= cutoffMovement.createdAt);
+      presentDocsEarmarkPending = computePresentDocsEarmarkPending(cutExaminationMovements).toFixed();
+      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(cutExaminationMovements).toFixed();
     }
 
     return {

@@ -9,20 +9,6 @@ import { BuilderModel } from './function-policy';
 import { describeApiError } from './api-error';
 
 /**
- * Inquire Events (2026-08-17, user-requested — "查詢每筆 Event 當時處理完成後的各類 Balance Snapshot") —
- * one relevant Balance Component's own point-in-time closing state as of a selected Event. `snapshot` is
- * null when this Balance Component did not exist yet at that point in time (e.g. no Shipping Guarantee
- * had been issued yet when an earlier LC Issue event is selected) — a real, renderable state, not an
- * error.
- */
-export interface SelectedEventBalanceRow {
-  instrumentType: InstrumentType;
-  label: string;
-  contract: BalanceContract;
-  snapshot: BalanceSnapshot | null;
-}
-
-/**
  * Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") —
  * pairs a raw BalanceMovement with the BalanceContract that owns it (Adapter pattern): a movement alone
  * carries neither instrumentType nor naturalKey, both of which the merged cross-ledger timeline and the
@@ -45,12 +31,12 @@ export interface InquiredEvent {
  * introduces exactly two genuinely new pieces of behavior — merging movements across an LC's own child
  * ledgers into one chronological timeline, and resolving+reconstructing a historical movement's own
  * original screen — and reuses everything else: BalanceComponentApiService.resolveContract/catalog/
- * listMovements (no new HTTP methods), buildFields() (builder-fields.ts, unchanged, wrapped by the new
- * toReadOnlyFields() Decorator there), and IMPORT_FUNCTIONS/EXPORT_FUNCTIONS as a Strategy table via the
- * new resolveFunctionForMovement() (balance-component.model.ts). The Account Entries half of the
- * requirement is not implemented here at all — the component calls its own existing
- * openAccountEntryDialog(event.movement) directly, reusing accountEntryDialogMovement/the existing
- * dialog template verbatim.
+ * listMovements/getBalanceAsOfMovement (no new HTTP methods), buildFields() (builder-fields.ts,
+ * unchanged, wrapped by the new toReadOnlyFields() Decorator there), and IMPORT_FUNCTIONS/
+ * EXPORT_FUNCTIONS as a Strategy table via the new resolveFunctionForMovement() (balance-component.
+ * model.ts). The Account Entries half of the requirement is not implemented here at all — the
+ * component calls its own existing openAccountEntryDialog(event.movement) directly, reusing
+ * accountEntryDialogMovement/the existing dialog template verbatim.
  *
  * Scope, matching the user's own wording ("適用於 Import LC 及 Confirmed LC"): the root LC is always
  * IPLC_LC (Import) or EPLC_CONFIRMATION (Export Confirmed) — defaultLcInstrumentTypeForSide(), shared
@@ -62,6 +48,14 @@ export interface InquiredEvent {
  * (same boundary contingentAccountEntry already enforces) and so are correctly excluded from this
  * timeline too — childInstrumentTypesOf() never returns them, since PARENT_INSTRUMENT_OPTIONS never
  * names EPLC_CONFIRMATION as their parent.
+ *
+ * 2026-08-17, revised same day (user-requested, "VIEW EVENT 只需 EVENT SNAPSHOT 即可"): an earlier
+ * version of this feature also fetched a "Closing Snapshot" row per SIBLING ledger (Acceptance/SG under
+ * the same LC), alongside a separate one-line "Balance Impact" delta. Simplified to exactly ONE snapshot
+ * — the selected event's own ledger, closing balance merged with its own before/after impact — per the
+ * same "avoid duplicate/redundant views" principle behind the Event List's own Account Entries button
+ * removal above. Viewing a SIBLING ledger's own state is already one click away: select ITS OWN event
+ * from the same merged timeline.
  */
 export class InquireEventsService {
   constructor(private readonly api: BalanceComponentApiService) {}
@@ -83,8 +77,9 @@ export class InquireEventsService {
   selectedEventModel: BuilderModel = {};
   /** A fresh, throwaway FormGroup per selection — Formly requires one; nothing is ever submitted through it. */
   selectedEventForm = new FormGroup({});
-  /** One row per relevant Balance Component (BALANCE_SNAPSHOT_LABEL), each closing as of the selected event's own time — see balanceRowsAsOf()'s own doc comment. */
-  selectedEventBalances: SelectedEventBalanceRow[] = [];
+  /** "Event Snapshot — {label} — LC {lc}[/IB.../SG...]" — see selectEvent()'s own doc comment. */
+  selectedEventSnapshotTitle = '';
+  selectedEventSnapshot: BalanceSnapshot | null = null;
 
   selectSide(side: 'IMPORT' | 'EXPORT'): void {
     this.side = side;
@@ -105,7 +100,8 @@ export class InquireEventsService {
     this.selectedEventFields = [];
     this.selectedEventModel = {};
     this.selectedEventForm = new FormGroup({});
-    this.selectedEventBalances = [];
+    this.selectedEventSnapshotTitle = '';
+    this.selectedEventSnapshot = null;
   }
 
   search(): void {
@@ -167,6 +163,11 @@ export class InquireEventsService {
    * ever affect buildFields()'s own cosmetic label wording (e.g. "carried from the Document Arrival,
    * protected"), never which fields exist or their values, and every field is forced read-only
    * regardless via toReadOnlyFields().
+   *
+   * Also fetches the ONE Event Snapshot this event's own ledger closed at (api.getBalanceAsOfMovement(),
+   * reusing an already-existing, already-tested backend capability — see that method's own doc comment
+   * for the full history) — a single, exact, same-contract point-in-time query; no cross-contract
+   * cutoff ambiguity to worry about, since this is always asking about the event's own contract.
    */
   selectEvent(event: InquiredEvent): void {
     this.selectedEvent = event;
@@ -200,78 +201,24 @@ export class InquireEventsService {
     this.selectedEventFields = toReadOnlyFields(buildFields(ctx));
     this.selectedEventForm = new FormGroup({});
 
-    this.loadSelectedEventBalances(event);
-  }
-
-  /**
-   * Inquire Events (2026-08-17, user-requested — Balance Snapshot/Closing Balance per Event). For every
-   * relevant Balance Component (BALANCE_SNAPSHOT_LABEL) already present in `this.events`, finds that
-   * contract's own latest movement at or before the selected event's own time, then fetches its
-   * point-in-time snapshot via the existing, already-tested `GET /balance-movements/:id/balance-as-of`
-   * endpoint (api.getBalanceAsOfMovement() — see that method's own doc comment for the full history: it
-   * reuses a backend capability that already existed, zero new server-side code). The selected event's
-   * OWN contract resolves through the exact same code path as every sibling ledger — no special-casing —
-   * since its own movement is trivially "the latest at or before its own time."
-   */
-  private loadSelectedEventBalances(selected: InquiredEvent): void {
-    const candidates = this.balanceCandidatesAsOf(selected);
-    if (!candidates.length) {
-      this.selectedEventBalances = [];
-      return;
-    }
-    forkJoin(
-      candidates.map((c) =>
-        c.asOfMovementId === null
-          ? of({ ...c, snapshot: null as BalanceSnapshot | null })
-          : this.api.getBalanceAsOfMovement(c.asOfMovementId).pipe(
-              map((snapshot) => ({ ...c, snapshot })),
-              catchError(() => of({ ...c, snapshot: null as BalanceSnapshot | null })),
-            ),
-      ),
-    ).subscribe((rows) => (this.selectedEventBalances = rows));
-  }
-
-  /**
-   * "{label} — LC {lc}" / "... / IB {ib}" / "... / SG {sg}" — mirrors LookUpPanelService.
-   * activeLookupLabel's own suffix convention, but kept independent rather than extracted into a shared
-   * helper: risking a behavior change to that already-shipped, already-tested Look Up panel wasn't
-   * justified for a purely cosmetic label string.
-   */
-  balanceRowTitle(row: SelectedEventBalanceRow): string {
-    const { lcNumber, ibNumber, sgNumber } = row.contract.naturalKey;
-    const suffix = ibNumber ? ` / IB ${ibNumber}` : sgNumber ? ` / SG ${sgNumber}` : '';
-    return `${row.label} — LC ${lcNumber}${suffix}`;
-  }
-
-  /**
-   * Groups `this.events` (already sorted ascending by createdAt) by contract, restricted to
-   * BALANCE_SNAPSHOT_LABEL's own instrumentTypes (EPLC_EXAMINATION and the ON_BALANCE_ASSET types are
-   * never real Balance Components — see BALANCE_SNAPSHOT_LABEL's own doc comment), and resolves each
-   * group's own movementId to pass to balance-as-of: the LAST entry with `createdAt <= selected`'s own
-   * — a plain filter+last since the source is already time-sorted, no re-sorting needed. A group with no
-   * qualifying entry (this Balance Component did not exist yet at that point in time) resolves to
-   * `asOfMovementId: null`, which loadSelectedEventBalances() above turns into a `snapshot: null` row
-   * (rendered as "not yet created") rather than an API call.
-   */
-  private balanceCandidatesAsOf(selected: InquiredEvent): { instrumentType: InstrumentType; label: string; contract: BalanceContract; asOfMovementId: string | null }[] {
-    const cutoff = new Date(selected.movement.createdAt).getTime();
-    const groups = new Map<string, InquiredEvent[]>();
-    for (const e of this.events) {
-      if (!(e.contract.instrumentType in BALANCE_SNAPSHOT_LABEL)) continue;
-      const list = groups.get(e.contract.balanceContractId);
-      if (list) list.push(e);
-      else groups.set(e.contract.balanceContractId, [e]);
-    }
-    return [...groups.values()].map((list) => {
-      const contract = list[0].contract;
-      const upToCutoff = list.filter((e) => new Date(e.movement.createdAt).getTime() <= cutoff);
-      const latest = upToCutoff[upToCutoff.length - 1] ?? null;
-      return {
-        instrumentType: contract.instrumentType,
-        label: BALANCE_SNAPSHOT_LABEL[contract.instrumentType] ?? contract.instrumentType,
-        contract,
-        asOfMovementId: latest?.movement.movementId ?? null,
-      };
+    this.selectedEventSnapshotTitle = this.snapshotTitleFor(event);
+    this.selectedEventSnapshot = null;
+    this.api.getBalanceAsOfMovement(movement.movementId).subscribe({
+      next: (snapshot) => (this.selectedEventSnapshot = snapshot),
+      error: () => (this.selectedEventSnapshot = null),
     });
+  }
+
+  /**
+   * "Event Snapshot — {label} — LC {lc}" / "... / IB {ib}" / "... / SG {sg}" — LC/IB/SG suffix mirrors
+   * LookUpPanelService.activeLookupLabel's own convention, kept independently implemented rather than
+   * extracted into a shared helper: risking a behavior change to that already-shipped, already-tested
+   * Look Up panel wasn't justified for a cosmetic label string.
+   */
+  private snapshotTitleFor(event: InquiredEvent): string {
+    const label = BALANCE_SNAPSHOT_LABEL[event.contract.instrumentType] ?? event.contract.instrumentType;
+    const { lcNumber, ibNumber, sgNumber } = event.contract.naturalKey;
+    const suffix = ibNumber ? ` / IB ${ibNumber}` : sgNumber ? ` / SG ${sgNumber}` : '';
+    return `Event Snapshot — ${label} — LC ${lcNumber}${suffix}`;
   }
 }

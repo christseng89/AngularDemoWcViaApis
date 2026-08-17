@@ -692,11 +692,16 @@
        dialog markup). -->
   <div class="tb-workspace" *ngIf="activeMode === 'INQUIRE'">
     <div class="tb-main">
+      <!-- Business instruction 2026-08-17 ("Remove the second 'Inquire Events' heading within the
+           Inquire Events screen to avoid duplicate labeling. Keep only the top-level 'Inquire Events'
+           tab.") — the .tb-section__header/<h2> this section used to open with (redundant with the
+           top-level mode tab immediately above) is gone; content now starts directly with the Import
+           LC/Export Confirmed side tabs. Wrapped in .tb-section__body — every OTHER .tb-section on this
+           page already wraps its own content that way (own padding/consistent look); this section was
+           the one exception, now closed for the same "consistent behavior" reason as the rest of this
+           pass. -->
       <section class="tb-section tb-section--maker">
-        <div class="tb-section__header">
-          <h2 class="tb-section__title">Inquire Events</h2>
-        </div>
-
+        <div class="tb-section__body">
         <div class="tb-tabs tb-tabs--side">
           <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'IMPORT'" (click)="inquireEvents.selectSide('IMPORT')">Import LC</button>
           <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'EXPORT'" (click)="inquireEvents.selectSide('EXPORT')">Export Confirmed</button>
@@ -757,30 +762,15 @@
           <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement)">Account Entries</button>
         </div>
 
-        <!-- Balance Impact & Closing Snapshot (2026-08-17, user-requested) — the actual increase/decrease
-             this Event caused on its OWN Balance Component (reusing movement.balanceBefore/balanceAfter,
-             already fetched, zero extra call — null on a still-PENDING movement since Confirmed Balance
-             doesn't move until Release, same domain semantics as everywhere else in this app), plus the
-             point-in-time closing Snapshot for every relevant Balance Component (BALANCE_SNAPSHOT_LABEL)
-             as of this Event's own time — inquireEvents.selectedEventBalances, one #balanceSnapshotBox
-             per row, the SAME shared template Transaction Processing's own Look Up panel uses above. -->
-        <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel2">
-          <div class="tb-balance-box__title">Balance Impact — {{ balanceSnapshotLabel[sel2.contract.instrumentType] }} ({{ displayStatus(sel2.movement.status) }})</div>
-          <div class="tb-balance-row" *ngIf="sel2.movement.balanceAfter !== null && sel2.movement.balanceAfter !== undefined">
-            <span class="tb-balance-row__label">Confirmed Balance</span>
-            <span class="tb-balance-row__value">{{ sel2.movement.balanceBefore ?? '—' }} → {{ sel2.movement.balanceAfter }}</span>
-          </div>
-          <div class="tb-hint" *ngIf="sel2.movement.balanceAfter === null || sel2.movement.balanceAfter === undefined">Still PENDING — Confirmed Balance not yet affected until this Event is Released.</div>
+        <!-- Event Snapshot (2026-08-17, user-requested — "VIEW EVENT 只需 EVENT SNAPSHOT 即可"): exactly
+             ONE snapshot, for the selected event's own ledger — its point-in-time closing Confirmed/
+             Available/Pending Earmark/(Off-Balance Exposure/Tight Available if LC), Confirmed Balance
+             annotated with its own before→after impact (movement.balanceBefore/balanceAfter, already
+             fetched, zero extra call — "still PENDING" until Released, same domain semantics as
+             everywhere else in this app). Reuses the SAME #balanceSnapshotBox shared template
+             Transaction Processing's own Look Up panel uses above, via its own optional `impact` param. -->
+        <ng-container *ngIf="inquireEvents.selectedEvent as sel2" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: inquireEvents.selectedEventSnapshotTitle, status: sel2.contract.status, snapshot: inquireEvents.selectedEventSnapshot, impact: { before: sel2.movement.balanceBefore, after: sel2.movement.balanceAfter } }"></ng-container>
         </div>
-        <ng-container *ngFor="let row of inquireEvents.selectedEventBalances">
-          <ng-container *ngIf="row.snapshot; else notYetCreated" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: 'Closing Snapshot — ' + inquireEvents.balanceRowTitle(row), status: row.contract.status, snapshot: row.snapshot }"></ng-container>
-          <ng-template #notYetCreated>
-            <div class="tb-balance-box mt-3">
-              <div class="tb-balance-box__title">{{ row.label }}</div>
-              <div class="tb-hint">Not yet created as of this Event.</div>
-            </div>
-          </ng-template>
-        </ng-container>
       </section>
     </div>
   </div>
@@ -828,12 +818,22 @@
        it from BOTH the Look Up panel (Transaction Processing, above) and Inquire Events (Event Inquiry,
        above): one canonical box, byte-for-byte identical rendering in both places, per the user's own
        "ensure consistent behavior between Transaction Processing and Event Inquiry" design principle. -->
-  <ng-template #balanceSnapshotBox let-title="title" let-status="status" let-snapshot="snapshot">
+  <!-- `impact` (optional — only Inquire Events passes it; Transaction Processing's own Look Up panel
+       call site above omits it, so *ngIf="impact" is simply false there and this row falls back to
+       plain, unannotated Confirmed Balance, unchanged) — {before, after} strings from
+       movement.balanceBefore/balanceAfter, both null while the movement is still PENDING (Confirmed
+       Balance doesn't move until Release, same domain semantics as everywhere else in this app). -->
+  <ng-template #balanceSnapshotBox let-title="title" let-status="status" let-snapshot="snapshot" let-impact="impact">
     <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="snapshot">
       <div class="tb-balance-box__title">{{ title }}</div>
       <div class="tb-balance-row" *ngIf="status"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ status }}</span></div>
       <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ snapshot.currency }}</span></div>
-      <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed Balance</span><span class="tb-balance-row__value">{{ snapshot.confirmedBalance }}</span></div>
+      <div class="tb-balance-row">
+        <span class="tb-balance-row__label">Confirmed Balance</span>
+        <span class="tb-balance-row__value" *ngIf="!impact">{{ snapshot.confirmedBalance }}</span>
+        <span class="tb-balance-row__value" *ngIf="impact && impact.after !== null && impact.after !== undefined">{{ impact.before ?? '—' }} → {{ impact.after }}</span>
+        <span class="tb-balance-row__value" *ngIf="impact && (impact.after === null || impact.after === undefined)">{{ snapshot.confirmedBalance }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span>
+      </div>
       <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ snapshot.availableBalance }}</span></div>
       <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal }}</span></div>
       <div class="tb-balance-row" *ngIf="snapshot.offBalanceExposure !== null"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ snapshot.offBalanceExposure }}</span></div>

@@ -2874,3 +2874,89 @@ rendering correctly) — the A1/B1 Currency dropdown and the Event List's remove
 were never clicked through live. Per this project's own "always verify live in browser" rule, that
 in-browser check is still outstanding and should be done in a follow-up session once the extension
 reconnects, even though static verification (build/typecheck/lint/tests) is clean.
+
+## Event Snapshot correctness fix, then simplified to ONE snapshot per Event (2026-08-17, same day, user-driven live-testing round)
+
+Follow-up to the UI polish pass immediately above, once the extension reconnected and the user actually
+clicked through the live app. Two rounds:
+
+**Round 1 — live-reviewer-caught correctness bug.** Selecting an SG's own Issue event and checking the
+LC's own "Closing Snapshot" row showed Off-Balance Exposure 0 when it should have reflected an EARLIER
+sibling SG already issued on the same LC (10,000) plus the just-issued one (20,000) = 30,000. Root
+cause: the multi-row "Closing Snapshot" design (from the prior pass) resolved a SIBLING contract's own
+row by finding THAT SIBLING's own latest movement at-or-before the selected event's time, then asked
+`getBalanceAsOfMovement()` for its snapshot — which derives ITS OWN cross-contract cutoff from THAT
+sibling movement's own timestamp, not the originally-selected event's. If a THIRD contract had
+something happen in between the sibling's own latest movement and the true selected-event time, it was
+silently missed. Fixed (briefly) by adding `BalanceService.getBalanceSnapshotAsOfTimestamp()` — a
+cross-contract-safe query taking a real wall-clock cutoff directly, wired into
+`GET /balance-contracts/:id/balance?asOfTimestamp=` — reproduced and proven with a dedicated regression
+test (LC + two SGs, `asOfTimestamp` = the second SG's own event, expects 30,000 not 0).
+
+**Round 2 — user then simplified the whole feature same day** ("VIEW EVENT 只需 EVENT SNAPSHOT 即可" —
+viewing an Event only needs ONE snapshot; "S01 第二個 EVENT SNAPSHOT 應該...欄位跟 CLOSING SNAPSHOT 一樣
+只是值不一樣" — confirmed via AskUserQuestion: keep exactly one "Event Snapshot" box, for the event's
+own ledger only, merging the separate "Balance Impact" delta into it; drop the sibling "Closing
+Snapshot" rows entirely — viewing another ledger's own state is already one click away, select ITS OWN
+event from the same merged timeline). This **fully obsoleted Round 1's own cross-contract fix** — with
+only one, same-contract snapshot needed, `getBalanceAsOfMovement()`'s existing eventSeq-based cutoff is
+exact again, no cross-contract cutoff ambiguity to guard against. `getBalanceSnapshotAsOfTimestamp()`,
+its route wiring, and its regression test were all **reverted the same day** (BAL-101-style: freshly
+added, immediately obsoleted code, purpose-built for a UI shape that no longer exists — kept nothing
+"just in case"). The ORIGINAL point-in-time fix underneath (`getBalanceSnapshot()`'s own
+`asOfEventSeq`-driven `offBalanceExposure`/`tightAvailableBalance`/`presentDocsEarmarkPending`/
+`presentDocsEarmarkApproved`, via `cutoffMovement.createdAt`) is untouched and still exactly what makes
+the single Event Snapshot correct.
+
+**`inquire-events.service.ts` — simplified**: `selectedEventBalances: SelectedEventBalanceRow[]` +
+`balanceCandidatesAsOf()`/`loadSelectedEventBalances()`/`balanceRowTitle()` all removed. New:
+`selectedEventSnapshot: BalanceSnapshot | null` + `selectedEventSnapshotTitle: string`, populated in
+`selectEvent()` via one direct `api.getBalanceAsOfMovement(movement.movementId)` call — no grouping, no
+cutoff-candidate resolution, no forkJoin. `BALANCE_SNAPSHOT_LABEL` (balance-component.model.ts) is still
+reused for the title's own label lookup.
+
+**Template**: the "Balance Impact" box and the `*ngFor` "Closing Snapshot" loop are gone; one
+`*ngTemplateOutlet` call for `selectedEventSnapshot`. The shared `#balanceSnapshotBox` (used by both
+Transaction Processing's Look Up panel and Inquire Events) gained one new **optional** `impact` context
+param — `{before, after}` from `movement.balanceBefore`/`balanceAfter` — that annotates the Confirmed
+Balance row with its own before→after delta (or "still PENDING — not yet affected" while unreleased)
+when passed; the Look Up panel's own call site omits it entirely, so that row renders exactly as before,
+byte-for-byte, unaffected by this change. `transaction-builder.component.ts`'s now-unused
+`balanceSnapshotLabel` field (and its `BALANCE_SNAPSHOT_LABEL` import) removed — the label lookup lives
+entirely inside `InquireEventsService` now.
+
+**Tests**: `inquire-events.service.spec.ts`'s multi-row balance/`balanceRowTitle` describe blocks
+rewritten for the single-snapshot shape (title composition per instrumentType/IB/SG, a fetch failure
+resetting to null, a second `selectEvent()` call replacing rather than merging with the first).
+`transaction-builder.component.inquire.spec.ts`'s own `mockApi()` gained a `getBalanceAsOfMovement`
+stub (the only thing that broke when the service started calling it unconditionally — the
+`selectEvent()` reconstruction test itself needed no change). Microservice:
+`getBalanceSnapshotAsOfTimestamp()`'s own tests removed along with the method; the two EARLIER
+same-contract point-in-time tests (SHGT/EPLC_EXAMINATION, from the correctness-fix section above) still
+stand — they test the part that's still live.
+
+Verified: microservice 294/294 passing (99.13%/96.38%/100%/99.42%), `npm run typecheck`/`npm run
+build`/`npm run lint` (0 errors) all clean; Angular app 701/701 passing (99.73%/96.43%/99.51%/99.77%,
+`inquire-events.service.ts` itself 100/100/100/100), `npx tsc --noEmit`/`ng build`/`npm run lint` (0
+errors, 211 pre-existing warnings) all clean; `backend/` 33/33 unaffected.
+
+**Live in-browser verification, this time completed** (extension reconnected): re-selected the S01 SG
+G02 Issue event — single "Event Snapshot — Shipping Guarantee Balance — LC S01 / SG G02" box, Confirmed
+Balance "0 → 20000" (merged impact), no Off-Balance Exposure row (correctly absent for a non-LC ledger),
+no separate Balance Impact box, no Closing Snapshot rows. Re-selected the LC's own Issue event — "Event
+Snapshot — LC Balance — LC S01", Confirmed Balance "0 → 100000", Off-Balance Exposure **0** (correct —
+matches the user's own first worked example exactly; no SG had been issued yet at this point in time)
+and Tight Available Balance 100000; also incidentally re-confirmed the A1 Currency dropdown renders all
+10 `CURRENCY_OPTIONS` codes and the duplicate "Inquire Events" heading stays gone from the earlier UI
+polish pass. Zero console errors.
+
+**Open idea, explicitly deferred, not implemented this pass**: user suggested persisting the Event
+Snapshot itself (computed once, e.g. at Release time, stored immutably on the movement — same pattern
+`contingentAccountEntry` already uses — then just fetched, never recomputed) instead of computing it on
+demand via `getBalanceAsOfMovement()` on every View click. Not implemented: it would require a DB
+migration (a new column on `balance_movements`) and touching the core `release()` write path (a
+heavily-tested, business-critical function) rather than staying purely additive/read-only like
+everything else in this Inquire Events feature — deliberately scoped as a separate follow-up requiring
+its own explicit sign-off, not bolted on reactively. If picked up later: the natural capture point is
+`release()` (where `balanceBefore`/`balanceAfter` are already computed today), since Confirmed Balance
+itself only actually closes at Release, not Create.

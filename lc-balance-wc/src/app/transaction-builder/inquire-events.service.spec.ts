@@ -1,5 +1,5 @@
 import { of, throwError } from 'rxjs';
-import { InquireEventsService, InquiredEvent } from './inquire-events.service';
+import { InquireEventsService } from './inquire-events.service';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 
 /**
@@ -211,143 +211,66 @@ describe('InquireEventsService', () => {
     });
   });
 
-  // Inquire Events (2026-08-17, user-requested) — Balance Snapshot/Closing Balance per Event.
-  describe('selectEvent — selectedEventBalances (Balance Snapshot per Event)', () => {
-    it('produces no rows and issues no API call when this.events is empty', () => {
+  // Inquire Events (2026-08-17, user-requested, simplified same day — "VIEW EVENT 只需 EVENT SNAPSHOT
+  // 即可") — exactly ONE point-in-time snapshot per Event, for the ledger it actually belongs to.
+  describe('selectEvent — selectedEventSnapshot (Event Snapshot)', () => {
+    it('fetches the snapshot for the event\'s own movement via getBalanceAsOfMovement() (exact, same-contract, no cross-contract cutoff needed)', () => {
       const api = makeApi();
       const svc = new InquireEventsService(api);
-      svc.events = [];
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementId: 'mv-1' });
 
-      svc.selectEvent({ movement: makeMovement(), contract: makeContract() });
+      svc.selectEvent({ movement, contract });
 
-      expect(svc.selectedEventBalances).toEqual([]);
-      expect(api.getBalanceAsOfMovement).not.toHaveBeenCalled();
+      expect(api.getBalanceAsOfMovement).toHaveBeenCalledWith('mv-1');
+      expect(svc.selectedEventSnapshot).toEqual(makeSnapshot());
     });
 
-    it('one row per relevant contract, each resolved to that contract\'s own LATEST movement at or before the selected event\'s time — not the selected event\'s own time on every contract', () => {
-      const lc = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC' });
-      const sg = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
-      const lcIssue = makeMovement({ movementId: 'mv-lc-issue', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
-      const sgIssue = makeMovement({ movementId: 'mv-sg-issue', balanceContractId: 'bc-sg', movementType: 'ISSUE', createdAt: '2026-08-02T00:00:00.000Z' });
-      const lcUtilize = makeMovement({ movementId: 'mv-lc-utilize', balanceContractId: 'bc-lc', movementType: 'UTILIZE', createdAt: '2026-08-03T00:00:00.000Z' });
-      const events: InquiredEvent[] = [
-        { movement: lcIssue, contract: lc },
-        { movement: sgIssue, contract: sg },
-        { movement: lcUtilize, contract: lc },
-      ];
-
-      const api = makeApi({ getBalanceAsOfMovement: jest.fn((movementId: string) => of(makeSnapshot({ confirmedBalance: movementId }))) });
-      const svc = new InquireEventsService(api);
-      svc.events = events;
-
-      // Select the SG Issue event (2026-08-02) — the LC's own latest movement AT OR BEFORE that time is
-      // the ISSUE (2026-08-01), NOT the later UTILIZE (2026-08-03), which hadn't happened yet.
-      svc.selectEvent({ movement: sgIssue, contract: sg });
-
-      expect(api.getBalanceAsOfMovement).toHaveBeenCalledWith('mv-lc-issue');
-      expect(api.getBalanceAsOfMovement).toHaveBeenCalledWith('mv-sg-issue');
-      expect(api.getBalanceAsOfMovement).not.toHaveBeenCalledWith('mv-lc-utilize');
-      expect(svc.selectedEventBalances).toHaveLength(2);
-      const lcRow = svc.selectedEventBalances.find((r) => r.instrumentType === 'IPLC_LC');
-      expect(lcRow?.label).toBe('LC Balance');
-      expect(lcRow?.snapshot?.confirmedBalance).toBe('mv-lc-issue');
-      const sgRow = svc.selectedEventBalances.find((r) => r.instrumentType === 'SHGT');
-      expect(sgRow?.label).toBe('Shipping Guarantee Balance');
-      expect(sgRow?.snapshot?.confirmedBalance).toBe('mv-sg-issue');
-    });
-
-    it('a Balance Component not yet created as of the selected event (all its movements are AFTER the cutoff) gets a null-snapshot row and no API call for it', () => {
-      const lc = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC' });
-      const sg = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
-      const lcIssue = makeMovement({ movementId: 'mv-lc-issue', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
-      const sgIssue = makeMovement({ movementId: 'mv-sg-issue', balanceContractId: 'bc-sg', movementType: 'ISSUE', createdAt: '2026-08-05T00:00:00.000Z' });
-      const events: InquiredEvent[] = [
-        { movement: lcIssue, contract: lc },
-        { movement: sgIssue, contract: sg },
-      ];
-
-      const api = makeApi();
-      const svc = new InquireEventsService(api);
-      svc.events = events;
-
-      // Selecting the LC Issue itself — the SG doesn't exist yet at that point in time.
-      svc.selectEvent({ movement: lcIssue, contract: lc });
-
-      expect(api.getBalanceAsOfMovement).toHaveBeenCalledTimes(1);
-      expect(api.getBalanceAsOfMovement).toHaveBeenCalledWith('mv-lc-issue');
-      const sgRow = svc.selectedEventBalances.find((r) => r.instrumentType === 'SHGT');
-      expect(sgRow?.snapshot).toBeNull();
-    });
-
-    it('excludes EPLC_EXAMINATION movements from the balance rows entirely — MEMO_ONLY, never a real Balance Component', () => {
-      const cnf = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION' });
-      const exam = makeContract({ balanceContractId: 'bc-exam', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E01' } });
-      const cnfIssue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
-      const examCreate = makeMovement({ movementId: 'mv-exam-create', balanceContractId: 'bc-exam', movementType: 'CREATE', createdAt: '2026-08-02T00:00:00.000Z' });
+    it('title is "Event Snapshot — {label} — LC {lc}" for a plain LC contract', () => {
       const svc = new InquireEventsService(makeApi());
-      svc.events = [
-        { movement: cnfIssue, contract: cnf },
-        { movement: examCreate, contract: exam },
-      ];
-
-      svc.selectEvent({ movement: examCreate, contract: exam });
-
-      expect(svc.selectedEventBalances.some((r) => r.instrumentType === 'EPLC_EXAMINATION')).toBe(false);
-      expect(svc.selectedEventBalances).toHaveLength(1);
-      expect(svc.selectedEventBalances[0].instrumentType).toBe('EPLC_CONFIRMATION');
+      const contract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } });
+      svc.selectEvent({ movement: makeMovement(), contract });
+      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — LC Balance — LC S001');
     });
 
-    it('a getBalanceAsOfMovement() failure for one contract is swallowed (catchError -> null snapshot), not fatal to the other rows', () => {
-      const lc = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC' });
-      const sg = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
-      const lcIssue = makeMovement({ movementId: 'mv-lc-issue', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
-      const sgIssue = makeMovement({ movementId: 'mv-sg-issue', balanceContractId: 'bc-sg', movementType: 'ISSUE', createdAt: '2026-08-02T00:00:00.000Z' });
+    it('title appends "/ IB {ib}" for an Acceptance contract', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
+      svc.selectEvent({ movement: makeMovement(), contract });
+      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — Acceptance Balance — LC S001 / IB IB01');
+    });
+
+    it('title appends "/ SG {sg}" for a Shipping Guarantee contract', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
+      svc.selectEvent({ movement: makeMovement(), contract });
+      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — Shipping Guarantee Balance — LC S001 / SG G01');
+    });
+
+    it('falls back to the bare instrumentType in the title for EPLC_EXAMINATION (not one of BALANCE_SNAPSHOT_LABEL\'s own keys — MEMO_ONLY, never a real Balance Component) — still renders, no crash', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E01' } });
+      svc.selectEvent({ movement: makeMovement(), contract });
+      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — EPLC_EXAMINATION — LC S001 / IB E01');
+    });
+
+    it('a getBalanceAsOfMovement() failure sets selectedEventSnapshot to null rather than leaving a stale value from a prior selection', () => {
+      const api = makeApi({ getBalanceAsOfMovement: jest.fn(() => throwError(() => new Error('boom'))) });
+      const svc = new InquireEventsService(api);
+      svc.selectEvent({ movement: makeMovement(), contract: makeContract() });
+      expect(svc.selectedEventSnapshot).toBeNull();
+    });
+
+    it('a second selectEvent() call replaces the previous snapshot, not merges with it', () => {
       const api = makeApi({
-        getBalanceAsOfMovement: jest.fn((movementId: string) => (movementId === 'mv-sg-issue' ? throwError(() => new Error('boom')) : of(makeSnapshot()))),
+        getBalanceAsOfMovement: jest.fn((movementId: string) => of(makeSnapshot({ confirmedBalance: movementId }))),
       });
       const svc = new InquireEventsService(api);
-      svc.events = [
-        { movement: lcIssue, contract: lc },
-        { movement: sgIssue, contract: sg },
-      ];
+      svc.selectEvent({ movement: makeMovement({ movementId: 'mv-first' }), contract: makeContract() });
+      expect(svc.selectedEventSnapshot?.confirmedBalance).toBe('mv-first');
 
-      svc.selectEvent({ movement: sgIssue, contract: sg });
-
-      expect(svc.selectedEventBalances).toHaveLength(2);
-      const lcRow = svc.selectedEventBalances.find((r) => r.instrumentType === 'IPLC_LC');
-      expect(lcRow?.snapshot).not.toBeNull();
-      const sgRow = svc.selectedEventBalances.find((r) => r.instrumentType === 'SHGT');
-      expect(sgRow?.snapshot).toBeNull();
-    });
-  });
-
-  describe('balanceRowTitle', () => {
-    it('plain "{label} — LC {lc}" when the contract has neither an IB nor an SG number', () => {
-      const svc = new InquireEventsService(makeApi());
-      const row = { instrumentType: 'IPLC_LC' as const, label: 'LC Balance', contract: makeContract({ naturalKey: { lcNumber: 'S001' } }), snapshot: null };
-      expect(svc.balanceRowTitle(row)).toBe('LC Balance — LC S001');
-    });
-
-    it('appends "/ IB {ib}" when the contract has an IB Number', () => {
-      const svc = new InquireEventsService(makeApi());
-      const row = {
-        instrumentType: 'IPLC_ACCEPTANCE' as const,
-        label: 'Acceptance Balance',
-        contract: makeContract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } }),
-        snapshot: null,
-      };
-      expect(svc.balanceRowTitle(row)).toBe('Acceptance Balance — LC S001 / IB IB01');
-    });
-
-    it('appends "/ SG {sg}" when the contract has an SG Number', () => {
-      const svc = new InquireEventsService(makeApi());
-      const row = {
-        instrumentType: 'SHGT' as const,
-        label: 'Shipping Guarantee Balance',
-        contract: makeContract({ naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } }),
-        snapshot: null,
-      };
-      expect(svc.balanceRowTitle(row)).toBe('Shipping Guarantee Balance — LC S001 / SG G01');
+      svc.selectEvent({ movement: makeMovement({ movementId: 'mv-second' }), contract: makeContract() });
+      expect(svc.selectedEventSnapshot?.confirmedBalance).toBe('mv-second');
     });
   });
 
@@ -363,7 +286,8 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventFunction).toBeNull();
       expect(svc.selectedEventFields).toEqual([]);
       expect(svc.selectedEventModel).toEqual({});
-      expect(svc.selectedEventBalances).toEqual([]);
+      expect(svc.selectedEventSnapshotTitle).toBe('');
+      expect(svc.selectedEventSnapshot).toBeNull();
     });
   });
 });
