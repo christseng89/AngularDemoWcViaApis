@@ -23,9 +23,15 @@ import { describeApiError } from './api-error';
  *    `CheckerActionOutcome`, and the component's own `applyCheckerActionOutcome()` (transaction-
  *    builder.component.ts) is the ONLY place that still touches `actionBusy`/`submitResult`/
  *    `submitError`/`arrivalApproved` and calls back into `refreshSelectedContractSnapshot()`/
- *    `syncCheckerToContext()`/`syncLookupToContext()`/`reloadPayableMovementsAfterCompound()`/
- *    `loadSgsForArrival()` — Single Responsibility: this service only ever decides "what happened",
- *    never "what the UI should do about it".
+ *    `syncCheckerToContext()`/`syncLookupToContext()`/`loadSgsForArrival()` — Single Responsibility:
+ *    this service only ever decides "what happened", never "what the UI should do about it".
+ *
+ * `reloadPayables` (a `'released'` outcome flag, A6/B4's own compound legs) was removed 2026-08-17 once
+ * superseded by the auto-reset UX: `release()` on the component now returns to a fully-reset screen on
+ * ANY genuine `'released'` outcome instead of running `finishCheckerAction()`'s own in-place
+ * `reloadPayableMovementsAfterCompound()` refresh, so a stale `payableMovements` list is no longer
+ * observable — the Maker re-picks a contract from scratch for the next transaction, which loads it
+ * fresh regardless. BAL-101-style dead-code removal, not a behavior regression.
  *
  * Every guard condition, branch order, and error-message string below is unchanged from the methods
  * it replaces — pure code motion re-expressed as RxJS `switchMap`/`catchError` chains instead of
@@ -52,7 +58,7 @@ export interface CheckerActionContext {
 }
 
 export type CheckerActionOutcome =
-  | { kind: 'released'; result: BalanceMovement; syncLookup?: boolean; reloadPayables?: boolean }
+  | { kind: 'released'; result: BalanceMovement; syncLookup?: boolean }
   /** A3S's own acknowledgment-only path (releaseArrivalDocument's old shape) — no API call, no `result`. */
   | { kind: 'documentArrivalAcknowledged' }
   | { kind: 'failed'; message: string };
@@ -346,9 +352,7 @@ export class CheckerActionsService {
         if (ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && ids.acceptanceMovementId) {
           return this.releaseAcceptanceLiability(checkerId, res, ids.acceptanceMovementId, ids.acceptanceReimbReceivableMovementId);
         }
-        // Both the picked source record and the Parent LC's own hints/snapshots are stale otherwise
-        // until the user navigates away and back.
-        return of<CheckerActionOutcome>({ kind: 'released', result: res, reloadPayables: true });
+        return of<CheckerActionOutcome>({ kind: 'released', result: res });
       }),
       catchError((err) =>
         this.fail(
@@ -361,7 +365,7 @@ export class CheckerActionsService {
   /** B4's Sight/HONOUR branch only — final leg, releasing the new Due from Issuing Bank asset after the Confirmation's own Honour (and, before that, the B3 Present Docs record) were already released above. */
   private releaseDueFromIssuingBank(checkerId: string, honourRes: BalanceMovement, dueFromIssuingBankMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(dueFromIssuingBankMovementId, checkerId).pipe(
-      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: honourRes, syncLookup: true, reloadPayables: true })),
+      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: honourRes, syncLookup: true })),
       catchError((err) => this.fail(`Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${describeApiError(err)}`)),
     );
   }
@@ -391,7 +395,7 @@ export class CheckerActionsService {
       );
     }
     return this.api.release(acceptanceReimbReceivableMovementId, checkerId).pipe(
-      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: acceptRes, syncLookup: true, reloadPayables: true })),
+      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: acceptRes, syncLookup: true })),
       catchError((err) => this.fail(`Acceptance released, but the Reimbursement Receivable asset failed to release: ${describeApiError(err)}`)),
     );
   }

@@ -461,12 +461,22 @@
 <a name='L396'></a><a href='#L396'>396</a>
 <a name='L397'></a><a href='#L397'>397</a>
 <a name='L398'></a><a href='#L398'>398</a>
-<a name='L399'></a><a href='#L399'>399</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">6x</span>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -809,8 +819,6 @@
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -884,9 +892,15 @@ import { describeApiError } from './api-error';
  *    `CheckerActionOutcome`, and the component's own `applyCheckerActionOutcome()` (transaction-
  *    builder.component.ts) is the ONLY place that still touches `actionBusy`/`submitResult`/
  *    `submitError`/`arrivalApproved` and calls back into `refreshSelectedContractSnapshot()`/
- *    `syncCheckerToContext()`/`syncLookupToContext()`/`reloadPayableMovementsAfterCompound()`/
- *    `loadSgsForArrival()` — Single Responsibility: this service only ever decides "what happened",
- *    never "what the UI should do about it".
+ *    `syncCheckerToContext()`/`syncLookupToContext()`/`loadSgsForArrival()` — Single Responsibility:
+ *    this service only ever decides "what happened", never "what the UI should do about it".
+ *
+ * `reloadPayables` (a `'released'` outcome flag, A6/B4's own compound legs) was removed 2026-08-17 once
+ * superseded by the auto-reset UX: `release()` on the component now returns to a fully-reset screen on
+ * ANY genuine `'released'` outcome instead of running `finishCheckerAction()`'s own in-place
+ * `reloadPayableMovementsAfterCompound()` refresh, so a stale `payableMovements` list is no longer
+ * observable — the Maker re-picks a contract from scratch for the next transaction, which loads it
+ * fresh regardless. BAL-101-style dead-code removal, not a behavior regression.
  *
  * Every guard condition, branch order, and error-message string below is unchanged from the methods
  * it replaces — pure code motion re-expressed as RxJS `switchMap`/`catchError` chains instead of
@@ -913,7 +927,7 @@ export interface CheckerActionContext {
 }
 &nbsp;
 export type CheckerActionOutcome =
-  | { kind: 'released'; result: BalanceMovement; syncLookup?: boolean; reloadPayables?: boolean }
+  | { kind: 'released'; result: BalanceMovement; syncLookup?: boolean }
   /** A3S's own acknowledgment-only path (releaseArrivalDocument's old shape) — no API call, no `result`. */
   | { kind: 'documentArrivalAcknowledged' }
   | { kind: 'failed'; message: string };
@@ -1207,9 +1221,7 @@ export class CheckerActionsService {
         if (ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate &amp;&amp; ids.acceptanceMovementId) {
           return this.releaseAcceptanceLiability(checkerId, res, ids.acceptanceMovementId, ids.acceptanceReimbReceivableMovementId);
         }
-        // Both the picked source record and the Parent LC's own hints/snapshots are stale otherwise
-        // until the user navigates away and back.
-        return of&lt;CheckerActionOutcome&gt;({ kind: 'released', result: res, reloadPayables: true });
+        return of&lt;CheckerActionOutcome&gt;({ kind: 'released', result: res });
       }),
       catchError((err) =&gt;
         this.fail(
@@ -1222,7 +1234,7 @@ export class CheckerActionsService {
   /** B4's Sight/HONOUR branch only — final leg, releasing the new Due from Issuing Bank asset after the Confirmation's own Honour (and, before that, the B3 Present Docs record) were already released above. */
   private releaseDueFromIssuingBank(checkerId: string, honourRes: BalanceMovement, dueFromIssuingBankMovementId: string): Observable&lt;CheckerActionOutcome&gt; {
     return this.api.release(dueFromIssuingBankMovementId, checkerId).pipe(
-      switchMap(() =&gt; of&lt;CheckerActionOutcome&gt;({ kind: 'released', result: honourRes, syncLookup: true, reloadPayables: true })),
+      switchMap(() =&gt; of&lt;CheckerActionOutcome&gt;({ kind: 'released', result: honourRes, syncLookup: true })),
       catchError((err) =&gt; this.fail(`Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${describeApiError(err)}`)),
     );
   }
@@ -1252,7 +1264,7 @@ export class CheckerActionsService {
       );
     }
     return this.api.release(acceptanceReimbReceivableMovementId, checkerId).pipe(
-      switchMap(() =&gt; of&lt;CheckerActionOutcome&gt;({ kind: 'released', result: acceptRes, syncLookup: true, reloadPayables: true })),
+      switchMap(() =&gt; of&lt;CheckerActionOutcome&gt;({ kind: 'released', result: acceptRes, syncLookup: true })),
       catchError((err) =&gt; this.fail(`Acceptance released, but the Reimbursement Receivable asset failed to release: ${describeApiError(err)}`)),
     );
   }
@@ -1264,7 +1276,7 @@ export class CheckerActionsService {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-17T11:51:08.472Z
+                at 2026-08-17T12:25:02.968Z
             </div>
         <script src="../prettify.js"></script>
         <script>

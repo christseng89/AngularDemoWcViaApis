@@ -836,7 +836,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).not.toHaveBeenCalled();
     });
 
-    it('plain path: single release call, success sets submitResult and resets actionBusy', () => {
+    it('plain path: single release call, success resets actionBusy and — per the 2026-08-17 auto-reset UX — returns to the SAME function with a fresh screen instead of leaving submitResult set', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
       comp.model.createdBy = 'maker1';
@@ -846,8 +846,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.release();
 
       expect(api.release).toHaveBeenCalledWith('mv-amend', 'checker1');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-amend', status: 'RELEASED' });
+      expect(comp.selectedFunction).toBe(A2);
+      expect(comp.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
+      expect(comp.releaseSuccessHint).toBe('Release completed (movement mv-amend) — screen reset for a new A2 (LC Amendment) transaction.');
     });
 
     it('plain path: derives checker2 when createdBy is not maker1', () => {
@@ -888,8 +890,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenNthCalledWith(1, 'mv-doc-arrival', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-acceptance', status: 'RELEASED' });
+      // 2026-08-17 auto-reset UX: a genuine 'released' outcome returns to the SAME function with a
+      // fresh screen instead of leaving submitResult set to the compound's own final leg response.
+      expect(comp.selectedFunction).toBe(A6);
+      expect(comp.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
+      expect(comp.releaseSuccessHint).toContain('mv-acceptance');
     });
 
     it('A6: a failed source release NEVER attempts to release the Acceptance', () => {
@@ -951,7 +957,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.actionBusy).toBe(false);
     });
 
-    it('B5 settlesAcceptanceOnMature: releases the Acceptance then the matching Receivable; submitResult stays the Acceptance response', () => {
+    it('B5 settlesAcceptanceOnMature: releases the Acceptance then the matching Receivable, then auto-resets to a fresh B5 screen', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
       comp.matchedReceivableMovementId = 'mv-receivable';
@@ -964,8 +970,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenNthCalledWith(1, 'mv-settle', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-settle', status: 'RELEASED' });
+      // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
+      expect(comp.selectedFunction).toBe(B5);
+      expect(comp.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
+      expect(comp.releaseSuccessHint).toContain('mv-settle');
     });
 
     it('B5: a failed Acceptance release never releases the Receivable', () => {
@@ -1013,8 +1022,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenNthCalledWith(1, 'mv-b3', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-honour', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-honour', status: 'RELEASED' });
+      // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
+      expect(comp.selectedFunction).toBe(B4);
+      expect(comp.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
+      expect(comp.releaseSuccessHint).toContain('mv-honour');
     });
 
     it('B4 Sight: the final Due from Issuing Bank release failing surfaces its own compound error', () => {
@@ -1056,7 +1068,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-accept', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(3, 'mv-acceptance', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(4, 'mv-receivable', 'checker1');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-accept', status: 'RELEASED' });
+      // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
+      expect(comp.selectedFunction).toBe(B4);
+      expect(comp.submitResult).toBeNull();
+      expect(comp.releaseSuccessHint).toContain('mv-accept');
     });
 
     it('B4 Usance: the Acceptance liability release failing stops before the Receivable leg', () => {

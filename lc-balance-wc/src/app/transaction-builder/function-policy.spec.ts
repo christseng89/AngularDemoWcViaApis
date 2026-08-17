@@ -274,6 +274,15 @@ describe('function-policy', () => {
       expect(contextSecondaryRef(s)).toBe('IB-TYPED');
     });
 
+    it('contextSecondaryRef is null (not empty string) when creating and the naturalKey field has not been typed yet (A6-shape)', () => {
+      const s = state({
+        model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' },
+        naturalKey: { lcNumber: '', ibNumber: '', sgNumber: '' },
+        selectedFunction: fn('A6'),
+      });
+      expect(contextSecondaryRef(s)).toBeNull();
+    });
+
     it('contextSecondaryRef falls back to selectedContract when the function is resolved (secondary field known) but model.instrumentType has not resolved yet (subChoice still pending, so neither isCreatingMovement nor usesTwoFieldSearch is true)', () => {
       const s = state({
         model: {},

@@ -278,6 +278,15 @@ export class TransactionBuilderComponent {
   submitError: string | null = null;
   actionBusy = false;
   /**
+   * UX improvement, business-directed 2026-08-17: "After Release is successfully completed, the system
+   * should automatically return to the same transaction function and reset the screen for a new
+   * transaction." Set by `release()` right after it re-invokes `selectFunction()` on a successful
+   * outcome (which is what actually performs the reset — this field only carries the brief confirmation
+   * across that reset, since `selectFunction()` itself clears it to null like every other piece of
+   * per-function state). Cleared by the very next `selectFunction()` call, whatever triggers it.
+   */
+  releaseSuccessHint: string | null = null;
+  /**
    * analysis/contingent-liability-ledger.html (business-requested 2026-08-16, "Account Entries button +
    * pop-up dialog") — whichever movement's own contingentAccountEntry is currently shown in the dialog,
    * or null when the dialog is closed. Set by an explicit "Account Entries" button click, from either
@@ -429,6 +438,7 @@ export class TransactionBuilderComponent {
     this.arrivalApproved = false;
     this.submitResult = null;
     this.submitError = null;
+    this.releaseSuccessHint = null;
     this.accountEntryDialogMovement = null;
     this.sgsForArrival = [];
     this.selectedArrivalSg = null;
@@ -1969,19 +1979,22 @@ export class TransactionBuilderComponent {
    * ~10 pieces of component state back and forth for no real benefit), this consolidates only the
    * mechanical success-tail shape every leg of the chain already shared byte-for-byte —
    * `actionBusy=false; submitResult=res; refreshSelectedContractSnapshot(); syncCheckerToContext();`,
-   * plus two call sites' worth of optional follow-up (`syncLookupToContext()`/
-   * `reloadPayableMovementsAfterCompound()`) — same "guard/branch logic unchanged, only the repeated
-   * body moves" convention as `loadPagedCatalog`/`loadSnapshotAndMovements` above. WHICH release/
-   * reject/cancel call to make, in what order, and under what business condition is completely
-   * untouched by this helper — every `if` branch below still decides that for itself.
+   * plus one call site's own optional follow-up (`syncLookupToContext()`) — same "guard/branch logic
+   * unchanged, only the repeated body moves" convention as `loadPagedCatalog`/`loadSnapshotAndMovements`
+   * above. WHICH release/reject/cancel call to make, in what order, and under what business condition is
+   * completely untouched by this helper — every `if` branch below still decides that for itself.
+   *
+   * `opts.reloadPayables`/`reloadPayableMovementsAfterCompound()` (A6/B4's own in-place payable-list
+   * refresh after a compound release) were removed 2026-08-17 — see `release()`'s own doc comment for
+   * why: superseded by the auto-reset UX, which now bypasses this whole method for every genuine
+   * `'released'` outcome, so the flag could never fire again (BAL-101-style dead-code removal).
    */
-  private finishCheckerAction(res: any, opts: { syncLookup?: boolean; reloadPayables?: boolean } = {}): void {
+  private finishCheckerAction(res: any, opts: { syncLookup?: boolean } = {}): void {
     this.actionBusy = false;
     this.submitResult = res;
     this.refreshSelectedContractSnapshot();
     this.syncCheckerToContext();
     if (opts.syncLookup) this.syncLookupToContext();
-    if (opts.reloadPayables) this.reloadPayableMovementsAfterCompound();
   }
 
   /** BAL-003 — the release/reject/cancel chain's other shared shape: every failed leg sets `actionBusy` false and surfaces its own (always distinct, business-context-specific) message via `submitError`. The message itself is still composed at each call site — only the two-field assignment is shared. */
@@ -1995,12 +2008,36 @@ export class TransactionBuilderComponent {
    * directly now lives in `CheckerActionsService.release()` (Dependency Inversion: the service depends
    * on `CheckerActionContext`, never on this component). This wrapper keeps exactly the same guard and
    * the same `actionBusy`/`submitError` reset the original had, then hands off.
+   *
+   * UX improvement, business-directed 2026-08-17: "After Release is successfully completed, the system
+   * should automatically return to the same transaction function and reset the screen for a new
+   * transaction." Only a genuine `'released'` outcome (the plain and every compound-release case —
+   * `applyCheckerActionOutcome()`'s own `finishCheckerAction()` path) triggers the reset; a
+   * `documentArrivalAcknowledged` outcome (A3S only — the SG redemption is genuinely released, but the
+   * Document Arrival record ITSELF stays PENDING for A4/A6 to finalize later, so this isn't a completed
+   * transaction to reset away from yet) is deliberately left on its existing `applyCheckerActionOutcome()`
+   * path (`arrivalApproved = true`, snapshot/checker/SG-picker refresh) unchanged — same reasoning
+   * `reject()`/`deleteMakerPending()` (also unchanged) already apply: the business instruction named
+   * Release specifically, not every Checker action. The reset itself re-invokes `selectFunction()` on
+   * the SAME function rather than running the normal post-release syncs — reusing the exact reset
+   * `selectFunction()` already performs (every per-function field, the natural key, every picker,
+   * `submitResult`/`submitError`) is simpler and safer than running those syncs and immediately
+   * discarding the result.
    */
   release(): void {
     if (!this.submitResult?.movementId) return;
     this.actionBusy = true;
     this.submitError = null;
-    this.checkerActions.release(this.buildCheckerActionContext()).subscribe((outcome) => this.applyCheckerActionOutcome(outcome));
+    const fn = this.selectedFunction;
+    this.checkerActions.release(this.buildCheckerActionContext()).subscribe((outcome) => {
+      if (fn && outcome.kind === 'released') {
+        this.actionBusy = false;
+        this.selectFunction(fn);
+        this.releaseSuccessHint = `Release completed (movement ${outcome.result.movementId}) — screen reset for a new ${fn.code} (${fn.label}) transaction.`;
+        return;
+      }
+      this.applyCheckerActionOutcome(outcome);
+    });
   }
 
   private buildCheckerActionContext(): CheckerActionContext {
@@ -2037,13 +2074,7 @@ export class TransactionBuilderComponent {
       this.loadSgsForArrival();
       return;
     }
-    this.finishCheckerAction(outcome.result, { syncLookup: outcome.syncLookup, reloadPayables: outcome.reloadPayables });
-  }
-
-  /** Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — refreshes whichever picker (A6's Parent LC, B4's flat Catalog) is actually in play, since B4 no longer has a "parent" of its own (its primary instrumentType is EPLC_CONFIRMATION). */
-  private reloadPayableMovementsAfterCompound(): void {
-    if (this.selectedParent) this.loadPayableMovements(this.selectedParent.balanceContractId);
-    else if (this.selectedContract) this.loadPayableMovements(this.selectedContract.balanceContractId);
+    this.finishCheckerAction(outcome.result, { syncLookup: outcome.syncLookup });
   }
 
   /** BAL-003 (Checker Actions extraction) — orchestration moved to `CheckerActionsService.reject()`; unlike `release()`/`deleteMakerPending()`, the original never reset `submitError` here — preserved exactly. */

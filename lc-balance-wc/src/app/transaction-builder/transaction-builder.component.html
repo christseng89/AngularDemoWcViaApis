@@ -59,6 +59,14 @@
         </div>
 
         <div class="tb-section__body">
+          <!-- Business instruction 2026-08-17 ("After Release is successfully completed, the system
+               should automatically return to the same transaction function and reset the screen for a
+               new transaction") — release() re-invokes selectFunction() with the same function on
+               success, which clears releaseSuccessHint too; this brief visible confirmation is set right
+               AFTER that reset call so it survives it, and disappears the moment any other action
+               (switching functions, a fresh Submit, etc.) touches state again. -->
+          <div class="tb-hint tb-hint--ok mb-2" *ngIf="releaseSuccessHint">{{ releaseSuccessHint }}</div>
+
           <div class="tb-field" *ngIf="selectedFunction.subChoice">
             <label class="tb-field__label">{{ selectedFunction.subChoice.label }}</label>
             <select class="tb-select tb-select--required" [(ngModel)]="subChoiceValue" (change)="onSubChoice()">
@@ -97,7 +105,7 @@
                       (search)="onParentSearch()"
                       emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
                       [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
-                      (pick)="onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
+                      (pick)="!formLocked && onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
                       <ng-template let-c>
                         <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span>
                         <span class="tb-row-badge">{{ c.status }}</span>
@@ -124,7 +132,7 @@
                     (search)="onParentSearch()"
                     emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
                     [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
-                    (pick)="onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
+                    (pick)="!formLocked && onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
                     <ng-template let-c>
                       <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span>
                       <span class="tb-row-badge">{{ c.status }}</span>
@@ -160,7 +168,7 @@
                   searchPlaceholder="Search {{ ibNumberLabel }}…"
                   emptyText="No PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{ selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first' }}."
                   autoPickedHint="Only one PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                  (pick)="onSelectPayMovement($event)">
+                  (pick)="!formLocked && onSelectPayMovement($event)">
                   <ng-template let-m>
                     <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
                     <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
@@ -177,25 +185,33 @@
             <div class="tb-field">
               <ng-container *ngIf="isCreatingMovement; else existingContract">
                 <label class="tb-field__label">{{ lcNumberFromParent ? 'New Reference — Natural Key' : 'New Logical Contract — Natural Key' }}</label>
+                <!-- Business instruction 2026-08-17 ("the primary key and 2ndary key are mandatory field...
+                     after Submit those key fields need to be protected as well") — LC Number is the
+                     Primary Key, IB/SG Number the 2ndary Key, for every A1-A9/B1-B5 natural-key entry;
+                     mandatory was already enforced at Submit time (validateSubmit(), submit-rules.ts), this
+                     adds the missing other half: once formLocked (a movement now exists — same flag the
+                     Formly-driven fields already lock on), these plain inputs (outside buildFields()'s own
+                     Formly array, so formLocked's displayFields() rewrite never reached them) grey out via
+                     the same .tb-input:disabled styling every other locked field already uses. -->
                 <div class="tb-grid-3">
-                  <input class="tb-input tb-input--required" *ngIf="!lcNumberFromParent" placeholder="LC Number" [(ngModel)]="naturalKey.lcNumber">
+                  <input class="tb-input tb-input--required" *ngIf="!lcNumberFromParent" placeholder="LC Number" [(ngModel)]="naturalKey.lcNumber" [disabled]="formLocked">
                   <div *ngIf="lcNumberFromParent">
                     <input class="tb-input" placeholder="LC Number" [ngModel]="naturalKey.lcNumber" disabled>
                     <div class="tb-hint" *ngIf="!naturalKey.lcNumber">Pick the Parent LC above first.</div>
                   </div>
-                  <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="naturalKey.ibNumber">
-                  <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="naturalKey.sgNumber">
+                  <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="naturalKey.ibNumber" [disabled]="formLocked">
+                  <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="naturalKey.sgNumber" [disabled]="formLocked">
                 </div>
               </ng-container>
               <ng-template #existingContract>
                 <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
                   <label class="tb-field__label">Search Existing Contract — LC Number + {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} (both mandatory — a single LC can have multiple {{ ibNumberLabel }}s)</label>
                   <div class="tb-grid-3">
-                    <input class="tb-input tb-input--required" placeholder="LC Number (mandatory)" [(ngModel)]="searchNaturalKey.lcNumber">
-                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="searchNaturalKey.ibNumber">
-                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="searchNaturalKey.sgNumber">
+                    <input class="tb-input tb-input--required" placeholder="LC Number (mandatory)" [(ngModel)]="searchNaturalKey.lcNumber" [disabled]="formLocked">
+                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="searchNaturalKey.ibNumber" [disabled]="formLocked">
+                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="searchNaturalKey.sgNumber" [disabled]="formLocked">
                   </div>
-                  <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()">Search</button>
+                  <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked">Search</button>
                   <div class="tb-error mt-2" *ngIf="searchError">{{ searchError }}</div>
                   <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}</div>
 
@@ -213,7 +229,7 @@
                       [selectedId]="selectedContract?.balanceContractId ?? null"
                       emptyText="{{ ibIndexPicker.contracts.length ? 'All entries on this page are 0-balance (already fully settled/redeemed) — try Next page.' : 'No ' + model.instrumentType + ' records yet under this LC.' }}"
                       [page]="ibIndexPicker.page" [totalPages]="ibIndexPicker.totalPages" [total]="ibIndexPicker.total"
-                      (pick)="onSelectIbIndex($event)" (prevPage)="ibIndexPrevPage()" (nextPage)="ibIndexNextPage()">
+                      (pick)="!formLocked && onSelectIbIndex($event)" (prevPage)="ibIndexPrevPage()" (nextPage)="ibIndexNextPage()">
                       <ng-template let-c>
                         <span class="tb-row-primary">{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
                         <span class="tb-row-badge">{{ c.status }}</span>
@@ -233,7 +249,7 @@
                       [loading]="settleableBalancesLoading"
                       [selectedId]="selectedContract?.balanceContractId ?? null"
                       emptyText="No outstanding balance under this LC — nothing left to settle."
-                      (pick)="onSelectSettleableBalance($event)">
+                      (pick)="!formLocked && onSelectSettleableBalance($event)">
                       <ng-template let-s>
                         <span class="tb-row-primary">{{ s.ibNumber || '(no EB Number recorded)' }}</span>
                         <span class="tb-row-sub">{{ s.availableBalance }} {{ s.currency }} — {{ s.instrumentType === 'EPLC_ACCEPTANCE' ? 'Acceptance Balance' : 'Due from Issuing Bank' }}</span>
@@ -253,7 +269,7 @@
                   (search)="onCatalogSearch()"
                   emptyText="{{ catalogPicker.contracts.length ? 'All contracts on this page are 0-balance — try Next page.' : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.' }}"
                   [page]="catalogPicker.page" [totalPages]="catalogPicker.totalPages" [total]="catalogPicker.total"
-                  (pick)="onSelectContract($event)" (prevPage)="catalogPrevPage()" (nextPage)="catalogNextPage()">
+                  (pick)="!formLocked && onSelectContract($event)" (prevPage)="catalogPrevPage()" (nextPage)="catalogNextPage()">
                   <ng-template let-c>
                     <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}{{ catalogIbHint(c) }}</span>
                     <span class="tb-row-badge">{{ c.status }}{{ catalogPendingHint(c) }}</span>
@@ -269,6 +285,7 @@
                     <button type="button" class="tb-quick-pick__row"
                             *ngFor="let row of flattenedPayableRows"
                             [class.tb-quick-pick__row--active]="selectedPayMovement?.movementId === row.movement.movementId"
+                            [disabled]="formLocked"
                             (click)="onSelectFlattenedPayable(row.contract.balanceContractId, row.movement.movementId)">
                       <span class="tb-row-primary">{{ row.contract.naturalKey.lcNumber }} / {{ row.movement.sourceTransactionRef || '(no IB Number)' }}</span>
                       <span class="tb-row-badge">{{ row.movement.amount }} {{ row.movement.currency }}</span>
@@ -319,7 +336,7 @@
                 [selectedId]="selectedArrivalSg?.balanceContractId ?? null"
                 emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
                 autoPickedHint="Only one Shipping Guarantee under this LC — picked automatically."
-                (pick)="onSelectArrivalSg($event)">
+                (pick)="!formLocked && onSelectArrivalSg($event)">
                 <ng-template let-sg>
                   <span class="tb-row-primary">{{ sg.naturalKey.sgNumber }}</span>
                   <span class="tb-row-badge">{{ sg.status }}</span>
@@ -356,7 +373,7 @@
                 searchPlaceholder="Search {{ ibNumberLabel }}…"
                 emptyText="No Approved (Checker-acknowledged) {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{ selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first' }}, then Release it in B3's own Checker panel."
                 autoPickedHint="Only one Approved {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                (pick)="onSelectPayMovement($event)">
+                (pick)="!formLocked && onSelectPayMovement($event)">
                 <ng-template let-m>
                   <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
                   <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
@@ -376,7 +393,7 @@
                 [selectedId]="selectedPayMovement?.movementId ?? null"
                 emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."
                 autoPickedHint="Only one PENDING Document Arrival under this LC — picked automatically."
-                (pick)="onSelectPayMovement($event)">
+                (pick)="!formLocked && onSelectPayMovement($event)">
                 <ng-template let-m>
                   <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no IB Number recorded)' }}</span>
                   <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>

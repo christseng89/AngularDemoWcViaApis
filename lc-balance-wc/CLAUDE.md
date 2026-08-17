@@ -3442,3 +3442,134 @@ specifically), and this project's own direct-instantiation test convention alrea
 changes are routinely shipped on static verification alone elsewhere in this file. A human should still
 click through one A-series function's Submit (confirm fields grey out) and one Inquire Events row
 (confirm hover highlight + click-to-View) once to fully close the loop.
+
+## Primary Key (LC Number) / 2ndary Key (IB/SG Number) — mandatory audited, and protected after Submit alongside the Formly fields (2026-08-17, business instruction: "For A1–A9 and B1–B5, the primary key and 2ndary key are mandatory field", clarified same turn — "After Submit those key fields need to be protected as well")
+
+**Mandatory — audited, found already comprehensive, no code change needed.** Every path that sets the
+Primary Key (LC Number)/2ndary Key (IB Number/SG Number) already validates them as mandatory at
+action-time, with a clear message, matching this app's own established "validate at the moment of the
+action, not via a preemptively-disabled button" convention (the same shape Amount/Currency/Tenor Type
+already use): `validateSubmit()` (`submit-rules.ts`) rejects a creating function's blank LC Number
+(business-reported gap 2026-08-14) and blank IB/SG Number when `requiredNaturalKeyFields` calls for one;
+`searchExistingContract()` rejects a blank LC Number/IB/SG Number before ever calling the resolve API
+(business instruction 2026-08-14, "If there are multiple document arrival, only the LC Number is not
+good enough"); `buildSubmitRequest()` rejects a flat-Catalog function with no `selectedContract` picked
+("Pick a contract from the Catalog below"). No gap found across creating, two-field-search, or
+flat-Catalog-browse functions — confirmed by reading, not assumed.
+
+**Protected after Submit — the actual gap, and the fix.** The read-only-after-Submit UX shipped earlier
+this same day (`formLocked`/`displayFields`, see the entry above) only covers `buildFields()`'s own
+Formly-driven fields (Amount/Currency/Tolerance/Reference No./Tenor). The Primary/2ndary Key inputs
+(`naturalKey.lcNumber`/`ibNumber`/`sgNumber` for creating, `searchNaturalKey.lcNumber`/`ibNumber`/
+`sgNumber` for the two-field search) are plain `<input>` elements bound via `ngModel` OUTSIDE that array
+entirely — `formLocked` going true never reached them, so a Maker could still retype the LC/IB/SG Number
+(or click a completely different picker row — Parent LC, flat Catalog, 2ndary/EB Index, A3S's SG picker,
+A6/B4's pending-record picker, A4's own PENDING/Quick-Pick pickers) after a movement was already created
+against the ORIGINAL key, silently changing `selectedContract`/`selectedParent`/`naturalKey` under a
+form that looked "submitted."
+
+Two-part fix, `transaction-builder.component.html` only (no `.ts`/service change — `formLocked` already
+existed):
+1. Every Primary/2ndary Key `<input>` (creating and two-field-search, 6 total) plus the "Search" button
+   gained `[disabled]="formLocked"` — picks up the exact same `.tb-input:disabled` greyed-out styling
+   every other locked field already renders with, zero new CSS.
+2. Every Maker-side picker `(pick)`/`(click)` binding that can change the resolved key/contract (Parent
+   LC ×2 template branches, flat Catalog, 2ndary/EB Index, settleable-balance EB Index, A3S's SG picker,
+   A6/B4's pending-record picker ×2, A4's own PENDING picker, A4's Quick Pick row buttons) now either
+   short-circuits at the template (`(pick)="!formLocked && onSelectXxx($event)"`) or, for the one plain
+   `<button>` case (Quick Pick), gets `[disabled]="formLocked"` directly — a template-level guard, not a
+   change to the handler methods themselves, so the same methods' existing internal auto-pick call sites
+   (e.g. "only one candidate found, select it automatically" during normal pre-Submit loading) are
+   completely unaffected; only a genuine post-lock user click becomes inert. The generic Checker panel's
+   own picker (`onSelectCheckerMovement`) was deliberately left untouched — the Checker acts AFTER the
+   Maker submits, so locking it would break the entire Maker/Checker workflow this app exists to model.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean
+(strict Angular templates — a bad binding would fail this), `npm run lint` 0 errors (211 pre-existing
+warnings, unchanged), full Angular suite 722/722 unchanged (this project's own direct-instantiation test
+convention never renders the DOM, so template-only guard changes were never covered by a test either
+before or after, same as every prior template-only fix in this file), coverage unchanged at
+99.74/96.35/99.52/99.78% (no `.ts` touched, so no new lines to cover). `backend/`/microservice suites
+unaffected (no files under either touched). Live in-browser verification not attempted this pass, for
+the same reason as the entry immediately above — a human should click through one creating function
+(e.g. A1) and one two-field-search function (e.g. A6) once, confirming the Primary/2ndary Key inputs and
+their pickers all grey out / stop responding immediately after Submit succeeds.
+
+## Checker Release auto-resets the screen back to the same function (2026-08-17, business instruction: "After Release is successfully completed, the system should automatically return to the same transaction function and reset the screen for a new transaction", reconfirmed with explicit scope — "For A1–A9 and B1–B5, after Release...")
+
+**Design.** A genuine `'released'` outcome from the Checker's own `release()` action (the plain path and
+every A6/A3S/B4/B5 compound-release path — `CheckerActionsService.release()`'s own final emitted
+outcome, intercepted in the component's `release()` wrapper BEFORE it ever reaches
+`applyCheckerActionOutcome()`) now re-invokes `selectFunction(this.selectedFunction)` instead of the
+normal `finishCheckerAction()` snapshot-refresh/sync path — reusing the exact reset `selectFunction()`
+already performs for a fresh function pick (every per-function field, the natural key, every picker,
+`submitResult`/`submitError`, `arrivalApproved`, all five secondary-leg movement fields, the Checker's
+own resolved contract/items) rather than running the normal post-release syncs and immediately
+discarding the result. `checkerLcNumber` is deliberately preserved by `selectFunction()`'s own existing
+reset (see its own doc comment) — a Checker who just released one item on LC S01 keeps S01 in the search
+box and can immediately search again for the next PENDING item on the same LC. Applies uniformly across
+all 14 named business functions (A1–A9/B1–B5) since it lives in the one shared `release()`
+method every Checker panel click routes through — no per-function wiring needed. A brief
+`releaseSuccessHint` (a new field, e.g. "Release completed (movement mv-xxx) — screen reset for a new A2
+(LC Amendment) transaction.") is set right after the reset call so some visible confirmation survives it
+— `selectFunction()`'s own reset clears the field to null first (like every other per-function field),
+and the very next `selectFunction()` call (switching function, or the next auto-reset) clears it again.
+
+**Deliberately scoped to `kind: 'released'` only, not `'documentArrivalAcknowledged'`.** A3S's own
+Checker Release click can also resolve to `documentArrivalAcknowledged` — the SG redemption is genuinely
+released, but the Document Arrival record ITSELF stays PENDING for A4/A6 to finalize later, so this
+isn't a completed transaction to reset away from yet. That outcome keeps its existing
+`applyCheckerActionOutcome()` path unchanged (`arrivalApproved = true`, snapshot/checker/SG-picker
+refresh) — same reasoning `reject()`/`deleteMakerPending()` (both also unchanged, still routed through
+`applyCheckerActionOutcome()` normally) already apply: the business instruction named Release
+specifically, not every Checker action.
+
+**BAL-101-style dead-code cleanup, found while verifying.** `finishCheckerAction()`'s own `reloadPayables`
+opt (and the private `reloadPayableMovementsAfterCompound()` method it called — A6/B4's own in-place
+payable-list refresh after a compound release) was ONLY ever set on a `kind: 'released'` outcome
+(`checker-actions.service.ts`'s own `releaseAcceptance()`/`releaseDueFromIssuingBank()`/
+`releaseAcceptanceReimbReceivable()`), which the new interception above now handles before
+`finishCheckerAction()` is ever reached for that outcome kind — making the flag and the method it drove
+permanently unreachable. Confirmed via a genuine coverage-report regression (`function-policy.ts` dropped
+from 100% branches to 98.18%, `transaction-builder.component.ts`'s own new dead lines flagged) rather
+than reasoned out in the abstract — removed the flag from `CheckerActionOutcome`'s `'released'` variant
+and its three emission sites, and the now-fully-dead `reloadPayableMovementsAfterCompound()` method
+itself, from both `checker-actions.service.ts` and `transaction-builder.component.ts`. Not a behavior
+regression: the auto-reset above makes the in-place refresh moot anyway (the Maker re-picks a contract
+from scratch for the next transaction, which loads fresh data regardless of whether the old list was
+ever refreshed in place). `syncLookup` (also a `'released'`-outcome flag) was NOT removed — it's still
+genuinely reachable via `deleteMakerPending()`'s own `cancelPrimary` outcome, which is untouched by this
+change and still routes through `finishCheckerAction()` normally.
+
+**A real bug caught before shipping, not from a review pass.** The new success branch bypasses
+`finishCheckerAction()` entirely (which is what normally resets `actionBusy = false`) — an early version
+of this change left `actionBusy` stuck `true` forever after every successful Release, silently disabling
+the Checker panel's own Release/Reject buttons with no way to recover short of switching functions and
+back. Caught by re-reading `selectFunction()`'s own reset list line-by-line and confirming `actionBusy`
+is NOT among the ~25 fields it resets (deliberately — `selectFunction()` is also called from the normal
+function-pick flow, where `actionBusy` should already be false and resetting it there would be a no-op
+at best, a mask for a stuck-busy bug elsewhere at worst). Fixed with an explicit `this.actionBusy =
+false;` in the new success branch, before calling `selectFunction()`.
+
+**Tests.** 6 existing tests in `transaction-builder.component.actions.spec.ts` (`release()`'s plain path,
+A6, B5, B4 Sight, B4 Usance) updated in place — each now asserts `comp.selectedFunction` is still the
+SAME function object, `comp.submitResult` is `null` (not the compound chain's own final leg response,
+which was the OLD, now-superseded assertion), `comp.actionBusy` is `false`, and `comp.releaseSuccessHint`
+contains the released movement's own id — rather than being deleted and rewritten from scratch, keeping
+every existing arrange/act block (mock setup, `api.release` call-order assertions) completely
+unchanged. One new test in `function-policy.spec.ts` closes the coverage regression found above
+(`contextSecondaryRef` returning `null`, not just a truthy value, when creating with an unfilled
+natural-key field — the branch that used to be incidentally covered via the old release()-success path).
+No test needed for the A3S/`documentArrivalAcknowledged`, `reject()`, or `deleteMakerPending()` paths —
+all three are unchanged, and their own existing tests already cover them.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean,
+`npm run lint` 0 errors (211 pre-existing warnings, unchanged), full Angular suite 723/723 (1 new),
+coverage 99.54/96.24/99.52/99.56% — all four metrics clear the 95% floor and branches actually IMPROVED
+over the prior entry's own 96.35% baseline once the dead-code cleanup landed (the regression found mid-
+pass was fully closed, not just tolerated under the floor). `backend/`/microservice suites unaffected (no
+files under either touched). Live in-browser verification not attempted this pass, for the same reason as
+the two entries immediately above — a human should Release one PENDING item (any function) and confirm
+the screen lands back on a fresh, same-function form with the success hint visible, then confirm a second
+Release on a DIFFERENT function still works correctly (proving `actionBusy` didn't get stuck from the
+first one).
