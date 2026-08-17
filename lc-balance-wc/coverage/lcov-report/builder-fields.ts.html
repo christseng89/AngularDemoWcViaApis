@@ -1,0 +1,619 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for builder-fields.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="prettify.css" />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="index.html">All files</a> builder-fields.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>23/23</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>60/60</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>8/8</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>22/22</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">224x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { FormlyFieldConfig } from '@ngx-formly/core';
+import { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import { TransactionFunction, decimalPlacesForCurrency } from './balance-component.model';
+import { BuilderModel, carriedCurrency, hasParent, isCreatingMovement, toleranceApplicable } from './function-policy';
+&nbsp;
+/**
+ * BAL-003 (God Component) — the Transaction Builder's own Formly field factory, extracted from
+ * `TransactionBuilderComponent.rebuildFields()` 2026-08-17.
+ *
+ * `rebuildFields()` was never really a method: it read eight pieces of state and assigned one array,
+ * mutating nothing else. As a pure `(context) =&gt; FormlyFieldConfig[]` function it is directly
+ * unit-testable without instantiating the component at all — which matters more here than in most of
+ * this session's other extractions, because this is where the Amount/Currency/Tenor "carried forward
+ * and protected" business instructions are actually enforced in the UI.
+ *
+ * Every label string, `hide`/`disabled`/`required` condition, and Formly `expressions` callback is
+ * unchanged from the component version, byte for byte.
+ */
+&nbsp;
+/** Everything `buildFields()` reads. Assembled by the component; never mutated here. */
+export interface BuilderFieldsContext {
+  model: BuilderModel;
+  selectedFunction: TransactionFunction | null;
+  selectedPayMovement: BalanceMovement | null;
+  selectedContract: BalanceContract | null;
+  selectedContractSnapshot: BalanceSnapshot | null;
+  selectedParent: BalanceContract | null;
+  dynamicSecondaryRefLabel: string | null;
+}
+&nbsp;
+export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
+  const { model, selectedFunction, selectedContractSnapshot } = ctx;
+  // Business instruction 2026-08-14: "The amount should carry from the related LC number + IB number and
+  // protected. The Tenor Type and Tenor days should carry from the LC Number and protected as well." — A6/B4
+  // only, and only once the source has actually been picked (before that, they're normal editable inputs).
+  // Also A7 Full Settle ("the amount should be carried from IB record and protected... if full settle") —
+  // Partial Settle stays free-typed, it's a genuine amount decision each time, not a carried-over value.
+  //
+  // BAL-135 fix: excludes settlesAcceptanceOnMature (B5) explicitly. B5's own registry entry declares
+  // `movementType: 'FULL_SETTLE'` as a placeholder default (the real FULL_SETTLE/PARTIAL_SETTLE value is
+  // DERIVED at submit() time from Amount vs Available — same pattern as A9's own `autoRedeemType`, see
+  // amountCappedAtSg's own doc comment below), never picked by the user via a subChoice the way A7's own
+  // FULL_SETTLE/PARTIAL_SETTLE subChoice is. Before this fix, that shared literal 'FULL_SETTLE' value
+  // made B5 ALSO match this A7-only rule — locking/disabling the Amount field and showing the "Full
+  // Settle — carried... protected" label — which silently pre-empted the dedicated, more specific,
+  // and correct amountCappedAtAcceptance rule below (added 2026-08-16, after this rule was first
+  // written) that the business instruction there explicitly calls for: "freely-editable... reduce for
+  // a Partial Settle". Confirmed unreachable in practice, not just in theory: nothing between
+  // afterResolved() and buildFields() ever changes B5's own model.movementType away from its registry
+  // default before Submit, so amountFromFullSettle matched on every single B5 render.
+  const amountFromDocArrival = !!selectedFunction?.settlesDocumentArrival &amp;&amp; !!ctx.selectedPayMovement;
+  const amountFromFullSettle = !selectedFunction?.settlesAcceptanceOnMature &amp;&amp; model.movementType === 'FULL_SETTLE' &amp;&amp; !!selectedContractSnapshot;
+  // Business instruction 2026-08-15 ("There is no need to select Full or Partial as long as the
+  // amount is not greater than the SG Balance. The defaulted amount is the SG Balance and
+  // mandatory.", refined same day: "Amount default to SG Available Balance") — A9 only, replacing
+  // the earlier Full-Redeem-locked/Partial-Redeem-free split with a single freely-editable Amount,
+  // pre-filled to the SG's Available Balance (refreshSelectedContractSnapshot()/afterResolved() set
+  // this on selection — Available, not Confirmed, so an already-PENDING redemption on the same SG
+  // is correctly netted out) and capped at it (props.max below) — never disabled. FULL_REDEEM vs
+  // PARTIAL_REDEEM is derived at submit() time from whether the typed amount still equals that
+  // Available Balance, not picked by the user (autoRedeemType — see its own doc comment).
+  const amountCappedAtSg = !!selectedFunction?.autoRedeemType &amp;&amp; !!selectedContractSnapshot;
+  // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance&gt;0的EB交易") — same
+  // default-to-Available/freely-editable-down-to-Partial/capped-at-it shape as amountCappedAtSg above,
+  // just for B5's own Usance/CNF_MATURE branch (model.instrumentType === 'EPLC_ACCEPTANCE', B5's own
+  // fixed registry type — see settlesAcceptanceOnMature's own doc comment for why this is always true
+  // for a real B5 submission, not a conditional fallback resolution).
+  const amountCappedAtAcceptance = !!selectedFunction?.settlesAcceptanceOnMature &amp;&amp; model.instrumentType === 'EPLC_ACCEPTANCE' &amp;&amp; !!selectedContractSnapshot;
+  const amountLocked = amountFromDocArrival || amountFromFullSettle;
+  const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length &amp;&amp; isCreatingMovement(model) &amp;&amp; hasParent(model) &amp;&amp; !!ctx.selectedParent;
+  // Business instruction 2026-08-16 ("A1/B1 = Input; every other function = Carry from A1/B1 +
+  // Protected") — see carriedCurrency's own doc comment (function-policy.ts).
+  const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
+&nbsp;
+  const fields: FormlyFieldConfig[] = [
+    {
+      key: 'amount',
+      type: 'input',
+      props: {
+        label: amountFromFullSettle
+          ? "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)"
+          : amountCappedAtSg
+            ? "Amount (defaults to the Shipping Guarantee's Available Balance — reduce for a Partial Redeem, must not exceed it)"
+            : amountCappedAtAcceptance
+              ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
+              : selectedFunction?.documentArrivalWithSg
+                ? // Business instruction 2026-08-15 ("Bill Amount = actual Document Arrival amount... SG
+                  // Redemption Amount = system-calculated MIN(Bill Amount, SG Outstanding)") — reverses the
+                  // prior full-match-only design (Bill Amount used to be locked to the SG's outstanding).
+                  'Bill Amount (actual document amount — see SG Redemption Amount below)'
+                : amountLocked
+                  ? 'Amount (carried from the Document Arrival, protected)'
+                  : 'Amount (face-level, per Design doc §6.2)',
+        required: true,
+        type: 'number',
+        disabled: amountLocked,
+        max: amountCappedAtSg || amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
+        // Keeps the input's own spinner/step granularity in sync with whichever Currency is typed
+        // alongside it (e.g. JPY -&gt; step 1, no cents) — see decimalPlacesForCurrency's own doc
+        // comment (balance-component.model.ts) for the ISO 4217 minor-unit table this reads.
+        step: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
+      },
+      // Currency is a free-typed sibling field (no fixed dropdown to hook a (change) event off of),
+      // so — same as tenorDays' own props.min/props.disabled below — this uses Formly's expressions
+      // to keep props.step live as the user types a Currency, rather than a full field rebuild (which
+      // would reassign the whole `fields` array on every keystroke and risk input-focus loss).
+      expressions: {
+        'props.step': (f: any) =&gt; Math.pow(10, -decimalPlacesForCurrency(f.model?.currency)),
+      },
+    },
+    {
+      key: 'currency',
+      type: 'input',
+      props: {
+        label: currencyLocked ? 'Currency (carried from the existing record, protected)' : 'Currency',
+        required: true,
+        disabled: currencyLocked,
+      },
+    },
+    {
+      key: 'tolerancePct',
+      type: 'input',
+      props: { label: 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)', type: 'number' },
+      hide: !toleranceApplicable(model),
+    },
+    {
+      key: 'secondaryRef',
+      type: 'input',
+      props: { label: ctx.dynamicSecondaryRefLabel ?? 'Reference No.', required: !!ctx.dynamicSecondaryRefLabel },
+      hide: !ctx.dynamicSecondaryRefLabel,
+    },
+    {
+      key: 'tenorType',
+      type: 'select',
+      props: {
+        label: tenorLocked ? 'Tenor Type (carried from the parent LC, protected)' : 'Tenor Type (Design doc §7 Tenor Type Routing)',
+        required: !!selectedFunction?.tenorTypeOptions?.length,
+        options: selectedFunction?.tenorTypeOptions ?? [],
+        disabled: tenorLocked,
+      },
+      hide: !selectedFunction?.tenorTypeOptions?.length,
+    },
+    {
+      key: 'tenorDays',
+      type: 'input',
+      props: { label: tenorLocked ? 'Tenor Days (carried from the parent LC, protected)' : 'Tenor Days', type: 'number', disabled: tenorLocked },
+      hide: !selectedFunction?.tenorTypeOptions?.length,
+      // Business instruction 2026-08-15 ("A1: Sight =&gt; Tenor Days = 0 and protected; not Sight
+      // =&gt; Tenor Days must be &gt; 0, mandatory") — extended same-day to B1 (Confirm LC) since it
+      // declares its own Tenor Type/Days independently, same as A1. Uses Formly's `expressions`
+      // (reacts live to the Tenor Type dropdown, evaluated internally by Formly on every model
+      // change) rather than a full field rebuild, which would reassign `fields` on every
+      // keystroke and risk the same input-focus loss as a live-reordered *ngFor.
+      ...((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') &amp;&amp; !tenorLocked
+        ? {
+            expressions: {
+              'props.disabled': (f: any) =&gt; f.model?.tenorType === 'SIGHT',
+              'props.required': (f: any) =&gt; !!f.model?.tenorType &amp;&amp; f.model.tenorType !== 'SIGHT',
+              'props.min': (f: any) =&gt; (f.model?.tenorType &amp;&amp; f.model.tenorType !== 'SIGHT' ? 1 : null),
+              'props.label': (f: any) =&gt; (f.model?.tenorType === 'SIGHT' ? 'Tenor Days (Sight — always 0, protected)' : 'Tenor Days'),
+              className: (f: any) =&gt; (f.model?.tenorType &amp;&amp; f.model.tenorType !== 'SIGHT' ? 'tb-field--required' : ''),
+              'model.tenorDays': (f: any) =&gt; (f.model?.tenorType === 'SIGHT' ? 0 : f.model?.tenorDays),
+            },
+          }
+        : {}),
+    },
+    { key: 'eventSeq', type: 'input', props: { label: 'Event Seq (idempotency key part, Design doc §8)', required: true, type: 'number' } },
+    { key: 'createdBy', type: 'input', props: { label: 'Created By (Maker)', required: true } },
+  ];
+&nbsp;
+  // Mandatory-field visual distinction (UI/UX best practice: don't rely on the tiny asterisk
+  // alone) — applies uniformly to every function (A1-A9/B1-B5) since it reads props.required
+  // rather than hardcoding field keys. See .tb-field--required in the stylesheet.
+  for (const f of fields) {
+    if (f.props?.required) f.className = [f.className, 'tb-field--required'].filter(Boolean).join(' ');
+  }
+  return fields;
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-17T03:58:04.598Z
+            </div>
+        <script src="prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="sorter.js"></script>
+        <script src="block-navigation.js"></script>
+    </body>
+</html>
+    

@@ -287,7 +287,11 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('filteredCatalogContracts: a decreasing movementType (A3) excludes 0-available contracts but keeps ones with no snapshot yet', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A3'));
-      c.catalogPicker.contracts = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' }), contract({ balanceContractId: 'unknown' })];
+      c.catalogPicker.contracts = [
+        contract({ balanceContractId: 'zero' }),
+        contract({ balanceContractId: 'nonzero' }),
+        contract({ balanceContractId: 'unknown' }),
+      ];
       (c as any).catalogPicker.snapshots.set('zero', snapshot({ availableBalance: '0' }));
       (c as any).catalogPicker.snapshots.set('nonzero', snapshot({ availableBalance: '500' }));
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['nonzero', 'unknown'].sort());

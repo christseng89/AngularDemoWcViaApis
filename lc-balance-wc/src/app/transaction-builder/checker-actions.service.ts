@@ -214,7 +214,9 @@ export class CheckerActionsService {
           this.api.cancel(ctx.acceptanceMovementId!, cancelledBy, 'MAKER_EC').pipe(
             switchMap(() => cancelPrimary()),
             catchError((err) =>
-              this.fail(`Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${describeApiError(err)}`),
+              this.fail(
+                `Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${describeApiError(err)}`,
+              ),
             ),
           ),
         ),

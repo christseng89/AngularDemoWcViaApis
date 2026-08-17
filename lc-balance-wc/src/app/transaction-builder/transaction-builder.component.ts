@@ -12,34 +12,18 @@ import { LookUpPanelService } from './look-up-panel.service';
 import { CatalogPickerService } from './catalog-picker.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
-  CREATING_MOVEMENT_TYPES,
   DECREASING_MOVEMENT_TYPES,
   EXPORT_FUNCTIONS,
-  HAS_PARENT,
   IMPORT_FUNCTIONS,
   InstrumentType,
-  NATURAL_KEY_FIELDS_BY_INSTRUMENT,
-  PARENT_INSTRUMENT_OPTIONS,
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
-  isToleranceApplicable,
 } from './balance-component.model';
-
-interface BuilderModel {
-  instrumentType?: InstrumentType;
-  movementType?: string;
-  amount?: string;
-  currency?: string;
-  tolerancePct?: string;
-  eventSeq?: number;
-  createdBy?: string;
-  /** Business instruction 2026-08-14 — generic secondary reference (Amendment No./IB Number/…), required on every function except LC Issue (A1/B1). Sent as sourceTransactionRef. */
-  secondaryRef?: string;
-  /** Design doc §7 Tenor Type Routing (v0.7) — mandatory on Acceptance (A6/B4). */
-  tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE';
-  tenorDays?: number;
-}
+import { buildFields } from './builder-fields';
+import { SubmitRulesContext, buildSubmitRequest as buildSubmitRequestRules, validateSubmit as validateSubmitRules } from './submit-rules';
+import * as policy from './function-policy';
+import { BuilderModel } from './function-policy';
 
 /**
  * Transaction Builder — organized as named Import (A-series) / Export
@@ -328,55 +312,44 @@ export class TransactionBuilderComponent {
     this.ibIndexPicker = new CatalogPickerService(this.ibIndexPageSize, api);
   }
 
+  /*
+   * BAL-003 (God Component, 2026-08-17) — the getters below are one-line delegations to
+   * `function-policy.ts`, where each rule now lives as a pure function alongside the business
+   * instruction that motivated it. They stay on the class purely as the template's own binding
+   * surface (and as the ~90 existing spec assertions' own read surface); none of them contains
+   * logic anymore.
+   */
+
   get isCreatingMovement(): boolean {
-    return !!this.model.movementType && CREATING_MOVEMENT_TYPES.has(this.model.movementType);
+    return policy.isCreatingMovement(this.model);
   }
 
   get requiredNaturalKeyFields(): ('ibNumber' | 'sgNumber')[] {
-    return this.model.instrumentType ? NATURAL_KEY_FIELDS_BY_INSTRUMENT[this.model.instrumentType] : [];
+    return policy.requiredNaturalKeyFields(this.model);
   }
 
-  /** IPLC_ACCEPTANCE uses Import Bill terminology (IB); EPLC_ACCEPTANCE uses Export Bill terminology (EB) — same underlying `ibNumber` field, different real-world label. */
   get ibNumberLabel(): string {
-    // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — generalized from
-    // checking EPLC_ACCEPTANCE specifically to activeFunctionSide, since B3 (EPLC_EXAMINATION) and
-    // B4's own EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE asset creation both need
-    // "EB Number" too — every Export instrumentType uses EB terminology, not just EPLC_ACCEPTANCE.
-    return this.activeFunctionSide === 'EXPORT' ? 'EB Number' : 'IB Number';
+    return policy.ibNumberLabel(this.activeFunctionSide);
   }
 
   get hasParent(): boolean {
-    return !!this.model.instrumentType && HAS_PARENT.has(this.model.instrumentType);
+    return policy.hasParent(this.model);
   }
 
   get parentOptions(): InstrumentType[] {
-    return this.model.instrumentType ? PARENT_INSTRUMENT_OPTIONS[this.model.instrumentType] : [];
+    return policy.parentOptions(this.model);
   }
 
-  /**
-   * Business instruction 2026-08-16 ("A1 Currency Code = Input; A2-A9 = Carry from A1 + Protected" /
-   * "B1 = Input; B2-B5 = Carry from B1 + Protected") — every function except LC Issue (A1) / Confirm LC
-   * (B1) operates on an existing LC/Confirmation, or a record that hangs off one, whose own Currency was
-   * already fixed the moment it was first created — never re-typed a second time. Same "carry from
-   * whichever contract is currently resolved, protected" shape as the existing Amount/Tenor precedent
-   * (rebuildFields()'s amountLocked/tenorLocked), just unconditional across every function rather than
-   * gated to specific ones, since A1/B1 structurally never populate selectedParent/selectedContract at
-   * all (they create a brand-new record with no existing target to pick). `selectedParent` is checked
-   * first — for a hasParent function (A6/A7/A8/A9/B3/B5) it resolves at Step 1, before any Step-2 child
-   * picker/search does, so currency locks in as soon as the LC/Confirmation itself is picked.
-   */
   get carriedCurrency(): string | null {
-    return this.selectedParent?.currency ?? this.selectedContract?.currency ?? null;
+    return policy.carriedCurrency(this.selectedParent, this.selectedContract);
   }
 
-
-  /** Business instruction 2026-08-14 — LC+IB / LC+SG two-field search replaces the flat Catalog dropdown for these instrumentTypes. */
   get usesTwoFieldSearch(): boolean {
-    return !this.isCreatingMovement && this.requiredNaturalKeyFields.length > 0;
+    return policy.usesTwoFieldSearch(this.model);
   }
 
   get toleranceApplicable(): boolean {
-    return !!this.model.instrumentType && !!this.model.movementType && isToleranceApplicable(this.model.instrumentType, this.model.movementType);
+    return policy.toleranceApplicable(this.model);
   }
 
   /** True once the typed Amount has more decimal places than the typed Currency allows (e.g. "10000.5 JPY") — mirrors the same check submit() blocks on. */
@@ -388,9 +361,8 @@ export class TransactionBuilderComponent {
     return decimalPlacesForCurrency(this.model.currency);
   }
 
-  /** True once the function is fully resolved (no pending subChoice) and ready to show the rest of the form. */
   get ready(): boolean {
-    return !!this.selectedFunction && !!this.model.instrumentType && !!this.model.movementType;
+    return policy.isReady(this.selectedFunction, this.model);
   }
 
   /**
@@ -702,11 +674,8 @@ export class TransactionBuilderComponent {
     if (page !== null) this.loadParentPage(page);
   }
 
-  /** Business instruction 2026-08-14 ("A6 => ...", "A7 should filter out LC records Tenor = Sight") — shared by loadParentPage()'s server-side filter and filteredParentCatalog()'s client-side one below. */
   get parentTenorFamily(): 'SIGHT' | 'USANCE' | undefined {
-    if (this.selectedFunction?.tenorTypeOptions?.length) return 'USANCE';
-    if (this.selectedFunction?.catalogTenorFilter === 'USANCE') return 'USANCE';
-    return undefined;
+    return policy.parentTenorFamily(this.selectedFunction);
   }
 
   /**
@@ -1432,33 +1401,28 @@ export class TransactionBuilderComponent {
     this.syncCheckerToContext();
   }
 
-  /** True when the natural key's LC Number is sourced from the Parent picker (A6/B4/A8) rather than freely typed (A1/B1). */
   get lcNumberFromParent(): boolean {
-    return this.isCreatingMovement && this.hasParent;
+    return policy.lcNumberFromParent(this.model);
   }
 
-  /**
-   * Business instruction 2026-08-15 ("Look Up Current Balance should use
-   * the existing LC Number on Screen... instead of keyin") — whatever LC
-   * Number is currently resolved for THIS function, from whichever picker
-   * shape it came from (freely typed A1/B1, Parent picker A6/A8, flat
-   * Catalog A2-A5/A3S, or the LC+IB/SG two-field search A7/A9/B5). Feeds
-   * both the Checker queue below and runLookup()'s auto-fill.
-   */
+  /** The state slice `contextLcNumber`/`contextSecondaryRef` resolve against — see function-policy.ts. */
+  private get contextRefState(): policy.ContextRefState {
+    return {
+      model: this.model,
+      naturalKey: this.naturalKey,
+      searchNaturalKey: this.searchNaturalKey,
+      selectedParent: this.selectedParent,
+      selectedContract: this.selectedContract,
+      selectedFunction: this.selectedFunction,
+    };
+  }
+
   get contextLcNumber(): string | null {
-    if (this.lcNumberFromParent) return this.selectedParent?.naturalKey.lcNumber ?? null;
-    if (this.isCreatingMovement) return this.naturalKey.lcNumber || null;
-    if (this.usesTwoFieldSearch) return this.selectedContract?.naturalKey.lcNumber ?? (this.searchNaturalKey.lcNumber || null);
-    return this.selectedContract?.naturalKey.lcNumber ?? null;
+    return policy.contextLcNumber(this.contextRefState);
   }
 
-  /** Same idea as contextLcNumber, for the SG/IB Number half of a two-field natural key (SHGT/Acceptance) — the LC Number is never sourced from the Parent picker for this half, even on A6/A8, since SG/IB Number is always freely typed by the Maker. Feeds syncCheckerToContext() below. */
   get contextSecondaryRef(): string | null {
-    const field = this.checkerSecondaryField;
-    if (!field) return null;
-    if (this.isCreatingMovement) return this.naturalKey[field] || null;
-    if (this.usesTwoFieldSearch) return this.selectedContract?.naturalKey[field] ?? (this.searchNaturalKey[field] || null);
-    return this.selectedContract?.naturalKey[field] ?? null;
+    return policy.contextSecondaryRef(this.contextRefState);
   }
 
   /**
@@ -1472,18 +1436,12 @@ export class TransactionBuilderComponent {
     return this.checkerContract?.balanceContractId ?? null;
   }
 
-  /**
-   * Which second natural-key field (if any) the Checker's own search needs,
-   * for THIS function's own instrumentType (selectedFunction.instrumentType
-   * — same "available immediately, unlike model.instrumentType" rationale as
-   * checkerContractId's doc comment above).
-   */
   get checkerSecondaryField(): 'ibNumber' | 'sgNumber' | null {
-    return this.selectedFunction?.instrumentType ? (NATURAL_KEY_FIELDS_BY_INSTRUMENT[this.selectedFunction.instrumentType][0] ?? null) : null;
+    return policy.checkerSecondaryField(this.selectedFunction);
   }
 
   get checkerSecondaryLabel(): string {
-    return this.checkerSecondaryField === 'ibNumber' ? (this.selectedFunction?.instrumentType === 'EPLC_ACCEPTANCE' ? 'EB Number' : 'IB Number') : 'SG Number';
+    return policy.checkerSecondaryLabel(this.selectedFunction);
   }
 
   /**
@@ -1786,311 +1744,73 @@ export class TransactionBuilderComponent {
     });
   }
 
+  /**
+   * BAL-003 (God Component, 2026-08-17) — the 131-line Formly config body moved verbatim into
+   * `buildFields()` (builder-fields.ts) as a pure function. It never mutated anything but
+   * `this.fields`, so all that is left here is assembling the context and assigning the result;
+   * same "guard/params unchanged, only the body moves" convention as `loadPagedCatalog`,
+   * `finishCheckerAction`, and `loadSnapshotAndMovements` before it.
+   */
   private rebuildFields(): void {
-    // Business instruction 2026-08-14: "The amount should carry from the related LC number + IB number and
-    // protected. The Tenor Type and Tenor days should carry from the LC Number and protected as well." — A6/B4
-    // only, and only once the source has actually been picked (before that, they're normal editable inputs).
-    // Also A7/B5 Full Settle ("the amount should be carried from IB record and protected... if full settle") —
-    // Partial Settle stays free-typed, it's a genuine amount decision each time, not a carried-over value.
-    const amountFromDocArrival = !!this.selectedFunction?.settlesDocumentArrival && !!this.selectedPayMovement;
-    const amountFromFullSettle = this.model.movementType === 'FULL_SETTLE' && !!this.selectedContractSnapshot;
-    // Business instruction 2026-08-15 ("There is no need to select Full or Partial as long as the
-    // amount is not greater than the SG Balance. The defaulted amount is the SG Balance and
-    // mandatory.", refined same day: "Amount default to SG Available Balance") — A9 only, replacing
-    // the earlier Full-Redeem-locked/Partial-Redeem-free split with a single freely-editable Amount,
-    // pre-filled to the SG's Available Balance (refreshSelectedContractSnapshot()/afterResolved() set
-    // this on selection — Available, not Confirmed, so an already-PENDING redemption on the same SG
-    // is correctly netted out) and capped at it (props.max below) — never disabled. FULL_REDEEM vs
-    // PARTIAL_REDEEM is derived at submit() time from whether the typed amount still equals that
-    // Available Balance, not picked by the user (autoRedeemType — see its own doc comment).
-    const amountCappedAtSg = !!this.selectedFunction?.autoRedeemType && !!this.selectedContractSnapshot;
-    // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance>0的EB交易") — same
-    // default-to-Available/freely-editable-down-to-Partial/capped-at-it shape as amountCappedAtSg above,
-    // just for B5's own Usance/CNF_MATURE branch (model.instrumentType === 'EPLC_ACCEPTANCE', B5's own
-    // fixed registry type — see settlesAcceptanceOnMature's own doc comment for why this is always true
-    // for a real B5 submission, not a conditional fallback resolution).
-    const amountCappedAtAcceptance =
-      !!this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && !!this.selectedContractSnapshot;
-    const amountLocked = amountFromDocArrival || amountFromFullSettle;
-    const tenorLocked = !!this.selectedFunction?.tenorTypeOptions?.length && this.isCreatingMovement && this.hasParent && !!this.selectedParent;
-    // Business instruction 2026-08-16 ("A1/B1 = Input; every other function = Carry from A1/B1 +
-    // Protected") — see carriedCurrency's own doc comment.
-    const currencyLocked = !!this.carriedCurrency;
-    this.fields = [
-      {
-        key: 'amount',
-        type: 'input',
-        props: {
-          label: amountFromFullSettle
-            ? "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)"
-            : amountCappedAtSg
-              ? "Amount (defaults to the Shipping Guarantee's Available Balance — reduce for a Partial Redeem, must not exceed it)"
-              : amountCappedAtAcceptance
-                ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
-                : this.selectedFunction?.documentArrivalWithSg
-                  ? // Business instruction 2026-08-15 ("Bill Amount = actual Document Arrival amount... SG
-                    // Redemption Amount = system-calculated MIN(Bill Amount, SG Outstanding)") — reverses the
-                    // prior full-match-only design (Bill Amount used to be locked to the SG's outstanding).
-                    'Bill Amount (actual document amount — see SG Redemption Amount below)'
-                  : amountLocked
-                    ? 'Amount (carried from the Document Arrival, protected)'
-                    : 'Amount (face-level, per Design doc §6.2)',
-          required: true,
-          type: 'number',
-          disabled: amountLocked,
-          max: amountCappedAtSg || amountCappedAtAcceptance ? Number(this.selectedContractSnapshot!.availableBalance) : undefined,
-          // Keeps the input's own spinner/step granularity in sync with whichever Currency is typed
-          // alongside it (e.g. JPY -> step 1, no cents) — see decimalPlacesForCurrency's own doc
-          // comment (balance-component.model.ts) for the ISO 4217 minor-unit table this reads.
-          step: Math.pow(10, -decimalPlacesForCurrency(this.model.currency)),
-        },
-        // Currency is a free-typed sibling field (no fixed dropdown to hook a (change) event off of),
-        // so — same as tenorDays' own props.min/props.disabled above — this uses Formly's expressions
-        // to keep props.step live as the user types a Currency, rather than rebuildFields() (which
-        // would reassign the whole `this.fields` array on every keystroke and risk input-focus loss).
-        expressions: {
-          'props.step': (f: any) => Math.pow(10, -decimalPlacesForCurrency(f.model?.currency)),
-        },
-      },
-      {
-        key: 'currency',
-        type: 'input',
-        props: {
-          label: currencyLocked ? 'Currency (carried from the existing record, protected)' : 'Currency',
-          required: true,
-          disabled: currencyLocked,
-        },
-      },
-      {
-        key: 'tolerancePct',
-        type: 'input',
-        props: { label: 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)', type: 'number' },
-        hide: !this.toleranceApplicable,
-      },
-      {
-        key: 'secondaryRef',
-        type: 'input',
-        props: { label: this.dynamicSecondaryRefLabel ?? 'Reference No.', required: !!this.dynamicSecondaryRefLabel },
-        hide: !this.dynamicSecondaryRefLabel,
-      },
-      {
-        key: 'tenorType',
-        type: 'select',
-        props: {
-          label: tenorLocked ? 'Tenor Type (carried from the parent LC, protected)' : 'Tenor Type (Design doc §7 Tenor Type Routing)',
-          required: !!this.selectedFunction?.tenorTypeOptions?.length,
-          options: this.selectedFunction?.tenorTypeOptions ?? [],
-          disabled: tenorLocked,
-        },
-        hide: !this.selectedFunction?.tenorTypeOptions?.length,
-      },
-      {
-        key: 'tenorDays',
-        type: 'input',
-        props: { label: tenorLocked ? 'Tenor Days (carried from the parent LC, protected)' : 'Tenor Days', type: 'number', disabled: tenorLocked },
-        hide: !this.selectedFunction?.tenorTypeOptions?.length,
-        // Business instruction 2026-08-15 ("A1: Sight => Tenor Days = 0 and protected; not Sight
-        // => Tenor Days must be > 0, mandatory") — extended same-day to B1 (Confirm LC) since it
-        // declares its own Tenor Type/Days independently, same as A1. Uses Formly's `expressions`
-        // (reacts live to the Tenor Type dropdown, evaluated internally by Formly on every model
-        // change) rather than rebuildFields(), which would reassign `this.fields` on every
-        // keystroke and risk the same input-focus loss as a live-reordered *ngFor.
-        ...((this.selectedFunction?.code === 'A1' || this.selectedFunction?.code === 'B1') && !tenorLocked
-          ? {
-              expressions: {
-                'props.disabled': (f: any) => f.model?.tenorType === 'SIGHT',
-                'props.required': (f: any) => !!f.model?.tenorType && f.model.tenorType !== 'SIGHT',
-                'props.min': (f: any) => (f.model?.tenorType && f.model.tenorType !== 'SIGHT' ? 1 : null),
-                'props.label': (f: any) => (f.model?.tenorType === 'SIGHT' ? 'Tenor Days (Sight — always 0, protected)' : 'Tenor Days'),
-                className: (f: any) => (f.model?.tenorType && f.model.tenorType !== 'SIGHT' ? 'tb-field--required' : ''),
-                'model.tenorDays': (f: any) => (f.model?.tenorType === 'SIGHT' ? 0 : f.model?.tenorDays),
-              },
-            }
-          : {}),
-      },
-      { key: 'eventSeq', type: 'input', props: { label: 'Event Seq (idempotency key part, Design doc §8)', required: true, type: 'number' } },
-      { key: 'createdBy', type: 'input', props: { label: 'Created By (Maker)', required: true } },
-    ];
-    // Mandatory-field visual distinction (UI/UX best practice: don't rely on the tiny asterisk
-    // alone) — applies uniformly to every function (A1-A9/B1-B5) since it reads props.required
-    // rather than hardcoding field keys. See .tb-field--required in the stylesheet.
-    for (const f of this.fields) {
-      if (f.props?.required) f.className = [f.className, 'tb-field--required'].filter(Boolean).join(' ');
-    }
+    this.fields = buildFields({
+      model: this.model,
+      selectedFunction: this.selectedFunction,
+      selectedPayMovement: this.selectedPayMovement,
+      selectedContract: this.selectedContract,
+      selectedContractSnapshot: this.selectedContractSnapshot,
+      selectedParent: this.selectedParent,
+      dynamicSecondaryRefLabel: this.dynamicSecondaryRefLabel,
+    });
   }
 
   /**
-   * Quality-report-balance.md BAL-003 — submit()'s own ~430-line body was first split (same-day) into
-   * this validation step, buildSubmitRequest() (request assembly), five named per-shape submission
-   * methods, and submit() itself as a thin dispatcher — pure code motion at the time, deliberately kept
-   * on the component rather than moved into a service, for the same reason `finishCheckerAction`'s own
-   * doc comment gave for the equivalent Checker-side methods: this logic reads/writes deeply into
-   * component state.
+   * BAL-003 (God Component, 2026-08-17) — validateSubmit()/buildSubmitRequest()'s own bodies moved
+   * into `submit-rules.ts` as pure functions.
    *
-   * That reasoning was revisited later (6th same-day OOD/SOLID pass, "Maker Submit service") the same
-   * way `CheckerActionsService`'s own extraction had already reversed the identical argument on the
-   * Checker side: the five submission methods and the dispatch `if` chain moved into
-   * `MakerSubmitService` (see that file's own doc comment) via Dependency Inversion — a narrow
-   * `MakerSubmitContext` interface, never the component itself. `validateSubmit()` and
-   * `buildSubmitRequest()` below, unlike the five submission methods, genuinely earn staying on the
-   * component: they read/write `model`/`naturalKey`/`selectedParent`/`selectedContractSnapshot`/etc. so
-   * pervasively (including in-place derivations like `model.movementType`/`model.tenorDays`) that a
-   * service extraction would only relocate that coupling, not remove it.
+   * This reverses the reasoning the previous doc comment here gave for keeping them ("they read/write
+   * `model`/`naturalKey`/`selectedParent`/`selectedContractSnapshot`/etc. so pervasively — including
+   * in-place derivations like `model.movementType`/`model.tenorDays` — that a service extraction
+   * would only relocate that coupling"). That argument holds against a SERVICE extraction, which
+   * would need mutable component state handed to it and written back. It does not hold against a
+   * PURE FUNCTION: the reads become one explicit context parameter, and the two in-place derivations
+   * become an explicit returned `patch` applied here — the coupling is made visible, then removed.
+   *
+   * The `patch` is applied REGARDLESS of `error`, deliberately: in the old inline version a mutation
+   * made by an early guard survived a later guard's own failure return, and that is observable.
    */
   private validateSubmit(): boolean {
-    if (!this.model.instrumentType || !this.model.movementType || !this.model.amount || !this.model.currency || !this.model.createdBy) {
-      this.submitError = 'Fill in amount, currency, createdBy.';
+    const { error, patch } = validateSubmitRules(this.submitRulesContext);
+    Object.assign(this.model, patch);
+    if (error) {
+      this.submitError = error;
       return false;
-    }
-    if (amountExceedsCurrencyDecimals(this.model.amount, this.model.currency)) {
-      this.submitError = `Amount ${this.model.amount} has more decimal places than ${this.model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(this.model.currency)}).`;
-      return false;
-    }
-    if (this.dynamicSecondaryRefLabel && !this.model.secondaryRef) {
-      this.submitError = `${this.dynamicSecondaryRefLabel} is mandatory for ${this.selectedFunction?.code}.`;
-      return false;
-    }
-    if (this.isCreatingMovement && this.model.instrumentType === 'SHGT' && !this.naturalKey.sgNumber) {
-      this.submitError = 'SG Number is mandatory when issuing a Shipping Guarantee.';
-      return false;
-    }
-    if (this.lcNumberFromParent && !this.naturalKey.lcNumber) {
-      this.submitError = "Pick the Parent LC first — that selection supplies this record's LC Number.";
-      return false;
-    }
-    // Business-reported gap 2026-08-14: A1/B1 (LC Issue) never had this
-    // check — lcNumberFromParent above only covers A6/B4/A8, which get the
-    // LC Number from the Parent picker. A1/B1 type it free-text and had
-    // nothing stopping a blank submission, silently creating a Logical
-    // Contract with lc_number='' (found live via a blank-LC-Number row in
-    // the Catalog during this session's testing).
-    if (this.isCreatingMovement && !this.lcNumberFromParent && !this.naturalKey.lcNumber) {
-      this.submitError = 'LC Number is mandatory.';
-      return false;
-    }
-    if (this.requiredNaturalKeyFields.includes('ibNumber') && this.isCreatingMovement && !this.naturalKey.ibNumber) {
-      this.submitError = `${this.ibNumberLabel} is mandatory.`;
-      return false;
-    }
-    if (this.selectedFunction?.tenorTypeOptions?.length && !this.model.tenorType) {
-      this.submitError = `Tenor Type is mandatory for ${this.selectedFunction.code}.`;
-      return false;
-    }
-    // Business instruction 2026-08-15 ("A1: Sight => Tenor Days = 0, protected; not Sight => Tenor
-    // Days must be > 0, mandatory") — the tenorDays field's expressions (rebuildFields()) already
-    // enforce this visually/reactively; this is the submit-time backstop, matching how every other
-    // mandatory field in this method is checked (submit() never gates on this.form.valid).
-    if (this.selectedFunction?.code === 'A1') {
-      if (this.model.tenorType === 'SIGHT') {
-        this.model.tenorDays = 0;
-      } else if (!this.model.tenorDays || Number(this.model.tenorDays) <= 0) {
-        this.submitError = "Tenor Days must be greater than 0 for Seller's/Buyer's Usance.";
-        return false;
-      }
-    }
-    // Business instruction 2026-08-14 ("A6 => Approved LC Balance and Create Acceptance Balance"),
-    // generalized 2026-08-15 for B4 ("B4 should index records from B3") — A6/B4 must convert a
-    // SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
-    if (this.selectedFunction?.settlesDocumentArrival && !this.selectedPayMovement) {
-      this.submitError = `Pick the still-PENDING ${this.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`;
-      return false;
-    }
-    // A3S must be tied to a SPECIFIC Shipping Guarantee — same reasoning as A6 above, just against an
-    // outstanding SG record instead of an existing PENDING Document Arrival.
-    if (this.selectedFunction?.documentArrivalWithSg && (!this.selectedArrivalSg || !this.arrivalSgSnapshot)) {
-      this.submitError = 'Pick the Shipping Guarantee this Document Arrival is against first.';
-      return false;
-    }
-    // Business instruction 2026-08-15 ("no need to select Full or Partial as long as the amount is not
-    // greater than the SG Balance. The defaulted amount is the SG Balance and mandatory.", refined same
-    // day: "Amount default to SG Available Balance") — A9 only. props.max in rebuildFields() already
-    // guards this reactively; this is the submit-time backstop, matching how every other mandatory rule
-    // in this method is checked. Checked against Available (Confirmed minus any other already-PENDING
-    // redemption on this same SG), not Confirmed — same distinction as shgtRedeem.ts's commitment-control
-    // fix, otherwise this could offer/accept an amount the server's own sufficiency check would reject.
-    // movementType is DERIVED here — never picked by the user — FULL_REDEEM when the typed amount still
-    // equals the SG's current Available Balance, PARTIAL_REDEEM when it's been reduced below it.
-    if (this.selectedFunction?.autoRedeemType) {
-      if (!this.selectedContractSnapshot) {
-        this.submitError = 'Search for the Shipping Guarantee to redeem first.';
-        return false;
-      }
-      const available = this.selectedContractSnapshot.availableBalance;
-      if (Number(this.model.amount) > Number(available)) {
-        this.submitError = `Amount must not exceed the SG's Available Balance (${available}).`;
-        return false;
-      }
-      this.model.movementType = Number(this.model.amount) === Number(available) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM';
-    }
-    // Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
-    // Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5 only, same "derive Full/Partial from
-    // amount vs Available" shape as autoRedeemType above, just targeting SETTLE instead of REDEEM. B5's
-    // own instrumentType is fixed to EPLC_ACCEPTANCE (Usance held-to-maturity — B5 has no Sight branch
-    // of its own, see settlesAcceptanceOnMature's own doc comment), so this condition is always true for
-    // a real B5 submission. Grounded in the frozen spec's own event table (impl-spec-en.md CNF_MATURE
-    // row): "−CONFIRMED_ACCEPTANCE_DPU_OUTSTANDING | −BENEFICIARY_ACCOUNT; +NOSTRO / −ACCEPTANCE_REIMB_
-    // RECEIVABLE_ISSUING_BANK" — ONE event clearing both the Acceptance liability and its matching
-    // Reimbursement Receivable together, not two independent ones the way CNF_REIMB (Sight/Nego'd) is.
-    if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE') {
-      if (!this.selectedContractSnapshot) {
-        this.submitError = 'Search for the Acceptance to settle first.';
-        return false;
-      }
-      const available = this.selectedContractSnapshot.availableBalance;
-      if (Number(this.model.amount) > Number(available)) {
-        this.submitError = `Amount must not exceed the Acceptance's Available Balance (${available}).`;
-        return false;
-      }
-      this.model.movementType = Number(this.model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
     }
     return true;
   }
 
-  /** BAL-003 — assembles the base CreateMovementRequest, same field-by-field logic as before this split. Returns null (and sets submitError) only for the "no contract picked" case — every other precondition was already checked by validateSubmit(). */
-  private buildSubmitRequest(): CreateMovementRequest | null {
-    const req: CreateMovementRequest = {
-      instrumentType: this.model.instrumentType!,
-      movementType: this.model.movementType!,
-      eventSeq: this.model.eventSeq ?? Date.now(),
-      amount: String(this.model.amount),
-      currency: this.model.currency!,
-      createdBy: this.model.createdBy!,
+  /** The state slice the two pure Maker-submit rule functions read — see submit-rules.ts. */
+  private get submitRulesContext(): SubmitRulesContext {
+    return {
+      model: this.model,
+      naturalKey: this.naturalKey,
+      selectedFunction: this.selectedFunction,
+      dynamicSecondaryRefLabel: this.dynamicSecondaryRefLabel,
+      activeFunctionSide: this.activeFunctionSide,
+      selectedPayMovement: this.selectedPayMovement,
+      selectedArrivalSg: this.selectedArrivalSg,
+      arrivalSgSnapshot: this.arrivalSgSnapshot,
+      selectedContractSnapshot: this.selectedContractSnapshot,
+      selectedContract: this.selectedContract,
+      selectedParent: this.selectedParent,
+      exposureNature: this.exposureNature,
     };
-    if (this.toleranceApplicable && this.model.tolerancePct) req.tolerancePct = String(this.model.tolerancePct);
-    if (this.model.secondaryRef) req.sourceTransactionRef = this.model.secondaryRef;
-    if (this.selectedFunction?.tenorTypeOptions?.length) {
-      req.tenorType = this.model.tenorType;
-      if (this.model.tenorDays) req.tenorDays = Number(this.model.tenorDays);
-    }
+  }
 
-    if (this.isCreatingMovement) {
-      req.naturalKey = {
-        lcNumber: this.naturalKey.lcNumber,
-        ibNumber: this.naturalKey.ibNumber || null,
-        sgNumber: this.naturalKey.sgNumber || null,
-      };
-    } else if (this.selectedContract) {
-      req.balanceContractId = this.selectedContract.balanceContractId;
-    } else {
-      this.submitError = 'Pick a contract from the Catalog below.';
-      return null;
-    }
-
-    if (this.hasParent && this.selectedParent) {
-      req.parentLogicalContractId = this.selectedParent.logicalContractId;
-    }
-    if (this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.model.movementType === 'CREATE') {
-      req.exposureNature = this.exposureNature;
-    }
-    // Bug fixed 2026-08-16 ("A6/B4 也修一下") — A6/B4 only: stamps the picked source Document
-    // Arrival/Present Docs record's own movementId onto the new primary movement, so a genuinely
-    // independent Checker session can later resolve and release it without needing this Maker's own
-    // in-memory selectedPayMovement — see CreateMovementRequest.referencedTransactionId's own doc
-    // comment for the full rule.
-    if (this.selectedFunction?.settlesDocumentArrival && this.selectedPayMovement) {
-      req.referencedTransactionId = this.selectedPayMovement.movementId;
-    }
-    return req;
+  /** BAL-003 — thin wrapper over `buildSubmitRequest()` (submit-rules.ts); surfaces its one "no contract picked" error the same way the inline version did. */
+  private buildSubmitRequest(): CreateMovementRequest | null {
+    const { request, error } = buildSubmitRequestRules(this.submitRulesContext);
+    if (error) this.submitError = error;
+    return request;
   }
 
   /**
@@ -2125,7 +1845,8 @@ export class TransactionBuilderComponent {
     if (outcome.secondary.dueFromIssuingBankMovementId !== undefined) this.dueFromIssuingBankMovementId = outcome.secondary.dueFromIssuingBankMovementId;
     if (outcome.secondary.acceptanceMovementId !== undefined) this.acceptanceMovementId = outcome.secondary.acceptanceMovementId;
     if (outcome.secondary.acceptanceMovement !== undefined) this.acceptanceMovement = outcome.secondary.acceptanceMovement;
-    if (outcome.secondary.acceptanceReimbReceivableMovementId !== undefined) this.acceptanceReimbReceivableMovementId = outcome.secondary.acceptanceReimbReceivableMovementId;
+    if (outcome.secondary.acceptanceReimbReceivableMovementId !== undefined)
+      this.acceptanceReimbReceivableMovementId = outcome.secondary.acceptanceReimbReceivableMovementId;
     if (outcome.secondary.matchedReceivableMovementId !== undefined) this.matchedReceivableMovementId = outcome.secondary.matchedReceivableMovementId;
 
     if (outcome.kind === 'submitted') {
@@ -2156,7 +1877,6 @@ export class TransactionBuilderComponent {
 
     this.makerSubmit.submit(req, this.buildMakerSubmitContext()).subscribe((outcome) => this.applyMakerSubmitOutcome(outcome));
   }
-
 
   /**
    * A3 (Document Arrival (Sight)) Checker action — business instruction

@@ -143,7 +143,11 @@ describe('MakerSubmitService.submit() — dispatch routing', () => {
   it('routes B4 to the Honour+DueFromIssuingBank compound when movementType is HONOUR', (done) => {
     const api = makeApi();
     const service = new MakerSubmitService(api);
-    const ctx = makeContext({ selectedFunction: B4, model: { amount: '1000', currency: 'USD', createdBy: 'maker1', movementType: 'HONOUR' }, selectedContract: makeContract() });
+    const ctx = makeContext({
+      selectedFunction: B4,
+      model: { amount: '1000', currency: 'USD', createdBy: 'maker1', movementType: 'HONOUR' },
+      selectedContract: makeContract(),
+    });
 
     service.submit(makeReq({ movementType: 'HONOUR' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('submitted');
@@ -155,7 +159,11 @@ describe('MakerSubmitService.submit() — dispatch routing', () => {
   it('routes B4 to the Accept+Acceptance+Receivable compound when movementType is ACCEPT', (done) => {
     const api = makeApi();
     const service = new MakerSubmitService(api);
-    const ctx = makeContext({ selectedFunction: B4, model: { amount: '1000', currency: 'USD', createdBy: 'maker1', movementType: 'ACCEPT' }, selectedContract: makeContract() });
+    const ctx = makeContext({
+      selectedFunction: B4,
+      model: { amount: '1000', currency: 'USD', createdBy: 'maker1', movementType: 'ACCEPT' },
+      selectedContract: makeContract(),
+    });
 
     service.submit(makeReq({ movementType: 'ACCEPT' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('submitted');
@@ -167,7 +175,11 @@ describe('MakerSubmitService.submit() — dispatch routing', () => {
   it('routes B5 to the Settle+Receivable compound when instrumentType is EPLC_ACCEPTANCE', (done) => {
     const api = makeApi();
     const service = new MakerSubmitService(api);
-    const ctx = makeContext({ selectedFunction: B5, model: { amount: '1000', currency: 'USD', createdBy: 'maker1', instrumentType: 'EPLC_ACCEPTANCE' }, selectedContract: makeContract() });
+    const ctx = makeContext({
+      selectedFunction: B5,
+      model: { amount: '1000', currency: 'USD', createdBy: 'maker1', instrumentType: 'EPLC_ACCEPTANCE' },
+      selectedContract: makeContract(),
+    });
 
     service.submit(makeReq({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('submitted');

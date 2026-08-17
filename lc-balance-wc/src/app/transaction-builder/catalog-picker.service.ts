@@ -62,7 +62,14 @@ export class CatalogPickerService {
     return this.paging.nextTarget();
   }
 
-  load(args: { guardFails: boolean; instrumentType: InstrumentType; page: number; lcNumber?: string; tenorFamily?: 'SIGHT' | 'USANCE'; onLoaded?: (items: BalanceContract[]) => void }): void {
+  load(args: {
+    guardFails: boolean;
+    instrumentType: InstrumentType;
+    page: number;
+    lcNumber?: string;
+    tenorFamily?: 'SIGHT' | 'USANCE';
+    onLoaded?: (items: BalanceContract[]) => void;
+  }): void {
     this.page = args.page;
     if (args.guardFails) {
       this.contracts = [];

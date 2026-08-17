@@ -46,19 +46,21 @@ surfaced BAL-122 and BAL-123 below.
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
+| **Reliability** | A (4.8/5) | 973/973 tests passing across 3 independent suites (648 Angular + 292 microservice + 33 backend, up from 835 — 113 new tests added for the `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` extraction, which had none before this pass). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage), and (found in a later same-day pass, reviewing a further BAL-003 extraction) **BAL-135** — a genuine, live Major bug (B5's own Amount field silently always locked/disabled, contradicting the documented business rule) surfaced only once dedicated unit tests were written for code that previously had none — and **every one of these was fixed the same pass it was found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A (4.9/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) **grew to 2,923 lines mid-pass** (A4's own Maker-side logic landing directly in the class) before three further post-close-out extractions — Maker Submit into `MakerSubmitService`, the Look Up panel into `LookUpPanelService`, then the three paginated pickers' load-and-page bookkeeping into `CatalogPickerService` (the last at a scope the user deliberately narrowed after a full selection-flow extraction was investigated and found too entangled with Maker orchestration) — brought it down to **2,304 lines**, net below where this pass started. Still open at Major (function/side selection and the pickers' own selection/business-filter logic remain), but every "does too many things" candidate this session's own BAL-003 history identified has now been extracted via the same Dependency Inversion pattern. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper). BAL-003 remains the one open Maintainability finding of any real weight, now materially narrower in scope than at any earlier point in this report's history. |
-| **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
+| **Maintainability** | A (4.9/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) **grew to 2,923 lines mid-pass** (A4's own Maker-side logic landing directly in the class) before four further post-close-out extractions — Maker Submit into `MakerSubmitService`, the Look Up panel into `LookUpPanelService`, the three paginated pickers' load-and-page bookkeeping into `CatalogPickerService`, then the state-derivation getters/Formly field factory/Maker-submit validation into `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` — brought it down to **2,024 lines**, well below where this pass started. Still open at Major (function/side selection and the pickers' own selection/business-filter logic remain), but every "does too many things" candidate this session's own BAL-003 history identified has now been extracted via the same Dependency Inversion / pure-function pattern. **BAL-136** (found this same pass) — `validateSubmit`/`buildSubmitRequest` shadowing their own imports by name — is now fixed via import aliasing. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper). BAL-003 remains the one open Maintainability finding of any real weight, now materially narrower in scope than at any earlier point in this report's history. |
+| **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (Angular count grew 534 → 648 — 113 new tests closing what had been a zero-coverage gap for `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts`, Angular branch coverage itself rising 95.98% → 96.37%, not just holding the floor; microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 → 100 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 → 100 → 100 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A → A → A)**
 
 **A composite of 100 does not mean this codebase is flawless or production-ready — see the paragraph
 immediately below and [Gate Conditions](#gate-conditions-before-any-production-consideration).** It
 means every single finding this specific 2026-08-17 reassessment pass itself surfaced — two Major bugs/
-gaps, one completeness gap, six Minor/Info code-smell findings, and one incidentally-discovered stale
-scenario — is now fixed, with zero exceptions remaining. BAL-001 (no auth, Blocker), BAL-002 (dependency
+gaps, one completeness gap, six Minor/Info code-smell findings, one incidentally-discovered stale
+scenario, and (in this pass's own later same-day continuation, reviewing a further BAL-003 extraction
+found already sitting uncommitted) one more genuine Major bug (**BAL-135**) plus one Minor code smell
+(**BAL-136**) — is now fixed, with zero exceptions remaining. BAL-001 (no auth, Blocker), BAL-002 (dependency
 CVEs, Critical), BAL-102 (SQLite locking, Major), and BAL-003 (God Component, Major) are all still
 open — every one of them **deferred, not resolved** — and have been open at every composite score point
 on this entire trend line, including its very first 86. The number tracks "how much of what this review
@@ -172,7 +174,7 @@ assessment. See [Gate Conditions](#gate-conditions-before-any-production-conside
 | [BAL-122](#bal-122) | 🟡 Major | Bug | A4's generic "Delete Pending (EC)" button cancels the **upstream A3/A3S Document Arrival**, not an A4-specific record — **Fixed** |
 | [BAL-123](#bal-123) | 🟡 Major | Vulnerability / Design Risk | A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY client-side — the microservice's own `/release` never checks it — **Fixed** |
 | [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites — **Fixed** |
-| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — **submit() split, paging state/math unified, Checker Actions extracted into `CheckerActionsService` via Dependency Inversion; still open — now 2,923 lines, grew further this pass with A4's own Maker-side logic, real decomposition remains future work** |
+| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — 8 extractions completed (Checker Actions, Maker Submit, Look Up panel, paginated pickers, function-policy/builder-fields/submit-rules), 2,923 → **2,024 lines**; still open — function/side selection and the pickers' own selection/business-filter logic remain, deliberately not extracted |
 | [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — deferred, user-confirmed |
 | [BAL-116](#bal-116) | 🔵 Minor | Code Smell | `zod` is a declared dependency but never used — request validation is manual presence checks only — **Fixed** |
 | [BAL-117](#bal-117) | 🔵 Minor | Security Hotspot | Both Express services' 500 handlers echo raw internal error messages to the client — **Fixed** |
@@ -193,6 +195,8 @@ assessment. See [Gate Conditions](#gate-conditions-before-any-production-conside
 | [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Fixed** |
 | [BAL-132](#bal-132) | ⚪ Info | Code Smell | `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion bypasses the type system's own declared nullability — **Fixed** |
 | [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — **Fixed** |
+| [BAL-135](#bal-135) | 🟡 Major | Bug | B5's own Amount field was silently ALWAYS locked/disabled, contradicting the documented "freely-editable, reduce for Partial Settle" business rule — **Fixed** |
+| [BAL-136](#bal-136) | 🔵 Minor | Code Smell | `validateSubmit`/`buildSubmitRequest` share their exact names between the component's own private methods and the pure functions imported from `submit-rules.ts` — **Fixed** |
 | [BAL-101](#fixed-in-prior-passes--re-verified-still-fixed-this-pass) | — | — | Fixed in prior passes, re-verified still fixed this pass (see below) |
 | [BAL-111](#bal-111) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found, in either store layer |
 | [BAL-112](#bal-112) | ⚪ Info (positive) | — | Test coverage clears 95% on all four metrics, all three suites |
@@ -537,7 +541,7 @@ Full three-suite re-verification per this file's own standing rule: Angular app 
 ## Code Smells & Maintainability
 
 ### BAL-003
-**`transaction-builder.component.ts` is still a God Component** — 🟡 Major (all 3 planned extractions attempted, plus a 4th OOD/SOLID pass unifying paging state, a 5th extracting Checker Actions into a service, a 6th extracting Maker Submit into a service, a 7th extracting the Look Up panel into a service, and an 8th extracting the paginated pickers' load-and-page bookkeeping into a service — see the seven Outcomes below)
+**`transaction-builder.component.ts` is still a God Component** — 🟡 Major (all 3 planned extractions attempted, plus a 4th OOD/SOLID pass unifying paging state, a 5th extracting Checker Actions into a service, a 6th extracting Maker Submit into a service, a 7th extracting the Look Up panel into a service, an 8th extracting the paginated pickers' load-and-page bookkeeping into a service, and a 9th extracting the pure state-derivation getters/Formly field factory/Maker-submit validation into `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` — see the eight Outcomes below)
 
 **Evidence:**
 ```
@@ -894,6 +898,61 @@ and microservice 292/292, both unaffected (Angular-only change).
 Major** — function/side selection and the pickers' own selection/business-filter logic remain, deliberately
 not extracted per the investigation above — but every extraction this session's BAL-003 history judged
 worth doing, at a scope the user actually confirmed rather than one picked unilaterally, is now done.
+
+**Eighth outcome (2026-08-17, user-directed — "Review all recent changes and ensure they continue to
+comply with the established Balance Component development and quality requirements... for the fixing of
+God Component. Check it out."): a 9th extraction (`function-policy.ts`/`builder-fields.ts`/
+`submit-rules.ts`) found already sitting uncommitted, reviewed and hardened rather than authored from
+scratch.** This extraction was NOT written in this conversation — found already present in the working
+tree (three new files plus a further-shrunk component) when responding to the user's comprehensive
+review request. Treated it the same as self-authored work per that request's own explicit instruction
+("don't consider it complete just because the new functionality works"): verified it end-to-end and
+closed every gap found, rather than assuming prior authorship meant it was already complete.
+
+**What it does** (confirmed byte-for-byte pure code motion via diff review against the pre-extraction
+component): `function-policy.ts` moves the ~15 purely state-derivation getters
+(`isCreatingMovement`/`hasParent`/`contextLcNumber`/`checkerSecondaryField`/etc.) into plain functions of
+a small state slice, with the component's own getters reduced to one-line delegations.
+`builder-fields.ts` moves `rebuildFields()`'s own 131-line Formly config body into a pure
+`buildFields(ctx) => FormlyFieldConfig[]` function. `submit-rules.ts` moves `validateSubmit()`/
+`buildSubmitRequest()`'s own bodies into pure functions returning `{error, patch}`/`{request, error}`
+instead of mutating `this.model`/`this.submitError` directly — reversing, for these two methods
+specifically, the Fifth outcome's own stated reason for keeping them on the component (a *service*
+extraction would only relocate the `this.model` coupling; a *pure function* with an explicit context
+parameter and an explicit returned `patch` genuinely removes it).
+
+**Gaps found and closed**: no dedicated unit tests existed for any of the three new files — added
+`function-policy.spec.ts` (49 tests), `builder-fields.spec.ts` (27 tests), `submit-rules.spec.ts` (39
+tests), all three files now at 100% statements/branches/functions/lines individually (closing two branches
+that were previously only incidentally covered through the component's own indirect tests:
+`settlesDocumentArrival`-without-`selectedPayMovement`, and B5's own `PARTIAL_SETTLE` derivation) — same
+"direct unit tests for a pure/utility module" convention `paged-list-state.spec.ts` already established in
+this codebase. Writing `builder-fields.spec.ts` surfaced **BAL-135**, a genuine business-rule-violating
+bug pre-dating this session's own work (B5's Amount field silently always locked/disabled, contradicting
+the documented "freely-editable, capped, reduce for Partial Settle" rule) — found and fixed with two
+regression tests, not just documented. Reviewing the extraction's own naming also surfaced **BAL-136**
+(the component's private `validateSubmit`/`buildSubmitRequest` methods shadow the imported pure functions
+of the same name) — fixed via import aliasing. `npm run format:check` additionally caught 4 pre-existing,
+previously-unformatted files left over from this session's own EARLIER extractions (Look Up
+panel/Catalog Picker/Checker Actions) that had never been run through `prettier --write` — reformatted,
+whitespace-only, zero logic changes.
+
+Verified: `tsc --noEmit`/`ng build --configuration development`/`npm run lint`/`npm run format:check` all
+clean (lint: 211 warnings, up from 202 — the 9 new ones are `any`-typed Formly `expressions` callback
+parameters, matching this codebase's own pre-existing convention for untyped Formly callbacks). Full
+Angular suite 648/648 (534 pre-existing + 113 new (BAL-135's own two fixed tests included in that count),
+coverage 99.71%/96.37%/99.46%/99.75% — branches genuinely UP from 95.98%, not merely holding the floor.
+`backend/` 33/33, microservice `typecheck` clean + 292/292, both unaffected and re-verified per this
+file's own standing three-suite rule. `npm audit --omit=dev` run fresh across all three sub-projects:
+`backend/` and the microservice both 0 vulnerabilities; the Angular app's own 8 High `@angular/core` CVEs
+are unchanged (BAL-002, an already-open, deliberately-deferred structural gap — a major-version Angular
+upgrade is out of scope here).
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` 2,304 → 2,024 lines — the lowest this file
+has been all session. **BAL-003 stays open at Major** — function/side selection and the pickers' own
+selection/business-filter logic remain (per the Seventh outcome's own investigation) — but this pass adds
+real value beyond line count: a genuine defect (BAL-135) found and fixed with regression coverage, not
+just code relocated.
 
 ---
 
@@ -1375,6 +1434,72 @@ obsolete. Title/description updated to describe what the case now demonstrates. 
 suite 32/32 (title assertion updated), and **live-verified end to end** against the real microservice —
 every step 2xx, both final snapshots match exactly; all 7 Import Case entries re-run individually
 afterward confirm the fix disturbed nothing else in the registry.
+
+---
+
+### BAL-135
+**B5's own Amount field was silently ALWAYS locked/disabled** — 🟡 Major (Bug) — **Fixed**
+
+**Evidence:** discovered while writing dedicated unit tests for `builder-fields.ts` (part of the
+uncommitted BAL-003 9th-pass extraction — see BAL-003's own "Eighth outcome" below). B5's own registry
+entry (`balance-component.model.ts`) declares `movementType: 'FULL_SETTLE'` as a placeholder default — the
+real FULL_SETTLE/PARTIAL_SETTLE value is DERIVED at submit() time from Amount vs Available Balance (same
+pattern as A9's own `autoRedeemType`), never picked by the user. `buildFields()`'s own
+`amountFromFullSettle` check (`model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot`) is a
+real, correct, and INTENTIONALLY separate rule for A7's own explicit Full-Settle-vs-Partial-Settle
+subChoice — but since B5 happens to share that exact literal string as its own default, and nothing
+between `afterResolved()` and `buildFields()` ever changes `model.movementType` away from it before
+Submit, `amountFromFullSettle` matched on every single B5 render — pre-empting the newer, more specific,
+correctly-designed `amountCappedAtAcceptance` rule (added 2026-08-16, i.e. chronologically after
+`amountFromFullSettle` itself — that rule's own doc comment even still read "A7/B5 Full Settle", stale
+evidence the collision was never caught). Net effect: B5's Amount field rendered `disabled: true` with the
+label "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)" unconditionally,
+directly contradicting the explicit 2026-08-16 business instruction ("B6改成B5選資料為有Acceptance
+Balance>0的EB交易" — "freely-editable... reduce for a Partial Settle, must not exceed it") documented in
+the very same file, one rule below the buggy one.
+
+**Impact:** Major — a real, live business-rule violation: any Maker attempting a genuine B5 Partial Settle
+(paying less than the Acceptance's full outstanding Available Balance) would find the Amount field
+uneditable, with no way to type a smaller value through the UI. Confirmed this predates the current
+session's extraction — it was present in the original inline `rebuildFields()` too (the extraction itself
+is byte-for-byte, confirmed via diff review) — this pass's new direct unit tests surfaced it, indirect
+component-level testing never had a B5-specific Amount-field assertion that would have caught it.
+
+**Fix:** `amountFromFullSettle` now explicitly excludes `selectedFunction?.settlesAcceptanceOnMature`
+(B5's own flag) — `!selectedFunction?.settlesAcceptanceOnMature && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot`
+— so B5 always routes through its own dedicated `amountCappedAtAcceptance` rule instead; A7 (which has no
+`settlesAcceptanceOnMature`) is completely unaffected, preserving its own correct locked-on-Full-Settle
+behavior. The stale "A7/B5" comment was corrected to "A7" and a new comment documents the exclusion and
+why it's needed. Two regression tests added to `builder-fields.spec.ts` lock in both sides: A7's Full
+Settle subChoice still locks the Amount field; B5 stays editable/capped even sharing the same literal
+`movementType` value. Verified: full Angular suite 648/648 (was already 622 with the new-but-unfixed
+tests failing one case; the fix + regression tests bring it to fully green), `builder-fields.ts` at 100%
+statements/branches/functions/lines.
+
+---
+
+### BAL-136
+**`validateSubmit`/`buildSubmitRequest` share their exact names between component methods and imported pure functions** — 🔵 Minor (Code Smell) — **Fixed**
+
+**Evidence:** the uncommitted BAL-003 9th-pass extraction (see BAL-003's own "Eighth outcome" below)
+imports `validateSubmit`/`buildSubmitRequest` from `submit-rules.ts`, and the component ALSO defines its
+own private methods of the exact same names, each calling the bare (imported) function of the same name
+one line into its own body — e.g. `private validateSubmit(): boolean { const {error, patch} =
+validateSubmit(this.submitRulesContext); ... }`. Legal TypeScript (an unqualified reference inside a
+method body resolves to the enclosing module scope, not implicitly to `this.methodOfTheSameName` —
+confirmed by every test and the build passing regardless), but a real readability trap: a reader skimming
+`this.validateSubmit()` at the `submit()` call site has no visual cue that the method's own first line
+calls something entirely different that happens to share its name. None of this session's other five
+BAL-003 extractions has this shape — `checkerActions`/`makerSubmit`/`lookUp`/`catalogPicker`/
+`parentPicker`/`ibIndexPicker` are all bound to distinctly-named fields, avoiding the ambiguity entirely.
+
+**Impact:** Minor — purely a maintainability/readability risk, not a functional defect (verified: behavior
+is correct either way, this is a naming clarity issue only).
+
+**Fix:** aliased the import — `buildSubmitRequest as buildSubmitRequestRules`, `validateSubmit as
+validateSubmitRules` — updating the two call sites inside the component's own like-named methods. No
+other changes; both methods' own external signatures/behavior are unchanged. Verified: `tsc --noEmit`
+clean, full Angular suite 648/648 unaffected.
 
 ---
 

@@ -2329,6 +2329,100 @@ Major — function/side selection and the pickers' own selection/business-filter
 not extracted (see the investigation above) — but every extraction this session's BAL-003 history judged
 worth doing, at a scope the user actually confirmed, is now done.
 
+## BAL-003 — a 9th extraction (function-policy.ts / builder-fields.ts / submit-rules.ts), reviewed and hardened per the user's own "keep tests/docs/quality-report synchronized" standing checklist (2026-08-17, user: "There have been additional changes to the lc-balance-wc project. Review all recent changes and ensure they continue to comply with the established Balance Component development and quality requirements... for the fixing of God Component. Check it out.")
+
+Found this extraction already sitting uncommitted in the working tree — three new files
+(`function-policy.ts`, `builder-fields.ts`, `submit-rules.ts`) plus a further-shrunk
+`transaction-builder.component.ts` — authored outside this conversation, not by the Look Up
+panel/Maker Submit/Catalog Picker work above. Treated it the same as a self-authored change: verified it
+end-to-end (typecheck/build/lint/format/full three-suite tests), added the dedicated unit coverage it was
+missing, and found + fixed one real business-rule bug and one readability defect along the way, per the
+user's explicit "don't consider it complete just because the new functionality works" instruction.
+
+**What the extraction itself does** (pure code motion, confirmed byte-for-byte against the pre-extraction
+component via diff review): `function-policy.ts` — the ~15 purely state-derivation getters
+(`isCreatingMovement`/`hasParent`/`contextLcNumber`/`checkerSecondaryField`/etc.), now plain functions of
+a small state slice, with the component's own getters reduced to one-line delegations. `builder-fields.ts`
+— `rebuildFields()`'s own 131-line Formly config body, now a pure `buildFields(ctx) => FormlyFieldConfig[]`
+function. `submit-rules.ts` — `validateSubmit()`/`buildSubmitRequest()`'s own bodies, now pure functions
+returning `{error, patch}`/`{request, error}` instead of mutating `this.model`/`this.submitError` directly;
+the component's own two like-named private methods become thin `Object.assign(this.model, patch)` +
+error-surfacing wrappers. The extraction's own doc comments carefully argue why THIS specific pair
+(`validateSubmit`/`buildSubmitRequest`) is now extractable as pure functions even though an earlier
+decision (recorded in this same file, "Fifth outcome" era) had kept them on the component specifically
+because a *service* extraction would only relocate their `this.model` coupling, not remove it — a pure
+function with an explicit context parameter and an explicit returned `patch` genuinely does remove it,
+which a service handed the same mutable state wouldn't.
+
+**BAL-135 (Major, found and fixed): B5's own Amount field was silently ALWAYS locked/disabled**, in direct
+contradiction of the 2026-08-16 business instruction cited in the same file ("B6改成B5選資料為有Acceptance
+Balance>0的EB交易" — "freely-editable... reduce for a Partial Settle"). Root cause: `buildFields()`'s
+`amountFromFullSettle` check (`model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot`) is a
+real, correct rule for A7's own explicit Full-Settle-vs-Partial-Settle subChoice — but B5's own registry
+entry ALSO declares `movementType: 'FULL_SETTLE'` as a placeholder default (never picked by the user; the
+real FULL_SETTLE/PARTIAL_SETTLE value is derived at submit() time from Amount vs Available, same pattern
+as A9's own `autoRedeemType`), and nothing between `afterResolved()` and `buildFields()` ever changes
+`model.movementType` away from that default before Submit. So `amountFromFullSettle` matched on every
+single B5 render, pre-empting the newer, more specific, correctly-designed `amountCappedAtAcceptance` rule
+(added 2026-08-16, i.e. after `amountFromFullSettle`'s own comment — which still read "A7/B5 Full Settle",
+stale evidence the collision was never noticed) — the Amount field showed `disabled: true` and "Full
+Settle — carried... protected" for B5 unconditionally, when it should have shown `disabled: false` with a
+`max` cap at the Available Balance, editable down for a Partial Settle. Confirmed this is a genuine
+pre-existing defect (present in the original inline `rebuildFields()` too, since the extraction is
+byte-for-byte) that this session's new direct unit tests surfaced — not something the extraction itself
+introduced. **Fix**: `amountFromFullSettle` now explicitly excludes `selectedFunction?.settlesAcceptanceOnMature`
+(B5's own flag), so B5 always routes through its own dedicated `amountCappedAtAcceptance` rule instead; A7
+(which has no `settlesAcceptanceOnMature`) is unaffected. Two regression tests lock in both sides of the
+fix (`builder-fields.spec.ts`: "A7's own Full Settle subChoice still locks the Amount field" /
+"B5 stays editable/capped even though its own registry movementType default is the SAME literal").
+
+**BAL-136 (Minor code smell, found and fixed): `validateSubmit`/`buildSubmitRequest` share their exact
+names** between the component's own private wrapper methods and the pure functions imported from
+`submit-rules.ts` — legal (an unqualified reference inside a method body resolves to the outer module
+scope, not implicitly to `this.methodOfTheSameName`) and every test/build passed regardless, but a real
+readability trap for a future reader skimming `this.validateSubmit()` without noticing the bare
+`validateSubmit(ctx)` call one line into its own body refers to something else entirely. None of this
+session's other five extractions has this shape — `checkerActions`/`makerSubmit`/`lookUp`/
+`catalogPicker`/`parentPicker`/`ibIndexPicker` are all bound to distinctly-named fields. **Fix**: aliased
+the import (`buildSubmitRequest as buildSubmitRequestRules`, `validateSubmit as validateSubmitRules`) —
+the two call sites inside the component's own like-named methods now read unambiguously.
+
+**Test coverage added** (none existed for the three new files before this pass): `function-policy.spec.ts`
+(49 tests), `builder-fields.spec.ts` (27 tests, including the two BAL-135 regression tests),
+`submit-rules.spec.ts` (39 tests, including a dedicated regression test for the `patch`-survives-a-later-
+guard-failure contract `SubmitValidation.patch`'s own doc comment describes) — all three files now sit at
+100% statements/branches/functions/lines individually, closing the two branches
+(`settlesDocumentArrival`-without-`selectedPayMovement`, B5's own `PARTIAL_SETTLE` derivation) that were
+previously covered only incidentally (95.98%/96.25% branch figures) through the component's own indirect
+integration tests, same convention as `paged-list-state.spec.ts`'s own direct-unit-test precedent for a
+pure/utility module in this codebase (unlike `LookUpPanelService`/`CatalogPickerService`, which are
+stateful classes still tested only indirectly through the component). Each new spec file follows this
+codebase's own established local-fixture-builder convention (`fn()`/`contract()`/`snapshot()`/`movement()`
+redefined per file, not shared) — a real but pre-existing, not newly-introduced, duplication pattern.
+
+**Also fixed while running the standard verification pass**: `npm run format:check` flagged 4
+PRE-EXISTING files as unformatted — `catalog-picker.service.ts`, `checker-actions.service.ts`,
+`maker-submit.service.spec.ts`, `transaction-builder.component.gaps.spec.ts` (all from earlier extractions
+in this session, never run through `prettier --write` after editing) — reformatted (whitespace-only,
+confirmed via diff, zero logic changes), plus the two new spec files once written.
+
+**Verified**: `tsc --noEmit`/`ng build --configuration development`/`npm run lint`/`npm run format:check`
+all clean (lint: 211 warnings, up from 202 — the 9 new warnings are `any`-typed Formly `expressions`
+callback parameters in the new spec files/`builder-fields.ts`, matching this codebase's own pre-existing
+convention for untyped Formly callbacks, not a new pattern). Full Angular suite 648/648 (534 pre-existing
++ 113 new), coverage 99.71%/96.37%/99.46%/99.75% (branches UP from 95.98%, not just holding the floor).
+`backend/` 33/33, microservice `typecheck` clean + 292/292, both unaffected and re-verified per this file's
+own standing three-suite rule. `npm audit --omit=dev` run across all three sub-projects: `backend/` and
+the microservice both report 0 vulnerabilities; the Angular app's own 8 High `@angular/core` CVEs are
+unchanged (BAL-002, an already-open, deliberately-deferred structural gap — a major-version Angular
+upgrade is out of scope for this pass).
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` 2,304 → 2,024 lines — the lowest this file
+has been all session. BAL-003 stays open at Major (function/side selection and the pickers' own
+selection/business-filter logic remain, per the Seventh outcome's own investigation above), but this pass
+adds real value beyond line count: a genuine business-rule-violating defect (BAL-135) found and fixed with
+regression coverage, not just code relocated.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation
@@ -2337,3 +2431,103 @@ suites for: the v0.12 unmatched-vs-matched Document Arrival hardening, SG-Issue-
 (v0.10→v0.11), the SG concurrent-PENDING-redemption bug fix, the event timeline, Tenor Type Routing,
 the re-ISSUE guard, the duplicate secondary-reference guard, Maker EC/Delete-Pending, and unit-level
 coverage of every domain function/error/money module named above.
+
+## BAL-003 — three pure-function extractions: `builder-fields.ts`, `submit-rules.ts`, `function-policy.ts` (2026-08-17, user-directed after an Angular-best-practice review of `transaction-builder.component.ts`)
+
+Continues this session's BAL-003 (God Component) history. Started from a measurement rather than an
+estimate: the file's 2,304 lines are **1,276 code + 911 comment + 118 blank** — the comment mass is
+this project's own business-instruction traceability, so the target was always ~3x on real code, and
+every comment had to MOVE WITH its rule rather than be dropped. The class held ~55 mutable fields,
+30 getters, and 62 methods; the template carries 80 `*ngIf`.
+
+Before starting, the user was offered three scopes (pure extractions / + a real `<app-checker-panel>`
+child component / a full signals + `toSignal`-`switchMap` migration to the ~400-line target) and
+explicitly chose **pure extractions only** — the only one of the three with zero spec-file blast
+radius. The other two are recorded here as the remaining options, not as work silently skipped: a
+genuine child component is blocked by the same constraint the Look Up panel extraction already hit
+(this project's direct-instantiation test convention never renders a DOM, so `@ViewChild`/`@Input`
+wiring is unreachable from ~40 existing Checker assertions), and the signals migration would rewrite
+large parts of all four spec files (~4,100 lines) since ~500 assertions read fields directly
+(`comp.selectedFunction` → `comp.selectedFunction()`).
+
+### `builder-fields.ts` — `buildFields(ctx): FormlyFieldConfig[]`
+`rebuildFields()` was never really a method: it read eight pieces of state and assigned one array,
+mutating nothing else. Moved verbatim as a pure function; the component's own `rebuildFields()` is now
+18 lines (assemble `BuilderFieldsContext`, assign `this.fields`) — same "guard/params unchanged, only
+the body moves" convention as `loadPagedCatalog`/`finishCheckerAction`/`loadSnapshotAndMovements`.
+Every label string, `hide`/`disabled`/`required` condition, and Formly `expressions` callback is
+byte-for-byte unchanged, including the Amount/Currency/Tenor "carried forward and protected" business
+instructions this is the actual UI-side enforcement point for.
+
+### `submit-rules.ts` — `validateSubmit(ctx)` / `buildSubmitRequest(ctx)`
+**This deliberately reverses the reasoning `validateSubmit()`'s own prior doc comment gave** for
+keeping both on the component ("they read/write `model`/`naturalKey`/`selectedParent`/
+`selectedContractSnapshot`/etc. so pervasively — including in-place derivations like
+`model.movementType`/`model.tenorDays` — that a service extraction would only relocate that
+coupling"). That argument holds against a *service* extraction, which would need mutable component
+state handed to it and written back. It does not hold against a *pure function*: the reads become one
+explicit `SubmitRulesContext` parameter, and the two in-place derivations become an explicit returned
+`patch` the caller applies — the coupling is made visible in the signature, then removed. Same shape
+as `CheckerActionsService`/`MakerSubmitService`'s own extractions reversing the identical argument
+earlier this session.
+
+**The one genuinely subtle behavior preserved**: the caller applies `patch` **regardless of `error`**,
+not only on success. In the old inline version the A1 Sight/`tenorDays = 0` normalization happened
+before later guards ran, so a mutation made by an early guard survived a later guard's own failure
+return — observable, and reproduced exactly by accumulating the patch as validation proceeds and
+applying it unconditionally. `buildSubmitRequest()` must therefore still be called only after the
+patch is applied (A9/B5's derived FULL/PARTIAL `movementType` and A1's `tenorDays` both feed fields it
+reads) — stated explicitly in its own doc comment.
+
+### `function-policy.ts` — the pure getters
+Selection criterion: a getter earned a place here only if it *derives* a value — anything that
+fetches, mutates, or orchestrates stayed on the component (or had already moved to
+`CheckerActionsService`/`MakerSubmitService`/`LookUpPanelService`/`CatalogPickerService` in this
+session's earlier passes). Moved: `isCreatingMovement`, `requiredNaturalKeyFields`, `ibNumberLabel`,
+`hasParent`, `parentOptions`, `carriedCurrency`, `usesTwoFieldSearch`, `toleranceApplicable`,
+`isReady`, `lcNumberFromParent`, `contextLcNumber`, `contextSecondaryRef`, `checkerSecondaryField`,
+`checkerSecondaryLabel`, `parentTenorFamily`. The component's own getters are now one-line delegations
+(`policy.xxx(...)`), kept purely as the template's binding surface and the ~90 existing spec
+assertions' read surface — none contains logic anymore. `BuilderModel` moved here too (it was a
+non-exported local interface in the component file) so the rule modules that read it needn't import
+from the component; it is unreferenced by any spec, so nothing needed updating.
+
+### Verification
+Angular app **534/534 passing with ZERO spec-file changes** — the strongest evidence available that
+behavior is preserved, since the whole suite was written against the pre-extraction implementation and
+still passes completely unmodified (same evidence standard every prior BAL-003 extraction in this
+session used). Coverage 99.71%/95.98%/99.46%/99.75%, all four clear the 95% floor; the three new files
+land at **100%/100%/100%/100%** (`builder-fields.ts`, `function-policy.ts`) and
+**100%/96.25%/100%/100%** (`submit-rules.ts`) with no new tests written — they are exercised entirely
+through the existing component specs, which is itself the proof this was pure code motion.
+`npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean,
+`npm run lint` **0 errors / 202 warnings (unchanged baseline)**, `prettier --check` clean on all four
+touched/created files.
+
+File size: `transaction-builder.component.ts` **2,304 → 2,024 lines** (1,276 → ~1,000 code lines);
+`function-policy.ts` 174, `submit-rules.ts` 212, `builder-fields.ts` 165.
+
+**Verification caveats, stated honestly rather than glossed:**
+- **`backend/` re-run and green (33/33, 97.32%/95.34%/96.42%/98.03%)**, per this file's standing
+  three-suite rule.
+- **The microservice suite could NOT be re-run this pass.** `npx jest` in
+  `microservices/balance-component/` fails to start with `Preset ts-jest not found relative to
+  rootDir`, even though `require.resolve('ts-jest/jest-preset')` succeeds from that same directory —
+  a jest preset-resolution artifact of the Linux session VM reading a Windows-installed
+  `node_modules`, not a test failure and not caused by this change. This pass modified **zero files**
+  under `microservices/` or `backend/` (Angular-only), and the one real cross-project coupling —
+  `instrument-type-contract.spec.ts`, which reads the microservice's `types.ts`/`balanceDerivation.ts`
+  as plain text — ran and passed. Re-run `npm test` there natively on Windows to close the loop.
+- **No live in-browser verification this pass.** Static verification is unusually strong here (strict-
+  template `ng build`, full typecheck, and a 534-test suite that needed no edits), and unlike the
+  `submit()`-split or `CheckerActionsService` passes this touches no API-call ordering — but a human
+  should still click through one A-series and one B-series function once.
+
+**Net effect on BAL-003**: BAL-003 stays open at Major. What remains on the component is now almost
+entirely *orchestration and view-binding surface* rather than rules: function/side selection, the
+three pickers' selection handlers, the ~50-line manual reset block in `selectFunction()`, and the
+imperative `loadX()`/`xLoading` pairs. Those last two are exactly what the two declined scopes above
+would remove — the reset block collapses when state is `computed()` from a `selectedFunction` signal,
+and each `loadX()`/`xLoading` pair collapses into one `toSignal(... switchMap ...)` stream (which
+would also close a real latent bug the imperative version has: a slow first response can overwrite a
+fast second one, since nothing cancels the in-flight request when the user re-clicks).
