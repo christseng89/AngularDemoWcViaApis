@@ -124,22 +124,22 @@ describe('TransactionBuilderComponent', () => {
   describe('selectFunctionSide', () => {
     it('IMPORT sets lookup.instrumentType to IPLC_LC and leaves sgNumber alone', () => {
       const { comp } = makeComponent();
-      comp.lookup.sgNumber = 'SG1';
+      comp.lookUp.lookup.sgNumber = 'SG1';
       comp.selectFunctionSide('IMPORT');
 
       expect(comp.activeFunctionSide).toBe('IMPORT');
-      expect(comp.lookup.instrumentType).toBe('IPLC_LC');
-      expect(comp.lookup.sgNumber).toBe('SG1');
+      expect(comp.lookUp.lookup.instrumentType).toBe('IPLC_LC');
+      expect(comp.lookUp.lookup.sgNumber).toBe('SG1');
     });
 
     it('EXPORT sets lookup.instrumentType to EPLC_CONFIRMATION and clears sgNumber (no SG on Export)', () => {
       const { comp } = makeComponent();
-      comp.lookup.sgNumber = 'SG1';
+      comp.lookUp.lookup.sgNumber = 'SG1';
       comp.selectFunctionSide('EXPORT');
 
       expect(comp.activeFunctionSide).toBe('EXPORT');
-      expect(comp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
-      expect(comp.lookup.sgNumber).toBe('');
+      expect(comp.lookUp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
+      expect(comp.lookUp.lookup.sgNumber).toBe('');
     });
   });
 
@@ -269,7 +269,7 @@ describe('TransactionBuilderComponent', () => {
       comp.naturalKey = { lcNumber: 'X', ibNumber: 'Y', sgNumber: 'Z' };
       comp.searchNaturalKey = { lcNumber: 'X', ibNumber: 'Y', sgNumber: 'Z' };
       comp.searchError = 'stale';
-      comp.lookup.sgNumber = 'SG1';
+      comp.lookUp.lookup.sgNumber = 'SG1';
 
       comp.selectFunction(B1);
 
@@ -277,8 +277,8 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.searchNaturalKey).toEqual({ lcNumber: '', ibNumber: '', sgNumber: '' });
       expect(comp.searchError).toBeNull();
       expect(comp.activeFunctionSide).toBe('EXPORT');
-      expect(comp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
-      expect(comp.lookup.sgNumber).toBe('');
+      expect(comp.lookUp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
+      expect(comp.lookUp.lookup.sgNumber).toBe('');
       expect(comp.model.tenorType).toBe('SIGHT'); // B1 also gets the Sight default
     });
   });

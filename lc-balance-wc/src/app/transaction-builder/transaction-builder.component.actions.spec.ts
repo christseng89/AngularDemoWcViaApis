@@ -1573,13 +1573,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       );
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '750' })) as any);
       api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
-      comp.lookup = { instrumentType: 'SHGT', lcNumber: 'LC001', ibNumber: '', sgNumber: 'SG01' };
+      comp.lookUp.lookup = { instrumentType: 'SHGT', lcNumber: 'LC001', ibNumber: '', sgNumber: 'SG01' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.lookupResult?.snapshot.availableBalance).toBe('750');
-      expect(comp.lookupMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
-      expect(comp.lookupError).toBeNull();
+      expect(comp.lookUp.lookupResult?.snapshot.availableBalance).toBe('750');
+      expect(comp.lookUp.lookupMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
+      expect(comp.lookUp.lookupError).toBeNull();
       // SHGT has no Acceptance-tab type and isn't IPLC_LC, so neither extra catalog fetch fires.
       expect(api.catalog).not.toHaveBeenCalled();
     });
@@ -1587,23 +1587,23 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('resolveContract error sets lookupError and leaves lookupResult null', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-      comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC999', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC999', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.lookupError).toBe('NOT_FOUND');
-      expect(comp.lookupResult).toBeNull();
+      expect(comp.lookUp.lookupError).toBe('NOT_FOUND');
+      expect(comp.lookUp.lookupResult).toBeNull();
     });
 
     it('getSnapshot error (after a successful resolveContract) sets lookupError', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract()) as any);
       api.getSnapshot.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-      comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.lookupError).toBe('NOT_FOUND');
+      expect(comp.lookUp.lookupError).toBe('NOT_FOUND');
     });
 
     it('IPLC_LC contract: fetches both Acceptance and SG candidates, auto-selecting a sole candidate on each', () => {
@@ -1614,25 +1614,25 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
           of({ items: [makeContract({ balanceContractId: 'bc-acc-1', instrumentType: 'IPLC_ACCEPTANCE' })], total: 1, page: 1, pageSize: 50 }) as any,
         )
         .mockReturnValueOnce(of({ items: [makeContract({ balanceContractId: 'bc-sg-1', instrumentType: 'SHGT' })], total: 1, page: 1, pageSize: 50 }) as any);
-      comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
       expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001');
       expect(api.catalog).toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001');
-      expect(comp.acceptancesUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-acc-1']);
-      expect(comp.sgsUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-sg-1']);
+      expect(comp.lookUp.acceptancesUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-acc-1']);
+      expect(comp.lookUp.sgsUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-sg-1']);
       // Sole candidate on each tab auto-selects.
-      expect(comp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
-      expect(comp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
+      expect(comp.lookUp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
+      expect(comp.lookUp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
     });
 
     it('EPLC_CONFIRMATION contract: fetches Acceptance candidates (EPLC_ACCEPTANCE) only, never SG', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE' })) as any);
-      comp.lookup = { instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookup = { instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
       expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001');
       expect(api.catalog).not.toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001');
@@ -1642,51 +1642,51 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract()) as any);
       api.listMovements.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-      comp.lookupMovements = [makeMovement()];
-      comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookupMovements = [makeMovement()];
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.lookupMovements).toEqual([]);
+      expect(comp.lookUp.lookupMovements).toEqual([]);
     });
 
     it('a failed Acceptance-candidates catalog fetch resets acceptancesUnderLookup to empty', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' })) as any);
       api.catalog.mockReturnValueOnce(apiErr('NOT_FOUND') as any).mockReturnValueOnce(of({ items: [], total: 0, page: 1, pageSize: 50 }) as any);
-      comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.acceptancesUnderLookup).toEqual([]);
+      expect(comp.lookUp.acceptancesUnderLookup).toEqual([]);
     });
 
     it('a failed SG-candidates catalog fetch resets sgsUnderLookup to empty', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' })) as any);
       api.catalog.mockReturnValueOnce(of({ items: [], total: 0, page: 1, pageSize: 50 }) as any).mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-      comp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.sgsUnderLookup).toEqual([]);
+      expect(comp.lookUp.sgsUnderLookup).toEqual([]);
     });
 
     it('resets any prior tab/selection state on a fresh call', () => {
       const { comp, api } = setup();
-      comp.lookupTab = 'ACCEPTANCE';
-      comp.selectedLookupAcceptance = makeContract({ balanceContractId: 'stale-acc' });
-      comp.acceptanceSnapshot = makeSnapshot();
-      comp.selectedLookupSg = makeContract({ balanceContractId: 'stale-sg' });
+      comp.lookUp.lookupTab = 'ACCEPTANCE';
+      comp.lookUp.selectedLookupAcceptance = makeContract({ balanceContractId: 'stale-acc' });
+      comp.lookUp.acceptanceSnapshot = makeSnapshot();
+      comp.lookUp.selectedLookupSg = makeContract({ balanceContractId: 'stale-sg' });
       api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'SHGT' })) as any);
-      comp.lookup = { instrumentType: 'SHGT', lcNumber: 'LC001', ibNumber: '', sgNumber: 'SG01' };
+      comp.lookUp.lookup = { instrumentType: 'SHGT', lcNumber: 'LC001', ibNumber: '', sgNumber: 'SG01' };
 
-      comp.runLookup();
+      comp.lookUp.runLookup();
 
-      expect(comp.lookupTab).toBe('LC');
-      expect(comp.selectedLookupAcceptance).toBeNull();
-      expect(comp.acceptanceSnapshot).toBeNull();
-      expect(comp.selectedLookupSg).toBeNull();
+      expect(comp.lookUp.lookupTab).toBe('LC');
+      expect(comp.lookUp.selectedLookupAcceptance).toBeNull();
+      expect(comp.lookUp.acceptanceSnapshot).toBeNull();
+      expect(comp.lookUp.selectedLookupSg).toBeNull();
     });
   });
 
@@ -1696,52 +1696,52 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('selectLookupTab()', () => {
     it('ACCEPTANCE tab auto-selects the sole candidate when none is yet selected', () => {
       const { comp, api } = setup();
-      comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot()) as any);
 
-      comp.selectLookupTab('ACCEPTANCE');
+      comp.lookUp.selectLookupTab('ACCEPTANCE');
 
-      expect(comp.lookupTab).toBe('ACCEPTANCE');
-      expect(comp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
+      expect(comp.lookUp.lookupTab).toBe('ACCEPTANCE');
+      expect(comp.lookUp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
     });
 
     it('SG tab auto-selects the sole candidate when none is yet selected', () => {
       const { comp, api } = setup();
-      comp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
+      comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot()) as any);
 
-      comp.selectLookupTab('SG');
+      comp.lookUp.selectLookupTab('SG');
 
-      expect(comp.lookupTab).toBe('SG');
-      expect(comp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
+      expect(comp.lookUp.lookupTab).toBe('SG');
+      expect(comp.lookUp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
     });
 
     it('LC tab just switches — no auto-select side effects', () => {
       const { comp, api } = setup();
 
-      comp.selectLookupTab('LC');
+      comp.lookUp.selectLookupTab('LC');
 
-      expect(comp.lookupTab).toBe('LC');
+      expect(comp.lookUp.lookupTab).toBe('LC');
       expect(api.getSnapshot).not.toHaveBeenCalled();
     });
 
     it('ACCEPTANCE tab does not re-trigger auto-select when a selection already exists', () => {
       const { comp, api } = setup();
-      comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
-      comp.selectedLookupAcceptance = makeContract({ balanceContractId: 'bc-acc-1' });
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
+      comp.lookUp.selectedLookupAcceptance = makeContract({ balanceContractId: 'bc-acc-1' });
 
-      comp.selectLookupTab('ACCEPTANCE');
+      comp.lookUp.selectLookupTab('ACCEPTANCE');
 
       expect(api.getSnapshot).not.toHaveBeenCalled();
     });
 
     it('ACCEPTANCE tab does not auto-select when there is more than one candidate', () => {
       const { comp, api } = setup();
-      comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' }), makeContract({ balanceContractId: 'bc-acc-2' })];
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' }), makeContract({ balanceContractId: 'bc-acc-2' })];
 
-      comp.selectLookupTab('ACCEPTANCE');
+      comp.lookUp.selectLookupTab('ACCEPTANCE');
 
-      expect(comp.selectedLookupAcceptance).toBeNull();
+      expect(comp.lookUp.selectedLookupAcceptance).toBeNull();
       expect(api.getSnapshot).not.toHaveBeenCalled();
     });
   });
@@ -1752,41 +1752,41 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('selectLookupSg()', () => {
     it('found: loads snapshot + event timeline sorted by eventSeq', () => {
       const { comp, api } = setup();
-      comp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
+      comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '250' })) as any);
       api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
 
-      comp.selectLookupSg('bc-sg-1');
+      comp.lookUp.selectLookupSg('bc-sg-1');
 
-      expect(comp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
-      expect(comp.sgSnapshot?.availableBalance).toBe('250');
-      expect(comp.sgMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
+      expect(comp.lookUp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
+      expect(comp.lookUp.sgSnapshot?.availableBalance).toBe('250');
+      expect(comp.lookUp.sgMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
     });
 
     it('not found: resets selection, snapshot, and movements', () => {
       const { comp, api } = setup();
-      comp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
-      comp.sgSnapshot = makeSnapshot();
-      comp.sgMovements = [makeMovement()];
+      comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
+      comp.lookUp.sgSnapshot = makeSnapshot();
+      comp.lookUp.sgMovements = [makeMovement()];
 
-      comp.selectLookupSg('does-not-exist');
+      comp.lookUp.selectLookupSg('does-not-exist');
 
-      expect(comp.selectedLookupSg).toBeNull();
-      expect(comp.sgSnapshot).toBeNull();
-      expect(comp.sgMovements).toEqual([]);
+      expect(comp.lookUp.selectedLookupSg).toBeNull();
+      expect(comp.lookUp.sgSnapshot).toBeNull();
+      expect(comp.lookUp.sgMovements).toEqual([]);
       expect(api.getSnapshot).not.toHaveBeenCalled();
     });
 
     it('getSnapshot/listMovements errors reset sgSnapshot/sgMovements respectively', () => {
       const { comp, api } = setup();
-      comp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
+      comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
       api.getSnapshot.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
       api.listMovements.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
 
-      comp.selectLookupSg('bc-sg-1');
+      comp.lookUp.selectLookupSg('bc-sg-1');
 
-      expect(comp.sgSnapshot).toBeNull();
-      expect(comp.sgMovements).toEqual([]);
+      expect(comp.lookUp.sgSnapshot).toBeNull();
+      expect(comp.lookUp.sgMovements).toEqual([]);
     });
   });
 
@@ -1796,44 +1796,44 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('selectLookupAcceptance()', () => {
     it('found: loads snapshot + event timeline sorted by eventSeq, independent of the LC tab', () => {
       const { comp, api } = setup();
-      comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
-      comp.lookupResult = { contract: makeContract({ balanceContractId: 'bc-lc-1' }), snapshot: makeSnapshot({ availableBalance: '999' }) };
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
+      comp.lookUp.lookupResult = { contract: makeContract({ balanceContractId: 'bc-lc-1' }), snapshot: makeSnapshot({ availableBalance: '999' }) };
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '400' })) as any);
       api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
 
-      comp.selectLookupAcceptance('bc-acc-1');
+      comp.lookUp.selectLookupAcceptance('bc-acc-1');
 
-      expect(comp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
-      expect(comp.acceptanceSnapshot?.availableBalance).toBe('400');
-      expect(comp.acceptanceMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
+      expect(comp.lookUp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
+      expect(comp.lookUp.acceptanceSnapshot?.availableBalance).toBe('400');
+      expect(comp.lookUp.acceptanceMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
       // The LC tab's own lookupResult is untouched.
-      expect(comp.lookupResult?.snapshot.availableBalance).toBe('999');
+      expect(comp.lookUp.lookupResult?.snapshot.availableBalance).toBe('999');
     });
 
     it('not found: resets selection, snapshot, and movements', () => {
       const { comp, api } = setup();
-      comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
-      comp.acceptanceSnapshot = makeSnapshot();
-      comp.acceptanceMovements = [makeMovement()];
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
+      comp.lookUp.acceptanceSnapshot = makeSnapshot();
+      comp.lookUp.acceptanceMovements = [makeMovement()];
 
-      comp.selectLookupAcceptance('does-not-exist');
+      comp.lookUp.selectLookupAcceptance('does-not-exist');
 
-      expect(comp.selectedLookupAcceptance).toBeNull();
-      expect(comp.acceptanceSnapshot).toBeNull();
-      expect(comp.acceptanceMovements).toEqual([]);
+      expect(comp.lookUp.selectedLookupAcceptance).toBeNull();
+      expect(comp.lookUp.acceptanceSnapshot).toBeNull();
+      expect(comp.lookUp.acceptanceMovements).toEqual([]);
       expect(api.getSnapshot).not.toHaveBeenCalled();
     });
 
     it('getSnapshot/listMovements errors reset acceptanceSnapshot/acceptanceMovements respectively', () => {
       const { comp, api } = setup();
-      comp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
       api.getSnapshot.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
       api.listMovements.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
 
-      comp.selectLookupAcceptance('bc-acc-1');
+      comp.lookUp.selectLookupAcceptance('bc-acc-1');
 
-      expect(comp.acceptanceSnapshot).toBeNull();
-      expect(comp.acceptanceMovements).toEqual([]);
+      expect(comp.lookUp.acceptanceSnapshot).toBeNull();
+      expect(comp.lookUp.acceptanceMovements).toEqual([]);
     });
   });
 });

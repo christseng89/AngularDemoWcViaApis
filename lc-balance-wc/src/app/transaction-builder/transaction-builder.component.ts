@@ -9,6 +9,7 @@ import { IndexPickerComponent } from './index-picker.component';
 import { PagedListState } from './paged-list-state';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './maker-submit.service';
+import { LookUpPanelService } from './look-up-panel.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   CREATING_MOVEMENT_TYPES,
@@ -349,43 +350,6 @@ export class TransactionBuilderComponent {
   /** A3 (Document Arrival (Sight)) only — set by approveArrival(), a Checker acknowledgment that does NOT call the backend release API. */
   arrivalApproved = false;
 
-  lookup = { instrumentType: 'IPLC_LC' as InstrumentType, lcNumber: '', ibNumber: '', sgNumber: '' };
-  lookupResult: { contract: BalanceContract; snapshot: BalanceSnapshot } | null = null;
-  lookupError: string | null = null;
-
-  /** Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in eventSeq (time) order. */
-  lookupMovements: BalanceMovement[] = [];
-
-  /**
-   * Business instruction 2026-08-14 ("`Look Up Current Balance` should be
-   * two tabs for Usance LC, one for LC Balance and one for Acceptance
-   * Balance"): when the looked-up contract is an IPLC_LC/EPLC_CONFIRMATION declared
-   * Usance, a second tab lists every IPLC_ACCEPTANCE/EPLC_ACCEPTANCE
-   * carved out under it (one per IB Number, per A6) and lets the user pick
-   * which one's own balance/timeline to view — a Usance LC's own Balance
-   * and its Acceptance's Balance are genuinely separate ledgers (Design
-   * doc §7), so "the balance" is ambiguous without picking which one.
-   */
-  lookupTab: 'LC' | 'ACCEPTANCE' | 'SG' = 'LC';
-  acceptancesUnderLookup: BalanceContract[] = [];
-  selectedLookupAcceptance: BalanceContract | null = null;
-  acceptanceSnapshot: BalanceSnapshot | null = null;
-  acceptanceMovements: BalanceMovement[] = [];
-
-  /**
-   * Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC
-   * Balance SG Balance, for Usance LC... three tabs, LC Balance,
-   * Acceptance Balance, and SG Balance") — SG applies to a Sight OR
-   * Usance IPLC_LC alike (unlike Acceptance, which is Usance-only, Design
-   * doc §7), so this tab shows for any IPLC_LC lookup regardless of
-   * tenor. EPLC_LC has no SHGT equivalent (PARENT_INSTRUMENT_OPTIONS.SHGT
-   * = ['IPLC_LC'] only), so this stays Import-only.
-   */
-  sgsUnderLookup: BalanceContract[] = [];
-  selectedLookupSg: BalanceContract | null = null;
-  sgSnapshot: BalanceSnapshot | null = null;
-  sgMovements: BalanceMovement[] = [];
-
   /**
    * BAL-003 (Checker Actions extraction): `checkerActions` defaults to a fresh
    * `CheckerActionsService` bound to the same `api` — preserves every existing `new
@@ -394,11 +358,21 @@ export class TransactionBuilderComponent {
    * real (default parameter values are never consulted by Angular's DI), so production wiring gets the
    * real injected singleton exactly as if this were a normal required dependency.
    */
+  /**
+   * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): `lookUp` is a plain field initialized in
+   * the constructor BODY (not a parameter-property default like `checkerActions`/`makerSubmit` above),
+   * specifically so its `onBeforeLookup` callback can close over `this` unambiguously — see
+   * `look-up-panel.service.ts`'s own doc comment for why this is a plain class, not an `@Component`.
+   */
+  readonly lookUp: LookUpPanelService;
+
   constructor(
     private readonly api: BalanceComponentApiService,
     private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
     private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
-  ) {}
+  ) {
+    this.lookUp = new LookUpPanelService(api, () => (this.accountEntryDialogMovement = null));
+  }
 
   get isCreatingMovement(): boolean {
     return !!this.model.movementType && CREATING_MOVEMENT_TYPES.has(this.model.movementType);
@@ -441,66 +415,6 @@ export class TransactionBuilderComponent {
     return this.selectedParent?.currency ?? this.selectedContract?.currency ?? null;
   }
 
-  /** Business instruction 2026-08-14 ("two/three tabs...") — whichever tab is active supplies the Event Timeline table. */
-  get activeLookupMovements(): any[] {
-    if (this.lookupTab === 'ACCEPTANCE') return this.acceptanceMovements;
-    if (this.lookupTab === 'SG') return this.sgMovements;
-    return this.lookupMovements;
-  }
-
-  /** Business instruction 2026-08-14 ("don't show the JSON, start with Event Timeline") — whichever tab is active supplies the live Current Balance summary shown after the Event Timeline, replacing the old raw `| json` dump. */
-  get activeLookupSnapshot(): BalanceSnapshot | null {
-    if (this.lookupTab === 'ACCEPTANCE') return this.acceptanceSnapshot;
-    if (this.lookupTab === 'SG') return this.sgSnapshot;
-    return this.lookupResult?.snapshot ?? null;
-  }
-
-  get activeLookupContract(): BalanceContract | null {
-    if (this.lookupTab === 'ACCEPTANCE') return this.selectedLookupAcceptance;
-    if (this.lookupTab === 'SG') return this.selectedLookupSg;
-    return this.lookupResult?.contract ?? null;
-  }
-
-  /**
-   * Business instruction 2026-08-14 ("always use the LC Number if exists") —
-   * the LC Number is the one natural-key field every instrumentType always
-   * carries (Design doc §3.1's natural key table), so it's always the
-   * primary label, never a UUID. Suffixed with IB#/SG# only when the active
-   * tab is drilled into that specific Acceptance/SG.
-   */
-  get activeLookupLabel(): string {
-    const lcNumber = this.lookupResult?.contract.naturalKey.lcNumber ?? this.lookup.lcNumber;
-    if (this.lookupTab === 'ACCEPTANCE') {
-      const ibNumber = this.selectedLookupAcceptance?.naturalKey.ibNumber;
-      return ibNumber ? `LC ${lcNumber} / IB ${ibNumber}` : `LC ${lcNumber}`;
-    }
-    if (this.lookupTab === 'SG') {
-      const sgNumber = this.selectedLookupSg?.naturalKey.sgNumber;
-      return sgNumber ? `LC ${lcNumber} / SG ${sgNumber}` : `LC ${lcNumber}`;
-    }
-    return `LC ${lcNumber}`;
-  }
-
-  /** A Sight LC never has an Acceptance (Design doc §7 Tenor Type Routing) — that tab is only meaningful for Usance. */
-  get lookupIsUsanceLc(): boolean {
-    const contract = this.lookupResult?.contract;
-    // Business instruction 2026-08-15: EPLC_LC (Unconfirmed) replaced by EPLC_CONFIRMATION as the
-    // Export lookup root — B4's Acceptance now always parents off EPLC_CONFIRMATION.
-    if (!contract || (contract.instrumentType !== 'IPLC_LC' && contract.instrumentType !== 'EPLC_CONFIRMATION')) return false;
-    return !!contract.tenorType && contract.tenorType !== 'SIGHT';
-  }
-
-  /** SG applies to any IPLC_LC regardless of tenor (unlike Acceptance) — Import only, PARENT_INSTRUMENT_OPTIONS.SHGT has no EPLC_LC option. */
-  get lookupHasSg(): boolean {
-    return this.lookupResult?.contract.instrumentType === 'IPLC_LC';
-  }
-
-  private acceptanceInstrumentTypeFor(lcInstrumentType: InstrumentType): InstrumentType | null {
-    if (lcInstrumentType === 'IPLC_LC') return 'IPLC_ACCEPTANCE';
-    // Business instruction 2026-08-15: EPLC_ACCEPTANCE's parent is now EPLC_CONFIRMATION, not EPLC_LC.
-    if (lcInstrumentType === 'EPLC_CONFIRMATION') return 'EPLC_ACCEPTANCE';
-    return null;
-  }
 
   /** Business instruction 2026-08-14 — LC+IB / LC+SG two-field search replaces the flat Catalog dropdown for these instrumentTypes. */
   get usesTwoFieldSearch(): boolean {
@@ -535,18 +449,13 @@ export class TransactionBuilderComponent {
    */
   selectFunctionSide(side: 'IMPORT' | 'EXPORT'): void {
     this.activeFunctionSide = side;
-    this.lookup.instrumentType = side === 'IMPORT' ? 'IPLC_LC' : 'EPLC_CONFIRMATION';
-    // Business instruction 2026-08-15 ("Export LC LC No, EB No 沒有 SG No") — SG# is Import-only
-    // (no Shipping Guarantee equivalent on the Export side); clear any stale value from the Import
-    // side rather than silently carrying it into an Export lookup call.
-    if (side === 'EXPORT') this.lookup.sgNumber = '';
+    this.lookUp.resetForSide(side);
   }
 
   selectFunction(fn: TransactionFunction): void {
     this.selectedFunction = fn;
     this.activeFunctionSide = fn.side;
-    this.lookup.instrumentType = fn.side === 'IMPORT' ? 'IPLC_LC' : 'EPLC_CONFIRMATION';
-    if (fn.side === 'EXPORT') this.lookup.sgNumber = '';
+    this.lookUp.resetForSide(fn.side);
     this.subChoiceValue = '';
     this.dynamicSecondaryRefLabel = fn.secondaryRefLabel ?? null;
     this.model = { currency: 'USD', createdBy: 'maker1', eventSeq: Date.now() };
@@ -1861,34 +1770,24 @@ export class TransactionBuilderComponent {
     });
   }
 
-  /** Look Up Current Balance is an LC-level view (with Acceptance/SG as sub-tabs) — a function whose own instrumentType IS a child (Acceptance/SG) still looks up its PARENT LC's own contract, not itself. */
-  private lcInstrumentTypeFor(instrumentType: InstrumentType): InstrumentType {
-    if (instrumentType === 'IPLC_ACCEPTANCE' || instrumentType === 'SHGT') return 'IPLC_LC';
-    // Business instruction 2026-08-15: EPLC_ACCEPTANCE's parent is always EPLC_CONFIRMATION now
-    // (EPLC_LC/Unconfirmed removed as a parent option) — was wrongly mapping to EPLC_LC, which
-    // would sync "Look Up" onto an instrumentType no longer even in its own dropdown.
-    if (instrumentType === 'EPLC_ACCEPTANCE') return 'EPLC_CONFIRMATION';
-    return instrumentType;
-  }
-
   /**
    * Business instruction 2026-08-15 ("Look Up Current Balance should use
    * the existing LC Number on Screen... Once Maker Submit or Checker
    * display, it will just use the LC Number instead of keyin") — syncs the
-   * Look Up panel's own fields from contextLcNumber and re-runs it, so a
+   * Look Up panel from contextLcNumber and re-runs it, so a
    * Maker/Checker never has to separately retype an LC Number they already
    * picked/typed elsewhere on the same screen. Called after a Submit and
    * whenever the Checker queue is (re)displayed — not on every intermediate
    * contract pick while still browsing, to avoid firing lookups mid-search.
+   * The guard stays here (not in `LookUpPanelService`) since both
+   * `contextLcNumber` and `model.instrumentType` are Maker-side selection
+   * concepts the panel deliberately doesn't own — see that class's own
+   * `syncFrom()` doc comment.
    */
   private syncLookupToContext(): void {
     const lcNumber = this.contextLcNumber;
     if (!lcNumber || !this.model.instrumentType) return;
-    this.lookup.lcNumber = lcNumber;
-    this.lookup.instrumentType = this.lcInstrumentTypeFor(this.model.instrumentType);
-    this.lookup.ibNumber = '';
-    this.lookup.sgNumber = '';
-    this.runLookup();
+    this.lookUp.syncFrom(lcNumber, this.model.instrumentType);
   }
 
   /**
@@ -2535,150 +2434,5 @@ export class TransactionBuilderComponent {
     this.actionBusy = true;
     this.submitError = null;
     this.checkerActions.deleteMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => this.applyCheckerActionOutcome(outcome));
-  }
-
-  /**
-   * Quality-report-balance.md BAL-003 (second of three planned extractions — see
-   * `finishCheckerAction`'s own doc comment, above `release()`, for the third/final one). Shared
-   * body behind the Look Up panel's three near-identical "fetch snapshot + fetch/sort movements by
-   * eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG) — only the fetch/populate shape is shared;
-   * each caller still owns its own target fields and its own snapshot-error behavior (Tab 1 surfaces
-   * `lookupError`, Tabs 2/3 just null out their own snapshot), same "guard/params unchanged, only the
-   * body moves" convention as `loadPagedCatalog` above.
-   */
-  private loadSnapshotAndMovements(
-    contractId: string,
-    setSnapshot: (snapshot: BalanceSnapshot) => void,
-    setMovements: (movements: BalanceMovement[]) => void,
-    onSnapshotError: (err: unknown) => void,
-  ): void {
-    this.api.getSnapshot(contractId).subscribe({
-      next: setSnapshot,
-      error: onSnapshotError,
-    });
-    // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per contract.
-    this.api.listMovements(contractId).subscribe({
-      next: (movements) => setMovements([...movements].sort((a, b) => a.eventSeq - b.eventSeq)),
-      error: () => setMovements([]),
-    });
-  }
-
-  /**
-   * Quality-report-balance.md BAL-003 — shared body behind runLookup()'s two near-identical "fetch
-   * candidates under this LC, auto-pick if exactly one" catalog calls (Acceptance tab / SG tab).
-   */
-  private loadUnderLookupCandidates(
-    instrumentType: InstrumentType,
-    lcNumber: string,
-    setCandidates: (items: BalanceContract[]) => void,
-    autoSelect: (contractId: string) => void,
-  ): void {
-    this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).subscribe({
-      next: (result) => {
-        setCandidates(result.items);
-        if (result.items.length === 1) autoSelect(result.items[0].balanceContractId);
-      },
-      error: () => setCandidates([]),
-    });
-  }
-
-  runLookup(): void {
-    this.lookupError = null;
-    this.lookupResult = null;
-    this.lookupMovements = [];
-    this.accountEntryDialogMovement = null;
-    this.lookupTab = 'LC';
-    this.acceptancesUnderLookup = [];
-    this.selectedLookupAcceptance = null;
-    this.acceptanceSnapshot = null;
-    this.acceptanceMovements = [];
-    this.sgsUnderLookup = [];
-    this.selectedLookupSg = null;
-    this.sgSnapshot = null;
-    this.sgMovements = [];
-    this.api
-      .resolveContract(this.lookup.instrumentType, {
-        lcNumber: this.lookup.lcNumber,
-        ibNumber: this.lookup.ibNumber || null,
-        sgNumber: this.lookup.sgNumber || null,
-      })
-      .subscribe({
-        next: (contract) => {
-          this.loadSnapshotAndMovements(
-            contract.balanceContractId,
-            (snapshot) => (this.lookupResult = { contract, snapshot }),
-            (movements) => (this.lookupMovements = movements),
-            (err) => (this.lookupError = this.describeApiError(err)),
-          );
-          // Business instruction 2026-08-14 ("two tabs for Usance LC, one for LC Balance and one for Acceptance
-          // Balance") — fetch every Acceptance carved out under this LC (one per IB Number, per A6) so the second
-          // tab has something to pick from as soon as it's a Usance-tenor LC; harmless no-op for a Sight LC's
-          // resolveContract() returning tenorType === 'SIGHT' (or unset legacy), since lookupIsUsanceLc() hides
-          // the tab entirely in that case regardless of whether this fetch found anything.
-          const acceptanceType = this.acceptanceInstrumentTypeFor(contract.instrumentType);
-          if (acceptanceType) {
-            this.loadUnderLookupCandidates(
-              acceptanceType,
-              contract.naturalKey.lcNumber,
-              (items) => (this.acceptancesUnderLookup = items),
-              (contractId) => this.selectLookupAcceptance(contractId),
-            );
-          }
-          // Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC...
-          // three tabs, LC Balance, Acceptance Balance, and SG Balance") — every SHGT under this LC, any tenor.
-          if (contract.instrumentType === 'IPLC_LC') {
-            this.loadUnderLookupCandidates(
-              'SHGT',
-              contract.naturalKey.lcNumber,
-              (items) => (this.sgsUnderLookup = items),
-              (contractId) => this.selectLookupSg(contractId),
-            );
-          }
-        },
-        error: (err) => (this.lookupError = this.describeApiError(err)),
-      });
-  }
-
-  /** Business instruction 2026-08-14 ("two/three tabs...") — switching tabs with only one candidate under it jumps straight to it. */
-  selectLookupTab(tab: 'LC' | 'ACCEPTANCE' | 'SG'): void {
-    this.lookupTab = tab;
-    if (tab === 'ACCEPTANCE' && !this.selectedLookupAcceptance && this.acceptancesUnderLookup.length === 1) {
-      this.selectLookupAcceptance(this.acceptancesUnderLookup[0].balanceContractId);
-    }
-    if (tab === 'SG' && !this.selectedLookupSg && this.sgsUnderLookup.length === 1) {
-      this.selectLookupSg(this.sgsUnderLookup[0].balanceContractId);
-    }
-  }
-
-  /** SG tab — business instruction 2026-08-14 ("SG Balance"): loads the picked SHGT's own snapshot + Event Timeline, independent of the LC's own and any Acceptance's. */
-  selectLookupSg(contractId: string): void {
-    this.selectedLookupSg = this.sgsUnderLookup.find((c) => c.balanceContractId === contractId) ?? null;
-    if (!this.selectedLookupSg) {
-      this.sgSnapshot = null;
-      this.sgMovements = [];
-      return;
-    }
-    this.loadSnapshotAndMovements(
-      this.selectedLookupSg.balanceContractId,
-      (snapshot) => (this.sgSnapshot = snapshot),
-      (movements) => (this.sgMovements = movements),
-      () => (this.sgSnapshot = null),
-    );
-  }
-
-  /** Acceptance tab — business instruction 2026-08-14 ("one for Acceptance Balance"): loads the picked Acceptance's own snapshot + Event Timeline, independent of the LC's own (Tab 1's lookupResult/lookupMovements are untouched). */
-  selectLookupAcceptance(contractId: string): void {
-    this.selectedLookupAcceptance = this.acceptancesUnderLookup.find((c) => c.balanceContractId === contractId) ?? null;
-    if (!this.selectedLookupAcceptance) {
-      this.acceptanceSnapshot = null;
-      this.acceptanceMovements = [];
-      return;
-    }
-    this.loadSnapshotAndMovements(
-      this.selectedLookupAcceptance.balanceContractId,
-      (snapshot) => (this.acceptanceSnapshot = snapshot),
-      (movements) => (this.acceptanceMovements = movements),
-      () => (this.acceptanceSnapshot = null),
-    );
   }
 }

@@ -576,54 +576,54 @@
                  below already auto-list every Acceptance/SG under the picked LC (selectLookupAcceptance()/
                  selectLookupSg(), auto-picking the one if there's exactly one) — no separate top-level
                  field was ever needed to narrow to a specific one. -->
-            <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookup.lcNumber">
+            <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber">
           </div>
-          <button class="tb-btn tb-btn--outline mt-2" (click)="runLookup()">Look Up</button>
-          <div class="tb-error mt-2" *ngIf="lookupError">{{ lookupError }}</div>
+          <button class="tb-btn tb-btn--outline mt-2" (click)="lookUp.runLookup()">Look Up</button>
+          <div class="tb-error mt-2" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
 
           <!-- Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC
                ... three tabs, LC Balance, Acceptance Balance, and SG Balance") — Acceptance only for Usance
                (Design doc §7); SG for either tenor (Import IPLC_LC only). Neither shown for a non-LC lookup
                (e.g. looking up an Acceptance/Confirmation/SG directly). -->
-          <div class="tb-tabs mt-2" *ngIf="lookupResult && (lookupIsUsanceLc || lookupHasSg)">
-            <button type="button" class="tb-tab" [class.tb-tab--active]="lookupTab === 'LC'" (click)="selectLookupTab('LC')">LC Balance</button>
-            <button type="button" class="tb-tab" *ngIf="lookupIsUsanceLc" [class.tb-tab--active]="lookupTab === 'ACCEPTANCE'" (click)="selectLookupTab('ACCEPTANCE')">Acceptance Balance</button>
-            <button type="button" class="tb-tab" *ngIf="lookupHasSg" [class.tb-tab--active]="lookupTab === 'SG'" (click)="selectLookupTab('SG')">SG Balance</button>
+          <div class="tb-tabs mt-2" *ngIf="lookUp.lookupResult && (lookUp.lookupIsUsanceLc || lookUp.lookupHasSg)">
+            <button type="button" class="tb-tab" [class.tb-tab--active]="lookUp.lookupTab === 'LC'" (click)="lookUp.selectLookupTab('LC')">LC Balance</button>
+            <button type="button" class="tb-tab" *ngIf="lookUp.lookupIsUsanceLc" [class.tb-tab--active]="lookUp.lookupTab === 'ACCEPTANCE'" (click)="lookUp.selectLookupTab('ACCEPTANCE')">Acceptance Balance</button>
+            <button type="button" class="tb-tab" *ngIf="lookUp.lookupHasSg" [class.tb-tab--active]="lookUp.lookupTab === 'SG'" (click)="lookUp.selectLookupTab('SG')">SG Balance</button>
           </div>
 
-          <div class="mt-2" *ngIf="lookupResult && lookupIsUsanceLc && lookupTab === 'ACCEPTANCE'">
-            <app-index-picker *ngIf="acceptancesUnderLookup.length > 1"
-              [items]="acceptancesUnderLookup"
-              [selectedId]="selectedLookupAcceptance?.balanceContractId ?? null"
-              (pick)="selectLookupAcceptance($event)">
+          <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupIsUsanceLc && lookUp.lookupTab === 'ACCEPTANCE'">
+            <app-index-picker *ngIf="lookUp.acceptancesUnderLookup.length > 1"
+              [items]="lookUp.acceptancesUnderLookup"
+              [selectedId]="lookUp.selectedLookupAcceptance?.balanceContractId ?? null"
+              (pick)="lookUp.selectLookupAcceptance($event)">
               <ng-template let-a>
                 <span class="tb-row-primary">{{ a.naturalKey.ibNumber }}</span>
                 <span class="tb-row-badge">{{ a.status }}</span>
               </ng-template>
             </app-index-picker>
-            <div class="tb-hint" *ngIf="!acceptancesUnderLookup.length">No Acceptance carved out under this LC yet — use A6 first.</div>
+            <div class="tb-hint" *ngIf="!lookUp.acceptancesUnderLookup.length">No Acceptance carved out under this LC yet — use A6 first.</div>
           </div>
 
-          <div class="mt-2" *ngIf="lookupResult && lookupHasSg && lookupTab === 'SG'">
-            <app-index-picker *ngIf="sgsUnderLookup.length > 1"
-              [items]="sgsUnderLookup"
-              [selectedId]="selectedLookupSg?.balanceContractId ?? null"
-              (pick)="selectLookupSg($event)">
+          <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupHasSg && lookUp.lookupTab === 'SG'">
+            <app-index-picker *ngIf="lookUp.sgsUnderLookup.length > 1"
+              [items]="lookUp.sgsUnderLookup"
+              [selectedId]="lookUp.selectedLookupSg?.balanceContractId ?? null"
+              (pick)="lookUp.selectLookupSg($event)">
               <ng-template let-sg>
                 <span class="tb-row-primary">{{ sg.naturalKey.sgNumber }}</span>
                 <span class="tb-row-badge">{{ sg.status }}</span>
               </ng-template>
             </app-index-picker>
-            <div class="tb-hint" *ngIf="!sgsUnderLookup.length">No Shipping Guarantee issued under this LC yet — use A8 first.</div>
+            <div class="tb-hint" *ngIf="!lookUp.sgsUnderLookup.length">No Shipping Guarantee issued under this LC yet — use A8 first.</div>
           </div>
 
           <!-- Event timeline (business instruction 2026-08-14): every movement, in eventSeq (time) order.
                Click one to see the balance right after THAT event, not the current live balance.
                Business instruction 2026-08-14 ("don't show the JSON, start with Event Timeline") — this is
                the FIRST thing shown for a lookup result, ahead of the Current Balance summary below. -->
-          <div class="mt-3" *ngIf="lookupResult">
-            <h3 class="tb-subheading">Event Timeline — {{ activeLookupLabel }}</h3>
-            <table class="tb-table" *ngIf="activeLookupMovements.length">
+          <div class="mt-3" *ngIf="lookUp.lookupResult">
+            <h3 class="tb-subheading">Event Timeline — {{ lookUp.activeLookupLabel }}</h3>
+            <table class="tb-table" *ngIf="lookUp.activeLookupMovements.length">
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
                    visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
@@ -638,7 +638,7 @@
                      clickable — the "Entries" column button below (business-requested 2026-08-16,
                      analysis/contingent-liability-ledger.html) is a deliberately separate, explicit
                      interaction, not a re-introduction of whole-row click. -->
-                <tr *ngFor="let m of activeLookupMovements">
+                <tr *ngFor="let m of lookUp.activeLookupMovements">
                   <td><span class="tb-type-tag">{{ m.movementType }}</span></td>
                   <td class="tb-table__amount">{{ m.amount }} <span class="tb-muted" *ngIf="m.ceilingAmount !== m.amount">(ceiling {{ m.ceilingAmount }})</span></td>
                   <td class="tb-table__ref">{{ m.sourceTransactionRef || '—' }}</td>
@@ -652,22 +652,22 @@
                 </tr>
               </tbody>
             </table>
-            <div class="tb-hint" *ngIf="!activeLookupMovements.length">No movements yet.</div>
+            <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
 
             <!-- Current Balance — no raw JSON dump (business instruction 2026-08-14). One field per line
                  (business instruction 2026-08-15 — was a wrapping flex row before, hard to scan). -->
-            <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="activeLookupSnapshot">
-              <div class="tb-balance-box__title">Current Balance — {{ activeLookupLabel }}</div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ activeLookupContract?.status }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.currency }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed Balance</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.confirmedBalance }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.availableBalance }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.pendingEarmarkTotal }}</span></div>
-              <div class="tb-balance-row" *ngIf="activeLookupSnapshot.offBalanceExposure !== null"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.offBalanceExposure }}</span></div>
-              <div class="tb-balance-row" *ngIf="activeLookupSnapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.tightAvailableBalance }}</span></div>
+            <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="lookUp.activeLookupSnapshot">
+              <div class="tb-balance-box__title">Current Balance — {{ lookUp.activeLookupLabel }}</div>
+              <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ lookUp.activeLookupContract?.status }}</span></div>
+              <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.currency }}</span></div>
+              <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed Balance</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.confirmedBalance }}</span></div>
+              <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.availableBalance }}</span></div>
+              <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.pendingEarmarkTotal }}</span></div>
+              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.offBalanceExposure !== null"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.offBalanceExposure }}</span></div>
+              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.tightAvailableBalance }}</span></div>
               <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
-              <div class="tb-balance-row" *ngIf="activeLookupSnapshot.presentDocsEarmarkPending !== null"><span class="tb-balance-row__label">Present Docs Earmark (Pending)</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.presentDocsEarmarkPending }}</span></div>
-              <div class="tb-balance-row" *ngIf="activeLookupSnapshot.presentDocsEarmarkApproved !== null"><span class="tb-balance-row__label">Present Docs Earmark (Approved)</span><span class="tb-balance-row__value">{{ activeLookupSnapshot.presentDocsEarmarkApproved }}</span></div>
+              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.presentDocsEarmarkPending !== null"><span class="tb-balance-row__label">Present Docs Earmark (Pending)</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.presentDocsEarmarkPending }}</span></div>
+              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.presentDocsEarmarkApproved !== null"><span class="tb-balance-row__label">Present Docs Earmark (Approved)</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.presentDocsEarmarkApproved }}</span></div>
             </div>
           </div>
         </div>

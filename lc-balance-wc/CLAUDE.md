@@ -2182,6 +2182,91 @@ BAL-003 stays open at Major — the class still owns function/side selection, th
 and the Look Up panel — but the two largest remaining "does too many things" candidates
 (Checker Actions, Maker Submit) are now both extracted via the same Dependency Inversion pattern.
 
+## BAL-003 — the Look Up panel extracted into `LookUpPanelService`, a plain class rather than an `@Component` (2026-08-17, user-directed: "兩個可行方向 最推薦哪一個?" (which of the two options do you recommend?) → recommended the plain-class option → "現在開始做方案二" (start on option two now))
+
+Closes the last of the three remaining BAL-003 "does too many things" candidates named in the entry
+above (function/side selection, three picker state machines, the Look Up panel) — the Look Up panel's
+own state and orchestration logic.
+
+**Investigated first, before proposing an approach: could this become a genuine Angular child component
+with its own template**, the way the user originally asked ("這次是要切出一個帶自己 template 的 Angular
+子元件"). Found a real, foreseeable blocker: `transaction-builder.component.spec.ts`/`.actions.spec.ts`
+construct `TransactionBuilderComponent` via plain `new TransactionBuilderComponent(mockApi)` — no
+TestBed, no Angular view rendering (this file's own established house style, confirmed in its own header
+comment) — and **77 existing test assertions** read/write Look Up state directly on the component
+instance (`comp.lookup`/`comp.runLookup()`/etc.). A genuine child component would need `@ViewChild`/
+`@Input`-`@Output()` wiring to talk to the parent, but `@ViewChild` resolution depends on Angular's view
+initialization lifecycle — which direct-instantiation tests never trigger — so all 77 assertions would
+break, and switching the child to a native Web Component (asked about explicitly) doesn't help either:
+the blocker isn't "Angular's `@ViewChild` specifically", it's that these tests never render *any* DOM at
+all, so nothing rendered — Angular or native — is reachable from them regardless of implementation
+technology. Reported both options plainly (rewrite 77 tests for a true child component, vs. a plain
+class with a mechanical rename) rather than picking one silently, given the first option's blast radius
+was well outside anything this session's BAL-003 history had previously accepted (the next-largest prior
+test-touching extraction, `PagedListState`, deliberately chose accessor delegation specifically to avoid
+touching ~30 call sites — a third of this scale).
+
+**Fix, once the plain-class direction was confirmed**: new `LookUpPanelService` (`look-up-panel.service.ts`)
+— NOT `@Injectable`/`@Component`, just a plain class, since it's exposed as a public
+`readonly lookUp = new LookUpPanelService(api, ...)` field the template binds to directly (`lookUp.xxx`),
+mirroring how `PagedListState` itself is already used. Owns the search criteria (`lookup`), the three
+tabs' own results (`lookupResult`/`acceptanceSnapshot`/`sgSnapshot`/etc.), the `activeLookup*` getters,
+and `runLookup()`/`selectLookupTab()`/`selectLookupAcceptance()`/`selectLookupSg()`/
+`loadSnapshotAndMovements()`/`loadUnderLookupCandidates()`. Two new public methods close real, small
+duplications found along the way:
+- `resetForSide(side)` — `selectFunctionSide()`/`selectFunction()` had **identical** 2-line
+  `lookup.instrumentType`/`lookup.sgNumber` reset logic; both now call this one method instead.
+- `syncFrom(lcNumber, instrumentType)` — replaces `syncLookupToContext()`'s own body; the
+  `contextLcNumber`/`model.instrumentType` presence guard stays on the component, since both are
+  Maker-side selection concepts the panel deliberately doesn't own.
+
+An optional constructor callback (`onBeforeLookup`) is the one piece of state `runLookup()` needs to
+reach outside itself — closing any open Account Entries dialog before a fresh lookup replaces the Event
+Timeline underneath it; the component wires `() => (this.accountEntryDialogMovement = null)`.
+
+**Side effect found and fixed**: `LookUpPanelService`'s own `activeLookupMovements` getter is genuinely
+typed `BalanceMovement[]` (the original was `any[]`) — tightening it surfaced that the Angular-side
+`BalanceMovement` interface was missing `balanceBefore`/`balanceAfter` entirely, even though the
+microservice's own `release()` always computes and persists both and the Look Up panel's own Event
+Timeline already displayed `m.balanceAfter` — it just compiled under the old `any` typing without the
+field ever being declared. Added both fields to `balance-component-api.service.ts`'s own
+`BalanceMovement` interface, matching the microservice's own `src/types.ts` exactly (the established
+"kept in sync by hand" convention this interface already follows).
+
+**Test migration**: the 77 existing assertions (99 raw `comp.X`/`c.X` occurrences once counted precisely,
+across `transaction-builder.component.spec.ts`, `.actions.spec.ts`, and `.gaps.spec.ts` — the third file
+uses `c` as its own local variable name, not `comp`) were mechanically renamed from `comp.lookupResult`
+to `comp.lookUp.lookupResult` (and similarly for every other moved identifier) via a scripted
+word-boundary regex pass — a pure rename, no logic touched. Two follow-up fixes the rename alone didn't
+catch: (1) `(c as any).lookupMovements = ...`-style casts in `.gaps.spec.ts` bypassed the regex (the
+identifier wasn't directly after `c.`) — fixed by hand, 10 sites; (2) three of those same sites also used
+bare `[{ id: 1 }]` fixtures that had silently compiled under the old `any` cast — once the cast was
+dropped (no longer needed, `LookUpPanelService`'s fields are genuinely public/typed), TypeScript
+correctly rejected them against the real `BalanceMovement` type; fixed using the file's own pre-existing
+`movement()` fixture builder.
+
+Verified: `tsc --noEmit`/`ng build --configuration development`/`npm run lint` all clean (warnings
+213 → 202, the removed `activeLookupMovements(): any[]` getter's own warning gone). Full Angular suite
+534/534 (unchanged count — this was a pure move, not new coverage) with **zero test files needing any
+logic changes** — only the mechanical identifier rename plus the two narrow follow-ups above — coverage
+99.63%/95.98%/99.18%/99.66% (all four metrics clear the 95% floor; `look-up-panel.service.ts` itself is
+**100% on all four metrics**). **Live in-browser verification could not be completed this pass** — the
+Chrome extension's own `computer` tool became unresponsive (screenshot capture timing out) on two
+separate fresh tabs, the same class of flakiness this file's own BAL-122/BAL-123 entries already
+recorded; stopped retrying per this session's own established "don't loop past 2-3 attempts" guidance
+rather than fabricating a result. Static verification (typecheck, strict-template `ng build`, full lint,
+and the full test suite's own "zero logic changes needed" evidence) is strong evidence the extraction is
+correct, but a human should still click through the Look Up panel's LC/Acceptance/SG tabs once to fully
+close the loop.
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` 2,684 → 2,438 lines. This closes the third
+and final "does too many things" candidate named in the entry above (Checker Actions and Maker Submit
+were the first two) — **every candidate this session's own BAL-003 history identified as a genuine
+separate job has now been extracted**. BAL-003 stays open at Major — the class still owns function/side
+selection and three picker state machines (deliberately left as-is, see the entry above for why) — but
+what remains is now a materially narrower, more clearly-scoped remainder than at any earlier point in
+this session's own BAL-003 history.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

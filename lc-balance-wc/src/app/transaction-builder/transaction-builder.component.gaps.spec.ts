@@ -147,97 +147,97 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
 
   describe('activeLookup* getters — LC vs ACCEPTANCE vs SG tab', () => {
     function withLookupResult(c: TransactionBuilderComponent, overrides: Partial<BalanceContract> = {}) {
-      (c as any).lookupResult = { contract: contract(overrides), snapshot: snapshot() };
+      c.lookUp.lookupResult = { contract: contract(overrides), snapshot: snapshot() };
     }
 
     it('default (LC) tab reads from lookupMovements/lookupResult', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      (c as any).lookupMovements = [{ id: 1 }];
+      c.lookUp.lookupMovements = [movement({ movementId: 'mv-1' })];
       withLookupResult(c);
-      expect(c.activeLookupMovements).toEqual([{ id: 1 }]);
-      expect(c.activeLookupSnapshot).toEqual(snapshot());
-      expect(c.activeLookupContract).toEqual(contract());
-      expect(c.activeLookupLabel).toBe('LC S001');
+      expect(c.lookUp.activeLookupMovements).toEqual([movement({ movementId: 'mv-1' })]);
+      expect(c.lookUp.activeLookupSnapshot).toEqual(snapshot());
+      expect(c.lookUp.activeLookupContract).toEqual(contract());
+      expect(c.lookUp.activeLookupLabel).toBe('LC S001');
     });
 
     it('ACCEPTANCE tab reads from acceptanceMovements/acceptanceSnapshot/selectedLookupAcceptance, and appends IB Number when present', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.lookupTab = 'ACCEPTANCE';
-      (c as any).acceptanceMovements = [{ id: 2 }];
-      (c as any).acceptanceSnapshot = snapshot({ confirmedBalance: '5' });
-      (c as any).selectedLookupAcceptance = contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
+      c.lookUp.lookupTab = 'ACCEPTANCE';
+      c.lookUp.acceptanceMovements = [movement({ movementId: 'mv-2' })];
+      c.lookUp.acceptanceSnapshot = snapshot({ confirmedBalance: '5' });
+      c.lookUp.selectedLookupAcceptance = contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
       withLookupResult(c);
-      expect(c.activeLookupMovements).toEqual([{ id: 2 }]);
-      expect(c.activeLookupSnapshot).toEqual(snapshot({ confirmedBalance: '5' }));
-      expect(c.activeLookupContract).toEqual(contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } }));
-      expect(c.activeLookupLabel).toBe('LC S001 / IB IB01');
+      expect(c.lookUp.activeLookupMovements).toEqual([movement({ movementId: 'mv-2' })]);
+      expect(c.lookUp.activeLookupSnapshot).toEqual(snapshot({ confirmedBalance: '5' }));
+      expect(c.lookUp.activeLookupContract).toEqual(contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } }));
+      expect(c.lookUp.activeLookupLabel).toBe('LC S001 / IB IB01');
     });
 
     it('ACCEPTANCE tab label falls back to bare LC when the selected acceptance has no ibNumber', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.lookupTab = 'ACCEPTANCE';
-      (c as any).selectedLookupAcceptance = contract({ naturalKey: { lcNumber: 'S001' } });
+      c.lookUp.lookupTab = 'ACCEPTANCE';
+      c.lookUp.selectedLookupAcceptance = contract({ naturalKey: { lcNumber: 'S001' } });
       withLookupResult(c);
-      expect(c.activeLookupLabel).toBe('LC S001');
+      expect(c.lookUp.activeLookupLabel).toBe('LC S001');
     });
 
     it('SG tab reads from sgMovements/sgSnapshot/selectedLookupSg, and appends SG Number when present', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.lookupTab = 'SG';
-      (c as any).sgMovements = [{ id: 3 }];
-      (c as any).sgSnapshot = snapshot({ confirmedBalance: '9' });
-      (c as any).selectedLookupSg = contract({ naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } });
+      c.lookUp.lookupTab = 'SG';
+      c.lookUp.sgMovements = [movement({ movementId: 'mv-3' })];
+      c.lookUp.sgSnapshot = snapshot({ confirmedBalance: '9' });
+      c.lookUp.selectedLookupSg = contract({ naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } });
       withLookupResult(c);
-      expect(c.activeLookupMovements).toEqual([{ id: 3 }]);
-      expect(c.activeLookupSnapshot).toEqual(snapshot({ confirmedBalance: '9' }));
-      expect(c.activeLookupContract).toEqual(contract({ naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } }));
-      expect(c.activeLookupLabel).toBe('LC S001 / SG SG01');
+      expect(c.lookUp.activeLookupMovements).toEqual([movement({ movementId: 'mv-3' })]);
+      expect(c.lookUp.activeLookupSnapshot).toEqual(snapshot({ confirmedBalance: '9' }));
+      expect(c.lookUp.activeLookupContract).toEqual(contract({ naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } }));
+      expect(c.lookUp.activeLookupLabel).toBe('LC S001 / SG SG01');
     });
 
     it('SG tab label falls back to bare LC when the selected SG has no sgNumber', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.lookupTab = 'SG';
-      (c as any).selectedLookupSg = contract({ naturalKey: { lcNumber: 'S001' } });
+      c.lookUp.lookupTab = 'SG';
+      c.lookUp.selectedLookupSg = contract({ naturalKey: { lcNumber: 'S001' } });
       withLookupResult(c);
-      expect(c.activeLookupLabel).toBe('LC S001');
+      expect(c.lookUp.activeLookupLabel).toBe('LC S001');
     });
 
     it('activeLookupLabel falls back to the typed lookup.lcNumber when no lookupResult is loaded yet', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.lookup.lcNumber = 'TYPED01';
-      expect(c.activeLookupLabel).toBe('LC TYPED01');
+      c.lookUp.lookup.lcNumber = 'TYPED01';
+      expect(c.lookUp.activeLookupLabel).toBe('LC TYPED01');
     });
 
     it('activeLookupSnapshot/activeLookupContract fall back to null on the default (LC) tab before any lookup has run', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      expect(c.activeLookupSnapshot).toBeNull();
-      expect(c.activeLookupContract).toBeNull();
+      expect(c.lookUp.activeLookupSnapshot).toBeNull();
+      expect(c.lookUp.activeLookupContract).toBeNull();
     });
 
     it('lookupIsUsanceLc is false with no lookupResult, false for a non-LC/non-Confirmation contract, false for Sight, true for Usance', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      expect(c.lookupIsUsanceLc).toBe(false);
+      expect(c.lookUp.lookupIsUsanceLc).toBe(false);
 
       withLookupResult(c, { instrumentType: 'SHGT' });
-      expect(c.lookupIsUsanceLc).toBe(false);
+      expect(c.lookUp.lookupIsUsanceLc).toBe(false);
 
       withLookupResult(c, { instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
-      expect(c.lookupIsUsanceLc).toBe(false);
+      expect(c.lookUp.lookupIsUsanceLc).toBe(false);
 
       withLookupResult(c, { instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE' });
-      expect(c.lookupIsUsanceLc).toBe(true);
+      expect(c.lookUp.lookupIsUsanceLc).toBe(true);
 
       withLookupResult(c, { instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE' });
-      expect(c.lookupIsUsanceLc).toBe(true);
+      expect(c.lookUp.lookupIsUsanceLc).toBe(true);
     });
 
     it('lookupHasSg is true only for an IPLC_LC lookup result', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      expect(c.lookupHasSg).toBe(false);
+      expect(c.lookUp.lookupHasSg).toBe(false);
       withLookupResult(c, { instrumentType: 'IPLC_LC' });
-      expect(c.lookupHasSg).toBe(true);
+      expect(c.lookUp.lookupHasSg).toBe(true);
       withLookupResult(c, { instrumentType: 'EPLC_LC' });
-      expect(c.lookupHasSg).toBe(false);
+      expect(c.lookUp.lookupHasSg).toBe(false);
     });
   });
 
@@ -1005,7 +1005,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('runLookup() resets an open dialog before reloading the Event Timeline', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.openAccountEntryDialog(movement());
-      c.runLookup();
+      c.lookUp.runLookup();
       expect(c.accountEntryDialogMovement).toBeNull();
     });
   });

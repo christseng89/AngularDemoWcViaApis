@@ -131,6 +131,16 @@ export interface BalanceMovement {
   releasedBy?: string | null;
   createdAt: string;
   releasedAt?: string | null;
+  /**
+   * BAL-003 (Look Up panel extraction, 2026-08-17) — genuinely missing from this hand-kept-in-sync
+   * interface until `LookUpPanelService`'s stricter `BalanceMovement[]` typing (replacing the Look Up
+   * panel's own previous `any[]`) surfaced the gap: `release()` on the microservice side always
+   * computes and persists both fields (see that project's own `src/types.ts`), and the Look Up panel's
+   * own Event Timeline already displayed `m.balanceAfter` — it just compiled under the old `any` typing
+   * without the field ever being declared.
+   */
+  balanceBefore?: string | null;
+  balanceAfter?: string | null;
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
   /**
