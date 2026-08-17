@@ -61,21 +61,25 @@ Three independently-versioned pieces talking over HTTP, not a shared in-process 
   `backend/`'s declarative registry) in one click; `balance-case-api.service.ts` is its backend client.
 - **`src/app/transaction-builder/`** — the lower-level Maker/Checker form that posts individual
   `BalanceMovement`s straight against the microservice, bypassing the Business Case Registry. This is
-  where nearly all UI logic lives. `transaction-builder.component.ts` was, earlier in this project's
-  history, a 2,800+-line "God Component" (still-open finding BAL-003 in `Quality-report-balance.md`) that
-  has since been substantially decomposed via a sequence of Dependency-Inversion/pure-function
-  extractions documented in this file's own decision log below — `checker-actions.service.ts` (Checker
-  release/reject/cancel), `maker-submit.service.ts` (the 5 Maker submission shapes), `look-up-panel.service.ts`
-  (the "Look Up Current Balance" panel), `catalog-picker.service.ts` (the 3 paginated pickers' fetch/page
-  bookkeeping, backed by `paged-list-state.ts`), `inquire-events.service.ts` (the Inquire Events merged
-  timeline), and three pure-function modules — `function-policy.ts` (derived getters), `builder-fields.ts`
-  (the shared Formly field factory every A1–A9/B1–B5 function uses), `submit-rules.ts`
-  (`validateSubmit`/`buildSubmitRequest`). The component itself is now the orchestration/view-binding
-  layer over these, not the owner of their logic. Test coverage for this file is split across 4 spec
-  files by concern, not 1:1 with source files — `.spec.ts` (function/catalog selection),
-  `.selection.spec.ts` (contract/movement selection), `.actions.spec.ts` (submit/release/reject/checker
-  actions), `.gaps.spec.ts` (accessor/edge-case gaps) — plus one dedicated spec file per extracted
-  service/module.
+  where nearly all UI logic lives, across two top-level modes on the same component
+  (`activeMode: 'PROCESSING' | 'INQUIRE'`): **Transaction Processing** (the A1–A9/B1–B5 Maker/Checker
+  functions themselves) and **Inquire Events** (`inquire-events.service.ts` — a read-only, merged,
+  chronologically-sorted timeline across an LC and all its child ledgers, reusing the SAME `buildFields()`
+  field definitions via a `toReadOnlyFields()` decorator rather than a second set of read-only templates).
+  `transaction-builder.component.ts` was, earlier in this project's history, a 2,800+-line "God Component"
+  (still-open finding BAL-003 in `Quality-report-balance.md`) that has since been substantially decomposed
+  via a sequence of Dependency-Inversion/pure-function extractions documented in this file's own decision
+  log below — `checker-actions.service.ts` (Checker release/reject/cancel), `maker-submit.service.ts` (the
+  5 Maker submission shapes), `look-up-panel.service.ts` (the "Look Up Current Balance" panel),
+  `catalog-picker.service.ts` (the 3 paginated pickers' fetch/page bookkeeping, backed by
+  `paged-list-state.ts`), `inquire-events.service.ts` itself, and three pure-function modules —
+  `function-policy.ts` (derived getters), `builder-fields.ts` (the shared Formly field factory every
+  A1–A9/B1–B5 function uses), `submit-rules.ts` (`validateSubmit`/`buildSubmitRequest`). The component
+  itself is now the orchestration/view-binding layer over these, not the owner of their logic. Test
+  coverage for this file is split across 4 spec files by concern, not 1:1 with source files — `.spec.ts`
+  (function/catalog selection), `.selection.spec.ts` (contract/movement selection), `.actions.spec.ts`
+  (submit/release/reject/checker actions), `.gaps.spec.ts` (accessor/edge-case gaps) — plus one dedicated
+  spec file per extracted service/module.
 - **`backend/server.js`** — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
   declarative registry of Import/Export Business Cases it replays (`createAndRelease()` collapses the
   common create-then-release step pair; `RELEASE_SHAPED_STEP_TYPES` dispatch table covers
