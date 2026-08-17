@@ -61,6 +61,15 @@ export type CheckerActionOutcome =
 export class CheckerActionsService {
   constructor(private readonly api: BalanceComponentApiService) {}
 
+  /**
+   * BAL-126 (Quality-report-balance.md): every `{ kind: 'failed', message }` outcome this service ever
+   * constructs — whether from a `catchError` or a plain pre-check return — collapsed into this one
+   * shared helper. Only the message text ever differed between the ~20 call sites it replaces.
+   */
+  private fail(message: string): Observable<CheckerActionOutcome> {
+    return of<CheckerActionOutcome>({ kind: 'failed', message });
+  }
+
   release(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
     const checkerId = ctx.createdBy === 'maker1' ? 'checker1' : 'checker2';
 
@@ -78,18 +87,16 @@ export class CheckerActionsService {
       return this.resolveSettlesDocumentArrivalIds(ctx).pipe(
         switchMap((ids) => {
           if (!ids.sourceMovementId) {
-            return of<CheckerActionOutcome>({
-              kind: 'failed',
-              message: `Could not find the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} record this was created from (no referencedTransactionId correlation found) — release it separately first.`,
-            });
+            return this.fail(
+              `Could not find the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} record this was created from (no referencedTransactionId correlation found) — release it separately first.`,
+            );
           }
           return this.api.release(ids.sourceMovementId, checkerId).pipe(
             switchMap(() => this.releaseAcceptance(checkerId, ctx, ids)),
             catchError((err) =>
-              of<CheckerActionOutcome>({
-                kind: 'failed',
-                message: `Could not release the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${ctx.selectedPayMovement?.sourceTransactionRef ?? ctx.selectedCheckerMovement?.sourceTransactionRef ?? ''}) — Acceptance NOT approved: ${describeApiError(err)}`,
-              }),
+              this.fail(
+                `Could not release the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${ctx.selectedPayMovement?.sourceTransactionRef ?? ctx.selectedCheckerMovement?.sourceTransactionRef ?? ''}) — Acceptance NOT approved: ${describeApiError(err)}`,
+              ),
             ),
           );
         }),
@@ -108,20 +115,13 @@ export class CheckerActionsService {
       return this.resolveLinkedMovementId(ctx, ctx.arrivalSgRedeemMovementId, 'FULL_REDEEM', 'PARTIAL_REDEEM').pipe(
         switchMap((arrivalSgRedeemMovementId) => {
           if (!arrivalSgRedeemMovementId) {
-            return of<CheckerActionOutcome>({
-              kind: 'failed',
-              message:
-                'Could not find the matched Shipping Guarantee redemption linked to this Document Arrival (no businessEventId correlation found) — release it separately first.',
-            });
+            return this.fail(
+              'Could not find the matched Shipping Guarantee redemption linked to this Document Arrival (no businessEventId correlation found) — release it separately first.',
+            );
           }
           return this.api.release(arrivalSgRedeemMovementId, checkerId).pipe(
             switchMap(() => of<CheckerActionOutcome>({ kind: 'documentArrivalAcknowledged' })),
-            catchError((err) =>
-              of<CheckerActionOutcome>({
-                kind: 'failed',
-                message: `Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`,
-              }),
-            ),
+            catchError((err) => this.fail(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`)),
           );
         }),
       );
@@ -137,16 +137,14 @@ export class CheckerActionsService {
       return this.resolveLinkedMovementId(ctx, ctx.matchedReceivableMovementId, 'REIMBURSE').pipe(
         switchMap((matchedReceivableMovementId) => {
           if (!matchedReceivableMovementId) {
-            return of<CheckerActionOutcome>({
-              kind: 'failed',
-              message:
-                'Could not find the matching Reimbursement Receivable linked to this Acceptance Settle (no businessEventId correlation found) — release it separately first.',
-            });
+            return this.fail(
+              'Could not find the matching Reimbursement Receivable linked to this Acceptance Settle (no businessEventId correlation found) — release it separately first.',
+            );
           }
           const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
           return this.api.release(primaryMovementId!, checkerId).pipe(
             switchMap((res) => this.releaseMatchedReceivable(checkerId, res, matchedReceivableMovementId)),
-            catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
+            catchError((err) => this.fail(describeApiError(err))),
           );
         }),
       );
@@ -155,7 +153,7 @@ export class CheckerActionsService {
     const plainMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.release(plainMovementId!, checkerId).pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
-      catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
+      catchError((err) => this.fail(describeApiError(err))),
     );
   }
 
@@ -167,7 +165,7 @@ export class CheckerActionsService {
     const movementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.reject(movementId!, 'checker1', 'MANUAL_TEST_REJECT').pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
-      catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
+      catchError((err) => this.fail(describeApiError(err))),
     );
   }
 
@@ -182,18 +180,13 @@ export class CheckerActionsService {
     const cancelPrimary = (): Observable<CheckerActionOutcome> =>
       this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res, syncLookup: true })),
-        catchError((err) => of<CheckerActionOutcome>({ kind: 'failed', message: describeApiError(err) })),
+        catchError((err) => this.fail(describeApiError(err))),
       );
 
     if (ctx.selectedFunction?.documentArrivalWithSg && ctx.arrivalSgRedeemMovementId) {
       return this.api.cancel(ctx.arrivalSgRedeemMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() => cancelPrimary()),
-        catchError((err) =>
-          of<CheckerActionOutcome>({
-            kind: 'failed',
-            message: `Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${describeApiError(err)}`,
-          }),
-        ),
+        catchError((err) => this.fail(`Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${describeApiError(err)}`)),
       );
     }
 
@@ -202,12 +195,7 @@ export class CheckerActionsService {
     if (ctx.selectedFunction?.createsIssuingBankReceivableOnHonour && ctx.dueFromIssuingBankMovementId) {
       return this.api.cancel(ctx.dueFromIssuingBankMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() => cancelPrimary()),
-        catchError((err) =>
-          of<CheckerActionOutcome>({
-            kind: 'failed',
-            message: `Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${describeApiError(err)}`,
-          }),
-        ),
+        catchError((err) => this.fail(`Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${describeApiError(err)}`)),
       );
     }
 
@@ -220,19 +208,11 @@ export class CheckerActionsService {
           this.api.cancel(ctx.acceptanceMovementId!, cancelledBy, 'MAKER_EC').pipe(
             switchMap(() => cancelPrimary()),
             catchError((err) =>
-              of<CheckerActionOutcome>({
-                kind: 'failed',
-                message: `Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${describeApiError(err)}`,
-              }),
+              this.fail(`Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${describeApiError(err)}`),
             ),
           ),
         ),
-        catchError((err) =>
-          of<CheckerActionOutcome>({
-            kind: 'failed',
-            message: `Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${describeApiError(err)}`,
-          }),
-        ),
+        catchError((err) => this.fail(`Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${describeApiError(err)}`)),
       );
     }
 
@@ -241,12 +221,7 @@ export class CheckerActionsService {
     if (ctx.selectedFunction?.settlesAcceptanceOnMature && ctx.matchedReceivableMovementId) {
       return this.api.cancel(ctx.matchedReceivableMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() => cancelPrimary()),
-        catchError((err) =>
-          of<CheckerActionOutcome>({
-            kind: 'failed',
-            message: `Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${describeApiError(err)}`,
-          }),
-        ),
+        catchError((err) => this.fail(`Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${describeApiError(err)}`)),
       );
     }
 
@@ -257,12 +232,7 @@ export class CheckerActionsService {
   private releaseMatchedReceivable(checkerId: string, settleRes: BalanceMovement, matchedReceivableMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(matchedReceivableMovementId, checkerId).pipe(
       switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: settleRes, syncLookup: true })),
-      catchError((err) =>
-        of<CheckerActionOutcome>({
-          kind: 'failed',
-          message: `Acceptance settled, but the matching Reimbursement Receivable failed to release: ${describeApiError(err)}`,
-        }),
-      ),
+      catchError((err) => this.fail(`Acceptance settled, but the matching Reimbursement Receivable failed to release: ${describeApiError(err)}`)),
     );
   }
 
@@ -373,10 +343,9 @@ export class CheckerActionsService {
         return of<CheckerActionOutcome>({ kind: 'released', result: res, reloadPayables: true });
       }),
       catchError((err) =>
-        of<CheckerActionOutcome>({
-          kind: 'failed',
-          message: `${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${describeApiError(err)}`,
-        }),
+        this.fail(
+          `${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} released, but the Confirmation Honour/Accept itself failed to release: ${describeApiError(err)}`,
+        ),
       ),
     );
   }
@@ -385,12 +354,7 @@ export class CheckerActionsService {
   private releaseDueFromIssuingBank(checkerId: string, honourRes: BalanceMovement, dueFromIssuingBankMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(dueFromIssuingBankMovementId, checkerId).pipe(
       switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: honourRes, syncLookup: true, reloadPayables: true })),
-      catchError((err) =>
-        of<CheckerActionOutcome>({
-          kind: 'failed',
-          message: `Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${describeApiError(err)}`,
-        }),
-      ),
+      catchError((err) => this.fail(`Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${describeApiError(err)}`)),
     );
   }
 
@@ -403,12 +367,7 @@ export class CheckerActionsService {
   ): Observable<CheckerActionOutcome> {
     return this.api.release(acceptanceMovementId, checkerId).pipe(
       switchMap(() => this.releaseAcceptanceReimbReceivable(checkerId, acceptRes, acceptanceReimbReceivableMovementId)),
-      catchError((err) =>
-        of<CheckerActionOutcome>({
-          kind: 'failed',
-          message: `Confirmation accepted, but the Acceptance liability failed to release: ${describeApiError(err)}`,
-        }),
-      ),
+      catchError((err) => this.fail(`Confirmation accepted, but the Acceptance liability failed to release: ${describeApiError(err)}`)),
     );
   }
 
@@ -419,20 +378,13 @@ export class CheckerActionsService {
     acceptanceReimbReceivableMovementId: string | null,
   ): Observable<CheckerActionOutcome> {
     if (!acceptanceReimbReceivableMovementId) {
-      return of<CheckerActionOutcome>({
-        kind: 'failed',
-        message:
-          'Acceptance liability released, but the matching Reimbursement Receivable could not be found (no businessEventId correlation found) — release it separately first.',
-      });
+      return this.fail(
+        'Acceptance liability released, but the matching Reimbursement Receivable could not be found (no businessEventId correlation found) — release it separately first.',
+      );
     }
     return this.api.release(acceptanceReimbReceivableMovementId, checkerId).pipe(
       switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: acceptRes, syncLookup: true, reloadPayables: true })),
-      catchError((err) =>
-        of<CheckerActionOutcome>({
-          kind: 'failed',
-          message: `Acceptance released, but the Reimbursement Receivable asset failed to release: ${describeApiError(err)}`,
-        }),
-      ),
+      catchError((err) => this.fail(`Acceptance released, but the Reimbursement Receivable asset failed to release: ${describeApiError(err)}`)),
     );
   }
 }

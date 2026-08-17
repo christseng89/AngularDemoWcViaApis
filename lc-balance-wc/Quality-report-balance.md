@@ -48,11 +48,11 @@ surfaced BAL-122 and BAL-123 below.
 |---|---|---|
 | **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A- (4.5/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124 and BAL-125 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters all retyped to `BalanceMovement`/`BalanceMovement | null`); BAL-126 (`checker-actions.service.ts`'s own `catchError` duplication), BAL-127/BAL-130 (two files trending toward their own future God-file status), and BAL-128 (stale eslint-disable comments) remain open — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
+| **Maintainability** | A (4.6/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124, BAL-125, and BAL-126 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped to `BalanceMovement`/`BalanceMovement | null`; that same file's own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper); BAL-127/BAL-130 (two files trending toward their own future God-file status) and BAL-128 (stale eslint-disable comments) remain open — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
-| **Duplication** | A (4.6/5) | Every previously-identified hotspot remains fixed. **BAL-124 is now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, closing the one duplication instance this pass had already found in code added this session. BAL-126 (`checker-actions.service.ts`'s own repeated `catchError` blocks) remains open — small, easy fix, not on the scale of what BAL-003's history required. |
+| **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A)**
 
 **Why the score dipped then recovered past its prior peak, rather than only ever climbing (or landing
 exactly back where it started):** this comprehensive follow-up pass is deliberately adversarial rather
@@ -71,11 +71,13 @@ its own fix directly closed BAL-124 too (the duplicated executor-handler code sm
 it as separate follow-up work. Then BAL-125 (95 → 96) — `checker-actions.service.ts`'s own 6 `any`-typed
 fields/parameters, the one instance of BAL-108's own already-fixed pattern that had re-appeared in code
 extracted after BAL-108 closed, all retyped to `BalanceMovement`/`BalanceMovement | null` with zero test
-assertions needing to change. The score ending above its prior peak is earned: this pass has now fixed
-every Major/Info finding it itself surfaced, plus two of its own Minor findings (BAL-124, BAL-125), on
-top of confirming every earlier pass's fixes still hold. A handful of Minor/Info findings from this pass
-remain open (BAL-126–BAL-130 minus BAL-124, BAL-132) — small, independently actionable, not gate
-conditions.
+assertions needing to change. Then BAL-126 (96 → 97) — that same file's own duplicated `{kind:'failed'}`
+constructions (a fresh count found 20, not the original ~12 estimate) collapsed into one shared `fail()`
+helper, again with zero test assertions needing to change. The score ending above its prior peak is
+earned: this pass has now fixed every Major/Info finding it itself surfaced, plus three of its own Minor
+findings (BAL-124, BAL-125, BAL-126), on top of confirming every earlier pass's fixes still hold. A
+handful of Minor/Info findings from this pass remain open (BAL-127–BAL-130, BAL-132) — small,
+independently actionable, not gate conditions.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -113,14 +115,16 @@ implemented as part of the same BAL-131 edit, avoiding the exact third-copy dupl
 original recommendation had warned against. **BAL-125** (`checker-actions.service.ts`'s own 6 un-swept
 `any` occurrences — the same class of finding BAL-108 had already fixed once, elsewhere, before this
 file existed) was fixed the same way as BAL-108's own precedent — all 6 retyped to
-`BalanceMovement`/`BalanceMovement | null`, zero test assertions needing to change. The remaining four
-(BAL-126–BAL-130 minus BAL-124, BAL-132) stay open — small, independently actionable, none
-Blocker/Critical, none regressing anything the five 2026-08-16 passes fixed.
+`BalanceMovement`/`BalanceMovement | null`, zero test assertions needing to change. **BAL-126** (that
+same file's own duplicated `{kind:'failed'}` constructions — a fresh count found 20, not the ~12
+originally estimated) was fixed with a single shared `fail()` helper, again zero test assertions needing
+to change. The remaining four (BAL-127–BAL-130, BAL-132) stay open — small, independently actionable,
+none Blocker/Critical, none regressing anything the five 2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
 as resolved. All findings this pass itself surfaced (BAL-122, BAL-123, BAL-134, BAL-131, BAL-124,
-BAL-125) are now fixed and no longer factor into that assessment. See
+BAL-125, BAL-126) are now fixed and no longer factor into that assessment. See
 [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
@@ -144,7 +148,7 @@ BAL-125) are now fixed and no longer factor into that assessment. See
 | [BAL-105](#bal-105) | 🔵 Minor | Code Smell | ESLint/Prettier configured project-wide — **Fixed** (`format:check` scoping bug fixed, repo-wide reformat landed; drift re-found and re-fixed this pass, see its own re-verification note) |
 | [BAL-124](#bal-124) | 🔵 Minor | Code Smell | `release`/`makerSubmit` step handlers in `backend/server.js`'s `runCase()` are near-byte-for-byte duplicated — **Fixed** |
 | [BAL-125](#bal-125) | 🔵 Minor | Code Smell | `checker-actions.service.ts` (extracted AFTER BAL-108 closed) has its own un-swept `any` typing — 6 occurrences — **Fixed** |
-| [BAL-126](#bal-126) | 🔵 Minor | Code Smell | `checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks — **Open, found this pass** |
+| [BAL-126](#bal-126) | 🔵 Minor | Code Smell | `checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks — **Fixed** |
 | [BAL-128](#bal-128) | 🔵 Minor | Code Smell | 3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured — **Open, found this pass** |
 | [BAL-129](#bal-129) | 🔵 Minor | Test Gap | The microservice's generic 500 handler — BAL-117's own fix — is itself untested; a regression re-opening BAL-117 would not be caught — **Open, found this pass** |
 | [BAL-120](#bal-120) | ⚪ Info | Reliability | Idempotency detection relies on string-matching the SQLite driver's error text — deferred, user-confirmed |
@@ -927,7 +931,7 @@ standing rule: `backend/` 33/33 and microservice 292/292, both unaffected (Angul
 ---
 
 ### BAL-126
-**`checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks** — 🔵 Minor (Code Smell) — Open, found this pass
+**`checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks** — 🔵 Minor (Code Smell) — Fixed
 
 **Evidence:** at least 12 occurrences (lines approximately 88-93, 119-124, 190-195, 204-209, 221-226,
 229-234, 243-248, 259-264, 374-379, 387-392, 405-410, 429-434) of the identical shape
@@ -942,6 +946,28 @@ worth closing for consistency with that stated design intent.
 **Recommended remediation:** a small `fail(message: string): Observable<CheckerActionOutcome>` private
 helper, `catchError((err) => this.fail(describeApiError(err)))` (or similar) at each of the 12 sites —
 purely mechanical, no behavior change.
+
+**Outcome (2026-08-17, business instruction: "Fix BAL-126 too"): fixed exactly per the recommended
+remediation, extended to the full duplicated shape.** A fresh count against the current file (after
+BAL-124/BAL-125's own recent changes) found **20** occurrences of the identical `{ kind: 'failed',
+message }` construction, not ~12 — the original estimate undercounted since it only sampled the
+`catchError`-wrapped ones; several plain pre-check `return of<CheckerActionOutcome>({kind:'failed',...})`
+sites (e.g. the `!ids.sourceMovementId`/`!arrivalSgRedeemMovementId`/`!matchedReceivableMovementId`/
+`!acceptanceReimbReceivableMovementId` guards) share the exact same literal shape and were included too,
+since the recommended `fail()` helper covers them for free with zero added risk. New private `fail(message:
+string): Observable<CheckerActionOutcome>` returns `of<CheckerActionOutcome>({ kind: 'failed', message })`
+— all 20 call sites now read `catchError((err) => this.fail(<message-expression>))` or
+`return this.fail(<message>)`; only the message text (unchanged, byte-for-byte) still varies between
+them. `of<CheckerActionOutcome>` remains imported/used for the `'released'`/`'documentArrivalAcknowledged'`
+outcome shapes, which this fix left untouched — genuinely different shapes, not part of this finding.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean; `ng build --configuration development` clean;
+`npm run lint` 0 errors (219 warnings, unchanged); full Angular suite 510/510 with **zero test files
+needing any changes** — the exact same evidence-of-behavior-preservation pattern this codebase's other
+mechanical extractions (`loadPagedCatalog`, `loadSnapshotAndMovements`, `finishCheckerAction`,
+`PagedListState`) have all relied on — coverage 99.63%/95.17%/99.16%/99.67% (unchanged, still clears the
+95% floor on all four metrics). Full three-suite re-verification per this file's own standing rule:
+`backend/` 33/33 and microservice 292/292, both unaffected (Angular-only change).
 
 ---
 
@@ -1346,9 +1372,10 @@ before the A4 feature area specifically is considered done:**
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
 its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
 non-obvious misclick sequence to trigger. **Both are now fixed, and so are BAL-134, BAL-131, BAL-124,
-and BAL-125** — `import-case-4`'s own stale scenario (found incidentally while verifying BAL-123), the
-Business Case Registry's own completeness gap (zero orchestrator-level `/acknowledge` coverage), the
-executor's duplicated step handlers (closed as a direct side effect of the BAL-131 fix), and
-`checker-actions.service.ts`'s own 6 un-swept `any` occurrences (retyped to `BalanceMovement`), respectively.
-All remaining 2026-08-17 findings (BAL-126–BAL-130, BAL-132) are Minor/Info, none are gate conditions,
-and none block anything.
+BAL-125, and BAL-126** — `import-case-4`'s own stale scenario (found incidentally while verifying
+BAL-123), the Business Case Registry's own completeness gap (zero orchestrator-level `/acknowledge`
+coverage), the executor's duplicated step handlers (closed as a direct side effect of the BAL-131 fix),
+`checker-actions.service.ts`'s own 6 un-swept `any` occurrences (retyped to `BalanceMovement`), and that
+same file's own 20 duplicated `{kind:'failed'}` constructions (collapsed into one shared `fail()`
+helper), respectively. All remaining 2026-08-17 findings (BAL-127–BAL-130, BAL-132) are Minor/Info, none
+are gate conditions, and none block anything.

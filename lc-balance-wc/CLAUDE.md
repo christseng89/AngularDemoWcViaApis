@@ -1972,6 +1972,33 @@ changes** beyond the 2 fixture literals — strong evidence of exact behavior pr
 three-suite re-verification per this file's own standing rule: `backend/` 33/33 and microservice
 292/292, both unaffected (Angular-only change).
 
+## BAL-126 fixed — `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper (2026-08-17, business instruction: "Fix BAL-126 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-126 section): every flow in
+`checker-actions.service.ts` (`release()`, `reject()`, `deleteMakerPending()`, and the four private
+per-leg helper methods) constructs its own `of<CheckerActionOutcome>({ kind: 'failed', message: <text>
+})` — both from `catchError` handlers and from plain pre-check guard returns — with only the message
+text ever differing. The finding's own original evidence estimated "~12" occurrences (sampled from the
+`catchError`-wrapped ones); a fresh count against the file as it stood after this session's own
+BAL-124/BAL-125 fixes found **20**, once the identically-shaped pre-check returns (e.g.
+`!ids.sourceMovementId`, `!arrivalSgRedeemMovementId`) were counted too.
+
+**Fix**: new private `fail(message: string): Observable<CheckerActionOutcome>` — returns
+`of<CheckerActionOutcome>({ kind: 'failed', message })` — and all 20 call sites rewritten to
+`catchError((err) => this.fail(<message-expression>))` or `return this.fail(<message>)`, extending the
+recommended remediation from its literal "12 `catchError` sites" scope to the full duplicated shape
+(purely mechanical, zero added risk — the extra 8 sites are the identical literal). Every message string
+is unchanged, byte-for-byte. `of<CheckerActionOutcome>` stays imported/used for the genuinely different
+`'released'`/`'documentArrivalAcknowledged'` outcome shapes, untouched by this fix.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean; `ng build --configuration development` clean;
+`npm run lint` 0 errors (219 warnings, unchanged); full Angular suite 510/510 with **zero test files
+needing any changes** — strong evidence of exact behavior preservation, matching this codebase's other
+mechanical-extraction precedents (`loadPagedCatalog`, `finishCheckerAction`, `PagedListState`) — coverage
+99.63%/95.17%/99.16%/99.67% (unchanged, still clears the 95% floor on all four metrics). Full
+three-suite re-verification per this file's own standing rule: `backend/` 33/33 and microservice
+292/292, both unaffected (Angular-only change).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation
