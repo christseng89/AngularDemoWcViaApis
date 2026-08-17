@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for transaction-builder/balance-component-api.service.ts</title>
+    <title>Code coverage report for transaction-builder/maker-submit.service.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">transaction-builder</a> balance-component-api.service.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">transaction-builder</a> maker-submit.service.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">96.77% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>30/31</span>
+                <span class='fraction'>67/67</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">74.07% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>40/54</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>8/8</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">91.66% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>11/12</span>
+                <span class='fraction'>29/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.83% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>23/24</span>
+                <span class='fraction'>66/66</span>
             </div>
         
             
@@ -309,15 +309,165 @@
 <a name='L244'></a><a href='#L244'>244</a>
 <a name='L245'></a><a href='#L245'>245</a>
 <a name='L246'></a><a href='#L246'>246</a>
-<a name='L247'></a><a href='#L247'>247</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">7x</span>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">333x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">38x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">21x</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -328,152 +478,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -482,24 +499,148 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -509,6 +650,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -518,287 +660,325 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Injectable } from '@angular/core';
-import { HttpClient, HttpResponse } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import type { InstrumentType } from './balance-component.model';
-&nbsp;
-export interface NaturalKey {
-  lcNumber: string;
-  ibNumber?: string | null;
-  sgNumber?: string | null;
-}
-&nbsp;
-export interface CreateMovementRequest {
-  instrumentType: InstrumentType;
-  naturalKey?: NaturalKey;
-  balanceContractId?: string;
-  movementType: string;
-  eventSeq: number;
-  amount: string;
-  currency: string;
-  tolerancePct?: string | null;
-  parentLogicalContractId?: string | null;
-  exposureNature?: 'CONTINGENT' | 'ACTUAL' | 'MEMO';
-  /** Business instruction 2026-08-14 — carries the Amendment No./Times or the Document Arrival's IB Number, per function (Design doc §3.3 audit reference field). */
-  sourceTransactionRef?: string | null;
-  /** A3S only (Design doc §3.3) — links a Document Arrival's own UTILIZE to its matched SG's FULL_REDEEM for audit/query purposes; not an atomicity guarantee (§3.3's own documented scope). */
-  businessEventId?: string | null;
-  /**
-   * Bug fixed 2026-08-16 ("A6/B4 也修一下") — A6/B4 only: the movementId of the pre-existing source
-   * Document Arrival/Present Docs record this movement converts/finalizes (this.selectedPayMovement at
-   * Submit time). Distinct from businessEventId above (which only links movements CREATED TOGETHER in
-   * one submission) — the source record here was created by an earlier, separate submission and never
-   * shares a businessEventId with this one. Lets a genuinely independent Checker session resolve and
-   * release the source record without needing the Maker's own in-memory selectedPayMovement — see
-   * checker-actions.service.ts's own doc comment for the full mechanism.
-   */
-  referencedTransactionId?: string | null;
-  /** Design doc §7 Tenor Type Routing (v0.7) — only for Acceptance (A6/B4). SELLERS_USANCE/BUYERS_USANCE share identical Balance mechanics; this is audit/reporting only. */
-  tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
-  tenorDays?: number | null;
-  createdBy: string;
-}
-&nbsp;
-export interface BalanceContract {
-  balanceContractId: string;
-  logicalContractId: string;
-  instrumentType: InstrumentType;
-  naturalKey: NaturalKey;
-  status: string;
-  currency: string;
-  tolerancePct?: string | null;
-  /** Design doc §7 Tenor Type Routing — declared at Issue, used to filter the Parent LC picker for Create Acceptance (business instruction 2026-08-14). */
-  tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
-  /** Business instruction 2026-08-14 ("Tenor Type and Tenor days should carry from the LC Number and protected") — the parent LC's own declared Tenor Days, copied onto A6/B4's Acceptance instead of being freely typed. */
-  tenorDays?: number | null;
-}
-&nbsp;
-/** Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計" — items are ordered by lc_number ascending. */
-export interface CatalogPage {
-  items: BalanceContract[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-&nbsp;
-export interface BalanceSnapshot {
-  balanceContractId: string;
-  logicalContractId: string;
-  currency: string;
-  confirmedBalance: string;
-  availableBalance: string;
-  pendingEarmarkTotal: string;
-  offBalanceExposure?: string | null;
-  tightAvailableBalance?: string | null;
-  /** Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only, null otherwise. */
-  presentDocsEarmarkPending?: string | null;
-  presentDocsEarmarkApproved?: string | null;
-}
-&nbsp;
-export interface MovementWarning {
-  code: 'OFF_BALANCE_EXPOSURE_WARNING';
-  message: string;
-  offBalanceExposureAtCheck?: string | null;
-  tightAvailableBalance?: string | null;
-}
+import { Observable, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
+import { InstrumentType, TransactionFunction } from './balance-component.model';
+import { describeApiError } from './api-error';
 &nbsp;
 /**
- * analysis/contingent-liability-ledger.html — the Dr/Cr contingent-liability account-entry pair the
- * microservice derives once, server-side, at movement creation (domain/contingentAccountEntry.ts), and
- * persists immutably with the movement. Null when the movement's own instrumentType is outside the
- * Balance Component's contingent/off-balance-sheet scope (the ON_BALANCE_ASSET instruments a
- * Confirmation's own Honour/Accept transforms into) — on-balance-sheet liability is never populated
- * here, by design.
+ * BAL-003 (Quality-report-balance.md — 6th same-day OOD/SOLID pass, "Maker Submit service"): the four
+ * compound Maker submission shapes (A3S/B3-Sight/B4-Usance/B5) plus the default single-call path —
+ * previously ~230 lines of `TransactionBuilderComponent`'s own private methods
+ * (`submitDocumentArrivalWithSg`, `submitConfirmationHonourWithReceivable`,
+ * `submitConfirmationAcceptWithReceivable`, `submitAcceptanceSettleWithReceivable`, `submitPlain`) plus
+ * the dispatch `if` chain that used to live directly inside `submit()` — now owns exactly the API-call
+ * orchestration: WHICH `createMovement()`/`resolveContract()` call to make, in what order, under what
+ * business condition. Mirrors `CheckerActionsService`'s own precedent exactly:
+ *  - the service depends only on `MakerSubmitContext` (a narrow, read-only interface — Interface
+ *    Segregation: exactly the fields these 5 flows read, nothing else) and the API client it already
+ *    injects itself — never on `TransactionBuilderComponent`.
+ *  - the service never mutates component state directly; every flow instead resolves to exactly one
+ *    `MakerSubmitOutcome`, and the component's own `applyMakerSubmitOutcome()` (transaction-
+ *    builder.component.ts) is the ONLY place that still touches `submitting`/`submitResult`/
+ *    `submitError`/the five secondary movement fields and calls back into
+ *    `refreshSelectedContractSnapshot()`/`syncCheckerToContext()`/`syncLookupToContext()` — Single
+ *    Responsibility: this service only ever decides "what happened", never "what the UI does about it".
+ *
+ * `validateSubmit()`/`buildSubmitRequest()` deliberately stay on the component — they read/write
+ * `model`/`naturalKey`/`selectedParent`/`selectedContractSnapshot`/etc. so deeply (including in-place
+ * writes like deriving `model.movementType`/`model.tenorDays`) that a service extraction would just
+ * relocate that coupling, not remove it — the exact same reasoning `submit()`'s own original BAL-003
+ * split already recorded for keeping them where they are.
+ *
+ * Every guard condition, branch order, and error-message string below — INCLUDING the one genuinely
+ * subtle rule this preserves exactly: only the call that submits `req` itself (never a secondary/
+ * tertiary leg) ever sets the outcome's own `result` field on failure, mirroring the original code's own
+ * `submitResult = err.error` placement precisely. A secondary leg's own failure leaves `result`
+ * `undefined` (the component's own `applyMakerSubmitOutcome()` then knows to leave `submitResult`
+ * untouched, exactly as the original nested-subscribe code already did) — is unchanged from the methods
+ * it replaces. Pure code motion re-expressed as RxJS `switchMap`/`catchError` chains instead of nested
+ * `.subscribe()` callbacks, so the exact same sequential-and-conditional shape survives.
  */
-export interface ContingentAccountEntry {
-  drAccount: string;
-  crAccount: string;
-  currency: string;
-  amount: string;
+export interface MakerSubmitContext {
+  readonly model: {
+    readonly amount?: string;
+    readonly currency?: string;
+    readonly createdBy?: string;
+    readonly secondaryRef?: string;
+    readonly movementType?: string;
+    readonly instrumentType?: InstrumentType;
+  };
+  readonly naturalKey: { readonly ibNumber: string };
+  readonly selectedFunction: TransactionFunction | null;
+  readonly selectedContract: BalanceContract | null;
+  readonly selectedArrivalSg: BalanceContract | null;
+  readonly arrivalSgSnapshot: BalanceSnapshot | null;
 }
 &nbsp;
-/**
- * Quality-report-balance.md BAL-006: mirrors the microservice's own `src/types.ts` BalanceMovement
- * shape (kept in sync by hand, same convention `balance-component.model.ts`'s own doc comment already
- * uses for the design-doc field/rule tables) — replaces the `Observable&lt;any&gt;`/`Observable&lt;any[]&gt;`
- * return types every mutating/listing method below used to have. Deliberately permissive on fields this
- * client never reads (index-signature-free, but every field the component actually touches — status,
- * movementType, sourceTransactionRef, amount, ceilingAmount, warnings, acknowledgedAt, etc. — is here),
- * and deliberately does NOT try to type the synthetic-field-merge some component call sites do (e.g.
- * loadPayableMovementsAcrossChildContracts's `{ ...m, sourceTransactionRef: ... }`) differently from a
- * real one — spreading a typed object and overriding one already-optional field stays type-compatible.
- */
-export interface BalanceMovement {
-  movementId: string;
-  balanceContractId: string;
-  eventSeq: number;
-  businessEventId?: string | null;
-  movementType: string;
-  exposureNature: 'CONTINGENT' | 'ACTUAL' | 'MEMO';
-  amount: string;
-  ceilingAmount: string;
-  currency: string;
-  status: 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED' | 'SUPERSEDED';
-  reasonCode?: string | null;
-  remarks?: string | null;
-  sourceTransactionRef?: string | null;
-  /** Bug fixed 2026-08-16 ("A6/B4 也修一下") — see CreateMovementRequest.referencedTransactionId's own doc comment for the full rule. */
-  referencedTransactionId?: string | null;
-  warnings?: MovementWarning[] | null;
-  contingentAccountEntry?: ContingentAccountEntry | null;
-  createdBy: string;
-  releasedBy?: string | null;
-  createdAt: string;
-  releasedAt?: string | null;
-  acknowledgedBy?: string | null;
-  acknowledgedAt?: string | null;
-  /**
-   * A4 (Sight Settlement) only (2026-08-16, business instruction "Add real Maker Submit, then have
-   * Checker to Release it. Exactly the same as A1."). Set via submitByMaker() below — see the
-   * microservice's own BalanceMovement.makerSubmittedAt doc comment for the full rationale (mirrors
-   * acknowledgedBy/acknowledgedAt's shape, but on the Maker side; status stays PENDING either way).
-   */
-  makerSubmittedBy?: string | null;
-  makerSubmittedAt?: string | null;
+/** Only the fields a given flow actually resolved are present — `undefined` means "unchanged", never "clear this". */
+export interface MakerSubmitSecondary {
+  arrivalSgRedeemMovementId?: string;
+  arrivalSgRedeemMovement?: BalanceMovement;
+  dueFromIssuingBankMovementId?: string;
+  acceptanceMovementId?: string;
+  acceptanceMovement?: BalanceMovement;
+  acceptanceReimbReceivableMovementId?: string;
+  matchedReceivableMovementId?: string;
 }
 &nbsp;
-/**
- * Talks DIRECTLY to the balance-component microservice (via the
- * /balance-component proxy path) — same posture as lc-payment-wc's own
- * payment-component-api.service.ts talking straight to
- * microservices/payment-component, bypassing the Node.js 中台 orchestrator
- * entirely. The 中台 is only for replaying the fixed Business Case
- * Registry; ad-hoc manual transaction testing goes straight to the API.
- */
+export type MakerSubmitOutcome =
+  | { kind: 'submitted'; result: BalanceMovement; secondary: MakerSubmitSecondary }
+  | { kind: 'failed'; message: string; result?: BalanceMovement | null; secondary: MakerSubmitSecondary };
+&nbsp;
 @Injectable({ providedIn: 'root' })
-export class BalanceComponentApiService {
-  private readonly base = '/balance-component';
+export class MakerSubmitService {
+  constructor(private readonly api: BalanceComponentApiService) {}
 &nbsp;
-  constructor(private readonly http: HttpClient) {}
-&nbsp;
-  createMovement(req: CreateMovementRequest): Observable&lt;HttpResponse&lt;BalanceMovement&gt;&gt; {
-    return this.http.post&lt;BalanceMovement&gt;(`${this.base}/balance-movements`, req, { observe: 'response' });
+  submit(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable&lt;MakerSubmitOutcome&gt; {
+    if (ctx.selectedFunction?.documentArrivalWithSg &amp;&amp; ctx.selectedArrivalSg &amp;&amp; ctx.arrivalSgSnapshot) {
+      return this.submitDocumentArrivalWithSg(req, ctx);
+    }
+    if (ctx.selectedFunction?.createsIssuingBankReceivableOnHonour &amp;&amp; ctx.model.movementType === 'HONOUR' &amp;&amp; ctx.selectedContract) {
+      return this.submitConfirmationHonourWithReceivable(req, ctx);
+    }
+    if (ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate &amp;&amp; ctx.selectedContract) {
+      return this.submitConfirmationAcceptWithReceivable(req, ctx);
+    }
+    if (ctx.selectedFunction?.settlesAcceptanceOnMature &amp;&amp; ctx.model.instrumentType === 'EPLC_ACCEPTANCE' &amp;&amp; ctx.selectedContract) {
+      return this.submitAcceptanceSettleWithReceivable(req, ctx);
+    }
+    return this.submitPlain(req);
   }
 &nbsp;
-  release(movementId: string, releasedBy: string): Observable&lt;BalanceMovement&gt; {
-    return this.http.post&lt;BalanceMovement&gt;(`${this.base}/balance-movements/${movementId}/release`, { releasedBy });
+  /** A3S only — creates the matched SG's own redemption FIRST, still PENDING, then the LC's own UTILIZE (`req`). */
+  private submitDocumentArrivalWithSg(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable&lt;MakerSubmitOutcome&gt; {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const sgOutstanding = Number(ctx.arrivalSgSnapshot!.confirmedBalance);
+    const sgRedeemAmount = Math.min(Number(ctx.model.amount), sgOutstanding);
+    const redeemReq: CreateMovementRequest = {
+      instrumentType: 'SHGT',
+      balanceContractId: ctx.selectedArrivalSg!.balanceContractId,
+      movementType: sgRedeemAmount &gt;= sgOutstanding ? 'FULL_REDEEM' : <span class="branch-1 cbranch-no" title="branch not covered" >'PARTIAL_REDEEM',</span>
+      eventSeq: Date.now(),
+      amount: String(sgRedeemAmount),
+      currency: ctx.selectedArrivalSg!.currency,
+      createdBy: ctx.model.createdBy!,
+      businessEventId,
+      sourceTransactionRef: ctx.model.secondaryRef || undefined,
+    };
+    return this.api.createMovement(redeemReq).pipe(
+      switchMap((redeemRes) =&gt; {
+        const secondary: MakerSubmitSecondary = { arrivalSgRedeemMovementId: redeemRes.body!.movementId, arrivalSgRedeemMovement: redeemRes.body! };
+        return this.api.createMovement(req).pipe(
+          map((res) =&gt; ({ kind: 'submitted' as const, result: res.body!, secondary })),
+          catchError((err) =&gt;
+            of&lt;MakerSubmitOutcome&gt;({
+              kind: 'failed',
+              message: `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${describeApiError(err)}`,
+              result: err.error ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span>
+              secondary,
+            }),
+          ),
+        );
+      }),
+      catchError((err) =&gt;
+        of&lt;MakerSubmitOutcome&gt;({ kind: 'failed', message: `Could not reserve the Shipping Guarantee redemption: ${describeApiError(err)}`, secondary: {} }),
+      ),
+    );
   }
 &nbsp;
-  reject(movementId: string, releasedBy: string, reasonCode: string, remarks?: string): Observable&lt;BalanceMovement&gt; {
-    return this.http.post&lt;BalanceMovement&gt;(`${this.base}/balance-movements/${movementId}/reject`, { releasedBy, reasonCode, remarks });
+  /** B3's Sight/HONOUR branch only — `req` (the Confirmation's own HONOUR) first, then the linked EPLC_DUE_FROM_ISSUING_BANK CREATE. */
+  private submitConfirmationHonourWithReceivable(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable&lt;MakerSubmitOutcome&gt; {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const cnfContract = ctx.selectedContract!;
+    return this.api.createMovement(req).pipe(
+      switchMap((res) =&gt; {
+        const result = res.body!;
+        const receivableReq: CreateMovementRequest = {
+          instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
+          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
+          parentLogicalContractId: cnfContract.logicalContractId,
+          movementType: 'CREATE',
+          eventSeq: Date.now(),
+          amount: String(ctx.model.amount),
+          currency: ctx.model.currency!,
+          createdBy: ctx.model.createdBy!,
+          businessEventId,
+        };
+        return this.api.createMovement(receivableReq).pipe(
+          map((receivableRes) =&gt; ({
+            kind: 'submitted' as const,
+            result,
+            secondary: { dueFromIssuingBankMovementId: receivableRes.body!.movementId },
+          })),
+          catchError((err) =&gt;
+            of&lt;MakerSubmitOutcome&gt;({
+              kind: 'failed',
+              message: `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${describeApiError(err)}`,
+              result,
+              secondary: {},
+            }),
+          ),
+        );
+      }),
+      catchError((err) =&gt;
+        of&lt;MakerSubmitOutcome&gt;({ kind: 'failed', message: err.error?.message ?? <span class="branch-1 cbranch-no" title="branch not covered" >err.message </span>?? <span class="branch-2 cbranch-no" title="branch not covered" >String(err),</span> result: err.error ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span> secondary: {} }),
+      ),
+    );
   }
 &nbsp;
-  /** Business instruction 2026-08-15 ("option for Maker to Delete Pending, i.e. EC") — Maker-initiated withdrawal of their own still-PENDING entry, distinct from reject() (a Checker's 4-eyes decline). */
-  cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): Observable&lt;BalanceMovement&gt; {
-    return this.http.post&lt;BalanceMovement&gt;(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
+  /** B4's Usance branch only — `req` (the Confirmation's own ACCEPT) first, then EPLC_ACCEPTANCE liability CREATE, then EPLC_ACCEPTANCE_REIMB_RECEIVABLE CREATE. */
+  private submitConfirmationAcceptWithReceivable(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable&lt;MakerSubmitOutcome&gt; {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const cnfContract = ctx.selectedContract!;
+    return this.api.createMovement(req).pipe(
+      switchMap((res) =&gt; {
+        const result = res.body!;
+        const acceptanceReq: CreateMovementRequest = {
+          instrumentType: 'EPLC_ACCEPTANCE',
+          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
+          parentLogicalContractId: cnfContract.logicalContractId,
+          movementType: 'CREATE',
+          eventSeq: Date.now(),
+          amount: String(ctx.model.amount),
+          currency: ctx.model.currency!,
+          createdBy: ctx.model.createdBy!,
+          businessEventId,
+          exposureNature: 'ACTUAL',
+          tenorType: cnfContract.tenorType ?? undefined,
+          tenorDays: cnfContract.tenorDays ?? undefined,
+        };
+        return this.api.createMovement(acceptanceReq).pipe(
+          switchMap((acceptanceRes) =&gt; {
+            const acceptanceMovement = acceptanceRes.body!;
+            const receivableReq: CreateMovementRequest = {
+              instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+              naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
+              parentLogicalContractId: cnfContract.logicalContractId,
+              movementType: 'CREATE',
+              eventSeq: Date.now(),
+              amount: String(ctx.model.amount),
+              currency: ctx.model.currency!,
+              createdBy: ctx.model.createdBy!,
+              businessEventId,
+            };
+            return this.api.createMovement(receivableReq).pipe(
+              map((receivableRes) =&gt; ({
+                kind: 'submitted' as const,
+                result,
+                secondary: {
+                  acceptanceMovementId: acceptanceMovement.movementId,
+                  acceptanceMovement,
+                  acceptanceReimbReceivableMovementId: receivableRes.body!.movementId,
+                },
+              })),
+              catchError((err) =&gt;
+                of&lt;MakerSubmitOutcome&gt;({
+                  kind: 'failed',
+                  message: `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${describeApiError(err)}`,
+                  result,
+                  secondary: { acceptanceMovementId: acceptanceMovement.movementId, acceptanceMovement },
+                }),
+              ),
+            );
+          }),
+          catchError((err) =&gt;
+            of&lt;MakerSubmitOutcome&gt;({
+              kind: 'failed',
+              message: `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${describeApiError(err)}`,
+              result,
+              secondary: {},
+            }),
+          ),
+        );
+      }),
+      catchError((err) =&gt;
+        of&lt;MakerSubmitOutcome&gt;({ kind: 'failed', message: err.error?.message ?? <span class="branch-1 cbranch-no" title="branch not covered" >err.message </span>?? <span class="branch-2 cbranch-no" title="branch not covered" >String(err),</span> result: err.error ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span> secondary: {} }),
+      ),
+    );
   }
 &nbsp;
-  /** Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — B3's own Checker Release; a real backend acknowledgment (status stays PENDING — B4 still finds/consumes it), not the plain release() transition. */
-  acknowledge(movementId: string, acknowledgedBy: string): Observable&lt;BalanceMovement&gt; {
-    return this.http.post&lt;BalanceMovement&gt;(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
+  /** B5's Usance/CNF_MATURE branch only — `req` (the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE) first, then resolves the matching EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract and REIMBURSEs it. */
+  private submitAcceptanceSettleWithReceivable(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable&lt;MakerSubmitOutcome&gt; {
+    const businessEventId = crypto.randomUUID();
+    req.businessEventId = businessEventId;
+    const acceptanceContract = ctx.selectedContract!;
+    return this.api.createMovement(req).pipe(
+      switchMap((res) =&gt; {
+        const result = res.body!;
+        return this.api
+          .resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
+            lcNumber: acceptanceContract.naturalKey.lcNumber,
+            ibNumber: acceptanceContract.naturalKey.ibNumber,
+          })
+          .pipe(
+            switchMap((receivableContract) =&gt; {
+              const reimbReq: CreateMovementRequest = {
+                instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+                balanceContractId: receivableContract.balanceContractId,
+                movementType: 'REIMBURSE',
+                eventSeq: Date.now(),
+                amount: String(ctx.model.amount),
+                currency: ctx.model.currency!,
+                createdBy: ctx.model.createdBy!,
+                businessEventId,
+              };
+              return this.api.createMovement(reimbReq).pipe(
+                map((reimbRes) =&gt; ({ kind: 'submitted' as const, result, secondary: { matchedReceivableMovementId: reimbRes.body!.movementId } })),
+                catchError((err) =&gt;
+                  of&lt;MakerSubmitOutcome&gt;({
+                    kind: 'failed',
+                    message: `Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: ${describeApiError(err)}`,
+                    result,
+                    secondary: {},
+                  }),
+                ),
+              );
+            }),
+            catchError((err) =&gt;
+              of&lt;MakerSubmitOutcome&gt;({
+                kind: 'failed',
+                message: `Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: ${describeApiError(err)}`,
+                result,
+                secondary: {},
+              }),
+            ),
+          );
+      }),
+      catchError((err) =&gt;
+        of&lt;MakerSubmitOutcome&gt;({ kind: 'failed', message: err.error?.message ?? <span class="branch-1 cbranch-no" title="branch not covered" >err.message </span>?? <span class="branch-2 cbranch-no" title="branch not covered" >String(err),</span> result: err.error ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span> secondary: {} }),
+      ),
+    );
   }
 &nbsp;
-  /** Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it. Exactly the same as A1.") — A4's own real Maker action; a genuine backend acknowledgment (status stays PENDING — the Checker's own release() below is still the real finalizing transition), not a new movement. */
-  submitByMaker(movementId: string, makerSubmittedBy: string): Observable&lt;BalanceMovement&gt; {
-    return this.http.post&lt;BalanceMovement&gt;(`${this.base}/balance-movements/${movementId}/maker-submit`, { makerSubmittedBy });
-  }
-&nbsp;
-  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): Observable&lt;BalanceContract&gt; {
-    const params: Record&lt;string, string&gt; = { instrumentType, lcNumber: naturalKey.lcNumber };
-    if (naturalKey.ibNumber) params['ibNumber'] = naturalKey.ibNumber;
-    if (naturalKey.sgNumber) params['sgNumber'] = naturalKey.sgNumber;
-    return this.http.get&lt;BalanceContract&gt;(`${this.base}/balance-contracts`, { params });
-  }
-&nbsp;
-  /**
-   * @param lcNumber — exact match (business instruction 2026-08-14 "search
-   *   LC Index, then the IB Index... to pick up the LC Number and IB
-   *   Number"): once an LC is picked from the LC Index, this drives the IB
-   *   Index step to exactly that LC's own IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/
-   *   SHGT rows. Deliberately separate from `q` (substring typeahead) —
-   *   see balanceContractStore.ts's CatalogFilter for why a substring match
-   *   would be unsafe here.
-   */
-  /**
-   * @param tenorFamily — business-reported gap 2026-08-14 ("Why U002 does
-   *   not shown A5 — Document Arrival (Usance)?"): filtered server-side so
-   *   page/total reflect the Sight/Usance-ELIGIBLE set, not the raw one —
-   *   a client-side-only filter let a page of 10 raw rows contain almost
-   *   none of the tenor actually wanted, hiding eligible LCs on other pages.
-   */
-  catalog(
-    instrumentType: InstrumentType,
-    status?: string,
-    q?: string,
-    page = 1,
-    pageSize = 10,
-    lcNumber?: string,
-    tenorFamily?: 'SIGHT' | 'USANCE',
-  ): Observable&lt;CatalogPage&gt; {
-    const params: Record&lt;string, string | number&gt; = { instrumentType, page, pageSize };
-    if (status) params['status'] = status;
-    if (q) params['q'] = q;
-    if (lcNumber) params['lcNumber'] = lcNumber;
-    if (tenorFamily) params['tenorFamily'] = tenorFamily;
-    return this.http.get&lt;CatalogPage&gt;(`${this.base}/balance-contracts/catalog`, { params });
-  }
-&nbsp;
-  getSnapshot(balanceContractId: string): Observable&lt;BalanceSnapshot&gt; {
-    return this.http.get&lt;BalanceSnapshot&gt;(`${this.base}/balance-contracts/${balanceContractId}/balance`);
-  }
-&nbsp;
-  /** Event timeline (business instruction 2026-08-14) — every movement against one contract, in eventSeq (time) order. */
-  listMovements(balanceContractId: string): Observable&lt;BalanceMovement[]&gt; {
-    return this.http.get&lt;BalanceMovement[]&gt;(`${this.base}/balance-contracts/${balanceContractId}/movements`);
-  }
-&nbsp;
-  /**
-   * Bug fixed 2026-08-16, reviewer-reported ("A1 -&gt; A8 -&gt; A3S -&gt; A4, the related SG entries was not
-   * shown") — lets checker-actions.service.ts resolve a compound submission's linked leg(s) (A3S's SG
-   * redemption, B5's Reimbursement Receivable) by their shared businessEventId, independent of the
-   * Maker's own in-memory submitResult. Cross-contract by design (the SG's own balanceContractId
-   * differs from the LC's) — see the microservice's own store.findByBusinessEventId doc comment.
-   */
-<span class="fstat-no" title="function not covered" >  findByBusinessEventId(</span>businessEventId: string): Observable&lt;BalanceMovement[]&gt; {
-<span class="cstat-no" title="statement not covered" >    return this.http.get&lt;BalanceMovement[]&gt;(`${this.base}/balance-movements`, { params: { businessEventId } });</span>
+  /** The default single-call path — every function that doesn't need one of the four compound shapes above. */
+  private submitPlain(req: CreateMovementRequest): Observable&lt;MakerSubmitOutcome&gt; {
+    return this.api.createMovement(req).pipe(
+      map((res) =&gt; ({ kind: 'submitted' as const, result: res.body!, secondary: {} })),
+      catchError((err) =&gt;
+        of&lt;MakerSubmitOutcome&gt;({ kind: 'failed', message: err.error?.message ?? <span class="branch-1 cbranch-no" title="branch not covered" >err.message </span>?? <span class="branch-2 cbranch-no" title="branch not covered" >String(err),</span> result: err.error ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span> secondary: {} }),
+      ),
+    );
   }
 }
 &nbsp;</pre></td></tr></table></pre>

@@ -2107,6 +2107,81 @@ codebase is production-ready — BAL-001 (no auth), BAL-002 (dependency CVEs), B
 and BAL-003 (God Component) remain open, deferred gate conditions, unchanged throughout this entire
 sequence of fixes.
 
+## BAL-003 — Maker Submit's five submission shapes extracted into `MakerSubmitService`, mirroring `CheckerActionsService`'s own precedent (2026-08-17, user-directed: "有甚麼建議解法?" (what's the recommended fix for the God Component?) → confirmed extracting the paginated pickers was already done and not worth pursuing further (see below) → "YES" to extracting Maker Submit instead)
+
+Continues this session's own BAL-003 (God Component) remediation history. Before touching anything,
+first investigated the picker-extraction idea (three paginated LC/Parent/IB Index pickers) the user had
+asked about first — found it was **already done**: `IndexPickerComponent` (content-projection-based
+presentation shell) and `PagedListState` (shared pagination state/math) already exist, and the only
+remaining duplication (three sets of `get/set` accessor pairs delegating to `PagedListState`) is
+deliberately kept as-is from an earlier pass specifically because collapsing it further would touch 35+
+existing test call sites (`comp.catalogPage = 5`-style direct writes) for a purely cosmetic gain — not
+worth it. Reported this back rather than doing low-value work, and pivoted to the genuinely unfinished
+piece: `submit()`'s own five per-shape submission methods
+(`submitDocumentArrivalWithSg`/`submitConfirmationHonourWithReceivable`/
+`submitConfirmationAcceptWithReceivable`/`submitAcceptanceSettleWithReceivable`/`submitPlain`) plus the
+dispatch `if` chain that used to live directly inside `submit()` — the Maker-side mirror of the exact
+`release()`/`reject()`/`deleteMakerPending()` shape `CheckerActionsService` already extracted from the
+Checker side.
+
+**Fix**: new `MakerSubmitService` (`maker-submit.service.ts`) — depends only on a narrow
+`MakerSubmitContext` interface (Interface Segregation: exactly the fields the five flows read) and its
+own injected `BalanceComponentApiService`, never on the component. `submit(req, ctx)` is the public
+dispatcher (same 4-branch `if` chain, unchanged); each of the five shapes resolves to exactly one
+`MakerSubmitOutcome` (`{kind:'submitted', result, secondary}` or `{kind:'failed', message, result?,
+secondary}`) instead of mutating component state directly. `validateSubmit()`/`buildSubmitRequest()`
+deliberately stayed on the component — same reasoning as before (they read/write `model`/`naturalKey`/
+etc. too pervasively for a service extraction to help). The component's own new
+`applyMakerSubmitOutcome()` is the only place outcomes turn into `submitting`/`submitResult`/
+`submitError`/the five secondary movement fields and the `refreshSelectedContractSnapshot()`/
+`syncCheckerToContext()`/`syncLookupToContext()` callback chain.
+
+**The one genuinely subtle behavior preserved exactly**: only the call that submits `req` itself (never
+a secondary/tertiary leg) sets the failed outcome's own `result` field — mirroring the original code's
+own `submitResult = err.error` placement precisely, audited call-site-by-call-site across all 5 methods
+before writing a single line of the new service (see `maker-submit.service.ts`'s own doc comment for the
+full rule). A secondary leg's own failure leaves `result` `undefined`, which `applyMakerSubmitOutcome()`
+correctly reads as "leave `submitResult` untouched" — matching cases like B4 Sight/HONOUR's own "Honour
+succeeds but the Due From Issuing Bank leg fails: `submitResult` stays the Honour response, not cleared"
+rule exactly.
+
+Verified: `tsc --noEmit`/`ng build`/`npm run lint` all clean (lint warnings dropped 219 → 213 as a side
+effect — the removed methods' own `any`-typed error handlers are gone). New
+`maker-submit.service.spec.ts` (22 tests: dispatch routing for all 5 shapes including the A1/A3S-without-
+prerequisites fallback-to-plain case and B4's HONOUR-vs-ACCEPT branching; every success path; every
+distinct failure branch — primary-leg-fails vs. secondary/tertiary-leg-fails — for all 5 methods, proving
+the `result`/`secondary` state-threading rule above holds in each case). Full Angular suite 534/534 (22
+new) with **zero pre-existing test files needing any changes** — the same strong evidence-of-behavior-
+preservation pattern every prior BAL-003/CheckerActionsService extraction in this session has shown —
+coverage 99.63%/96%/99.17%/99.66% (all four metrics clear the 95% floor; `maker-submit.service.ts` itself
+is 100% on statements/functions/lines, 74% on branches — the uncovered branches are unexercised
+`err.message`/`String(err)` fallback permutations in error-message construction, the same class of gap
+already accepted in `checker-actions.service.ts`'s own 90% branch figure, not untested business logic).
+
+**Live-verified end to end in the browser** (not just unit tests, given the stakes — this is the actual
+money-moving Maker Submit path across all 14 named business functions): A1 (LC Issue) submitted
+successfully via the new `submitPlain()` — MAKER RESULT panel, Account Entries, correct PENDING earmark
+all matched the pre-extraction behavior. Then the highest-risk compound shape, A3S (Document Arrival w/
+Shipping Gtee, `submitDocumentArrivalWithSg()`): issued and released an SG against the same LC, then
+submitted A3S with a Bill Amount exactly matching the SG's own Outstanding — confirmed **both**
+"Account Entries" and "Account Entries — SG Redemption" buttons rendered (proving `outcome.secondary`
+correctly carried the SG leg's full `BalanceMovement` through to the component), the SG's own Event
+Timeline showed `FULL_REDEEM 20000 IBVERIFY01 PENDING`, and the LC's own Off-Balance Exposure correctly
+dropped from 20,000 to 0 (the PENDING SG redemption netting out before the Document Arrival's own
+sufficiency check, per §6.1) — the "Account Entries — SG Redemption" dialog itself showed the correct
+historical Dr/Cr pair (`Dr Shipping Guarantees Outstanding` / `Cr Customers' Liability under Shipping
+Guarantees`, both 20,000 USD). Zero console errors throughout. Test data cleaned up afterward. Full
+three-suite re-verification per this file's own standing rule: `backend/` 33/33 and microservice 292/292,
+both unaffected (Angular-only change).
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` 2,923 → 2,684 lines — a genuine reduction,
+not just relocation-with-growth like some earlier same-session passes, because this is the first
+extraction since `CheckerActionsService` itself that reduces the *number of jobs* the class does (money-
+moving API orchestration now genuinely lives elsewhere) rather than only DRYing one job's own internals.
+BAL-003 stays open at Major — the class still owns function/side selection, three picker state machines,
+and the Look Up panel — but the two largest remaining "does too many things" candidates
+(Checker Actions, Maker Submit) are now both extracted via the same Dependency Inversion pattern.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

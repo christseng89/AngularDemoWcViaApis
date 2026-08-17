@@ -8,6 +8,7 @@ import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSn
 import { IndexPickerComponent } from './index-picker.component';
 import { PagedListState } from './paged-list-state';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
+import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './maker-submit.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   CREATING_MOVEMENT_TYPES,
@@ -396,6 +397,7 @@ export class TransactionBuilderComponent {
   constructor(
     private readonly api: BalanceComponentApiService,
     private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
+    private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
   ) {}
 
   get isCreatingMovement(): boolean {
@@ -2153,19 +2155,22 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * Quality-report-balance.md BAL-003, final increment — submit()'s own ~430-line body split into
+   * Quality-report-balance.md BAL-003 — submit()'s own ~430-line body was first split (same-day) into
    * this validation step, buildSubmitRequest() (request assembly), five named per-shape submission
-   * methods (submitDocumentArrivalWithSg/submitConfirmationHonourWithReceivable/
-   * submitConfirmationAcceptWithReceivable/submitAcceptanceSettleWithReceivable/submitPlain), and
-   * submit() itself, now just a thin dispatcher. Pure code motion — every guard condition, every
-   * business-instruction comment, every error message, and the exact order every API call fires in is
-   * unchanged; only WHERE each piece lives changed. Not a "guard/params unchanged, only a repeated
-   * body moves" consolidation like the extractions above (there's no meaningful duplication here to
-   * remove) — this is a straightforward decompose-one-giant-method-into-named-pieces split, chosen
-   * over moving anything into a separate service/component for the same reason `finishCheckerAction`'s
-   * own doc comment gives: this logic reads/writes deeply into component state
-   * (`selectedContract`/`selectedArrivalSg`/`arrivalSgSnapshot`/`naturalKey`/`model`/etc.) and a
-   * service extraction would just relocate that coupling, not remove it.
+   * methods, and submit() itself as a thin dispatcher — pure code motion at the time, deliberately kept
+   * on the component rather than moved into a service, for the same reason `finishCheckerAction`'s own
+   * doc comment gave for the equivalent Checker-side methods: this logic reads/writes deeply into
+   * component state.
+   *
+   * That reasoning was revisited later (6th same-day OOD/SOLID pass, "Maker Submit service") the same
+   * way `CheckerActionsService`'s own extraction had already reversed the identical argument on the
+   * Checker side: the five submission methods and the dispatch `if` chain moved into
+   * `MakerSubmitService` (see that file's own doc comment) via Dependency Inversion — a narrow
+   * `MakerSubmitContext` interface, never the component itself. `validateSubmit()` and
+   * `buildSubmitRequest()` below, unlike the five submission methods, genuinely earn staying on the
+   * component: they read/write `model`/`naturalKey`/`selectedParent`/`selectedContractSnapshot`/etc. so
+   * pervasively (including in-place derivations like `model.movementType`/`model.tenorDays`) that a
+   * service extraction would only relocate that coupling, not remove it.
    */
   private validateSubmit(): boolean {
     if (!this.model.instrumentType || !this.model.movementType || !this.model.amount || !this.model.currency || !this.model.createdBy) {
@@ -2323,281 +2328,52 @@ export class TransactionBuilderComponent {
     return req;
   }
 
-  // Business instruction 2026-08-14 ("Document Arrival w Shipping Gtee... will also Redemp SG Balance in
-  // Pending via Maker and then Redemp SG Balance in Approved via Checker approved") — A3S only. Creates the
-  // matched SG's own redemption FIRST, still PENDING — src/domain/offBalanceExposure.ts's
-  // computeOffBalanceExposure() counts a PENDING redemption the same as a RELEASED one, so by the time the
-  // second call (the LC's own UTILIZE, req below, for the FULL Bill Amount) runs its sufficiency check
-  // server-side, this SG's exposure is already netted out of Tight Available. Only proceeds to the second
-  // call if the first genuinely succeeds — a failed SG redemption must never leave an orphaned Document
-  // Arrival behind.
-  //
-  // Business instruction 2026-08-15 ("SG Redemption Amount = system-calculated MIN(Bill Amount, SG
-  // Outstanding)... Incremental Exposure = Document Amount − Eligible SG Match") — reverses the prior
-  // full-match-only design (the SG call used to always redeem its full outstanding, forced equal to Bill
-  // Amount). The SG's own redemption is now only ever for the matched portion — never more than its
-  // outstanding — classified FULL_REDEEM/PARTIAL_REDEEM by whether that portion exhausts it. req's own
-  // amount (the LC UTILIZE) is untouched here — it already carries the FULL Bill Amount from model.amount;
-  // any excess above the SG match is ordinary incremental LC exposure, still checked for real against
-  // Tight Available (§6.1 v0.12's hard-409 rule) since only the matched portion was netted out.
-  private submitDocumentArrivalWithSg(req: CreateMovementRequest): void {
-    const businessEventId = crypto.randomUUID();
-    req.businessEventId = businessEventId;
-    const sgOutstanding = Number(this.arrivalSgSnapshot!.confirmedBalance);
-    const sgRedeemAmount = Math.min(Number(this.model.amount), sgOutstanding);
-    const redeemReq: CreateMovementRequest = {
-      instrumentType: 'SHGT',
-      balanceContractId: this.selectedArrivalSg!.balanceContractId,
-      movementType: sgRedeemAmount >= sgOutstanding ? 'FULL_REDEEM' : 'PARTIAL_REDEEM',
-      eventSeq: Date.now(),
-      amount: String(sgRedeemAmount),
-      currency: this.selectedArrivalSg!.currency,
-      createdBy: this.model.createdBy!,
-      businessEventId,
-      sourceTransactionRef: this.model.secondaryRef || undefined,
+  /**
+   * BAL-003 (6th same-day OOD/SOLID pass, "Maker Submit service") — the four compound submission
+   * shapes and the dispatch `if` chain that used to decide between them now live in
+   * `MakerSubmitService.submit()`; this method just builds the narrow `MakerSubmitContext` it needs.
+   * Mirrors `buildCheckerActionContext()`'s own shape exactly.
+   */
+  private buildMakerSubmitContext(): MakerSubmitContext {
+    return {
+      model: this.model,
+      naturalKey: this.naturalKey,
+      selectedFunction: this.selectedFunction,
+      selectedContract: this.selectedContract,
+      selectedArrivalSg: this.selectedArrivalSg,
+      arrivalSgSnapshot: this.arrivalSgSnapshot,
     };
-    this.api.createMovement(redeemReq).subscribe({
-      next: (redeemRes: any) => {
-        this.arrivalSgRedeemMovementId = redeemRes.body.movementId;
-        this.arrivalSgRedeemMovement = redeemRes.body;
-        this.api.createMovement(req).subscribe({
-          next: (res: any) => {
-            this.submitting = false;
-            this.submitResult = res.body;
-            this.refreshSelectedContractSnapshot();
-            this.syncCheckerToContext();
-            this.syncLookupToContext();
-          },
-          error: (err) => {
-            this.submitting = false;
-            this.submitError = `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${this.describeApiError(err)}`;
-            this.submitResult = err.error ?? null;
-          },
-        });
-      },
-      error: (err) => {
-        this.submitting = false;
-        this.submitError = `Could not reserve the Shipping Guarantee redemption: ${this.describeApiError(err)}`;
-      },
-    });
   }
 
-  // Business instruction 2026-08-15 (Gap Analysis Row 5, rationale-en.md §7.4a "paying the exporter
-  // under a confirmation creates an asset against the issuing/reimbursing bank, not another
-  // liability") — B3's Sight/HONOUR branch only. Creates the EPLC_CONFIRMATION's own HONOUR (req)
-  // FIRST — only proceeds to the linked EPLC_DUE_FROM_ISSUING_BANK CREATE if that genuinely
-  // succeeds, so a rejected HONOUR (e.g. insufficient Confirmation balance) never leaves an orphaned
-  // receivable behind. No ordering dependency the other way — CREATE on a brand-new asset contract
-  // is NO_CHECK server-side (no sufficiency check to net against), unlike A3S's SG-first ordering
-  // above.
-  private submitConfirmationHonourWithReceivable(req: CreateMovementRequest): void {
-    const businessEventId = crypto.randomUUID();
-    req.businessEventId = businessEventId;
-    const cnfContract = this.selectedContract!;
-    this.api.createMovement(req).subscribe({
-      next: (res: any) => {
-        this.submitResult = res.body;
-        const receivableReq: CreateMovementRequest = {
-          instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
-          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
-          parentLogicalContractId: cnfContract.logicalContractId,
-          movementType: 'CREATE',
-          eventSeq: Date.now(),
-          amount: String(this.model.amount),
-          // Non-null: submit()'s own mandatory-fields guard already required these before this
-          // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
-          currency: this.model.currency!,
-          createdBy: this.model.createdBy!,
-          businessEventId,
-        };
-        this.api.createMovement(receivableReq).subscribe({
-          next: (receivableRes: any) => {
-            this.submitting = false;
-            this.dueFromIssuingBankMovementId = receivableRes.body.movementId;
-            this.refreshSelectedContractSnapshot();
-            this.syncCheckerToContext();
-            this.syncLookupToContext();
-          },
-          error: (err) => {
-            this.submitting = false;
-            this.submitError = `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${this.describeApiError(err)}`;
-          },
-        });
-      },
-      error: (err) => {
-        this.submitting = false;
-        this.submitError = err.error?.message ?? err.message ?? String(err);
-        this.submitResult = err.error ?? null;
-      },
-    });
-  }
+  /**
+   * The one place `MakerSubmitService`'s outcomes turn back into component state/side effects —
+   * mirrors `applyCheckerActionOutcome()` exactly. `outcome.secondary`'s fields are only ever present
+   * when that specific flow actually resolved them (a secondary/tertiary leg succeeding before a LATER
+   * leg failed still needs its own id recorded) — `undefined` means "leave this field alone", never
+   * "clear it", which is why each is applied with its own explicit presence check rather than a blanket
+   * object spread.
+   */
+  private applyMakerSubmitOutcome(outcome: MakerSubmitOutcome): void {
+    this.submitting = false;
+    if (outcome.secondary.arrivalSgRedeemMovementId !== undefined) this.arrivalSgRedeemMovementId = outcome.secondary.arrivalSgRedeemMovementId;
+    if (outcome.secondary.arrivalSgRedeemMovement !== undefined) this.arrivalSgRedeemMovement = outcome.secondary.arrivalSgRedeemMovement;
+    if (outcome.secondary.dueFromIssuingBankMovementId !== undefined) this.dueFromIssuingBankMovementId = outcome.secondary.dueFromIssuingBankMovementId;
+    if (outcome.secondary.acceptanceMovementId !== undefined) this.acceptanceMovementId = outcome.secondary.acceptanceMovementId;
+    if (outcome.secondary.acceptanceMovement !== undefined) this.acceptanceMovement = outcome.secondary.acceptanceMovement;
+    if (outcome.secondary.acceptanceReimbReceivableMovementId !== undefined) this.acceptanceReimbReceivableMovementId = outcome.secondary.acceptanceReimbReceivableMovementId;
+    if (outcome.secondary.matchedReceivableMovementId !== undefined) this.matchedReceivableMovementId = outcome.secondary.matchedReceivableMovementId;
 
-  // Business instruction 2026-08-15 (Gap Analysis Row 6 Critical Gap, then unified into B4's own
-  // Honour/Accept legal-event role by the "Confirm LC Balance 控制" table review — B4 now IS
-  // `CNF_ACCEPT` itself, not just its follow-up) — B4's Usance branch only. req here is the PRIMARY:
-  // the Confirmation's own ACCEPT (movementTypeFromContractTenor already built it as
-  // instrumentType=EPLC_CONFIRMATION/movementType=ACCEPT/balanceContractId=selectedContract, same as
-  // the Sight/HONOUR branch above). On success, creates the EPLC_ACCEPTANCE liability, THEN the
-  // EPLC_ACCEPTANCE_REIMB_RECEIVABLE asset (the piece Row 6 was missing) — each only proceeding if
-  // the previous genuinely succeeded, so a failure never leaves a partial compound behind. Tenor
-  // Type/Days for the new Acceptance are carried from the Confirmation itself (server-enforced they
-  // must match anyway, per B4's own help text).
-  private submitConfirmationAcceptWithReceivable(req: CreateMovementRequest): void {
-    const businessEventId = crypto.randomUUID();
-    req.businessEventId = businessEventId;
-    const cnfContract = this.selectedContract!;
-    this.api.createMovement(req).subscribe({
-      next: (res: any) => {
-        this.submitResult = res.body;
-        const acceptanceReq: CreateMovementRequest = {
-          instrumentType: 'EPLC_ACCEPTANCE',
-          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null, sgNumber: null },
-          parentLogicalContractId: cnfContract.logicalContractId,
-          movementType: 'CREATE',
-          eventSeq: Date.now(),
-          amount: String(this.model.amount),
-          // Non-null: submit()'s own mandatory-fields guard already required these before this
-          // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
-          currency: this.model.currency!,
-          createdBy: this.model.createdBy!,
-          businessEventId,
-          exposureNature: 'ACTUAL',
-          tenorType: cnfContract.tenorType ?? undefined,
-          tenorDays: cnfContract.tenorDays ?? undefined,
-        };
-        this.api.createMovement(acceptanceReq).subscribe({
-          next: (acceptanceRes: any) => {
-            this.acceptanceMovementId = acceptanceRes.body.movementId;
-            this.acceptanceMovement = acceptanceRes.body;
-            const receivableReq: CreateMovementRequest = {
-              instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-              naturalKey: {
-                lcNumber: cnfContract.naturalKey.lcNumber,
-                ibNumber: this.naturalKey.ibNumber || this.model.secondaryRef || null,
-                sgNumber: null,
-              },
-              parentLogicalContractId: cnfContract.logicalContractId,
-              movementType: 'CREATE',
-              eventSeq: Date.now(),
-              amount: String(this.model.amount),
-              currency: this.model.currency!,
-              createdBy: this.model.createdBy!,
-              businessEventId,
-            };
-            this.api.createMovement(receivableReq).subscribe({
-              next: (receivableRes: any) => {
-                this.submitting = false;
-                this.acceptanceReimbReceivableMovementId = receivableRes.body.movementId;
-                this.refreshSelectedContractSnapshot();
-                this.syncCheckerToContext();
-                this.syncLookupToContext();
-              },
-              error: (err) => {
-                this.submitting = false;
-                this.submitError = `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${this.describeApiError(err)}`;
-              },
-            });
-          },
-          error: (err) => {
-            this.submitting = false;
-            this.submitError = `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${this.describeApiError(err)}`;
-          },
-        });
-      },
-      error: (err) => {
-        this.submitting = false;
-        this.submitError = err.error?.message ?? err.message ?? String(err);
-        this.submitResult = err.error ?? null;
-      },
-    });
-  }
-
-  // Business instruction 2026-08-16 ("從Balance Component角度來看B5不需要，B6改成B5選資料為有Acceptance
-  // Balance>0的EB交易，交易會解除EB交易的Acceptance Balance") — B5's Usance/CNF_MATURE branch only. req
-  // here is the PRIMARY: the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE (derived above). On success,
-  // resolves the MATCHING EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract (same LC+EB Number natural key —
-  // B4's own compound already created it, linked to the same Acceptance) and creates its REIMBURSE for
-  // the SAME amount, same businessEventId — one Checker Release finalizes both (see release()'s own
-  // settlesAcceptanceOnMature branch). B5's own instrumentType is fixed to EPLC_ACCEPTANCE (Usance —
-  // B5 has no Sight branch of its own, see settlesAcceptanceOnMature's doc comment), so this guard is
-  // always true for a real B5 submission; the plain REIMBURSE path below is reached by other functions
-  // instead (unchanged from the old B6), never by B5 falling through this one.
-  private submitAcceptanceSettleWithReceivable(req: CreateMovementRequest): void {
-    const businessEventId = crypto.randomUUID();
-    req.businessEventId = businessEventId;
-    const acceptanceContract = this.selectedContract!;
-    this.api.createMovement(req).subscribe({
-      next: (res: any) => {
-        this.submitResult = res.body;
-        this.api
-          .resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
-            lcNumber: acceptanceContract.naturalKey.lcNumber,
-            ibNumber: acceptanceContract.naturalKey.ibNumber,
-          })
-          .subscribe({
-            next: (receivableContract) => {
-              const reimbReq: CreateMovementRequest = {
-                instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-                balanceContractId: receivableContract.balanceContractId,
-                movementType: 'REIMBURSE',
-                eventSeq: Date.now(),
-                amount: String(this.model.amount),
-                // Non-null: submit()'s own mandatory-fields guard already required these before this
-                // closure could ever run — TS just can't see that narrowing across the .subscribe() boundary.
-                currency: this.model.currency!,
-                createdBy: this.model.createdBy!,
-                businessEventId,
-              };
-              this.api.createMovement(reimbReq).subscribe({
-                next: (reimbRes: any) => {
-                  this.submitting = false;
-                  this.matchedReceivableMovementId = reimbRes.body.movementId;
-                  this.refreshSelectedContractSnapshot();
-                  this.syncCheckerToContext();
-                  this.syncLookupToContext();
-                },
-                error: (err) => {
-                  this.submitting = false;
-                  this.submitError = `Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: ${this.describeApiError(err)}`;
-                },
-              });
-            },
-            error: (err) => {
-              this.submitting = false;
-              this.submitError = `Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: ${this.describeApiError(err)}`;
-            },
-          });
-      },
-      error: (err) => {
-        this.submitting = false;
-        this.submitError = err.error?.message ?? err.message ?? String(err);
-        this.submitResult = err.error ?? null;
-      },
-    });
-  }
-
-  // Business instruction 2026-08-14 (revised): "When Submit A6, the LC Balance is remain unchanged but
-  // create an Acceptance Balance in Pending." — the Document Arrival release moved OUT of the Maker's
-  // Submit and into the Checker's release() below; a Maker submitting a request must never be able to
-  // unilaterally finalize the LC's own Balance — that needs the same 4-eyes Checker step as everything else.
-  // The default/plain path — every function that doesn't need one of the four compound shapes above.
-  private submitPlain(req: CreateMovementRequest): void {
-    this.api.createMovement(req).subscribe({
-      next: (res: any) => {
-        this.submitting = false;
-        this.submitResult = res.body;
-        // Earmark takes effect immediately at PENDING, before Release (Design doc §6) —
-        // refresh right away so the panel shows the drop, not just after Release.
-        this.refreshSelectedContractSnapshot();
-        this.syncCheckerToContext();
-        this.syncLookupToContext();
-      },
-      error: (err) => {
-        this.submitting = false;
-        this.submitError = err.error?.message ?? err.message ?? String(err);
-        this.submitResult = err.error ?? null;
-      },
-    });
+    if (outcome.kind === 'submitted') {
+      this.submitResult = outcome.result;
+      // Earmark takes effect immediately at PENDING, before Release (Design doc §6) —
+      // refresh right away so the panel shows the drop, not just after Release.
+      this.refreshSelectedContractSnapshot();
+      this.syncCheckerToContext();
+      this.syncLookupToContext();
+      return;
+    }
+    this.submitError = outcome.message;
+    if ('result' in outcome && outcome.result !== undefined) this.submitResult = outcome.result;
   }
 
   submit(): void {
@@ -2613,24 +2389,9 @@ export class TransactionBuilderComponent {
     this.arrivalSgRedeemMovement = null;
     this.acceptanceMovement = null;
 
-    if (this.selectedFunction?.documentArrivalWithSg && this.selectedArrivalSg && this.arrivalSgSnapshot) {
-      this.submitDocumentArrivalWithSg(req);
-      return;
-    }
-    if (this.selectedFunction?.createsIssuingBankReceivableOnHonour && this.model.movementType === 'HONOUR' && this.selectedContract) {
-      this.submitConfirmationHonourWithReceivable(req);
-      return;
-    }
-    if (this.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && this.selectedContract) {
-      this.submitConfirmationAcceptWithReceivable(req);
-      return;
-    }
-    if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContract) {
-      this.submitAcceptanceSettleWithReceivable(req);
-      return;
-    }
-    this.submitPlain(req);
+    this.makerSubmit.submit(req, this.buildMakerSubmitContext()).subscribe((outcome) => this.applyMakerSubmitOutcome(outcome));
   }
+
 
   /**
    * A3 (Document Arrival (Sight)) Checker action — business instruction

@@ -5,8 +5,9 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
 
 // submit()'s compound branches (A3S/B4/B5) call `crypto.randomUUID()` to link legs via
 // businessEventId — jsdom's test environment doesn't always implement it. Polyfill once, module-load
-// time, same posture as any other jsdom API gap; this file owns it since it's the only slice that
-// exercises those branches.
+// time, same posture as any other jsdom API gap. `maker-submit.service.spec.ts` carries an identical
+// copy of this same polyfill — each Jest test FILE gets its own fresh module registry/globalThis, so
+// there's no single shared place to hoist this to without a global Jest setup-file change.
 if (typeof (globalThis as any).crypto === 'undefined') {
   (globalThis as any).crypto = {};
 }
