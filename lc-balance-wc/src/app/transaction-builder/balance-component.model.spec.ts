@@ -16,6 +16,7 @@ import {
   CURRENCY_DECIMALS,
   decimalPlacesForCurrency,
   amountExceedsCurrencyDecimals,
+  groupThousands,
   defaultLcInstrumentTypeForSide,
   childInstrumentTypesOf,
   resolveFunctionForMovement,
@@ -610,6 +611,35 @@ describe('balance-component.model data invariants', () => {
       expect(amountExceedsCurrencyDecimals(undefined, 'JPY')).toBe(false);
       expect(amountExceedsCurrencyDecimals(null, 'JPY')).toBe(false);
     });
+  });
+
+  describe('groupThousands (Quality-report-balance.md Security Hotspot fix — non-regex thousand-separator formatting)', () => {
+    it('leaves a 1-3 digit string unchanged', () => {
+      expect(groupThousands('0')).toBe('0');
+      expect(groupThousands('5')).toBe('5');
+      expect(groupThousands('25')).toBe('25');
+      expect(groupThousands('999')).toBe('999');
+    });
+
+    it('inserts one comma for 4-6 digits', () => {
+      expect(groupThousands('1000')).toBe('1,000');
+      expect(groupThousands('25000')).toBe('25,000');
+      expect(groupThousands('999999')).toBe('999,999');
+    });
+
+    it('inserts multiple commas for longer digit strings', () => {
+      expect(groupThousands('1000000')).toBe('1,000,000');
+      expect(groupThousands('1234567890')).toBe('1,234,567,890');
+    });
+
+    it('handles an empty string', () => {
+      expect(groupThousands('')).toBe('');
+    });
+
+    it('handles a string whose length is an exact multiple of 3 (no leading comma)', () => {
+      expect(groupThousands('123456')).toBe('123,456');
+      expect(groupThousands('123456789')).toBe('123,456,789');
+    });
 
     // Live bug, reviewer-reported 2026-08-16 ("All the Submit functions are not working in UI"): every
     // test above passes a genuine string literal, which is exactly why the whole suite missed this —
@@ -652,7 +682,7 @@ describe('balance-component.model data invariants', () => {
       expect(childInstrumentTypesOf('IPLC_ACCEPTANCE')).toEqual([]);
     });
 
-    it('the three ON_BALANCE_ASSET instrumentTypes never appear as anyone\'s child (their own PARENT_INSTRUMENT_OPTIONS entries are empty by design)', () => {
+    it("the three ON_BALANCE_ASSET instrumentTypes never appear as anyone's child (their own PARENT_INSTRUMENT_OPTIONS entries are empty by design)", () => {
       for (const root of ALL_INSTRUMENT_TYPES) {
         expect(childInstrumentTypesOf(root)).not.toContain('EPLC_DUE_FROM_ISSUING_BANK');
         expect(childInstrumentTypesOf(root)).not.toContain('EPLC_ACCEPTANCE_REIMB_RECEIVABLE');
@@ -676,12 +706,12 @@ describe('balance-component.model data invariants', () => {
       expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'ACCEPT')?.code).toBe('B4');
     });
 
-    it('resolves the derived PARTIAL_REDEEM via autoRedeemType (A9), not only the registry\'s own literal FULL_REDEEM default', () => {
+    it("resolves the derived PARTIAL_REDEEM via autoRedeemType (A9), not only the registry's own literal FULL_REDEEM default", () => {
       expect(resolveFunctionForMovement('SHGT', 'FULL_REDEEM')?.code).toBe('A9');
       expect(resolveFunctionForMovement('SHGT', 'PARTIAL_REDEEM')?.code).toBe('A9');
     });
 
-    it('resolves the derived PARTIAL_SETTLE via settlesAcceptanceOnMature (B5), not only the registry\'s own literal FULL_SETTLE default', () => {
+    it("resolves the derived PARTIAL_SETTLE via settlesAcceptanceOnMature (B5), not only the registry's own literal FULL_SETTLE default", () => {
       expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
       expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'PARTIAL_SETTLE')?.code).toBe('B5');
     });
@@ -690,7 +720,7 @@ describe('balance-component.model data invariants', () => {
       expect(resolveFunctionForMovement('EPLC_EXAMINATION', 'AMEND')).toBeUndefined();
     });
 
-    it('known limitation, explicitly accepted (see the function\'s own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: \'UTILIZE\') — the resolver deterministically returns the first registry match, A3, since it\'s declared first', () => {
+    it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
       expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
     });
   });
@@ -700,7 +730,7 @@ describe('balance-component.model data invariants', () => {
       expect(new Set(Object.keys(BALANCE_SNAPSHOT_LABEL))).toEqual(new Set(['IPLC_LC', 'IPLC_ACCEPTANCE', 'SHGT', 'EPLC_CONFIRMATION', 'EPLC_ACCEPTANCE']));
     });
 
-    it('deliberately excludes EPLC_EXAMINATION (MEMO_ONLY, never a real Balance Component) even though it is one of childInstrumentTypesOf(\'EPLC_CONFIRMATION\')\'s own results', () => {
+    it("deliberately excludes EPLC_EXAMINATION (MEMO_ONLY, never a real Balance Component) even though it is one of childInstrumentTypesOf('EPLC_CONFIRMATION')'s own results", () => {
       expect(childInstrumentTypesOf('EPLC_CONFIRMATION')).toContain('EPLC_EXAMINATION');
       expect(BALANCE_SNAPSHOT_LABEL['EPLC_EXAMINATION']).toBeUndefined();
     });
@@ -711,7 +741,7 @@ describe('balance-component.model data invariants', () => {
       expect(BALANCE_SNAPSHOT_LABEL['EPLC_EXPORT_BILLS_DISCOUNTED']).toBeUndefined();
     });
 
-    it('exact label text matches the user\'s own wording', () => {
+    it("exact label text matches the user's own wording", () => {
       expect(BALANCE_SNAPSHOT_LABEL['IPLC_LC']).toBe('LC Balance');
       expect(BALANCE_SNAPSHOT_LABEL['IPLC_ACCEPTANCE']).toBe('Acceptance Balance');
       expect(BALANCE_SNAPSHOT_LABEL['SHGT']).toBe('Shipping Guarantee Balance');
@@ -723,7 +753,7 @@ describe('balance-component.model data invariants', () => {
   // Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as a
   // drop-down list, consistent with the existing implementation in lc-payment-wc").
   describe('CURRENCY_OPTIONS', () => {
-    it('matches lc-payment-wc/backend/data/currencies.json\'s own 10-code set exactly, no more no fewer', () => {
+    it("matches lc-payment-wc/backend/data/currencies.json's own 10-code set exactly, no more no fewer", () => {
       expect(CURRENCY_OPTIONS.map((o) => o.value)).toEqual(['USD', 'EUR', 'JPY', 'GBP', 'TWD', 'IDR', 'CNY', 'HKD', 'SGD', 'AUD']);
     });
 

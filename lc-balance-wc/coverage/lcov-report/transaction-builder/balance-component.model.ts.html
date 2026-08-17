@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>54/54</span>
+                <span class='fraction'>63/63</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">96.29% </span>
+                <span class="strong">96.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>26/27</span>
+                <span class='fraction'>29/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>43/43</span>
+                <span class='fraction'>50/50</span>
             </div>
         
             
@@ -1020,7 +1020,27 @@
 <a name='L955'></a><a href='#L955'>955</a>
 <a name='L956'></a><a href='#L956'>956</a>
 <a name='L957'></a><a href='#L957'>957</a>
-<a name='L958'></a><a href='#L958'>958</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L958'></a><a href='#L958'>958</a>
+<a name='L959'></a><a href='#L959'>959</a>
+<a name='L960'></a><a href='#L960'>960</a>
+<a name='L961'></a><a href='#L961'>961</a>
+<a name='L962'></a><a href='#L962'>962</a>
+<a name='L963'></a><a href='#L963'>963</a>
+<a name='L964'></a><a href='#L964'>964</a>
+<a name='L965'></a><a href='#L965'>965</a>
+<a name='L966'></a><a href='#L966'>966</a>
+<a name='L967'></a><a href='#L967'>967</a>
+<a name='L968'></a><a href='#L968'>968</a>
+<a name='L969'></a><a href='#L969'>969</a>
+<a name='L970'></a><a href='#L970'>970</a>
+<a name='L971'></a><a href='#L971'>971</a>
+<a name='L972'></a><a href='#L972'>972</a>
+<a name='L973'></a><a href='#L973'>973</a>
+<a name='L974'></a><a href='#L974'>974</a>
+<a name='L975'></a><a href='#L975'>975</a>
+<a name='L976'></a><a href='#L976'>976</a>
+<a name='L977'></a><a href='#L977'>977</a>
+<a name='L978'></a><a href='#L978'>978</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1263,6 +1283,26 @@
 <span class="cline-any cline-yes">82x</span>
 <span class="cline-any cline-yes">78x</span>
 <span class="cline-any cline-yes">78x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">77x</span>
+<span class="cline-any cline-yes">77x</span>
+<span class="cline-any cline-yes">77x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2223,6 +2263,26 @@ export function amountExceedsCurrencyDecimals(amount: string | number | null | u
 }
 &nbsp;
 /**
+ * Thousand-separates a plain (non-negative) digit string — display formatting only, never used for any
+ * calculation or API payload (those stay plain decimal strings throughout this app).
+ *
+ * Quality-report-balance.md Security Hotspot (SonarQube typescript:S5852, 2026-08-17): the prior
+ * implementation used `digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')` — the nested `(\d{3})+` quantifier
+ * inside a lookahead backtracks quadratically on a long run of digits, flagged as a potential ReDoS
+ * vector. This is a plain linear right-to-left scan instead — no regex, no backtracking risk regardless
+ * of input length.
+ */
+export function groupThousands(digits: string): string {
+  let result = '';
+  for (let i = 0; i &lt; digits.length; i++) {
+    const remaining = digits.length - i;
+    if (i &gt; 0 &amp;&amp; remaining % 3 === 0) result += ',';
+    result += digits[i];
+  }
+  return result;
+}
+&nbsp;
+/**
  * Business instruction 2026-08-14: "還有相關BALANCE為0的交易過濾" — mirrors
  * src/domain/balanceDerivation.ts's MOVEMENT_DIRECTION on the microservice
  * (movementTypes with direction -1). Used to filter existing-contract
@@ -2941,7 +3001,7 @@ export function resolveFunctionForMovement(instrumentType: InstrumentType, movem
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-17T12:40:06.726Z
+                at 2026-08-17T15:26:49.444Z
             </div>
         <script src="../prettify.js"></script>
         <script>

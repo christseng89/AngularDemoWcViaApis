@@ -657,6 +657,7 @@
           <div class="mt-3" *ngIf="lookUp.lookupResult">
             <h3 class="tb-subheading">Event Timeline — {{ lookUp.activeLookupLabel }}</h3>
             <table class="tb-table" *ngIf="lookUp.activeLookupMovements.length">
+              <caption class="visually-hidden">Event Timeline — {{ lookUp.activeLookupLabel }}</caption>
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
                    visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
@@ -745,6 +746,7 @@
                "Original Transaction Screen" panel's own Account Entries button, reusing
                openAccountEntryDialog() unchanged. -->
           <table class="tb-table" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
+            <caption class="visually-hidden">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</caption>
             <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Secondary Ref.</th><th>Status</th><th>Time</th></tr></thead>
             <tbody>
               <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
@@ -820,6 +822,7 @@
         <span class="tb-status-badge" [class.tb-status-badge--pending]="accountEntryDialogMovement.status === 'PENDING'" [class.tb-status-badge--approved]="accountEntryDialogMovement.status === 'RELEASED'" [class.tb-status-badge--negative]="accountEntryDialogMovement.status === 'REJECTED' || accountEntryDialogMovement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="accountEntryDialogMovement.status === 'SUPERSEDED'">{{ displayStatus(accountEntryDialogMovement.status) }}</span>
       </div>
       <table class="tb-table tb-table--static mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry as entry">
+        <caption class="visually-hidden">Contingent liability account entries for {{ accountEntryDialogMovement.movementType }}</caption>
         <thead><tr><th>Dr/Cr</th><th>Account Name</th><th>Currency</th><th>Amount</th></tr></thead>
         <tbody>
           <tr>

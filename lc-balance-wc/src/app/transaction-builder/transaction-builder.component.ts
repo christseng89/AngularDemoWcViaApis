@@ -20,6 +20,7 @@ import {
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
+  groupThousands,
 } from './balance-component.model';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import { SubmitRulesContext, buildSubmitRequest as buildSubmitRequestRules, validateSubmit as validateSubmitRules } from './submit-rules';
@@ -786,10 +787,20 @@ export class TransactionBuilderComponent {
     return ` — ${label}: ${this.formatAmount(snap.pendingEarmarkTotal.replace('-', ''))}`;
   }
 
-  /** Thousand-separated display only (business instruction 2026-08-14 example: "Pending: 25,000") — never used for any calculation or API payload, those stay plain decimal strings. */
+  /**
+   * Thousand-separated display only (business instruction 2026-08-14 example: "Pending: 25,000") —
+   * never used for any calculation or API payload, those stay plain decimal strings.
+   *
+   * Quality-report-balance.md Security Hotspot (SonarQube typescript:S5852): the original
+   * implementation grouped digits via `/\B(?=(\d{3})+(?!\d))/g`, whose nested `(\d{3})+` quantifier
+   * inside a lookahead backtracks quadratically on a long run of digits — flagged as a potential ReDoS
+   * vector. Replaced with a plain linear scan (no regex at all) that walks the digit string once,
+   * inserting a comma every 3 digits from the right — same output, no backtracking risk regardless of
+   * input length.
+   */
   private formatAmount(amount: string): string {
     const [whole, frac] = amount.split('.');
-    const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const withCommas = groupThousands(whole);
     return frac ? `${withCommas}.${frac}` : withCommas;
   }
 

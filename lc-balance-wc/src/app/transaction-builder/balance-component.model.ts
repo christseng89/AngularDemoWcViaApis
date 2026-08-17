@@ -244,6 +244,26 @@ export function amountExceedsCurrencyDecimals(amount: string | number | null | u
 }
 
 /**
+ * Thousand-separates a plain (non-negative) digit string — display formatting only, never used for any
+ * calculation or API payload (those stay plain decimal strings throughout this app).
+ *
+ * Quality-report-balance.md Security Hotspot (SonarQube typescript:S5852, 2026-08-17): the prior
+ * implementation used `digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')` — the nested `(\d{3})+` quantifier
+ * inside a lookahead backtracks quadratically on a long run of digits, flagged as a potential ReDoS
+ * vector. This is a plain linear right-to-left scan instead — no regex, no backtracking risk regardless
+ * of input length.
+ */
+export function groupThousands(digits: string): string {
+  let result = '';
+  for (let i = 0; i < digits.length; i++) {
+    const remaining = digits.length - i;
+    if (i > 0 && remaining % 3 === 0) result += ',';
+    result += digits[i];
+  }
+  return result;
+}
+
+/**
  * Business instruction 2026-08-14: "還有相關BALANCE為0的交易過濾" — mirrors
  * src/domain/balanceDerivation.ts's MOVEMENT_DIRECTION on the microservice
  * (movementTypes with direction -1). Used to filter existing-contract
