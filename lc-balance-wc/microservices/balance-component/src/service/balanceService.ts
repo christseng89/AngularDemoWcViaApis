@@ -550,25 +550,21 @@ export class BalanceService {
    * acknowledgment, not a generic "acknowledge anything" action.
    */
   acknowledge(movementId: string, acknowledgedBy: string): BalanceMovement {
-    const movement = this.movements.findById(movementId);
-    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
-
-    const contract = this.contracts.findById(movement.balanceContractId);
-    if (!contract || contract.instrumentType !== 'EPLC_EXAMINATION' || movement.movementType !== 'CREATE') {
-      throw new RequestValidationError(
-        `acknowledge() only applies to an EPLC_EXAMINATION CREATE movement (Present Docs earmark) — ` +
-          `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
-      );
-    }
-    if (movement.status !== 'PENDING') {
-      throw new IllegalStateTransitionError(`Cannot acknowledge movement ${movementId} — its status is ${movement.status}, not PENDING.`);
-    }
-    if (movement.acknowledgedAt) {
-      throw new IllegalStateTransitionError(`Movement ${movementId} was already acknowledged by ${movement.acknowledgedBy} at ${movement.acknowledgedAt}.`);
-    }
-
-    this.movements.acknowledge({ movementId, acknowledgedBy, acknowledgedAt: this.now() });
-    return this.movements.findById(movementId)!;
+    return this.guardSecondaryAction(movementId, {
+      presentTense: 'acknowledge',
+      pastTense: 'acknowledged',
+      validate: (contract, movement) => {
+        if (!contract || contract.instrumentType !== 'EPLC_EXAMINATION' || movement.movementType !== 'CREATE') {
+          throw new RequestValidationError(
+            `acknowledge() only applies to an EPLC_EXAMINATION CREATE movement (Present Docs earmark) — ` +
+              `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+          );
+        }
+      },
+      alreadyDoneAt: (movement) => movement.acknowledgedAt,
+      alreadyDoneBy: (movement) => movement.acknowledgedBy,
+      persist: (id, now) => this.movements.acknowledge({ movementId: id, acknowledgedBy, acknowledgedAt: now }),
+    });
   }
 
   /**
@@ -590,24 +586,57 @@ export class BalanceService {
    * client-side instead — see transaction-builder.component.ts checkerAct()'s own doc comment.
    */
   submitByMaker(movementId: string, makerSubmittedBy: string): BalanceMovement {
+    return this.guardSecondaryAction(movementId, {
+      presentTense: 'submit',
+      pastTense: 'submitted',
+      validate: (contract, movement) => {
+        if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+          throw new RequestValidationError(
+            `submitByMaker() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
+              `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+          );
+        }
+      },
+      alreadyDoneAt: (movement) => movement.makerSubmittedAt,
+      alreadyDoneBy: (movement) => movement.makerSubmittedBy,
+      persist: (id, now) => this.movements.submitByMaker({ movementId: id, makerSubmittedBy, makerSubmittedAt: now }),
+    });
+  }
+
+  /**
+   * Quality-report-balance.md BAL-130 (2026-08-17, "not yet urgent" per the finding's own text, fixed
+   * on explicit user request): `acknowledge()` and `submitByMaker()` above share the identical
+   * find-movement -> validate-shape -> guard-PENDING -> guard-not-already-done -> persist-and-refetch
+   * shape — only the shape validation, the "already done" field pair, and the persist call differ.
+   * Every guard order and every error-message string is unchanged from what this replaces — pure code
+   * motion, not a behavior change.
+   */
+  private guardSecondaryAction(
+    movementId: string,
+    opts: {
+      presentTense: string;
+      pastTense: string;
+      validate: (contract: BalanceContract | undefined, movement: BalanceMovement) => void;
+      alreadyDoneAt: (movement: BalanceMovement) => string | null | undefined;
+      alreadyDoneBy: (movement: BalanceMovement) => string | null | undefined;
+      persist: (movementId: string, now: string) => void;
+    },
+  ): BalanceMovement {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
 
     const contract = this.contracts.findById(movement.balanceContractId);
-    if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
-      throw new RequestValidationError(
-        `submitByMaker() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
-          `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
-      );
-    }
+    opts.validate(contract, movement);
+
     if (movement.status !== 'PENDING') {
-      throw new IllegalStateTransitionError(`Cannot submit movement ${movementId} — its status is ${movement.status}, not PENDING.`);
+      throw new IllegalStateTransitionError(`Cannot ${opts.presentTense} movement ${movementId} — its status is ${movement.status}, not PENDING.`);
     }
-    if (movement.makerSubmittedAt) {
-      throw new IllegalStateTransitionError(`Movement ${movementId} was already submitted by ${movement.makerSubmittedBy} at ${movement.makerSubmittedAt}.`);
+    const doneAt = opts.alreadyDoneAt(movement);
+    if (doneAt) {
+      throw new IllegalStateTransitionError(`Movement ${movementId} was already ${opts.pastTense} by ${opts.alreadyDoneBy(movement)} at ${doneAt}.`);
     }
 
-    this.movements.submitByMaker({ movementId, makerSubmittedBy, makerSubmittedAt: this.now() });
+    opts.persist(movementId, this.now());
     return this.movements.findById(movementId)!;
   }
 

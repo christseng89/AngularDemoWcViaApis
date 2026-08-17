@@ -2051,6 +2051,31 @@ on boot; a live `import-case-1` run exercised the request-handling path). Test d
 afterward. Full three-suite re-verification per this file's own standing rule: Angular app 510/510 and
 microservice 292/292, both unaffected (`backend/`-only change).
 
+## BAL-130 fixed — `balanceService.ts`'s `acknowledge()`/`submitByMaker()` duplicated find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper (2026-08-17, business instruction: "Fix BAL-130 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-130 section): `acknowledge()` (B3's
+Present-Docs Checker acknowledgment) and `submitByMaker()` (A4's real Maker Submit) both follow the
+identical find-movement → validate-shape → guard-PENDING → guard-not-already-done → persist-and-refetch
+shape, differing only in the shape check, the "already done" field pair, and the store call. The
+finding's own text rated this "not urgent — wait for a 3rd occurrence" (currently only 2). Fixed anyway
+on explicit user request, one occurrence ahead of that threshold.
+
+**Fix**: new private `guardSecondaryAction()` — takes a caller-supplied `validate(contract, movement)`
+(the shape check), `presentTense`/`pastTense` verb forms (the "Cannot X"/"already Xed" wording — passed
+explicitly rather than derived, since "acknowledge"→"acknowledged" and "submit"→"submitted" don't follow
+one regular transformation), `alreadyDoneAt`/`alreadyDoneBy` accessors, and a `persist(movementId, now)`
+callback. `acknowledge()` and `submitByMaker()` are now thin callers passing their own specifics through
+this one shared shape. Every guard order and every error-message string is unchanged, byte-for-byte.
+
+Verified: `npm run typecheck`/`npm run build` clean; full suite 292/292 with **zero test files needing
+any changes** — existing tests directly assert the exact error-message substrings for both methods, all
+still passing unmodified; coverage 99.13%/96.33%/100%/99.42% (all four metrics clear the 95% floor).
+`npm run lint` unchanged (0 errors, same pre-existing warnings, none in this file). **Live-verified both
+call sites** against the real running stack: `import-case-6` (`submitByMaker()` ×3) and
+`export-case-6`/`export-case-7` (`acknowledge()` ×1 each) all return 2xx with correct movement responses.
+Test data cleaned up afterward. Full three-suite re-verification per this file's own standing rule:
+`backend/` 33/33 and Angular app 510/510, both unaffected (microservice-only change).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

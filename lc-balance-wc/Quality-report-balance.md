@@ -48,11 +48,22 @@ surfaced BAL-122 and BAL-123 below.
 |---|---|---|
 | **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A (4.8/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124, BAL-125, BAL-126, BAL-127, and BAL-128 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped to `BalanceMovement`/`BalanceMovement | null`; that same file's own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted, `npm run lint` now 0 errors/0 warnings); BAL-130 (`balanceService.ts` trending toward its own future God-file status) remains open — not individually severe, but part of the pattern (newly-added code consistently needing its own follow-up cleanup pass) worth naming. |
+| **Maintainability** | A (4.9/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper, one occurrence ahead of the finding's own "wait for a 3rd" threshold). BAL-003 remains the one open Maintainability finding of any real weight — the pattern this section previously named (newly-added code consistently needing its own follow-up cleanup pass) has now been fully worked through this session. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 → 100 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A → A)**
+
+**A composite of 100 does not mean this codebase is flawless or production-ready — see the paragraph
+immediately below and [Gate Conditions](#gate-conditions-before-any-production-consideration).** It
+means every Major/Minor/Info finding this specific 2026-08-17 reassessment pass itself surfaced is now
+either fixed or (for BAL-132 only) a deliberately low-priority, currently-safe-in-practice Info item.
+BAL-001 (no auth, Blocker), BAL-002 (dependency CVEs, Critical), BAL-102 (SQLite locking, Major), and
+BAL-003 (God Component, Major) are all still open — every one of them **deferred, not resolved** — and
+have been open at every composite score point on this entire trend line, including its very first 86.
+The number tracks "how much of what this review can find and fix has been fixed," not "is this ready to
+run real trade-finance data" — those two questions are answered separately, on purpose, throughout this
+report.
 
 **Why the score dipped then recovered past its prior peak, rather than only ever climbing (or landing
 exactly back where it started):** this comprehensive follow-up pass is deliberately adversarial rather
@@ -80,11 +91,14 @@ into one shared `createAndRelease()` helper, live-verified across all 14 registe
 against the real running stack, again zero test assertions needing to change. Then BAL-128 (98 → 99) —
 the 3 stale `eslint-disable` comments in `backend/` (suppressing rules the project's own
 `eslint.config.js` never configured) deleted outright, bringing `npm run lint` to a genuine 0
-errors/0 warnings for the first time this session. The score ending above its prior peak is earned: this
-pass has now fixed every Major/Info finding it itself surfaced, plus five of its own Minor/Info findings
-(BAL-124, BAL-125, BAL-126, BAL-127, BAL-128), on top of confirming every earlier pass's fixes still
-hold. Two Info-level findings from this pass remain open (BAL-130, BAL-132) — small, independently
-actionable, not gate conditions.
+errors/0 warnings for the first time this session. Then BAL-130 (99 → 100) — despite the finding's own
+"not urgent, wait for a 3rd occurrence" framing, fixed on explicit request one occurrence early: the
+microservice's own `acknowledge()`/`submitByMaker()` collapsed their identical find→validate→persist
+shape into a shared `guardSecondaryAction()` helper, live-verified against the real running stack. The
+score ending at its ceiling reflects this pass having now fixed every Major/Info finding it itself
+surfaced, plus all six of its own Minor/Info findings (BAL-124–BAL-128, BAL-130), on top of confirming
+every earlier pass's fixes still hold — see the caveat directly above this trend line before reading
+"100" as anything more than that.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -130,14 +144,17 @@ to change. **BAL-127** (`backend/data/businessCases.js`'s own ~49 duplicated cre
 into a single shared `createAndRelease()` helper, live-verified across all 14 registered cases against
 the real running stack. **BAL-128** (3 stale `eslint-disable` comments in `backend/` suppressing rules
 the project's `eslint.config.js` never configured) was deleted outright, bringing `npm run lint` to a
-genuine 0 errors/0 warnings. The remaining two (BAL-130, BAL-132) stay open — small, independently
-actionable, none Blocker/Critical, none regressing anything the five 2026-08-16 passes fixed.
+genuine 0 errors/0 warnings. **BAL-130** (`balanceService.ts`'s own `acknowledge()`/`submitByMaker()`
+duplicated find→validate→persist shape — filed as "not urgent, wait for a 3rd occurrence" by its own
+original text, fixed anyway one occurrence early) was collapsed into a single shared
+`guardSecondaryAction()` helper. Only **BAL-132** stays open — small, low-risk by the finding's own
+assessment, not a gate condition, not regressing anything the five 2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
 as resolved. All findings this pass itself surfaced (BAL-122, BAL-123, BAL-134, BAL-131, BAL-124,
-BAL-125, BAL-126, BAL-127, BAL-128) are now fixed and no longer factor into that assessment. See
-[Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
+BAL-125, BAL-126, BAL-127, BAL-128, BAL-130) are now fixed and no longer factor into that assessment.
+See [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
 
@@ -166,7 +183,7 @@ BAL-125, BAL-126, BAL-127, BAL-128) are now fixed and no longer factor into that
 | [BAL-120](#bal-120) | ⚪ Info | Reliability | Idempotency detection relies on string-matching the SQLite driver's error text — deferred, user-confirmed |
 | [BAL-109](#bal-109) | ⚪ Info | Reliability | A handful of provably-dead defensive branches, left uncovered on purpose (2 more instances found and correctly left alone this pass) |
 | [BAL-110](#bal-110) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth — **Fixed** (contract test added) |
-| [BAL-130](#bal-130) | ⚪ Info | Technical Debt | `balanceService.ts` (microservice) trending toward its own mini-God-file — 614 lines, 8 methods sharing one repeated find→validate→persist shape — **Open, found this pass, not yet urgent** |
+| [BAL-130](#bal-130) | ⚪ Info | Technical Debt | `balanceService.ts` (microservice) trending toward its own mini-God-file — 614 lines, 8 methods sharing one repeated find→validate→persist shape — **Fixed** |
 | [BAL-127](#bal-127) | ⚪ Info | Technical Debt | `backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case (now 1,439 lines / 14 cases) — **Fixed** |
 | [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Fixed** |
 | [BAL-132](#bal-132) | ⚪ Info | Code Smell | `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion bypasses the type system's own declared nullability — **Open, found this pass, low risk** |
@@ -401,7 +418,7 @@ app 454/454 and `backend/` 27/27, both unaffected (microservice-only change).
 ---
 
 ### BAL-130
-**`balanceService.ts` is trending toward its own mini-God-file inside the microservice** — ⚪ Info (Technical Debt) — Open, found this pass, not yet urgent
+**`balanceService.ts` is trending toward its own mini-God-file inside the microservice** — ⚪ Info (Technical Debt) — Fixed
 
 **Evidence:** `microservices/balance-component/src/service/balanceService.ts` is **614 lines, 64 decision
 points** (`grep -c "if (\|else if\|&&\|||\|case "`) — by a wide margin the largest/most complex file in
@@ -423,6 +440,34 @@ suggests it'll be the last), each one plausibly repeating the same 5-step shape 
 shared `guardAndPersistSecondaryAction()` (or similar) helper before it, rather than after a 4th makes
 the duplication undeniable — the same "fix it at 3, not 5" discipline `transaction-builder.component.ts`'s
 own BAL-003 history shows the cost of deferring too long.
+
+**Outcome (2026-08-17, business instruction: "Fix BAL-130 too"): fixed exactly per the recommended
+remediation, one occurrence ahead of its own "wait for a 3rd" threshold.** New private
+`guardSecondaryAction()` — find the movement → run a caller-supplied `validate(contract, movement)` (the
+one genuinely different piece: `acknowledge()`'s EPLC_EXAMINATION/CREATE shape check vs.
+`submitByMaker()`'s IPLC_LC/UTILIZE one) → guard PENDING → guard "not already done" via caller-supplied
+`alreadyDoneAt`/`alreadyDoneBy` accessors → call a caller-supplied `persist(movementId, now)` → refetch
+and return. `acknowledge()` and `submitByMaker()` are now thin callers passing their own shape check,
+field pair, and store call through this one shared shape. Every guard order and every error-message
+string is unchanged, byte-for-byte, from what this replaces — pure code motion, not a behavior change
+(the "Cannot acknowledge"/"Cannot submit" and "already acknowledged"/"already submitted" wording pairs
+don't follow a single regular transformation from one verb, so both tenses are passed explicitly as
+`presentTense`/`pastTense` rather than derived, to guarantee the exact original text survives).
+
+Verified: `npm run typecheck`/`npm run build` clean; full suite 292/292 with **zero test files needing
+any changes** — the existing tests directly assert the exact error-message substrings for both methods
+(`/already acknowledged by checker1/`, `/acknowledge\(\) only applies to an EPLC_EXAMINATION CREATE
+movement/`, `/already submitted by maker1/`, `/submitByMaker\(\) only applies to an IPLC_LC UTILIZE
+movement/`), all still passing unmodified — strong evidence of exact behavior preservation; coverage
+99.13%/96.33%/100%/99.42% (all four metrics clear the 95% floor; function count rose 114 → 123 as the
+extracted helper's own caller-supplied callbacks are individually instrumented, all fully exercised).
+`npm run lint` unchanged (0 errors, same 11 pre-existing warnings, none in this file); `format:check`
+unaffected (the microservice's own auto-reload `node --watch` process picked the change up live).
+**Live-verified both call sites** against the real running stack: `import-case-6` (exercises
+`submitByMaker()` three times) and `export-case-6`/`export-case-7` (exercise `acknowledge()` once each)
+all return 2xx with correct movement responses. Test data cleaned up afterward. Full three-suite
+re-verification per this file's own standing rule: `backend/` 33/33 and Angular app 510/510, both
+unaffected (microservice-only change).
 
 ---
 
@@ -1440,13 +1485,15 @@ before the A4 feature area specifically is considered done:**
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
 its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
 non-obvious misclick sequence to trigger. **Both are now fixed, and so are BAL-134, BAL-131, BAL-124,
-BAL-125, BAL-126, BAL-127, and BAL-128** — `import-case-4`'s own stale scenario (found incidentally
-while verifying BAL-123), the Business Case Registry's own completeness gap (zero orchestrator-level
-`/acknowledge` coverage), the executor's duplicated step handlers (closed as a direct side effect of the
-BAL-131 fix), `checker-actions.service.ts`'s own 6 un-swept `any` occurrences (retyped to
-`BalanceMovement`), that same file's own 20 duplicated `{kind:'failed'}` constructions (collapsed into
-one shared `fail()` helper), `backend/data/businessCases.js`'s own ~49 duplicated create+release step
-pairs (collapsed into one shared `createAndRelease()` helper, fixed despite its own "not yet urgent"
-framing), and `backend/`'s 3 stale `eslint-disable` comments (deleted outright, bringing `npm run lint`
-to 0 errors/0 warnings), respectively. The two remaining 2026-08-17 findings (BAL-130, BAL-132) are both
-Info-level, neither is a gate condition, and neither blocks anything.
+BAL-125, BAL-126, BAL-127, BAL-128, and BAL-130** — `import-case-4`'s own stale scenario (found
+incidentally while verifying BAL-123), the Business Case Registry's own completeness gap (zero
+orchestrator-level `/acknowledge` coverage), the executor's duplicated step handlers (closed as a direct
+side effect of the BAL-131 fix), `checker-actions.service.ts`'s own 6 un-swept `any` occurrences
+(retyped to `BalanceMovement`), that same file's own 20 duplicated `{kind:'failed'}` constructions
+(collapsed into one shared `fail()` helper), `backend/data/businessCases.js`'s own ~49 duplicated
+create+release step pairs (collapsed into one shared `createAndRelease()` helper, fixed despite its own
+"not yet urgent" framing), `backend/`'s 3 stale `eslint-disable` comments (deleted outright, bringing
+`npm run lint` to 0 errors/0 warnings), and the microservice's own `balanceService.ts`
+`acknowledge()`/`submitByMaker()` duplication (collapsed into one shared `guardSecondaryAction()`
+helper, also fixed ahead of its own "not urgent" framing), respectively. Only **BAL-132** remains open
+from this pass — Info-level, low-risk by its own assessment, not a gate condition, blocking nothing.
