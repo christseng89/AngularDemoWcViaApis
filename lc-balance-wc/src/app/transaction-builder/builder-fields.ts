@@ -187,3 +187,28 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   }
   return fields;
 }
+
+/**
+ * Inquire Events (2026-08-17, OOD Design Patterns — Decorator): wraps buildFields()'s own output to
+ * force every field read-only, without touching buildFields() itself (Open/Closed Principle) — the
+ * live Maker Submit screen and Inquire Events' own "original transaction screen, read-only" reuse the
+ * exact same field definitions/labels, they just decorate the result differently.
+ *
+ * `expressions` is stripped rather than left in place: Formly re-evaluates every `expressions` callback
+ * on each change-detection cycle, and some of buildFields()'s own callbacks (e.g. tenorDays'
+ * `'props.disabled'`) would otherwise recompute a value that could fight the `disabled: true` this
+ * function forces — stripping them guarantees the decorated read-only state can never be undone by a
+ * live recompute. Safe here specifically because Inquire Events' own model is a static, one-time
+ * reconstruction that never changes after being set (unlike the live Maker form, where those same
+ * expressions are exactly what keeps the form reactive to user input).
+ *
+ * A flat map over the top-level array is sufficient — buildFields() never nests fields via
+ * `fieldGroup`, confirmed by reading its own implementation above.
+ */
+export function toReadOnlyFields(fields: FormlyFieldConfig[]): FormlyFieldConfig[] {
+  return fields.map((f) => ({
+    ...f,
+    expressions: undefined,
+    props: { ...f.props, disabled: true },
+  }));
+}

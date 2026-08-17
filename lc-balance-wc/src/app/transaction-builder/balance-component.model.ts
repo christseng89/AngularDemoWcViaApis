@@ -114,6 +114,38 @@ export function isToleranceApplicable(instrumentType: InstrumentType, movementTy
   return TOLERANCE_APPLICABLE_INSTRUMENT_TYPES.has(instrumentType) && TOLERANCE_APPLICABLE_MOVEMENT_TYPES.has(movementType);
 }
 
+/** IMPORT -> IPLC_LC, EXPORT -> EPLC_CONFIRMATION — the root LC-level instrumentType for each Import/Export side (business instruction 2026-08-15, "Look Up Current Balance... 如果選 Import LC Tab... Export Confirmed Tab..."). Shared by LookUpPanelService.resetForSide() and InquireEventsService, so the one Import/Export default only ever lives in one place. */
+export function defaultLcInstrumentTypeForSide(side: 'IMPORT' | 'EXPORT'): InstrumentType {
+  return side === 'IMPORT' ? 'IPLC_LC' : 'EPLC_CONFIRMATION';
+}
+
+/**
+ * PARENT_INSTRUMENT_OPTIONS above, inverted once at module load — every instrumentType that can hang
+ * off a given root as a child (IPLC_LC -> IPLC_ACCEPTANCE/SHGT; EPLC_CONFIRMATION -> EPLC_ACCEPTANCE/
+ * EPLC_EXAMINATION). Single source of truth for "what child ledgers exist under this LC" — no second
+ * hand-written map to keep in sync. Inquire Events (2026-08-17) is this function's first caller: it
+ * needs to fetch every sub-ledger's own movements to build one merged Event timeline. Deliberately
+ * does NOT recurse — nothing in PARENT_INSTRUMENT_OPTIONS names IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT/
+ * EPLC_EXAMINATION as a parent of anything else, so the hierarchy is exactly two levels deep today.
+ * The three ON_BALANCE_ASSET instrumentTypes (EPLC_DUE_FROM_ISSUING_BANK/
+ * EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED) never appear here — their own
+ * PARENT_INSTRUMENT_OPTIONS entries are empty by design (out of Balance Component's own "只負責
+ * Contingent Liability" scope, same boundary contingentAccountEntry already enforces), so they are
+ * correctly excluded from Inquire Events' own merged timeline too, not just from the Parent LC picker.
+ */
+const CHILD_INSTRUMENT_TYPES_BY_PARENT: Record<InstrumentType, InstrumentType[]> = (() => {
+  const result = {} as Record<InstrumentType, InstrumentType[]>;
+  for (const instrumentType of Object.keys(PARENT_INSTRUMENT_OPTIONS) as InstrumentType[]) result[instrumentType] = [];
+  for (const [child, parents] of Object.entries(PARENT_INSTRUMENT_OPTIONS) as [InstrumentType, InstrumentType[]][]) {
+    for (const parent of parents) result[parent].push(child as InstrumentType);
+  }
+  return result;
+})();
+
+export function childInstrumentTypesOf(root: InstrumentType): InstrumentType[] {
+  return CHILD_INSTRUMENT_TYPES_BY_PARENT[root] ?? [];
+}
+
 /**
  * ISO 4217 minor-unit (decimal place) count per currency code — keeps the Amount input's own
  * granularity in step with whichever Currency is typed alongside it (e.g. "JPY 10000" has no cents).
@@ -830,3 +862,51 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     help: "Confirm LC Settlement — Usance held-to-maturity only (CNF_MATURE): one compound settles BOTH the Acceptance (this bank's own DPU liability, paid to the beneficiary) AND its matching Reimbursement Receivable (the issuing bank's own reimbursement to this bank), same amount, in a single Checker Release. Pick the LC (LC Index, Usance only), then the EB Number (EB Index) — a single LC can have multiple Document Presentations. Sight settlement (Due from Issuing Bank) is out of Balance Component's own scope — Balance Component only owns the contingent/liability side; B4 still creates that asset, but collecting it happens outside this system. Nego'd/discounted Usance (EPLC_EXPORT_BILLS_DISCOUNTED) is still follow-up work, not this function.",
   },
 ];
+
+/**
+ * Inquire Events (2026-08-17, OOD Design Patterns — Strategy) — true when `movementType` is one this
+ * function could actually have produced, treating IMPORT_FUNCTIONS/EXPORT_FUNCTIONS as a strategy
+ * table for resolveFunctionForMovement() below rather than adding a second, separately-maintained
+ * (instrumentType, movementType) -> function map.
+ *
+ * A literal `fn.movementType`/`fn.subChoice.options` match covers most functions. Three flags mean the
+ * registry's own `movementType` is only a placeholder default — the real value is derived elsewhere —
+ * so a literal-only match would silently miss half of what the function actually produces:
+ *  - `movementTypeFromContractTenor` (B4): HONOUR vs ACCEPT is read from the picked contract's own
+ *    tenorType at submit time, not fixed on the registry entry. B4 is EPLC_CONFIRMATION's only HONOUR/
+ *    ACCEPT producer today, so matching on instrumentType alone is unambiguous here.
+ *  - `autoRedeemType` (A9): FULL_REDEEM is the registry default; PARTIAL_REDEEM is derived from Amount
+ *    vs the SG's own Available Balance at submit time.
+ *  - `settlesAcceptanceOnMature` (B5): same shape as autoRedeemType, for FULL_SETTLE/PARTIAL_SETTLE.
+ */
+function movementTypeMatchesFunction(fn: TransactionFunction, movementType: string): boolean {
+  if (fn.movementType === movementType) return true;
+  if (fn.subChoice?.options.some((o) => o.value === movementType)) return true;
+  if (fn.movementTypeFromContractTenor) return true;
+  if (fn.autoRedeemType && movementType === 'PARTIAL_REDEEM') return true;
+  if (fn.settlesAcceptanceOnMature && movementType === 'PARTIAL_SETTLE') return true;
+  return false;
+}
+
+/**
+ * Inquire Events (2026-08-17) — which named business function (A1-A9/B1-B5) could have produced a
+ * given (instrumentType, movementType) pair, so a historical movement's own data can be redisplayed
+ * through that function's own field set (builder-fields.ts's buildFields(), unchanged) rather than a
+ * second, purpose-built "view" field list.
+ *
+ * Known, explicitly-accepted limitation (same honesty convention as Quality-report-balance.md BAL-108's
+ * own "left as-is, documented" entries): a handful of (instrumentType, movementType) pairs are produced
+ * by MORE than one function code — e.g. IPLC_LC/UTILIZE comes from both A3 (Document Arrival, Sight)
+ * and A3S (Document Arrival w/ Shipping Gtee); SHGT/FULL_REDEEM comes from both A9 (SG Redemption) and
+ * A3S's own first leg. This resolver returns the first registry match (IMPORT_FUNCTIONS ahead of
+ * EXPORT_FUNCTIONS, each searched in declared order) rather than trying to disambiguate via
+ * businessEventId cross-referencing — the reconstructed FIELD SET is identical either way in every
+ * such case (the difference between the two functions is a label string, never which fields exist), so
+ * this only affects which function-code badge Inquire Events shows, never the data displayed. Returns
+ * undefined when nothing matches (a movementType/instrumentType combination no current function
+ * produces, e.g. legacy data) — callers must fall back to a generic, function-less field set rather
+ * than guessing.
+ */
+export function resolveFunctionForMovement(instrumentType: InstrumentType, movementType: string): TransactionFunction | undefined {
+  return [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].find((fn) => fn.instrumentType === instrumentType && movementTypeMatchesFunction(fn, movementType));
+}

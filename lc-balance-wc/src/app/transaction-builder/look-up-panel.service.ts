@@ -1,5 +1,5 @@
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { InstrumentType } from './balance-component.model';
+import { InstrumentType, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
 
 /**
@@ -123,7 +123,7 @@ export class LookUpPanelService {
    * before this extraction — now one shared method.
    */
   resetForSide(side: 'IMPORT' | 'EXPORT'): void {
-    this.lookup.instrumentType = side === 'IMPORT' ? 'IPLC_LC' : 'EPLC_CONFIRMATION';
+    this.lookup.instrumentType = defaultLcInstrumentTypeForSide(side);
     // Business instruction 2026-08-15 ("Export LC LC No, EB No 沒有 SG No") — SG# is Import-only.
     if (side === 'EXPORT') this.lookup.sgNumber = '';
   }

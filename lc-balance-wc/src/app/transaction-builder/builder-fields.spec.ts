@@ -1,4 +1,4 @@
-import { BuilderFieldsContext, buildFields } from './builder-fields';
+import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 
@@ -315,6 +315,41 @@ describe('builder-fields', () => {
       const fields = buildFields(baseCtx());
       expect(fieldByKey(fields, 'eventSeq').className).toContain('tb-field--required');
       expect(fieldByKey(fields, 'createdBy').className).toContain('tb-field--required');
+    });
+  });
+
+  // Inquire Events (2026-08-17, OOD Design Patterns — Decorator).
+  describe('toReadOnlyFields', () => {
+    it('forces every field disabled, regardless of its own live-disabled state', () => {
+      const fields = toReadOnlyFields(buildFields(baseCtx()));
+      expect(fields.every((f) => f.props?.disabled === true)).toBe(true);
+      // Sanity check against the un-decorated baseline — the plain A1 Amount field is normally
+      // editable, proving this test would fail without the decorator actually forcing it.
+      expect(fieldByKey(buildFields(baseCtx()), 'amount').props?.disabled).toBe(false);
+    });
+
+    it('strips expressions so a live recompute (e.g. tenorDays\' own props.disabled callback) can never undo the forced disabled state', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A1'), model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', tenorType: 'SELLERS_USANCE' } });
+      const live = fieldByKey(buildFields(ctx), 'tenorDays');
+      expect(live.expressions).toBeDefined();
+      const readOnly = fieldByKey(toReadOnlyFields(buildFields(ctx)), 'tenorDays');
+      expect(readOnly.expressions).toBeUndefined();
+      expect(readOnly.props?.disabled).toBe(true);
+    });
+
+    it('does not mutate buildFields()\'s own returned array (each field is a new object)', () => {
+      const original = buildFields(baseCtx());
+      const decorated = toReadOnlyFields(original);
+      expect(fieldByKey(original, 'amount').props?.disabled).toBe(false);
+      expect(fieldByKey(decorated, 'amount').props?.disabled).toBe(true);
+    });
+
+    it('preserves every field key and its required-ness (className/props.required untouched)', () => {
+      const original = buildFields(baseCtx());
+      const decorated = toReadOnlyFields(original);
+      expect(decorated.map((f) => f.key)).toEqual(original.map((f) => f.key));
+      expect(fieldByKey(decorated, 'amount').props?.required).toBe(true);
+      expect(fieldByKey(decorated, 'amount').className).toContain('tb-field--required');
     });
   });
 });

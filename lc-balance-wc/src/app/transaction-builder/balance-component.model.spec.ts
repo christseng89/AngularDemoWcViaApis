@@ -16,6 +16,9 @@ import {
   CURRENCY_DECIMALS,
   decimalPlacesForCurrency,
   amountExceedsCurrencyDecimals,
+  defaultLcInstrumentTypeForSide,
+  childInstrumentTypesOf,
+  resolveFunctionForMovement,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -621,6 +624,72 @@ describe('balance-component.model data invariants', () => {
       expect(amountExceedsCurrencyDecimals(100.12, 'USD')).toBe(false);
       expect(amountExceedsCurrencyDecimals(100.123, 'USD')).toBe(true);
       expect(amountExceedsCurrencyDecimals(0, 'JPY')).toBe(false);
+    });
+  });
+
+  // Inquire Events (2026-08-17) — defaultLcInstrumentTypeForSide/childInstrumentTypesOf/
+  // resolveFunctionForMovement.
+  describe('defaultLcInstrumentTypeForSide', () => {
+    it('IMPORT -> IPLC_LC, EXPORT -> EPLC_CONFIRMATION', () => {
+      expect(defaultLcInstrumentTypeForSide('IMPORT')).toBe('IPLC_LC');
+      expect(defaultLcInstrumentTypeForSide('EXPORT')).toBe('EPLC_CONFIRMATION');
+    });
+  });
+
+  describe('childInstrumentTypesOf', () => {
+    it('IPLC_LC -> IPLC_ACCEPTANCE and SHGT (order-independent)', () => {
+      expect(new Set(childInstrumentTypesOf('IPLC_LC'))).toEqual(new Set(['IPLC_ACCEPTANCE', 'SHGT']));
+    });
+
+    it('EPLC_CONFIRMATION -> EPLC_ACCEPTANCE and EPLC_EXAMINATION (order-independent)', () => {
+      expect(new Set(childInstrumentTypesOf('EPLC_CONFIRMATION'))).toEqual(new Set(['EPLC_ACCEPTANCE', 'EPLC_EXAMINATION']));
+    });
+
+    it('a leaf instrumentType (no PARENT_INSTRUMENT_OPTIONS ever names it as a parent) has no children', () => {
+      expect(childInstrumentTypesOf('SHGT')).toEqual([]);
+      expect(childInstrumentTypesOf('IPLC_ACCEPTANCE')).toEqual([]);
+    });
+
+    it('the three ON_BALANCE_ASSET instrumentTypes never appear as anyone\'s child (their own PARENT_INSTRUMENT_OPTIONS entries are empty by design)', () => {
+      for (const root of ALL_INSTRUMENT_TYPES) {
+        expect(childInstrumentTypesOf(root)).not.toContain('EPLC_DUE_FROM_ISSUING_BANK');
+        expect(childInstrumentTypesOf(root)).not.toContain('EPLC_ACCEPTANCE_REIMB_RECEIVABLE');
+        expect(childInstrumentTypesOf(root)).not.toContain('EPLC_EXPORT_BILLS_DISCOUNTED');
+      }
+    });
+  });
+
+  describe('resolveFunctionForMovement', () => {
+    it('resolves a literal fn.movementType match (A1 — IPLC_LC/ISSUE)', () => {
+      expect(resolveFunctionForMovement('IPLC_LC', 'ISSUE')?.code).toBe('A1');
+    });
+
+    it('resolves via subChoice.options (A2 — IPLC_LC/AMEND_INCREASE and AMEND_DECREASE, both from the same A2 subChoice)', () => {
+      expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_INCREASE')?.code).toBe('A2');
+      expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_DECREASE')?.code).toBe('A2');
+    });
+
+    it('resolves via movementTypeFromContractTenor for BOTH derived movementTypes (B4 — EPLC_CONFIRMATION/HONOUR and ACCEPT)', () => {
+      expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'HONOUR')?.code).toBe('B4');
+      expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'ACCEPT')?.code).toBe('B4');
+    });
+
+    it('resolves the derived PARTIAL_REDEEM via autoRedeemType (A9), not only the registry\'s own literal FULL_REDEEM default', () => {
+      expect(resolveFunctionForMovement('SHGT', 'FULL_REDEEM')?.code).toBe('A9');
+      expect(resolveFunctionForMovement('SHGT', 'PARTIAL_REDEEM')?.code).toBe('A9');
+    });
+
+    it('resolves the derived PARTIAL_SETTLE via settlesAcceptanceOnMature (B5), not only the registry\'s own literal FULL_SETTLE default', () => {
+      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
+      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'PARTIAL_SETTLE')?.code).toBe('B5');
+    });
+
+    it('returns undefined for a movementType/instrumentType combination no current function produces', () => {
+      expect(resolveFunctionForMovement('EPLC_EXAMINATION', 'AMEND')).toBeUndefined();
+    });
+
+    it('known limitation, explicitly accepted (see the function\'s own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: \'UTILIZE\') — the resolver deterministically returns the first registry match, A3, since it\'s declared first', () => {
+      expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
     });
   });
 });

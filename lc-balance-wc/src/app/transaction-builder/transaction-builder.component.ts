@@ -10,6 +10,7 @@ import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } fro
 import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './maker-submit.service';
 import { LookUpPanelService } from './look-up-panel.service';
 import { CatalogPickerService } from './catalog-picker.service';
+import { InquireEventsService } from './inquire-events.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   DECREASING_MOVEMENT_TYPES,
@@ -56,6 +57,15 @@ export class TransactionBuilderComponent {
    * picked function's own Maker/Checker panels get the vertical space.
    */
   activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
+
+  /**
+   * Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") — a
+   * second top-level mode, sibling to the existing function-picker/Maker/Checker/Look-Up workspace
+   * (activeMode === 'PROCESSING', unchanged), reachable without first picking a business function
+   * (unlike the existing "Look Up Current Balance" panel, which only renders once selectedFunction is
+   * set — deliberately not changed here, out of scope for this feature).
+   */
+  activeMode: 'PROCESSING' | 'INQUIRE' = 'PROCESSING';
 
   selectedFunction: TransactionFunction | null = null;
   /** Value of the function's subChoice (e.g. 'AMEND_INCREASE', or 'CONFIRMED' for B1/B2). */
@@ -294,6 +304,8 @@ export class TransactionBuilderComponent {
    * `look-up-panel.service.ts`'s own doc comment for why this is a plain class, not an `@Component`.
    */
   readonly lookUp: LookUpPanelService;
+  /** Inquire Events (2026-08-17) — same "plain class, constructed in the body" convention as `lookUp` above, for the same reason (see look-up-panel.service.ts's own doc comment). */
+  readonly inquireEvents: InquireEventsService;
   /**
    * BAL-003 (8th same-day OOD/SOLID pass, "paginated pickers" — narrowed scope, see
    * `catalog-picker.service.ts`'s own module note): `catalogPicker`/`parentPicker`/`ibIndexPicker`
@@ -307,9 +319,16 @@ export class TransactionBuilderComponent {
     private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
   ) {
     this.lookUp = new LookUpPanelService(api, () => (this.accountEntryDialogMovement = null));
+    this.inquireEvents = new InquireEventsService(api);
     this.catalogPicker = new CatalogPickerService(this.catalogPageSize, api);
     this.parentPicker = new CatalogPickerService(this.parentPageSize, api);
     this.ibIndexPicker = new CatalogPickerService(this.ibIndexPageSize, api);
+  }
+
+  /** Inquire Events (2026-08-17) — top-level mode toggle, sibling to selectFunctionSide()'s own Import/Export toggle. Closes any open Account Entries dialog when leaving Inquire mode, same "close before the underlying data changes" convention lookUp.runLookup()'s own onBeforeLookup callback already follows. */
+  selectMode(mode: 'PROCESSING' | 'INQUIRE'): void {
+    this.activeMode = mode;
+    this.accountEntryDialogMovement = null;
   }
 
   /*

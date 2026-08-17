@@ -7,6 +7,16 @@
     </p>
   </header>
 
+  <!-- Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") — a
+       top-level mode toggle sibling to the Import/Export function-side tabs below, reachable without first
+       picking a business function (see transaction-builder.component.ts's own activeMode doc comment). -->
+  <div class="tb-tabs tb-tabs--side">
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'PROCESSING'" (click)="selectMode('PROCESSING')">Transaction Processing</button>
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'INQUIRE'" (click)="selectMode('INQUIRE')">Inquire Events</button>
+  </div>
+
+  <ng-container *ngIf="activeMode === 'PROCESSING'">
+
   <!-- Business instruction 2026-08-15 ("A1-A9 B1-B5 should be horizental instead of vertical... the function
        input should be more important than the menu... Tab Import => A1...A9 horizontal, Tab Export B1...B5
        horizontal") — Import/Export is now a tab switch (one function row visible at a time, horizontal chips)
@@ -670,6 +680,81 @@
               <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.presentDocsEarmarkApproved !== null"><span class="tb-balance-row__label">Present Docs Earmark (Approved)</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.presentDocsEarmarkApproved }}</span></div>
             </div>
           </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  </ng-container>
+
+  <!-- ══════════════════════════ INQUIRE EVENTS (2026-08-17) ══════════════════════════
+       Reuses: BalanceComponentApiService.resolveContract/catalog/listMovements (inquire-events.service.ts,
+       no new HTTP methods), buildFields() (builder-fields.ts, unchanged, decorated read-only via
+       toReadOnlyFields()), IMPORT_FUNCTIONS/EXPORT_FUNCTIONS (resolveFunctionForMovement(),
+       balance-component.model.ts), and the Account Entries dialog below (openAccountEntryDialog(), no new
+       dialog markup). -->
+  <div class="tb-workspace" *ngIf="activeMode === 'INQUIRE'">
+    <div class="tb-main">
+      <section class="tb-section tb-section--maker">
+        <div class="tb-section__header">
+          <h2 class="tb-section__title">Inquire Events</h2>
+        </div>
+
+        <div class="tb-tabs tb-tabs--side">
+          <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'IMPORT'" (click)="inquireEvents.selectSide('IMPORT')">Import LC</button>
+          <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'EXPORT'" (click)="inquireEvents.selectSide('EXPORT')">Export Confirmed</button>
+        </div>
+
+        <div class="tb-field tb-field--inline tb-field--search mt-2">
+          <label class="tb-field__label">LC Number</label>
+          <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="inquireEvents.lcNumber" (keyup.enter)="inquireEvents.search()">
+          <button type="button" class="tb-btn tb-btn--outline" [disabled]="!inquireEvents.lcNumber.trim() || inquireEvents.searching" (click)="inquireEvents.search()">
+            {{ inquireEvents.searching ? 'Searching…' : 'Search' }}
+          </button>
+        </div>
+        <div class="tb-error mt-2" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
+        <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}</div>
+
+        <div class="mt-3" *ngIf="inquireEvents.rootContract">
+          <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
+          <div class="tb-hint" *ngIf="inquireEvents.eventsLoading">Loading events…</div>
+          <table class="tb-table" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
+            <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Time</th><th></th><th>Entries</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let e of inquireEvents.events">
+                <td><span class="tb-type-tag">{{ e.contract.instrumentType }}</span></td>
+                <td><span class="tb-type-tag">{{ e.movement.movementType }}</span></td>
+                <td class="tb-table__amount">{{ e.movement.amount }}</td>
+                <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
+                <td><span class="tb-status-badge" [class.tb-status-badge--pending]="e.movement.status === 'PENDING'" [class.tb-status-badge--approved]="e.movement.status === 'RELEASED'" [class.tb-status-badge--negative]="e.movement.status === 'REJECTED' || e.movement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="e.movement.status === 'SUPERSEDED'">{{ displayStatus(e.movement.status) }}</span></td>
+                <td class="tb-table__time">{{ e.movement.createdAt | date:'short' }}</td>
+                <td><button type="button" class="tb-btn tb-btn--tiny" (click)="inquireEvents.selectEvent(e)">View</button></td>
+                <td>
+                  <button type="button" class="tb-btn tb-btn--tiny" *ngIf="e.movement.contingentAccountEntry" (click)="openAccountEntryDialog(e.movement)">Account Entries</button>
+                  <span class="tb-muted" *ngIf="!e.movement.contingentAccountEntry">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
+        </div>
+
+        <!-- Original transaction screen, restored, read-only — same buildFields()/<formly-form> the live
+             Maker Submit screen uses, decorated via toReadOnlyFields() (builder-fields.ts). -->
+        <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel">
+          <div class="tb-balance-box__title">
+            Original Transaction Screen —
+            <ng-container *ngIf="inquireEvents.selectedEventFunction as fn">{{ fn.code }} · {{ fn.label }}</ng-container>
+            <ng-container *ngIf="!inquireEvents.selectedEventFunction">(function not resolved — showing captured transaction data)</ng-container>
+          </div>
+          <div class="tb-balance-row"><span class="tb-balance-row__label">LC Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.lcNumber }}</span></div>
+          <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber"><span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.ibNumber }}</span></div>
+          <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber"><span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.sgNumber }}</span></div>
+          <formly-form [form]="inquireEvents.selectedEventForm" [fields]="inquireEvents.selectedEventFields" [model]="inquireEvents.selectedEventModel"></formly-form>
+          <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ displayStatus(sel.movement.status) }}</span></div>
+          <div class="tb-balance-row"><span class="tb-balance-row__label">Created</span><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date:'short' }}</span></div>
+          <div class="tb-balance-row" *ngIf="sel.movement.releasedBy"><span class="tb-balance-row__label">Released</span><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date:'short' }}</span></div>
+          <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement)">Account Entries</button>
         </div>
       </section>
     </div>

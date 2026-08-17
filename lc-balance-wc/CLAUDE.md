@@ -2607,3 +2607,98 @@ a comment placed *between* two `case` labels rather than above the whole grouped
 moving the comment above the group, same convention the pre-existing `ON_BALANCE_ASSET` group already
 used); `backend/` 33/33 (unaffected); Angular app 652/652 (unaffected) — all three clear their own 95%
 floor on all four metrics.
+
+## Inquire Events added — Angular-only, OOD Design Patterns (2026-08-17, user-requested — "使用OOD Design Patterns 新增 Inquire Events 功能，適用於 Import LC 及 Confirmed LC")
+
+New top-level mode on the Transaction Builder (`activeMode: 'PROCESSING' | 'INQUIRE'`, a tab toggle
+sibling to the existing Import/Export function tabs, reachable without first picking a business
+function — deliberately not gated behind `selectedFunction` the way the existing "Look Up Current
+Balance" panel still is, out of scope to change here): pick an LC Number (Import LC / Confirmed LC),
+see every transaction Event under it — merged across ALL its child ledgers (Acceptance/SG/Examination),
+sorted by true Event Date/Time (`createdAt`, not the per-contract-scoped `eventSeq`) — then, on
+selecting one, see its original transaction screen restored read-only plus its Account Entries.
+
+**Design principle (user-stated) — reuse existing screens/logic/services rather than duplicate them —
+honored literally**: zero new HTTP endpoints (reuses `resolveContract`/`catalog`/`listMovements`), zero
+new field definitions (reuses `buildFields()` unchanged), zero new function registry (reuses
+`IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS`), zero new dialog (reuses `openAccountEntryDialog()` and its
+existing template block verbatim — confirmed live: the SAME dialog, byte-for-byte, opens correctly from
+an Inquire Events row).
+
+**OOD Design Patterns applied, per the user's explicit request:**
+- **Facade** — new `src/app/transaction-builder/inquire-events.service.ts`
+  (`InquireEventsService`), a plain class over `BalanceComponentApiService` + the function registry +
+  `buildFields()`, mirroring `LookUpPanelService`'s own existing role and "plain class, not
+  `@Component`" testability convention (this file's own test suite constructs
+  `new TransactionBuilderComponent(mockApi)`, no TestBed — a real child component's
+  `@ViewChild`/`@Input`-`@Output` wiring would never resolve there).
+- **Decorator** — new `toReadOnlyFields()` (`builder-fields.ts`, next to `buildFields()`): wraps
+  `buildFields()`'s own output to force every field `disabled: true` and strip `expressions` (which
+  would otherwise re-evaluate every change-detection cycle and could undo the forced state), without
+  touching `buildFields()` itself (Open/Closed) — the live Maker form and the read-only Inquire Events
+  screen decorate the exact same field definitions differently, they don't duplicate them.
+- **Strategy (reused table, not a new hierarchy)** — new `resolveFunctionForMovement()`
+  (`balance-component.model.ts`): treats the existing `IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS` registry as
+  a lookup table keyed by `(instrumentType, movementType)`. Handles three cases where the registry's own
+  `movementType` is a placeholder (the real value is derived elsewhere): `movementTypeFromContractTenor`
+  (B4 — HONOUR vs ACCEPT), `autoRedeemType` (A9 — FULL_REDEEM vs PARTIAL_REDEEM), and
+  `settlesAcceptanceOnMature` (B5 — FULL_SETTLE vs PARTIAL_SETTLE). **Known, explicitly-accepted
+  limitation** (same honesty convention as BAL-108's own "left as-is, documented" entries): a few
+  `(instrumentType, movementType)` pairs are produced by more than one function code (e.g. `IPLC_LC`/
+  `UTILIZE` — both A3 and A3S; `SHGT`/`FULL_REDEEM` — both A9 and A3S's own first leg). The resolver
+  returns the first registry match deterministically; the reconstructed FIELD SET is identical either
+  way in every such case (the difference between the two functions is a label string, never which
+  fields exist), so this only affects which function-code badge is shown, never the data displayed.
+- **Adapter** — new `InquiredEvent` (`inquire-events.service.ts`): pairs a raw `BalanceMovement` with
+  the `BalanceContract` that owns it, since a movement alone carries neither `instrumentType` nor
+  `naturalKey`, both needed for the merged timeline and the screen reconstruction.
+- **Single Responsibility** — `InquireEventsService` isolated from `TransactionBuilderComponent`, same
+  separation convention as every other BAL-003 extraction already in this file.
+
+**Child-ledger discovery** — new `childInstrumentTypesOf()` (`balance-component.model.ts`) inverts the
+existing `PARENT_INSTRUMENT_OPTIONS` map ONCE at module load, rather than hand-writing a second parent→
+child map: for `IPLC_LC` that resolves to `IPLC_ACCEPTANCE`/`SHGT`, for `EPLC_CONFIRMATION` to
+`EPLC_ACCEPTANCE`/`EPLC_EXAMINATION`. The three `ON_BALANCE_ASSET` instrumentTypes
+(`EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/`EPLC_EXPORT_BILLS_DISCOUNTED`) never
+appear as anyone's child (their own `PARENT_INSTRUMENT_OPTIONS` entries are empty by design, same
+"Balance Component 只負責 Contingent Liability" boundary `contingentAccountEntry` already enforces), so
+they're correctly excluded from this timeline too — not a new scope decision, an inherited one. New
+`defaultLcInstrumentTypeForSide()` (IMPORT→`IPLC_LC`, EXPORT→`EPLC_CONFIRMATION`) extracted out of
+`LookUpPanelService.resetForSide()`'s own inline ternary and shared by both services — closes a
+would-be duplication the moment a second caller needed the same default.
+
+**Tests:** `inquire-events.service.spec.ts` (new, mirrors `checker-actions.service.spec.ts`'s own
+mock-factory convention — `search()`'s cross-contract merge/sort, both `catchError` swallow paths,
+`selectEvent()`'s function resolution incl. the documented A3/A3S-style ambiguity and the unresolved-
+function fallback); `balance-component.model.spec.ts` (new `resolveFunctionForMovement`/
+`childInstrumentTypesOf`/`defaultLcInstrumentTypeForSide` describe blocks); `builder-fields.spec.ts`
+(new `toReadOnlyFields` describe block); new `transaction-builder.component.inquire.spec.ts` (component-
+level wiring only — `activeMode`/`selectMode()`, `inquireEvents` construction, Account Entries dialog
+reuse — same "service owns its own behavior, component spec only proves the wiring" split this file's
+other service/`.actions.spec.ts` pairs already use).
+
+Full three-suite verification per this file's own standing rule: Angular app 683/683 passing (31 new),
+99.73%/96.38%/99.5%/99.77% coverage (`inquire-events.service.ts` itself at 100/100/100/100), `npx tsc -p
+tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean, `npm run lint` 0 errors
+(211 pre-existing `any` warnings, unchanged); microservice 292/292 and `backend/` 33/33 (both
+unaffected — zero backend/microservice changes, this is Angular-only).
+
+**Live in-browser verification** (against the already-running dev stack, not a fresh `dev:all` — see
+below): Import LC S01 — the merged timeline correctly interleaved `IPLC_LC`/`SHGT` events in true
+chronological order across both ledgers; clicking a `SHGT`/`FULL_REDEEM` row correctly resolved to "A9 ·
+Shipping Gtee (Redemption)" and reconstructed Amount 10000/Currency USD/Reference B01 read-only
+(fields visibly greyed out); its Account Entries button opened the identical dialog
+(`Dr Shipping Guarantees Outstanding` / `Cr Customers' Liability under Shipping Guarantees`, both USD
+10000). Export Confirmed U01 — the merged timeline correctly surfaced `EPLC_EXAMINATION` (B3) events for
+the first time (the old Look Up panel has no tab for this instrument at all); clicking one resolved to
+"B3 · Present Docs" and reconstructed LC/IB Number + Amount/Currency read-only; incidentally also
+live-confirmed the B3 Account-Entries-removal fix immediately above this section — an older
+`EPLC_EXAMINATION` record (created before that fix) still showed its persisted `Account Entries` button
+(immutable, never recomputed, exactly as designed), while the newest one (created after) correctly
+showed none. Zero console errors across the whole session.
+
+**Note on how this was verified live**: `npm run dev:all` failed outright (`EADDRINUSE` on all three
+ports, 4100/4200/4300) — a dev stack from an earlier session was already running. Per this project's own
+established "don't chase port conflicts" posture, verification connected directly to that already-
+running `ng serve` instead of killing/restarting it; its watch mode had already picked up every source
+change made in this pass (confirmed: the new mode toggle rendered immediately with no manual reload).
