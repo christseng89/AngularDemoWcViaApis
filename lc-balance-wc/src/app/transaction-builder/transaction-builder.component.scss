@@ -603,6 +603,15 @@
   margin: 0 0 8px;
 }
 
+// Bug fix (reviewer-reported 2026-08-17, "Time column truncated for A1-A9/B1-B5") — gives a .tb-table
+// its own horizontal-scroll surface so a nowrap column (e.g. .tb-table__time) that can't shrink to fit
+// scrolls into view instead of being silently clipped by an ancestor .tb-section's own overflow:hidden
+// (kept there for its rounded-corner header background, not something this fix should touch).
+.tb-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
 // Business instruction 2026-08-15 ("Event Timeline does not look pretty") — status badges (color-coded
 // by outcome, not bare text), a type tag, zebra striping, and column-specific alignment/typography
 // instead of six identically-styled plain <td>s.

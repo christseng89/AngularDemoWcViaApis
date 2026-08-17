@@ -656,7 +656,14 @@
                the FIRST thing shown for a lookup result, ahead of the Current Balance summary below. -->
           <div class="mt-3" *ngIf="lookUp.lookupResult">
             <h3 class="tb-subheading">Event Timeline — {{ lookUp.activeLookupLabel }}</h3>
-            <table class="tb-table" *ngIf="lookUp.activeLookupMovements.length">
+            <!-- Bug fix (reviewer-reported 2026-08-17, "Time column truncated for A1-A9/B1-B5") — the
+                 ancestor .tb-section's own overflow:hidden (kept for its rounded-corner header background)
+                 was silently CLIPPING this table's Time column instead of letting it scroll: .tb-table__time
+                 is white-space:nowrap, so table-layout:auto refuses to shrink it below its content width,
+                 and with no scroll container of its own the overflow had nowhere to go but clipped. This
+                 wrapper gives that overflow a dedicated horizontal-scroll surface instead. -->
+            <div class="tb-table-scroll" *ngIf="lookUp.activeLookupMovements.length">
+            <table class="tb-table">
               <caption class="visually-hidden">Event Timeline — {{ lookUp.activeLookupLabel }}</caption>
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
@@ -686,6 +693,7 @@
                 </tr>
               </tbody>
             </table>
+            </div>
             <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
 
             <!-- Current Balance — no raw JSON dump (business instruction 2026-08-14). One field per line
