@@ -403,7 +403,7 @@
 
             <ng-container *ngIf="!selectedFunction.payExistingUtilize">
               <form [formGroup]="form">
-                <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
+                <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
               </form>
 
               <div class="tb-error mt-2" *ngIf="amountDecimalMismatch">
@@ -728,16 +728,22 @@
                "Original Transaction Screen" panel's own Account Entries button, reusing
                openAccountEntryDialog() unchanged. -->
           <table class="tb-table" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
-            <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Time</th><th></th></tr></thead>
+            <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Secondary Ref.</th><th>Status</th><th>Time</th></tr></thead>
             <tbody>
-              <tr *ngFor="let e of inquireEvents.events">
+              <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
+                   itself should be clickable... hover → highlight/pointer → single click → View Event
+                   Details") — the row-level View button/column was removed; the whole <tr> now dispatches
+                   the identical selectEvent() call the button used to. .tb-table's own tbody tr already
+                   carries cursor:pointer + hover-highlight styling (the same pickable-row affordance every
+                   other .tb-table in this app already uses), so no new CSS was needed. -->
+              <tr *ngFor="let e of inquireEvents.events" (click)="inquireEvents.selectEvent(e)">
                 <td><span class="tb-type-tag">{{ e.contract.instrumentType }}</span></td>
                 <td><span class="tb-type-tag">{{ e.movement.movementType }}</span></td>
                 <td class="tb-table__amount">{{ e.movement.amount }}</td>
                 <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
+                <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
                 <td><span class="tb-status-badge" [class.tb-status-badge--pending]="e.movement.status === 'PENDING'" [class.tb-status-badge--approved]="e.movement.status === 'RELEASED'" [class.tb-status-badge--negative]="e.movement.status === 'REJECTED' || e.movement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="e.movement.status === 'SUPERSEDED'">{{ displayStatus(e.movement.status) }}</span></td>
                 <td class="tb-table__time">{{ e.movement.createdAt | date:'short' }}</td>
-                <td><button type="button" class="tb-btn tb-btn--tiny" (click)="inquireEvents.selectEvent(e)">View</button></td>
               </tr>
             </tbody>
           </table>
@@ -762,14 +768,19 @@
           <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement)">Account Entries</button>
         </div>
 
-        <!-- Event Snapshot (2026-08-17, user-requested — "VIEW EVENT 只需 EVENT SNAPSHOT 即可"): exactly
-             ONE snapshot, for the selected event's own ledger — its point-in-time closing Confirmed/
-             Available/Pending Earmark/(Off-Balance Exposure/Tight Available if LC), Confirmed Balance
-             annotated with its own before→after impact (movement.balanceBefore/balanceAfter, already
-             fetched, zero extra call — "still PENDING" until Released, same domain semantics as
-             everywhere else in this app). Reuses the SAME #balanceSnapshotBox shared template
-             Transaction Processing's own Look Up panel uses above, via its own optional `impact` param. -->
-        <ng-container *ngIf="inquireEvents.selectedEvent as sel2" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: inquireEvents.selectedEventSnapshotTitle, status: sel2.contract.status, snapshot: inquireEvents.selectedEventSnapshot, impact: { before: sel2.movement.balanceBefore, after: sel2.movement.balanceAfter } }"></ng-container>
+        <!-- Balance Tabs (2026-08-17, user-specified — up to 3 tabs: LC/Confirmed LC Balance (always),
+             Acceptance Balance (Usance tenor only), Shipping Guarantee Balance (Import only) — same
+             gating rule as the Look Up panel's own LC/Acceptance/SG tabs above (lookupIsUsanceLc/
+             lookupHasSg), reused here as selectedEventIsUsanceLc/selectedEventHasSg. A child tab is only
+             ever populated when the selected Event belongs to that specific child (confirmed via
+             AskUserQuestion) — the LC tab is always populated (own ledger for a root Event, the parent's
+             own balance — rootEventSnapshot — for a child Event). Reuses the SAME #balanceSnapshotBox
+             shared template Transaction Processing's own Look Up panel uses above, and the same
+             .tb-tabs/.tb-tab tab-strip markup pattern as the Look Up panel's own LC/Acceptance/SG tabs. -->
+        <div class="tb-tabs mt-3" *ngIf="inquireEvents.selectedEventTabs.length > 1">
+          <button type="button" class="tb-tab" *ngFor="let tab of inquireEvents.selectedEventTabs" [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key" (click)="inquireEvents.selectEventTab(tab.key)">{{ tab.label }}</button>
+        </div>
+        <ng-container *ngIf="inquireEvents.selectedEvent as sel2" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: inquireEvents.activeEventTab?.title, status: sel2.contract.status, snapshot: inquireEvents.activeEventTab?.snapshot, impact: inquireEvents.activeEventTab?.impact }"></ng-container>
         </div>
       </section>
     </div>
@@ -822,7 +833,13 @@
        call site above omits it, so *ngIf="impact" is simply false there and this row falls back to
        plain, unannotated Confirmed Balance, unchanged) — {before, after} strings from
        movement.balanceBefore/balanceAfter, both null while the movement is still PENDING (Confirmed
-       Balance doesn't move until Release, same domain semantics as everywhere else in this app). -->
+       Balance doesn't move until Release, same domain semantics as everywhere else in this app).
+       2026-08-17 ("REFER TO DB S01") — `snapshot.redirectedImpact`, when present, takes priority over
+       `impact`: the snapshot itself is a REDIRECTED one (SHGT/EPLC_EXAMINATION event showing the parent
+       LC/Confirmation's own balance), so `impact` (the CHILD's own balanceBefore/balanceAfter) would be
+       decorating the wrong field entirely — Confirmed Balance shows plain, and the before→after instead
+       lands on whichever row `redirectedImpact.label` names (Off-Balance Exposure or one of the two
+       Present Docs Earmark rows). -->
   <ng-template #balanceSnapshotBox let-title="title" let-status="status" let-snapshot="snapshot" let-impact="impact">
     <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="snapshot">
       <div class="tb-balance-box__title">{{ title }}</div>
@@ -830,17 +847,32 @@
       <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ snapshot.currency }}</span></div>
       <div class="tb-balance-row">
         <span class="tb-balance-row__label">Confirmed Balance</span>
-        <span class="tb-balance-row__value" *ngIf="!impact">{{ snapshot.confirmedBalance }}</span>
-        <span class="tb-balance-row__value" *ngIf="impact && impact.after !== null && impact.after !== undefined">{{ impact.before ?? '—' }} → {{ impact.after }}</span>
-        <span class="tb-balance-row__value" *ngIf="impact && (impact.after === null || impact.after === undefined)">{{ snapshot.confirmedBalance }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact || !impact">{{ snapshot.confirmedBalance }}</span>
+        <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && impact.after !== null && impact.after !== undefined">{{ impact.before ?? '—' }} → {{ impact.after }}</span>
+        <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && (impact.after === null || impact.after === undefined)">{{ snapshot.confirmedBalance }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span>
       </div>
       <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ snapshot.availableBalance }}</span></div>
       <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal }}</span></div>
-      <div class="tb-balance-row" *ngIf="snapshot.offBalanceExposure !== null"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ snapshot.offBalanceExposure }}</span></div>
+      <!-- 2026-08-17 ("REFER TO DB S01") — a redirected snapshot's own before→after lands on whichever
+           field below its own redirectedImpact.label names, never on Confirmed Balance above (that
+           field didn't move — see the microservice's own doc comment for why). -->
+      <div class="tb-balance-row" *ngIf="snapshot.offBalanceExposure !== null">
+        <span class="tb-balance-row__label">Off-Balance Exposure</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'offBalanceExposure'">{{ snapshot.offBalanceExposure }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'offBalanceExposure'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
+      </div>
       <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span></div>
       <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
-      <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkPending !== null"><span class="tb-balance-row__label">Present Docs Earmark (Pending)</span><span class="tb-balance-row__value">{{ snapshot.presentDocsEarmarkPending }}</span></div>
-      <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkApproved !== null"><span class="tb-balance-row__label">Present Docs Earmark (Approved)</span><span class="tb-balance-row__value">{{ snapshot.presentDocsEarmarkApproved }}</span></div>
+      <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkPending !== null">
+        <span class="tb-balance-row__label">Present Docs Earmark (Pending)</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkPending'">{{ snapshot.presentDocsEarmarkPending }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkPending'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
+      </div>
+      <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkApproved !== null">
+        <span class="tb-balance-row__label">Present Docs Earmark (Approved)</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkApproved'">{{ snapshot.presentDocsEarmarkApproved }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkApproved'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
+      </div>
     </div>
   </ng-template>
 </div>

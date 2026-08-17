@@ -7,7 +7,7 @@
  * Earmark acknowledgment — see acknowledge() below).
  */
 import type { Db } from '../db';
-import type { AccountEntry, BalanceMovement, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
+import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
 
 interface MovementRow {
   movement_id: string;
@@ -46,6 +46,10 @@ interface MovementRow {
   acknowledged_at: string | null;
   maker_submitted_by: string | null;
   maker_submitted_at: string | null;
+  event_snapshot: string | null;
+  root_event_snapshot: string | null;
+  acceptance_event_snapshot: string | null;
+  sg_event_snapshot: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -86,6 +90,10 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     acknowledgedAt: row.acknowledged_at,
     makerSubmittedBy: row.maker_submitted_by,
     makerSubmittedAt: row.maker_submitted_at,
+    eventSnapshot: row.event_snapshot ? (JSON.parse(row.event_snapshot) as BalanceSnapshot) : null,
+    rootEventSnapshot: row.root_event_snapshot ? (JSON.parse(row.root_event_snapshot) as BalanceSnapshot) : null,
+    acceptanceEventSnapshot: row.acceptance_event_snapshot ? (JSON.parse(row.acceptance_event_snapshot) as BalanceSnapshot) : null,
+    sgEventSnapshot: row.sg_event_snapshot ? (JSON.parse(row.sg_event_snapshot) as BalanceSnapshot) : null,
   };
 }
 
@@ -110,7 +118,8 @@ export class BalanceMovementStore {
             reason_code, remarks, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before,
-            balance_after, warnings, created_by, released_by, created_at, released_at
+            balance_after, warnings, created_by, released_by, created_at, released_at,
+            event_snapshot, root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot
           ) VALUES (
             @movementId, @balanceContractId, @eventSeq, @businessEventId, @movementType,
             @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
@@ -119,7 +128,8 @@ export class BalanceMovementStore {
             @reasonCode, @remarks, @transactionDate, @businessDate, @valueDate,
             @sourceModule, @sourceFunction, @sourceTransactionRef, @referencedTransactionId,
             @balanceBefore,
-            @balanceAfter, @warnings, @createdBy, @releasedBy, @createdAt, @releasedAt
+            @balanceAfter, @warnings, @createdBy, @releasedBy, @createdAt, @releasedAt,
+            @eventSnapshot, @rootEventSnapshot, @acceptanceEventSnapshot, @sgEventSnapshot
           )`,
         )
         .run({
@@ -155,6 +165,10 @@ export class BalanceMovementStore {
           releasedBy: movement.releasedBy ?? null,
           createdAt: movement.createdAt,
           releasedAt: movement.releasedAt ?? null,
+          eventSnapshot: movement.eventSnapshot ? JSON.stringify(movement.eventSnapshot) : null,
+          rootEventSnapshot: movement.rootEventSnapshot ? JSON.stringify(movement.rootEventSnapshot) : null,
+          acceptanceEventSnapshot: movement.acceptanceEventSnapshot ? JSON.stringify(movement.acceptanceEventSnapshot) : null,
+          sgEventSnapshot: movement.sgEventSnapshot ? JSON.stringify(movement.sgEventSnapshot) : null,
         });
       return { created: true };
     } catch (err) {
@@ -255,13 +269,40 @@ export class BalanceMovementStore {
     remarks?: string | null;
     balanceBefore?: string | null;
     balanceAfter?: string | null;
+    /**
+     * 2026-08-17 — passed by release() only (the RELEASED-state Event Snapshot, JSON string). Omitted
+     * by reject(), which leaves event_snapshot untouched (out of scope — see types.ts's
+     * BalanceMovement.eventSnapshot doc comment). Omitted/undefined and explicit null are
+     * indistinguishable once bound as a SQL param — both fall through the COALESCE below and preserve
+     * the existing column value, which is exactly the "don't touch it" behavior every non-release
+     * caller needs.
+     */
+    eventSnapshot?: string | null;
+    /** 2026-08-17 — same "don't touch unless release() passes it" COALESCE posture as eventSnapshot above. */
+    rootEventSnapshot?: string | null;
+    /**
+     * 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔") — unlike eventSnapshot/rootEventSnapshot
+     * above, release() ALWAYS recomputes these (captureSiblingSnapshots() runs unconditionally), and a
+     * freshly-recomputed value can legitimately BE null (e.g. a second SG was issued between Create and
+     * Release, making the candidate count ambiguous) — so a plain COALESCE(@param, column) would
+     * incorrectly preserve a now-stale non-null value from Create. These two therefore use an explicit
+     * "was this key provided at all" flag (`in params`, distinct from the value itself being null) rather
+     * than COALESCE, so release()'s own null IS written, while reject()/cancel() (which omit the key
+     * entirely, out of scope) still leave the column untouched.
+     */
+    acceptanceEventSnapshot?: string | null;
+    sgEventSnapshot?: string | null;
   }): void {
     this.db
       .prepare(
         `UPDATE balance_movements
          SET status = @status, released_by = @releasedBy, released_at = @releasedAt,
              reason_code = @reasonCode, remarks = @remarks,
-             balance_before = @balanceBefore, balance_after = @balanceAfter
+             balance_before = @balanceBefore, balance_after = @balanceAfter,
+             event_snapshot = COALESCE(@eventSnapshot, event_snapshot),
+             root_event_snapshot = COALESCE(@rootEventSnapshot, root_event_snapshot),
+             acceptance_event_snapshot = CASE WHEN @hasAcceptanceEventSnapshot = 1 THEN @acceptanceEventSnapshot ELSE acceptance_event_snapshot END,
+             sg_event_snapshot = CASE WHEN @hasSgEventSnapshot = 1 THEN @sgEventSnapshot ELSE sg_event_snapshot END
          WHERE movement_id = @movementId`,
       )
       .run({
@@ -273,6 +314,12 @@ export class BalanceMovementStore {
         remarks: params.remarks ?? null,
         balanceBefore: params.balanceBefore ?? null,
         balanceAfter: params.balanceAfter ?? null,
+        eventSnapshot: params.eventSnapshot ?? null,
+        rootEventSnapshot: params.rootEventSnapshot ?? null,
+        acceptanceEventSnapshot: params.acceptanceEventSnapshot ?? null,
+        sgEventSnapshot: params.sgEventSnapshot ?? null,
+        hasAcceptanceEventSnapshot: 'acceptanceEventSnapshot' in params ? 1 : 0,
+        hasSgEventSnapshot: 'sgEventSnapshot' in params ? 1 : 0,
       });
   }
 

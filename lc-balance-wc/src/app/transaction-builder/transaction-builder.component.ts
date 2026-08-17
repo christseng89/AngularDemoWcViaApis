@@ -21,7 +21,7 @@ import {
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
 } from './balance-component.model';
-import { buildFields } from './builder-fields';
+import { buildFields, toReadOnlyFields } from './builder-fields';
 import { SubmitRulesContext, buildSubmitRequest as buildSubmitRequestRules, validateSubmit as validateSubmitRules } from './submit-rules';
 import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
@@ -1780,6 +1780,34 @@ export class TransactionBuilderComponent {
       selectedParent: this.selectedParent,
       dynamicSecondaryRefLabel: this.dynamicSecondaryRefLabel,
     });
+  }
+
+  /**
+   * UX improvement, business-directed 2026-08-17: "once the user clicks Submit, all input fields must
+   * become protected / read-only... Any subsequent change must be performed through the appropriate
+   * follow-up transaction or amendment function, rather than modifying the submitted transaction
+   * directly. Apply the same behavior consistently across A1–A9 and B1–B5." Locked on `submitResult`
+   * being set (a real movement now exists — whether the overall Submit fully succeeded or a later
+   * compound leg failed after the primary one already posted, per `applyMakerSubmitOutcome()`'s own
+   * partial-failure case), not merely on the Submit click itself: a validation failure with no movement
+   * created (`submitError` only, `submitResult` still null) must leave the form editable so the Maker
+   * can correct it and resubmit — locking then would contradict the same instruction's own "review in
+   * View / Read-Only Mode" framing, which presumes something real was actually submitted. `submitA4()`
+   * (A4's own dedicated Maker-Submit action) sets `submitResult` on success exactly the same way, so
+   * this applies to it for free with no separate wiring.
+   */
+  get formLocked(): boolean {
+    return !!this.submitResult;
+  }
+
+  /**
+   * Template binds to this instead of `fields` directly, so the live form flips to
+   * `toReadOnlyFields()` (BAL-101/Decorator, already built for Inquire Events' own read-only
+   * reconstruction — reused here rather than duplicated) the instant `formLocked` goes true, with no
+   * change needed at any of `rebuildFields()`'s own call sites.
+   */
+  get displayFields(): FormlyFieldConfig[] {
+    return this.formLocked ? toReadOnlyFields(this.fields) : this.fields;
   }
 
   /**

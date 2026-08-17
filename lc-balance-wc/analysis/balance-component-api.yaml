@@ -287,7 +287,45 @@ info:
     disclosed trade-off ("the reference Angular Transaction Builder client enforces the gate itself,
     client-side") — any caller can now be relied upon to hit this same 409 if it skips
     `/maker-submit`, not just the one reference UI.
-  version: "1.5.0"
+
+
+    v1.6.0 (2026-08-17, business instruction, "建議把交易當時(PENDING XOR APPROVED) 交易時的Current
+    Balance 存檔 VIEW EVENTS時 直接抓取為EVENT SNAPSHOT" / "只存PENDING 或 APPROVED 其中一個"): new
+    `BalanceMovement.eventSnapshot` — the same `BalanceSnapshot` shape
+    `GET /balance-movements/{id}/balance-as-of` computes on demand, now ALSO captured once at
+    `POST /balance-movements` (PENDING) and overwritten at `POST /balance-movements/{id}/release`
+    (RELEASED), so a caller already holding the movement (e.g. from the Event Timeline) can read it
+    directly with no extra request. `balance-as-of` itself is unchanged and remains the correct source
+    for movements predating this field (null `eventSnapshot`).
+
+
+    v1.7.0 (2026-08-17, same day, business-reported gap then simplified — "REFER TO DB S01" showed a
+    child-ledger movement's `eventSnapshot` (e.g. a Shipping Guarantee's own) has no way to surface the
+    PARENT LC/Confirmation's own balance impact, which some callers also need; final instruction "不複雜
+    就是交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE
+    SNAPSHOT"): new `BalanceMovement.rootEventSnapshot` — ADDITIONAL to `eventSnapshot` (never a
+    replacement — `eventSnapshot` stays this movement's own contract's own balance, unchanged from
+    v1.6.0), populated only for a child-ledger movement (SHGT, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE,
+    EPLC_EXAMINATION): the parent LC/Confirmation's own plain `BalanceSnapshot` at that same moment —
+    exactly what `GET /balance-contracts/{id}/balance` would return for the parent if queried live right
+    then, no before/after decoration. Null for a root-level movement (nothing to redirect to) and for
+    movements predating this field.
+
+
+    v1.8.0 (2026-08-17, same day, business-reported gap — live example, LC S02's 3rd event: a plain A3
+    Document Arrival UTILIZE on the LC itself, no direct SG movement, with SG G01 already issued —
+    "the CURRENT EVENT BALANCE SNAPSHOT should be [both LC Balance AND SG Balance]"; final instruction
+    "就是交易當時LC所有的BALANCE的拍照存檔"): new `BalanceMovement.acceptanceEventSnapshot`/
+    `sgEventSnapshot` — ADDITIONAL to `eventSnapshot`/`rootEventSnapshot` above, never a replacement.
+    Populated whenever exactly ONE Acceptance/Shipping Guarantee contract exists under this movement's
+    own root LC/Confirmation (two or more is ambiguous — left null), excluding when this movement's own
+    contract already IS that type (`eventSnapshot` already covers it). Each is the sibling's own CURRENT
+    plain balance, captured server-side at `POST /balance-movements`/`POST /balance-movements/{id}/release`
+    time — a deliberate correction from an initial same-day implementation that fetched this live when
+    later viewed; business-confirmed it must be captured/persisted AT TRANSACTION TIME instead, matching
+    every other snapshot field in this contract. `sgEventSnapshot` is Import-side only (Shipping
+    Guarantee has no Export equivalent). Null for movements predating this field.
+  version: "1.8.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1138,6 +1176,49 @@ components:
             from releasedBy/releasedAt: submitting never transitions status
             — the movement stays PENDING until the Checker's own /release.
         makerSubmittedAt: { type: string, format: date-time, nullable: true }
+        eventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.6.0, business instruction 2026-08-17 ("PENDING XOR APPROVED... 只存PENDING 或 APPROVED
+            其中一個") — the same BalanceSnapshot shape GET /balance-movements/{id}/balance-as-of
+            computes on demand, captured once server-side and persisted here instead: written at
+            POST /balance-movements (reflecting this movement's own still-PENDING contribution) and
+            OVERWRITTEN at POST /balance-movements/{id}/release (reflecting the finalized/RELEASED
+            state) — never both at once, always the snapshot as of this movement's CURRENT status.
+            Left untouched by reject()/cancel() (out of scope). Null for movements created before this
+            field existed. Callers should prefer this field over a separate balance-as-of call when
+            already holding the movement (e.g. from the Event Timeline); balance-as-of remains the
+            correct fallback for pre-existing movements with a null eventSnapshot. ALWAYS this
+            movement's own contract's own balance — never the parent's (see rootEventSnapshot below).
+        rootEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.7.0, business instruction 2026-08-17 ("REFER TO DB S01", then simplified — "不複雜 就是
+            交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT
+            BALANCE SNAPSHOT") — populated ONLY for a child-ledger movement (SHGT, IPLC_ACCEPTANCE,
+            EPLC_ACCEPTANCE, EPLC_EXAMINATION): the PARENT LC/Confirmation's own plain BalanceSnapshot,
+            captured at the same PENDING/RELEASED moment as eventSnapshot above — exactly what
+            GET /balance-contracts/{id}/balance would return for the parent if queried live right then.
+            ADDITIONAL to eventSnapshot, never a replacement. Null for a root-level movement (nothing to
+            redirect to) and for movements predating this field.
+        acceptanceEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.8.0, business instruction 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔") — the ONE
+            Acceptance contract's own CURRENT plain BalanceSnapshot under this movement's own root LC/
+            Confirmation, captured server-side ONLY when exactly one such contract exists (two or more is
+            ambiguous — left null). Null when this movement's own contract already IS an Acceptance
+            (eventSnapshot already covers it), when none/multiple exist, or for movements predating this
+            field. ADDITIONAL to eventSnapshot/rootEventSnapshot, never a replacement.
+        sgEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.8.0 — same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract
+            instead. Import-side only (Shipping Guarantee has no Export equivalent).
 
     BalanceMovementCreateRequest:
       type: object

@@ -191,6 +191,49 @@ export interface BalanceMovement {
    */
   makerSubmittedBy?: string | null;
   makerSubmittedAt?: string | null;
+  /**
+   * Business instruction 2026-08-17 ("建議把交易當時(PENDING XOR APPROVED) 交易時的Current Balance
+   * 存檔 VIEW EVENTS時 直接抓取為EVENT SNAPSHOT" / "只存PENDING 或 APPROVED 其中一個", later simplified
+   * to "不複雜 就是交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB ==
+   * EVENT BALANCE SNAPSHOT") — THIS movement's own contract's own balance, the exact same plain
+   * BalanceSnapshot shape/values GET /balance-contracts/{id}/balance (Look Up Current Balance) would
+   * return for this same contract at this same moment — captured once and persisted here instead:
+   * written at createMovement() (reflecting this movement's own still-PENDING contribution) and
+   * OVERWRITTEN at release() (reflecting the finalized/RELEASED state) — never both at once, always the
+   * snapshot as of this movement's current status. Always this movement's OWN contract — see
+   * BalanceMovement.rootEventSnapshot below for the separate, additional parent-contract capture on a
+   * child-ledger movement (SHGT/Acceptance/EPLC_EXAMINATION). Null for movements created before this
+   * field existed (pre-migration rows) and for reject()/cancel() (out of scope per business instruction
+   * — those transitions leave whatever was captured at Create). Same "computed once, persisted
+   * immutably, never recomputed at inquiry time" posture as contingentAccountEntry above.
+   */
+  eventSnapshot?: BalanceSnapshot | null;
+  /**
+   * 2026-08-17 ("REFER TO DB S01" business-reported gap, then "不複雜 就是...SAVED TO DB == EVENT
+   * BALANCE SNAPSHOT") — set ONLY on a child-ledger movement (SHGT, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE,
+   * EPLC_EXAMINATION — see BalanceService.resolveParentContract's own doc comment): the PARENT LC/
+   * EPLC_CONFIRMATION's own plain balance, captured at the exact same moment as eventSnapshot above —
+   * exactly what Look Up Current Balance's own "LC tab" would show for the parent if queried live right
+   * then. Additive, never a replacement for eventSnapshot (which always stays this movement's own
+   * contract) — Inquire Events' Balance Tabs read whichever of the two applies per tab (see
+   * inquire-events.service.ts's own doc comment). Null for a root-level movement (IPLC_LC/EPLC_LC/
+   * EPLC_CONFIRMATION — there is no parent to redirect to) and for movements predating this field.
+   */
+  rootEventSnapshot?: BalanceSnapshot | null;
+  /**
+   * 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔" — a snapshot of ALL the LC family's balances at
+   * transaction time, saved to DB; business-confirmed live example, LC S02's 3rd event — a plain A3
+   * Document Arrival UTILIZE with no direct SG movement, still needs SG G01's own balance captured too)
+   * — the ONE Acceptance contract's own CURRENT plain balance under this movement's own root LC/
+   * Confirmation, captured ONLY when exactly one such contract exists (two or more is ambiguous — left
+   * null, same posture Inquire Events' own Balance Tabs use). Null when this movement's own contract
+   * already IS an Acceptance (eventSnapshot already covers it), when the root has no Acceptance yet, when
+   * more than one exists, or for movements predating this field. See
+   * BalanceService.captureSiblingSnapshots's own doc comment for the full capture rule.
+   */
+  acceptanceEventSnapshot?: BalanceSnapshot | null;
+  /** Same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only — SHGT has no Export equivalent). */
+  sgEventSnapshot?: BalanceSnapshot | null;
 }
 
 export interface BalanceSnapshot {

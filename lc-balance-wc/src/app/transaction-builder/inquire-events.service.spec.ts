@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { InquireEventsService } from './inquire-events.service';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 
@@ -59,6 +59,7 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
     listMovements: jest.fn(() => of([] as BalanceMovement[])),
     catalog: jest.fn(() => of(emptyCatalog())),
     getBalanceAsOfMovement: jest.fn(() => of(makeSnapshot())),
+    getSnapshot: jest.fn(() => of(makeSnapshot())),
     ...overrides,
   } as unknown as BalanceComponentApiService;
 }
@@ -211,73 +212,308 @@ describe('InquireEventsService', () => {
     });
   });
 
-  // Inquire Events (2026-08-17, user-requested, simplified same day — "VIEW EVENT 只需 EVENT SNAPSHOT
-  // 即可") — exactly ONE point-in-time snapshot per Event, for the ledger it actually belongs to.
-  describe('selectEvent — selectedEventSnapshot (Event Snapshot)', () => {
-    it('fetches the snapshot for the event\'s own movement via getBalanceAsOfMovement() (exact, same-contract, no cross-contract cutoff needed)', () => {
+  /**
+   * 2026-08-17, Balance Tabs (third revision — precise user spec, confirmed via AskUserQuestion): up to
+   * 3 tabs, gated purely by the root LC's own product type/tenor (selectedEventIsUsanceLc/
+   * selectedEventHasSg), a child tab (Acceptance/SG) populated ONLY when the selected Event belongs to
+   * that specific child.
+   */
+  describe('selectEvent — Balance Tabs (tenor/side gating)', () => {
+    it('Import Sight LC: exactly 2 tabs (LC, SG) — no Acceptance tab at all', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
+      expect(svc.selectedEventTabs.map((t) => t.key)).toEqual(['LC', 'SG']);
+    });
+
+    it('Import Usance LC: exactly 3 tabs (LC, Acceptance, SG)', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE' });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
+      expect(svc.selectedEventTabs.map((t) => t.key)).toEqual(['LC', 'ACCEPTANCE', 'SG']);
+    });
+
+    it('Export Sight Confirmation: exactly 1 tab (Confirmed LC Balance) — tab strip stays hidden (length <= 1)', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.side = 'EXPORT';
+      svc.rootContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SIGHT' });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
+      expect(svc.selectedEventTabs.map((t) => t.key)).toEqual(['LC']);
+      expect(svc.selectedEventTabs[0].label).toBe('Confirmed LC Balance');
+    });
+
+    it('Export Usance Confirmation: exactly 2 tabs (Confirmed LC Balance, Acceptance Balance) — never SG (Export has no Shipping Guarantee)', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.side = 'EXPORT';
+      svc.rootContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE' });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
+      expect(svc.selectedEventTabs.map((t) => t.key)).toEqual(['LC', 'ACCEPTANCE']);
+      expect(svc.selectedEventTabs[1].label).toBe('Confirmed LC Acceptance Balance');
+    });
+
+    it('a null/unset tenorType is treated as NOT Usance — Acceptance tab absent', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: null });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
+      expect(svc.selectedEventTabs.map((t) => t.key)).toEqual(['LC', 'SG']);
+    });
+  });
+
+  describe('selectEvent — Balance Tab population ("only the one the selected Event belongs to")', () => {
+    it('an LC-level event populates ONLY the LC tab (own eventSnapshot, own impact) — Acceptance/SG tabs stay null/no impact', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE', naturalKey: { lcNumber: 'S001' } });
+      const lcSnapshot = makeSnapshot({ confirmedBalance: '100000' });
+      const movement = makeMovement({ eventSnapshot: lcSnapshot, balanceBefore: '0', balanceAfter: '100000' });
+
+      svc.selectEvent({ movement, contract: svc.rootContract });
+
+      const lcTab = svc.selectedEventTabs.find((t) => t.key === 'LC')!;
+      expect(lcTab.snapshot).toBe(lcSnapshot);
+      expect(lcTab.impact).toEqual({ before: '0', after: '100000' });
+      expect(svc.selectedEventTabs.find((t) => t.key === 'ACCEPTANCE')!.snapshot).toBeNull();
+      expect(svc.selectedEventTabs.find((t) => t.key === 'ACCEPTANCE')!.impact).toBeNull();
+      expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.snapshot).toBeNull();
+      expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.impact).toBeNull();
+      expect(svc.selectedEventTab).toBe('LC');
+    });
+
+    it('an SHGT event populates the SG tab (own eventSnapshot, own impact) AND the LC tab from movement.rootEventSnapshot, with NO impact on the LC tab', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S001' } });
+      const sgContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
+      const sgSnapshot = makeSnapshot({ confirmedBalance: '32000' });
+      const rootSnapshot = makeSnapshot({ confirmedBalance: '100000', offBalanceExposure: '32000', tightAvailableBalance: '68000' });
+      const movement = makeMovement({ eventSnapshot: sgSnapshot, rootEventSnapshot: rootSnapshot, balanceBefore: '0', balanceAfter: '32000' });
+
+      svc.selectEvent({ movement, contract: sgContract });
+
+      const sgTab = svc.selectedEventTabs.find((t) => t.key === 'SG')!;
+      expect(sgTab.snapshot).toBe(sgSnapshot);
+      expect(sgTab.impact).toEqual({ before: '0', after: '32000' });
+      expect(sgTab.title).toBe('Shipping Guarantee Balance — LC S001 / SG G01');
+
+      const lcTab = svc.selectedEventTabs.find((t) => t.key === 'LC')!;
+      expect(lcTab.snapshot).toBe(rootSnapshot);
+      // No impact on the redirected LC tab — a different contract's own before/after would be wrong here.
+      expect(lcTab.impact).toBeNull();
+
+      expect(svc.selectedEventTab).toBe('SG');
+    });
+
+    it('an Acceptance event populates the Acceptance tab (own ledger) AND the LC tab from rootEventSnapshot', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE', naturalKey: { lcNumber: 'S001' } });
+      const acceptanceContract = makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
+      const ownSnapshot = makeSnapshot({ confirmedBalance: '0' });
+      const rootSnapshot = makeSnapshot({ confirmedBalance: '100000' });
+      const movement = makeMovement({ eventSnapshot: ownSnapshot, rootEventSnapshot: rootSnapshot });
+
+      svc.selectEvent({ movement, contract: acceptanceContract });
+
+      const acceptanceTab = svc.selectedEventTabs.find((t) => t.key === 'ACCEPTANCE')!;
+      expect(acceptanceTab.snapshot).toBe(ownSnapshot);
+      expect(acceptanceTab.title).toBe('Acceptance Balance — LC S001 / IB IB01');
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBe(rootSnapshot);
+      expect(svc.selectedEventTab).toBe('ACCEPTANCE');
+    });
+
+    it('an EPLC_EXAMINATION event has no dedicated tab of its own — only the LC/Confirmed LC tab populates, from rootEventSnapshot', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S001' } });
+      const examContract = makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E01' } });
+      const rootSnapshot = makeSnapshot({ confirmedBalance: '100000', presentDocsEarmarkPending: '40000' });
+      const movement = makeMovement({ eventSnapshot: makeSnapshot(), rootEventSnapshot: rootSnapshot });
+
+      svc.selectEvent({ movement, contract: examContract });
+
+      expect(svc.selectedEventTabs.map((t) => t.key)).toEqual(['LC']);
+      expect(svc.selectedEventTabs[0].snapshot).toBe(rootSnapshot);
+      expect(svc.selectedEventTab).toBe('LC');
+    });
+  });
+
+  describe('selectEvent — legacy-data fallback (getBalanceAsOfMovement)', () => {
+    it('reads movement.eventSnapshot directly for the LC tab when present — no API call at all', () => {
       const api = makeApi();
       const svc = new InquireEventsService(api);
-      const contract = makeContract({ instrumentType: 'IPLC_LC' });
-      const movement = makeMovement({ movementId: 'mv-1' });
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const stored = makeSnapshot({ confirmedBalance: '77000' });
+      const movement = makeMovement({ movementId: 'mv-stored', eventSnapshot: stored });
 
-      svc.selectEvent({ movement, contract });
+      svc.selectEvent({ movement, contract: svc.rootContract });
 
-      expect(api.getBalanceAsOfMovement).toHaveBeenCalledWith('mv-1');
-      expect(svc.selectedEventSnapshot).toEqual(makeSnapshot());
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBe(stored);
+      expect(api.getBalanceAsOfMovement).not.toHaveBeenCalled();
     });
 
-    it('title is "Event Snapshot — {label} — LC {lc}" for a plain LC contract', () => {
-      const svc = new InquireEventsService(makeApi());
-      const contract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } });
-      svc.selectEvent({ movement: makeMovement(), contract });
-      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — LC Balance — LC S001');
+    it('falls back to getBalanceAsOfMovement() for the matching own-ledger tab when eventSnapshot is null (pre-migration data), leaving other tabs untouched', () => {
+      const api = makeApi();
+      const svc = new InquireEventsService(api);
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S001' } });
+      const sgContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
+      const movement = makeMovement({ movementId: 'mv-legacy', eventSnapshot: null, rootEventSnapshot: null });
+
+      svc.selectEvent({ movement, contract: sgContract });
+
+      expect(api.getBalanceAsOfMovement).toHaveBeenCalledWith('mv-legacy');
+      expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.snapshot).toEqual(makeSnapshot());
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBeNull();
     });
 
-    it('title appends "/ IB {ib}" for an Acceptance contract', () => {
-      const svc = new InquireEventsService(makeApi());
-      const contract = makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
-      svc.selectEvent({ movement: makeMovement(), contract });
-      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — Acceptance Balance — LC S001 / IB IB01');
-    });
-
-    it('title appends "/ SG {sg}" for a Shipping Guarantee contract', () => {
-      const svc = new InquireEventsService(makeApi());
-      const contract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
-      svc.selectEvent({ movement: makeMovement(), contract });
-      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — Shipping Guarantee Balance — LC S001 / SG G01');
-    });
-
-    it('falls back to the bare instrumentType in the title for EPLC_EXAMINATION (not one of BALANCE_SNAPSHOT_LABEL\'s own keys — MEMO_ONLY, never a real Balance Component) — still renders, no crash', () => {
-      const svc = new InquireEventsService(makeApi());
-      const contract = makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E01' } });
-      svc.selectEvent({ movement: makeMovement(), contract });
-      expect(svc.selectedEventSnapshotTitle).toBe('Event Snapshot — EPLC_EXAMINATION — LC S001 / IB E01');
-    });
-
-    it('a getBalanceAsOfMovement() failure sets selectedEventSnapshot to null rather than leaving a stale value from a prior selection', () => {
+    it('a fallback failure leaves the tab snapshot null rather than throwing', () => {
       const api = makeApi({ getBalanceAsOfMovement: jest.fn(() => throwError(() => new Error('boom'))) });
       const svc = new InquireEventsService(api);
-      svc.selectEvent({ movement: makeMovement(), contract: makeContract() });
-      expect(svc.selectedEventSnapshot).toBeNull();
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const movement = makeMovement({ eventSnapshot: null });
+
+      svc.selectEvent({ movement, contract: svc.rootContract });
+
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBeNull();
     });
 
-    it('a second selectEvent() call replaces the previous snapshot, not merges with it', () => {
+    it('a stale fallback response is discarded once a different Event has since been selected (race guard)', () => {
+      const firstResponse = new Subject<BalanceSnapshot>();
       const api = makeApi({
-        getBalanceAsOfMovement: jest.fn((movementId: string) => of(makeSnapshot({ confirmedBalance: movementId }))),
+        getBalanceAsOfMovement: jest.fn((movementId: string) => (movementId === 'mv-first' ? firstResponse.asObservable() : of(makeSnapshot({ confirmedBalance: 'mv-second' })))),
       });
       const svc = new InquireEventsService(api);
-      svc.selectEvent({ movement: makeMovement({ movementId: 'mv-first' }), contract: makeContract() });
-      expect(svc.selectedEventSnapshot?.confirmedBalance).toBe('mv-first');
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
 
-      svc.selectEvent({ movement: makeMovement({ movementId: 'mv-second' }), contract: makeContract() });
-      expect(svc.selectedEventSnapshot?.confirmedBalance).toBe('mv-second');
+      svc.selectEvent({ movement: makeMovement({ movementId: 'mv-first', eventSnapshot: null }), contract: svc.rootContract });
+      svc.selectEvent({ movement: makeMovement({ movementId: 'mv-second', eventSnapshot: null }), contract: svc.rootContract });
+      firstResponse.next(makeSnapshot({ confirmedBalance: 'mv-first-stale' }));
+
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot?.confirmedBalance).toBe('mv-second');
+    });
+  });
+
+  /**
+   * Business-confirmed live example 2026-08-17 (LC S02, 3rd event — a plain A3 Document Arrival UTILIZE
+   * with no direct SG movement, SG G01 already existing under the LC): "the CURRENT EVENT BALANCE
+   * SNAPSHOT should be [both LC Balance AND SG Balance]" — confirmed via AskUserQuestion: live current
+   * balance (api.getSnapshot()), not a historical "as of this event" computation.
+   */
+  describe('selectEvent — sibling Acceptance/SG snapshots (movement.acceptanceEventSnapshot/sgEventSnapshot, persisted server-side)', () => {
+    it('a root-level event (LC UTILIZE, no direct SG movement) reads the SG tab straight off movement.sgEventSnapshot — no API call at all', () => {
+      const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S02' } });
+      const api = makeApi();
+      const svc = new InquireEventsService(api);
+      svc.rootContract = root;
+
+      const sgSnapshot = makeSnapshot({ balanceContractId: 'bc-sg', confirmedBalance: '12345', availableBalance: '12345' });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        eventSnapshot: makeSnapshot({ offBalanceExposure: '12345' }),
+        sgEventSnapshot: sgSnapshot,
+      });
+      svc.selectEvent({ movement: utilizeMovement, contract: root });
+
+      expect(api.getSnapshot).not.toHaveBeenCalled();
+      const sgTab = svc.selectedEventTabs.find((t) => t.key === 'SG')!;
+      expect(sgTab.snapshot).toBe(sgSnapshot);
+      expect(sgTab.title).toBe('Shipping Guarantee Balance — LC S02');
+      // Still no impact on this tab — it's a DIFFERENT contract's own balance than the selected event's own.
+      expect(sgTab.impact).toBeNull();
+      // The LC tab itself is unaffected — still the event's own eventSnapshot.
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBe(utilizeMovement.eventSnapshot);
+    });
+
+    it('mirrors the same read for the Acceptance tab — movement.acceptanceEventSnapshot, no API call', () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE', naturalKey: { lcNumber: 'S04' } });
+      const api = makeApi();
+      const svc = new InquireEventsService(api);
+      svc.rootContract = root;
+
+      const acceptanceSnapshot = makeSnapshot({ balanceContractId: 'bc-acc', confirmedBalance: '30000' });
+      svc.selectEvent({ movement: makeMovement({ movementType: 'UTILIZE', acceptanceEventSnapshot: acceptanceSnapshot }), contract: root });
+
+      expect(api.getSnapshot).not.toHaveBeenCalled();
+      const acceptanceTab = svc.selectedEventTabs.find((t) => t.key === 'ACCEPTANCE')!;
+      expect(acceptanceTab.snapshot).toBe(acceptanceSnapshot);
+      expect(acceptanceTab.impact).toBeNull();
+    });
+
+    it('a null sgEventSnapshot (ambiguous — two or more SGs, or none) leaves the tab empty', () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S03' } });
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = root;
+
+      svc.selectEvent({ movement: makeMovement({ movementType: 'UTILIZE', sgEventSnapshot: null }), contract: root });
+
+      expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.snapshot).toBeNull();
+    });
+  });
+
+  /**
+   * Business instruction 2026-08-17 ("EPLC_EXAMINATION should carry E01/E02 as the Secondary Reference
+   * so that each Examination event can be clearly linked to its subsequent Honour/Acceptance event") —
+   * surfaces EPLC_EXAMINATION's own natural key (ibNumber, "EB Number") as a Secondary Ref column value,
+   * since B4's own Honour/Accept later carries that SAME value as its own sourceTransactionRef (already
+   * shown in the existing Reference column) — letting a reader visually connect "Examination E01" to
+   * "Honour E01" in the merged Event Timeline.
+   */
+  describe('secondaryReferenceFor', () => {
+    it('returns the ibNumber for an EPLC_EXAMINATION event', () => {
+      const svc = new InquireEventsService(makeApi());
+      const examContract = makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'U02', ibNumber: 'E01' } });
+      expect(svc.secondaryReferenceFor({ movement: makeMovement(), contract: examContract })).toBe('E01');
+    });
+
+    it('returns "—" for an EPLC_EXAMINATION event with no ibNumber recorded (should not happen in practice, but stays non-throwing)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const examContract = makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'U02' } });
+      expect(svc.secondaryReferenceFor({ movement: makeMovement(), contract: examContract })).toBe('—');
+    });
+
+    it('returns "—" for every other instrumentType, including the root EPLC_CONFIRMATION and a later HONOUR event that already carries E01 via the existing Reference column', () => {
+      const svc = new InquireEventsService(makeApi());
+      const cnfContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'U02' } });
+      expect(svc.secondaryReferenceFor({ movement: makeMovement({ movementType: 'ISSUE' }), contract: cnfContract })).toBe('—');
+      expect(svc.secondaryReferenceFor({ movement: makeMovement({ movementType: 'HONOUR', sourceTransactionRef: 'E01' }), contract: cnfContract })).toBe('—');
+    });
+
+    it('returns "—" for an IPLC_ACCEPTANCE event — not asked for yet, unlike EPLC_EXAMINATION/SHGT', () => {
+      const svc = new InquireEventsService(makeApi());
+      const acceptanceContract = makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S01', ibNumber: 'IB01' } });
+      expect(svc.secondaryReferenceFor({ movement: makeMovement(), contract: acceptanceContract })).toBe('—');
+    });
+
+    // 2026-08-17 ("the corresponding Shipping Guarantee Number (SG Number) should be displayed so the
+    // user can identify which Shipping Guarantee the event belongs to") — reproduces the business's own
+    // worked example exactly: LC S01, SHGT ISSUE 22345, "SG G01".
+    it('returns "SG {sgNumber}" for an SHGT event', () => {
+      const svc = new InquireEventsService(makeApi());
+      const sgContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S01', sgNumber: 'G01' } });
+      expect(svc.secondaryReferenceFor({ movement: makeMovement(), contract: sgContract })).toBe('SG G01');
+    });
+
+    it('returns "—" for an SHGT event with no sgNumber recorded (should not happen in practice, but stays non-throwing)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const sgContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S01' } });
+      expect(svc.secondaryReferenceFor({ movement: makeMovement(), contract: sgContract })).toBe('—');
+    });
+  });
+
+  describe('selectEventTab', () => {
+    it('switches the active tab; activeEventTab getter reflects it', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE' });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
+      expect(svc.selectedEventTab).toBe('LC');
+
+      svc.selectEventTab('SG');
+
+      expect(svc.selectedEventTab).toBe('SG');
+      expect(svc.activeEventTab?.key).toBe('SG');
     });
   });
 
   describe('closeEvent', () => {
     it('clears the selection back to its initial empty state', () => {
       const svc = new InquireEventsService(makeApi());
-      svc.selectEvent({ movement: makeMovement(), contract: makeContract() });
+      svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE' });
+      svc.selectEvent({ movement: makeMovement(), contract: svc.rootContract });
       expect(svc.selectedEvent).not.toBeNull();
 
       svc.closeEvent();
@@ -286,8 +522,9 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventFunction).toBeNull();
       expect(svc.selectedEventFields).toEqual([]);
       expect(svc.selectedEventModel).toEqual({});
-      expect(svc.selectedEventSnapshotTitle).toBe('');
-      expect(svc.selectedEventSnapshot).toBeNull();
+      expect(svc.selectedEventTabs).toEqual([]);
+      expect(svc.selectedEventTab).toBe('LC');
+      expect(svc.activeEventTab).toBeNull();
     });
   });
 });

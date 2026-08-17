@@ -145,6 +145,56 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     });
   });
 
+  describe('formLocked / displayFields — UX improvement 2026-08-17, "fields become read-only once Submit succeeds"', () => {
+    it('formLocked is false and displayFields === fields (same reference, no read-only wrapping) before any Submit', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      expect(c.formLocked).toBe(false);
+      expect(c.displayFields).toBe(c.fields);
+    });
+
+    it('formLocked stays false, and displayFields stays editable, after a validation-only failure (submitError set, submitResult still null)', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      c.submitError = 'Amount is required.';
+      expect(c.formLocked).toBe(false);
+      expect(c.displayFields).toBe(c.fields);
+    });
+
+    it('formLocked becomes true once submitResult is set (a real movement was created), and displayFields is a read-only-decorated copy — every field disabled, expressions stripped', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      c.submitResult = movement({ movementId: 'mv-new', status: 'PENDING' });
+      expect(c.formLocked).toBe(true);
+      expect(c.displayFields).not.toBe(c.fields);
+      expect(c.displayFields.length).toBe(c.fields.length);
+      for (const f of c.displayFields) {
+        expect(f.props?.disabled).toBe(true);
+        expect(f.expressions).toBeUndefined();
+      }
+    });
+
+    it('formLocked resets to false, and displayFields becomes editable again, once selectFunction() moves to a different function', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      c.submitResult = movement({ movementId: 'mv-new', status: 'PENDING' });
+      expect(c.formLocked).toBe(true);
+
+      c.selectFunction(fn('A2'));
+      expect(c.formLocked).toBe(false);
+      expect(c.displayFields).toBe(c.fields);
+    });
+
+    it('formLocked stays true on a partial compound-submit failure that still populated submitResult from the primary leg', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      c.submitResult = movement({ movementId: 'mv-primary', status: 'PENDING' });
+      c.submitError = 'The secondary leg failed to post.';
+      expect(c.formLocked).toBe(true);
+      expect(c.displayFields).not.toBe(c.fields);
+    });
+  });
+
   describe('activeLookup* getters — LC vs ACCEPTANCE vs SG tab', () => {
     function withLookupResult(c: TransactionBuilderComponent, overrides: Partial<BalanceContract> = {}) {
       c.lookUp.lookupResult = { contract: contract(overrides), snapshot: snapshot() };

@@ -1,3 +1,118 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+**Three-process dev setup** — Angular app (`ng serve`, :4200), `backend/` Express 中台 orchestrator
+(:4300), `microservices/balance-component/` Express/TS ledger (:4100). `proxy.conf.json` forwards
+`/api/*` → :4300 and `/balance-component/*` → :4100. If a backend isn't running, the corresponding UI tab
+400s or hangs with no obvious hint — check the process before assuming a bug.
+
+```bash
+npm install
+cd backend && npm install && cd ..
+cd microservices/balance-component && npm install && cd ../..
+
+npm run dev:all   # all three concurrently (concurrently, color-coded per process)
+```
+
+Or individually: `microservices/balance-component && npm run dev` (`node --watch -r ts-node/register
+src/server.ts`, auto-restarts on save), `backend && npm start`, `npm start` (`ng serve --open`).
+
+**Testing** — all three sub-projects (Angular app, `backend/`, `microservices/balance-component/`) have
+their own independent Jest suite, each gated at a **95%** `coverageThreshold` (statements/branches/
+functions/lines) in its own `jest.config.js`. Per this file's own standing rule below, run and confirm
+all three green before calling a change complete, not just the one you touched:
+
+```bash
+# Angular app (repo root)
+npm test                                       # jest — src/app/**/*.ts
+npm run test:coverage                          # jest --coverage
+npx tsc -p tsconfig.app.json --noEmit          # typecheck (no dedicated "typecheck" script here)
+
+# backend/
+cd backend && npm test && npm run test:coverage
+
+# microservices/balance-component/
+cd microservices/balance-component
+npm run typecheck   # tsc --noEmit
+npm test             # test/unit/ — domain logic, schema, full case-walkthroughs
+npm run test:coverage
+npm run build         # tsc -p tsconfig.build.json → dist/
+```
+
+Single test / single spec, same syntax in all three: `npm test -- <file-or--t-pattern>` (e.g. `npm test
+-- transaction-builder.component.selection.spec.ts` or `npm test -- -t "carriedCurrency"`).
+
+**Never let the two Jest configs (Angular app vs. the microservice) cross** — always `cd` into
+`microservices/balance-component` before running its own Jest commands. This project's own root
+`tsconfig.json` (like the Angular app's `tsconfig.spec.json`) sets `noPropertyAccessFromIndexSignature`;
+mixing the two configs surfaces spurious TS4111 errors that look like a real break but aren't.
+
+**Lint / format**: `npm run lint` and `npm run format:check` exist in all three sub-projects
+(`eslint.config.js` + `.prettierrc.json`, baseline-only — not wired into CI or `npm test`).
+
+## High-level architecture
+
+Three independently-versioned pieces talking over HTTP, not a shared in-process app:
+
+- **`src/app/business-case-runner/`** — runs a whole registered Business Case (Import/Export, via
+  `backend/`'s declarative registry) in one click; `balance-case-api.service.ts` is its backend client.
+- **`src/app/transaction-builder/`** — the lower-level Maker/Checker form that posts individual
+  `BalanceMovement`s straight against the microservice, bypassing the Business Case Registry. This is
+  where nearly all UI logic lives. `transaction-builder.component.ts` was, earlier in this project's
+  history, a 2,800+-line "God Component" (still-open finding BAL-003 in `Quality-report-balance.md`) that
+  has since been substantially decomposed via a sequence of Dependency-Inversion/pure-function
+  extractions documented in this file's own decision log below — `checker-actions.service.ts` (Checker
+  release/reject/cancel), `maker-submit.service.ts` (the 5 Maker submission shapes), `look-up-panel.service.ts`
+  (the "Look Up Current Balance" panel), `catalog-picker.service.ts` (the 3 paginated pickers' fetch/page
+  bookkeeping, backed by `paged-list-state.ts`), `inquire-events.service.ts` (the Inquire Events merged
+  timeline), and three pure-function modules — `function-policy.ts` (derived getters), `builder-fields.ts`
+  (the shared Formly field factory every A1–A9/B1–B5 function uses), `submit-rules.ts`
+  (`validateSubmit`/`buildSubmitRequest`). The component itself is now the orchestration/view-binding
+  layer over these, not the owner of their logic. Test coverage for this file is split across 4 spec
+  files by concern, not 1:1 with source files — `.spec.ts` (function/catalog selection),
+  `.selection.spec.ts` (contract/movement selection), `.actions.spec.ts` (submit/release/reject/checker
+  actions), `.gaps.spec.ts` (accessor/edge-case gaps) — plus one dedicated spec file per extracted
+  service/module.
+- **`backend/server.js`** — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
+  declarative registry of Import/Export Business Cases it replays (`createAndRelease()` collapses the
+  common create-then-release step pair; `RELEASE_SHAPED_STEP_TYPES` dispatch table covers
+  `release`/`makerSubmit`/`acknowledge`).
+- **`microservices/balance-component/`** — the real ledger:
+  - `src/service/balanceService.ts` orchestrates the two Express routers in `src/routes/`
+    (`balanceContracts.ts`: lookup/catalog/balance/movement-history; `balanceMovements.ts`: post/release/
+    reject/cancel/acknowledge/maker-submit — a Maker-Checker lifecycle per movement).
+  - `src/domain/` — the actual accounting/exposure logic (`balanceDerivation.ts`, `tolerance.ts`,
+    `statusTransition.ts`, `amendDecrease.ts`, `offBalanceExposure.ts`, `shgtRedeem.ts`,
+    `contingentAccountEntry.ts`), each cited to `analysis/TF_Balance_Component_Spec-{en,zh}.docx`/
+    `TF_Contingent_Liability_Lifecycle-{en,zh}.docx` section numbers — see this file's own "Confirmed
+    Architecture Decisions" section below before touching any of it.
+  - `src/db/` — **Node's built-in `node:sqlite` (`DatabaseSync`)**, not `better-sqlite3` (no C++ build
+    toolchain on this machine). `':memory:'` for tests, a real file otherwise. Schema changes go through
+    `src/db/migrations.ts`'s own `schema_migrations`-tracked `Migration[]` array (`PRAGMA table_info`
+    existence checks), never a raw `ALTER TABLE`. **Known limitation**: SQLite locks at the whole-
+    database-file level even under WAL — cannot demonstrate true per-instrument non-blocking concurrency;
+    flagged as a must-replace (PostgreSQL row-level locking) before that's validated in production, not a
+    silently-accepted gap.
+  - `src/store/` — `balanceContractStore.ts`/`balanceMovementStore.ts`, the SQL-backed persistence layer
+    the service reads/writes through exclusively (no other module touches SQL directly).
+- **`analysis/`** — source-of-truth spec documents: `balance-component-api.yaml` (microservice OAS),
+  `balance-component-channel-api.yaml` (a separate, thinner Web/Mobile Channel-API OAS façade in named
+  business-function vocabulary), `TF_Balance_Component_Spec-{en,zh}.docx`,
+  `TF_Balance_Component_Mapping-{en,zh}.xlsx`, `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`, and
+  `contingent-liability-ledger.html` (a self-contained Dr/Cr account-pair reference). The two `.docx`
+  pairs are binary and cannot be read/edited by this tooling — this file's own decision log is the actual
+  source of truth for what changed and why in cases where a `.docx` would normally need updating too.
+
+No README.md, `.cursor/rules/`, `.cursorrules`, or repo-level `.github/copilot-instructions.md` exist in
+this project as of this writing. A global OpenAI Codex config was found at `~/.codex/config.toml` — reply
+`/import` to scan what's importable from it (MCP servers, slash commands, subagents, skills,
+instructions), then `/import --yes=<digest>` to apply; no Gemini CLI config was found.
+
+---
+
 You are a professional **Trade Finance and Contingent Liability Balance Solutions expert**, holding a **CITF (Certificate in International Trade and Finance)** qualification, with strong expertise in both **banking business processes and modern financial technology architecture**.
 
 In addition to deep knowledge of **Trade Finance, Payments, Accounting, Settlement, Clearing, and FX processing**, you possess extensive technical expertise and relevant certifications or hands-on experience in areas including **HTML, Stylesheets (CSS), Web Components, Angular, Formly, JavaScript, TypeScript, Node.js, Microservices Architecture, REST APIs, OpenAPI/Swagger, Kubernetes, CKA, CKS, Oracle Database DBA Certification, Microsoft Azure Database Administrator Associate (DP-300), and PostgreSQL / EDB PostgreSQL Certification**.
@@ -2960,3 +3075,370 @@ everything else in this Inquire Events feature — deliberately scoped as a sepa
 its own explicit sign-off, not bolted on reactively. If picked up later: the natural capture point is
 `release()` (where `balanceBefore`/`balanceAfter` are already computed today), since Confirmed Balance
 itself only actually closes at Release, not Create.
+
+**Superseded by the entry immediately below, same day**: the "Release-only" capture point named just
+above turned out to be half the actual requirement — the user's own follow-up clarified BOTH Create
+(PENDING) and Release (RELEASED) each independently capture/overwrite the one stored snapshot.
+
+## Persisted Event Snapshot on BalanceMovement — Create + Release, one stored column (2026-08-17, same day, third round)
+
+**Business instruction** (verbatim, three successive messages refining the same idea): "也可以把SNAPSHOT
+存檔 到時抓取即可" → "也可以把EVENT SNAPSHOT存檔 到時抓取即可" → "建議把交易當時(PENDING OR APPROVED)
+交易時的Current Balance 存檔 VIEW EVENTS時 直接抓取為EVENT SNAPSHOT OK?" → "建議把交易當時(PENDING XOR
+APPROVED) 交易時的Current Balance 存檔 VIEW EVENTS時 直接抓取為EVENT SNAPSHOT OK?" → "只存PENDING 或
+APPROVED 其中一個". Confirmed via AskUserQuestion: reject()/cancel() are explicitly OUT of scope
+("Create + Release only") — a rejected/cancelled movement's stored snapshot stays whatever it was
+captured at Create.
+
+**Design — reuse over duplication.** `getBalanceSnapshot()`'s own assembly logic (confirmed/available/
+pendingEarmarkTotal, plus the conditional offBalanceExposure/tightAvailableBalance or
+presentDocsEarmarkPending/Approved branches) was extracted into a new private
+`assembleSnapshot(contract, movements, shgtMovements, examinationMovements): BalanceSnapshot` —
+`getBalanceSnapshot()` itself is now a thin wrapper (fetch + eventSeq-cutoff-filter, then call
+`assembleSnapshot()`), unchanged in external behavior. `createMovement()` and `release()` each build
+their own already-correct movement list and call the SAME `assembleSnapshot()` — no separate math, no
+drift risk between the on-demand and persisted code paths (proven equal in tests, see below).
+
+- `createMovement()`: after all sufficiency checks pass, before insert — `assembleSnapshot(contract,
+  [...existingMovements, movement], shgtMovements, examinationMovements)`, entirely in-memory
+  (`existingMovements` was already fetched above for the sufficiency checks; the new `movement` isn't
+  inserted yet) — no extra DB read, same "simulate rather than round-trip" posture `release()`'s own
+  `before`/`after` Confirmed-Balance computation already used.
+- `release()`: same posture — `assembleSnapshot(contract, allMovements.map(m => m.movementId ===
+  movementId ? {...m, status: 'RELEASED'} : m), freshShgtMovements, freshExaminationMovements)`, passed
+  into a new `eventSnapshot` param on `BalanceMovementStore.updateStatus()` (`SET ... event_snapshot =
+  COALESCE(@eventSnapshot, event_snapshot)` — omitted/null from every OTHER caller of `updateStatus()`
+  correctly preserves whatever was already there, which is exactly the "don't touch" behavior
+  reject()/cancel() need without any special-casing).
+- Migration `id: 5` (`db/migrations.ts`) — `event_snapshot TEXT`, same `PRAGMA table_info` existence-check
+  pattern as migrations 1–4. `BalanceMovement.eventSnapshot?: BalanceSnapshot | null` added to both
+  `microservices/balance-component/src/types.ts` and the Angular `balance-component-api.service.ts`
+  (hand-kept-in-sync, same convention as every other field on that interface). OAS
+  (`analysis/balance-component-api.yaml`) bumped v1.5.0 → v1.6.0 with the new field. The companion
+  `analysis/balance-component-channel-api.yaml` was deliberately NOT touched — checked its own
+  `ChannelTransaction` schema first and found `makerSubmittedBy`/`makerSubmittedAt`/`referencedTransactionId`
+  (as a response field) were never mirrored there either when THEY were added to the microservice API;
+  only `contingentAccountEntry` was, because it drove a specific channel-client UI need (the Account
+  Entries button). `eventSnapshot` is the same class of internal Maker/Checker bookkeeping field as
+  makerSubmittedAt, not a core channel-facing projection need — following the established precedent
+  rather than my own a priori plan (which had assumed both OAS files needed updating).
+- `InquireEventsService.selectEvent()` (`inquire-events.service.ts`): now prefers
+  `movement.eventSnapshot` directly (zero API call — the movement is already loaded as part of the
+  merged Event Timeline) and falls back to the pre-existing `api.getBalanceAsOfMovement()` call only
+  when it's null (a movement created before this migration). `getBalanceAsOfMovement()`/its route are
+  therefore NOT dead code — they remain the correct path for historical data.
+- Per the AskUserQuestion answer, `reject()`/`cancel()` were deliberately left untouched — their calls
+  into `updateStatus()` simply omit `eventSnapshot`, which the COALESCE above correctly no-ops.
+
+Per the user's own follow-up ("此次如果DB有調整...可以清除舊的RECORDS"), the dev SQLite file's stale
+business data (53 pre-existing movements from earlier sessions/manual testing) was cleared via a direct
+`DELETE FROM balance_movements; DELETE FROM balance_contracts;` against the already-running dev server's
+DB file (WAL mode tolerates a second short-lived connection) rather than restarting any process — the
+running `node --watch` microservice picked up the code changes automatically and kept serving throughout.
+
+**Reused, not duplicated**: `assembleSnapshot()` (new, but factored OUT of existing logic, not new
+logic), `computeConfirmedBalance`/`computeAvailableBalance`/`computeOffBalanceExposure`/
+`computePresentDocsEarmarkPending`/`computePresentDocsEarmarkApproved` (unchanged domain functions),
+the `PRAGMA table_info` migration-guard pattern (migrations.ts), the JSON-serialize-on-write/parse-on-
+read pattern `contingentAccountEntry` established in `balanceMovementStore.ts`, and
+`getBalanceAsOfMovement()` itself (kept alive as the historical-data fallback rather than orphaned).
+
+**Test coverage**: microservice — new `describe('BalanceService — persisted Event Snapshot...')` in
+`test/unit/service/balanceService.test.ts` (createMovement() PENDING capture including the new
+movement's own earmark contribution and proven `toEqual` against `getBalanceSnapshotAsOfMovement()`;
+release() overwrite proven `confirmedBalance` 0→100000; reject() proven to leave the PENDING snapshot
+untouched; an SHGT/parent-LC cross-contract case proving offBalanceExposure is null on the SHGT's own
+snapshot but populated on the parent LC's next event); new HTTP integration `describe` in `app.test.ts`
+(POST create → PENDING snapshot in the response body; POST release → overwritten RELEASED snapshot,
+also visible via the Event Timeline; a later PENDING movement's snapshot proven `toEqual` against a
+live `GET .../balance-as-of` call for the same movement); `migrations.test.ts` updated to assert
+`event_snapshot` is among the columns added on a fresh run. 300/300 microservice tests green,
+99.15/96.55/100/99.43% coverage (new code fully covered; the handful of uncovered lines are pre-existing,
+unrelated to this change). Angular: two new tests in `inquire-events.service.spec.ts` (reads
+`movement.eventSnapshot` directly with `getBalanceAsOfMovement` proven NOT called; falls back to it when
+`eventSnapshot` is null) — 703/703 Angular tests green, 99.73/96.43/99.51/99.77% coverage. `backend/`
+33/33 unaffected (passthrough). `npx tsc -p tsconfig.app.json --noEmit`, `npm run lint` (both projects,
+0 errors, only pre-existing warnings), `npm run build` (microservice `tsc -p tsconfig.build.json`,
+Angular `ng build`) all clean.
+
+**Live in-browser verification, both capture points, with network-tab proof of zero extra round-trips**:
+submitted a fresh A1 (LC SNAP01, 100000 USD), released it — Inquire Events' View showed "EVENT SNAPSHOT
+— LC BALANCE — LC SNAP01", Confirmed Balance "0 → 100000", with `read_network_requests` confirming NO
+`balance-as-of` (or any) request fired for the View click — the stored, RELEASED-state snapshot was read
+directly off the already-loaded movement. Then submitted an A2 AMEND_DECREASE (15000) and left it
+PENDING (no Release) — View showed Confirmed Balance "100000 (still PENDING — not yet affected until
+Released)", Available Balance 85000, Pending Earmark Total -15000 — again zero network requests fired,
+confirming the PENDING-state snapshot captured at Create time (including the new movement's own earmark
+contribution against Available Balance) is what's being read.
+
+## Inquire Events — Balance Tabs (LC/Acceptance/SG, tenor-gated) — supersedes an intermediate single-box redirect (2026-08-17, same day, fourth round)
+
+**Business-reported gap** (live-tested against real DB data, "REFER TO DB S01"): viewing the SG G01 Issue
+event showed its own ledger balance ("EVENT SNAPSHOT — SHIPPING GUARANTEE BALANCE — LC S01 / SG G01",
+Confirmed Balance 0→32000) but not the parent LC's own off-balance-exposure impact — business-marked
+"錯的(X)". First fix attempt (same session, NOT separately logged here since it was superseded before
+this entry was written): redirect the SG/EPLC_EXAMINATION event's own persisted `eventSnapshot` to the
+PARENT's balance instead (`snapshotTargetContract()`), plus a `redirectedImpact` before→after decoration.
+Live-tested against LC S01/SG G01 — this REPLACED the SG's own display with the LC's, i.e. traded one
+missing story for the other. User's precise, revised requirement then arrived (mid-implementation):
+**Balance Tabs** — up to 3 tabs shown together, not one box redirected:
+
+| Side + Tenor | Tabs |
+|---|---|
+| Import, Sight | LC Balance, Shipping Guarantee Balance |
+| Import, Usance | LC Balance, Acceptance Balance, Shipping Guarantee Balance |
+| Export, Sight | Confirmed LC Balance |
+| Export, Usance | Confirmed LC Balance, Acceptance Balance |
+
+Confirmed via AskUserQuestion: a child tab (Acceptance/SG) is populated **only** when the selected Event
+belongs to that specific child ("only the one the selected Event belongs to") — the LC/Confirmed LC tab
+is always populated. Then simplified further, user's own framing: "不複雜 就是交易處理時 Look Up
+Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE SNAPSHOT" — dropped the
+`redirectedImpact` before→after decoration entirely; each tab is the exact plain `BalanceSnapshot`
+`LookUpPanelService`'s own live tabs would show for that same contract at that moment, no synthetic
+polish beyond the pre-existing Confirmed Balance impact (movement.balanceBefore/balanceAfter, unrelated
+to this feature).
+
+**Design — additive, not replacing.** `BalanceMovement.eventSnapshot` reverted to ALWAYS being the
+movement's own contract's own plain balance (undoing the intermediate redirect). New
+`BalanceMovement.rootEventSnapshot` (migration id:6, `root_event_snapshot TEXT`, same JSON-column/
+COALESCE-on-update pattern as `event_snapshot`) — populated ONLY for a child-ledger movement (SHGT,
+IPLC_ACCEPTANCE, EPLC_ACCEPTANCE, EPLC_EXAMINATION — `resolveParentContract()`, generalized from the
+prior `snapshotTargetContract()` to cover Acceptance too, since the LC/Confirmed LC tab must populate
+for an Acceptance event now as well): the parent's own plain balance at the same create/release moment
+(`captureRootEventSnapshot()`, reusing `assembleSnapshot()`). Both fields persisted side by side, neither
+replacing the other.
+
+**Angular (`inquire-events.service.ts`)**: replaced the single `selectedEventSnapshotTitle`/
+`selectedEventSnapshot` fields with `selectedEventTabs: EventBalanceTab[]` (`{key, label, title, snapshot,
+impact}`) + `selectedEventTab`/`selectEventTab()`/`activeEventTab`. `selectedEventIsUsanceLc`/
+`selectedEventHasSg` getters mirror `LookUpPanelService.lookupIsUsanceLc`/`lookupHasSg` EXACTLY (same
+rule, reused rather than reinvented — "reuse existing code and components" design principle applied
+directly to an already-shipped, already-tested tab-gating pattern) keyed off `rootContract` instead of a
+picked lookup result. Population: LC tab reads `event.contract.instrumentType === rootContract.
+instrumentType ? movement.eventSnapshot : movement.rootEventSnapshot`; Acceptance/SG tabs read
+`movement.eventSnapshot` ONLY when the event's own contract matches that child type, else null.
+`impact` (movement.balanceBefore/balanceAfter) attached ONLY alongside `eventSnapshot`, never
+`rootEventSnapshot` — a different contract's own before/after would be meaningless there; the existing
+`#balanceSnapshotBox` template's `snapshot.redirectedImpact || !impact` guard from the (now-reverted)
+intermediate pass was simplified back to a plain `!impact` check, and `redirectedImpact` itself (field,
+computation, template branches, `EVENT_SNAPSHOT_LABEL_REDIRECT` constant) was removed entirely as dead
+code (BAL-101) once the tab design made it unnecessary. Legacy-data fallback (`getBalanceAsOfMovement()`)
+applies only to the ONE tab matching the event's own ledger, guarded against a stale-response race via
+`applyFallbackSnapshot()` checking `this.selectedEvent === forEvent` before applying. Default active tab
+on selection: whichever tab the clicked event's own contract maps to (SHGT→SG, Acceptance→ACCEPTANCE,
+else→LC). Template (`transaction-builder.component.html`): a `.tb-tabs`/`.tb-tab` strip (identical
+markup/classes to the Look Up panel's own LC/Acceptance/SG tabs) rendered `*ngIf="selectedEventTabs.
+length > 1"`, followed by one `#balanceSnapshotBox` outlet bound to `activeEventTab`.
+
+**Test coverage**: microservice — rewrote the SHGT/EPLC_EXAMINATION `balanceService.test.ts` cases for
+the dual-field model (eventSnapshot always own + separate rootEventSnapshot), added an Acceptance
+`rootEventSnapshot` case (new — Acceptance wasn't redirected at all in the prior pass) and HTTP
+integration coverage in `app.test.ts`; `migrations.test.ts` asserts `root_event_snapshot` is added.
+307/307 microservice tests green, 99.19/96.58/100/99.45% coverage. Angular: rewrote
+`inquire-events.service.spec.ts`'s snapshot-behavior tests into tab-gating (all 4 side/tenor
+combinations), tab-population ("only if belongs to"), and legacy-fallback (incl. a stale-response race
+test via `Subject`) describe blocks — 708/708 Angular tests green, 99.74/96.3/99.51/99.78% coverage.
+`backend/` 33/33 unaffected. All four typecheck/lint/build commands clean (0 errors, only pre-existing
+warnings).
+
+**Live in-browser verification, both the Sight (2-tab) and Usance (3-tab) cases, network-tab-confirmed
+zero extra round-trips per tab switch**: recreated LC S01 (Sight)/SG G01 (100000/32000) exactly as the
+user's own worked example — View on the SG G01 event defaulted to the "Shipping Guarantee Balance" tab
+(Confirmed Balance "0 → 32000", Available 32000 — the SG's own ledger, impact arrow present), switching
+to the "LC Balance" tab showed Confirmed Balance "100000" (plain, no arrow), Off-Balance Exposure "32000"
+(plain), Tight Available Balance "68000" — an exact match to the user's own "對的(V)" example. Then
+created a Buyer's Usance LC U01 (100000) and released it — View on the LC's own Issue event showed all 3
+tabs ("LC Balance", "Acceptance Balance", "Shipping Guarantee Balance"), LC tab correctly showing its own
+impact arrow ("Confirmed Balance 0 → 100000", since this event IS the root's own — impact only applies to
+the event's own ledger, matching the design). `read_network_requests` confirmed zero requests fired for
+every View click and every tab switch throughout.
+
+## Sibling Acceptance/SG snapshots for root-level events (`acceptanceEventSnapshot`/`sgEventSnapshot`) — persisted at transaction time, not live-fetched (2026-08-17, same day, fifth round)
+
+**Business-reported gap, live example**: LC S02 — A1 ISSUE 100000, A8 SG G01 ISSUE 12345, then a plain A3
+Document Arrival UTILIZE 22345 (a movement purely on the LC itself — `businessEventId: null`, no SG
+movement of its own; distinct from A3S, which WOULD link an SG redemption). "Inquire the 3rd event for
+S02, the EVENT Snapshot should have SG Balance information. By the time A3 Transaction input, the Balance
+information has both LC Balance and SG Balance. Right?" — the prior round's "only POPULATED when the
+selected Event belongs to that specific child" rule (confirmed via AskUserQuestion two rounds ago) left
+the SG tab empty for this event, even though SG G01 already existed on the LC. User then supplied the
+exact expected values live (both the "CURRENT BALANCE — LC S02" and "CURRENT BALANCE — LC S02 / SG G01"
+boxes Look Up Current Balance would show), asking to confirm the Event Balance Snapshot should carry both.
+
+**Design, confirmed via AskUserQuestion twice.** First: for a root-level event with no direct movement on
+a given child, the child tab should show that child's own CURRENT balance — but ONLY when exactly one
+candidate of that type exists under the LC (two or more is ambiguous, left empty — same "only if
+unambiguous" posture as the existing per-event population rule). Initial implementation: a live
+`api.getSnapshot()` call fired from `InquireEventsService.selectEvent()` when exactly one Acceptance/SG
+contract was discovered via the existing `catalog()` fetch already used to build the merged Event
+Timeline. User then corrected this ("就是交易當時LC所有的BALANCE的拍照存檔" — a snapshot of ALL the LC
+family's balances AT TRANSACTION TIME, saved to DB) — reconfirmed via a second AskUserQuestion: capture
+and PERSIST this at `createMovement()`/`release()` time instead, consistent with every other snapshot
+field in this feature, not a live fetch when later viewed.
+
+**Backend**: new `BalanceMovement.acceptanceEventSnapshot`/`sgEventSnapshot` (migration id:7,
+`acceptance_event_snapshot`/`sg_event_snapshot TEXT`) — additive to `eventSnapshot`/`rootEventSnapshot`,
+never replacing either. New `BalanceService.captureSiblingSnapshots(contract, rootInstrumentType)`:
+resolves candidates via `this.contracts.listCatalog({instrumentType, lcNumber: contract.naturalKey.
+lcNumber})` (the SAME store method the HTTP catalog picker already uses — no new query shape), and when
+exactly one exists, calls the existing `getBalanceSnapshot(candidateId)` (current, live, no cutoff — Look
+Up Current Balance's own shape) to capture its plain balance. Skips capturing a field for the type this
+movement's own contract already IS (eventSnapshot covers it). Called from both `createMovement()` (before
+insert) and `release()` (before `updateStatus()`), reusing `resolveParentContract()`'s already-computed
+parent/root-instrumentType rather than re-resolving. **Store-layer subtlety**: unlike `eventSnapshot`/
+`rootEventSnapshot` (which use `COALESCE(@param, column)` — correct because `release()` always passes a
+real value there, and every OTHER caller of `updateStatus()` genuinely wants "don't touch"), these two
+fields can legitimately be recomputed to `null` by `release()` itself (e.g. a second SG appeared between
+Create and Release, making the candidate count newly ambiguous) — a plain COALESCE would then wrongly
+preserve a stale non-null value from Create. Fixed with an explicit `'acceptanceEventSnapshot' in params`/
+`'sgEventSnapshot' in params` flag (`CASE WHEN @hasX = 1 THEN @x ELSE x END`), so `release()`'s own null
+IS written, while `reject()`/`cancel()` (which omit the key entirely, out of scope) still leave the
+column untouched — a real bug caught before it shipped, not from a review pass but from reasoning through
+the COALESCE semantics while implementing the second capture point.
+
+**Angular**: `InquireEventsService.selectEvent()` reads `movement.acceptanceEventSnapshot`/
+`movement.sgEventSnapshot` directly for a child tab the event doesn't own (replacing the reverted live-
+fetch — `fetchLiveChildSnapshot()`/`acceptanceContracts`/`sgContracts` tracking/the `tap()` in
+`childMovementsOf()` all removed as dead code, BAL-101). The tab's title suffix (e.g. "/ SG G01") is only
+available for the event's-own-ledger case now — `BalanceSnapshot` itself carries no naturalKey, so the
+sibling-fallback case's title drops the suffix (e.g. "Shipping Guarantee Balance — LC S02" rather than
+"... / SG G01") — accepted as a minor, honest simplification rather than adding naturalKey to the shared
+snapshot shape for one cosmetic suffix.
+
+**Reused, not duplicated**: `listCatalog()` (existing store method), `getBalanceSnapshot()` (existing,
+unchanged — no new snapshot-computation logic, just a new caller), `resolveParentContract()`'s already-
+computed root-instrumentType (no re-resolution).
+
+**Test coverage**: microservice — 3 new `balanceService.test.ts` cases reproducing LC S02's 3rd event
+exactly (sgEventSnapshot captured on a root UTILIZE with no direct SG movement; ambiguous when 2+ SGs
+exist; the reverse case — an SHGT event capturing acceptanceEventSnapshot), 1 new HTTP integration test
+in `app.test.ts`, `migrations.test.ts` asserts both new columns. 311/311 microservice tests green,
+99.23/96.53/100/99.47% coverage. Angular — rewrote the (now-reverted) live-fetch tests into 3 persisted-
+field-read cases, explicitly asserting `api.getSnapshot` is never called. 711/711 Angular tests green,
+99.74/96.32/99.51/99.78% coverage. `backend/` 33/33 unaffected. All four typecheck/lint/build commands
+clean.
+
+**Live in-browser verification, reproducing the user's own live example byte-for-byte**: recreated LC
+S02 (A1 100000, A8 SG G01 12345, then the exact 3rd-event A3 UTILIZE 22345/B01) — View on that 3rd event
+resolved correctly as "A3 · Document Arrival", showing 2 tabs. LC Balance tab: "Confirmed Balance 100000
+(still PENDING...)", "Available Balance 77655", "Off-Balance Exposure 12345", "Tight Available Balance
+65310" — exact match to the user's own "CURRENT BALANCE — LC S02" example. Switching to the Shipping
+Guarantee Balance tab: "Confirmed Balance 12345", "Available Balance 12345", "Pending Earmark Total 0" —
+exact match to the user's own "CURRENT BALANCE — LC S02 / SG G01" example. `read_network_requests`
+confirmed zero requests for the View click and both tab switches.
+
+## Inquire Events — "Secondary Ref." column (EPLC_EXAMINATION E01/E02, SHGT SG Number) — pure display, no API/data change (2026-08-17, same day, sixth round)
+
+**Business instruction, Trade Finance lifecycle/audit-trail rationale**: "EPLC_EXAMINATION should carry
+E01/E02 as the Secondary Reference so that each Examination event can be clearly linked to its subsequent
+Honour/Acceptance event" (worked example: LC U02's merged timeline — EXAMINATION CREATE rows show E01/E02
+in a new Secondary Ref. column; the later HONOUR rows already show E01/E02 in the EXISTING Reference
+column, via `sourceTransactionRef` carried-and-protected from the picked Present Docs record at B4). Then
+extended same day to SHGT: "the corresponding Shipping Guarantee Number (SG Number) should be displayed
+so the user can identify which Shipping Guarantee the event belongs to" (worked example: LC S01's SHGT
+ISSUE row showing "SG G01").
+
+**Design — zero backend/API change, pure client-side derivation.** Both E01/E02 and G01 are ALREADY part
+of each event's own already-loaded `contract.naturalKey` (`ibNumber` for EPLC_EXAMINATION — B3's own "EB
+Number" field; `sgNumber` for SHGT — A8's own "SG Number" field) — no new data was ever missing, just not
+surfaced in the merged Event Timeline table. New `InquireEventsService.secondaryReferenceFor(event):
+string` — `event.contract.instrumentType === 'EPLC_EXAMINATION'` → bare `ibNumber` (e.g. "E01", matching
+the business's own example exactly, no prefix); `=== 'SHGT'` → `"SG " + sgNumber` (e.g. "SG G01", ALSO
+matching the business's own example exactly — each type's own display format follows its own literal
+example rather than an imposed cross-type convention, since the two examples actually differ: EXAMINATION
+bare, SHGT prefixed); every other instrumentType (including the root LC/Confirmation, Acceptance — not
+asked for yet) returns "—". Template: new "Secondary Ref." `<th>`/`<td>` in the existing Inquire Events
+table, positioned right after the existing Reference column, calling `inquireEvents.secondaryReferenceFor(e)`.
+
+**Reused, not duplicated**: `contract.naturalKey.ibNumber`/`sgNumber` — already-loaded fields, no new
+fetch, no new field, no OAS/microservice change at all (this feature lives entirely in the Angular
+Transaction Builder's own display layer). The existing `<td class="tb-table__ref">` styling/class is
+reused for the new column too, rather than inventing new CSS.
+
+**Test coverage**: 6 new `inquire-events.service.spec.ts` cases (EPLC_EXAMINATION → bare ibNumber;
+EPLC_EXAMINATION with no ibNumber recorded → "—", non-throwing; every other instrumentType incl. root
+EPLC_CONFIRMATION and a HONOUR event that already carries E01 via the EXISTING Reference column → "—";
+IPLC_ACCEPTANCE → "—", not asked for yet; SHGT → "SG {sgNumber}"; SHGT with no sgNumber → "—"). 717/717
+Angular tests green, 99.74/96.34/99.52/99.78% coverage. `npx tsc --noEmit`/`npm run lint`/`npm run build`
+all clean (0 errors, only pre-existing warnings). Microservice/backend genuinely unaffected — not re-run
+this pass (no file under either touched).
+
+**Live in-browser verification NOT completed this pass** — the Claude in Chrome browser tab became
+unresponsive to clicks on the "Inquire Events" tab-strip button after 5 attempts across a page reload (no
+console errors; likely an extension-side connection glitch, not a code issue — this happened before in
+this same session and previously resolved itself after reconnecting). Per this session's own established
+practice ("don't keep retrying the same failing browser action — stop and report"), live verification was
+skipped rather than forced; correctness instead rests on the 6 new unit tests above, which construct the
+exact `InquiredEvent`/`BalanceContract` shapes the business's own worked examples describe and assert the
+exact expected output strings ("E01", "SG G01"). Confirmed via direct DB inspection that LC S01 already
+carries a live SHGT G01 contract (created by the user's own manual testing, naturalKey.sgNumber = "G01")
+that this feature would render as "SG G01" once the page next loads successfully — recommend the user
+verify visually on next use; flag back if the display doesn't match.
+
+**Documentation scope note** (business instruction: "Update all Balance Component related files (md,
+docx, yaml etc.)"): this `CLAUDE.md` decision log is the only file actually updated for this round.
+`analysis/balance-component-api.yaml`/`balance-component-channel-api.yaml` (the OAS) deliberately were
+NOT touched — this feature makes no wire-contract change (no new field, no new endpoint; `ibNumber`/
+`sgNumber` were already part of the modeled `NaturalKey` schema). `Quality-report-balance.md` (the static-
+analysis review) was left alone too — this isn't a fix for a flagged finding. The `.docx` spec sources
+under `analysis/` (`TF_Balance_Component_Spec-{en,zh}.docx`, `TF_Contingent_Liability_Lifecycle-
+{en,zh}.docx`) and the root-level `MVV-Architecture-LcIssueElement-BalanceComponent-{EN,CN}.docx` were
+NOT updated — confirmed via a direct Read attempt that these are binary files outside this tool's
+read/edit capability (Read explicitly refuses `.docx` as "cannot read binary files"); editing them would
+require a different tool this session doesn't have access to. This matches the project's own established
+convention for `lc-balance-wc/` specifically (per this file's own top-of-document note): "design docs...
+were never committed as files — the nested CLAUDE.md's own decision log is the only place that captures
+them" — even where a `.docx` DOES physically exist on disk here, keeping it in sync isn't something this
+tooling can do, so this decision log remains the actual source of truth for what changed and why.
+
+## Inquire Events row click replaces the "View" button; Submit locks all input fields read-only across A1–A9/B1–B5 (2026-08-17, two UX-directed requests, same day)
+
+**1. Event row itself is now the click target, not a separate "View" button/column.** Business framing:
+"the row should visually indicate that it is selectable... Hover Event Row → Highlight Row / Pointer
+Cursor → Single Click → View Event Details." `transaction-builder.component.html`'s Inquire Events table:
+the trailing `<th></th>`/`<td><button ...>View</button></td>` column removed, `(click)="inquireEvents.
+selectEvent(e)"` moved onto the `<tr>` itself. Zero new CSS needed — `.tb-table`'s own `tbody tr` rule
+already carries `cursor: pointer` + `:hover`/`:nth-child(even)` highlighting (the same pickable-row
+affordance already used by the LC Index/Parent LC/IB Index pickers elsewhere on this page), so the row
+picked up the requested hover/pointer behavior for free. No TS/service change — `selectEvent()` itself is
+unchanged, only which element dispatches the identical call.
+
+**2. All A1–A9/B1–B5 input fields become read-only once a Submit actually creates a movement.**
+Business framing: "once the user clicks Submit, all input fields must become protected/read-only...
+Any subsequent change must be performed through the appropriate follow-up transaction or amendment
+function, rather than modifying the submitted transaction directly." Locked on `submitResult` being set,
+not the bare Submit click — a validation-only failure (`submitError` set, `submitResult` still null) must
+leave the form editable so the Maker can correct and resubmit; locking then would contradict the same
+instruction's own "review in View/Read-Only Mode" framing, which presumes something real was actually
+submitted. `submitResult` already covers the compound-partial-failure case too (a primary leg posts, a
+later secondary leg fails — `applyMakerSubmitOutcome()` still sets `submitResult` from the primary), so
+the same rule correctly locks then as well; `submitA4()` sets `submitResult` on success the identical way,
+so A4 is covered with no separate wiring.
+
+**Design — reused the Decorator already built for Inquire Events, not a new one.** New `formLocked`
+getter (`!!this.submitResult`) and `displayFields` getter (`formLocked ? toReadOnlyFields(this.fields) :
+this.fields`) on `TransactionBuilderComponent`; the live `<formly-form>`'s own `[fields]` binding switched
+from `fields` to `displayFields`. `toReadOnlyFields()` (`builder-fields.ts`) already existed — built for
+Inquire Events' own read-only transaction-screen reconstruction — and needed zero changes; this is a
+second caller of the same function, not a duplicate. `selectFunction()` already resets `submitResult =
+null`, so switching functions naturally re-unlocks the form with no new reset logic needed.
+
+**Tests**: 5 new cases in `transaction-builder.component.gaps.spec.ts` (unlocked + `displayFields ===
+fields` before Submit; stays unlocked after a validation-only failure; locks + every field
+`disabled`/`expressions` stripped once `submitResult` is set; re-unlocks on `selectFunction()`; stays
+locked on a partial compound failure that still populated `submitResult`). No test needed for the row-
+click change (this project's own direct-instantiation test convention never renders the DOM, so template-
+only click-target changes were never covered by a test either before or after, same as every prior
+template-only fix in this file). Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build
+--configuration development` clean, `npm run lint` 0 errors (211 pre-existing warnings, unchanged), full
+Angular suite 722/722 (5 new), coverage 99.74/96.35/99.52/99.78% (all four clear the 95% floor; the two
+new getters are now fully covered). `backend/` 33/33 unaffected and re-verified; microservice suite
+unaffected (no file under `microservices/` touched by either change).
+
+**Live in-browser verification not attempted this pass** — both changes are static-verification-strong
+(strict-template `ng build`, full typecheck, and 5 new dedicated tests for the field-locking behavior
+specifically), and this project's own direct-instantiation test convention already means template-only
+changes are routinely shipped on static verification alone elsewhere in this file. A human should still
+click through one A-series function's Submit (confirm fields grey out) and one Inquire Events row
+(confirm hover highlight + click-to-View) once to fully close the loop.

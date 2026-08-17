@@ -160,8 +160,6 @@ export class BalanceService {
 
     const allMovements = this.movements.listByContract(balanceContractId);
     const movements = asOfEventSeq === undefined ? allMovements : allMovements.filter((m) => m.eventSeq <= asOfEventSeq);
-    const confirmed = computeConfirmedBalance(movements);
-    const available = computeAvailableBalance(confirmed, movements);
 
     // undefined -> "no cutoff" (the live snapshot route never passes asOfEventSeq). Otherwise the last
     // (eventSeq-order-guaranteed) entry in the already-filtered `movements` list above — normally the
@@ -169,26 +167,48 @@ export class BalanceService {
     // derives asOfEventSeq from a real movement on this same contract.
     const cutoffMovement = asOfEventSeq === undefined ? undefined : movements[movements.length - 1];
 
+    const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
+    const cutShgtMovements = cutoffMovement === undefined ? shgtMovements : shgtMovements.filter((m) => m.createdAt <= cutoffMovement.createdAt);
+
+    const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
+    const cutExaminationMovements =
+      cutoffMovement === undefined ? examinationMovements : examinationMovements.filter((m) => m.createdAt <= cutoffMovement.createdAt);
+
+    return this.assembleSnapshot(contract, movements, cutShgtMovements, cutExaminationMovements);
+  }
+
+  /**
+   * 2026-08-17 — shared assembly extracted out of getBalanceSnapshot() so createMovement()/release() can
+   * capture an Event Snapshot (see types.ts's BalanceMovement.eventSnapshot) using the exact same math,
+   * without going through getBalanceSnapshot()'s own DB re-fetch (createMovement() needs to include an
+   * in-memory movement that isn't inserted yet; release() needs to simulate one movement's status flipping
+   * to RELEASED without a second read-after-write). Callers are responsible for handing in an
+   * ALREADY-correct movement/shgtMovements/examinationMovements list for the moment being captured — no
+   * cutoff/override logic lives in here.
+   */
+  private assembleSnapshot(
+    contract: BalanceContract,
+    movements: readonly BalanceMovement[],
+    shgtMovements: readonly BalanceMovement[],
+    examinationMovements: readonly BalanceMovement[],
+  ): BalanceSnapshot {
+    const confirmed = computeConfirmedBalance(movements);
+    const available = computeAvailableBalance(confirmed, movements);
+
     let offBalanceExposure: string | null = null;
     let tightAvailableBalance: string | null = null;
     if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
-      const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
-      const cutShgtMovements = cutoffMovement === undefined ? shgtMovements : shgtMovements.filter((m) => m.createdAt <= cutoffMovement.createdAt);
-      const exposure = computeOffBalanceExposure(cutShgtMovements);
+      const exposure = computeOffBalanceExposure(shgtMovements);
       offBalanceExposure = exposure.toFixed();
       tightAvailableBalance = available.minus(exposure).toFixed();
     }
 
-    // Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION
-    // only. Point-in-time via the same cutoffMovement.createdAt cut as offBalanceExposure above.
+    // Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only.
     let presentDocsEarmarkPending: string | null = null;
     let presentDocsEarmarkApproved: string | null = null;
     if (contract.instrumentType === 'EPLC_CONFIRMATION') {
-      const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
-      const cutExaminationMovements =
-        cutoffMovement === undefined ? examinationMovements : examinationMovements.filter((m) => m.createdAt <= cutoffMovement.createdAt);
-      presentDocsEarmarkPending = computePresentDocsEarmarkPending(cutExaminationMovements).toFixed();
-      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(cutExaminationMovements).toFixed();
+      presentDocsEarmarkPending = computePresentDocsEarmarkPending(examinationMovements).toFixed();
+      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements).toFixed();
     }
 
     return {
@@ -204,6 +224,99 @@ export class BalanceService {
       presentDocsEarmarkApproved,
       asOf: null,
     };
+  }
+
+  /**
+   * 2026-08-17 ("REFER TO DB S01" business-reported gap, then simplified to "不複雜 就是交易處理時
+   * Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE SNAPSHOT") —
+   * every child-ledger instrumentType (SHGT, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE, EPLC_EXAMINATION) has a
+   * PARENT LC/Confirmation whose own balance Inquire Events' Balance Tabs also need (see
+   * BalanceMovement.rootEventSnapshot's own doc comment) — captured ADDITIONALLY to, never replacing,
+   * the movement's own contract's own eventSnapshot. Returns null for a root-level contract (IPLC_LC/
+   * EPLC_LC/EPLC_CONFIRMATION — nothing to redirect to) or when the parent can't be resolved (should not
+   * happen for a real child-ledger row, since all four require parentLogicalContractId at creation — see
+   * createMovement()'s own validation above — but this keeps snapshot capture non-throwing rather than
+   * failing an otherwise-valid create/release).
+   */
+  private resolveParentContract(contract: BalanceContract): BalanceContract | null {
+    const isChildLedger =
+      contract.instrumentType === 'SHGT' ||
+      contract.instrumentType === 'IPLC_ACCEPTANCE' ||
+      contract.instrumentType === 'EPLC_ACCEPTANCE' ||
+      contract.instrumentType === 'EPLC_EXAMINATION';
+    if (!isChildLedger) return null;
+    if (!contract.parentLogicalContractId) return null;
+    return this.contracts.findActiveByLogicalContractId(contract.parentLogicalContractId) ?? null;
+  }
+
+  /**
+   * The parent's own plain balance (Look Up Current Balance's own "LC tab" shape/values, no decoration)
+   * — shared by createMovement()/release() below. `childMovement` is the child-ledger movement being
+   * captured, in EXACTLY the status/acknowledgedAt it has at this specific capture moment (PENDING when
+   * called from createMovement(), RELEASED when called from release()) — always excluded-then-reappended
+   * into the parent's own SHGT/EPLC_EXAMINATION sibling list (never relying on whatever listShgtMovements
+   * ForParent()/listExaminationMovementsForParent() already has on file for it, since at Create time it
+   * isn't persisted yet, and at Release time the DB still shows its OLD PENDING status until this same
+   * call's own updateStatus() below writes the new one) — this keeps presentDocsEarmarkPending/Approved
+   * (status-sensitive) correct at both capture points, not just offBalanceExposure (which happens to be
+   * status-insensitive). The parent's own confirmedBalance/availableBalance never move from a child
+   * event, so `parentMovements` itself needs no such simulation.
+   */
+  private captureRootEventSnapshot(parent: BalanceContract, childInstrumentType: InstrumentType, childMovement: BalanceMovement): BalanceSnapshot {
+    const parentMovements = this.movements.listByContract(parent.balanceContractId);
+    let shgtMovements: BalanceMovement[] = [];
+    let examinationMovements: BalanceMovement[] = [];
+    if (parent.instrumentType === 'IPLC_LC' || parent.instrumentType === 'EPLC_LC') {
+      shgtMovements = this.movements.listShgtMovementsForParent(parent.logicalContractId).filter((m) => m.movementId !== childMovement.movementId);
+      if (childInstrumentType === 'SHGT') shgtMovements = [...shgtMovements, childMovement];
+    }
+    if (parent.instrumentType === 'EPLC_CONFIRMATION') {
+      examinationMovements = this.movements.listExaminationMovementsForParent(parent.logicalContractId).filter((m) => m.movementId !== childMovement.movementId);
+      if (childInstrumentType === 'EPLC_EXAMINATION') examinationMovements = [...examinationMovements, childMovement];
+    }
+    return this.assembleSnapshot(parent, parentMovements, shgtMovements, examinationMovements);
+  }
+
+  /**
+   * 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔" — a snapshot of ALL the LC family's balances at
+   * transaction time, saved to DB; business-confirmed live example — LC S02's 3rd event, a plain A3
+   * Document Arrival UTILIZE with no direct SG movement, still needs SG G01's own balance captured
+   * alongside it) — the ONE Acceptance's and the ONE Shipping Guarantee's own CURRENT plain balance
+   * (`getBalanceSnapshot()`, same "Look Up Current Balance" shape/values every other snapshot field in
+   * this file uses), captured whenever exactly one candidate of that type exists under the same root LC/
+   * Confirmation (`this.contracts.listCatalog()`, the same store method the HTTP catalog picker uses) —
+   * regardless of whether THIS movement's own contract already IS that type (in which case eventSnapshot
+   * already covers it, so the matching sibling field is deliberately left null rather than duplicated).
+   * Two or more candidates is ambiguous (which one?) and is deliberately left null — same posture
+   * Inquire Events' own Balance Tabs use for "only the one it belongs to". `rootInstrumentType` is the
+   * contract's own instrumentType when it already IS the root, or the already-resolved parent's
+   * instrumentType for a child-ledger movement — passed in rather than re-resolved, since every caller
+   * already computed it via resolveParentContract() for rootEventSnapshot just above.
+   */
+  private captureSiblingSnapshots(
+    contract: BalanceContract,
+    rootInstrumentType: InstrumentType,
+  ): { acceptanceEventSnapshot: BalanceSnapshot | null; sgEventSnapshot: BalanceSnapshot | null } {
+    const lcNumber = contract.naturalKey.lcNumber;
+
+    let acceptanceEventSnapshot: BalanceSnapshot | null = null;
+    if (contract.instrumentType !== 'IPLC_ACCEPTANCE' && contract.instrumentType !== 'EPLC_ACCEPTANCE') {
+      const acceptanceType = rootInstrumentType === 'IPLC_LC' ? 'IPLC_ACCEPTANCE' : rootInstrumentType === 'EPLC_CONFIRMATION' ? 'EPLC_ACCEPTANCE' : null;
+      if (acceptanceType) {
+        const candidates = this.contracts.listCatalog({ instrumentType: acceptanceType, lcNumber }).items;
+        const only = candidates.length === 1 ? candidates[0] : undefined;
+        if (only) acceptanceEventSnapshot = this.getBalanceSnapshot(only.balanceContractId);
+      }
+    }
+
+    let sgEventSnapshot: BalanceSnapshot | null = null;
+    if (contract.instrumentType !== 'SHGT' && rootInstrumentType === 'IPLC_LC') {
+      const candidates = this.contracts.listCatalog({ instrumentType: 'SHGT', lcNumber }).items;
+      const only = candidates.length === 1 ? candidates[0] : undefined;
+      if (only) sgEventSnapshot = this.getBalanceSnapshot(only.balanceContractId);
+    }
+
+    return { acceptanceEventSnapshot, sgEventSnapshot };
   }
 
   /** Event timeline (business instruction 2026-08-14) — every movement against one contract, in time order (eventSeq is already strictly increasing per contract, Design doc §8). */
@@ -472,7 +585,35 @@ export class BalanceService {
       warnings,
       createdBy: req.createdBy,
       createdAt: this.now(),
+      eventSnapshot: null,
+      rootEventSnapshot: null,
+      acceptanceEventSnapshot: null,
+      sgEventSnapshot: null,
     };
+
+    // 2026-08-17 ("不複雜 就是交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED)
+    // SAVED TO DB == EVENT BALANCE SNAPSHOT") — eventSnapshot is ALWAYS this movement's own contract's
+    // own plain balance, captured in-memory (existingMovements is already fetched above for the
+    // sufficiency checks; `movement` isn't inserted yet — no extra DB read, same "simulate rather than
+    // round-trip" posture release() below uses).
+    const ownShgtMovements =
+      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
+    const ownExaminationMovements =
+      contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
+    movement.eventSnapshot = this.assembleSnapshot(contract, [...existingMovements, movement], ownShgtMovements, ownExaminationMovements);
+
+    // ADDITIONALLY, for a child-ledger movement (SHGT/Acceptance/EPLC_EXAMINATION), also capture the
+    // PARENT LC/Confirmation's own plain balance at this same moment — see resolveParentContract()'s own
+    // doc comment. Never replaces eventSnapshot above.
+    const parent = this.resolveParentContract(contract);
+    if (parent) movement.rootEventSnapshot = this.captureRootEventSnapshot(parent, contract.instrumentType, movement);
+
+    // ADDITIONALLY, capture the one unambiguous sibling Acceptance's/SG's own CURRENT plain balance — see
+    // captureSiblingSnapshots()'s own doc comment ("就是交易當時LC所有的BALANCE的拍照存檔").
+    const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
+    const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
+    movement.acceptanceEventSnapshot = siblings.acceptanceEventSnapshot;
+    movement.sgEventSnapshot = siblings.sgEventSnapshot;
 
     const result = this.movements.insert(movement);
     if (!result.created) return { created: false, existing: result.existing };
@@ -514,6 +655,29 @@ export class BalanceService {
     // Compute the after-figure by simulating this one movement flipping to RELEASED,
     // rather than a second DB round-trip — cheaper and avoids a two-write window.
     const after = before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
+
+    // 2026-08-17 ("...SAVED TO DB == EVENT BALANCE SNAPSHOT") — eventSnapshot is ALWAYS this movement's
+    // own contract's own plain balance, overwriting whatever was captured at Create. Same in-memory
+    // simulation posture as before/after above: flip this one movement to RELEASED in the already-
+    // fetched movement list rather than reading the DB again after updateStatus() below writes it.
+    const releasedSelf = { ...movement, status: 'RELEASED' as const };
+    const ownMovements = this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movementId ? releasedSelf : m));
+    const ownShgtMovements =
+      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
+    const ownExaminationMovements =
+      contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
+    const eventSnapshot = this.assembleSnapshot(contract, ownMovements, ownShgtMovements, ownExaminationMovements);
+
+    // ADDITIONALLY, for a child-ledger movement, also capture the PARENT's own plain balance — see
+    // resolveParentContract()'s own doc comment. Never replaces eventSnapshot above.
+    const parent = this.resolveParentContract(contract);
+    const rootEventSnapshot = parent ? this.captureRootEventSnapshot(parent, contract.instrumentType, releasedSelf) : null;
+
+    // ADDITIONALLY, capture the one unambiguous sibling Acceptance's/SG's own CURRENT plain balance —
+    // see captureSiblingSnapshots()'s own doc comment ("就是交易當時LC所有的BALANCE的拍照存檔").
+    const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
+    const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
+
     this.movements.updateStatus({
       movementId,
       status: 'RELEASED',
@@ -521,6 +685,10 @@ export class BalanceService {
       releasedAt,
       balanceBefore: before.toFixed(),
       balanceAfter: after.toFixed(),
+      eventSnapshot: JSON.stringify(eventSnapshot),
+      rootEventSnapshot: rootEventSnapshot ? JSON.stringify(rootEventSnapshot) : null,
+      acceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
+      sgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
     });
 
     return this.movements.findById(movementId)!;

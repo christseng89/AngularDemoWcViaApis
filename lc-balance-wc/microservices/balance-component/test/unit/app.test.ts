@@ -2476,3 +2476,211 @@ describe('HTTP integration — referencedTransactionId passthrough (bug fixed 20
     expect(res.body.referencedTransactionId).toBeNull();
   });
 });
+
+describe('HTTP integration — persisted Event Snapshot (business instruction 2026-08-17, "PENDING XOR APPROVED... 只存PENDING 或 APPROVED 其中一個")', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('POST create response carries a non-null eventSnapshot reflecting PENDING state; POST release response overwrites it with RELEASED figures', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'EVSNAP-HTTP-1' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(issue.body.status).toBe('PENDING');
+    expect(issue.body.eventSnapshot).not.toBeNull();
+    expect(issue.body.eventSnapshot.confirmedBalance).toBe('0');
+    expect(issue.body.eventSnapshot.availableBalance).toBe('100000');
+
+    const released = await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    expect(released.body.status).toBe('RELEASED');
+    expect(released.body.eventSnapshot.confirmedBalance).toBe('100000');
+    expect(released.body.eventSnapshot.availableBalance).toBe('100000');
+
+    // The Event Timeline's own copy carries the same RELEASED snapshot — this is exactly the field
+    // Inquire Events reads directly, with no separate /balance-as-of call.
+    const timeline = await request(app).get(`/balance-contracts/${issue.body.balanceContractId}/movements`).expect(200);
+    expect(timeline.body[0].eventSnapshot).toEqual(released.body.eventSnapshot);
+  });
+
+  test('a later PENDING movement\'s eventSnapshot includes its own earmark contribution, and matches GET .../balance-as-of computed independently for the same movement', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'EVSNAP-HTTP-2' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const decrease = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'AMEND_DECREASE',
+        eventSeq: 2,
+        amount: '15000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(decrease.body.status).toBe('PENDING');
+    expect(decrease.body.eventSnapshot.availableBalance).toBe('85000');
+
+    const asOf = await request(app).get(`/balance-movements/${decrease.body.movementId}/balance-as-of`).expect(200);
+    expect(decrease.body.eventSnapshot).toEqual(asOf.body);
+  });
+});
+
+describe('HTTP integration — rootEventSnapshot, Inquire Events Balance Tabs (2026-08-17, "REFER TO DB S01" then "不複雜 就是...SAVED TO DB == EVENT BALANCE SNAPSHOT")', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('an SHGT ISSUE carries BOTH its own eventSnapshot (own ledger) AND a rootEventSnapshot (parent LC, plain, no decoration)', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ROOTSNAP-1' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'ROOTSNAP-1' }).expect(200);
+
+    const sgIssue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'ROOTSNAP-1', sgNumber: 'G01' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '32000',
+        currency: 'USD',
+        parentLogicalContractId: lcContract.body.logicalContractId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(sgIssue.body.eventSnapshot.confirmedBalance).toBe('0');
+    expect(sgIssue.body.eventSnapshot.availableBalance).toBe('32000');
+    expect(sgIssue.body.rootEventSnapshot.balanceContractId).toBe(lc.body.balanceContractId);
+    expect(sgIssue.body.rootEventSnapshot.confirmedBalance).toBe('100000');
+    expect(sgIssue.body.rootEventSnapshot.offBalanceExposure).toBe('32000');
+    expect(sgIssue.body.rootEventSnapshot.tightAvailableBalance).toBe('68000');
+
+    const sgReleased = await request(app).post(`/balance-movements/${sgIssue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    expect(sgReleased.body.eventSnapshot.confirmedBalance).toBe('32000');
+    expect(sgReleased.body.rootEventSnapshot.confirmedBalance).toBe('100000');
+    expect(sgReleased.body.rootEventSnapshot.offBalanceExposure).toBe('32000');
+
+    // The Event Timeline's own copy carries the same rootEventSnapshot — Inquire Events' Balance Tabs
+    // read it directly with no separate cross-contract query.
+    const timeline = await request(app).get(`/balance-contracts/${sgIssue.body.balanceContractId}/movements`).expect(200);
+    expect(timeline.body[0].rootEventSnapshot).toEqual(sgReleased.body.rootEventSnapshot);
+  });
+
+  test('the root LC\'s own ISSUE movement carries a null rootEventSnapshot — nothing to redirect to', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ROOTSNAP-2' }, movementType: 'ISSUE', eventSeq: 1, amount: '50000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    expect(lc.body.rootEventSnapshot).toBeNull();
+  });
+
+  test('an Acceptance CREATE also carries a rootEventSnapshot (parent LC\'s own balance, unaffected by the Acceptance itself)', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'ROOTSNAP-3' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'BUYERS_USANCE',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'ROOTSNAP-3' }).expect(200);
+
+    const acceptance = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: 'ROOTSNAP-3', ibNumber: 'IB01' },
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '30000',
+        currency: 'USD',
+        tenorType: 'BUYERS_USANCE',
+        parentLogicalContractId: lcContract.body.logicalContractId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(acceptance.body.eventSnapshot.balanceContractId).not.toBe(lc.body.balanceContractId);
+    expect(acceptance.body.rootEventSnapshot.balanceContractId).toBe(lc.body.balanceContractId);
+    expect(acceptance.body.rootEventSnapshot.confirmedBalance).toBe('100000');
+  });
+});
+
+describe('HTTP integration — sibling Acceptance/SG snapshots (2026-08-17, "就是交易當時LC所有的BALANCE的拍照存檔"), reproducing LC S02\'s 3rd event exactly', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('a plain A3 (LC UTILIZE, no direct SG movement) carries sgEventSnapshot = the one existing SG\'s own CURRENT balance', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S02' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'S02' }).expect(200);
+
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S02', sgNumber: 'G01' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '12345',
+        currency: 'USD',
+        parentLogicalContractId: lcContract.body.logicalContractId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${sg.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '22345',
+        currency: 'USD',
+        sourceTransactionRef: 'B01',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    expect(utilize.body.eventSnapshot.offBalanceExposure).toBe('12345');
+    expect(utilize.body.rootEventSnapshot).toBeNull();
+    expect(utilize.body.sgEventSnapshot.balanceContractId).toBe(sg.body.balanceContractId);
+    expect(utilize.body.sgEventSnapshot.confirmedBalance).toBe('12345');
+    expect(utilize.body.sgEventSnapshot.availableBalance).toBe('12345');
+    expect(utilize.body.acceptanceEventSnapshot).toBeNull();
+
+    // The Event Timeline's own copy carries the same sgEventSnapshot — zero extra request when viewed.
+    const timeline = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+    const utilizeInTimeline = timeline.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
+    expect(utilizeInTimeline.sgEventSnapshot).toEqual(utilize.body.sgEventSnapshot);
+  });
+});

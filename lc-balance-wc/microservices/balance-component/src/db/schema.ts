@@ -115,7 +115,23 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- acknowledged_by/acknowledged_at's own shape (a second, non-finalizing actor action recorded on
   -- the SAME movement) but on the MAKER side — status stays PENDING either way.
   maker_submitted_by      TEXT,
-  maker_submitted_at      TEXT
+  maker_submitted_at      TEXT,
+  -- Business instruction 2026-08-17 ("PENDING XOR APPROVED... 只存PENDING 或 APPROVED 其中一個") — the
+  -- BalanceSnapshot captured once at createMovement() (PENDING) and overwritten at release() (RELEASED),
+  -- so Inquire Events can fetch it directly instead of recomputing on-demand. JSON. See types.ts's
+  -- BalanceMovement.eventSnapshot doc comment.
+  event_snapshot          TEXT,
+  -- 2026-08-17 ("REFER TO DB S01", then "...SAVED TO DB == EVENT BALANCE SNAPSHOT") — the PARENT LC/
+  -- Confirmation's own plain balance, captured at the same moment as event_snapshot above, for a
+  -- child-ledger movement only (SHGT/Acceptance/EPLC_EXAMINATION). JSON. See types.ts's
+  -- BalanceMovement.rootEventSnapshot doc comment.
+  root_event_snapshot     TEXT,
+  -- 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔") — the ONE Acceptance's / ONE Shipping
+  -- Guarantee's own plain balance, captured alongside the fields above whenever exactly one candidate
+  -- of that type exists under this movement's own root LC/Confirmation. JSON. See types.ts's
+  -- BalanceMovement.acceptanceEventSnapshot/sgEventSnapshot doc comments.
+  acceptance_event_snapshot TEXT,
+  sg_event_snapshot        TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

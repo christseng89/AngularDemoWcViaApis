@@ -74,6 +74,13 @@ export interface BalanceSnapshot {
   /** Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only, null otherwise. */
   presentDocsEarmarkPending?: string | null;
   presentDocsEarmarkApproved?: string | null;
+  /**
+   * 2026-08-17 ("REFER TO DB S01") — set only on a REDIRECTED snapshot (SHGT/EPLC_EXAMINATION events —
+   * see the microservice's own BalanceSnapshot.redirectedImpact doc comment): names which field above
+   * carries the before→after this event actually caused, since BalanceMovement.balanceBefore/
+   * balanceAfter track the CHILD's own Confirmed Balance, not this (parent) snapshot's own moved field.
+   */
+  redirectedImpact?: { label: 'offBalanceExposure' | 'presentDocsEarmarkPending' | 'presentDocsEarmarkApproved'; before: string; after: string } | null;
 }
 
 export interface MovementWarning {
@@ -151,6 +158,37 @@ export interface BalanceMovement {
    */
   makerSubmittedBy?: string | null;
   makerSubmittedAt?: string | null;
+  /**
+   * Business instruction 2026-08-17 ("PENDING XOR APPROVED... 只存PENDING 或 APPROVED 其中一個") — the
+   * BalanceSnapshot captured server-side at createMovement() (PENDING) and overwritten at release()
+   * (RELEASED); see the microservice's own BalanceMovement.eventSnapshot doc comment. Null for
+   * movements created before this field existed, and for reject()/cancel() (out of scope). Read
+   * directly by InquireEventsService.selectEvent() instead of a separate getBalanceAsOfMovement() call
+   * when present.
+   */
+  eventSnapshot?: BalanceSnapshot | null;
+  /**
+   * Business instruction 2026-08-17 ("REFER TO DB S01", then "不複雜 就是交易處理時 Look Up Current
+   * Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE SNAPSHOT") — populated ONLY
+   * for a child-ledger movement (SHGT/IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION): the PARENT
+   * LC/Confirmation's own plain balance at the same moment as eventSnapshot above — see the
+   * microservice's own BalanceMovement.rootEventSnapshot doc comment. Additional to eventSnapshot,
+   * never a replacement. Read by InquireEventsService's Balance Tabs for the LC/Confirmed LC tab
+   * whenever the selected Event's own contract isn't the root itself.
+   */
+  rootEventSnapshot?: BalanceSnapshot | null;
+  /**
+   * Business instruction 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔" — a snapshot of ALL the LC
+   * family's balances at transaction time, saved to DB) — the ONE Acceptance contract's own CURRENT
+   * plain balance under this movement's own root LC/Confirmation, captured server-side ONLY when exactly
+   * one such contract exists (two or more is ambiguous, left null — same posture Inquire Events' own
+   * Balance Tabs use). Null when this movement's own contract already IS an Acceptance (eventSnapshot
+   * already covers it), when none/multiple exist, or for movements predating this field. See the
+   * microservice's own BalanceService.captureSiblingSnapshots doc comment for the full capture rule.
+   */
+  acceptanceEventSnapshot?: BalanceSnapshot | null;
+  /** Same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only). */
+  sgEventSnapshot?: BalanceSnapshot | null;
 }
 
 /**

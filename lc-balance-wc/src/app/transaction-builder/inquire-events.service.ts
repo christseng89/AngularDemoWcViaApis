@@ -19,6 +19,18 @@ export interface InquiredEvent {
   contract: BalanceContract;
 }
 
+/** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
+export interface EventBalanceTab {
+  key: 'LC' | 'ACCEPTANCE' | 'SG';
+  /** Static per-side label for the tab-strip button itself, e.g. "LC Balance" — never includes the LC Number/suffix. */
+  label: string;
+  /** "{label} — LC {lc}[/ SG {sg}]" — the box's own title once this tab is active. */
+  title: string;
+  snapshot: BalanceSnapshot | null;
+  /** movement.balanceBefore/balanceAfter — set ONLY when `snapshot` is the event's own contract's own ledger, never when it's a redirected parent balance (see selectEvent()'s own doc comment). */
+  impact: { before: string | null | undefined; after: string | null | undefined } | null;
+}
+
 /**
  * Facade over BalanceComponentApiService + the existing function registry + builder-fields.ts's
  * buildFields() — same role LookUpPanelService already plays for "Look Up Current Balance", and built
@@ -49,13 +61,34 @@ export interface InquiredEvent {
  * timeline too — childInstrumentTypesOf() never returns them, since PARENT_INSTRUMENT_OPTIONS never
  * names EPLC_CONFIRMATION as their parent.
  *
- * 2026-08-17, revised same day (user-requested, "VIEW EVENT 只需 EVENT SNAPSHOT 即可"): an earlier
- * version of this feature also fetched a "Closing Snapshot" row per SIBLING ledger (Acceptance/SG under
- * the same LC), alongside a separate one-line "Balance Impact" delta. Simplified to exactly ONE snapshot
- * — the selected event's own ledger, closing balance merged with its own before/after impact — per the
- * same "avoid duplicate/redundant views" principle behind the Event List's own Account Entries button
- * removal above. Viewing a SIBLING ledger's own state is already one click away: select ITS OWN event
- * from the same merged timeline.
+ * 2026-08-17, third revision same day — **Balance Tabs**, precisely specified by the user after two
+ * earlier passes (a per-sibling "Closing Snapshot" design, then a single merged "Event Snapshot" box)
+ * each proved incomplete: up to 3 tabs — LC/Confirmed LC (always), Acceptance (Usance tenor only),
+ * Shipping Guarantee (Import only, any tenor) — gated purely by the root LC's own product type/tenor,
+ * mirroring `LookUpPanelService.lookupIsUsanceLc`/`lookupHasSg` exactly (`selectedEventIsUsanceLc`/
+ * `selectedEventHasSg` below — same rule, reused rather than reinvented). Confirmed via AskUserQuestion:
+ * a child tab (Acceptance/SG) is only ever POPULATED when the selected Event belongs to that specific
+ * child; the LC tab is always populated (the event's own contract's own eventSnapshot when the event IS
+ * the root, otherwise its rootEventSnapshot — see BalanceMovement's own doc comment on both fields).
+ * Business instruction, final framing: "不複雜 就是交易處理時 Look Up Current Balance 的SNAPSHOT
+ * (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE SNAPSHOT" — each tab's content is exactly what Look
+ * Up Current Balance would show for that same contract if queried live at that moment; no synthetic
+ * decoration beyond the pre-existing Confirmed Balance before→after (`impact`, from
+ * movement.balanceBefore/balanceAfter — unrelated to this feature, confirmed wanted earlier this
+ * session), which only ever applies to a tab showing the event's own ledger, never a redirected parent.
+ *
+ * 2026-08-17, fourth revision same day — live example (LC S02's 3rd event: a plain A3 Document Arrival
+ * UTILIZE with no direct SG movement, SG G01 already existing on the LC) surfaced that "only POPULATED
+ * when the selected Event belongs to that specific child" (above) was too narrow: a root-level event
+ * still needs the Acceptance/SG tab populated whenever exactly one such child exists under the LC — the
+ * Maker already sees both balances together at input time (A3's own sufficiency check nets the SG's
+ * exposure into Tight Available Balance), so Inquire Events should too ("就是交易當時LC所有的BALANCE的
+ * 拍照存檔" — a snapshot of ALL the LC family's balances at transaction time, saved to DB). Confirmed via
+ * AskUserQuestion, twice: first that this is the CURRENT balance (not a historical "as of this event"
+ * cross-contract computation), then — correcting an initial live-fetch implementation — that it must be
+ * PERSISTED at createMovement()/release() time (`movement.acceptanceEventSnapshot`/`sgEventSnapshot`,
+ * captured server-side by `BalanceService.captureSiblingSnapshots` whenever exactly one candidate
+ * exists), not fetched live when later viewed — consistent with every other field this class reads.
  */
 export class InquireEventsService {
   constructor(private readonly api: BalanceComponentApiService) {}
@@ -77,9 +110,26 @@ export class InquireEventsService {
   selectedEventModel: BuilderModel = {};
   /** A fresh, throwaway FormGroup per selection — Formly requires one; nothing is ever submitted through it. */
   selectedEventForm = new FormGroup({});
-  /** "Event Snapshot — {label} — LC {lc}[/IB.../SG...]" — see selectEvent()'s own doc comment. */
-  selectedEventSnapshotTitle = '';
-  selectedEventSnapshot: BalanceSnapshot | null = null;
+
+  /** Up to 3 Balance Tabs, in fixed order (LC, then Acceptance if applicable, then SG if applicable) — see this class's own doc comment. */
+  selectedEventTabs: EventBalanceTab[] = [];
+  selectedEventTab: 'LC' | 'ACCEPTANCE' | 'SG' = 'LC';
+
+  get activeEventTab(): EventBalanceTab | null {
+    return this.selectedEventTabs.find((t) => t.key === this.selectedEventTab) ?? null;
+  }
+
+  /** A Sight LC never has an Acceptance (Design doc §7 Tenor Type Routing) — mirrors LookUpPanelService.lookupIsUsanceLc exactly, keyed off rootContract instead of a picked lookupResult. */
+  get selectedEventIsUsanceLc(): boolean {
+    const contract = this.rootContract;
+    if (!contract || (contract.instrumentType !== 'IPLC_LC' && contract.instrumentType !== 'EPLC_CONFIRMATION')) return false;
+    return !!contract.tenorType && contract.tenorType !== 'SIGHT';
+  }
+
+  /** SG applies to any IPLC_LC regardless of tenor (unlike Acceptance) — Import only. Mirrors LookUpPanelService.lookupHasSg. */
+  get selectedEventHasSg(): boolean {
+    return this.rootContract?.instrumentType === 'IPLC_LC';
+  }
 
   selectSide(side: 'IMPORT' | 'EXPORT'): void {
     this.side = side;
@@ -100,8 +150,37 @@ export class InquireEventsService {
     this.selectedEventFields = [];
     this.selectedEventModel = {};
     this.selectedEventForm = new FormGroup({});
-    this.selectedEventSnapshotTitle = '';
-    this.selectedEventSnapshot = null;
+    this.selectedEventTabs = [];
+    this.selectedEventTab = 'LC';
+  }
+
+  selectEventTab(tab: 'LC' | 'ACCEPTANCE' | 'SG'): void {
+    this.selectedEventTab = tab;
+  }
+
+  /**
+   * 2026-08-17, Trade Finance lifecycle/audit-trail business instruction ("EPLC_EXAMINATION should carry
+   * E01/E02 as the Secondary Reference so that each Examination event can be clearly linked to its
+   * subsequent Honour/Acceptance event") — EPLC_EXAMINATION's own natural key (`ibNumber`, B3's own "EB
+   * Number" field) IS the exact same value B4's own Honour/Accept later carries as its own
+   * `sourceTransactionRef` (B4's `secondaryRefLabel: 'EB Number'`, carried-and-protected from the picked
+   * Present Docs record — see balance-component.model.ts's own B4 doc comment) — surfacing it here as a
+   * "Secondary Ref." column lets a reader visually connect "Examination E01" to "Honour E01" in the same
+   * merged timeline, without cross-referencing anything.
+   *
+   * Extended same day for SHGT ("the corresponding Shipping Guarantee Number (SG Number) should be
+   * displayed so the user can identify which Shipping Guarantee the event belongs to") — same purpose,
+   * SHGT's own natural key (`sgNumber`, A8's own "SG Number" field) prefixed "SG " per the business's own
+   * worked example ("SG G01"), unlike EPLC_EXAMINATION's bare "E01" — each type's own display format
+   * follows its own literal example rather than an imposed cross-type convention. Every other
+   * instrumentType still returns "—" — either its own identity is just the LC Number (root), it's
+   * already surfaced once a LATER event's own Reference column refers back to it (as for
+   * EPLC_EXAMINATION → HONOUR), or it hasn't been asked for yet (Acceptance's own IB Number).
+   */
+  secondaryReferenceFor(event: InquiredEvent): string {
+    if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
+    if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
+    return '—';
   }
 
   search(): void {
@@ -164,10 +243,23 @@ export class InquireEventsService {
    * protected"), never which fields exist or their values, and every field is forced read-only
    * regardless via toReadOnlyFields().
    *
-   * Also fetches the ONE Event Snapshot this event's own ledger closed at (api.getBalanceAsOfMovement(),
-   * reusing an already-existing, already-tested backend capability — see that method's own doc comment
-   * for the full history) — a single, exact, same-contract point-in-time query; no cross-contract
-   * cutoff ambiguity to worry about, since this is always asking about the event's own contract.
+   * Balance Tabs (see this class's own doc comment): builds up to 3 tabs, each reading directly off the
+   * already-loaded movement — zero extra network calls except the legacy-data fallback below.
+   * - LC tab: `movement.eventSnapshot` when the event IS the root, else `movement.rootEventSnapshot`.
+   * - Acceptance/SG tab: `movement.eventSnapshot` when the event belongs to that specific child; else
+   *   `movement.acceptanceEventSnapshot`/`movement.sgEventSnapshot` — the one unambiguous sibling's own
+   *   CURRENT balance, captured server-side at createMovement()/release() time (2026-08-17, "就是交易
+   *   當時LC所有的BALANCE的拍照存檔" — business-confirmed live example: LC S02's 3rd event, a plain A3
+   *   Document Arrival UTILIZE with no direct SG movement, still needs SG G01's own balance shown; then
+   *   explicitly confirmed via AskUserQuestion that this must be PERSISTED at transaction time, not a
+   *   live fetch when later viewed — see BalanceMovement.acceptanceEventSnapshot/sgEventSnapshot's own
+   *   doc comments and BalanceService.captureSiblingSnapshots on the microservice side).
+   * `impact` (movement.balanceBefore/balanceAfter) is attached ONLY alongside a tab showing
+   * `movement.eventSnapshot` (this movement's own ledger) — never alongside a sibling/redirected
+   * snapshot, where a different contract's own before/after would be meaningless. Legacy-data fallback
+   * (api.getBalanceAsOfMovement()) applies only to the ONE tab matching the event's own ledger, only
+   * when its eventSnapshot is null (a movement created before that field existed) — the LC/Acceptance/SG
+   * sibling fields have no live-fallback equivalent for such pre-migration rows; they simply stay empty.
    */
   selectEvent(event: InquiredEvent): void {
     this.selectedEvent = event;
@@ -201,24 +293,59 @@ export class InquireEventsService {
     this.selectedEventFields = toReadOnlyFields(buildFields(ctx));
     this.selectedEventForm = new FormGroup({});
 
-    this.selectedEventSnapshotTitle = this.snapshotTitleFor(event);
-    this.selectedEventSnapshot = null;
-    this.api.getBalanceAsOfMovement(movement.movementId).subscribe({
-      next: (snapshot) => (this.selectedEventSnapshot = snapshot),
-      error: () => (this.selectedEventSnapshot = null),
-    });
+    const isRootEvent = contract.instrumentType === this.rootContract?.instrumentType;
+    const isAcceptanceEvent = contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE';
+    const isSgEvent = contract.instrumentType === 'SHGT';
+    const ownImpact = { before: movement.balanceBefore, after: movement.balanceAfter };
+    const lcNumber = this.rootContract?.naturalKey.lcNumber ?? this.lcNumber;
+    const rootLabel = this.rootContract ? (BALANCE_SNAPSHOT_LABEL[this.rootContract.instrumentType] ?? this.rootContract.instrumentType) : 'Balance';
+
+    const tabs: EventBalanceTab[] = [
+      {
+        key: 'LC',
+        label: rootLabel,
+        title: `${rootLabel} — LC ${lcNumber}`,
+        snapshot: isRootEvent ? movement.eventSnapshot ?? null : (movement.rootEventSnapshot ?? null),
+        impact: isRootEvent ? ownImpact : null,
+      },
+    ];
+    if (this.selectedEventIsUsanceLc) {
+      const acceptanceLabel = this.side === 'IMPORT' ? 'Acceptance Balance' : 'Confirmed LC Acceptance Balance';
+      const suffix = isAcceptanceEvent && contract.naturalKey.ibNumber ? ` / IB ${contract.naturalKey.ibNumber}` : '';
+      tabs.push({
+        key: 'ACCEPTANCE',
+        label: acceptanceLabel,
+        title: `${acceptanceLabel} — LC ${lcNumber}${suffix}`,
+        snapshot: isAcceptanceEvent ? (movement.eventSnapshot ?? null) : (movement.acceptanceEventSnapshot ?? null),
+        impact: isAcceptanceEvent ? ownImpact : null,
+      });
+    }
+    if (this.selectedEventHasSg) {
+      const suffix = isSgEvent && contract.naturalKey.sgNumber ? ` / SG ${contract.naturalKey.sgNumber}` : '';
+      tabs.push({
+        key: 'SG',
+        label: 'Shipping Guarantee Balance',
+        title: `Shipping Guarantee Balance — LC ${lcNumber}${suffix}`,
+        snapshot: isSgEvent ? (movement.eventSnapshot ?? null) : (movement.sgEventSnapshot ?? null),
+        impact: isSgEvent ? ownImpact : null,
+      });
+    }
+    this.selectedEventTabs = tabs;
+    this.selectedEventTab = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
+
+    if (!movement.eventSnapshot) {
+      const ownTabKey: 'LC' | 'ACCEPTANCE' | 'SG' = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
+      this.api.getBalanceAsOfMovement(movement.movementId).subscribe({
+        next: (snapshot) => this.applyFallbackSnapshot(event, ownTabKey, snapshot),
+        error: () => {},
+      });
+    }
   }
 
-  /**
-   * "Event Snapshot — {label} — LC {lc}" / "... / IB {ib}" / "... / SG {sg}" — LC/IB/SG suffix mirrors
-   * LookUpPanelService.activeLookupLabel's own convention, kept independently implemented rather than
-   * extracted into a shared helper: risking a behavior change to that already-shipped, already-tested
-   * Look Up panel wasn't justified for a cosmetic label string.
-   */
-  private snapshotTitleFor(event: InquiredEvent): string {
-    const label = BALANCE_SNAPSHOT_LABEL[event.contract.instrumentType] ?? event.contract.instrumentType;
-    const { lcNumber, ibNumber, sgNumber } = event.contract.naturalKey;
-    const suffix = ibNumber ? ` / IB ${ibNumber}` : sgNumber ? ` / SG ${sgNumber}` : '';
-    return `Event Snapshot — ${label} — LC ${lcNumber}${suffix}`;
+  /** Guards against a stale async fallback response landing after the user has already selected a different Event. */
+  private applyFallbackSnapshot(forEvent: InquiredEvent, tabKey: 'LC' | 'ACCEPTANCE' | 'SG', snapshot: BalanceSnapshot): void {
+    if (this.selectedEvent !== forEvent) return;
+    const tab = this.selectedEventTabs.find((t) => t.key === tabKey);
+    if (tab) tab.snapshot = snapshot;
   }
 }

@@ -60,6 +60,34 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('maker_submitted_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_at TEXT');
     },
   },
+  {
+    id: 5,
+    description:
+      'Add event_snapshot to balance_movements (2026-08-17, persisted Event Snapshot captured at createMovement()/release() — see types.ts BalanceMovement.eventSnapshot)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN event_snapshot TEXT');
+    },
+  },
+  {
+    id: 6,
+    description:
+      'Add root_event_snapshot to balance_movements (2026-08-17, Inquire Events Balance Tabs — the parent LC/Confirmation\'s own plain balance for a child-ledger movement — see types.ts BalanceMovement.rootEventSnapshot)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('root_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN root_event_snapshot TEXT');
+    },
+  },
+  {
+    id: 7,
+    description:
+      'Add acceptance_event_snapshot/sg_event_snapshot to balance_movements (2026-08-17, "就是交易當時LC所有的BALANCE的拍照存檔" — the one unambiguous sibling Acceptance\'s/SG\'s own plain balance — see types.ts BalanceMovement.acceptanceEventSnapshot/sgEventSnapshot)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('acceptance_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN acceptance_event_snapshot TEXT');
+      if (!columns.includes('sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN sg_event_snapshot TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {
