@@ -76,11 +76,11 @@
                       [items]="filteredParentCatalog"
                       [selectedId]="selectedParent?.balanceContractId ?? null"
                       [searchable]="true"
-                      [(searchValue)]="parentSearch"
+                      [(searchValue)]="parentPicker.search"
                       searchPlaceholder="Search LC Number…"
                       (search)="onParentSearch()"
                       emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
-                      [page]="parentPage" [totalPages]="parentTotalPages" [total]="parentTotal"
+                      [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
                       (pick)="onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
                       <ng-template let-c>
                         <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span>
@@ -103,11 +103,11 @@
                     [items]="filteredParentCatalog"
                     [selectedId]="selectedParent?.balanceContractId ?? null"
                     [searchable]="true"
-                    [(searchValue)]="parentSearch"
+                    [(searchValue)]="parentPicker.search"
                     searchPlaceholder="Search LC Number…"
                     (search)="onParentSearch()"
                     emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
-                    [page]="parentPage" [totalPages]="parentTotalPages" [total]="parentTotal"
+                    [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
                     (pick)="onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
                     <ng-template let-c>
                       <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span>
@@ -172,7 +172,7 @@
                 </div>
               </ng-container>
               <ng-template #existingContract>
-                <ng-container *ngIf="usesTwoFieldSearch; else catalogPicker">
+                <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
                   <label class="tb-field__label">Search Existing Contract — LC Number + {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} (both mandatory — a single LC can have multiple {{ ibNumberLabel }}s)</label>
                   <div class="tb-grid-3">
                     <input class="tb-input tb-input--required" placeholder="LC Number (mandatory)" [(ngModel)]="searchNaturalKey.lcNumber">
@@ -195,8 +195,8 @@
                       label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{ searchNaturalKey.lcNumber }}"
                       [items]="filteredIbIndexCatalog"
                       [selectedId]="selectedContract?.balanceContractId ?? null"
-                      emptyText="{{ ibIndexCatalog.length ? 'All entries on this page are 0-balance (already fully settled/redeemed) — try Next page.' : 'No ' + model.instrumentType + ' records yet under this LC.' }}"
-                      [page]="ibIndexPage" [totalPages]="ibIndexTotalPages" [total]="ibIndexTotal"
+                      emptyText="{{ ibIndexPicker.contracts.length ? 'All entries on this page are 0-balance (already fully settled/redeemed) — try Next page.' : 'No ' + model.instrumentType + ' records yet under this LC.' }}"
+                      [page]="ibIndexPicker.page" [totalPages]="ibIndexPicker.totalPages" [total]="ibIndexPicker.total"
                       (pick)="onSelectIbIndex($event)" (prevPage)="ibIndexPrevPage()" (nextPage)="ibIndexNextPage()">
                       <ng-template let-c>
                         <span class="tb-row-primary">{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
@@ -226,17 +226,17 @@
                   </div>
                 </ng-container>
               </ng-template>
-              <ng-template #catalogPicker>
+              <ng-template #flatCatalogPicker>
                 <app-index-picker
                   label="{{ selectedFunction.payExistingUtilize ? 'LC Index — pick the LC to pay against' : 'LC Index — Existing Contract' }}"
                   [items]="filteredCatalogContracts"
                   [selectedId]="selectedContract?.balanceContractId ?? null"
                   [searchable]="true"
-                  [(searchValue)]="catalogSearch"
+                  [(searchValue)]="catalogPicker.search"
                   searchPlaceholder="Search LC Number…"
                   (search)="onCatalogSearch()"
-                  emptyText="{{ catalogContracts.length ? 'All contracts on this page are 0-balance — try Next page.' : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.' }}"
-                  [page]="catalogPage" [totalPages]="catalogTotalPages" [total]="catalogTotal"
+                  emptyText="{{ catalogPicker.contracts.length ? 'All contracts on this page are 0-balance — try Next page.' : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.' }}"
+                  [page]="catalogPicker.page" [totalPages]="catalogPicker.totalPages" [total]="catalogPicker.total"
                   (pick)="onSelectContract($event)" (prevPage)="catalogPrevPage()" (nextPage)="catalogNextPage()">
                   <ng-template let-c>
                     <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}{{ catalogIbHint(c) }}</span>

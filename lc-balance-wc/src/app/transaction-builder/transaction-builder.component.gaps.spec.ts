@@ -247,7 +247,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectFunction(fn('A4'));
       expect(c.flattenedPayableRows).toEqual([]);
 
-      c.catalogContracts = [
+      c.catalogPicker.contracts = [
         contract({ balanceContractId: 'b', naturalKey: { lcNumber: 'B001' } }),
         contract({ balanceContractId: 'a', naturalKey: { lcNumber: 'A001' } }),
       ];
@@ -260,43 +260,43 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(rows.map((r) => r.movement.movementId)).toEqual(['m-a1', 'm-a2', 'm-b2']);
     });
 
-    it('catalogTotalPages / parentTotalPages are always at least 1', () => {
+    it('catalogPicker.totalPages / parentPicker.totalPages are always at least 1', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      expect(c.catalogTotalPages).toBe(1);
-      expect(c.parentTotalPages).toBe(1);
-      c.catalogTotal = 25;
-      expect(c.catalogTotalPages).toBe(3);
-      c.parentTotal = 21;
-      expect(c.parentTotalPages).toBe(3);
+      expect(c.catalogPicker.totalPages).toBe(1);
+      expect(c.parentPicker.totalPages).toBe(1);
+      c.catalogPicker.total = 25;
+      expect(c.catalogPicker.totalPages).toBe(3);
+      c.parentPicker.total = 21;
+      expect(c.parentPicker.totalPages).toBe(3);
     });
 
     it('filteredCatalogContracts: no tenor filter / no movementType -> passthrough', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.catalogContracts = [contract()];
+      c.catalogPicker.contracts = [contract()];
       expect(c.filteredCatalogContracts).toEqual([contract()]);
     });
 
     it('filteredCatalogContracts: payExistingUtilize (A4) always returns the tenor-filtered list unfiltered by balance', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A4'));
-      c.catalogContracts = [contract({ balanceContractId: 'zero', tenorType: 'SIGHT' })];
-      (c as any).catalogSnapshots.set('zero', snapshot({ availableBalance: '0' }));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'zero', tenorType: 'SIGHT' })];
+      (c as any).catalogPicker.snapshots.set('zero', snapshot({ availableBalance: '0' }));
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['zero']);
     });
 
     it('filteredCatalogContracts: a decreasing movementType (A3) excludes 0-available contracts but keeps ones with no snapshot yet', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A3'));
-      c.catalogContracts = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' }), contract({ balanceContractId: 'unknown' })];
-      (c as any).catalogSnapshots.set('zero', snapshot({ availableBalance: '0' }));
-      (c as any).catalogSnapshots.set('nonzero', snapshot({ availableBalance: '500' }));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' }), contract({ balanceContractId: 'unknown' })];
+      (c as any).catalogPicker.snapshots.set('zero', snapshot({ availableBalance: '0' }));
+      (c as any).catalogPicker.snapshots.set('nonzero', snapshot({ availableBalance: '500' }));
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['nonzero', 'unknown'].sort());
     });
 
     it('filteredCatalogContracts: tenorFilter excludes the opposite tenor family but keeps contracts with no tenorType recorded', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A4')); // catalogTenorFilter: 'SIGHT'
-      c.catalogContracts = [
+      c.catalogPicker.contracts = [
         contract({ balanceContractId: 'sight', tenorType: 'SIGHT' }),
         contract({ balanceContractId: 'usance', tenorType: 'BUYERS_USANCE' }),
         contract({ balanceContractId: 'legacy' }),
@@ -318,7 +318,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A6'));
       c.model.tenorType = 'BUYERS_USANCE';
-      c.parentCatalog = [
+      c.parentPicker.contracts = [
         contract({ balanceContractId: 'match', tenorType: 'BUYERS_USANCE' }),
         contract({ balanceContractId: 'other-tenor', tenorType: 'SELLERS_USANCE' }),
         contract({ balanceContractId: 'sight', tenorType: 'SIGHT' }),
@@ -330,21 +330,21 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('filteredParentCatalog: catalogTenorFilter USANCE (A7) excludes only Sight, keeps legacy, and skips the 0-balance filter', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A7'));
-      c.parentCatalog = [
+      c.parentPicker.contracts = [
         contract({ balanceContractId: 'usance', tenorType: 'BUYERS_USANCE' }),
         contract({ balanceContractId: 'sight', tenorType: 'SIGHT' }),
         contract({ balanceContractId: 'legacy' }),
       ];
-      (c as any).parentSnapshots.set('usance', snapshot({ availableBalance: '0' }));
+      (c as any).parentPicker.snapshots.set('usance', snapshot({ availableBalance: '0' }));
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'usance'].sort());
     });
 
     it('filteredParentCatalog: no tenor flags at all (A8) applies only the 0-balance filter', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A8'));
-      c.parentCatalog = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' })];
-      (c as any).parentSnapshots.set('zero', snapshot({ availableBalance: '0' }));
-      (c as any).parentSnapshots.set('nonzero', snapshot({ availableBalance: '500' }));
+      c.parentPicker.contracts = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' })];
+      (c as any).parentPicker.snapshots.set('zero', snapshot({ availableBalance: '0' }));
+      (c as any).parentPicker.snapshots.set('nonzero', snapshot({ availableBalance: '500' }));
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['nonzero']);
     });
   });
@@ -375,14 +375,14 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectFunction(fn('A4'));
       expect(c.catalogPendingHint(contract({ balanceContractId: 'no-snap' }))).toBe('');
 
-      (c as any).catalogSnapshots.set('zero', snapshot({ pendingEarmarkTotal: '0' }));
+      (c as any).catalogPicker.snapshots.set('zero', snapshot({ pendingEarmarkTotal: '0' }));
       expect(c.catalogPendingHint(contract({ balanceContractId: 'zero' }))).toBe('');
 
-      (c as any).catalogSnapshots.set('one', snapshot({ pendingEarmarkTotal: '-1234567.89' }));
+      (c as any).catalogPicker.snapshots.set('one', snapshot({ pendingEarmarkTotal: '-1234567.89' }));
       (c as any).catalogPayableIbs.set('one', ['IB01']);
       expect(c.catalogPendingHint(contract({ balanceContractId: 'one' }))).toBe(' — Pending: 1,234,567.89');
 
-      (c as any).catalogSnapshots.set('many', snapshot({ pendingEarmarkTotal: '-5000' }));
+      (c as any).catalogPicker.snapshots.set('many', snapshot({ pendingEarmarkTotal: '-5000' }));
       (c as any).catalogPayableIbs.set('many', ['IB01', 'IB02']);
       expect(c.catalogPendingHint(contract({ balanceContractId: 'many' }))).toBe(' — Total Pending: 5,000');
     });
@@ -432,15 +432,15 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('filteredIbIndexCatalog: passthrough for a non-decreasing movementType, filters 0-balance for a decreasing one', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A1'));
-      c.ibIndexCatalog = [contract({ balanceContractId: 'x' })];
-      expect(c.filteredIbIndexCatalog).toEqual(c.ibIndexCatalog);
+      c.ibIndexPicker.contracts = [contract({ balanceContractId: 'x' })];
+      expect(c.filteredIbIndexCatalog).toEqual(c.ibIndexPicker.contracts);
 
       const c2 = new TransactionBuilderComponent(mockApi());
       c2.selectFunction(fn('A7'));
       c2.model.movementType = 'FULL_SETTLE';
-      c2.ibIndexCatalog = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' })];
-      (c2 as any).ibIndexSnapshots.set('zero', snapshot({ availableBalance: '0' }));
-      (c2 as any).ibIndexSnapshots.set('nonzero', snapshot({ availableBalance: '10' }));
+      c2.ibIndexPicker.contracts = [contract({ balanceContractId: 'zero' }), contract({ balanceContractId: 'nonzero' })];
+      (c2 as any).ibIndexPicker.snapshots.set('zero', snapshot({ availableBalance: '0' }));
+      (c2 as any).ibIndexPicker.snapshots.set('nonzero', snapshot({ availableBalance: '10' }));
       expect(c2.filteredIbIndexCatalog.map((x) => x.balanceContractId)).toEqual(['nonzero']);
     });
 
@@ -675,7 +675,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('flattenedPayableRows: a filtered catalog contract with no entry in catalogPayableMovements contributes zero rows (the Map.get() ?? [] fallback)', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A4'));
-      c.catalogContracts = [contract({ balanceContractId: 'no-movements' })];
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'no-movements' })];
       // catalogPayableMovements deliberately left empty for this contract.
       expect(c.flattenedPayableRows).toEqual([]);
     });
@@ -693,8 +693,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it("filteredCatalogContracts: the tenorFilter ternary's USANCE side (as opposed to A4's SIGHT side already covered elsewhere)", () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A7')); // catalogTenorFilter: 'USANCE' — exercised directly against the getter,
-      // independent of A7's normal two-field-search flow (which never populates catalogContracts itself).
-      c.catalogContracts = [
+      // independent of A7's normal two-field-search flow (which never populates catalogPicker.contracts itself).
+      c.catalogPicker.contracts = [
         contract({ balanceContractId: 'sight', tenorType: 'SIGHT' }),
         contract({ balanceContractId: 'usance', tenorType: 'BUYERS_USANCE' }),
       ];
@@ -753,10 +753,10 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const api = mockApi({ catalog: jest.fn(() => throwError(() => new Error('boom'))) as any });
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('A3S'));
-      // onSelectContract() itself re-resolves selectedContract from catalogContracts by id — must be
+      // onSelectContract() itself re-resolves selectedContract from catalogPicker.contracts by id — must be
       // populated first, or the lookup falls back to null and loadSgsForArrival() short-circuits on
       // its own `if (!lcNumber) return;` guard before ever reaching the catalog() call under test.
-      c.catalogContracts = [contract({ balanceContractId: 'bc-1', naturalKey: { lcNumber: 'S001' } })];
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'bc-1', naturalKey: { lcNumber: 'S001' } })];
       c.onSelectContract('bc-1');
       expect(c.sgsForArrivalLoading).toBe(false);
       expect(c.sgsForArrival).toEqual([]);
@@ -768,7 +768,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('A3S'));
       catalogSpy.mockClear(); // selectFunction()'s own reloadCatalog() already called it once, unrelated to this guard
-      c.catalogContracts = []; // picking an id that matches nothing leaves selectedContract null
+      c.catalogPicker.contracts = []; // picking an id that matches nothing leaves selectedContract null
       c.onSelectContract('does-not-exist');
       expect(c.sgsForArrivalLoading).toBe(false);
       expect(c.sgsForArrival).toEqual([]);
@@ -782,7 +782,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       });
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('A4'));
-      c.catalogContracts = [contract({ balanceContractId: 'bc-1' })];
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'bc-1' })];
       c.onSelectContract('bc-1');
       expect(c.payableMovementsLoading).toBe(false);
       expect(c.payableMovements).toEqual([]);
@@ -793,7 +793,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const api = mockApi({ listMovements: listMovementsSpy as any });
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('A4'));
-      c.catalogContracts = []; // picking an id that matches nothing leaves selectedContract null
+      c.catalogPicker.contracts = []; // picking an id that matches nothing leaves selectedContract null
       c.payableMovements = [movement({ movementId: 'stale' })]; // must be cleared, not left stale
       c.onSelectContract('does-not-exist');
       expect(c.payableMovements).toEqual([]);
@@ -940,7 +940,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('onSelectParent (A6, tenorTypeOptions): a parent LC with no declared tenorType/tenorDays falls back to undefined, not carrying over a stale value', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A6'));
-      c.parentCatalog = [contract({ balanceContractId: 'p1', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } })]; // no tenorType/tenorDays set
+      c.parentPicker.contracts = [contract({ balanceContractId: 'p1', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } })]; // no tenorType/tenorDays set
       c.onSelectParent('p1');
       expect(c.model.tenorType).toBeUndefined();
       expect(c.model.tenorDays).toBeUndefined();
@@ -949,7 +949,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('onSelectIbIndex: a found contract with no ibNumber on its natural key (e.g. an SHGT row, A8) falls back to "" rather than undefined', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A8'));
-      c.ibIndexCatalog = [contract({ balanceContractId: 'ib1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } })];
+      c.ibIndexPicker.contracts = [contract({ balanceContractId: 'ib1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } })];
       c.onSelectIbIndex('ib1');
       expect(c.searchNaturalKey.ibNumber).toBe('');
       expect(c.searchNaturalKey.sgNumber).toBe('SG01');

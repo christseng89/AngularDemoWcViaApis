@@ -2267,6 +2267,68 @@ selection and three picker state machines (deliberately left as-is, see the entr
 what remains is now a materially narrower, more clearly-scoped remainder than at any earlier point in
 this session's own BAL-003 history.
 
+## BAL-003 — the three paginated pickers' load-and-page bookkeeping extracted into `CatalogPickerService` — narrowed scope, not the full selection-flow extraction originally floated (2026-08-17, user-directed: "對於God Component的問題 有甚麼建議解法?" (asked again what to do about the God Component), a full-selection-flow extraction was investigated and found too entangled → presented three options via AskUserQuestion → user picked "縮小範圍：只抽分頁載入" (narrow scope: only extract paged loading))
+
+Investigated the three paginated pickers (Catalog LC Index / Parent LC picker / IB-SG Index) as the next
+BAL-003 candidate, since all three "does too many things" jobs named in the entries above (Checker
+Actions, Maker Submit, Look Up panel) were already extracted. Unlike those three, the pickers'
+`onSelectContract()`/`onSelectParent()`/`onSelectIbIndex()` selection handlers are NOT a self-contained
+subsystem — they mutate `model.movementType`/`model.currency`, call `rebuildFields()`, cascade into
+`loadPayableMovements()`/`loadSgsForArrival()`/`loadSettleableBalances()`, and sync the Checker panel.
+That's core Maker-flow orchestration, not picker bookkeeping; extracting it would need a context/callback
+surface at least as large as `MakerSubmitService`'s own, for a comparatively small payoff. Reported this
+plainly rather than plowing ahead on the original framing, and let the user choose the scope via
+`AskUserQuestion` rather than deciding unilaterally.
+
+**Fix, at the confirmed narrower scope**: new `CatalogPickerService` (`catalog-picker.service.ts`) — one
+instance per picker (`catalogPicker`/`parentPicker`/`ibIndexPicker`, all three initialized in the
+constructor body alongside `lookUp`, for the same "field initializers can't rely on `this.api` being set
+yet" reason `lookUp` itself already documents). Owns `contracts`/`search`/`snapshots`/the underlying
+`PagedListState` instance (`page`/`total`/`totalPages`, `prevTarget()`/`nextTarget()`/`resetPaging()`),
+and a `load()` method absorbing the old `loadPagedCatalog()` shared helper's fetch/populate/error body
+verbatim (including `loadSnapshotsInto()`, now private to the service). `reloadCatalog()`/
+`loadParentPage()`/`loadIbIndexPage()` on the component stay as thin wrappers supplying each picker's own
+DIFFERENT guard condition, `tenorFamily`, and (Catalog only) an `onLoaded` hook that triggers A4's payable-
+IB-hint follow-up load — exactly the same "guard/params unchanged, only the fetch body moves" shape this
+report's own BAL-003 history has used for every prior extraction. Selection handlers, the business-rule
+`filteredCatalogContracts`/`filteredParentCatalog`/`filteredIbIndexCatalog` getters, and
+`catalogPayableIbs`/`catalogPayableMovements`/`loadPayableIbHints()` (A4-specific, not generic picker
+concerns) all stay on the component, unchanged, exactly as scoped.
+
+**Naming collision found and fixed**: the .html template already had an unrelated `<ng-template
+#catalogPicker>` (the flat-Catalog-picker fallback branch of `*ngIf="usesTwoFieldSearch; else
+catalogPicker"`) — Angular's template type-checker resolved the new `catalogPicker` field references
+against that template-ref variable instead of the component property, surfacing as `NG9: Property
+'contracts' does not exist on type 'TemplateRef<any>'` at build time (not at `tsc --noEmit`, which
+doesn't type-check templates). Renamed the pre-existing, unrelated template-ref variable to
+`#flatCatalogPicker` (its own `else` reference updated too) rather than renaming the new service field,
+since the field name is the one that needed to stay `catalogPicker` for the (already-completed) mechanical
+rename below.
+
+**Test/template migration**: ~260 raw occurrences of the moved identifiers
+(`catalogContracts`/`catalogSearch`/`catalogSnapshots`/`catalogPage`/`catalogTotal`/`catalogTotalPages`
+and the `parent`/`ibIndex` equivalents) across `transaction-builder.component.ts`, `.html`, and all three
+spec files (`.spec.ts`/`.selection.spec.ts`/`.gaps.spec.ts`) renamed via the same scripted word-boundary
+regex pass used for the Look Up panel — pure rename, no test logic touched. One rename-script bug caught
+by the immediate `tsc --noEmit` re-run: the regex also matched the component's OWN `catalogTotalPages`/
+`parentTotalPages`/`ibIndexTotalPages` getter *declarations* (not just references to them), corrupting
+`get catalogTotalPages()` into invalid syntax `get catalogPicker.totalPages()` — fixed by deleting those
+three now-redundant thin getters entirely (external callers already reference `catalogPicker.totalPages`
+etc. directly post-rename, matching how `catalogPage`/`catalogTotal`'s own getters were fully removed
+rather than kept as wrappers).
+
+Verified: `tsc --noEmit`/`ng build --configuration development` both clean, `npm run lint` clean (202
+warnings, unchanged — the one `PagedListState` import left unused by this extraction was removed). Full
+Angular suite 534/534 (unchanged count — pure move) with **zero test files needing any logic changes**,
+coverage 99.7%/95.97%/99.43%/99.74% (all four clear the 95% floor; `catalog-picker.service.ts` itself is
+**100% on all four metrics**). `backend/` 33/33 and microservice 292/292 both unaffected and re-verified
+per this file's own standing three-suite rule (Angular-only change).
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` 2,438 → 2,304 lines. BAL-003 stays open at
+Major — function/side selection and the pickers' own selection/business-filter logic remain, deliberately
+not extracted (see the investigation above) — but every extraction this session's BAL-003 history judged
+worth doing, at a scope the user actually confirmed, is now done.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

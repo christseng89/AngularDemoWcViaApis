@@ -6,10 +6,10 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
-import { PagedListState } from './paged-list-state';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './maker-submit.service';
 import { LookUpPanelService } from './look-up-panel.service';
+import { CatalogPickerService } from './catalog-picker.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   CREATING_MOVEMENT_TYPES,
@@ -91,33 +91,9 @@ export class TransactionBuilderComponent {
   fields: FormlyFieldConfig[] = [];
 
   naturalKey = { lcNumber: '', ibNumber: '', sgNumber: '' };
-  catalogContracts: BalanceContract[] = [];
   readonly catalogPageSize = 10;
-  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID): state/boundary-math now owned by PagedListState — see catalogPage/catalogTotal/catalogTotalPages accessors below. */
-  private readonly catalogPaging = new PagedListState(this.catalogPageSize);
-  get catalogPage(): number {
-    return this.catalogPaging.page;
-  }
-  set catalogPage(page: number) {
-    this.catalogPaging.page = page;
-  }
-  get catalogTotal(): number {
-    return this.catalogPaging.total;
-  }
-  set catalogTotal(total: number) {
-    this.catalogPaging.total = total;
-  }
-  /**
-   * Business-reported gap 2026-08-14 ("Why the U003 does not allow for
-   * Amendment?" — it did; it was just on page 2 of 2, alphabetically after
-   * "900"/"S001", invisible without clicking Next). Substring search
-   * against lc_number (backend's existing `q` LIKE filter), resets to
-   * page 1 so a specific LC doesn't require paging through the whole
-   * alphabetically-ordered list to find.
-   */
-  catalogSearch = '';
-  /** Business instruction 2026-08-14: snapshot per catalog entry, so the picker itself can filter out 0-balance contracts instead of only failing after submission. */
-  catalogSnapshots = new Map<string, BalanceSnapshot>();
+  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see catalogPicker below. */
+  readonly catalogPicker: CatalogPickerService;
   /** A4 (Sight Settlement) only — business instruction 2026-08-14: LC Index shows the pending IB Number(s) inline (e.g. "810 — IB00001 — ACTIVE — Pending: 25,000") so the user can identify which Document Arrival is being settled without opening Step 2 first. */
   catalogPayableIbs = new Map<string, string[]>();
   /** Full movement objects backing catalogPayableIbs, keyed the same way — business-reported gap "select S001 IB03 or S001 IB04 separately". */
@@ -143,28 +119,14 @@ export class TransactionBuilderComponent {
    * (via the catalog's exact lcNumber filter, not the substring `q`), so
    * the user picks the IB/SG Number instead of typing it.
    */
-  ibIndexCatalog: BalanceContract[] = [];
   readonly ibIndexPageSize = 10;
-  /** BAL-003 (OOD/SOLID): state/boundary-math now owned by PagedListState — see ibIndexPage/ibIndexTotal/ibIndexTotalPages accessors below. */
-  private readonly ibIndexPaging = new PagedListState(this.ibIndexPageSize);
-  get ibIndexPage(): number {
-    return this.ibIndexPaging.page;
-  }
-  set ibIndexPage(page: number) {
-    this.ibIndexPaging.page = page;
-  }
-  get ibIndexTotal(): number {
-    return this.ibIndexPaging.total;
-  }
-  set ibIndexTotal(total: number) {
-    this.ibIndexPaging.total = total;
-  }
-  ibIndexSnapshots = new Map<string, BalanceSnapshot>();
+  /** BAL-003 (OOD/SOLID, 8th pass): contracts/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see ibIndexPicker below. */
+  readonly ibIndexPicker: CatalogPickerService;
 
   /**
    * Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB Index —
    * Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5's own "EB Index"
-   * Step 2, once its Parent LC (Step 1) is picked. Unlike ibIndexCatalog above (single instrumentType,
+   * Step 2, once its Parent LC (Step 1) is picked. Unlike ibIndexPicker.contracts above (single instrumentType,
    * model.instrumentType's own catalog), this is populated from selectedFunction.instrumentType
    * (EPLC_ACCEPTANCE, B5's own fixed type) under the same picked Confirmation. Each entry carries its
    * own real balanceContractId/instrumentType/availableBalance so onSelectSettleableBalance() can route
@@ -311,26 +273,9 @@ export class TransactionBuilderComponent {
   checkerId = 'checker1';
 
   parentInstrumentType: InstrumentType | '' = '';
-  parentCatalog: BalanceContract[] = [];
   readonly parentPageSize = 10;
-  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID): state/boundary-math now owned by PagedListState — see parentPage/parentTotal/parentTotalPages accessors below. */
-  private readonly parentPaging = new PagedListState(this.parentPageSize);
-  get parentPage(): number {
-    return this.parentPaging.page;
-  }
-  set parentPage(page: number) {
-    this.parentPaging.page = page;
-  }
-  get parentTotal(): number {
-    return this.parentPaging.total;
-  }
-  set parentTotal(total: number) {
-    this.parentPaging.total = total;
-  }
-  /** Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?") — same fix as the flat Catalog picker's catalogSearch. */
-  parentSearch = '';
-  /** Business instruction 2026-08-14: snapshot per parent candidate, combined with tenorType in filteredParentCatalog() below. */
-  parentSnapshots = new Map<string, BalanceSnapshot>();
+  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see parentPicker below. */
+  readonly parentPicker: CatalogPickerService;
   selectedParent: BalanceContract | null = null;
   exposureNature: 'ACTUAL' | 'MEMO' = 'ACTUAL';
 
@@ -365,13 +310,22 @@ export class TransactionBuilderComponent {
    * `look-up-panel.service.ts`'s own doc comment for why this is a plain class, not an `@Component`.
    */
   readonly lookUp: LookUpPanelService;
-
+  /**
+   * BAL-003 (8th same-day OOD/SOLID pass, "paginated pickers" — narrowed scope, see
+   * `catalog-picker.service.ts`'s own module note): `catalogPicker`/`parentPicker`/`ibIndexPicker`
+   * (declared next to their picker's other fields above) are all initialized here in the constructor
+   * body alongside `lookUp` — `this.catalogPageSize` etc. are only guaranteed assigned once field
+   * initializers have run, so this stays out of a field initializer.
+   */
   constructor(
     private readonly api: BalanceComponentApiService,
     private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
     private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
   ) {
     this.lookUp = new LookUpPanelService(api, () => (this.accountEntryDialogMovement = null));
+    this.catalogPicker = new CatalogPickerService(this.catalogPageSize, api);
+    this.parentPicker = new CatalogPickerService(this.parentPageSize, api);
+    this.ibIndexPicker = new CatalogPickerService(this.ibIndexPageSize, api);
   }
 
   get isCreatingMovement(): boolean {
@@ -469,13 +423,13 @@ export class TransactionBuilderComponent {
     this.selectedContractSnapshot = null;
     this.parentInstrumentType = fn.defaultParentInstrumentType ?? '';
     this.selectedParent = null;
-    this.parentCatalog = [];
-    this.parentPaging.reset();
-    this.parentSearch = '';
-    this.catalogPaging.reset();
-    this.catalogSearch = '';
-    this.ibIndexCatalog = [];
-    this.ibIndexPaging.reset();
+    this.parentPicker.contracts = [];
+    this.parentPicker.resetPaging();
+    this.parentPicker.search = '';
+    this.catalogPicker.resetPaging();
+    this.catalogPicker.search = '';
+    this.ibIndexPicker.contracts = [];
+    this.ibIndexPicker.resetPaging();
     this.settleableBalances = [];
     this.settleableBalancesLoading = false;
     this.payableMovements = [];
@@ -558,78 +512,14 @@ export class TransactionBuilderComponent {
     if (this.parentInstrumentType) this.onParentInstrumentTypeChange();
   }
 
-  /** Business instruction 2026-08-14: fetch each candidate's live balance so filteredCatalogContracts()/filteredParentCatalog() can exclude 0-balance ones — never lets a picker offer a target an action would immediately fail against. */
-  private loadSnapshotsInto(list: BalanceContract[], target: Map<string, BalanceSnapshot>): void {
-    target.clear();
-    if (!list.length) return;
-    forkJoin(list.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null))))).subscribe((snapshots) => {
-      list.forEach((c, i) => {
-        const snap = snapshots[i];
-        if (snap) target.set(c.balanceContractId, snap);
-      });
-    });
-  }
-
-  /**
-   * Quality-report-balance.md BAL-003 (first of three planned extractions — see that report's
-   * "one real extraction now" scope note): shared body behind the Catalog/Parent LC/IB Index pickers'
-   * three near-identical "call catalog(), populate items+total(+snapshots), clear both on any failure"
-   * state machines. Each picker's own public page/total/pageSize fields, `prevPage()`/`nextPage()`, and
-   * `*TotalPages` getter are all UNCHANGED below — this only consolidates the internal fetch/populate
-   * logic, since the `.html` template (not covered by this project's Jest config) binds directly to
-   * those public names and must not need to change. Each picker's own DIFFERENT guard condition (e.g.
-   * Catalog also blocks on `isCreatingMovement`, IB Index also requires a picked LC Number) is still
-   * evaluated by that picker's own thin wrapper below, not hidden in here — only the fetch/populate
-   * shape that was byte-for-byte identical three times over is shared.
-   */
-  private loadPagedCatalog(args: {
-    guardFails: boolean;
-    instrumentType: InstrumentType;
-    search?: string;
-    page: number;
-    pageSize: number;
-    lcNumber?: string;
-    tenorFamily?: 'SIGHT' | 'USANCE';
-    setPage: (page: number) => void;
-    setContracts: (items: BalanceContract[]) => void;
-    setTotal: (total: number) => void;
-    snapshots?: Map<string, BalanceSnapshot>;
-    onSuccess?: (items: BalanceContract[]) => void;
-  }): void {
-    args.setPage(args.page);
-    if (args.guardFails) {
-      args.setContracts([]);
-      args.setTotal(0);
-      return;
-    }
-    this.api.catalog(args.instrumentType, 'ACTIVE', args.search || undefined, args.page, args.pageSize, args.lcNumber, args.tenorFamily).subscribe({
-      next: (result) => {
-        args.setContracts(result.items);
-        args.setTotal(result.total);
-        if (args.snapshots) this.loadSnapshotsInto(result.items, args.snapshots);
-        args.onSuccess?.(result.items);
-      },
-      error: () => {
-        args.setContracts([]);
-        args.setTotal(0);
-      },
-    });
-  }
-
-  /** Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計" — page defaults to 1 (a fresh search), pass an explicit page to page through an already-loaded list. */
+  /** Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計" — page defaults to 1 (a fresh search), pass an explicit page to page through an already-loaded list. BAL-003 (8th pass): thin wrapper over `catalogPicker.load()` — guard/tenorFamily/onLoaded (this picker's own A4 payable-hint follow-up) are unchanged, only the fetch/populate/error body moved into the service. */
   reloadCatalog(page = 1): void {
-    this.loadPagedCatalog({
+    this.catalogPicker.load({
       guardFails: !this.model.instrumentType || this.isCreatingMovement,
       instrumentType: this.model.instrumentType!,
-      search: this.catalogSearch,
       page,
-      pageSize: this.catalogPageSize,
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
-      setPage: (p) => (this.catalogPage = p),
-      setContracts: (items) => (this.catalogContracts = items),
-      setTotal: (total) => (this.catalogTotal = total),
-      snapshots: this.catalogSnapshots,
-      onSuccess: (items) => {
+      onLoaded: (items) => {
         if (this.selectedFunction?.payExistingUtilize) this.loadPayableIbHints(items);
       },
     });
@@ -702,7 +592,7 @@ export class TransactionBuilderComponent {
    * is already sitting in catalogPayableMovements from the LC Index load.
    */
   onSelectFlattenedPayable(contractId: string, movementId: string): void {
-    this.selectedContract = this.catalogContracts.find((c) => c.balanceContractId === contractId) ?? null;
+    this.selectedContract = this.catalogPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     this.refreshSelectedContractSnapshot();
     this.payableMovements = this.catalogPayableMovements.get(contractId) ?? [];
     this.payableMovementsLoading = false;
@@ -730,17 +620,13 @@ export class TransactionBuilderComponent {
     return ibs.length === 1 ? ` — ${ibs[0]}` : ` — ${ibs.length} pending: ${ibs.join(', ')}`;
   }
 
-  get catalogTotalPages(): number {
-    return this.catalogPaging.totalPages;
-  }
-
   catalogPrevPage(): void {
-    const page = this.catalogPaging.prevTarget();
+    const page = this.catalogPicker.prevTarget();
     if (page !== null) this.reloadCatalog(page);
   }
 
   catalogNextPage(): void {
-    const page = this.catalogPaging.nextTarget();
+    const page = this.catalogPicker.nextTarget();
     if (page !== null) this.reloadCatalog(page);
   }
 
@@ -759,7 +645,7 @@ export class TransactionBuilderComponent {
    * filtering it out here would hide the one thing this function looks for.
    */
   get filteredCatalogContracts(): BalanceContract[] {
-    let list = this.catalogContracts;
+    let list = this.catalogPicker.contracts;
     const tenorFilter = this.selectedFunction?.catalogTenorFilter;
     if (tenorFilter) {
       list = list.filter((c) => !c.tenorType || (tenorFilter === 'SIGHT' ? c.tenorType === 'SIGHT' : c.tenorType !== 'SIGHT'));
@@ -767,7 +653,7 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.payExistingUtilize) return list;
     if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return list;
     return list.filter((c) => {
-      const snap = this.catalogSnapshots.get(c.balanceContractId);
+      const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
       return !snap || snap.availableBalance !== '0';
     });
   }
@@ -783,9 +669,8 @@ export class TransactionBuilderComponent {
 
   /**
    * Business instruction 2026-08-14 "Page by Page設計" — fetches one page without resetting the
-   * current parent selection. See `loadPagedCatalog`'s own doc comment (BAL-003) for why this is now
-   * a thin wrapper — the guard condition and every parameter below are unchanged from before the
-   * extraction, only the fetch/populate/error body moved into the shared helper.
+   * current parent selection. BAL-003 (8th pass): thin wrapper over `parentPicker.load()` — the guard
+   * condition and every parameter below are unchanged, only the fetch/populate/error body moved.
    *
    * Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?", "A7 should filter out LC
    * records Tenor = Sight") — same class of bug as A5's flat Catalog picker: filtering client-side AFTER
@@ -794,17 +679,11 @@ export class TransactionBuilderComponent {
    * filter server-side; A8's SHGT parent (neither) stays unfiltered, same as before.
    */
   private loadParentPage(page: number): void {
-    this.loadPagedCatalog({
+    this.parentPicker.load({
       guardFails: !this.parentInstrumentType,
       instrumentType: this.parentInstrumentType as InstrumentType,
-      search: this.parentSearch,
       page,
-      pageSize: this.parentPageSize,
       tenorFamily: this.parentTenorFamily,
-      setPage: (p) => (this.parentPage = p),
-      setContracts: (items) => (this.parentCatalog = items),
-      setTotal: (total) => (this.parentTotal = total),
-      snapshots: this.parentSnapshots,
     });
   }
 
@@ -813,17 +692,13 @@ export class TransactionBuilderComponent {
     this.loadParentPage(1);
   }
 
-  get parentTotalPages(): number {
-    return this.parentPaging.totalPages;
-  }
-
   parentPrevPage(): void {
-    const page = this.parentPaging.prevTarget();
+    const page = this.parentPicker.prevTarget();
     if (page !== null) this.loadParentPage(page);
   }
 
   parentNextPage(): void {
-    const page = this.parentPaging.nextTarget();
+    const page = this.parentPicker.nextTarget();
     if (page !== null) this.loadParentPage(page);
   }
 
@@ -849,7 +724,7 @@ export class TransactionBuilderComponent {
    * with the same 0-balance exclusion as filteredCatalogContracts() above.
    */
   get filteredParentCatalog(): BalanceContract[] {
-    let list = this.parentCatalog;
+    let list = this.parentPicker.contracts;
     if (this.selectedFunction?.tenorTypeOptions?.length) {
       list = list.filter((c) => c.tenorType && c.tenorType !== 'SIGHT' && (!this.model.tenorType || c.tenorType === this.model.tenorType));
     } else if (this.selectedFunction?.catalogTenorFilter === 'USANCE') {
@@ -863,7 +738,7 @@ export class TransactionBuilderComponent {
     // Available Balance 0) was wrongly excluded from B5's own "LC Index" before this fix.
     if (this.selectedFunction?.catalogTenorFilter === 'USANCE' || this.selectedFunction?.settleableBalanceIndex) return list;
     return list.filter((c) => {
-      const snap = this.parentSnapshots.get(c.balanceContractId);
+      const snap = this.parentPicker.snapshots.get(c.balanceContractId);
       return !snap || snap.availableBalance !== '0';
     });
   }
@@ -899,14 +774,14 @@ export class TransactionBuilderComponent {
   /**
    * UX 2026-08-14 "UX要做好 方便操作" — A4 (Sight Settlement) only: shows which LCs in
    * the Step 1 picker actually have something to pay, using the
-   * pendingEarmarkTotal already fetched into catalogSnapshots for the
+   * pendingEarmarkTotal already fetched into catalogPicker.snapshots for the
    * (now-skipped) 0-balance filter, so no extra API calls are needed.
    * Without this, the user has to click through every Sight LC blind to
    * find the one with a pending Document Arrival.
    */
   catalogPendingHint(c: BalanceContract): string {
     if (!this.selectedFunction?.payExistingUtilize) return '';
-    const snap = this.catalogSnapshots.get(c.balanceContractId);
+    const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
     if (!snap || snap.pendingEarmarkTotal === '0') return '';
     const ibs = this.catalogPayableIbs.get(c.balanceContractId);
     const label = ibs && ibs.length > 1 ? 'Total Pending' : 'Pending';
@@ -958,7 +833,7 @@ export class TransactionBuilderComponent {
   }
 
   onSelectContract(contractId: string): void {
-    this.selectedContract = this.catalogContracts.find((c) => c.balanceContractId === contractId) ?? null;
+    this.selectedContract = this.catalogPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     // Business instruction 2026-08-15 ("B3 不須選 Sight/Usance 因為交易本身已經有此訊息了") — B3 only.
     // Sight/Usance is no longer a manual subChoice; derive it from the picked Confirmation's own
     // tenorType (declared once, at B1) instead of asking the Maker to re-pick it here.
@@ -1371,7 +1246,7 @@ export class TransactionBuilderComponent {
   }
 
   onSelectParent(contractId: string): void {
-    this.selectedParent = this.parentCatalog.find((c) => c.balanceContractId === contractId) ?? null;
+    this.selectedParent = this.parentPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     // Business instruction 2026-08-16 ("A2-A9/B2-B5 Currency = Carry from A1/B1 + Protected") — see
     // carriedCurrency's own doc comment. Fires for every hasParent function (A6/A7/A8/A9/B3/B5) as soon
     // as the LC/Confirmation itself is picked, before any Step-2 child picker/search.
@@ -1424,34 +1299,25 @@ export class TransactionBuilderComponent {
 
   /**
    * Step 2 of the "LC Index -> IB Index" cascading picker (business instruction 2026-08-14) — one page
-   * of IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows under the exact LC picked in Step 1. See
-   * `loadPagedCatalog`'s own doc comment (BAL-003) — thin wrapper, guard/params unchanged.
+   * of IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows under the exact LC picked in Step 1. BAL-003 (8th
+   * pass): thin wrapper over `ibIndexPicker.load()`, guard/params unchanged.
    */
   private loadIbIndexPage(page: number): void {
-    this.loadPagedCatalog({
+    this.ibIndexPicker.load({
       guardFails: !this.model.instrumentType || !this.searchNaturalKey.lcNumber,
       instrumentType: this.model.instrumentType!,
       page,
-      pageSize: this.ibIndexPageSize,
       lcNumber: this.searchNaturalKey.lcNumber,
-      setPage: (p) => (this.ibIndexPage = p),
-      setContracts: (items) => (this.ibIndexCatalog = items),
-      setTotal: (total) => (this.ibIndexTotal = total),
-      snapshots: this.ibIndexSnapshots,
     });
   }
 
-  get ibIndexTotalPages(): number {
-    return this.ibIndexPaging.totalPages;
-  }
-
   ibIndexPrevPage(): void {
-    const page = this.ibIndexPaging.prevTarget();
+    const page = this.ibIndexPicker.prevTarget();
     if (page !== null) this.loadIbIndexPage(page);
   }
 
   ibIndexNextPage(): void {
-    const page = this.ibIndexPaging.nextTarget();
+    const page = this.ibIndexPicker.nextTarget();
     if (page !== null) this.loadIbIndexPage(page);
   }
 
@@ -1540,16 +1406,16 @@ export class TransactionBuilderComponent {
 
   /** Same 0-balance exclusion as filteredCatalogContracts()/filteredParentCatalog() — don't offer an already fully-settled/redeemed row as a Settlement/Redeem target. */
   get filteredIbIndexCatalog(): BalanceContract[] {
-    if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return this.ibIndexCatalog;
-    return this.ibIndexCatalog.filter((c) => {
-      const snap = this.ibIndexSnapshots.get(c.balanceContractId);
+    if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return this.ibIndexPicker.contracts;
+    return this.ibIndexPicker.contracts.filter((c) => {
+      const snap = this.ibIndexPicker.snapshots.get(c.balanceContractId);
       return !snap || snap.availableBalance !== '0';
     });
   }
 
   /** Step 2 selection — sets selectedContract directly from the already-fetched row, no separate Search click needed. */
   onSelectIbIndex(contractId: string): void {
-    this.selectedContract = this.ibIndexCatalog.find((c) => c.balanceContractId === contractId) ?? null;
+    this.selectedContract = this.ibIndexPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     this.searchError = null;
     if (this.selectedContract) {
       this.searchNaturalKey.ibNumber = this.selectedContract.naturalKey.ibNumber ?? '';

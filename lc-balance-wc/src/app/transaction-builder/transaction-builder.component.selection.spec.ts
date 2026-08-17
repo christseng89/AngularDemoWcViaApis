@@ -101,7 +101,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it("loads the picked contract's live snapshot (plain function, no special branches)", () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '5000' }))) });
       const comp = makeComponent(getFn('A3'), api);
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
 
       comp.onSelectContract('C1');
 
@@ -110,10 +110,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.selectedContractSnapshot?.availableBalance).toBe('5000');
     });
 
-    it('sets selectedContract to null and skips the snapshot fetch when the id is not in catalogContracts', () => {
+    it('sets selectedContract to null and skips the snapshot fetch when the id is not in catalogPicker.contracts', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A3'), api);
-      comp.catalogContracts = [];
+      comp.catalogPicker.contracts = [];
 
       comp.onSelectContract('missing');
 
@@ -125,7 +125,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('handles a snapshot-fetch error by leaving selectedContractSnapshot null and clearing snapshotLoading', () => {
       const api = makeApi({ getSnapshot: jest.fn(() => throwError(() => ({ error: { message: 'snapshot boom' } }))) });
       const comp = makeComponent(getFn('A3'), api);
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1' })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1' })];
 
       comp.onSelectContract('C1');
 
@@ -138,7 +138,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const releasedUtilize = { movementId: 'M2', status: 'RELEASED', movementType: 'UTILIZE' };
       const api = makeApi({ listMovements: jest.fn(() => of([pendingUtilize, releasedUtilize])) });
       const comp = makeComponent(getFn('A4'), api);
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1' })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1' })];
 
       comp.onSelectContract('C1');
 
@@ -162,7 +162,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         listMovements: jest.fn((id: string) => (id === 'EX1' ? of([pendingCreate]) : of([]))),
       });
       const comp = makeComponent(getFn('B4'), api);
-      comp.catalogContracts = [
+      comp.catalogPicker.contracts = [
         makeContract({
           balanceContractId: 'CNF1',
           instrumentType: 'EPLC_CONFIRMATION',
@@ -196,7 +196,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         listMovements: jest.fn((id: string) => (id === 'EX2' ? of([unacknowledgedCreate]) : of([]))),
       });
       const comp = makeComponent(getFn('B4'), api);
-      comp.catalogContracts = [
+      comp.catalogPicker.contracts = [
         makeContract({
           balanceContractId: 'CNF2',
           instrumentType: 'EPLC_CONFIRMATION',
@@ -218,7 +218,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         getSnapshot: jest.fn((id: string) => (id === 'SG1' ? of(makeSnapshot({ availableBalance: '3000', confirmedBalance: '3000' })) : of(makeSnapshot()))),
       });
       const comp = makeComponent(getFn('A3S'), api);
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
 
       comp.onSelectContract('C1');
 
@@ -579,7 +579,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it("A8 (creating movement, no tenorTypeOptions, no two-field search): auto-fills the new contract's LC Number from the picked Parent", () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A8'), api);
-      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
 
       comp.onSelectParent('P1');
 
@@ -599,7 +599,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         ),
       });
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
-      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } })];
       comp.selectedContract = makeContract({ balanceContractId: 'STALE' });
       comp.searchNaturalKey = { lcNumber: '', ibNumber: 'STALE_IB', sgNumber: '' };
 
@@ -609,14 +609,14 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.searchNaturalKey.ibNumber).toBe('');
       expect(comp.selectedContract).toBeNull();
       expect(comp.selectedContractSnapshot).toBeNull();
-      expect(comp.ibIndexCatalog).toEqual([ibContract]);
+      expect(comp.ibIndexPicker.contracts).toEqual([ibContract]);
     });
 
     it('A6 (settlesDocumentArrival + tenorTypeOptions): loads still-PENDING Document Arrivals and carries Tenor Type/Days from the Parent', () => {
       const pendingArrival = { movementId: 'M1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1500' };
       const api = makeApi({ listMovements: jest.fn(() => of([pendingArrival])) });
       const comp = makeComponent(getFn('A6'), api);
-      comp.parentCatalog = [
+      comp.parentPicker.contracts = [
         makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, tenorType: 'SELLERS_USANCE', tenorDays: 90 }),
       ];
 
@@ -641,7 +641,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         getSnapshot: jest.fn((id: string) => (id === 'ACC1' ? of(makeSnapshot({ availableBalance: '4000' })) : of(makeSnapshot({ availableBalance: '0' })))),
       });
       const comp = makeComponent(getFn('B5'), api);
-      comp.parentCatalog = [
+      comp.parentPicker.contracts = [
         makeContract({ balanceContractId: 'CNF1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } }),
       ];
 
@@ -659,7 +659,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         ),
       });
       const comp = makeComponent(getFn('B5'), api);
-      comp.parentCatalog = [makeContract({ balanceContractId: 'CNF1', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } })];
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'CNF1', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } })];
 
       expect(() => comp.onSelectParent('CNF1')).not.toThrow();
 
@@ -680,7 +680,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
         getSnapshot: jest.fn(() => throwError(() => ({ error: { message: 'snapshot boom' } }))),
       });
       const comp = makeComponent(getFn('B5'), api);
-      comp.parentCatalog = [makeContract({ balanceContractId: 'CNF1', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } })];
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'CNF1', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } })];
 
       comp.onSelectParent('CNF1');
 
@@ -688,10 +688,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.settleableBalancesLoading).toBe(false);
     });
 
-    it('does nothing (leaves selectedParent null, no side loads) when the contractId is not in parentCatalog', () => {
+    it('does nothing (leaves selectedParent null, no side loads) when the contractId is not in parentPicker.contracts', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
-      comp.parentCatalog = [];
+      comp.parentPicker.contracts = [];
 
       comp.onSelectParent('missing');
 
@@ -724,7 +724,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it("A2 (flat Catalog, non-hasParent): onSelectContract carries the picked LC's Currency into model.currency and locks the field", () => {
       const comp = makeComponent(getFn('A2'), makeApi());
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', currency: 'EUR' })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', currency: 'EUR' })];
 
       comp.onSelectContract('C1');
 
@@ -735,7 +735,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it("B2 (flat Catalog, non-hasParent, Export side): onSelectContract carries the picked Confirmation's Currency", () => {
       const comp = makeComponent(getFn('B2'), makeApi());
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION', currency: 'GBP' })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION', currency: 'GBP' })];
 
       comp.onSelectContract('C1');
 
@@ -745,7 +745,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it("A6 (Parent LC picker, hasParent): onSelectParent carries the parent LC's Currency and locks the field, before any Step 2 picker", () => {
       const comp = makeComponent(getFn('A6'), makeApi());
-      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', currency: 'JPY' })];
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', currency: 'JPY' })];
 
       comp.onSelectParent('P1');
 
@@ -756,7 +756,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it("B5 (Parent LC picker, hasParent, Export side): onSelectParent carries the Confirmation's Currency", () => {
       const comp = makeComponent(getFn('B5'), makeApi());
-      comp.parentCatalog = [makeContract({ balanceContractId: 'P1', instrumentType: 'EPLC_CONFIRMATION', currency: 'CNY' })];
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', instrumentType: 'EPLC_CONFIRMATION', currency: 'CNY' })];
 
       comp.onSelectParent('P1');
 
@@ -774,7 +774,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it('switching back to A1 clears the lock (selectFunction resets selectedContract/selectedParent to null)', () => {
       const comp = makeComponent(getFn('A2'), makeApi());
-      comp.catalogContracts = [makeContract({ balanceContractId: 'C1', currency: 'EUR' })];
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', currency: 'EUR' })];
       comp.onSelectContract('C1');
       expect(currencyFieldProps(comp).disabled).toBe(true);
 
@@ -798,12 +798,12 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it('ibIndexPrevPage decrements and reloads when not on page 1', () => {
       const { api, comp } = setup();
-      comp.ibIndexPage = 2;
-      comp.ibIndexTotal = 25; // pageSize 10 -> 3 pages
+      comp.ibIndexPicker.page = 2;
+      comp.ibIndexPicker.total = 25; // pageSize 10 -> 3 pages
 
       comp.ibIndexPrevPage();
 
-      expect(comp.ibIndexPage).toBe(1);
+      expect(comp.ibIndexPicker.page).toBe(1);
       // BAL-003 (Quality-report-balance.md): loadIbIndexPage now delegates to the shared
       // loadPagedCatalog helper, which always passes all 7 catalog() positional args (tenorFamily
       // explicitly undefined when unset) rather than omitting a trailing one — behaviorally identical
@@ -813,34 +813,34 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
     it('ibIndexPrevPage is a no-op on page 1', () => {
       const { api, comp } = setup();
-      comp.ibIndexPage = 1;
-      comp.ibIndexTotal = 25;
+      comp.ibIndexPicker.page = 1;
+      comp.ibIndexPicker.total = 25;
 
       comp.ibIndexPrevPage();
 
-      expect(comp.ibIndexPage).toBe(1);
+      expect(comp.ibIndexPicker.page).toBe(1);
       expect(api.catalog).not.toHaveBeenCalled();
     });
 
     it('ibIndexNextPage increments and reloads when below the last page', () => {
       const { api, comp } = setup();
-      comp.ibIndexPage = 1;
-      comp.ibIndexTotal = 25;
+      comp.ibIndexPicker.page = 1;
+      comp.ibIndexPicker.total = 25;
 
       comp.ibIndexNextPage();
 
-      expect(comp.ibIndexPage).toBe(2);
+      expect(comp.ibIndexPicker.page).toBe(2);
       expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 2, 10, 'LC1', undefined);
     });
 
     it('ibIndexNextPage is a no-op on the last page', () => {
       const { api, comp } = setup();
-      comp.ibIndexPage = 3;
-      comp.ibIndexTotal = 25; // totalPages = 3
+      comp.ibIndexPicker.page = 3;
+      comp.ibIndexPicker.total = 25; // totalPages = 3
 
       comp.ibIndexNextPage();
 
-      expect(comp.ibIndexPage).toBe(3);
+      expect(comp.ibIndexPicker.page).toBe(3);
       expect(api.catalog).not.toHaveBeenCalled();
     });
 
@@ -849,15 +849,15 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
       comp.model.instrumentType = undefined; // no LC picked yet — loadIbIndexPage's own defensive guard
       comp.searchNaturalKey.lcNumber = '';
-      comp.ibIndexPage = 1;
-      comp.ibIndexTotal = 25;
+      comp.ibIndexPicker.page = 1;
+      comp.ibIndexPicker.total = 25;
       (api.catalog as jest.Mock).mockClear();
 
       comp.ibIndexNextPage();
 
-      expect(comp.ibIndexPage).toBe(2);
-      expect(comp.ibIndexCatalog).toEqual([]);
-      expect(comp.ibIndexTotal).toBe(0);
+      expect(comp.ibIndexPicker.page).toBe(2);
+      expect(comp.ibIndexPicker.contracts).toEqual([]);
+      expect(comp.ibIndexPicker.total).toBe(0);
       expect(api.catalog).not.toHaveBeenCalled();
     });
   });
@@ -894,7 +894,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('selects the row directly, carries its IB/SG Number into searchNaturalKey, and refreshes the snapshot', () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '3300' }))) });
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
-      comp.ibIndexCatalog = [
+      comp.ibIndexPicker.contracts = [
         makeContract({ balanceContractId: 'IB1', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null } }),
       ];
       comp.searchError = 'stale error';
@@ -908,10 +908,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.selectedContractSnapshot?.availableBalance).toBe('3300');
     });
 
-    it('clears selectedContract (and skips the snapshot fetch) when the contractId is not in ibIndexCatalog', () => {
+    it('clears selectedContract (and skips the snapshot fetch) when the contractId is not in ibIndexPicker.contracts', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
-      comp.ibIndexCatalog = [makeContract({ balanceContractId: 'IB1' })];
+      comp.ibIndexPicker.contracts = [makeContract({ balanceContractId: 'IB1' })];
       comp.searchNaturalKey.lcNumber = ''; // keep contextLcNumber falsy so syncCheckerToContext stays inert
 
       comp.onSelectIbIndex('missing');

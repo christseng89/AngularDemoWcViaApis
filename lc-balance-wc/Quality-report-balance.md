@@ -48,7 +48,7 @@ surfaced BAL-122 and BAL-123 below.
 |---|---|---|
 | **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A (4.9/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) **grew to 2,923 lines mid-pass** (A4's own Maker-side logic landing directly in the class) before two further post-close-out extractions — Maker Submit into `MakerSubmitService`, then the Look Up panel into `LookUpPanelService` (a plain class, not an `@Component`, chosen specifically because a genuine child component would have broken 77 existing no-TestBed test assertions) — brought it down to **2,438 lines**, net below where this pass started. Still open at Major (function/side selection and three picker state machines remain), but every "does too many things" candidate this session's own BAL-003 history identified has now been extracted via the same Dependency Inversion pattern. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper). BAL-003 remains the one open Maintainability finding of any real weight, now materially narrower in scope than at any earlier point in this report's history. |
+| **Maintainability** | A (4.9/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) **grew to 2,923 lines mid-pass** (A4's own Maker-side logic landing directly in the class) before three further post-close-out extractions — Maker Submit into `MakerSubmitService`, the Look Up panel into `LookUpPanelService`, then the three paginated pickers' load-and-page bookkeeping into `CatalogPickerService` (the last at a scope the user deliberately narrowed after a full selection-flow extraction was investigated and found too entangled with Maker orchestration) — brought it down to **2,304 lines**, net below where this pass started. Still open at Major (function/side selection and the pickers' own selection/business-filter logic remain), but every "does too many things" candidate this session's own BAL-003 history identified has now been extracted via the same Dependency Inversion pattern. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper). BAL-003 remains the one open Maintainability finding of any real weight, now materially narrower in scope than at any earlier point in this report's history. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
 
@@ -537,7 +537,7 @@ Full three-suite re-verification per this file's own standing rule: Angular app 
 ## Code Smells & Maintainability
 
 ### BAL-003
-**`transaction-builder.component.ts` is still a God Component** — 🟡 Major (all 3 planned extractions attempted, plus a 4th OOD/SOLID pass unifying paging state, a 5th extracting Checker Actions into a service, a 6th extracting Maker Submit into a service, and a 7th extracting the Look Up panel into a service — see the six Outcomes below)
+**`transaction-builder.component.ts` is still a God Component** — 🟡 Major (all 3 planned extractions attempted, plus a 4th OOD/SOLID pass unifying paging state, a 5th extracting Checker Actions into a service, a 6th extracting Maker Submit into a service, a 7th extracting the Look Up panel into a service, and an 8th extracting the paginated pickers' load-and-page bookkeeping into a service — see the seven Outcomes below)
 
 **Evidence:**
 ```
@@ -847,6 +847,53 @@ selection and three picker state machines (deliberately left as-is; the picker o
 investigated and explicitly rejected as further work earlier this same pass, before Maker Submit was
 chosen instead — see the note at the top of the Fifth outcome) — but what remains is now a materially
 narrower, more clearly-scoped remainder than at any earlier point in this section's own history.
+
+**Seventh outcome (2026-08-17, user-directed — asked "有甚麼建議解法?" again after the Sixth outcome, so
+the three paginated pickers (Catalog LC Index / Parent LC picker / IB-SG Index) were investigated as the
+next candidate, since every job named above was already extracted): `CatalogPickerService`, at a scope the
+user narrowed after seeing the investigation.** The pickers' OWN selection handlers
+(`onSelectContract()`/`onSelectParent()`/`onSelectIbIndex()`) turned out not to be a self-contained
+subsystem the way Checker Actions/Maker Submit/Look Up were — they mutate `model.movementType`/
+`model.currency`, call `rebuildFields()`, and cascade into `loadPayableMovements()`/`loadSgsForArrival()`/
+`loadSettleableBalances()`/Checker sync, i.e. they're Maker-flow orchestration, not picker bookkeeping.
+Reported this plainly rather than proceeding on the original framing, and presented three scope options
+via `AskUserQuestion` (full selection-flow extraction / narrow-to-paging-only / stop here) instead of
+picking one — the user chose the narrow option.
+
+**Fix, at the confirmed scope**: `CatalogPickerService` (`catalog-picker.service.ts`), one instance per
+picker (`catalogPicker`/`parentPicker`/`ibIndexPicker`). Owns `contracts`/`search`/`snapshots`/the
+underlying `PagedListState`, and a `load()` method absorbing the old shared `loadPagedCatalog()` helper's
+fetch/populate/error body verbatim (`loadSnapshotsInto()` now private to the service). Each picker's own
+thin wrapper method on the component (`reloadCatalog()`/`loadParentPage()`/`loadIbIndexPage()`) still
+supplies its own DIFFERENT guard condition, `tenorFamily`, and (Catalog only) the A4 payable-IB-hint
+follow-up — same "guard/params unchanged, only the fetch body moves" shape as every prior BAL-003
+extraction. Selection handlers and the business-rule `filteredXxxCatalog` getters stay on the component,
+unchanged, exactly as scoped.
+
+**Two issues found and fixed along the way**: (1) the `.html` template already had an unrelated
+`<ng-template #catalogPicker>` (the flat-Catalog fallback branch of an existing `*ngIf`/`else`) — Angular's
+template type-checker resolved the new field references against that template-ref variable instead of the
+component property, surfacing only at `ng build` (not `tsc --noEmit`, which doesn't type-check templates)
+as `NG9: Property 'contracts' does not exist on type 'TemplateRef<any>'`; fixed by renaming the
+pre-existing, unrelated template-ref variable to `#flatCatalogPicker`. (2) the mechanical rename script
+(~260 raw occurrences across the component, template, and 3 spec files) also matched the component's own
+`catalogTotalPages`/`parentTotalPages`/`ibIndexTotalPages` getter *declarations*, corrupting them into
+invalid syntax (`get catalogPicker.totalPages()`) — caught immediately by the next `tsc --noEmit` run;
+fixed by deleting those three now-redundant getters (external callers reference `catalogPicker.totalPages`
+directly post-rename, same as `catalogPage`/`catalogTotal`'s own getters were fully removed rather than
+kept as thin wrappers).
+
+Verified: `tsc --noEmit`/`ng build --configuration development`/`npm run lint` all clean (202 warnings,
+unchanged — the one `PagedListState` import left unused by this extraction was removed). Full Angular
+suite 534/534 (unchanged count — pure move) with **zero test files needing any logic changes**, coverage
+99.7%/95.97%/99.43%/99.74% (all four clear the 95% floor; `catalog-picker.service.ts` itself is **100% on
+all four metrics**). Full three-suite re-verification per this file's own standing rule: `backend/` 33/33
+and microservice 292/292, both unaffected (Angular-only change).
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` 2,438 → 2,304 lines. **BAL-003 stays open at
+Major** — function/side selection and the pickers' own selection/business-filter logic remain, deliberately
+not extracted per the investigation above — but every extraction this session's BAL-003 history judged
+worth doing, at a scope the user actually confirmed rather than one picked unilaterally, is now done.
 
 ---
 

@@ -105,9 +105,9 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.model.createdBy).toBe('maker1');
       expect(typeof comp.model.eventSeq).toBe('number');
       expect(comp.naturalKey).toEqual({ lcNumber: '', ibNumber: '', sgNumber: '' });
-      expect(comp.catalogPage).toBe(1);
+      expect(comp.catalogPicker.page).toBe(1);
       expect(comp.catalogPageSize).toBe(10);
-      expect(comp.catalogContracts).toEqual([]);
+      expect(comp.catalogPicker.contracts).toEqual([]);
       expect(comp.selectedContract).toBeNull();
       expect(comp.submitResult).toBeNull();
       expect(comp.checkerLcNumber).toBe('');
@@ -190,19 +190,19 @@ describe('TransactionBuilderComponent', () => {
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
 
       // Poison the state as if a previous function had been fully used.
-      comp.catalogPage = 5;
-      comp.catalogTotal = 99;
-      comp.catalogSearch = 'stale';
+      comp.catalogPicker.page = 5;
+      comp.catalogPicker.total = 99;
+      comp.catalogPicker.search = 'stale';
       comp.selectedContract = mkContract('c1', '001');
       comp.selectedContractSnapshot = mkSnapshot('c1');
-      comp.parentCatalog = [mkContract('p1', '002')];
-      comp.parentPage = 3;
-      comp.parentTotal = 30;
-      comp.parentSearch = 'stale';
+      comp.parentPicker.contracts = [mkContract('p1', '002')];
+      comp.parentPicker.page = 3;
+      comp.parentPicker.total = 30;
+      comp.parentPicker.search = 'stale';
       comp.parentInstrumentType = 'SHGT';
-      comp.ibIndexCatalog = [mkContract('ib1', '003')];
-      comp.ibIndexPage = 2;
-      comp.ibIndexTotal = 20;
+      comp.ibIndexPicker.contracts = [mkContract('ib1', '003')];
+      comp.ibIndexPicker.page = 2;
+      comp.ibIndexPicker.total = 20;
       comp.settleableBalances = [{ balanceContractId: 'x', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: null, availableBalance: '1', currency: 'USD' }];
       comp.payableMovements = [mkMovement('m1')];
       comp.payableMovementSearch = 'stale';
@@ -227,19 +227,19 @@ describe('TransactionBuilderComponent', () => {
 
       comp.selectFunction(A2);
 
-      expect(comp.catalogPage).toBe(1);
-      expect(comp.catalogTotal).toBe(0);
-      expect(comp.catalogSearch).toBe('');
+      expect(comp.catalogPicker.page).toBe(1);
+      expect(comp.catalogPicker.total).toBe(0);
+      expect(comp.catalogPicker.search).toBe('');
       expect(comp.selectedContract).toBeNull();
       expect(comp.selectedContractSnapshot).toBeNull();
-      expect(comp.parentCatalog).toEqual([]);
-      expect(comp.parentPage).toBe(1);
-      expect(comp.parentTotal).toBe(0);
-      expect(comp.parentSearch).toBe('');
+      expect(comp.parentPicker.contracts).toEqual([]);
+      expect(comp.parentPicker.page).toBe(1);
+      expect(comp.parentPicker.total).toBe(0);
+      expect(comp.parentPicker.search).toBe('');
       expect(comp.parentInstrumentType).toBe(''); // A2 has no defaultParentInstrumentType
-      expect(comp.ibIndexCatalog).toEqual([]);
-      expect(comp.ibIndexPage).toBe(1);
-      expect(comp.ibIndexTotal).toBe(0);
+      expect(comp.ibIndexPicker.contracts).toEqual([]);
+      expect(comp.ibIndexPicker.page).toBe(1);
+      expect(comp.ibIndexPicker.total).toBe(0);
       expect(comp.settleableBalances).toEqual([]);
       expect(comp.payableMovements).toEqual([]);
       expect(comp.payableMovementSearch).toBe('');
@@ -330,13 +330,13 @@ describe('TransactionBuilderComponent', () => {
   describe('reloadCatalog', () => {
     it('does nothing (clears catalog) when model.instrumentType is unset', () => {
       const { comp, mockApi } = makeComponent();
-      comp.catalogContracts = [mkContract('c1', '001')];
-      comp.catalogTotal = 5;
+      comp.catalogPicker.contracts = [mkContract('c1', '001')];
+      comp.catalogPicker.total = 5;
 
       comp.reloadCatalog();
 
-      expect(comp.catalogContracts).toEqual([]);
-      expect(comp.catalogTotal).toBe(0);
+      expect(comp.catalogPicker.contracts).toEqual([]);
+      expect(comp.catalogPicker.total).toBe(0);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
@@ -344,17 +344,17 @@ describe('TransactionBuilderComponent', () => {
       const { comp, mockApi } = makeComponent();
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'ISSUE';
-      comp.catalogContracts = [mkContract('c1', '001')];
-      comp.catalogTotal = 5;
+      comp.catalogPicker.contracts = [mkContract('c1', '001')];
+      comp.catalogPicker.total = 5;
 
       comp.reloadCatalog();
 
-      expect(comp.catalogContracts).toEqual([]);
-      expect(comp.catalogTotal).toBe(0);
+      expect(comp.catalogPicker.contracts).toEqual([]);
+      expect(comp.catalogPicker.total).toBe(0);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it("calls api.catalog with instrumentType + the function's own catalogTenorFilter, and populates catalogContracts/catalogTotal", () => {
+    it("calls api.catalog with instrumentType + the function's own catalogTenorFilter, and populates catalogPicker.contracts/catalogPicker.total", () => {
       const { comp, mockApi } = makeComponent();
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'UTILIZE';
@@ -368,19 +368,19 @@ describe('TransactionBuilderComponent', () => {
       comp.reloadCatalog(1);
 
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, 'SIGHT');
-      expect(comp.catalogContracts).toEqual([c1, c2]);
-      expect(comp.catalogTotal).toBe(2);
-      expect(comp.catalogPage).toBe(1);
-      // loadSnapshotsInto populated catalogSnapshots via forkJoin(getSnapshot).
-      expect(comp.catalogSnapshots.get('c1')).toEqual(mkSnapshot('c1'));
-      expect(comp.catalogSnapshots.get('c2')).toEqual(mkSnapshot('c2'));
+      expect(comp.catalogPicker.contracts).toEqual([c1, c2]);
+      expect(comp.catalogPicker.total).toBe(2);
+      expect(comp.catalogPicker.page).toBe(1);
+      // loadSnapshotsInto populated catalogPicker.snapshots via forkJoin(getSnapshot).
+      expect(comp.catalogPicker.snapshots.get('c1')).toEqual(mkSnapshot('c1'));
+      expect(comp.catalogPicker.snapshots.get('c2')).toEqual(mkSnapshot('c2'));
     });
 
-    it('passes catalogSearch as the q filter when set', () => {
+    it('passes catalogPicker.search as the q filter when set', () => {
       const { comp, mockApi } = makeComponent();
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'UTILIZE';
-      comp.catalogSearch = 'S001';
+      comp.catalogPicker.search = 'S001';
 
       comp.reloadCatalog(1);
 
@@ -408,17 +408,17 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.catalogPayableMovements.get('c1')?.map((m: any) => m.movementId)).toEqual(['m1']);
     });
 
-    it('handles an error response by clearing catalogContracts/catalogTotal instead of throwing', () => {
+    it('handles an error response by clearing catalogPicker.contracts/catalogPicker.total instead of throwing', () => {
       const { comp, mockApi } = makeComponent();
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'UTILIZE';
-      comp.catalogContracts = [mkContract('c1', '001')];
-      comp.catalogTotal = 3;
+      comp.catalogPicker.contracts = [mkContract('c1', '001')];
+      comp.catalogPicker.total = 3;
       mockApi.catalog.mockReturnValue(throwError(() => new Error('server down')));
 
       expect(() => comp.reloadCatalog(1)).not.toThrow();
-      expect(comp.catalogContracts).toEqual([]);
-      expect(comp.catalogTotal).toBe(0);
+      expect(comp.catalogPicker.contracts).toEqual([]);
+      expect(comp.catalogPicker.total).toBe(0);
     });
   });
 
@@ -427,13 +427,13 @@ describe('TransactionBuilderComponent', () => {
       const { comp, mockApi } = makeComponent();
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'UTILIZE';
-      comp.catalogPage = 4;
-      comp.catalogSearch = 'U003';
+      comp.catalogPicker.page = 4;
+      comp.catalogPicker.search = 'U003';
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
 
       comp.onCatalogSearch();
 
-      expect(comp.catalogPage).toBe(1);
+      expect(comp.catalogPicker.page).toBe(1);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U003', 1, comp.catalogPageSize, undefined, undefined);
     });
   });
@@ -442,7 +442,7 @@ describe('TransactionBuilderComponent', () => {
     it('sets selectedContract, refreshes its snapshot, wires payableMovements from the flattened cache, and selects the movement', () => {
       const { comp, mockApi } = makeComponent();
       const c1 = mkContract('c1', '810');
-      comp.catalogContracts = [c1];
+      comp.catalogPicker.contracts = [c1];
       const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
       comp.catalogPayableMovements.set('c1', [movement]);
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
@@ -461,7 +461,7 @@ describe('TransactionBuilderComponent', () => {
       const { comp, mockApi } = makeComponent();
       const c1 = mkContract('c1', '810');
       comp.selectedFunction = A6; // settlesDocumentArrival: true
-      comp.catalogContracts = [c1];
+      comp.catalogPicker.contracts = [c1];
       const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
       comp.catalogPayableMovements.set('c1', [movement]);
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
@@ -472,9 +472,9 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.model.amount).toBe('25000');
     });
 
-    it('leaves selectedContract null when the contractId is not in catalogContracts', () => {
+    it('leaves selectedContract null when the contractId is not in catalogPicker.contracts', () => {
       const { comp } = makeComponent();
-      comp.catalogContracts = [mkContract('c1', '810')];
+      comp.catalogPicker.contracts = [mkContract('c1', '810')];
 
       comp.onSelectFlattenedPayable('missing', 'm1');
 
@@ -509,51 +509,51 @@ describe('TransactionBuilderComponent', () => {
     function setupPaged(comp: TransactionBuilderComponent, mockApi: ReturnType<typeof makeApiMock>) {
       comp.model.instrumentType = 'IPLC_LC';
       comp.model.movementType = 'UTILIZE';
-      comp.catalogTotal = 25; // pageSize 10 -> 3 pages
+      comp.catalogPicker.total = 25; // pageSize 10 -> 3 pages
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([], 25)));
     }
 
     it('catalogPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.catalogPage = 1;
+      comp.catalogPicker.page = 1;
 
       comp.catalogPrevPage();
 
-      expect(comp.catalogPage).toBe(1);
+      expect(comp.catalogPicker.page).toBe(1);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('catalogPrevPage reloads the previous page when not on page 1', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.catalogPage = 3;
+      comp.catalogPicker.page = 3;
 
       comp.catalogPrevPage();
 
-      expect(comp.catalogPage).toBe(2);
+      expect(comp.catalogPicker.page).toBe(2);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined);
     });
 
     it('catalogNextPage is a no-op on the last page', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.catalogPage = 3; // totalPages = 3
+      comp.catalogPicker.page = 3; // totalPages = 3
 
       comp.catalogNextPage();
 
-      expect(comp.catalogPage).toBe(3);
+      expect(comp.catalogPicker.page).toBe(3);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('catalogNextPage reloads the next page when not on the last page', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.catalogPage = 1;
+      comp.catalogPicker.page = 1;
 
       comp.catalogNextPage();
 
-      expect(comp.catalogPage).toBe(2);
+      expect(comp.catalogPicker.page).toBe(2);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined);
     });
   });
@@ -573,49 +573,49 @@ describe('TransactionBuilderComponent', () => {
 
       expect(comp.selectedParent).toBeNull();
       expect(comp.exposureNature).toBe('ACTUAL');
-      expect(comp.parentPage).toBe(1);
+      expect(comp.parentPicker.page).toBe(1);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE');
-      expect(comp.parentCatalog).toEqual([p1]);
-      expect(comp.parentTotal).toBe(1);
+      expect(comp.parentPicker.contracts).toEqual([p1]);
+      expect(comp.parentPicker.total).toBe(1);
     });
 
     it('clears the parent catalog without calling the api when parentInstrumentType is empty', () => {
       const { comp, mockApi } = makeComponent();
       comp.parentInstrumentType = '';
-      comp.parentCatalog = [mkContract('p1', '001')];
-      comp.parentTotal = 5;
+      comp.parentPicker.contracts = [mkContract('p1', '001')];
+      comp.parentPicker.total = 5;
 
       comp.onParentInstrumentTypeChange();
 
-      expect(comp.parentCatalog).toEqual([]);
-      expect(comp.parentTotal).toBe(0);
+      expect(comp.parentPicker.contracts).toEqual([]);
+      expect(comp.parentPicker.total).toBe(0);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it('handles a catalog error by clearing parentCatalog/parentTotal', () => {
+    it('handles a catalog error by clearing parentPicker.contracts/parentPicker.total', () => {
       const { comp, mockApi } = makeComponent();
       comp.parentInstrumentType = 'IPLC_LC';
-      comp.parentCatalog = [mkContract('p1', '001')];
-      comp.parentTotal = 5;
+      comp.parentPicker.contracts = [mkContract('p1', '001')];
+      comp.parentPicker.total = 5;
       mockApi.catalog.mockReturnValue(throwError(() => new Error('fail')));
 
       expect(() => comp.onParentInstrumentTypeChange()).not.toThrow();
-      expect(comp.parentCatalog).toEqual([]);
-      expect(comp.parentTotal).toBe(0);
+      expect(comp.parentPicker.contracts).toEqual([]);
+      expect(comp.parentPicker.total).toBe(0);
     });
   });
 
   describe('onParentSearch', () => {
-    it('reloads the parent catalog at page 1 using the current parentSearch text', () => {
+    it('reloads the parent catalog at page 1 using the current parentPicker.search text', () => {
       const { comp, mockApi } = makeComponent();
       comp.parentInstrumentType = 'IPLC_LC';
-      comp.parentPage = 4;
-      comp.parentSearch = 'U002';
+      comp.parentPicker.page = 4;
+      comp.parentPicker.search = 'U002';
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
 
       comp.onParentSearch();
 
-      expect(comp.parentPage).toBe(1);
+      expect(comp.parentPicker.page).toBe(1);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U002', 1, comp.parentPageSize, undefined, undefined);
     });
   });
@@ -623,51 +623,51 @@ describe('TransactionBuilderComponent', () => {
   describe('parentPrevPage / parentNextPage', () => {
     function setupPaged(comp: TransactionBuilderComponent, mockApi: ReturnType<typeof makeApiMock>) {
       comp.parentInstrumentType = 'IPLC_LC';
-      comp.parentTotal = 15; // pageSize 10 -> 2 pages
+      comp.parentPicker.total = 15; // pageSize 10 -> 2 pages
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([], 15)));
     }
 
     it('parentPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.parentPage = 1;
+      comp.parentPicker.page = 1;
 
       comp.parentPrevPage();
 
-      expect(comp.parentPage).toBe(1);
+      expect(comp.parentPicker.page).toBe(1);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('parentPrevPage reloads the previous page otherwise', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.parentPage = 2;
+      comp.parentPicker.page = 2;
 
       comp.parentPrevPage();
 
-      expect(comp.parentPage).toBe(1);
+      expect(comp.parentPicker.page).toBe(1);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, undefined);
     });
 
     it('parentNextPage is a no-op on the last page', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.parentPage = 2; // totalPages = 2
+      comp.parentPicker.page = 2; // totalPages = 2
 
       comp.parentNextPage();
 
-      expect(comp.parentPage).toBe(2);
+      expect(comp.parentPicker.page).toBe(2);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('parentNextPage reloads the next page otherwise', () => {
       const { comp, mockApi } = makeComponent();
       setupPaged(comp, mockApi);
-      comp.parentPage = 1;
+      comp.parentPicker.page = 1;
 
       comp.parentNextPage();
 
-      expect(comp.parentPage).toBe(2);
+      expect(comp.parentPicker.page).toBe(2);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.parentPageSize, undefined, undefined);
     });
   });
@@ -723,7 +723,7 @@ describe('TransactionBuilderComponent', () => {
       const { comp } = makeComponent();
       comp.selectedFunction = A4;
       const c1 = mkContract('c1', '810');
-      comp.catalogSnapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '0' }));
+      comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '0' }));
       expect(comp.catalogPendingHint(c1)).toBe('');
     });
 
@@ -731,7 +731,7 @@ describe('TransactionBuilderComponent', () => {
       const { comp } = makeComponent();
       comp.selectedFunction = A4;
       const c1 = mkContract('c1', '810');
-      comp.catalogSnapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-25000' }));
+      comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-25000' }));
       comp.catalogPayableIbs.set('c1', ['IB00001']);
       expect(comp.catalogPendingHint(c1)).toBe(' — Pending: 25,000');
     });
@@ -740,7 +740,7 @@ describe('TransactionBuilderComponent', () => {
       const { comp } = makeComponent();
       comp.selectedFunction = A4;
       const c1 = mkContract('c1', '810');
-      comp.catalogSnapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-1234567.89' }));
+      comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-1234567.89' }));
       comp.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
       expect(comp.catalogPendingHint(c1)).toBe(' — Total Pending: 1,234,567.89');
     });
