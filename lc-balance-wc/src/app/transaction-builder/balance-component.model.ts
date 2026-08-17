@@ -147,6 +147,26 @@ export function childInstrumentTypesOf(root: InstrumentType): InstrumentType[] {
 }
 
 /**
+ * Inquire Events (2026-08-17, user-requested — "Import LC：LC Balance、Acceptance Balance、Shipping
+ * Guarantee Balance; Export Confirmed LC：Confirmed LC Balance、Confirmed LC Acceptance Balance") —
+ * exactly the 5 instrumentTypes the user named as real, display-worthy Balance Components, each mapped
+ * to its own display label. Deliberately excludes `EPLC_EXAMINATION` even though it's one of
+ * `childInstrumentTypesOf('EPLC_CONFIRMATION')`'s own results — it's `MEMO_ONLY` and never a real
+ * Balance Component (the same "Balance Component 只負責 Contingent Liability" scope boundary
+ * `contingentAccountEntry` already enforces for it elsewhere). A single flat map needs no IMPORT/EXPORT
+ * branching: a caller scoped to one side's own event set (e.g. InquireEventsService) only ever
+ * encounters IPLC_LC/IPLC_ACCEPTANCE/SHGT on the Import side, or EPLC_CONFIRMATION/EPLC_ACCEPTANCE on
+ * the Export side — never both, so `Object.keys(BALANCE_SNAPSHOT_LABEL)` never over-matches.
+ */
+export const BALANCE_SNAPSHOT_LABEL: Partial<Record<InstrumentType, string>> = {
+  IPLC_LC: 'LC Balance',
+  IPLC_ACCEPTANCE: 'Acceptance Balance',
+  SHGT: 'Shipping Guarantee Balance',
+  EPLC_CONFIRMATION: 'Confirmed LC Balance',
+  EPLC_ACCEPTANCE: 'Confirmed LC Acceptance Balance',
+};
+
+/**
  * ISO 4217 minor-unit (decimal place) count per currency code — keeps the Amount input's own
  * granularity in step with whichever Currency is typed alongside it (e.g. "JPY 10000" has no cents).
  * Mirrors lc-payment-wc/backend/data/currencies.json's own JPY/TWD/IDR=0 entries for consistency

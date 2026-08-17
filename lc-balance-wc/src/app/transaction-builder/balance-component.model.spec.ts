@@ -19,6 +19,7 @@ import {
   defaultLcInstrumentTypeForSide,
   childInstrumentTypesOf,
   resolveFunctionForMovement,
+  BALANCE_SNAPSHOT_LABEL,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -690,6 +691,31 @@ describe('balance-component.model data invariants', () => {
 
     it('known limitation, explicitly accepted (see the function\'s own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: \'UTILIZE\') — the resolver deterministically returns the first registry match, A3, since it\'s declared first', () => {
       expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
+    });
+  });
+
+  describe('BALANCE_SNAPSHOT_LABEL', () => {
+    it('covers exactly the 5 instrumentTypes the user named as real Balance Components, no more, no fewer', () => {
+      expect(new Set(Object.keys(BALANCE_SNAPSHOT_LABEL))).toEqual(new Set(['IPLC_LC', 'IPLC_ACCEPTANCE', 'SHGT', 'EPLC_CONFIRMATION', 'EPLC_ACCEPTANCE']));
+    });
+
+    it('deliberately excludes EPLC_EXAMINATION (MEMO_ONLY, never a real Balance Component) even though it is one of childInstrumentTypesOf(\'EPLC_CONFIRMATION\')\'s own results', () => {
+      expect(childInstrumentTypesOf('EPLC_CONFIRMATION')).toContain('EPLC_EXAMINATION');
+      expect(BALANCE_SNAPSHOT_LABEL['EPLC_EXAMINATION']).toBeUndefined();
+    });
+
+    it('excludes the three ON_BALANCE_ASSET instrumentTypes, same scope boundary as contingentAccountEntry', () => {
+      expect(BALANCE_SNAPSHOT_LABEL['EPLC_DUE_FROM_ISSUING_BANK']).toBeUndefined();
+      expect(BALANCE_SNAPSHOT_LABEL['EPLC_ACCEPTANCE_REIMB_RECEIVABLE']).toBeUndefined();
+      expect(BALANCE_SNAPSHOT_LABEL['EPLC_EXPORT_BILLS_DISCOUNTED']).toBeUndefined();
+    });
+
+    it('exact label text matches the user\'s own wording', () => {
+      expect(BALANCE_SNAPSHOT_LABEL['IPLC_LC']).toBe('LC Balance');
+      expect(BALANCE_SNAPSHOT_LABEL['IPLC_ACCEPTANCE']).toBe('Acceptance Balance');
+      expect(BALANCE_SNAPSHOT_LABEL['SHGT']).toBe('Shipping Guarantee Balance');
+      expect(BALANCE_SNAPSHOT_LABEL['EPLC_CONFIRMATION']).toBe('Confirmed LC Balance');
+      expect(BALANCE_SNAPSHOT_LABEL['EPLC_ACCEPTANCE']).toBe('Confirmed LC Acceptance Balance');
     });
   });
 });

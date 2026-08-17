@@ -244,6 +244,19 @@ export class BalanceComponentApiService {
   }
 
   /**
+   * Inquire Events (2026-08-17) — point-in-time BalanceSnapshot for the given movement's own contract,
+   * "as of" that exact movement (i.e. only movements up to and including its own eventSeq contribute).
+   * Reuses an endpoint that already existed server-side (built for an earlier "Balance as of event"
+   * panel later removed from this Angular app in favor of the Event Timeline's plain "Balance After"
+   * column — see service/balanceService.ts's own getBalanceSnapshotAsOfMovement() doc comment for the
+   * full history and its one documented limitation: offBalanceExposure/tightAvailableBalance are NOT
+   * point-in-time, they always reflect the SHGT side's current state).
+   */
+  getBalanceAsOfMovement(movementId: string): Observable<BalanceSnapshot> {
+    return this.http.get<BalanceSnapshot>(`${this.base}/balance-movements/${movementId}/balance-as-of`);
+  }
+
+  /**
    * Bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG entries was not
    * shown") — lets checker-actions.service.ts resolve a compound submission's linked leg(s) (A3S's SG
    * redemption, B5's Reimbursement Receivable) by their shared businessEventId, independent of the

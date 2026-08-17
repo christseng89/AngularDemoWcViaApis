@@ -177,4 +177,10 @@ describe('BalanceComponentApiService', () => {
     service.listMovements('BC-1');
     expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/BC-1/movements');
   });
+
+  it('getBalanceAsOfMovement() GETs the /balance-as-of sub-path for the given movement id', () => {
+    const result = service.getBalanceAsOfMovement('MV-1');
+    expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/balance-as-of');
+    expect(result).toBe('OBS');
+  });
 });

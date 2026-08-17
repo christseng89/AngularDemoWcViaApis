@@ -665,20 +665,11 @@
             <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
 
             <!-- Current Balance — no raw JSON dump (business instruction 2026-08-14). One field per line
-                 (business instruction 2026-08-15 — was a wrapping flex row before, hard to scan). -->
-            <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="lookUp.activeLookupSnapshot">
-              <div class="tb-balance-box__title">Current Balance — {{ lookUp.activeLookupLabel }}</div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ lookUp.activeLookupContract?.status }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.currency }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed Balance</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.confirmedBalance }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.availableBalance }}</span></div>
-              <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.pendingEarmarkTotal }}</span></div>
-              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.offBalanceExposure !== null"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.offBalanceExposure }}</span></div>
-              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.tightAvailableBalance }}</span></div>
-              <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
-              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.presentDocsEarmarkPending !== null"><span class="tb-balance-row__label">Present Docs Earmark (Pending)</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.presentDocsEarmarkPending }}</span></div>
-              <div class="tb-balance-row" *ngIf="lookUp.activeLookupSnapshot.presentDocsEarmarkApproved !== null"><span class="tb-balance-row__label">Present Docs Earmark (Approved)</span><span class="tb-balance-row__value">{{ lookUp.activeLookupSnapshot.presentDocsEarmarkApproved }}</span></div>
-            </div>
+                 (business instruction 2026-08-15 — was a wrapping flex row before, hard to scan).
+                 Inquire Events (2026-08-17): this box is now a shared #balanceSnapshotBox template
+                 (defined once, near the end of this file) so Transaction Processing (here) and Event
+                 Inquiry (below) render an identical box from one canonical markup, not two copies. -->
+            <ng-container *ngTemplateOutlet="balanceSnapshotBox; context: { title: 'Current Balance — ' + lookUp.activeLookupLabel, status: lookUp.activeLookupContract?.status, snapshot: lookUp.activeLookupSnapshot }"></ng-container>
           </div>
         </div>
       </section>
@@ -756,6 +747,31 @@
           <div class="tb-balance-row" *ngIf="sel.movement.releasedBy"><span class="tb-balance-row__label">Released</span><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date:'short' }}</span></div>
           <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement)">Account Entries</button>
         </div>
+
+        <!-- Balance Impact & Closing Snapshot (2026-08-17, user-requested) — the actual increase/decrease
+             this Event caused on its OWN Balance Component (reusing movement.balanceBefore/balanceAfter,
+             already fetched, zero extra call — null on a still-PENDING movement since Confirmed Balance
+             doesn't move until Release, same domain semantics as everywhere else in this app), plus the
+             point-in-time closing Snapshot for every relevant Balance Component (BALANCE_SNAPSHOT_LABEL)
+             as of this Event's own time — inquireEvents.selectedEventBalances, one #balanceSnapshotBox
+             per row, the SAME shared template Transaction Processing's own Look Up panel uses above. -->
+        <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel2">
+          <div class="tb-balance-box__title">Balance Impact — {{ balanceSnapshotLabel[sel2.contract.instrumentType] }} ({{ displayStatus(sel2.movement.status) }})</div>
+          <div class="tb-balance-row" *ngIf="sel2.movement.balanceAfter !== null && sel2.movement.balanceAfter !== undefined">
+            <span class="tb-balance-row__label">Confirmed Balance</span>
+            <span class="tb-balance-row__value">{{ sel2.movement.balanceBefore ?? '—' }} → {{ sel2.movement.balanceAfter }}</span>
+          </div>
+          <div class="tb-hint" *ngIf="sel2.movement.balanceAfter === null || sel2.movement.balanceAfter === undefined">Still PENDING — Confirmed Balance not yet affected until this Event is Released.</div>
+        </div>
+        <ng-container *ngFor="let row of inquireEvents.selectedEventBalances">
+          <ng-container *ngIf="row.snapshot; else notYetCreated" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: 'Closing Snapshot — ' + inquireEvents.balanceRowTitle(row), status: row.contract.status, snapshot: row.snapshot }"></ng-container>
+          <ng-template #notYetCreated>
+            <div class="tb-balance-box mt-3">
+              <div class="tb-balance-box__title">{{ row.label }}</div>
+              <div class="tb-hint">Not yet created as of this Event.</div>
+            </div>
+          </ng-template>
+        </ng-container>
       </section>
     </div>
   </div>
@@ -797,4 +813,25 @@
       <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closeAccountEntryDialog()">Close</button>
     </div>
   </div>
+
+  <!-- Shared Balance Snapshot box (2026-08-17, extracted from the Look Up panel's own former inline
+       "Current Balance" block) — declared at the root of this template so *ngTemplateOutlet can invoke
+       it from BOTH the Look Up panel (Transaction Processing, above) and Inquire Events (Event Inquiry,
+       above): one canonical box, byte-for-byte identical rendering in both places, per the user's own
+       "ensure consistent behavior between Transaction Processing and Event Inquiry" design principle. -->
+  <ng-template #balanceSnapshotBox let-title="title" let-status="status" let-snapshot="snapshot">
+    <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="snapshot">
+      <div class="tb-balance-box__title">{{ title }}</div>
+      <div class="tb-balance-row" *ngIf="status"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ status }}</span></div>
+      <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ snapshot.currency }}</span></div>
+      <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed Balance</span><span class="tb-balance-row__value">{{ snapshot.confirmedBalance }}</span></div>
+      <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ snapshot.availableBalance }}</span></div>
+      <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal }}</span></div>
+      <div class="tb-balance-row" *ngIf="snapshot.offBalanceExposure !== null"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ snapshot.offBalanceExposure }}</span></div>
+      <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span></div>
+      <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
+      <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkPending !== null"><span class="tb-balance-row__label">Present Docs Earmark (Pending)</span><span class="tb-balance-row__value">{{ snapshot.presentDocsEarmarkPending }}</span></div>
+      <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkApproved !== null"><span class="tb-balance-row__label">Present Docs Earmark (Approved)</span><span class="tb-balance-row__value">{{ snapshot.presentDocsEarmarkApproved }}</span></div>
+    </div>
+  </ng-template>
 </div>

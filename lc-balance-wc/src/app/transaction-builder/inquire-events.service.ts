@@ -2,11 +2,25 @@ import { FormGroup } from '@angular/forms';
 import { FormlyFieldConfig } from '@ngx-formly/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
-import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
-import { InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, resolveFunctionForMovement } from './balance-component.model';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, resolveFunctionForMovement } from './balance-component.model';
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
 import { BuilderModel } from './function-policy';
 import { describeApiError } from './api-error';
+
+/**
+ * Inquire Events (2026-08-17, user-requested — "查詢每筆 Event 當時處理完成後的各類 Balance Snapshot") —
+ * one relevant Balance Component's own point-in-time closing state as of a selected Event. `snapshot` is
+ * null when this Balance Component did not exist yet at that point in time (e.g. no Shipping Guarantee
+ * had been issued yet when an earlier LC Issue event is selected) — a real, renderable state, not an
+ * error.
+ */
+export interface SelectedEventBalanceRow {
+  instrumentType: InstrumentType;
+  label: string;
+  contract: BalanceContract;
+  snapshot: BalanceSnapshot | null;
+}
 
 /**
  * Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") —
@@ -69,6 +83,8 @@ export class InquireEventsService {
   selectedEventModel: BuilderModel = {};
   /** A fresh, throwaway FormGroup per selection — Formly requires one; nothing is ever submitted through it. */
   selectedEventForm = new FormGroup({});
+  /** One row per relevant Balance Component (BALANCE_SNAPSHOT_LABEL), each closing as of the selected event's own time — see balanceRowsAsOf()'s own doc comment. */
+  selectedEventBalances: SelectedEventBalanceRow[] = [];
 
   selectSide(side: 'IMPORT' | 'EXPORT'): void {
     this.side = side;
@@ -89,6 +105,7 @@ export class InquireEventsService {
     this.selectedEventFields = [];
     this.selectedEventModel = {};
     this.selectedEventForm = new FormGroup({});
+    this.selectedEventBalances = [];
   }
 
   search(): void {
@@ -182,5 +199,79 @@ export class InquireEventsService {
     };
     this.selectedEventFields = toReadOnlyFields(buildFields(ctx));
     this.selectedEventForm = new FormGroup({});
+
+    this.loadSelectedEventBalances(event);
+  }
+
+  /**
+   * Inquire Events (2026-08-17, user-requested — Balance Snapshot/Closing Balance per Event). For every
+   * relevant Balance Component (BALANCE_SNAPSHOT_LABEL) already present in `this.events`, finds that
+   * contract's own latest movement at or before the selected event's own time, then fetches its
+   * point-in-time snapshot via the existing, already-tested `GET /balance-movements/:id/balance-as-of`
+   * endpoint (api.getBalanceAsOfMovement() — see that method's own doc comment for the full history: it
+   * reuses a backend capability that already existed, zero new server-side code). The selected event's
+   * OWN contract resolves through the exact same code path as every sibling ledger — no special-casing —
+   * since its own movement is trivially "the latest at or before its own time."
+   */
+  private loadSelectedEventBalances(selected: InquiredEvent): void {
+    const candidates = this.balanceCandidatesAsOf(selected);
+    if (!candidates.length) {
+      this.selectedEventBalances = [];
+      return;
+    }
+    forkJoin(
+      candidates.map((c) =>
+        c.asOfMovementId === null
+          ? of({ ...c, snapshot: null as BalanceSnapshot | null })
+          : this.api.getBalanceAsOfMovement(c.asOfMovementId).pipe(
+              map((snapshot) => ({ ...c, snapshot })),
+              catchError(() => of({ ...c, snapshot: null as BalanceSnapshot | null })),
+            ),
+      ),
+    ).subscribe((rows) => (this.selectedEventBalances = rows));
+  }
+
+  /**
+   * "{label} — LC {lc}" / "... / IB {ib}" / "... / SG {sg}" — mirrors LookUpPanelService.
+   * activeLookupLabel's own suffix convention, but kept independent rather than extracted into a shared
+   * helper: risking a behavior change to that already-shipped, already-tested Look Up panel wasn't
+   * justified for a purely cosmetic label string.
+   */
+  balanceRowTitle(row: SelectedEventBalanceRow): string {
+    const { lcNumber, ibNumber, sgNumber } = row.contract.naturalKey;
+    const suffix = ibNumber ? ` / IB ${ibNumber}` : sgNumber ? ` / SG ${sgNumber}` : '';
+    return `${row.label} — LC ${lcNumber}${suffix}`;
+  }
+
+  /**
+   * Groups `this.events` (already sorted ascending by createdAt) by contract, restricted to
+   * BALANCE_SNAPSHOT_LABEL's own instrumentTypes (EPLC_EXAMINATION and the ON_BALANCE_ASSET types are
+   * never real Balance Components — see BALANCE_SNAPSHOT_LABEL's own doc comment), and resolves each
+   * group's own movementId to pass to balance-as-of: the LAST entry with `createdAt <= selected`'s own
+   * — a plain filter+last since the source is already time-sorted, no re-sorting needed. A group with no
+   * qualifying entry (this Balance Component did not exist yet at that point in time) resolves to
+   * `asOfMovementId: null`, which loadSelectedEventBalances() above turns into a `snapshot: null` row
+   * (rendered as "not yet created") rather than an API call.
+   */
+  private balanceCandidatesAsOf(selected: InquiredEvent): { instrumentType: InstrumentType; label: string; contract: BalanceContract; asOfMovementId: string | null }[] {
+    const cutoff = new Date(selected.movement.createdAt).getTime();
+    const groups = new Map<string, InquiredEvent[]>();
+    for (const e of this.events) {
+      if (!(e.contract.instrumentType in BALANCE_SNAPSHOT_LABEL)) continue;
+      const list = groups.get(e.contract.balanceContractId);
+      if (list) list.push(e);
+      else groups.set(e.contract.balanceContractId, [e]);
+    }
+    return [...groups.values()].map((list) => {
+      const contract = list[0].contract;
+      const upToCutoff = list.filter((e) => new Date(e.movement.createdAt).getTime() <= cutoff);
+      const latest = upToCutoff[upToCutoff.length - 1] ?? null;
+      return {
+        instrumentType: contract.instrumentType,
+        label: BALANCE_SNAPSHOT_LABEL[contract.instrumentType] ?? contract.instrumentType,
+        contract,
+        asOfMovementId: latest?.movement.movementId ?? null,
+      };
+    });
   }
 }

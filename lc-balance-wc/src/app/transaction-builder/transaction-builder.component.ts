@@ -13,6 +13,7 @@ import { CatalogPickerService } from './catalog-picker.service';
 import { InquireEventsService } from './inquire-events.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
+  BALANCE_SNAPSHOT_LABEL,
   DECREASING_MOVEMENT_TYPES,
   EXPORT_FUNCTIONS,
   IMPORT_FUNCTIONS,
@@ -46,6 +47,8 @@ import { BuilderModel } from './function-policy';
 export class TransactionBuilderComponent {
   readonly importFunctions = IMPORT_FUNCTIONS;
   readonly exportFunctions = EXPORT_FUNCTIONS;
+  /** Inquire Events (2026-08-17) — the template's own binding surface for the "Balance Impact" box's label; reuses the same map InquireEventsService's own balance-row grouping filters against. */
+  readonly balanceSnapshotLabel = BALANCE_SNAPSHOT_LABEL;
 
   /**
    * Business instruction 2026-08-15 ("A1-A9 B1-B5 should be horizental

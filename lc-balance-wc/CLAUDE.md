@@ -2702,3 +2702,106 @@ ports, 4100/4200/4300) — a dev stack from an earlier session was already runni
 established "don't chase port conflicts" posture, verification connected directly to that already-
 running `ng serve` instead of killing/restarting it; its watch mode had already picked up every source
 change made in this pass (confirmed: the new mode toggle rendered immediately with no manual reload).
+
+## Inquire Events — Balance Snapshot / Closing Balance per Event, zero backend changes (2026-08-17, user-requested — "Inquire Events 亦應支援查詢每筆 Event 當時處理完成後的各類 Balance Snapshot")
+
+Follow-up to the Inquire Events feature immediately above: for a selected Event, also show (a) the
+actual increase/decrease impact it caused, and (b) the point-in-time closing Snapshot/Balance, for every
+relevant Balance Component — Import LC: LC Balance, Acceptance Balance, Shipping Guarantee Balance;
+Export Confirmed LC: Confirmed LC Balance, Confirmed LC Acceptance Balance.
+
+**Key finding, before writing anything: the microservice already had a working, tested, point-in-time
+balance endpoint.** `GET /balance-movements/:movementId/balance-as-of`
+(`routes/balanceMovements.ts` → `service/balanceService.ts`'s `getBalanceSnapshotAsOfMovement()` →
+`getBalanceSnapshot(contractId, asOfEventSeq)`, reusing the exact same `computeConfirmedBalance()`/
+`computeAvailableBalance()` from `domain/balanceDerivation.ts` the LIVE snapshot uses, just fed a
+movement list filtered to `eventSeq <= asOfEventSeq`) was built for an earlier "Balance as of event"
+Angular panel later removed (replaced by the Event Timeline's plain "Balance After" column, per that
+change's own template comment: "Event Timeline 上一行已經顯示了 不需再多選取"). The backend capability was
+never deleted; `grep` confirmed the Angular side had zero references to it before this pass. Its own doc
+comment already documents one accepted limitation: `offBalanceExposure`/`tightAvailableBalance` are NOT
+point-in-time — they always reflect the SHGT side's CURRENT state ("out of scope for this prototype,"
+not silently approximated). This pass inherits that same documented limitation rather than fixing it —
+confirmed live (see below): an SG's own off-balance exposure figure shown alongside an older event was
+the SAME as the live current figure, exactly as documented.
+
+**Result: zero backend/microservice changes.** Everything below is Angular-side composition over an
+already-existing, already-tested endpoint plus data `InquireEventsService` already fetches for the
+merged Event Timeline.
+
+**`balance-component-api.service.ts`** — one new client method, `getBalanceAsOfMovement(movementId)`,
+`GET .../balance-movements/{id}/balance-as-of`, reusing the existing `BalanceSnapshot` interface
+verbatim (zero new types).
+
+**`balance-component.model.ts`** — new `BALANCE_SNAPSHOT_LABEL: Partial<Record<InstrumentType, string>>`,
+covering exactly the 5 instrumentTypes the user named (`IPLC_LC`/`IPLC_ACCEPTANCE`/`SHGT`/
+`EPLC_CONFIRMATION`/`EPLC_ACCEPTANCE`). Deliberately excludes `EPLC_EXAMINATION` even though it's one of
+`childInstrumentTypesOf('EPLC_CONFIRMATION')`'s own results — `MEMO_ONLY`, never a real Balance
+Component, same "只負責 Contingent Liability" boundary `contingentAccountEntry` already enforces for it.
+A single flat map needs no IMPORT/EXPORT branching: a side-scoped event set never mixes both families.
+
+**`inquire-events.service.ts`** — `selectEvent()` extended to also call a new private
+`loadSelectedEventBalances()`, composing over `this.events` (already fetched, already time-sorted) with
+zero new HTTP surface beyond the one client method above:
+- `balanceCandidatesAsOf()` groups `this.events` by `balanceContractId`, restricted to
+  `BALANCE_SNAPSHOT_LABEL`'s own keys, and resolves each group to the LAST entry with
+  `createdAt <= selected event's own createdAt` — a plain filter+last since the source is already
+  time-sorted, no re-sort needed. The selected event's OWN contract resolves through this exact same
+  path (its own movement trivially IS the latest at-or-before its own time) — no special-casing between
+  "primary" and "sibling" ledgers. A contract with no qualifying entry (didn't exist yet at that point)
+  becomes `asOfMovementId: null`, turned into a `snapshot: null` row (rendered "not yet created") rather
+  than an API call.
+- `loadSelectedEventBalances()` `forkJoin`s one `getBalanceAsOfMovement()` call per candidate (skipped
+  entirely, zero calls, when `candidates.length === 0`), each wrapped in its own `catchError` so one
+  contract's fetch failure doesn't blank the others → new `selectedEventBalances: SelectedEventBalanceRow[]`.
+- **Impact (increase/decrease)** — deliberately NOT a new fetch: reuses `movement.balanceBefore`/
+  `balanceAfter`, already present on every fetched movement, zero extra call. Both null on a still-
+  PENDING movement (Confirmed Balance doesn't move until Release, same domain semantics everywhere else
+  in this app) — rendered as "Still PENDING — Confirmed Balance not yet affected" rather than a numeric
+  delta. Available Balance's own point-in-time value (which DOES move immediately for a PENDING
+  movement, per `computeAvailableBalance`'s own PENDING-delta term) still comes through correctly via
+  the row's own snapshot — no special-casing needed, the reused endpoint already gets this right.
+- `balanceRowTitle()` — "{label} — LC {lc}" / ".../ IB {ib}" / ".../ SG {sg}", mirroring
+  `LookUpPanelService.activeLookupLabel`'s own suffix convention but kept independently implemented
+  rather than extracted into a shared helper — a behavior-risk-for-a-cosmetic-string tradeoff judged not
+  worth it against that already-shipped, already-tested panel.
+
+**Template reuse — extracted, not duplicated, the "Current Balance" box.** The Look Up panel's own
+pre-existing balance box (`.tb-balance-box.tb-balance-box--current`, bound to
+`lookUp.activeLookupSnapshot`) is now a single shared `<ng-template #balanceSnapshotBox let-title
+let-status let-snapshot>`, declared once at the root of the template (visible to both `*ngIf` branches
+it's invoked from) and invoked via `*ngTemplateOutlet`/`[ngTemplateOutletContext]` from BOTH the Look Up
+panel (unchanged bindings, now routed through the shared template — a template-only extraction, zero TS/
+logic change) AND the new Inquire Events balance rows (one outlet call per `selectedEventBalances` row).
+This is what actually satisfies the user's own "ensure consistent behavior between Transaction
+Processing and Event Inquiry" wording literally — one canonical markup block, two call sites, not two
+independently-maintained copies of the same field list. `transaction-builder.component.ts` also exposes
+`readonly balanceSnapshotLabel = BALANCE_SNAPSHOT_LABEL` as the "Balance Impact" box's own label lookup
+(same reused map, no second copy).
+
+**Tests:** `inquire-events.service.spec.ts` (new `selectedEventBalances`/`balanceRowTitle` describe
+blocks — multi-contract grouping incl. the "latest at-or-before cutoff, not the selected event's own
+time" case explicitly, the "not yet created" null-snapshot skip, `EPLC_EXAMINATION` exclusion, the
+per-contract `catchError` isolation); `balance-component-api.service.spec.ts` (new client-method test);
+`balance-component.model.spec.ts` (new `BALANCE_SNAPSHOT_LABEL` data-invariant tests, same "covers
+exactly N, no more no fewer" style as this file's existing tests). Verified: Angular app 696/696 passing
+(13 new), 99.73%/96.33%/99.51%/99.77% coverage (`inquire-events.service.ts` itself 100/96.96/100/100 —
+the one uncovered branch is a defensive `?? contract.instrumentType` fallback on an index access already
+guaranteed present by the caller's own `in` filter, same class as other defensively-typed-but-
+unreachable code already accepted elsewhere in this file), `npx tsc -p tsconfig.app.json --noEmit`
+clean, `ng build --configuration development` clean, `npm run lint` 0 errors (211 pre-existing `any`
+warnings, unchanged); microservice 292/292 and `backend/` 33/33 (both unaffected — no backend/
+microservice files touched at all).
+
+**Live in-browser verification** (same already-running dev stack): re-selected the S01 `SHGT`/
+`FULL_REDEEM` (10,000, SG G01) event from the prior pass's own check — "Balance Impact — Shipping
+Guarantee Balance (Approved): Confirmed Balance 10000 → 0" (correct); "Closing Snapshot — LC Balance —
+LC S01: Confirmed 100000 / Available 100000" (correct — as of THIS event's own time, the later
+`IPLC_LC`/`UTILIZE` B01 hadn't happened yet, proving the point-in-time cutoff is genuinely per-event, not
+"whatever's current"); two separate "Closing Snapshot — Shipping Guarantee Balance" rows, one per real
+SG contract under this LC (G01: 0/0 matching the impact; G02: 20000/20000, untouched by this specific
+event) — confirming the multi-sibling-contract case renders correctly, not just the single-ledger case.
+Off-Balance Exposure/Tight Available Balance rendered only on the LC row, never the SG rows (matches
+`getBalanceSnapshot()`'s own `IPLC_LC`/`EPLC_LC`-only branching). Separately re-verified the Look Up
+panel's own "Current Balance — LC S01" box (Transaction Processing side) renders byte-identical to
+before this pass's `#balanceSnapshotBox` extraction. Zero console errors across the whole session.
