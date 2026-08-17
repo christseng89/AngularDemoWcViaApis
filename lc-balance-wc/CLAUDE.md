@@ -2566,3 +2566,44 @@ would remove — the reset block collapses when state is `computed()` from a `se
 and each `loadX()`/`xLoading` pair collapses into one `toSignal(... switchMap ...)` stream (which
 would also close a real latent bug the imperative version has: a slow first response can overwrite a
 fast second one, since nothing cancels the in-flight request when the user re-clicks).
+
+## B3's own contingent account-entry pair removed — `EPLC_EXAMINATION` now correctly generates no `contingentAccountEntry` at all (2026-08-17, user-directed — "請將 B3 出的這一對 ACCOUNT ENTRIES 拿掉")
+
+Reverses the "shown in the ledger as a real, named pair rather than silently absent" design choice made
+in the original contingent-account-entry feature (see that section above): `EPLC_EXAMINATION` CREATE
+(B3, Present Docs) never actually posts to the books — Design Principle D3 ("Documents arriving is a
+physical event... Only legal events move balances") and B3's own MEMO_ONLY classification already
+establish this; the account-entry feature had nonetheless generated a named
+`Dr Export Bills — Received, Under Examination (memo) / Cr Export Bills — Contra (memo)` pair and
+surfaced it through the API/UI same as every real contingent event. User confirmed, after being told B4
+does not (and structurally cannot) reverse this pair — since B4 only ever *releases* B3's own PENDING
+CREATE rather than posting a separate closing movement — that the pair should simply never have been
+generated in the first place.
+
+**Fix, `microservices/balance-component/src/domain/contingentAccountEntry.ts`:** `EPLC_EXAMINATION`
+moved out of its own `EXAMINATION_FAMILY` case into the same `null`-returning case group as the three
+`ON_BALANCE_ASSET` instruments (`accountFamilyFor()`), with a doc comment explaining why. The
+now-unreferenced `EXAMINATION_FAMILY` constant removed outright (BAL-101-style dead-code posture — no
+partial/half-used state left behind). `createMovement()` in `service/balanceService.ts` needed no
+change — it already just persists whatever `deriveContingentAccountEntry()` returns, `null` included,
+same as it already does for the three out-of-scope on-balance-sheet instruments.
+
+**Not touched, deliberately:** `analysis/contingent-liability-ledger.html`'s own Folio 4 B3 row —
+already tagged `No GL effect` there (footnote 2: shown as a row specifically so B3 is "visibly
+accounted for rather than silently absent" from the *reference document*, not a claim that the system
+posts it). That documentation-only framing was already correct; only the code's own behavior was
+out of step with it.
+
+**Tests:** `test/unit/domain/contingentAccountEntry.test.ts`'s own `EPLC_EXAMINATION` describe block
+rewritten from asserting the memo pair to asserting `null`. No other test (microservice or Angular)
+asserted a `contingentAccountEntry` shape specifically for `EPLC_EXAMINATION`/B3 — the Angular
+"Account Entries" button is already generically gated on `*ngIf="...?.contingentAccountEntry"`, so it
+now simply never renders for a B3 submission, with no component/template change required.
+
+Full three-suite verification per this file's own standing rule: microservice 292/292 passing
+(99.12%/96.33%/100%/99.42% coverage), `npm run typecheck`/`npm run build` clean, `npm run lint` 0
+errors (11 pre-existing warnings, unchanged — one transient `no-fallthrough` error surfaced mid-fix from
+a comment placed *between* two `case` labels rather than above the whole grouped-case block, fixed by
+moving the comment above the group, same convention the pre-existing `ON_BALANCE_ASSET` group already
+used); `backend/` 33/33 (unaffected); Angular app 652/652 (unaffected) — all three clear their own 95%
+floor on all four metrics.

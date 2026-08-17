@@ -19,6 +19,11 @@
  *    (EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE / EPLC_EXPORT_BILLS_DISCOUNTED) —
  *    on-balance-sheet liability/asset entries are never generated here, by design (ledger's own scope
  *    boundary: "On-Balance-Sheet Liability remains out of scope for the Balance Component").
+ *  - EPLC_EXAMINATION (B3 Present Docs) — business-confirmed 2026-08-17: B3 never actually posts to the
+ *    books (Design Principle D3, "Documents arriving is a physical event... Only legal events move
+ *    balances"), so no account-entry pair is generated for it, even though the ledger's own Folio 1/4
+ *    "no GL effect" rows visually named a pair. This reverses this module's own earlier decision to
+ *    model that pair as a real, named entry rather than leaving it silently absent.
  *  - any movementType this ledger does not document a contingent pair for (defensive default — every
  *    movementType actually reachable through balanceService.createMovement() today is covered).
  */
@@ -67,12 +72,6 @@ const EXPORT_ACCEPTANCE_FAMILY: AccountFamily = {
   establishCr: 'Confirmed Acceptances & DPU — Outstanding (memo)',
   tenorSuffix: 'NONE',
 };
-/** B3 (Present Docs) — MEMO_ONLY, operational memo per Design Principle D3; shown in the ledger (Folios 1/4's own "No GL effect" rows) as a real, named pair rather than silently absent. Import's own equivalent (A3 "Document Arrival received") has no distinct persisted movement to attach it to — A3 IS the LC's own UTILIZE earmark, not a separate memo event — so it is intentionally not modelled here. */
-const EXAMINATION_FAMILY: AccountFamily = {
-  establishDr: 'Export Bills — Received, Under Examination (memo)',
-  establishCr: 'Export Bills — Contra (memo)',
-  tenorSuffix: 'NONE',
-};
 
 function accountFamilyFor(instrumentType: InstrumentType): AccountFamily | null {
   switch (instrumentType) {
@@ -87,10 +86,11 @@ function accountFamilyFor(instrumentType: InstrumentType): AccountFamily | null 
       return CONFIRMATION_FAMILY;
     case 'EPLC_ACCEPTANCE':
       return EXPORT_ACCEPTANCE_FAMILY;
+    // EPLC_EXAMINATION (B3 Present Docs) never posts a real account-entry pair (see this file's own top
+    // doc comment for the 2026-08-17 reversal), grouped here with the ON_BALANCE_ASSET instruments —
+    // explicitly out of the Balance Component's own contingent scope (ledger's own Scope boundary). No
+    // family, no entry, by design.
     case 'EPLC_EXAMINATION':
-      return EXAMINATION_FAMILY;
-    // ON_BALANCE_ASSET — explicitly out of the Balance Component's own contingent scope (ledger's own
-    // Scope boundary). No family, no entry, by design.
     case 'EPLC_DUE_FROM_ISSUING_BANK':
     case 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE':
     case 'EPLC_EXPORT_BILLS_DISCOUNTED':
