@@ -418,3 +418,30 @@ describe('CheckerActionsService.reject() — prefers selectedCheckerMovement ove
     });
   });
 });
+
+describe('CheckerActionsService.deleteMakerPending() — BAL-132 createdBy runtime guard', () => {
+  it('fails cleanly, without calling the API, when createdBy is null', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: null, submitResult: makeMovement({ movementId: 'mv-1' }) });
+
+    service.deleteMakerPending(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('no Maker (createdBy) is known');
+      expect(api.cancel).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('still cancels normally when createdBy is present (unaffected by the new guard)', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-2' }) });
+
+    service.deleteMakerPending(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('released');
+      expect(api.cancel).toHaveBeenCalledWith('mv-2', 'maker1', 'MAKER_EC');
+      done();
+    });
+  });
+});

@@ -2076,6 +2076,37 @@ call sites** against the real running stack: `import-case-6` (`submitByMaker()` 
 Test data cleaned up afterward. Full three-suite re-verification per this file's own standing rule:
 `backend/` 33/33 and Angular app 510/510, both unaffected (microservice-only change).
 
+## BAL-132 fixed — `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion replaced with a runtime guard, closing out every finding from the 2026-08-17 comprehensive review pass (business instruction: "Fix BAL-132 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-132 section): `checker-actions.service.ts`'s
+`deleteMakerPending()` asserted `ctx.createdBy!` away rather than proving it can't be null/undefined —
+safe in practice today (the component's own `submit()` already requires `model.createdBy` before any
+Maker submission a Checker could later Delete-Pending can exist), but a silent assumption rather than a
+proven one.
+
+**Fix**: `const cancelledBy = ctx.createdBy!;` replaced with `if (!ctx.createdBy) return
+this.fail('Cannot delete this Maker submission — no Maker (createdBy) is known for it.'); const
+cancelledBy = ctx.createdBy;` — reusing BAL-126's own `fail()` helper. Purely additive; the only
+reachable path today (createdBy present) is byte-for-byte unchanged.
+
+Verified: `tsc --noEmit`/`ng build` clean, `npm run lint` unchanged (0 errors, 219 warnings). Two new
+dedicated tests added to `checker-actions.service.spec.ts` (the new guard fails cleanly without calling
+the API when `createdBy` is null; the happy path is unaffected) — the new guard's own branch would
+otherwise have gone uncovered, so added coverage rather than leaving a newly-uncovered branch, per this
+project's own 95%-floor rule. Full Angular suite 512/512 (2 new), coverage 99.63%/95.17%/99.16%/99.67%
+(branches recovered to exactly the pre-fix level). Full three-suite re-verification: `backend/` 33/33 and
+microservice 292/292, both unaffected (Angular-only change). No live browser session — the fix only adds
+a guard on a path the real UI never reaches today, fully proven by the new dedicated tests.
+
+**This closes out every finding the 2026-08-17 comprehensive quality reassessment pass itself
+surfaced** — BAL-122 through BAL-132 plus BAL-134 (11 findings total: 2 Major, 1 completeness gap, 6
+Minor/Info code smells, 1 stale-scenario bug, all found and fixed across this session's sequence of
+`"Fix BAL-XXX too"` requests). `Quality-report-balance.md`'s own composite score reached 100/100 with an
+explicit caveat that this reflects this specific review pass's own findings being resolved, not that the
+codebase is production-ready — BAL-001 (no auth), BAL-002 (dependency CVEs), BAL-102 (SQLite locking),
+and BAL-003 (God Component) remain open, deferred gate conditions, unchanged throughout this entire
+sequence of fixes.
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

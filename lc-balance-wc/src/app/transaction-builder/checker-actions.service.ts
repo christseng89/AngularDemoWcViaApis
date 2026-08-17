@@ -176,7 +176,13 @@ export class CheckerActionsService {
    * secondary/asset leg(s) FIRST (reverse creation order) so an EC never leaves a later leg orphaned.
    */
   deleteMakerPending(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
-    const cancelledBy = ctx.createdBy!;
+    // BAL-132 (Quality-report-balance.md): was `const cancelledBy = ctx.createdBy!;` — asserted away
+    // `CheckerActionContext.createdBy`'s own declared `string | null | undefined` type instead of
+    // proving it can't happen. Safe in practice today (the component's own submit() already requires
+    // model.createdBy before a Maker submission can exist to delete), but a real runtime guard costs
+    // nothing and doesn't silently mask a future caller reaching this method with it unset.
+    if (!ctx.createdBy) return this.fail('Cannot delete this Maker submission — no Maker (createdBy) is known for it.');
+    const cancelledBy = ctx.createdBy;
     const cancelPrimary = (): Observable<CheckerActionOutcome> =>
       this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res, syncLookup: true })),
