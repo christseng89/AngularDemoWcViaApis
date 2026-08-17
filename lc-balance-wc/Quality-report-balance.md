@@ -48,11 +48,11 @@ surfaced BAL-122 and BAL-123 below.
 |---|---|---|
 | **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A (4.6/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124, BAL-125, and BAL-126 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped to `BalanceMovement`/`BalanceMovement | null`; that same file's own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper); BAL-127/BAL-130 (two files trending toward their own future God-file status) and BAL-128 (stale eslint-disable comments) remain open — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
+| **Maintainability** | A (4.7/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124, BAL-125, BAL-126, and BAL-127 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped to `BalanceMovement`/`BalanceMovement | null`; that same file's own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper); BAL-130 (`balanceService.ts` trending toward its own future God-file status) and BAL-128 (stale eslint-disable comments) remain open — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A)**
 
 **Why the score dipped then recovered past its prior peak, rather than only ever climbing (or landing
 exactly back where it started):** this comprehensive follow-up pass is deliberately adversarial rather
@@ -73,11 +73,15 @@ fields/parameters, the one instance of BAL-108's own already-fixed pattern that 
 extracted after BAL-108 closed, all retyped to `BalanceMovement`/`BalanceMovement | null` with zero test
 assertions needing to change. Then BAL-126 (96 → 97) — that same file's own duplicated `{kind:'failed'}`
 constructions (a fresh count found 20, not the original ~12 estimate) collapsed into one shared `fail()`
-helper, again with zero test assertions needing to change. The score ending above its prior peak is
-earned: this pass has now fixed every Major/Info finding it itself surfaced, plus three of its own Minor
-findings (BAL-124, BAL-125, BAL-126), on top of confirming every earlier pass's fixes still hold. A
-handful of Minor/Info findings from this pass remain open (BAL-127–BAL-130, BAL-132) — small,
-independently actionable, not gate conditions.
+helper, again with zero test assertions needing to change. Then BAL-127 (97 → 98) — despite the
+finding's own "not yet urgent" framing, fixed on explicit request: `backend/data/businessCases.js`'s own
+~49 duplicated create+release step pairs (the single most common repeated shape in the file) collapsed
+into one shared `createAndRelease()` helper, live-verified across all 14 registered cases individually
+against the real running stack, again zero test assertions needing to change. The score ending above its
+prior peak is earned: this pass has now fixed every Major/Info finding it itself surfaced, plus four of
+its own Minor/Info findings (BAL-124, BAL-125, BAL-126, BAL-127), on top of confirming every earlier
+pass's fixes still hold. A handful of Minor/Info findings from this pass remain open (BAL-128, BAL-130,
+BAL-132) — small, independently actionable, not gate conditions.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -118,13 +122,16 @@ file existed) was fixed the same way as BAL-108's own precedent — all 6 retype
 `BalanceMovement`/`BalanceMovement | null`, zero test assertions needing to change. **BAL-126** (that
 same file's own duplicated `{kind:'failed'}` constructions — a fresh count found 20, not the ~12
 originally estimated) was fixed with a single shared `fail()` helper, again zero test assertions needing
-to change. The remaining four (BAL-127–BAL-130, BAL-132) stay open — small, independently actionable,
-none Blocker/Critical, none regressing anything the five 2026-08-16 passes fixed.
+to change. **BAL-127** (`backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs
+— filed as "not yet urgent" by its own original text, fixed anyway on explicit request) was collapsed
+into a single shared `createAndRelease()` helper, live-verified across all 14 registered cases against
+the real running stack. The remaining three (BAL-128, BAL-130, BAL-132) stay open — small, independently
+actionable, none Blocker/Critical, none regressing anything the five 2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
 as resolved. All findings this pass itself surfaced (BAL-122, BAL-123, BAL-134, BAL-131, BAL-124,
-BAL-125, BAL-126) are now fixed and no longer factor into that assessment. See
+BAL-125, BAL-126, BAL-127) are now fixed and no longer factor into that assessment. See
 [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
@@ -155,7 +162,7 @@ BAL-125, BAL-126) are now fixed and no longer factor into that assessment. See
 | [BAL-109](#bal-109) | ⚪ Info | Reliability | A handful of provably-dead defensive branches, left uncovered on purpose (2 more instances found and correctly left alone this pass) |
 | [BAL-110](#bal-110) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth — **Fixed** (contract test added) |
 | [BAL-130](#bal-130) | ⚪ Info | Technical Debt | `balanceService.ts` (microservice) trending toward its own mini-God-file — 614 lines, 8 methods sharing one repeated find→validate→persist shape — **Open, found this pass, not yet urgent** |
-| [BAL-127](#bal-127) | ⚪ Info | Technical Debt | `backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case (now 1,439 lines / 14 cases) — **Open, found this pass, not yet urgent** |
+| [BAL-127](#bal-127) | ⚪ Info | Technical Debt | `backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case (now 1,439 lines / 14 cases) — **Fixed** |
 | [BAL-131](#bal-131) | ⚪ Info | Reliability / Completeness | The Business Case Registry never exercises `POST /balance-movements/:id/acknowledge` — the one microservice endpoint with zero orchestrator-level coverage — **Fixed** |
 | [BAL-132](#bal-132) | ⚪ Info | Code Smell | `deleteMakerPending()`'s `ctx.createdBy!` non-null assertion bypasses the type system's own declared nullability — **Open, found this pass, low risk** |
 | [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — **Fixed** |
@@ -415,7 +422,7 @@ own BAL-003 history shows the cost of deferring too long.
 ---
 
 ### BAL-127
-**`backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case** — ⚪ Info (Technical Debt) — Open, found this pass, not yet urgent
+**`backend/data/businessCases.js`'s declarative-data duplication is growing with each new compound case** — ⚪ Info (Technical Debt) — Fixed
 
 **Evidence:** the file is now 1,439 lines / 14 registered cases (`grep -c "createdBy: MAKER"` → 69,
 `"releasedBy: CHECKER"` → 68, `"currency: 'USD'"` → 69 — the same literal shape repeated dozens of
@@ -433,6 +440,42 @@ cut line count without changing the file's own declarative-step-list model.
 **Recommended remediation:** not urgent; revisit if/when a case #18–20 is added and the file crosses
 ~2,000 lines, at which point a `createAndRelease(request, releasedBy)` step-pair helper (or similar)
 would be worth the refactor.
+
+**Outcome (2026-08-17, business instruction: "Fix BAL-127 too" — despite the finding's own "not yet
+urgent" framing): fixed on explicit request, exactly per the recommended remediation.** New
+`createAndRelease(createLabel, captureAs, request, releaseLabel, releasedBy = CHECKER)` helper — returns
+the identical `[{type:'createMovement',...}, {type:'release',...}]` two-step shape the file already
+wrote out longhand everywhere, spread into a case's `steps` array via `...createAndRelease(...)`.
+Applied at **49** of the file's plain "create a movement, then have the Checker release it in the very
+next step, nothing in between" pairs — the overwhelming majority of the file's own step-pairs.
+Deliberately left as explicit longhand wherever something genuinely sits between create and release (a
+`note`, a second `createMovement`, or a compound/deferred release the caller must sequence by hand —
+A3S/A6/B4/B5-style, or `import-case-5`'s own `expectError: true` case with no release at all) — collapsing
+those would risk hiding real ordering the file's own doc comments already call out as load-bearing, which
+this fix's own risk posture (zero behavior change) explicitly ruled out.
+
+Verified: full `backend/` suite 33/33 with **zero test files needing any changes** — `businessCases.js`
+itself stays at 100% coverage on all four metrics, and the registry-shape/structural tests in
+`businessCases.test.js` (step-type validation, `*Ref` resolution, the "structurally deterministic across
+independent calls" test) all pass unmodified since they only ever inspect the final expanded step array,
+never the source that builds it — strong evidence of exact behavior preservation. `npm run lint` unchanged
+(0 errors, the same 3 pre-existing BAL-128 "unused eslint-disable" warnings); `prettier --write` applied
+to reformat the rewritten file cleanly (`format:check` now passes). File size: 1,471 → 1,440 lines — a
+modest reduction (this was never primarily a line-count exercise; the real win is that the ~49 repeated
+create+release pairs are now one shared, single-source-of-truth shape instead of 49 independently-typed
+copies of the same two step objects).
+
+**Live-verified all 14 Business Case Registry entries individually** against the real running
+backend+microservice (not just the mocked-fetch unit suite) — every case's full step sequence returns
+2xx throughout with correct final balances, confirming the rewrite is byte-for-byte behavior-preserving
+end to end, not just structurally equivalent in the unit tests. (Two transient `ORCHESTRATION_ERROR`
+failures surfaced mid-verification on `export-case-3`/`export-case-6` when run back-to-back with the
+other 13 cases in quick succession — re-confirmed as the same rate-limiter false-positive artifact this
+session has already diagnosed and documented elsewhere in this report, not a regression: both succeeded
+cleanly on an isolated re-run once the 60-second window cleared.) Test data from this verification pass
+scoped-cleaned afterward (`IMP-C%`/`EXP-C%`), leaving the user's own 18 S01/S02/U01 records untouched.
+Full three-suite re-verification per this file's own standing rule: Angular app 510/510 and microservice
+292/292, both unaffected (`backend/`-only change).
 
 ---
 
@@ -1372,10 +1415,12 @@ before the A4 feature area specifically is considered done:**
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
 its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
 non-obvious misclick sequence to trigger. **Both are now fixed, and so are BAL-134, BAL-131, BAL-124,
-BAL-125, and BAL-126** — `import-case-4`'s own stale scenario (found incidentally while verifying
-BAL-123), the Business Case Registry's own completeness gap (zero orchestrator-level `/acknowledge`
-coverage), the executor's duplicated step handlers (closed as a direct side effect of the BAL-131 fix),
-`checker-actions.service.ts`'s own 6 un-swept `any` occurrences (retyped to `BalanceMovement`), and that
-same file's own 20 duplicated `{kind:'failed'}` constructions (collapsed into one shared `fail()`
-helper), respectively. All remaining 2026-08-17 findings (BAL-127–BAL-130, BAL-132) are Minor/Info, none
-are gate conditions, and none block anything.
+BAL-125, BAL-126, and BAL-127** — `import-case-4`'s own stale scenario (found incidentally while
+verifying BAL-123), the Business Case Registry's own completeness gap (zero orchestrator-level
+`/acknowledge` coverage), the executor's duplicated step handlers (closed as a direct side effect of the
+BAL-131 fix), `checker-actions.service.ts`'s own 6 un-swept `any` occurrences (retyped to
+`BalanceMovement`), that same file's own 20 duplicated `{kind:'failed'}` constructions (collapsed into
+one shared `fail()` helper), and `backend/data/businessCases.js`'s own ~49 duplicated create+release
+step pairs (collapsed into one shared `createAndRelease()` helper, fixed despite its own "not yet
+urgent" framing), respectively. All remaining 2026-08-17 findings (BAL-128, BAL-130, BAL-132) are
+Minor/Info, none are gate conditions, and none block anything.

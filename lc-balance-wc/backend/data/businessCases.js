@@ -44,6 +44,22 @@ function lcNumberFor(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
+// Quality-report-balance.md BAL-127 (2026-08-17, "not yet urgent" per the finding's own text, fixed on
+// explicit user request): the plain "create a movement, then have the Checker release it in the very
+// next step, nothing in between" shape repeats ~49 times across the case functions below — the single
+// most common step-pair in this file. This helper expands to the exact same two step objects
+// (`createMovement` + `release`) the file already wrote out longhand everywhere, so it changes nothing
+// about server.js's generic executor or this file's own declarative-step-list model — only used where
+// create and release are genuinely adjacent with nothing between them; a case needing a note, a second
+// create, or a compound/deferred release (A3S/A6/B4/B5-style, or an expectError case) keeps writing its
+// steps out explicitly, since collapsing those would risk hiding real ordering that matters.
+function createAndRelease(createLabel, captureAs, request, releaseLabel, releasedBy = CHECKER) {
+  return [
+    { type: 'createMovement', label: createLabel, captureAs, request },
+    { type: 'release', label: releaseLabel, movementRef: captureAs, releasedBy },
+  ];
+}
+
 // ── Import LC ────────────────────────────────────────────────────────────
 
 function importCase1(lc) {
@@ -52,11 +68,10 @@ function importCase1(lc) {
     title: 'Import Case 1 — USD Sight',
     description: 'LC Issue 100,000 w/ Tolerance 10% -> Amendment +10,000 -> Document Arrival 50,000 -> Accept Pay 50,000',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10%',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10%',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -66,13 +81,12 @@ function importCase1(lc) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'AMEND_INCREASE',
@@ -81,14 +95,13 @@ function importCase1(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
+        'Checker releases Amendment',
+      ),
       { type: 'snapshot', label: 'LC Balance after Issue+Amendment (expect 121,000)', contractRef: 'lc' },
-      {
-        type: 'createMovement',
-        label: 'Document Arrival 50,000 (Earmark)',
-        captureAs: 'utilize',
-        request: {
+      ...createAndRelease(
+        'Document Arrival 50,000 (Earmark)',
+        'utilize',
+        {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'UTILIZE',
@@ -97,8 +110,8 @@ function importCase1(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Accept Pay 50,000 (Sight Honour)', movementRef: 'utilize', releasedBy: CHECKER },
+        'Accept Pay 50,000 (Sight Honour)',
+      ),
       { type: 'snapshot', label: 'LC Balance after Accept Pay (expect 71,000)', contractRef: 'lc' },
     ],
   };
@@ -110,11 +123,10 @@ function importCase2(lc, ib) {
     title: 'Import Case 2 — USD Usance 120 days after sight',
     description: 'LC Issue+Amendment -> Document Arrival 50,000 -> Accept 50,000 (LC Liability -> Acceptance Liability) -> Settlement Due Date',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10%',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10%',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -124,13 +136,12 @@ function importCase2(lc, ib) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'AMEND_INCREASE',
@@ -139,13 +150,12 @@ function importCase2(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Document Arrival 50,000 (Earmark)',
-        captureAs: 'utilize',
-        request: {
+        'Checker releases Amendment',
+      ),
+      ...createAndRelease(
+        'Document Arrival 50,000 (Earmark)',
+        'utilize',
+        {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'UTILIZE',
@@ -154,14 +164,13 @@ function importCase2(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
+        'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability',
+      ),
       { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
-      {
-        type: 'createMovement',
-        label: 'Create Acceptance 50,000 (carved out of the LC, linked call)',
-        captureAs: 'acceptance',
-        request: {
+      ...createAndRelease(
+        'Create Acceptance 50,000 (carved out of the LC, linked call)',
+        'acceptance',
+        {
           instrumentType: 'IPLC_ACCEPTANCE',
           naturalKey: { lcNumber: lc, ibNumber: ib },
           parentLogicalContractIdRef: 'lc',
@@ -172,14 +181,13 @@ function importCase2(lc, ib) {
           exposureNature: 'ACTUAL',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Acceptance CREATE', movementRef: 'acceptance', releasedBy: CHECKER },
+        'Checker releases Acceptance CREATE',
+      ),
       { type: 'snapshot', label: 'Acceptance Balance (expect 50,000)', contractRef: 'acceptance' },
-      {
-        type: 'createMovement',
-        label: 'Settlement Due Date 50,000 (Cr CA)',
-        captureAs: 'settle',
-        request: {
+      ...createAndRelease(
+        'Settlement Due Date 50,000 (Cr CA)',
+        'settle',
+        {
           instrumentType: 'IPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptance',
           movementType: 'FULL_SETTLE',
@@ -188,8 +196,8 @@ function importCase2(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement', movementRef: 'settle', releasedBy: CHECKER },
+        'Checker releases Settlement',
+      ),
       { type: 'snapshot', label: 'Acceptance Balance after Settlement (expect 0)', contractRef: 'acceptance' },
       { type: 'snapshot', label: 'LC Balance, untouched by maturity settlement (expect still 71,000)', contractRef: 'lc' },
     ],
@@ -202,11 +210,10 @@ function importCase3(lc, sg) {
     title: 'Import Case 3 — USD Sight + Shipping Guarantee 50,000 + IBL',
     description: 'SG amount exactly matches the arrived documents — no WARNING, and SG can be FULL_REDEEM-ed once documents reconcile.',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10%',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10%',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -216,13 +223,12 @@ function importCase3(lc, sg) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'AMEND_INCREASE',
@@ -231,13 +237,12 @@ function importCase3(lc, sg) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Shipping Guarantee 50,000',
-        captureAs: 'sg',
-        request: {
+        'Checker releases Amendment',
+      ),
+      ...createAndRelease(
+        'Shipping Guarantee 50,000',
+        'sg',
+        {
           instrumentType: 'SHGT',
           naturalKey: { lcNumber: lc, sgNumber: sg },
           parentLogicalContractIdRef: 'lc',
@@ -247,8 +252,8 @@ function importCase3(lc, sg) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG Issue', movementRef: 'sg', releasedBy: CHECKER },
+        'Checker releases SG Issue',
+      ),
       {
         type: 'createMovement',
         label: 'Document Arrival 50,000 (Earmark, off-balance checked against SG)',
@@ -266,11 +271,10 @@ function importCase3(lc, sg) {
       { type: 'note', label: 'Expect NO warning here — Tight Available (71,000) still >= 50,000' },
       { type: 'release', label: 'IBL/Pay 50,000 (120 days)', movementRef: 'utilize', releasedBy: CHECKER },
       { type: 'note', label: 'IBL itself is a Loan Component ASSET — no Balance Component call' },
-      {
-        type: 'createMovement',
-        label: 'SG matches arrived documents exactly -> FULL_REDEEM 50,000',
-        captureAs: 'redeem',
-        request: {
+      ...createAndRelease(
+        'SG matches arrived documents exactly -> FULL_REDEEM 50,000',
+        'redeem',
+        {
           instrumentType: 'SHGT',
           balanceContractIdRef: 'sg',
           movementType: 'FULL_REDEEM',
@@ -279,8 +283,8 @@ function importCase3(lc, sg) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG Redemption', movementRef: 'redeem', releasedBy: CHECKER },
+        'Checker releases SG Redemption',
+      ),
       { type: 'snapshot', label: 'LC Balance (expect 71,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'SG Balance (expect 0)', contractRef: 'sg' },
       { type: 'note', label: 'Settlement Due Date 50,000 — pure Loan Component (IBL maturity), no Balance Component call' },
@@ -312,11 +316,10 @@ function importCase4(lc, sg) {
     description:
       "SG covers the full LC but only half the documents arrive — Document Arrival w/ Shipping Gtee (A3S) nets the SG's own reserved capacity out of the Tight Available check BEFORE the Document Arrival's own sufficiency check runs, so the partial presentation succeeds cleanly (no warning, no error); SG itself can only be PARTIAL_REDEEM-ed for the matched amount, leaving the rest outstanding.",
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10%',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10%',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -326,13 +329,12 @@ function importCase4(lc, sg) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'AMEND_INCREASE',
@@ -341,13 +343,12 @@ function importCase4(lc, sg) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Shipping Guarantee 100,000 (covers full LC)',
-        captureAs: 'sg',
-        request: {
+        'Checker releases Amendment',
+      ),
+      ...createAndRelease(
+        'Shipping Guarantee 100,000 (covers full LC)',
+        'sg',
+        {
           instrumentType: 'SHGT',
           naturalKey: { lcNumber: lc, sgNumber: sg },
           parentLogicalContractIdRef: 'lc',
@@ -357,11 +358,12 @@ function importCase4(lc, sg) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG Issue', movementRef: 'sg', releasedBy: CHECKER },
+        'Checker releases SG Issue',
+      ),
       {
         type: 'createMovement',
-        label: 'SG Redemption Amount = MIN(Bill 50,000, SG Outstanding 100,000) -> PARTIAL_REDEEM 50,000 (created FIRST — still PENDING, nets out of the Document Arrival\'s own Tight Available check below)',
+        label:
+          "SG Redemption Amount = MIN(Bill 50,000, SG Outstanding 100,000) -> PARTIAL_REDEEM 50,000 (created FIRST — still PENDING, nets out of the Document Arrival's own Tight Available check below)",
         captureAs: 'redeem',
         request: {
           instrumentType: 'SHGT',
@@ -376,7 +378,7 @@ function importCase4(lc, sg) {
       },
       {
         type: 'createMovement',
-        label: 'Document Arrival w/ SG 50,000 (A3S — matches the SG\'s own reserved capacity; only half the SG-covered goods have arrived)',
+        label: "Document Arrival w/ SG 50,000 (A3S — matches the SG's own reserved capacity; only half the SG-covered goods have arrived)",
         captureAs: 'utilize',
         request: {
           instrumentType: 'IPLC_LC',
@@ -410,11 +412,10 @@ function importCase5(lc) {
     title: 'Import Case 5 — USD Sight, Amendment Decrease 120,000 (expect ERROR)',
     description: 'A face-level decrease that would drive the LC face amount negative — must be rejected, not silently clipped.',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10%',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10%',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -424,8 +425,8 @@ function importCase5(lc) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
+        'Checker releases LC Issue',
+      ),
       {
         type: 'createMovement',
         label: 'LC Amendment DECREASE 120,000 — expect 409 ERROR',
@@ -465,11 +466,10 @@ function importCase6(lc) {
     description:
       'LC Issue 100,000 (Sight) -> SG1 10,000 + SG2 20,000 -> Document Arrival w/ SG 12,000 (B01, matches SG1 exactly -> FULL_REDEEM) -> Document Arrival w/ SG 12,000 (B02, partially matches SG2 -> PARTIAL_REDEEM) -> plain Document Arrival 30,000 (B03, no SG) -> A4 Sight Settlement (real Maker Submit + Checker Release) on all three',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000 (Sight)',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000 (Sight)',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -479,13 +479,12 @@ function importCase6(lc) {
           tenorType: 'SIGHT',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Shipping Guarantee 10,000 (G01)',
-        captureAs: 'sg1',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'Shipping Guarantee 10,000 (G01)',
+        'sg1',
+        {
           instrumentType: 'SHGT',
           naturalKey: { lcNumber: lc, sgNumber: 'G01' },
           parentLogicalContractIdRef: 'lc',
@@ -495,13 +494,12 @@ function importCase6(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG1 Issue', movementRef: 'sg1', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Shipping Guarantee 20,000 (G02)',
-        captureAs: 'sg2',
-        request: {
+        'Checker releases SG1 Issue',
+      ),
+      ...createAndRelease(
+        'Shipping Guarantee 20,000 (G02)',
+        'sg2',
+        {
           instrumentType: 'SHGT',
           naturalKey: { lcNumber: lc, sgNumber: 'G02' },
           parentLogicalContractIdRef: 'lc',
@@ -511,8 +509,8 @@ function importCase6(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG2 Issue', movementRef: 'sg2', releasedBy: CHECKER },
+        'Checker releases SG2 Issue',
+      ),
       {
         type: 'createMovement',
         label: 'Document Arrival w/ SG 12,000 (B01 — A3S, matches SG1 exactly)',
@@ -529,11 +527,10 @@ function importCase6(lc) {
           createdBy: MAKER,
         },
       },
-      {
-        type: 'createMovement',
-        label: 'SG1 Redemption Amount = MIN(Bill 12,000, SG Outstanding 10,000) -> FULL_REDEEM 10,000',
-        captureAs: 'redeemSg1',
-        request: {
+      ...createAndRelease(
+        'SG1 Redemption Amount = MIN(Bill 12,000, SG Outstanding 10,000) -> FULL_REDEEM 10,000',
+        'redeemSg1',
+        {
           instrumentType: 'SHGT',
           balanceContractIdRef: 'sg1',
           movementType: 'FULL_REDEEM',
@@ -544,8 +541,8 @@ function importCase6(lc) {
           businessEventId: `${lc}-b01`,
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG1 Redemption', movementRef: 'redeemSg1', releasedBy: CHECKER },
+        'Checker releases SG1 Redemption',
+      ),
       {
         type: 'createMovement',
         label: 'Document Arrival w/ SG 12,000 (B02 — A3S, partially matches SG2)',
@@ -562,11 +559,10 @@ function importCase6(lc) {
           createdBy: MAKER,
         },
       },
-      {
-        type: 'createMovement',
-        label: 'SG2 Redemption Amount = MIN(Bill 12,000, SG Outstanding 20,000) -> PARTIAL_REDEEM 12,000',
-        captureAs: 'redeemSg2',
-        request: {
+      ...createAndRelease(
+        'SG2 Redemption Amount = MIN(Bill 12,000, SG Outstanding 20,000) -> PARTIAL_REDEEM 12,000',
+        'redeemSg2',
+        {
           instrumentType: 'SHGT',
           balanceContractIdRef: 'sg2',
           movementType: 'PARTIAL_REDEEM',
@@ -577,8 +573,8 @@ function importCase6(lc) {
           businessEventId: `${lc}-b02`,
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG2 partial Redemption', movementRef: 'redeemSg2', releasedBy: CHECKER },
+        'Checker releases SG2 partial Redemption',
+      ),
       {
         type: 'createMovement',
         label: 'Document Arrival 30,000 (B03 — plain A3, no Shipping Guarantee)',
@@ -620,11 +616,10 @@ function importCase7(lc) {
     description:
       'LC Issue 100,000 (Sellers Usance 120d) -> plain Document Arrival 20,000 (B01) -> SG1 20,000 -> Document Arrival w/ SG 25,000 (B02, matches SG1 exactly -> FULL_REDEEM) -> A6 Acceptance (Usance) for B01/B02 (compound: releases the source Document Arrival, then the Acceptance) -> A7 Acceptance Settlement (Due Date) for both',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000 (Sellers Usance, 120 days)',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000 (Sellers Usance, 120 days)',
+        'lc',
+        {
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -635,8 +630,8 @@ function importCase7(lc) {
           tenorDays: 120,
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
+        'Checker releases LC Issue',
+      ),
       {
         type: 'createMovement',
         label: 'Document Arrival 20,000 (B01 — plain A3, no Shipping Guarantee)',
@@ -652,11 +647,10 @@ function importCase7(lc) {
           createdBy: MAKER,
         },
       },
-      {
-        type: 'createMovement',
-        label: 'Shipping Guarantee 20,000 (G01)',
-        captureAs: 'sg1',
-        request: {
+      ...createAndRelease(
+        'Shipping Guarantee 20,000 (G01)',
+        'sg1',
+        {
           instrumentType: 'SHGT',
           naturalKey: { lcNumber: lc, sgNumber: 'G01' },
           parentLogicalContractIdRef: 'lc',
@@ -666,8 +660,8 @@ function importCase7(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG1 Issue', movementRef: 'sg1', releasedBy: CHECKER },
+        'Checker releases SG1 Issue',
+      ),
       {
         type: 'createMovement',
         label: 'Document Arrival w/ SG 25,000 (B02 — A3S, matches SG1 exactly)',
@@ -684,11 +678,10 @@ function importCase7(lc) {
           createdBy: MAKER,
         },
       },
-      {
-        type: 'createMovement',
-        label: 'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
-        captureAs: 'redeemSg1',
-        request: {
+      ...createAndRelease(
+        'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
+        'redeemSg1',
+        {
           instrumentType: 'SHGT',
           balanceContractIdRef: 'sg1',
           movementType: 'FULL_REDEEM',
@@ -699,8 +692,8 @@ function importCase7(lc) {
           businessEventId: `${lc}-b02`,
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases SG1 Redemption', movementRef: 'redeemSg1', releasedBy: CHECKER },
+        'Checker releases SG1 Redemption',
+      ),
       {
         type: 'snapshot',
         label: 'LC Balance before Acceptance (expect Confirmed 100,000, Available 55,000 — 45,000 still Pending across both Document Arrivals)',
@@ -761,11 +754,10 @@ function importCase7(lc) {
       { type: 'snapshot', label: 'LC Balance after both Acceptances (expect Confirmed 55,000, Available 55,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'Acceptance B01 Balance (expect 20,000)', contractRef: 'acceptanceB01' },
       { type: 'snapshot', label: 'Acceptance B02 Balance (expect 25,000)', contractRef: 'acceptanceB02' },
-      {
-        type: 'createMovement',
-        label: 'Acceptance Settlement (A7) — FULL_SETTLE 20,000 (B01)',
-        captureAs: 'settleB01',
-        request: {
+      ...createAndRelease(
+        'Acceptance Settlement (A7) — FULL_SETTLE 20,000 (B01)',
+        'settleB01',
+        {
           instrumentType: 'IPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptanceB01',
           movementType: 'FULL_SETTLE',
@@ -774,13 +766,12 @@ function importCase7(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement — B01', movementRef: 'settleB01', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Acceptance Settlement (A7) — FULL_SETTLE 25,000 (B02)',
-        captureAs: 'settleB02',
-        request: {
+        'Checker releases Settlement — B01',
+      ),
+      ...createAndRelease(
+        'Acceptance Settlement (A7) — FULL_SETTLE 25,000 (B02)',
+        'settleB02',
+        {
           instrumentType: 'IPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptanceB02',
           movementType: 'FULL_SETTLE',
@@ -789,8 +780,8 @@ function importCase7(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement — B02', movementRef: 'settleB02', releasedBy: CHECKER },
+        'Checker releases Settlement — B02',
+      ),
       { type: 'snapshot', label: 'Acceptance B01 Balance after Settlement (expect 0)', contractRef: 'acceptanceB01' },
       { type: 'snapshot', label: 'Acceptance B02 Balance after Settlement (expect 0)', contractRef: 'acceptanceB02' },
     ],
@@ -810,11 +801,10 @@ function exportCase1(lc) {
     title: 'Export Case #1 — USD Sight + Confirmed',
     description: 'Confirm LC 100,000+10% -> Amendment +10,000 -> Present Docs 80,000 (no entry) -> Issuing Bank Honour 80,000',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'Confirm LC 100,000, Tolerance 10% (Maximum Exposure Basis)',
-        captureAs: 'conf',
-        request: {
+      ...createAndRelease(
+        'Confirm LC 100,000, Tolerance 10% (Maximum Exposure Basis)',
+        'conf',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -824,13 +814,12 @@ function exportCase1(lc) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Confirmation Issue', movementRef: 'conf', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases Confirmation Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           balanceContractIdRef: 'conf',
           movementType: 'AMEND',
@@ -839,14 +828,13 @@ function exportCase1(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
+        'Checker releases Amendment',
+      ),
       { type: 'snapshot', label: 'CONF LIAB after Issue+Amendment (expect 121,000)', contractRef: 'conf' },
-      {
-        type: 'createMovement',
-        label: 'Present Docs 80,000 (Earmark — mere presentation, no GL entry yet)',
-        captureAs: 'honour',
-        request: {
+      ...createAndRelease(
+        'Present Docs 80,000 (Earmark — mere presentation, no GL entry yet)',
+        'honour',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           balanceContractIdRef: 'conf',
           movementType: 'HONOUR',
@@ -855,8 +843,8 @@ function exportCase1(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Issuing Bank Pay/Honour 80,000', movementRef: 'honour', releasedBy: CHECKER },
+        'Issuing Bank Pay/Honour 80,000',
+      ),
       { type: 'snapshot', label: 'CONF LIAB after Honour (expect 41,000)', contractRef: 'conf' },
     ],
   };
@@ -868,11 +856,10 @@ function exportCase2(lc, ib) {
     title: 'Export Case #2 — USD Usance + Confirmed + No EBL',
     description: 'CONF LIAB -> Acceptance Liability transformation at Issuing Bank Accept; Settlement Due Date pays via Customer A/C.',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'Confirm LC 100,000, Tolerance 10%',
-        captureAs: 'conf',
-        request: {
+      ...createAndRelease(
+        'Confirm LC 100,000, Tolerance 10%',
+        'conf',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -882,13 +869,12 @@ function exportCase2(lc, ib) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Confirmation Issue', movementRef: 'conf', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases Confirmation Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           balanceContractIdRef: 'conf',
           movementType: 'AMEND',
@@ -897,13 +883,12 @@ function exportCase2(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Present Docs 80,000 (Earmark)',
-        captureAs: 'accept',
-        request: {
+        'Checker releases Amendment',
+      ),
+      ...createAndRelease(
+        'Present Docs 80,000 (Earmark)',
+        'accept',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           balanceContractIdRef: 'conf',
           movementType: 'ACCEPT',
@@ -912,14 +897,13 @@ function exportCase2(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Issuing Bank Accept Docs 80,000 -> CONF LIAB releases', movementRef: 'accept', releasedBy: CHECKER },
+        'Issuing Bank Accept Docs 80,000 -> CONF LIAB releases',
+      ),
       { type: 'snapshot', label: 'CONF LIAB after Accept (expect 41,000)', contractRef: 'conf' },
-      {
-        type: 'createMovement',
-        label: 'Create Acceptance Liability 80,000 (linked call)',
-        captureAs: 'acceptance',
-        request: {
+      ...createAndRelease(
+        'Create Acceptance Liability 80,000 (linked call)',
+        'acceptance',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           naturalKey: { lcNumber: lc, ibNumber: ib },
           parentLogicalContractIdRef: 'conf',
@@ -930,14 +914,13 @@ function exportCase2(lc, ib) {
           exposureNature: 'ACTUAL',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Acceptance CREATE', movementRef: 'acceptance', releasedBy: CHECKER },
+        'Checker releases Acceptance CREATE',
+      ),
       { type: 'snapshot', label: 'Acceptance Liability (expect 80,000)', contractRef: 'acceptance' },
-      {
-        type: 'createMovement',
-        label: 'Due Date Settlement 80,000 (Cr Customer A/C)',
-        captureAs: 'settle',
-        request: {
+      ...createAndRelease(
+        'Due Date Settlement 80,000 (Cr Customer A/C)',
+        'settle',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptance',
           movementType: 'FULL_SETTLE',
@@ -946,8 +929,8 @@ function exportCase2(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement', movementRef: 'settle', releasedBy: CHECKER },
+        'Checker releases Settlement',
+      ),
       { type: 'snapshot', label: 'Acceptance Liability after Settlement (expect 0)', contractRef: 'acceptance' },
     ],
   };
@@ -959,11 +942,10 @@ function exportCase3(lc, ib) {
     title: 'Export Case #3 — USD Usance + Confirmed + EBL',
     description: 'Same as Case #2, plus early EBL financing (Loan Component ASSET, not a Balance Component liability, not double-counted).',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'Confirm LC 100,000, Tolerance 10%',
-        captureAs: 'conf',
-        request: {
+      ...createAndRelease(
+        'Confirm LC 100,000, Tolerance 10%',
+        'conf',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -973,13 +955,12 @@ function exportCase3(lc, ib) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Confirmation Issue', movementRef: 'conf', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000',
-        captureAs: 'amend',
-        request: {
+        'Checker releases Confirmation Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000',
+        'amend',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           balanceContractIdRef: 'conf',
           movementType: 'AMEND',
@@ -988,13 +969,12 @@ function exportCase3(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Present Docs 80,000 (Earmark)',
-        captureAs: 'accept',
-        request: {
+        'Checker releases Amendment',
+      ),
+      ...createAndRelease(
+        'Present Docs 80,000 (Earmark)',
+        'accept',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           balanceContractIdRef: 'conf',
           movementType: 'ACCEPT',
@@ -1003,14 +983,13 @@ function exportCase3(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Issuing Bank Accept Docs 80,000 -> EBL 80,000', movementRef: 'accept', releasedBy: CHECKER },
+        'Issuing Bank Accept Docs 80,000 -> EBL 80,000',
+      ),
       { type: 'snapshot', label: 'CONF LIAB after Accept (expect 41,000)', contractRef: 'conf' },
-      {
-        type: 'createMovement',
-        label: 'Create Acceptance Liability 80,000 (linked call)',
-        captureAs: 'acceptance',
-        request: {
+      ...createAndRelease(
+        'Create Acceptance Liability 80,000 (linked call)',
+        'acceptance',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           naturalKey: { lcNumber: lc, ibNumber: ib },
           parentLogicalContractIdRef: 'conf',
@@ -1021,18 +1000,17 @@ function exportCase3(lc, ib) {
           exposureNature: 'ACTUAL',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Acceptance CREATE', movementRef: 'acceptance', releasedBy: CHECKER },
+        'Checker releases Acceptance CREATE',
+      ),
       {
         type: 'note',
         label:
           'Export Bank finances early via EBL 80,000 — Loan Component ASSET (Dr EBL / Cr Customer A/C), no Balance Component call. NOT to be summed with Acceptance Liability for total credit exposure — see Design doc "Accounting Balance vs Risk Exposure".',
       },
-      {
-        type: 'createMovement',
-        label: 'Due Date Settlement 80,000 (Cr EBL — Issuing Bank repays via Nostro)',
-        captureAs: 'settle',
-        request: {
+      ...createAndRelease(
+        'Due Date Settlement 80,000 (Cr EBL — Issuing Bank repays via Nostro)',
+        'settle',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptance',
           movementType: 'FULL_SETTLE',
@@ -1041,8 +1019,8 @@ function exportCase3(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement', movementRef: 'settle', releasedBy: CHECKER },
+        'Checker releases Settlement',
+      ),
       { type: 'snapshot', label: 'Acceptance Liability after Settlement (expect 0)', contractRef: 'acceptance' },
     ],
   };
@@ -1054,11 +1032,10 @@ function exportCase4(lc, ib) {
     title: 'Export Case #4 — USD Usance + Unconfirmed + No EBL',
     description: "No Confirmation exists -> Issuing Bank Accept produces a MEMO receivable-tracking record only, never Export Bank's own liability.",
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10% (reference only — no liability, no Confirmation exists)',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10% (reference only — no liability, no Confirmation exists)',
+        'lc',
+        {
           instrumentType: 'EPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -1068,13 +1045,12 @@ function exportCase4(lc, ib) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000 (still reference only)',
-        captureAs: 'amend',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000 (still reference only)',
+        'amend',
+        {
           instrumentType: 'EPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'AMEND_INCREASE',
@@ -1083,14 +1059,13 @@ function exportCase4(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
+        'Checker releases Amendment',
+      ),
       { type: 'note', label: 'Present Docs — no Confirmation, no earmark, no Balance Component call at all' },
-      {
-        type: 'createMovement',
-        label: "Issuing Bank Accept 80,000 -> MEMO tracking only (no accountEntries, not Export Bank's own liability)",
-        captureAs: 'acceptance',
-        request: {
+      ...createAndRelease(
+        "Issuing Bank Accept 80,000 -> MEMO tracking only (no accountEntries, not Export Bank's own liability)",
+        'acceptance',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           naturalKey: { lcNumber: lc, ibNumber: ib },
           parentLogicalContractIdRef: 'lc',
@@ -1101,14 +1076,13 @@ function exportCase4(lc, ib) {
           exposureNature: 'MEMO',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Acceptance CREATE (MEMO)', movementRef: 'acceptance', releasedBy: CHECKER },
+        'Checker releases Acceptance CREATE (MEMO)',
+      ),
       { type: 'snapshot', label: 'Acceptance MEMO tracking (expect 80,000, exposureNature=MEMO)', contractRef: 'acceptance' },
-      {
-        type: 'createMovement',
-        label: 'Due Date Settlement 80,000 (Cr Customer A/C) — closes the MEMO tracking entry',
-        captureAs: 'settle',
-        request: {
+      ...createAndRelease(
+        'Due Date Settlement 80,000 (Cr Customer A/C) — closes the MEMO tracking entry',
+        'settle',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptance',
           movementType: 'FULL_SETTLE',
@@ -1117,8 +1091,8 @@ function exportCase4(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement', movementRef: 'settle', releasedBy: CHECKER },
+        'Checker releases Settlement',
+      ),
       { type: 'snapshot', label: 'Acceptance MEMO after Settlement (expect 0)', contractRef: 'acceptance' },
     ],
   };
@@ -1130,11 +1104,10 @@ function exportCase5(lc, ib) {
     title: 'Export Case #5 — USD Usance + Unconfirmed + EBL',
     description: 'Same as Case #4, plus EBL financing (still Loan Component asset, still no Export Bank CONF LIAB).',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'LC Issue 100,000, Tolerance 10% (reference only)',
-        captureAs: 'lc',
-        request: {
+      ...createAndRelease(
+        'LC Issue 100,000, Tolerance 10% (reference only)',
+        'lc',
+        {
           instrumentType: 'EPLC_LC',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -1144,13 +1117,12 @@ function exportCase5(lc, ib) {
           tolerancePct: '10',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases LC Issue', movementRef: 'lc', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'LC Amendment increase 10,000 (reference only)',
-        captureAs: 'amend',
-        request: {
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'LC Amendment increase 10,000 (reference only)',
+        'amend',
+        {
           instrumentType: 'EPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'AMEND_INCREASE',
@@ -1159,13 +1131,12 @@ function exportCase5(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Amendment', movementRef: 'amend', releasedBy: CHECKER },
-      {
-        type: 'createMovement',
-        label: 'Issuing Bank Accept 80,000 -> MEMO tracking only',
-        captureAs: 'acceptance',
-        request: {
+        'Checker releases Amendment',
+      ),
+      ...createAndRelease(
+        'Issuing Bank Accept 80,000 -> MEMO tracking only',
+        'acceptance',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           naturalKey: { lcNumber: lc, ibNumber: ib },
           parentLogicalContractIdRef: 'lc',
@@ -1176,14 +1147,13 @@ function exportCase5(lc, ib) {
           exposureNature: 'MEMO',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Acceptance CREATE (MEMO)', movementRef: 'acceptance', releasedBy: CHECKER },
+        'Checker releases Acceptance CREATE (MEMO)',
+      ),
       { type: 'note', label: "Export Bank finances via EBL 80,000 — Loan Component ASSET, no Balance Component call, still NOT Export Bank's own CONF LIAB" },
-      {
-        type: 'createMovement',
-        label: 'Due Date Settlement 80,000 (Cr EBL)',
-        captureAs: 'settle',
-        request: {
+      ...createAndRelease(
+        'Due Date Settlement 80,000 (Cr EBL)',
+        'settle',
+        {
           instrumentType: 'EPLC_ACCEPTANCE',
           balanceContractIdRef: 'acceptance',
           movementType: 'FULL_SETTLE',
@@ -1192,8 +1162,8 @@ function exportCase5(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Settlement', movementRef: 'settle', releasedBy: CHECKER },
+        'Checker releases Settlement',
+      ),
       { type: 'snapshot', label: 'Acceptance MEMO after Settlement (expect 0)', contractRef: 'acceptance' },
     ],
   };
@@ -1217,11 +1187,10 @@ function exportCase6(lc) {
     description:
       'Confirm LC 100,000 (Sight) -> Present Docs 10,000 (B3 memo earmark, no GL effect) -> Issuing Bank Honour 10,000 (B4 unified legal event, references the B3 earmark) -> Due From Issuing Bank 10,000 (linked asset leg, same compound submission as Honour)',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'Confirm LC 100,000 (Sight)',
-        captureAs: 'conf',
-        request: {
+      ...createAndRelease(
+        'Confirm LC 100,000 (Sight)',
+        'conf',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -1231,8 +1200,8 @@ function exportCase6(lc) {
           tenorType: 'SIGHT',
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Confirmation Issue', movementRef: 'conf', releasedBy: CHECKER },
+        'Checker releases Confirmation Issue',
+      ),
       {
         type: 'createMovement',
         label: 'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark; Design Principle D3, no GL/contingent effect on the Confirmation itself)',
@@ -1250,7 +1219,8 @@ function exportCase6(lc) {
       },
       {
         type: 'acknowledge',
-        label: "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
+        label:
+          "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
         movementRef: 'examination',
         acknowledgedBy: CHECKER,
       },
@@ -1308,11 +1278,10 @@ function exportCase7(lc, ib) {
     description:
       'Confirm LC 100,000 (Sellers Usance 120d) -> Present Docs 10,000 (B3 memo earmark) -> Issuing Bank Accept 10,000 (B4 unified legal event; compound-creates Acceptance Liability + Acceptance Reimbursement Receivable) -> Acceptance Settlement (B5; compound-releases FULL_SETTLE + REIMBURSE)',
     steps: [
-      {
-        type: 'createMovement',
-        label: 'Confirm LC 100,000 (Sellers Usance, 120 days)',
-        captureAs: 'conf',
-        request: {
+      ...createAndRelease(
+        'Confirm LC 100,000 (Sellers Usance, 120 days)',
+        'conf',
+        {
           instrumentType: 'EPLC_CONFIRMATION',
           naturalKey: { lcNumber: lc },
           movementType: 'ISSUE',
@@ -1323,8 +1292,8 @@ function exportCase7(lc, ib) {
           tenorDays: 120,
           createdBy: MAKER,
         },
-      },
-      { type: 'release', label: 'Checker releases Confirmation Issue', movementRef: 'conf', releasedBy: CHECKER },
+        'Checker releases Confirmation Issue',
+      ),
       {
         type: 'createMovement',
         label: 'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark; Design Principle D3, no GL/contingent effect on the Confirmation itself)',
@@ -1342,7 +1311,8 @@ function exportCase7(lc, ib) {
       },
       {
         type: 'acknowledge',
-        label: "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
+        label:
+          "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
         movementRef: 'examination',
         acknowledgedBy: CHECKER,
       },

@@ -1999,6 +1999,36 @@ mechanical-extraction precedents (`loadPagedCatalog`, `finishCheckerAction`, `Pa
 three-suite re-verification per this file's own standing rule: `backend/` 33/33 and microservice
 292/292, both unaffected (Angular-only change).
 
+## BAL-127 fixed — `backend/data/businessCases.js`'s ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper (2026-08-17, business instruction: "Fix BAL-127 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-127 section): the plain "create a
+movement, then have the Checker release it in the very next step, nothing in between" shape repeats
+across the vast majority of this file's own step arrays — the finding's own text flagged this as growing
+with each new compound case, but rated it "not yet urgent" (revisit at ~2,000 lines). Fixed anyway on
+explicit user request.
+
+**Fix**: new `createAndRelease(createLabel, captureAs, request, releaseLabel, releasedBy = CHECKER)` —
+returns the exact `[{type:'createMovement',...}, {type:'release',...}]` two-step shape the file already
+wrote out longhand everywhere — spread into a case's `steps` array via `...createAndRelease(...)` at 49
+of the file's plain create-then-release pairs. Deliberately left as explicit longhand wherever something
+genuinely sits between create and release — a `note`, a second `createMovement`, or a compound/deferred
+release the caller must sequence by hand (A3S/A6/B4/B5-style, or `import-case-5`'s own `expectError:
+true` case with no release at all) — collapsing those would risk hiding real ordering the file's own doc
+comments already call out as load-bearing.
+
+Verified: `backend/` suite 33/33 with **zero test files needing any changes** — `businessCases.js` stays
+at 100% coverage on all four metrics, and the registry-shape/structural tests only ever inspect the final
+expanded step array, never the source that builds it. `npm run lint` unchanged (0 errors, same 3
+pre-existing BAL-128 warnings); `prettier --write` applied to the rewritten file, `format:check` passes.
+File size: 1,471 → 1,440 lines. **Live-verified all 14 Business Case Registry entries individually**
+against the real running backend+microservice — every case's full step sequence returns 2xx with correct
+final balances, confirming byte-for-byte behavior preservation end to end (two transient
+`ORCHESTRATION_ERROR` failures mid-verification on `export-case-3`/`export-case-6`, re-confirmed as the
+session's already-diagnosed rate-limiter false-positive artifact — both succeeded cleanly on an isolated
+re-run). Test data scoped-cleaned afterward (`IMP-C%`/`EXP-C%`), leaving the user's own 18 S01/S02/U01
+records untouched. Full three-suite re-verification per this file's own standing rule: Angular app
+510/510 and microservice 292/292, both unaffected (`backend/`-only change).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation
