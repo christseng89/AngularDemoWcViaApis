@@ -164,8 +164,19 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
           }
         : {}),
     },
-    { key: 'eventSeq', type: 'input', props: { label: 'Event Seq (idempotency key part, Design doc §8)', required: true, type: 'number' } },
-    { key: 'createdBy', type: 'input', props: { label: 'Created By (Maker)', required: true } },
+    // Protected System-Controlled Fields (business instruction 2026-08-17): Event Seq and Created By
+    // must be system-derived and read-only on every A1-A9/B1-B5 screen, never manually typed/edited —
+    // this applies uniformly here for the same reason the mandatory-field tagging loop below does
+    // (one shared field factory, not per-function overrides). Both are already auto-populated onto
+    // `model` before buildFields() ever runs (constructor / selectFunction()'s own reset: `createdBy:
+    // 'maker1'`, `eventSeq: Date.now()`) — `disabled: true` only stops the UI from letting a Maker
+    // change those system-derived values, it doesn't affect how they're derived or submitted.
+    {
+      key: 'eventSeq',
+      type: 'input',
+      props: { label: 'Event Seq (system-generated, protected — idempotency key part, Design doc §8)', required: true, type: 'number', disabled: true },
+    },
+    { key: 'createdBy', type: 'input', props: { label: 'Created By (Maker, system-derived, protected)', required: true, disabled: true } },
   ];
 
   // Mandatory-field visual distinction (UI/UX best practice: don't rely on the tiny asterisk

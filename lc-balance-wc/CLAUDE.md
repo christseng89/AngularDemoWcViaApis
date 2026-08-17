@@ -2423,6 +2423,41 @@ selection/business-filter logic remain, per the Seventh outcome's own investigat
 adds real value beyond line count: a genuine business-rule-violating defect (BAL-135) found and fixed with
 regression coverage, not just code relocated.
 
+## Protected System-Controlled Fields — Event Seq / Created By now read-only on every A1-A9/B1-B5 screen (2026-08-17, user-directed business requirement)
+
+Business requirement: "For all A1–A9 (Import LC) and B1–B5 (Export Confirmed LC) function input screens,
+Event Seq and Created By must be system-controlled and protected (read-only) — the system must
+automatically derive and populate these values; users must not be permitted to manually enter, edit, or
+override them through the UI — applied consistently across all A1–A9 and B1–B5 input screens."
+
+**Scope check confirmed this is a one-place fix, not a per-function one**: `builder-fields.ts`'s own
+`buildFields()` is the SINGLE shared Formly field factory used by every A1-A9/B1-B5 function (no
+per-function override of the `eventSeq`/`createdBy` field definitions exists anywhere) — matching the
+requirement's own "applied consistently" wording directly. Both values were ALREADY system-derived before
+this change (`transaction-builder.component.ts`'s constructor and `selectFunction()`'s own reset both set
+`createdBy: 'maker1'`, `eventSeq: Date.now()` — no function-specific override of either exists) — this
+requirement is purely a UI-editability change, not a new derivation rule.
+
+**Fix**: both fields' Formly config in `builder-fields.ts` now set `disabled: true`, and their labels were
+updated to say "system-generated, protected"/"system-derived, protected" respectively — same visual
+convention this file already uses for every other carried/protected field (Amount when locked, Currency
+when carried, Tenor Type/Days when carried). `disabled: true` only stops the UI from letting a Maker edit
+the bound value; `model.eventSeq`/`model.createdBy` are still read and submitted exactly as before — a
+disabled Formly field still displays its bound `model` value, it doesn't clear it.
+
+**Test coverage**: 4 new tests in `builder-fields.spec.ts` (a dedicated "Protected System-Controlled
+Fields" describe block) — both fields disabled on both an Import (A1) and an Export (B1) function, both
+still disabled on a function whose OTHER fields (Amount/Tenor) are NOT locked (boundary — this disabled
+state is unconditional, not derived from the same locking logic as the carried fields), label text
+confirmation, and confirming the required+disabled combination still gets the `tb-field--required`
+className (matching the existing carried-field convention, e.g. locked Amount/Tenor Days). `builder-fields.ts`
+stays at 100% statements/branches/functions/lines.
+
+Verified: `tsc --noEmit`/`ng build --configuration development`/`npm run lint`/`npm run format:check` all
+clean (lint: 211 warnings, unchanged). Full Angular suite 652/652 (648 + 4 new). `backend/` 33/33 and
+microservice 292/292 both unaffected and re-verified per this file's own standing three-suite rule
+(Angular-only, UI-editability-only change — no request/response contract change).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation

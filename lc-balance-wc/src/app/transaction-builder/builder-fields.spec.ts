@@ -287,4 +287,34 @@ describe('builder-fields', () => {
     expect(fieldByKey(fields, 'eventSeq').props?.required).toBe(true);
     expect(fieldByKey(fields, 'createdBy').props?.required).toBe(true);
   });
+
+  describe('Protected System-Controlled Fields (Event Seq / Created By)', () => {
+    it('are always disabled (read-only), regardless of function — A1 (Import) and B1 (Export)', () => {
+      expect(fieldByKey(buildFields(baseCtx()), 'eventSeq').props?.disabled).toBe(true);
+      expect(fieldByKey(buildFields(baseCtx()), 'createdBy').props?.disabled).toBe(true);
+
+      const b1Ctx = baseCtx({ selectedFunction: fn('B1'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE' } });
+      expect(fieldByKey(buildFields(b1Ctx), 'eventSeq').props?.disabled).toBe(true);
+      expect(fieldByKey(buildFields(b1Ctx), 'createdBy').props?.disabled).toBe(true);
+    });
+
+    it('stay disabled even on a function whose own Amount/Tenor fields are NOT locked (boundary — disabled is unconditional here, unlike the carried/protected fields above)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND' } });
+      const fields = buildFields(ctx);
+      expect(fieldByKey(fields, 'eventSeq').props?.disabled).toBe(true);
+      expect(fieldByKey(fields, 'createdBy').props?.disabled).toBe(true);
+    });
+
+    it('label text marks both fields as system-controlled/protected', () => {
+      const fields = buildFields(baseCtx());
+      expect(fieldByKey(fields, 'eventSeq').props?.label).toContain('protected');
+      expect(fieldByKey(fields, 'createdBy').props?.label).toContain('protected');
+    });
+
+    it('being both required and disabled still applies the tb-field--required className (matches the existing carried/protected-field convention, e.g. locked Amount/Tenor Days)', () => {
+      const fields = buildFields(baseCtx());
+      expect(fieldByKey(fields, 'eventSeq').className).toContain('tb-field--required');
+      expect(fieldByKey(fields, 'createdBy').className).toContain('tb-field--required');
+    });
+  });
 });
