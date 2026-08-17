@@ -168,13 +168,16 @@ export const BALANCE_SNAPSHOT_LABEL: Partial<Record<InstrumentType, string>> = {
 
 /**
  * ISO 4217 minor-unit (decimal place) count per currency code — keeps the Amount input's own
- * granularity in step with whichever Currency is typed alongside it (e.g. "JPY 10000" has no cents).
- * Mirrors lc-payment-wc/backend/data/currencies.json's own JPY/TWD/IDR=0 entries for consistency
- * across the two sibling demo projects, extended with the standard 3-decimal ISO 4217 exceptions
- * (BHD/IQD/JOD/KWD/OMR/TND) since this project's own Currency field is free-typed (no fixed
- * dropdown/backend currency master to source this from, unlike lc-payment-wc's CurrencyService).
- * Unlisted currencies default to 2 (the common case, matching both that same JSON's own entries and
- * the microservice's own MONETARY_AMOUNT_PATTERN ceiling of 3).
+ * granularity in step with whichever Currency is typed/picked alongside it (e.g. "JPY 10000" has no
+ * cents). Mirrors lc-payment-wc/backend/data/currencies.json's own JPY/TWD/IDR=0 entries for
+ * consistency across the two sibling demo projects, extended with the standard 3-decimal ISO 4217
+ * exceptions (BHD/IQD/JOD/KWD/OMR/TND) — this project has no backend currency master of its own (unlike
+ * lc-payment-wc's CurrencyService/GET /api/currencies) so this table stands in for one, covering every
+ * currency this app's own fields can produce: CURRENCY_OPTIONS' own dropdown codes below, and any value
+ * still freely typed elsewhere (every function except A1/B1 carries/protects the currency from A1/B1
+ * rather than typing it again — see CURRENCY_OPTIONS' own doc comment). Unlisted currencies default to
+ * 2 (the common case, matching both that same JSON's own entries and the microservice's own
+ * MONETARY_AMOUNT_PATTERN ceiling of 3).
  */
 export const CURRENCY_DECIMALS: Record<string, number> = {
   JPY: 0,
@@ -196,6 +199,28 @@ export const CURRENCY_DECIMALS: Record<string, number> = {
 export function decimalPlacesForCurrency(currency: string | null | undefined): number {
   return CURRENCY_DECIMALS[(currency ?? '').trim().toUpperCase()] ?? 2;
 }
+
+/**
+ * Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as a
+ * drop-down list, consistent with the existing implementation in lc-payment-wc") — the same 10-currency
+ * code set as lc-payment-wc/backend/data/currencies.json (USD/EUR/JPY/GBP/TWD/IDR/CNY/HKD/SGD/AUD), so
+ * both sibling demo apps offer the identical currency universe even though lc-balance-wc has no backend
+ * currency master of its own to fetch it from (CurrencyService/GET /api/currencies is lc-payment-wc-
+ * only — see CURRENCY_DECIMALS' own doc comment). Labels are the bare code, matching lc-payment-wc's
+ * own dropdown convention there (label is the code, not "USD - US Dollar", even though its backend data
+ * carries a full name) — builder-fields.ts wires this to A1/B1's own Currency field only; every other
+ * function still carries/protects whatever Currency A1/B1 declared (Design doc/business instruction
+ * 2026-08-16, "Currency = Carry from A1/B1 + Protected"), so this list only ever needs to cover a value
+ * a Maker is actively CHOOSING at LC/Confirmation creation time, not every value this app might ever
+ * display (e.g. Inquire Events' own read-only reconstruction of a historical A1/B1 event still renders
+ * through this same dropdown, decorated disabled — a legacy/exotic currency outside this list would
+ * render blank there, an accepted prototype-scope limitation, not a silent data-loss risk, since the
+ * underlying stored value is untouched either way).
+ */
+export const CURRENCY_OPTIONS: { value: string; label: string }[] = ['USD', 'EUR', 'JPY', 'GBP', 'TWD', 'IDR', 'CNY', 'HKD', 'SGD', 'AUD'].map((code) => ({
+  value: code,
+  label: code,
+}));
 
 /**
  * True if `amount`'s own typed decimal-place count exceeds what `currency` allows (Design doc §6.2

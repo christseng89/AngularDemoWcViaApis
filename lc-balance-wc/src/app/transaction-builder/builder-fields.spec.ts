@@ -1,5 +1,5 @@
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
-import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
+import { CURRENCY_OPTIONS, IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 
 /**
@@ -170,6 +170,27 @@ describe('builder-fields', () => {
       const currency = fieldByKey(buildFields(baseCtx({ selectedParent: contract({ currency: 'EUR' }) })), 'currency');
       expect(currency.props?.disabled).toBe(true);
       expect(currency.props?.label).toBe('Currency (carried from the existing record, protected)');
+    });
+
+    // Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as
+    // a drop-down list, consistent with the existing implementation in lc-payment-wc").
+    it('is a dropdown (type select, CURRENCY_OPTIONS) for A1', () => {
+      const currency = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A1') })), 'currency');
+      expect(currency.type).toBe('select');
+      expect(currency.props?.options).toEqual(CURRENCY_OPTIONS);
+    });
+
+    it('is a dropdown (type select, CURRENCY_OPTIONS) for B1', () => {
+      const currency = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('B1'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE' } })), 'currency');
+      expect(currency.type).toBe('select');
+      expect(currency.props?.options).toEqual(CURRENCY_OPTIONS);
+    });
+
+    it('stays a plain input (no options) for every other function, even before it becomes locked', () => {
+      const currency = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A6'), model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' } })), 'currency');
+      expect(currency.type).toBe('input');
+      expect(currency.props?.options).toBeUndefined();
+      expect(currency.props?.disabled).toBe(false);
     });
   });
 

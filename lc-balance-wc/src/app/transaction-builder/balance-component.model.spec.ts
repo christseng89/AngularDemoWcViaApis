@@ -20,6 +20,7 @@ import {
   childInstrumentTypesOf,
   resolveFunctionForMovement,
   BALANCE_SNAPSHOT_LABEL,
+  CURRENCY_OPTIONS,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -716,6 +717,24 @@ describe('balance-component.model data invariants', () => {
       expect(BALANCE_SNAPSHOT_LABEL['SHGT']).toBe('Shipping Guarantee Balance');
       expect(BALANCE_SNAPSHOT_LABEL['EPLC_CONFIRMATION']).toBe('Confirmed LC Balance');
       expect(BALANCE_SNAPSHOT_LABEL['EPLC_ACCEPTANCE']).toBe('Confirmed LC Acceptance Balance');
+    });
+  });
+
+  // Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as a
+  // drop-down list, consistent with the existing implementation in lc-payment-wc").
+  describe('CURRENCY_OPTIONS', () => {
+    it('matches lc-payment-wc/backend/data/currencies.json\'s own 10-code set exactly, no more no fewer', () => {
+      expect(CURRENCY_OPTIONS.map((o) => o.value)).toEqual(['USD', 'EUR', 'JPY', 'GBP', 'TWD', 'IDR', 'CNY', 'HKD', 'SGD', 'AUD']);
+    });
+
+    it('label is the bare code, matching lc-payment-wc\'s own dropdown convention (not "USD - US Dollar")', () => {
+      for (const o of CURRENCY_OPTIONS) expect(o.label).toBe(o.value);
+    });
+
+    it('every option resolves through decimalPlacesForCurrency() without needing a new CURRENCY_DECIMALS entry (JPY/TWD/IDR are the three 0dp exceptions already covered there)', () => {
+      const zeroDp = ['JPY', 'TWD', 'IDR'];
+      for (const code of zeroDp) expect(decimalPlacesForCurrency(code)).toBe(0);
+      for (const o of CURRENCY_OPTIONS.filter((c) => !zeroDp.includes(c.value))) expect(decimalPlacesForCurrency(o.value)).toBe(2);
     });
   });
 });

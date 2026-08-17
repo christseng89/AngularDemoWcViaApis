@@ -1,6 +1,6 @@
 import { FormlyFieldConfig } from '@ngx-formly/core';
 import { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { TransactionFunction, decimalPlacesForCurrency } from './balance-component.model';
+import { CURRENCY_OPTIONS, TransactionFunction, decimalPlacesForCurrency } from './balance-component.model';
 import { BuilderModel, carriedCurrency, hasParent, isCreatingMovement, toleranceApplicable } from './function-policy';
 
 /**
@@ -71,6 +71,11 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // Business instruction 2026-08-16 ("A1/B1 = Input; every other function = Carry from A1/B1 +
   // Protected") — see carriedCurrency's own doc comment (function-policy.ts).
   const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
+  // Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as
+  // a drop-down list, consistent with the existing implementation in lc-payment-wc") — A1/B1 only, the
+  // only functions where Currency is actually being CHOSEN (currencyLocked above is always false for
+  // them). See CURRENCY_OPTIONS' own doc comment (balance-component.model.ts).
+  const currencyIsDropdown = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
 
   const fields: FormlyFieldConfig[] = [
     {
@@ -100,21 +105,27 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
         // comment (balance-component.model.ts) for the ISO 4217 minor-unit table this reads.
         step: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
       },
-      // Currency is a free-typed sibling field (no fixed dropdown to hook a (change) event off of),
-      // so — same as tenorDays' own props.min/props.disabled below — this uses Formly's expressions
-      // to keep props.step live as the user types a Currency, rather than a full field rebuild (which
-      // would reassign the whole `fields` array on every keystroke and risk input-focus loss).
+      // Currency is a dropdown only on A1/B1 (see the 'currency' field below) — everywhere else it's
+      // either free-typed (defensive default, unreachable in practice since every non-A1/B1 function
+      // carries/protects it) or locked — so this still can't hook a (change) event off a fixed field
+      // reference. Same as tenorDays' own props.min/props.disabled below, this uses Formly's
+      // expressions to keep props.step live as Currency changes, rather than a full field rebuild
+      // (which would reassign the whole `fields` array on every keystroke/selection and risk input-
+      // focus loss).
       expressions: {
         'props.step': (f: any) => Math.pow(10, -decimalPlacesForCurrency(f.model?.currency)),
       },
     },
     {
       key: 'currency',
-      type: 'input',
+      // Reuses the exact same Formly `type: 'select'` pattern the Tenor Type field already uses lower
+      // in this same function — not a new field-type wiring, just a new caller of an existing one.
+      type: currencyIsDropdown ? 'select' : 'input',
       props: {
         label: currencyLocked ? 'Currency (carried from the existing record, protected)' : 'Currency',
         required: true,
         disabled: currencyLocked,
+        ...(currencyIsDropdown ? { options: CURRENCY_OPTIONS } : {}),
       },
     },
     {

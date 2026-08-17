@@ -2805,3 +2805,72 @@ Off-Balance Exposure/Tight Available Balance rendered only on the LC row, never 
 `getBalanceSnapshot()`'s own `IPLC_LC`/`EPLC_LC`-only branching). Separately re-verified the Look Up
 panel's own "Current Balance — LC S01" box (Transaction Processing side) renders byte-identical to
 before this pass's `#balanceSnapshotBox` extraction. Zero console errors across the whole session.
+
+## Inquire Events UI polish — mode-tab spacing, A1/B1 Currency dropdown, single-entry-point View (2026-08-17, user-requested)
+
+Three small, independent UI fixes to the two features above, same "reuse existing code/components,
+consistent behavior between Transaction Processing and Event Inquiry" design principle stated again by
+the user.
+
+**1. Spacing between the mode tab bar and whichever section renders below it.** `mb-4` added directly to
+the top-level `Transaction Processing / Inquire Events` toggle div (`transaction-builder.component.html`)
+— a Bootstrap spacing utility, already loaded (`angular.json`'s own `styles` array), the exact same
+utility-class convention this template already uses 37+ times elsewhere (`mt-2`/`mt-3`/etc.). Deliberately
+NOT added to the shared `.tb-tabs--side` class itself — that class is reused by several OTHER tab bars on
+this page (Look Up panel's LC/Acceptance/SG tabs, the Import/Export function-side tabs, Inquire Events'
+own Import LC/Export Confirmed side tabs) that don't need the extra gap and shouldn't be affected by a
+class-level change made for one specific instance.
+
+**2. A1/B1 Currency Code — free-typed input → dropdown, "consistent with lc-payment-wc".** New
+`CURRENCY_OPTIONS` (`balance-component.model.ts`) — the identical 10-code set as
+`lc-payment-wc/backend/data/currencies.json` (USD/EUR/JPY/GBP/TWD/IDR/CNY/HKD/SGD/AUD), labels the bare
+code (matching that project's own dropdown convention there — label is the code, not "USD - US Dollar",
+confirmed by reading `lc-payment-wc`'s `CurrencyService`/`leg-allocator.component.html` directly). No new
+backend surface: `lc-balance-wc` has no currency master of its own to fetch from (unlike
+`lc-payment-wc`'s `CurrencyService`/`GET /api/currencies`), so this is a static, client-side list — the
+existing `CURRENCY_DECIMALS` map already covers every listed code's own decimal places (JPY/TWD/IDR at
+0dp, the rest falling through to its existing 2dp default), so no new decimal data either, only the code
+list itself is new.
+
+`builder-fields.ts`'s `currency` field: new `currencyIsDropdown = selectedFunction?.code === 'A1' ||
+selectedFunction?.code === 'B1'` (A1/B1 are the only functions where Currency is actually being CHOSEN —
+`currencyLocked` is always false for them; every other function carries/protects it from A1/B1, per the
+existing 2026-08-16 "Currency = Carry from A1/B1 + Protected" rule, and stays a plain `input`
+unconditionally, dropdown or not). `type: currencyIsDropdown ? 'select' : 'input'`, reusing the exact
+same Formly `type: 'select'`/`props.options` pattern the Tenor Type field already uses lower in this same
+function — not new Formly wiring, a new caller of an existing one. Inquire Events' own read-only
+reconstruction (`toReadOnlyFields()`) inherits this automatically when it resolves a historical event
+back to A1/B1 — flagged explicitly in `CURRENCY_OPTIONS`' own doc comment as an accepted prototype-scope
+limitation: a legacy/exotic currency outside this 10-code list would render blank in that specific
+read-only dropdown (the underlying stored value is untouched either way, this is a display-only edge
+case, not a data-loss risk).
+
+**3. Event List's own "Account Entries" button removed — View is now the single entry point.** The
+merged Events table's "Entries" column/button (`transaction-builder.component.html`) is gone; View
+already opens the "Original Transaction Screen" panel below, which already had its own Account Entries
+button (and, since the previous pass, the Balance Impact/Closing Snapshot rows too) — so View already
+covered Transaction Details + Account Entries + Balance Snapshot in one place, and the row-level button
+was a redundant second path to the identical `openAccountEntryDialog()` call, not a genuinely different
+feature. No TS/service change — `openAccountEntryDialog()` itself is completely unchanged, still reused
+verbatim from the "Original Transaction Screen" panel's own button.
+
+**Tests:** `builder-fields.spec.ts` (new Currency-field describe-block cases: A1 dropdown, B1 dropdown,
+a non-A1/B1 function staying a plain input with no options even before it becomes locked);
+`balance-component.model.spec.ts` (new `CURRENCY_OPTIONS` data-invariant tests — exact code set, bare-code
+labels, and that every option already resolves correctly through the existing `decimalPlacesForCurrency()`
+with zero new `CURRENCY_DECIMALS` entries needed). No test changes needed for fixes 1 or 3 — both are
+template-only (this project's Jest config excludes `.html` from coverage, per its own
+`collectCoverageFrom` convention) with zero TS/service logic touched either way.
+
+Verified: Angular app 702/702 passing (7 new), 99.73%/96.35%/99.51%/99.77% coverage, `npx tsc -p
+tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean, `npm run lint` 0 errors
+(211 pre-existing `any` warnings, unchanged). No backend/microservice files touched by any of the three
+fixes — `microservices/balance-component`/`backend` suites unaffected.
+
+**Live in-browser verification NOT completed this pass** — the Claude in Chrome extension disconnected
+mid-session (confirmed reproducible: `tabs_context_mcp` failed repeatedly, not a one-off) after
+confirming only the mode-tab spacing visually (a screenshot before the disconnect showed the added gap
+rendering correctly) — the A1/B1 Currency dropdown and the Event List's removed Account Entries column
+were never clicked through live. Per this project's own "always verify live in browser" rule, that
+in-browser check is still outstanding and should be done in a follow-up session once the extension
+reconnects, even though static verification (build/typecheck/lint/tests) is clean.

@@ -9,8 +9,14 @@
 
   <!-- Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") — a
        top-level mode toggle sibling to the Import/Export function-side tabs below, reachable without first
-       picking a business function (see transaction-builder.component.ts's own activeMode doc comment). -->
-  <div class="tb-tabs tb-tabs--side">
+       picking a business function (see transaction-builder.component.ts's own activeMode doc comment).
+       `mb-4` (2026-08-17, user-requested — clearer visual separation from whichever section renders
+       below, added here rather than on the shared `.tb-tabs--side` class since that class is also reused
+       by several OTHER tab bars on this page — Look Up panel's LC/Acceptance/SG tabs, the Import/Export
+       function-side tabs, Inquire Events' own Import LC/Export Confirmed side tabs — that don't need it
+       and shouldn't be affected. Reuses the same Bootstrap spacing utility (`mt-2`/`mt-3`/etc.) already
+       used throughout this template, no new CSS. -->
+  <div class="tb-tabs tb-tabs--side mb-4">
     <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'PROCESSING'" (click)="selectMode('PROCESSING')">Transaction Processing</button>
     <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'INQUIRE'" (click)="selectMode('INQUIRE')">Inquire Events</button>
   </div>
@@ -709,8 +715,15 @@
         <div class="mt-3" *ngIf="inquireEvents.rootContract">
           <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
           <div class="tb-hint" *ngIf="inquireEvents.eventsLoading">Loading events…</div>
+          <!-- Business instruction 2026-08-17 ("Since the View screen already provides access to Account
+               Entries, remove the Account Entries button from the Event List... The View button should
+               serve as the single entry point for reviewing the selected Event, including its
+               Transaction Details, Account Entries, and Balance Snapshot.") — the row-level Account
+               Entries button/column was removed; View (below) already reaches the same dialog via the
+               "Original Transaction Screen" panel's own Account Entries button, reusing
+               openAccountEntryDialog() unchanged. -->
           <table class="tb-table" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
-            <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Time</th><th></th><th>Entries</th></tr></thead>
+            <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Time</th><th></th></tr></thead>
             <tbody>
               <tr *ngFor="let e of inquireEvents.events">
                 <td><span class="tb-type-tag">{{ e.contract.instrumentType }}</span></td>
@@ -720,10 +733,6 @@
                 <td><span class="tb-status-badge" [class.tb-status-badge--pending]="e.movement.status === 'PENDING'" [class.tb-status-badge--approved]="e.movement.status === 'RELEASED'" [class.tb-status-badge--negative]="e.movement.status === 'REJECTED' || e.movement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="e.movement.status === 'SUPERSEDED'">{{ displayStatus(e.movement.status) }}</span></td>
                 <td class="tb-table__time">{{ e.movement.createdAt | date:'short' }}</td>
                 <td><button type="button" class="tb-btn tb-btn--tiny" (click)="inquireEvents.selectEvent(e)">View</button></td>
-                <td>
-                  <button type="button" class="tb-btn tb-btn--tiny" *ngIf="e.movement.contingentAccountEntry" (click)="openAccountEntryDialog(e.movement)">Account Entries</button>
-                  <span class="tb-muted" *ngIf="!e.movement.contingentAccountEntry">—</span>
-                </td>
               </tr>
             </tbody>
           </table>
