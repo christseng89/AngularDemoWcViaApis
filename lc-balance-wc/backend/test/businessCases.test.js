@@ -160,7 +160,6 @@ describe('data/businessCases.js buildRegistry()', () => {
   });
 
   it('module.exports exposes exactly buildRegistry', () => {
-    // eslint-disable-next-line global-require
     const mod = require('../data/businessCases');
     expect(Object.keys(mod)).toEqual(['buildRegistry']);
     expect(typeof mod.buildRegistry).toBe('function');

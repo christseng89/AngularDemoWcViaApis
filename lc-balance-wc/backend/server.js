@@ -159,7 +159,6 @@ app.post('/api/business-cases/:id/run', runLimiter, async (req, res) => {
     // caller (this endpoint has no authentication) could read back internal error detail (e.g. a
     // downstream microservice's own raw error body, re-serialized into this message by
     // resolveLogicalContractId()). Log the detail server-side, return a generic message to the client.
-    // eslint-disable-next-line no-console
     console.error(`[business-cases/run] orchestration error for "${req.params.id}":`, detail);
     res.status(500).json({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
   }
@@ -173,7 +172,6 @@ app.get('/healthz', (_req, res) => res.json({ status: 'ok', balanceServiceUrl: B
 const PORT = process.env.PORT || 4300;
 if (require.main === module) {
   app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
     console.log(`balance-component-backend (中台) listening on :${PORT} -> ${BALANCE_SERVICE_URL}`);
   });
 }

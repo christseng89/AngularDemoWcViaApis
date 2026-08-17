@@ -48,11 +48,11 @@ surfaced BAL-122 and BAL-123 below.
 |---|---|---|
 | **Reliability** | A (4.8/5) | 835/835 tests passing across 3 independent suites (510 Angular + 292 microservice + 33 backend, up from 834 — BAL-131's own new acknowledge-step coverage). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), and one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage) — and **all four were fixed the same pass they were found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A (4.7/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124, BAL-125, BAL-126, and BAL-127 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped to `BalanceMovement`/`BalanceMovement | null`; that same file's own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper); BAL-130 (`balanceService.ts` trending toward its own future God-file status) and BAL-128 (stale eslint-disable comments) remain open — none individually severe, but the pattern (newly-added code consistently needing its own follow-up cleanup pass) is worth naming. |
+| **Maintainability** | A (4.8/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) is smaller in *complexity-per-job* terms than its original form but **grew again this pass** (2,888 → 2,923 lines) as A4's own Maker-side logic landed directly in the class rather than following the Checker-side extraction precedent — still open at Major, trending the wrong direction. Several new Minor/Info code-smell findings surfaced in code that hadn't been reviewed before — **BAL-124, BAL-125, BAL-126, BAL-127, and BAL-128 are now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table, closed as a direct side effect of fixing BAL-131; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped to `BalanceMovement`/`BalanceMovement | null`; that same file's own 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted, `npm run lint` now 0 errors/0 warnings); BAL-130 (`balanceService.ts` trending toward its own future God-file status) remains open — not individually severe, but part of the pattern (newly-added code consistently needing its own follow-up cleanup pass) worth naming. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
 | **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A)**
 
 **Why the score dipped then recovered past its prior peak, rather than only ever climbing (or landing
 exactly back where it started):** this comprehensive follow-up pass is deliberately adversarial rather
@@ -77,11 +77,14 @@ helper, again with zero test assertions needing to change. Then BAL-127 (97 → 
 finding's own "not yet urgent" framing, fixed on explicit request: `backend/data/businessCases.js`'s own
 ~49 duplicated create+release step pairs (the single most common repeated shape in the file) collapsed
 into one shared `createAndRelease()` helper, live-verified across all 14 registered cases individually
-against the real running stack, again zero test assertions needing to change. The score ending above its
-prior peak is earned: this pass has now fixed every Major/Info finding it itself surfaced, plus four of
-its own Minor/Info findings (BAL-124, BAL-125, BAL-126, BAL-127), on top of confirming every earlier
-pass's fixes still hold. A handful of Minor/Info findings from this pass remain open (BAL-128, BAL-130,
-BAL-132) — small, independently actionable, not gate conditions.
+against the real running stack, again zero test assertions needing to change. Then BAL-128 (98 → 99) —
+the 3 stale `eslint-disable` comments in `backend/` (suppressing rules the project's own
+`eslint.config.js` never configured) deleted outright, bringing `npm run lint` to a genuine 0
+errors/0 warnings for the first time this session. The score ending above its prior peak is earned: this
+pass has now fixed every Major/Info finding it itself surfaced, plus five of its own Minor/Info findings
+(BAL-124, BAL-125, BAL-126, BAL-127, BAL-128), on top of confirming every earlier pass's fixes still
+hold. Two Info-level findings from this pass remain open (BAL-130, BAL-132) — small, independently
+actionable, not gate conditions.
 
 **Final assessment: CONDITIONAL PASS**, unchanged verdict but on updated grounds. The codebase continues
 to improve on maintainability, security hygiene, duplication, and reliability across five same-day
@@ -125,13 +128,15 @@ originally estimated) was fixed with a single shared `fail()` helper, again zero
 to change. **BAL-127** (`backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs
 — filed as "not yet urgent" by its own original text, fixed anyway on explicit request) was collapsed
 into a single shared `createAndRelease()` helper, live-verified across all 14 registered cases against
-the real running stack. The remaining three (BAL-128, BAL-130, BAL-132) stay open — small, independently
+the real running stack. **BAL-128** (3 stale `eslint-disable` comments in `backend/` suppressing rules
+the project's `eslint.config.js` never configured) was deleted outright, bringing `npm run lint` to a
+genuine 0 errors/0 warnings. The remaining two (BAL-130, BAL-132) stay open — small, independently
 actionable, none Blocker/Critical, none regressing anything the five 2026-08-16 passes fixed.
 
 It remains **NOT production-ready as-is**: BAL-001 (no authentication) and BAL-002 (dependency CVEs) are
 unchanged release blockers for any deployment handling real trade-finance data — deferred is not the same
 as resolved. All findings this pass itself surfaced (BAL-122, BAL-123, BAL-134, BAL-131, BAL-124,
-BAL-125, BAL-126, BAL-127) are now fixed and no longer factor into that assessment. See
+BAL-125, BAL-126, BAL-127, BAL-128) are now fixed and no longer factor into that assessment. See
 [Gate Conditions](#gate-conditions-before-any-production-consideration) at the end.
 
 ---
@@ -156,7 +161,7 @@ BAL-125, BAL-126, BAL-127) are now fixed and no longer factor into that assessme
 | [BAL-124](#bal-124) | 🔵 Minor | Code Smell | `release`/`makerSubmit` step handlers in `backend/server.js`'s `runCase()` are near-byte-for-byte duplicated — **Fixed** |
 | [BAL-125](#bal-125) | 🔵 Minor | Code Smell | `checker-actions.service.ts` (extracted AFTER BAL-108 closed) has its own un-swept `any` typing — 6 occurrences — **Fixed** |
 | [BAL-126](#bal-126) | 🔵 Minor | Code Smell | `checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks — **Fixed** |
-| [BAL-128](#bal-128) | 🔵 Minor | Code Smell | 3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured — **Open, found this pass** |
+| [BAL-128](#bal-128) | 🔵 Minor | Code Smell | 3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured — **Fixed** |
 | [BAL-129](#bal-129) | 🔵 Minor | Test Gap | The microservice's generic 500 handler — BAL-117's own fix — is itself untested; a regression re-opening BAL-117 would not be caught — **Open, found this pass** |
 | [BAL-120](#bal-120) | ⚪ Info | Reliability | Idempotency detection relies on string-matching the SQLite driver's error text — deferred, user-confirmed |
 | [BAL-109](#bal-109) | ⚪ Info | Reliability | A handful of provably-dead defensive branches, left uncovered on purpose (2 more instances found and correctly left alone this pass) |
@@ -1015,7 +1020,7 @@ mechanical extractions (`loadPagedCatalog`, `loadSnapshotAndMovements`, `finishC
 ---
 
 ### BAL-128
-**3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured** — 🔵 Minor (Code Smell) — Open, found this pass
+**3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured** — 🔵 Minor (Code Smell) — Fixed
 
 **Evidence:** `npm run lint` reports "Unused eslint-disable directive (no problems were reported from
 'no-console')" at `server.js:170,184`, and "...'global-require'" at `test/businessCases.test.js:163`.
@@ -1030,6 +1035,26 @@ assumes a disable comment is load-bearing.
 
 **Recommended remediation:** delete the 3 stale comments, or add the two rules to `eslint.config.js` if
 restricting `console`/`require` usage is actually wanted going forward.
+
+**Outcome (2026-08-17, business instruction: "Fix BAL-128 too"): fixed exactly per the recommended
+remediation's first option — the 3 stale comments deleted.** `server.js:162` (before the orchestration
+error's own `console.error`) and `server.js:176` (before the startup `console.log`) both removed;
+`test/businessCases.test.js:163` (before a plain `require('../data/businessCases')` call inside a test)
+removed too. No rule was added to `eslint.config.js` — restricting `console`/`require` usage was never
+actually wanted here (this is a demo backend that logs to stdout deliberately, and the test file's own
+`require` is a normal Node/Jest pattern, not something needing a lint exception in the first place), so
+deleting the dead artifacts was the correct fix, not adding real rules to justify them retroactively.
+
+Verified: `npm run lint` → **0 errors, 0 warnings** (down from 3 warnings — the only findings this
+specific run had); `backend/` suite 33/33 unchanged; `format:check` unaffected (the one remaining
+formatting warning it reports, `test/server.test.js`, is pre-existing drift this file never touched, not
+introduced by this fix). Backend dev server restarted and live-verified both log statements still fire
+correctly with the comments gone (startup `console.log` observed in the process log on boot; a live
+`import-case-1` run exercised the request-handling path, confirming the `console.error` call site is
+still reachable and unaffected — removing a stale disable comment has no runtime effect either way, this
+was a belt-and-suspenders check given money-adjacent code was touched). Test data cleaned up afterward.
+Full three-suite re-verification per this file's own standing rule: Angular app 510/510 and microservice
+292/292, both unaffected (`backend/`-only change).
 
 ---
 
@@ -1415,12 +1440,13 @@ before the A4 feature area specifically is considered done:**
 Neither BAL-122 nor BAL-123 ever blocked continued prototype/demo use — the feature worked correctly for
 its own intended interactive-UI use case even before either was fixed, and BAL-122 required a specific,
 non-obvious misclick sequence to trigger. **Both are now fixed, and so are BAL-134, BAL-131, BAL-124,
-BAL-125, BAL-126, and BAL-127** — `import-case-4`'s own stale scenario (found incidentally while
-verifying BAL-123), the Business Case Registry's own completeness gap (zero orchestrator-level
+BAL-125, BAL-126, BAL-127, and BAL-128** — `import-case-4`'s own stale scenario (found incidentally
+while verifying BAL-123), the Business Case Registry's own completeness gap (zero orchestrator-level
 `/acknowledge` coverage), the executor's duplicated step handlers (closed as a direct side effect of the
 BAL-131 fix), `checker-actions.service.ts`'s own 6 un-swept `any` occurrences (retyped to
 `BalanceMovement`), that same file's own 20 duplicated `{kind:'failed'}` constructions (collapsed into
-one shared `fail()` helper), and `backend/data/businessCases.js`'s own ~49 duplicated create+release
-step pairs (collapsed into one shared `createAndRelease()` helper, fixed despite its own "not yet
-urgent" framing), respectively. All remaining 2026-08-17 findings (BAL-128, BAL-130, BAL-132) are
-Minor/Info, none are gate conditions, and none block anything.
+one shared `fail()` helper), `backend/data/businessCases.js`'s own ~49 duplicated create+release step
+pairs (collapsed into one shared `createAndRelease()` helper, fixed despite its own "not yet urgent"
+framing), and `backend/`'s 3 stale `eslint-disable` comments (deleted outright, bringing `npm run lint`
+to 0 errors/0 warnings), respectively. The two remaining 2026-08-17 findings (BAL-130, BAL-132) are both
+Info-level, neither is a gate condition, and neither blocks anything.

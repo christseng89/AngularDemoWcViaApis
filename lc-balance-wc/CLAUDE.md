@@ -2029,6 +2029,28 @@ re-run). Test data scoped-cleaned afterward (`IMP-C%`/`EXP-C%`), leaving the use
 records untouched. Full three-suite re-verification per this file's own standing rule: Angular app
 510/510 and microservice 292/292, both unaffected (`backend/`-only change).
 
+## BAL-128 fixed — 3 stale `eslint-disable` comments in `backend/` deleted (2026-08-17, business instruction: "Fix BAL-128 too")
+
+Root cause (full detail in `Quality-report-balance.md`'s own BAL-128 section): `backend/eslint.config.js`
+only extends `js.configs.recommended` — `no-console` isn't part of it, and `global-require` (an
+`eslint-plugin-node`-family rule) was never installed or configured at all. Three
+`// eslint-disable-next-line` comments (`server.js:162` before the orchestration-error `console.error`,
+`server.js:176` before the startup `console.log`, `test/businessCases.test.js:163` before a plain
+`require('../data/businessCases')` call inside a test) suppressed rules that were never active in the
+first place — dead artifacts, most likely carried over from a stricter template config.
+
+**Fix**: all 3 comments deleted outright. No rule was added to `eslint.config.js` — restricting
+`console`/`require` usage was never actually wanted here (this demo backend logs to stdout deliberately;
+the test file's `require` is a normal Node/Jest pattern), so removing the dead artifacts was correct, not
+adding real rules to retroactively justify them.
+
+Verified: `npm run lint` → **0 errors, 0 warnings** (down from 3 warnings — the only findings that run
+had); `backend/` suite 33/33 unchanged; `format:check` unaffected. Backend dev server restarted and
+live-verified both `console` call sites still fire correctly with the comments gone (startup log observed
+on boot; a live `import-case-1` run exercised the request-handling path). Test data cleaned up
+afterward. Full three-suite re-verification per this file's own standing rule: Angular app 510/510 and
+microservice 292/292, both unaffected (`backend/`-only change).
+
 ## Test coverage (confirms the above; see for worked examples)
 
 `microservices/balance-component/test/unit/` covers Import Case 1–5, a separate "Export Confirmation
