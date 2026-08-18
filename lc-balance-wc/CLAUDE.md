@@ -3954,3 +3954,51 @@ zero truncation despite the wider table; "Page 1 / 2 (16 total)" showed with a w
 clicking it correctly revealed the remaining 6 events on page 2, ending with B05's own "A4 · Sight
 Settlement" row (the exact row the "last row missing" report immediately above this entry was originally
 asking about) at 10:19 AM, confirming both enhancements land correctly together.
+
+## Bug fixed — A6/B4's own Parent LC picker wrongly excluded a parent whose Available Balance was already 0, hiding exactly the LCs that most need A6 (2026-08-18, reviewer-reported — "U01 B04 / U02 B01 not shown in A6", reproduced live with a fresh Buyer's Usance case: "A1 Issue Buyer's Usance 10000, A3 10000 w E01, then A6 has no record shown")
+
+Investigated with the actual data first, not just code reading: queried `balance-component.sqlite`
+directly and confirmed both U01's own B04 and U02's own B01 were genuinely still-PENDING `UTILIZE`
+movements with the correct `movementType`/`status` A6 requires — the server-side data and A6's own Step-2
+`loadPayableMovements()` filter (`status === 'PENDING' && movementType === 'UTILIZE'`) were never at
+fault. The actual break was one level up, in `filteredParentCatalog` (Step 1, the LC Index picker A6/B4
+use to pick their own parent) — reproduced live in the browser after building a fresh, controlled
+scenario (A1 Issue a Buyer's Usance LC 10000 → A3 Document Arrival 10000/E01, leaving it PENDING) that
+put A6's own "No eligible parent IPLC_LC contracts on this page (Tenor Type / 0-balance filtered)."
+message on screen with all 3 candidate LCs (the new one, plus U01/U02) genuinely present server-side.
+
+**Root cause**: `filteredParentCatalog`'s own 0-balance exclusion (`snap.availableBalance !== '0'`) was
+added for the flat-Catalog-style pickers, where a parent with nothing left in Available Balance
+genuinely has nothing left to draw a NEW amount against — correct there. A7/B5 (Acceptance Settlement)
+were already exempted from it in an earlier pass (2026-08-16, the "IDX01 fully ACCEPTed" fix) with the
+documented reasoning "the LC/Confirmation's own remaining balance is irrelevant to whether it still has
+an outstanding record to finalize." **A6/B4 needed the exact same exemption and never got it** — they
+use a different branch of the same getter (`tenorTypeOptions`/no matching flag, vs. A7/B5's
+`catalogTenorFilter === 'USANCE'`), so the earlier fix's bypass condition never covered them. A6/B4
+finalize an ALREADY-earmarked PENDING Document Arrival/Present Docs record, not draw fresh capacity —
+and that earmark is exactly what drops the parent's own Available Balance, often straight to 0 when one
+presentation draws the whole LC/Confirmation down (the ordinary case, not an edge case: U01's own B04
+was its last 22,345 of exactly 100,000; U02's own B01 was its entire 10,000; the reproduction LC's own
+E01 was its entire 10,000). The more completely a Document Arrival used up its LC, the more certain this
+bug was to hide it from A6 — the worst case looked like the most common one.
+
+**Fix**: `filteredParentCatalog`'s bypass condition (`transaction-builder.component.ts`) extended from
+`catalogTenorFilter === 'USANCE' || settleableBalanceIndex` to also include
+`this.selectedFunction?.settlesDocumentArrival` — the one flag both A6 and B4 already carry and no other
+function does, so this is additive only to those two. New regression test in
+`transaction-builder.component.gaps.spec.ts` (`filteredParentCatalog: settlesDocumentArrival (A6) skips
+the 0-balance filter too`) directly reproduces the fully-earmarked-LC shape. Verified: `npx tsc -p
+tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint` (0 errors, 212
+pre-existing warnings) all clean, Angular suite 747/747 (1 new), coverage 99.55/96.48/99.53/99.57% (all
+four metrics clear the 95% floor). `backend/` 33/33 and microservice 315/315 both re-run per this file's
+own standing rule, unaffected (Angular-only change).
+
+**Live-verified end to end, twice, independently**: this session's own reproduction (Buyer's Usance LC,
+A3 10000/E01) — after the fix, A6's LC Index correctly listed all 3 candidates (the new LC, U01, U02);
+picking the new LC correctly carried over `Buyer's Usance` as the Tenor Type. Separately, the user's own
+live session completed A6 against the ORIGINAL U01/B04 and U02/B01 records the same reload — confirmed
+afterward via direct DB query: both now have real, correctly-created `IPLC_ACCEPTANCE` sibling contracts
+(`ib_number: 'B04'`/`'B01'` respectively), and both source UTILIZE movements are `RELEASED` — exactly
+A6's documented "one Release click does BOTH" outcome, not a partial/inconsistent state. This session's
+own reproduction data (`BUTEST01`) was cleaned up afterward; the user's own U01/U02 records were left
+exactly as their own live testing produced them.

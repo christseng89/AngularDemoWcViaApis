@@ -392,6 +392,15 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['match']);
     });
 
+    it('filteredParentCatalog: settlesDocumentArrival (A6) skips the 0-balance filter too — bug fixed 2026-08-18, "A6 has no record shown" for an LC fully earmarked by its own Document Arrival', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A6'));
+      c.model.tenorType = 'BUYERS_USANCE';
+      c.parentPicker.contracts = [contract({ balanceContractId: 'fully-earmarked', tenorType: 'BUYERS_USANCE' })];
+      (c as any).parentPicker.snapshots.set('fully-earmarked', snapshot({ availableBalance: '0' }));
+      expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['fully-earmarked']);
+    });
+
     it('filteredParentCatalog: catalogTenorFilter USANCE (A7) excludes only Sight, keeps legacy, and skips the 0-balance filter', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A7'));

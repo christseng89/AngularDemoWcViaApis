@@ -719,8 +719,7 @@ export class TransactionBuilderComponent {
    * SEARCH, not a creation, so there's nothing risky about showing an LC
    * of unproven tenor; the actual Acceptance lookup just returns nothing
    * if it isn't there. A8/SHGT has neither flag, so its parent picker is
-   * left unfiltered by tenor — SG can be issued under any tenor. Combined
-   * with the same 0-balance exclusion as filteredCatalogContracts() above.
+   * left unfiltered by tenor — SG can be issued under any tenor.
    */
   get filteredParentCatalog(): BalanceContract[] {
     let list = this.parentPicker.contracts;
@@ -735,7 +734,24 @@ export class TransactionBuilderComponent {
     // balance); a fully-honoured/accepted Confirmation can easily still have those waiting. Same
     // exemption reasoning as A4's filteredCatalogContracts(). Found live: IDX01 (fully ACCEPTed, own
     // Available Balance 0) was wrongly excluded from B5's own "LC Index" before this fix.
-    if (this.selectedFunction?.catalogTenorFilter === 'USANCE' || this.selectedFunction?.settleableBalanceIndex) return list;
+    //
+    // Bug fixed 2026-08-18, reviewer-reported live ("A1 Issue Buyer's Usance 10000, A3 10000 w E01,
+    // then A6 has no record shown" — reproduced identically for U01/B04 and U02/B01, see this file's
+    // own CLAUDE.md decision log): A6/B4 (settlesDocumentArrival) were NOT covered by the bypass above
+    // — they fell through into the same 0-balance exclusion filteredCatalogContracts() uses, even
+    // though the exact same "remaining balance is irrelevant" reasoning applies to them too. A6/B4
+    // finalize an ALREADY-earmarked PENDING Document Arrival/Present Docs record — that earmark is
+    // exactly what drops the parent's own Available Balance, often all the way to 0 when a single
+    // presentation draws the LC/Confirmation down completely (the common, expected case, not an edge
+    // case). Excluding 0-balance parents made every such LC/Confirmation invisible to A6/B4's own
+    // Parent LC picker — the more fully a Document Arrival used up the LC, the more certain this bug
+    // was to hide it.
+    if (
+      this.selectedFunction?.settlesDocumentArrival ||
+      this.selectedFunction?.catalogTenorFilter === 'USANCE' ||
+      this.selectedFunction?.settleableBalanceIndex
+    )
+      return list;
     return list.filter((c) => {
       const snap = this.parentPicker.snapshots.get(c.balanceContractId);
       return !snap || snap.availableBalance !== '0';
