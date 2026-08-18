@@ -1,6 +1,7 @@
-import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
+import { InquiredEvent, toEventRows } from './inquire-events.service';
 
 /**
  * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): the "Look Up Current Balance" panel's own
@@ -36,8 +37,16 @@ export class LookUpPanelService {
   lookupResult: { contract: BalanceContract; snapshot: BalanceSnapshot } | null = null;
   lookupError: string | null = null;
 
-  /** Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in eventSeq (time) order. */
-  lookupMovements: BalanceMovement[] = [];
+  /**
+   * Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in eventSeq
+   * (time) order. `InquiredEvent[]` (2026-08-18, "should use the SAME status/display logic as Inquire
+   * Events"), not a raw `BalanceMovement[]` — a finalized Sight IPLC_LC/UTILIZE (A3/A3S earmarked, later
+   * A4-finalized) splits into its own 'create' + 'finalize' rows via the SAME `toEventRows()` Inquire
+   * Events itself uses (both rows show the movement's own real, current status — see `toEventRows()`'s
+   * own doc comment), so the two screens can never disagree on what status the same underlying movement
+   * shows.
+   */
+  lookupMovements: InquiredEvent[] = [];
 
   /**
    * Business instruction 2026-08-14 ("`Look Up Current Balance` should be two tabs for Usance LC, one
@@ -51,7 +60,7 @@ export class LookUpPanelService {
   acceptancesUnderLookup: BalanceContract[] = [];
   selectedLookupAcceptance: BalanceContract | null = null;
   acceptanceSnapshot: BalanceSnapshot | null = null;
-  acceptanceMovements: BalanceMovement[] = [];
+  acceptanceMovements: InquiredEvent[] = [];
 
   /**
    * Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC...
@@ -62,10 +71,10 @@ export class LookUpPanelService {
   sgsUnderLookup: BalanceContract[] = [];
   selectedLookupSg: BalanceContract | null = null;
   sgSnapshot: BalanceSnapshot | null = null;
-  sgMovements: BalanceMovement[] = [];
+  sgMovements: InquiredEvent[] = [];
 
   /** Business instruction 2026-08-14 ("two/three tabs...") — whichever tab is active supplies the Event Timeline table. */
-  get activeLookupMovements(): BalanceMovement[] {
+  get activeLookupMovements(): InquiredEvent[] {
     if (this.lookupTab === 'ACCEPTANCE') return this.acceptanceMovements;
     if (this.lookupTab === 'SG') return this.sgMovements;
     return this.lookupMovements;
@@ -181,6 +190,7 @@ export class LookUpPanelService {
         next: (contract) => {
           this.loadSnapshotAndMovements(
             contract.balanceContractId,
+            contract,
             (snapshot) => (this.lookupResult = { contract, snapshot }),
             (movements) => (this.lookupMovements = movements),
             (err) => (this.lookupError = describeApiError(err)),
@@ -233,6 +243,7 @@ export class LookUpPanelService {
     }
     this.loadSnapshotAndMovements(
       this.selectedLookupSg.balanceContractId,
+      this.selectedLookupSg,
       (snapshot) => (this.sgSnapshot = snapshot),
       (movements) => (this.sgMovements = movements),
       () => (this.sgSnapshot = null),
@@ -249,26 +260,40 @@ export class LookUpPanelService {
     }
     this.loadSnapshotAndMovements(
       this.selectedLookupAcceptance.balanceContractId,
+      this.selectedLookupAcceptance,
       (snapshot) => (this.acceptanceSnapshot = snapshot),
       (movements) => (this.acceptanceMovements = movements),
       () => (this.acceptanceSnapshot = null),
     );
   }
 
-  /** Shared body behind this panel's three near-identical "fetch snapshot + fetch/sort movements by eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG). */
+  /**
+   * Shared body behind this panel's three near-identical "fetch snapshot + fetch/sort movements by
+   * eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG). `contract` (2026-08-18) is required by
+   * `toEventRows()` (a finalized Sight IPLC_LC/UTILIZE splits into two rows — see that function's own
+   * doc comment) — each of the 3 call sites already has the relevant contract on hand.
+   */
   private loadSnapshotAndMovements(
     contractId: string,
+    contract: BalanceContract,
     setSnapshot: (snapshot: BalanceSnapshot) => void,
-    setMovements: (movements: BalanceMovement[]) => void,
+    setMovements: (events: InquiredEvent[]) => void,
     onSnapshotError: (err: unknown) => void,
   ): void {
     this.api.getSnapshot(contractId).subscribe({
       next: setSnapshot,
       error: onSnapshotError,
     });
-    // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per contract.
+    // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per
+    // contract; a stable sort (guaranteed since ES2019) preserves toEventRows()'s own [create, finalize]
+    // ordering for the two rows a split movement produces, since both share the same eventSeq.
     this.api.listMovements(contractId).subscribe({
-      next: (movements) => setMovements([...movements].sort((a, b) => a.eventSeq - b.eventSeq)),
+      next: (movements) =>
+        setMovements(
+          movements
+            .flatMap((movement) => toEventRows(movement, contract))
+            .sort((a, b) => a.movement.eventSeq - b.movement.eventSeq),
+        ),
       error: () => setMovements([]),
     });
   }
@@ -301,6 +326,17 @@ export class LookUpPanelService {
     if (instrumentType === 'IPLC_ACCEPTANCE' || instrumentType === 'SHGT') return 'IPLC_LC';
     // Business instruction 2026-08-15: EPLC_ACCEPTANCE's parent is always EPLC_CONFIRMATION now.
     if (instrumentType === 'EPLC_ACCEPTANCE') return 'EPLC_CONFIRMATION';
+    // Bug fixed 2026-08-18, reviewer-reported ("B3 Present Docs -> Submit -> Release -> Look Up Current
+    // Balance" showed "No Logical Contract exists yet for this natural key"): EPLC_EXAMINATION (B3) was
+    // missing from this map, so it fell through to the `return instrumentType` default below and
+    // syncFrom() left lookup.instrumentType as EPLC_EXAMINATION itself — but EPLC_EXAMINATION's own
+    // natural key requires ibNumber (the EB Number) too, which syncFrom() always clears to '' before
+    // calling runLookup(), so resolveContract('EPLC_EXAMINATION', {lcNumber, ibNumber: null, ...}) could
+    // never match anything. EPLC_EXAMINATION is MEMO_ONLY and never itself a real Balance Component
+    // ledger worth looking up (same boundary contingentAccountEntry/BALANCE_SNAPSHOT_LABEL already
+    // enforce) — Look Up Current Balance should show its PARENT Confirmation instead, same as every
+    // other child instrumentType above.
+    if (instrumentType === 'EPLC_EXAMINATION') return 'EPLC_CONFIRMATION';
     return instrumentType;
   }
 }

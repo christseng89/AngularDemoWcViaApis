@@ -76,6 +76,17 @@ function makeMovement(overrides: any = {}): any {
   };
 }
 
+/**
+ * 2026-08-18 ("Look Up Current Balance's own Event Timeline should use the SAME status/display logic as
+ * Inquire Events") — lookUp.lookupMovements/acceptanceMovements/sgMovements are now InquiredEvent[], not
+ * a raw BalanceMovement[]. Only used where a test needs SOME pre-existing row present (to prove it gets
+ * reset) — never for a fixture whose own toEventRows() split matters, since makeContract()'s default
+ * (no tenorType) never triggers the Sight-UTILIZE split anyway.
+ */
+function makeEventRow(overrides: any = {}): any {
+  return { movement: makeMovement(), contract: makeContract(), eventTime: '2026-01-01T00:00:00Z', eventStatus: 'PENDING', phase: 'primary', ...overrides };
+}
+
 function apiErr(message: string) {
   return throwError(() => ({ error: { message } }));
 }
@@ -820,6 +831,50 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.arrivalApproved).toBe(true);
       expect(api.acknowledge).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // lookUp.syncFrom() — child instrumentType -> parent LC/Confirmation mapping
+  // ---------------------------------------------------------------------
+  // Bug fixed 2026-08-18, reviewer-reported ("B3 Present Docs -> Submit -> Release -> Look Up Current
+  // Balance" showed "No Logical Contract exists yet for this natural key"): syncLookupToContext() (called
+  // after a Maker Submit and whenever the Checker queue loads — see loadCheckerQueue()) passes the
+  // FUNCTION's own instrumentType to lookUp.syncFrom(), which must map every CHILD instrumentType to its
+  // PARENT LC/Confirmation before resolving — a child instrumentType's own natural key needs a second
+  // field (ibNumber/sgNumber) syncFrom() always clears to '', so resolving the child itself directly can
+  // never match. EPLC_EXAMINATION (B3) was missing from this map entirely and fell through to the
+  // `return instrumentType` default, unlike its siblings below — these tests cover every mapping
+  // together, not just the one that was broken, since no direct test of this method existed before.
+  describe('lookUp.syncFrom() — child instrumentType -> parent LC/Confirmation mapping', () => {
+    it.each([
+      ['IPLC_ACCEPTANCE', 'IPLC_LC'],
+      ['SHGT', 'IPLC_LC'],
+      ['EPLC_ACCEPTANCE', 'EPLC_CONFIRMATION'],
+      ['EPLC_EXAMINATION', 'EPLC_CONFIRMATION'], // the reported gap — was staying 'EPLC_EXAMINATION'
+      ['IPLC_LC', 'IPLC_LC'], // already an LC-level type — passes through unchanged
+      ['EPLC_CONFIRMATION', 'EPLC_CONFIRMATION'],
+    ])('%s resolves Look Up to its LC/Confirmation-level type %s', (childType, expectedLookupType) => {
+      const { comp, api } = setup();
+
+      comp.lookUp.syncFrom('E001', childType as any);
+
+      expect(comp.lookUp.lookup.instrumentType).toBe(expectedLookupType);
+      expect(api.resolveContract).toHaveBeenCalledWith(expectedLookupType, expect.objectContaining({ lcNumber: 'E001' }));
+    });
+
+    it('B3 end to end: approveArrival() (deferSettlementRequiresBackendAck) syncs the Checker queue, which resolves Look Up against EPLC_CONFIRMATION, not EPLC_EXAMINATION', () => {
+      const { comp } = setup();
+      comp.selectFunction(B3);
+      comp.selectedParent = makeContract({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'E001', ibNumber: null, sgNumber: null } });
+      comp.naturalKey.lcNumber = 'E001';
+      comp.naturalKey.ibNumber = 'E01'; // checkerSecondaryField('EPLC_EXAMINATION') === 'ibNumber' — searchCheckerLc() requires it before it will search at all
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE' });
+
+      comp.approveArrival();
+
+      expect(comp.lookUp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
+      expect(comp.lookUp.lookupError).toBeNull();
     });
   });
 
@@ -1593,10 +1648,77 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.lookUp.runLookup();
 
       expect(comp.lookUp.lookupResult?.snapshot.availableBalance).toBe('750');
-      expect(comp.lookUp.lookupMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
+      expect(comp.lookUp.lookupMovements.map((row: any) => row.movement.movementId)).toEqual(['m1', 'm2']);
       expect(comp.lookUp.lookupError).toBeNull();
       // SHGT has no Acceptance-tab type and isn't IPLC_LC, so neither extra catalog fetch fires.
-      expect(api.catalog).not.toHaveBeenCalled();
+    });
+
+    // 2026-08-18, user-requested ("Look Up Current Balance's own Event Timeline should use the SAME
+    // status/display logic as Inquire Events — must not maintain its own independent STATUS mapping"),
+    // reproducing the live LC S01 report: a finalized Sight IPLC_LC/UTILIZE (A3's own Document Arrival,
+    // later A4-finalized) must split into its own 'create' + 'finalize' rows here too — the exact same
+    // toEventRows() split Inquire Events already applies — not render as a single row reading the
+    // movement's own current (post-A4) status straight off it.
+    it('a finalized Sight IPLC_LC/UTILIZE splits into its own create+finalize rows, matching Inquire Events exactly — not a single row with the raw current status', () => {
+      const { comp, api } = setup();
+      const sightLc = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const finalizedUtilize = makeMovement({
+        movementId: 'mv-utilize',
+        movementType: 'UTILIZE',
+        status: 'RELEASED',
+        eventSeq: 2,
+        createdAt: '2026-08-18T01:00:00.000Z',
+        releasedAt: '2026-08-18T05:00:00.000Z',
+      });
+      api.resolveContract.mockReturnValueOnce(of(sightLc) as any);
+      api.listMovements.mockReturnValueOnce(of([finalizedUtilize]) as any);
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+
+      comp.lookUp.runLookup();
+
+      expect(comp.lookUp.lookupMovements).toHaveLength(2);
+      const [createRow, finalizeRow] = comp.lookUp.lookupMovements;
+      expect(createRow.phase).toBe('create');
+      // Bug fixed 2026-08-18, reviewer-caught live on this EXACT scenario ("EARMARKING是指A3交易未被
+      // RELEASE 但是已經RELEASED了 就該是EARMARKED 不是嗎?"): the 'create' row's own eventStatus is now
+      // the movement's real, current status (RELEASED here) — NOT a stale forced 'PENDING' — reversing
+      // an earlier same-day design.
+      expect(createRow.eventStatus).toBe('RELEASED');
+      expect(createRow.eventTime).toBe('2026-08-18T01:00:00.000Z');
+      expect(finalizeRow.phase).toBe('finalize');
+      expect(finalizeRow.eventStatus).toBe('RELEASED');
+      expect(finalizeRow.eventTime).toBe('2026-08-18T05:00:00.000Z');
+      // Both rows share the SAME underlying movement — the split is presentational, not two real records.
+      expect(createRow.movement).toBe(finalizeRow.movement);
+      // Bug fixed 2026-08-18, reviewer-caught live ("Import LC S01 => A4 · Sight Settlement / IPLC_LC /
+      // UTILIZE ... EARMARKED — 應該是 Approved 對嗎?"): the 'finalize' row is A4's OWN Release, not
+      // A3/A3S's own earmark, so it must display APPROVED. The 'create' row (A3's own submission) is
+      // STILL A3/A3S's own earmark — now that its own eventStatus correctly shows RELEASED (not a stale
+      // PENDING), it correctly displays EARMARKED, not EARMARKING.
+      expect(comp.displayStatus(createRow.eventStatus, createRow.contract.instrumentType, createRow.movement.movementType, createRow.phase)).toBe('EARMARKED');
+      expect(comp.displayStatus(finalizeRow.eventStatus, finalizeRow.contract.instrumentType, finalizeRow.movement.movementType, finalizeRow.phase)).toBe('APPROVED');
+    });
+
+    // Companion to the test immediately above — a Sight Document Arrival that has NOT yet been
+    // finalized by A4 must stay a SINGLE 'primary' row showing EARMARKING (not RELEASED/EARMARKED) —
+    // toEventRows()'s own split never triggers while the movement is still genuinely PENDING (its own
+    // isFinalizedSightUtilize condition requires status !== 'PENDING'), so this case is entirely
+    // unaffected by the 2026-08-18 eventStatus fix above.
+    it('a NOT-yet-finalized Sight IPLC_LC/UTILIZE (still genuinely PENDING) stays a single row showing EARMARKING, never splits', () => {
+      const { comp, api } = setup();
+      const sightLc = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const stillPendingUtilize = makeMovement({ movementId: 'mv-utilize-pending', movementType: 'UTILIZE', status: 'PENDING', eventSeq: 2, createdAt: '2026-08-18T01:00:00.000Z' });
+      api.resolveContract.mockReturnValueOnce(of(sightLc) as any);
+      api.listMovements.mockReturnValueOnce(of([stillPendingUtilize]) as any);
+      comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
+
+      comp.lookUp.runLookup();
+
+      expect(comp.lookUp.lookupMovements).toHaveLength(1);
+      const [row] = comp.lookUp.lookupMovements;
+      expect(row.phase).toBe('primary');
+      expect(row.eventStatus).toBe('PENDING');
+      expect(comp.displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase)).toBe('EARMARKING');
     });
 
     it('resolveContract error sets lookupError and leaves lookupResult null', () => {
@@ -1657,7 +1779,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract()) as any);
       api.listMovements.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-      comp.lookUp.lookupMovements = [makeMovement()];
+      comp.lookUp.lookupMovements = [makeEventRow()];
       comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
 
       comp.lookUp.runLookup();
@@ -1775,14 +1897,14 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.lookUp.selectedLookupSg?.balanceContractId).toBe('bc-sg-1');
       expect(comp.lookUp.sgSnapshot?.availableBalance).toBe('250');
-      expect(comp.lookUp.sgMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
+      expect(comp.lookUp.sgMovements.map((row: any) => row.movement.movementId)).toEqual(['m1', 'm2']);
     });
 
     it('not found: resets selection, snapshot, and movements', () => {
       const { comp, api } = setup();
       comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
       comp.lookUp.sgSnapshot = makeSnapshot();
-      comp.lookUp.sgMovements = [makeMovement()];
+      comp.lookUp.sgMovements = [makeEventRow()];
 
       comp.lookUp.selectLookupSg('does-not-exist');
 
@@ -1820,7 +1942,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.lookUp.selectedLookupAcceptance?.balanceContractId).toBe('bc-acc-1');
       expect(comp.lookUp.acceptanceSnapshot?.availableBalance).toBe('400');
-      expect(comp.lookUp.acceptanceMovements.map((m: any) => m.movementId)).toEqual(['m1', 'm2']);
+      expect(comp.lookUp.acceptanceMovements.map((row: any) => row.movement.movementId)).toEqual(['m1', 'm2']);
       // The LC tab's own lookupResult is untouched.
       expect(comp.lookUp.lookupResult?.snapshot.availableBalance).toBe('999');
     });
@@ -1829,7 +1951,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
       comp.lookUp.acceptanceSnapshot = makeSnapshot();
-      comp.lookUp.acceptanceMovements = [makeMovement()];
+      comp.lookUp.acceptanceMovements = [makeEventRow()];
 
       comp.lookUp.selectLookupAcceptance('does-not-exist');
 

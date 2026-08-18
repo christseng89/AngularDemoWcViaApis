@@ -746,18 +746,98 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
+  // Settled requirement, 2026-08-18 ("Both Look Up Current Balance and Inquire Events must use exactly
+  // the same Status mapping logic... do not get this wrong again") — the full mapping table:
+  //   Import A3/A3S, Export B3        : Not Released -> EARMARKING, Released -> EARMARKED
+  //   Every other function            : Not Released -> PENDING,    Released -> APPROVED
   describe('displayStatus', () => {
-    it('relabels RELEASED as Approved (display-only)', () => {
+    it('relabels RELEASED as APPROVED (display-only) for a function OTHER than Document Arrival/Present Docs', () => {
       const { comp } = makeComponent();
-      expect(comp.displayStatus('RELEASED')).toBe('Approved');
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'ISSUE')).toBe('APPROVED');
+      expect(comp.displayStatus('RELEASED')).toBe('APPROVED'); // no instrumentType/movementType supplied at all
     });
 
-    it('passes every other status through unchanged', () => {
+    it('relabels RELEASED as EARMARKED for Import LC Document Arrival (IPLC_LC/UTILIZE) and Export Present Docs (EPLC_EXAMINATION/CREATE) only', () => {
       const { comp } = makeComponent();
-      expect(comp.displayStatus('PENDING')).toBe('PENDING');
-      expect(comp.displayStatus('REJECTED')).toBe('REJECTED');
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKED');
+      expect(comp.displayStatus('RELEASED', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKED');
+    });
+
+    it('does NOT relabel a different movementType on the same two instrumentTypes as EARMARKED', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'ISSUE')).toBe('APPROVED');
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'AMEND_INCREASE')).toBe('APPROVED');
+    });
+
+    it('relabels PENDING as EARMARKING for the SAME two Document Arrival/Present Docs functions — the not-yet-released half of the pair', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKING');
+      expect(comp.displayStatus('PENDING', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKING');
+    });
+
+    it('leaves PENDING as plain PENDING for every other function', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('PENDING', 'IPLC_LC', 'ISSUE')).toBe('PENDING');
+      expect(comp.displayStatus('PENDING')).toBe('PENDING'); // no instrumentType/movementType supplied at all
+    });
+
+    it('passes every non-PENDING/RELEASED status through unchanged, ignoring instrumentType/movementType entirely', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('REJECTED', 'IPLC_LC', 'UTILIZE')).toBe('REJECTED');
       expect(comp.displayStatus('CANCELLED')).toBe('CANCELLED');
       expect(comp.displayStatus('SUPERSEDED')).toBe('SUPERSEDED');
+    });
+
+    // Bug fixed 2026-08-18, reviewer-caught live on the real running app: "Import LC S01 => A4 · Sight
+    // Settlement / IPLC_LC / UTILIZE / 12000 / B01 / — / EARMARKED / 8/18/26, 9:04 AM — 應該是 Approved
+    // 對嗎?" (shouldn't that be Approved?). Inquire Events' own merged timeline splits a finalized Sight
+    // Document Arrival into a 'create' row (A3's own submission) and a 'finalize' row (A4's own Release)
+    // — both sharing the IDENTICAL (IPLC_LC, UTILIZE), so the earlier fix (scoped by instrumentType/
+    // movementType alone) wrongly labeled A4's OWN row EARMARKED too, even though the Function column
+    // right next to it correctly said "A4 · Sight Settlement", not A3.
+    it("does NOT relabel RELEASED as EARMARKED for a 'finalize'-phase row (A4's own completion of a Sight Document Arrival) — reproduces the exact reported LC S01 case", () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE', 'finalize')).toBe('APPROVED');
+    });
+
+    it("still relabels RELEASED as EARMARKED for the SAME (IPLC_LC, UTILIZE) pair under 'create'/'primary'/omitted phase — A3/A3S's own row, unaffected by the fix", () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE', 'create')).toBe('EARMARKED');
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE', 'primary')).toBe('EARMARKED');
+      expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKED');
+    });
+  });
+
+  // 2026-08-18, user-requested ("EARMARK 可否用與APPROVED PENDING不同顏色區分" — a color distinct from
+  // both APPROVED and PENDING) — mirrors displayStatus()'s own EARMARKING/EARMARKED-vs-PENDING/APPROVED
+  // decision exactly. EARMARKING (a PENDING-status earmark movement) deliberately shares PENDING's own
+  // amber class, unchanged — only the RELEASED side gets a distinct color.
+  describe('statusBadgeClass', () => {
+    it('returns the pending class for PENDING, regardless of instrumentType/movementType (EARMARKING included)', () => {
+      const { comp } = makeComponent();
+      expect(comp.statusBadgeClass('PENDING')).toBe('tb-status-badge--pending');
+      expect(comp.statusBadgeClass('PENDING', 'IPLC_LC', 'UTILIZE')).toBe('tb-status-badge--pending');
+    });
+
+    it('returns the approved class for RELEASED outside Document Arrival/Present Docs', () => {
+      const { comp } = makeComponent();
+      expect(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'ISSUE')).toBe('tb-status-badge--approved');
+      expect(comp.statusBadgeClass('RELEASED')).toBe('tb-status-badge--approved');
+    });
+
+    it('returns a DIFFERENT, dedicated earmark class for RELEASED Import Document Arrival / Export Present Docs — distinct from both approved and pending', () => {
+      const { comp } = makeComponent();
+      expect(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'UTILIZE')).toBe('tb-status-badge--earmark');
+      expect(comp.statusBadgeClass('RELEASED', 'EPLC_EXAMINATION', 'CREATE')).toBe('tb-status-badge--earmark');
+      expect(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'UTILIZE')).not.toBe(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'ISSUE'));
+      expect(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'UTILIZE')).not.toBe(comp.statusBadgeClass('PENDING'));
+    });
+
+    it('returns the negative class for REJECTED/CANCELLED and the neutral class for SUPERSEDED', () => {
+      const { comp } = makeComponent();
+      expect(comp.statusBadgeClass('REJECTED')).toBe('tb-status-badge--negative');
+      expect(comp.statusBadgeClass('CANCELLED')).toBe('tb-status-badge--negative');
+      expect(comp.statusBadgeClass('SUPERSEDED')).toBe('tb-status-badge--neutral');
     });
   });
 });

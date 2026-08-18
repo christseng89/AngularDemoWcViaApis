@@ -34,23 +34,86 @@ import { PagedListState } from './paged-list-state';
  * mechanism), so `phase` is 'primary' and `eventTime`/`eventStatus` are just the movement's own
  * `createdAt`/`status` — but A4 is the one function in the whole registry that finalizes an EXISTING
  * row instead of creating a new one, so THAT specific row is split into two InquiredEvent entries
- * sharing the same underlying `movement`, each with its own accurate position/status: `phase: 'create'`
- * (A3's own submission, `eventTime: movement.createdAt`, `eventStatus` forced 'PENDING' — historically
- * accurate, since Confirmed Balance genuinely hadn't moved yet at that moment) and `phase: 'finalize'`
- * (A4's own Release, `eventTime: movement.releasedAt`, `eventStatus: movement.status` — the movement's
- * real, current terminal status). See `toEventRows()` below for the exact split condition and
- * `selectEvent()`'s own doc comment for how `phase` changes which function code (A3 vs A4) and which
- * balance-impact figures the "View" screen shows for each of the two rows.
+ * sharing the same underlying `movement`, each with its own accurate position: `phase: 'create'` (A3's
+ * own submission, `eventTime: movement.createdAt`) and `phase: 'finalize'` (A4's own Release,
+ * `eventTime: movement.releasedAt`). `eventStatus` is `movement.status` on BOTH — see `toEventRows()`'s
+ * own doc comment (settled 2026-08-18, business-mandated) for why an earlier same-day design that forced
+ * the 'create' row's own status to 'PENDING' regardless of the movement's real current status was
+ * reversed. See `selectEvent()`'s own doc comment for how `phase` still changes which function code (A3
+ * vs A4) and which Balance SNAPSHOT (a separate, independently-frozen concept) the "View" screen shows
+ * for each of the two rows.
  */
 export interface InquiredEvent {
   movement: BalanceMovement;
   contract: BalanceContract;
   /** The true Event Date/Time this ROW represents — sort/display MUST use this, never movement.createdAt directly (see this file's own doc comment above). */
   eventTime: string;
-  /** movement.status AS OF eventTime — the movement's own current status for 'primary'/'finalize'; forced 'PENDING' for a 'create' row, which by definition precedes its own later 'finalize' row. */
+  /**
+   * The movement's own TRUE, CURRENT `status` — identical to `movement.status` for every phase,
+   * including 'create' (2026-08-18, business-mandated — "RELEASE 是指該筆交易是否已完成 RELEASE...Status
+   * 必須根據該筆交易實際的 RELEASE 狀態決定，不得...誤判為 RELEASED" — RELEASE means whether THIS
+   * transaction has actually completed release; status must reflect that real fact, never a historical
+   * reconstruction). Superseded an EARLIER same-day design (forcing 'PENDING' on the 'create' row for
+   * "historical accuracy") once the business clarified live, reproducing LC S01's own B03 exactly, that
+   * forcing a stale PENDING onto an ALREADY-RELEASED transaction's own row violates this rule outright —
+   * see `toEventRows()`'s own doc comment for the full before/after.
+   */
   eventStatus: BalanceMovement['status'];
   /** 'primary' — the common case, this row IS the movement's only real-world event. 'create'/'finalize' — see this file's own doc comment: A4 (Sight Settlement) finalizing an EXISTING A3/A3S row, the one case in this registry where one movement spans two materially separate, independently-timed business actions. */
   phase: 'primary' | 'create' | 'finalize';
+}
+
+/**
+ * Splits one BalanceMovement into its one or two real-world event rows — see InquiredEvent's own doc
+ * comment for the full "A4 Sight Payment" bug this originally fixed. Every movement produces exactly one
+ * 'primary' row UNLESS it is a Sight-tenor IPLC_LC UTILIZE (A3/A3S's own Document Arrival earmark) that
+ * has since been finalized (`status !== 'PENDING'`, `releasedAt` set) — the one case A4's own
+ * `payExistingUtilize` flag identifies, where a LATER business action (Maker-Submit + Checker-Release)
+ * completes an EXISTING movement instead of creating a new one — in which case it produces two: 'create'
+ * (the original submission, at its own createdAt) and 'finalize' (the Release, at releasedAt). `phase`
+ * alone is what still differs between the two — WHICH function/time each row is attributed to (A3 at
+ * createdAt vs. A4 at releasedAt) — `eventStatus` is now the SAME real value on both, see below.
+ * `releasedAt` is reused (not a new field) — it's set for ANY second-actor outcome on this row (release/
+ * reject/cancel, see balanceService.ts's own release()/reject() — both call updateStatus() with
+ * releasedAt: this.now()), not release specifically, so a Sight Document Arrival that was instead
+ * rejected/cancelled still correctly splits into its own 'create' + 'finalize' pair.
+ *
+ * **`eventStatus` is `movement.status` unconditionally, including for the 'create' row — settled
+ * 2026-08-18, business-mandated, reversing this SAME function's own earlier same-day design.** The
+ * ORIGINAL version of this fix forced the 'create' row's own `eventStatus` to `'PENDING'` regardless of
+ * the movement's real current status, reasoning "historically accurate — Confirmed Balance genuinely
+ * hadn't moved yet at that earlier moment." The business found this live, reproducing LC S01's own B03
+ * exactly (a fully-RELEASED, A4-finalized Document Arrival whose OWN 'create' row still displayed
+ * "EARMARKING" — i.e. "not yet released" — days after it genuinely had been), and ruled it out flatly:
+ * "RELEASE 是指該筆交易是否已完成 RELEASE...Status 必須根據該筆交易實際的 RELEASE 狀態決定，不得因為
+ * Event 已建立、Balance 已更新或其他條件而誤判為 RELEASED" (RELEASE means whether THIS transaction has
+ * actually completed release; Status must reflect that real fact — never a historical reconstruction,
+ * and never inferred from Event/Balance side effects). The historical-accuracy framing was a genuine,
+ * good-faith design choice for the ORIGINAL "A4 Sight Payment" bug (which was about the row's own
+ * eventTIME/ordering and Function attribution, not its status) — but extending that same historical
+ * framing to the STATUS field itself directly violated this later, more specific, explicitly-confirmed
+ * requirement once the business examined it closely. Deliberately scoped to `eventStatus` ONLY — the
+ * separately-confirmed "Balance SNAPSHOT stays frozen at Create-time" behavior (`selectEvent()`'s own
+ * `ownSnapshot`/sibling-snapshot logic, "SNAP SHOT保留當時...不會因為後續交易改變") is a DIFFERENT,
+ * independently business-confirmed requirement and is UNCHANGED by this fix — only the raw PENDING/
+ * RELEASED status this function itself controls was ever in scope here.
+ *
+ * Module-level exported function (2026-08-18, user-requested — "Look Up Current Balance's own Event
+ * Timeline should use the SAME status/display logic as Inquire Events... must not maintain its own
+ * independent STATUS mapping") — was a private InquireEventsService method; extracted so
+ * LookUpPanelService can call the exact same split, not a second, separately-maintained copy of it. Both
+ * services import it from here rather than either owning it, since the underlying "A4 finalizes an
+ * existing A3/A3S row" business rule this encodes belongs to neither screen specifically.
+ */
+export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
+  const isFinalizedSightUtilize = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType === 'SIGHT' && movement.status !== 'PENDING' && !!movement.releasedAt;
+  if (!isFinalizedSightUtilize) {
+    return [{ movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'primary' }];
+  }
+  return [
+    { movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'create' },
+    { movement, contract, eventTime: movement.releasedAt as string, eventStatus: movement.status, phase: 'finalize' },
+  ];
 }
 
 /** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
@@ -283,34 +346,9 @@ export class InquireEventsService {
 
   private movementsOf(contract: BalanceContract): Observable<InquiredEvent[]> {
     return this.api.listMovements(contract.balanceContractId).pipe(
-      map((movements) => movements.flatMap((movement) => this.toEventRows(movement, contract))),
+      map((movements) => movements.flatMap((movement) => toEventRows(movement, contract))),
       catchError(() => of([] as InquiredEvent[])),
     );
-  }
-
-  /**
-   * Splits one BalanceMovement into its one or two real-world Inquire Events rows — see InquiredEvent's
-   * own doc comment for the full "A4 Sight Payment" bug this fixes. Every movement produces exactly one
-   * 'primary' row UNLESS it is a Sight-tenor IPLC_LC UTILIZE (A3/A3S's own Document Arrival earmark)
-   * that has since been finalized (`status !== 'PENDING'`, `releasedAt` set) — the one case A4's own
-   * `payExistingUtilize` flag identifies, where a LATER business action (Maker-Submit + Checker-Release)
-   * completes an EXISTING movement instead of creating a new one — in which case it produces two:
-   * 'create' (the original submission, at its own createdAt, historically PENDING — Confirmed Balance
-   * genuinely hadn't moved yet) and 'finalize' (the Release, at releasedAt, showing the movement's real
-   * current status). `releasedAt` is reused (not a new field) — it's set for ANY second-actor outcome on
-   * this row (release/reject/cancel, see balanceService.ts's own release()/reject() — both call
-   * updateStatus() with releasedAt: this.now()), not release specifically, so a Sight Document Arrival
-   * that was instead rejected/cancelled still correctly splits into its own 'create' + 'finalize' pair.
-   */
-  private toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
-    const isFinalizedSightUtilize = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType === 'SIGHT' && movement.status !== 'PENDING' && !!movement.releasedAt;
-    if (!isFinalizedSightUtilize) {
-      return [{ movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'primary' }];
-    }
-    return [
-      { movement, contract, eventTime: movement.createdAt, eventStatus: 'PENDING', phase: 'create' },
-      { movement, contract, eventTime: movement.releasedAt as string, eventStatus: movement.status, phase: 'finalize' },
-    ];
   }
 
   private childMovementsOf(instrumentType: InstrumentType, lcNumber: string): Observable<InquiredEvent[]> {
@@ -354,13 +392,11 @@ export class InquireEventsService {
    * a 'finalize' row resolves its function via payExistingUtilizeFunctionFor() instead of the generic
    * resolveFunctionForMovement() (which would always return A3, the earlier-registered, identically-
    * shaped function) — so the "View" screen correctly shows "A4 · Sight Settlement" for that row, "A3 ·
-   * Document Arrival" for its sibling 'create' row. A 'create' row's own `impact` is forced to
-   * `{before: null, after: null}` regardless of the movement's real (already-finalized) balanceBefore/
-   * balanceAfter — showing the ACTUAL current impact figures next to a historically-accurate "Status:
-   * Pending" would be self-contradictory (Confirmed Balance genuinely hadn't moved yet at that earlier
-   * moment); the existing #balanceSnapshotBox template already renders a null `impact.after` as "still
-   * PENDING — not yet affected until Released", so this reuses that rendering verbatim rather than
-   * needing a template change.
+   * Document Arrival" for its sibling 'create' row. `impact` (movement.balanceBefore/balanceAfter) is the
+   * SAME real value on both rows (2026-08-18, business-mandated — see toEventRows()'s own doc comment
+   * for the full reversal of an earlier same-day design that forced the 'create' row's own impact to
+   * `{before: null, after: null}`; a 'create' row can only exist for an already-finalized movement in the
+   * first place, so these values are always genuinely populated).
    *
    * The Balance Tabs' own LC-tab `snapshot` IS also adjusted per phase (2026-08-18, business instruction
    * "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" — closes what was, until this date, an
@@ -420,7 +456,16 @@ export class InquireEventsService {
     const isRootEvent = contract.instrumentType === this.rootContract?.instrumentType;
     const isAcceptanceEvent = contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE';
     const isSgEvent = contract.instrumentType === 'SHGT';
-    const ownImpact = event.phase === 'create' ? { before: null, after: null } : { before: movement.balanceBefore, after: movement.balanceAfter };
+    // 2026-08-18, business-mandated (same fix as toEventRows()'s own eventStatus change) — no more
+    // 'create'-phase forcing to {null, null}. That forcing was justified purely by "impact next to a
+    // historically-forced Pending status would be self-contradictory"; now that eventStatus itself
+    // reflects the movement's real current status (see toEventRows()'s own doc comment for the full
+    // reversal), showing the SAME real before/after this row's own sibling 'finalize' row already shows
+    // is no longer contradictory — it's the same movement's own single real impact, visible from either
+    // row. A 'create' row can only ever exist for an ALREADY-finalized movement in the first place (see
+    // toEventRows()'s own isFinalizedSightUtilize condition — status !== 'PENDING' is a precondition of
+    // the split itself), so balanceBefore/balanceAfter are always genuinely populated here, never null.
+    const ownImpact = { before: movement.balanceBefore, after: movement.balanceAfter };
     // 'finalize' reads finalizeEventSnapshot (falling back to eventSnapshot for a pre-migration
     // movement) — release() no longer overwrites eventSnapshot for this case, so 'create'/'primary'
     // correctly keep reading plain eventSnapshot below, unaffected.

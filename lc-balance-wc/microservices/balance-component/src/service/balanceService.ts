@@ -219,6 +219,16 @@ export class BalanceService {
     if (contract.instrumentType === 'EPLC_CONFIRMATION') {
       presentDocsEarmarkPending = computePresentDocsEarmarkPending(examinationMovements).toFixed();
       presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements).toFixed();
+      // 2026-08-18, user-requested ("Would it be possible to have the same [Tight Available Balance]
+      // field for the Export Confirmed LC?") — EPLC_CONFIRMATION has no sibling SHGT exposure to net
+      // out (SHGT is Import-only, always a child of IPLC_LC), so this is NOT the same offBalanceExposure
+      // computation as above; it reuses the genuine Export-side analog instead — the exact
+      // Pending+Approved-combined figure B3's own createMovement() sufficiency check (below) already
+      // nets against Available internally (computePresentDocsEarmark == presentDocsEarmarkPending +
+      // presentDocsEarmarkApproved, see offBalanceExposure.ts's own doc comments on all three
+      // functions) — this just surfaces that same figure as a persisted/queryable BalanceSnapshot field
+      // instead of a value computed only inline at submission time.
+      tightAvailableBalance = available.minus(computePresentDocsEarmark(examinationMovements)).toFixed();
     }
 
     return {

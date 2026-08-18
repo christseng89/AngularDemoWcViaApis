@@ -353,7 +353,21 @@ info:
     UNTOUCHED too — no new field needed for this case, since B4 always creates its own separate movement
     with its own correctly-timed figures, so B3's own row simply needs to stay frozen with no "finalize"
     counterpart to read.
-  version: "1.10.0"
+
+
+    v1.11.0 (2026-08-18, same day, user-requested — "For the Import LC, there is a Tight Available
+    Balance. Would it be possible to have the same field for the Export Confirmed LC?"):
+    `BalanceSnapshot.tightAvailableBalance` is now ALSO populated for `EPLC_CONFIRMATION`, not just
+    `IPLC_LC`/`EPLC_LC`. NOT the same computation as the Import case (`EPLC_CONFIRMATION` has no sibling
+    SHGT exposure to net out — SHGT is always a child of `IPLC_LC`) — it reuses the genuine Export-side
+    analog instead: `availableBalance` minus the COMBINED `presentDocsEarmarkPending` +
+    `presentDocsEarmarkApproved`, the exact figure `POST /balance-movements`' own B3 Present Docs
+    sufficiency check already nets internally at creation time (`domain/offBalanceExposure.ts`'s
+    `computePresentDocsEarmark`) — this only surfaces that same figure as a persisted/queryable
+    `BalanceSnapshot` field, the same way it was already surfaced for Import. `offBalanceExposure`
+    itself remains null for `EPLC_CONFIRMATION` (unchanged) — only `tightAvailableBalance` gains this
+    second, differently-computed population case.
+  version: "1.11.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1354,12 +1368,15 @@ components:
       type: object
       description: >
         Design doc §3.3 — the derived balance numbers, never stored
-        directly. offBalanceExposure/tightAvailableBalance (Design doc
-        §6.1) apply only to IPLC_LC/EPLC_LC contracts that may have an
-        SHGT issued against them — both are null for any other
-        instrumentType. presentDocsEarmarkPending/presentDocsEarmarkApproved
-        (v0.8.0, EPLC_CONFIRMATION only) are null for any other
-        instrumentType.
+        directly. offBalanceExposure (Design doc §6.1) applies only to
+        IPLC_LC/EPLC_LC contracts that may have an SHGT issued against
+        them — null for any other instrumentType. tightAvailableBalance
+        (v1.11.0) is populated for IPLC_LC/EPLC_LC (availableBalance minus
+        offBalanceExposure) AND for EPLC_CONFIRMATION (availableBalance
+        minus the combined Present Docs earmark — see its own field
+        description below); null for every other instrumentType.
+        presentDocsEarmarkPending/presentDocsEarmarkApproved (v0.8.0,
+        EPLC_CONFIRMATION only) are null for any other instrumentType.
       properties:
         balanceContractId: { type: string, format: uuid }
         logicalContractId: { type: string, format: uuid }
@@ -1374,7 +1391,26 @@ components:
         tightAvailableBalance:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
           nullable: true
-          description: availableBalance minus offBalanceExposure — the threshold a UTILIZE amount (and, at creation time, an SHGT ISSUE against this LC as parent) is checked against. v1.0.0 — this check is now a hard 409 on both sides, not a soft warning (see the removed MovementWarning schema note below). Null where offBalanceExposure is null.
+          description: >
+            IPLC_LC/EPLC_LC: availableBalance minus offBalanceExposure —
+            the threshold a UTILIZE amount (and, at creation time, an SHGT
+            ISSUE against this LC as parent) is checked against. v1.0.0 —
+            this check is now a hard 409 on both sides, not a soft warning
+            (see the removed MovementWarning schema note below).
+
+            v1.11.0 (2026-08-18, user-requested — "the same field for the
+            Export Confirmed LC"): also populated for EPLC_CONFIRMATION —
+            availableBalance minus the COMBINED presentDocsEarmarkPending +
+            presentDocsEarmarkApproved (the same figure B3's own Present
+            Docs sufficiency check already nets internally at creation
+            time — see presentDocsEarmarkApproved's own description). This
+            is a genuinely different deduction from the Import case, not
+            the same SHGT computation reused — EPLC_CONFIRMATION has no
+            sibling SHGT exposure to net out (SHGT is always a child of
+            IPLC_LC). Both share the same PURPOSE (true remaining capacity
+            before the next event), via a different source figure.
+
+            Null for every other instrumentType.
         presentDocsEarmarkPending:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
           nullable: true

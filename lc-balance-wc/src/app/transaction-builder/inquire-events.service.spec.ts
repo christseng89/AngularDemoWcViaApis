@@ -190,16 +190,20 @@ describe('InquireEventsService', () => {
       expect(svc.events.length).toBe(4);
       expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-issue', 'mv-utilize', 'mv-sg', 'mv-utilize']);
       expect(svc.events.map((e) => e.phase)).toEqual(['primary', 'create', 'primary', 'finalize']);
-      expect(svc.events.map((e) => e.eventStatus)).toEqual(['RELEASED', 'PENDING', 'RELEASED', 'RELEASED']);
+      // eventStatus is the movement's own real, current status on EVERY row (2026-08-18, business-
+      // mandated — "RELEASE 是指該筆交易是否已完成 RELEASE...不得誤判為RELEASED" reversing an earlier
+      // same-day design that forced the 'create' row to a stale 'PENDING' — see toEventRows()'s own doc
+      // comment for the full history).
+      expect(svc.events.map((e) => e.eventStatus)).toEqual(['RELEASED', 'RELEASED', 'RELEASED', 'RELEASED']);
       expect(svc.events.map((e) => e.eventTime)).toEqual([issueMovement.createdAt, utilizeMovement.createdAt, sgMovement.createdAt, utilizeMovement.releasedAt]);
 
-      // Selecting the 'create' row resolves to A3 (Document Arrival) with a historically-accurate
-      // Pending status and no balance impact yet; selecting the 'finalize' row resolves to A4 (Sight
-      // Settlement) with the movement's real RELEASED status and its real before/after impact.
+      // Selecting the 'create' row resolves to A3 (Document Arrival) with the movement's real RELEASED
+      // status and its real before/after impact — the SAME real impact the 'finalize' row (A4) shows,
+      // since both rows represent the one real movement's one real release.
       const createRow = svc.events.find((e) => e.phase === 'create')!;
       svc.selectEvent(createRow);
       expect(svc.selectedEventFunction?.code).toBe('A3');
-      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: null, after: null });
+      expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter });
       // The core guarantee this fix protects: A3's own snapshot is exactly what createMovement()
       // captured, never A4's own later result — even though BOTH rows share the identical underlying
       // `movement` object (movement.finalizeEventSnapshot is NOT what the 'create' row shows).

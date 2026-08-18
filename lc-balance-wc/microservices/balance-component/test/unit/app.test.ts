@@ -1265,6 +1265,10 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
     expect(cnfSnapshot.body.confirmedBalance).toBe('100000');
     expect(cnfSnapshot.body.availableBalance).toBe('100000');
+    // 2026-08-18, user-requested — EPLC_CONFIRMATION now also gets a tightAvailableBalance, same
+    // purpose as IPLC_LC/EPLC_LC's own SHGT-based figure but netting the Present Docs earmark instead:
+    // Available 100000 minus the 90000 still-PENDING EB03 earmark.
+    expect(cnfSnapshot.body.tightAvailableBalance).toBe('10000');
     expect(exam.body.status).toBe('PENDING');
     examEb03MovementId = exam.body.movementId;
   });
@@ -1320,6 +1324,8 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
     expect(cnfSnapshot.body.presentDocsEarmarkPending).toBe('100000');
     expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('0');
+    // Both presentations combined (90000 + 10000) now exactly consume the 100000 Available Balance.
+    expect(cnfSnapshot.body.tightAvailableBalance).toBe('0');
   });
 
   // ("B3 Release => Present Docs Earmark Pending - Bill Amount, Present Docs Earmark Approved + Bill
@@ -1335,6 +1341,9 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
     expect(cnfSnapshot.body.presentDocsEarmarkPending).toBe('10000');
     expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('90000');
+    // tightAvailableBalance nets Pending+Approved COMBINED (computePresentDocsEarmark), so shifting
+    // 90000 from one bucket to the other leaves the total, and this figure, unchanged at 0.
+    expect(cnfSnapshot.body.tightAvailableBalance).toBe('0');
   });
 
   test('POST /balance-movements/:id/acknowledge: acknowledging the same movement twice -> 409, rejected', async () => {

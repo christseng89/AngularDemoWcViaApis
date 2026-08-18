@@ -67,11 +67,13 @@ describe('TransactionBuilderComponent — Inquire Events wiring', () => {
   it('selectMode switches activeMode and closes any open Account Entries dialog', () => {
     const c = new TransactionBuilderComponent(mockApi());
     c.accountEntryDialogMovement = movement();
+    c.accountEntryDialogInstrumentType = 'IPLC_LC';
 
     c.selectMode('INQUIRE');
 
     expect(c.activeMode).toBe('INQUIRE');
     expect(c.accountEntryDialogMovement).toBeNull();
+    expect(c.accountEntryDialogInstrumentType).toBeNull();
 
     c.selectMode('PROCESSING');
     expect(c.activeMode).toBe('PROCESSING');
@@ -81,7 +83,7 @@ describe('TransactionBuilderComponent — Inquire Events wiring', () => {
     const c = new TransactionBuilderComponent(mockApi());
     const inquiredMovement = movement({ movementId: 'mv-inquired' });
 
-    c.openAccountEntryDialog(inquiredMovement);
+    c.openAccountEntryDialog(inquiredMovement, 'IPLC_LC');
 
     expect(c.accountEntryDialogMovement).toBe(inquiredMovement);
 

@@ -310,10 +310,17 @@
                 <div class="tb-balance-box" *ngIf="!snapshotLoading && selectedContractSnapshot">
                   <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.confirmedBalance }}</span></div>
                   <div class="tb-balance-row"><span class="tb-balance-row__label">Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.availableBalance }}</span></div>
-                  <ng-container *ngIf="selectedContractSnapshot.offBalanceExposure !== null && selectedContractSnapshot.offBalanceExposure !== undefined">
-                    <div class="tb-balance-row"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.offBalanceExposure }}</span></div>
-                    <div class="tb-balance-row"><span class="tb-balance-row__label">Tight Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.tightAvailableBalance }}</span></div>
-                  </ng-container>
+                  <div class="tb-balance-row" *ngIf="selectedContractSnapshot.offBalanceExposure !== null && selectedContractSnapshot.offBalanceExposure !== undefined">
+                    <span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.offBalanceExposure }}</span>
+                  </div>
+                  <!-- 2026-08-18, user-requested ("the same [Tight Available Balance] field for the Export
+                       Confirmed LC") — this used to be nested inside the offBalanceExposure ngIf above,
+                       which is IPLC_LC/EPLC_LC-only; EPLC_CONFIRMATION's own tightAvailableBalance (netting
+                       the Present Docs earmark instead of SHGT exposure) is now populated with
+                       offBalanceExposure staying null, so the two rows must gate independently. -->
+                  <div class="tb-balance-row" *ngIf="selectedContractSnapshot.tightAvailableBalance !== null && selectedContractSnapshot.tightAvailableBalance !== undefined">
+                    <span class="tb-balance-row__label">Tight Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.tightAvailableBalance }}</span>
+                  </div>
                   <!-- Bug fixed 2026-08-18, reviewer-reported ("A1 1000 A3 1000 Submit => get warning, which
                        is wrong"): both warnings below are pre-submit HINTS computed live from model.amount vs
                        the CURRENT selectedContractSnapshot — but a successful Submit calls
@@ -482,22 +489,25 @@
         <h3 class="tb-result__title">Maker Result</h3>
         <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
         <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
-        <p class="tb-result__status" *ngIf="submitResult?.status"><strong>Status:</strong> {{ displayStatus(submitResult.status) }}</p>
+        <p class="tb-result__status" *ngIf="submitResult?.status"><strong>Status:</strong> {{ displayStatus(submitResult.status, model.instrumentType, submitResult.movementType) }}</p>
         <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
              this event actually has a contingent-scope entry (null for an on-balance-sheet instrumentType,
              e.g. the DUE_FROM_ISSUING_BANK/ACCEPTANCE_REIMB_RECEIVABLE legs a B4 compound also creates). -->
-        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="submitResult?.contingentAccountEntry" (click)="openAccountEntryDialog(submitResult)">
+        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="submitResult?.contingentAccountEntry" (click)="openAccountEntryDialog(submitResult, model.instrumentType)">
           Account Entries
         </button>
         <!-- Bug fixed 2026-08-16 (reviewer-reported — "A3S does not generate the related SG redemption
              entries in Pending"): A3S's own SG FULL_REDEEM/PARTIAL_REDEEM leg is a separate, EARLIER API
              call than submitResult (which holds A3S's own LC UTILIZE) — its own contingentAccountEntry
              was being silently dropped. Same root cause also affected B4 Usance's own new Acceptance
-             liability leg (acceptanceMovement below); both now get their own button. -->
-        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="arrivalSgRedeemMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(arrivalSgRedeemMovement!)">
+             liability leg (acceptanceMovement below); both now get their own button. arrivalSgRedeemMovement
+             is always SHGT (A3S's own SG leg); acceptanceMovement is always EPLC_ACCEPTANCE (B4 Usance's own
+             Acceptance-liability leg) — both instrumentTypes are fixed by which field they are, not read off
+             the movement itself. -->
+        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="arrivalSgRedeemMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(arrivalSgRedeemMovement!, 'SHGT')">
           Account Entries — SG Redemption
         </button>
-        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="acceptanceMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(acceptanceMovement!)">
+        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="acceptanceMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(acceptanceMovement!, 'EPLC_ACCEPTANCE')">
           Account Entries — Acceptance
         </button>
         <p class="tb-hint" *ngIf="submitResult?.status === 'PENDING'">Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.</p>
@@ -736,13 +746,24 @@
                      dedicated "Entries" column/button is gone; the dialog itself (below) now shows a plain
                      "No voucher entries" hint instead of a Dr/Cr table when the clicked event has none,
                      closing the same "—" case the removed button's own empty state used to cover. -->
-                <tr *ngFor="let m of lookUp.activeLookupMovements" (click)="openAccountEntryDialog(m)">
-                  <td><span class="tb-type-tag">{{ m.movementType }}</span></td>
-                  <td class="tb-table__amount">{{ m.amount }} <span class="tb-muted" *ngIf="m.ceilingAmount !== m.amount">(ceiling {{ m.ceilingAmount }})</span></td>
-                  <td class="tb-table__ref">{{ m.sourceTransactionRef || '—' }}</td>
-                  <td><span class="tb-status-badge" [class.tb-status-badge--pending]="m.status === 'PENDING'" [class.tb-status-badge--approved]="m.status === 'RELEASED'" [class.tb-status-badge--negative]="m.status === 'REJECTED' || m.status === 'CANCELLED'" [class.tb-status-badge--neutral]="m.status === 'SUPERSEDED'">{{ displayStatus(m.status) }}</span></td>
-                  <td class="tb-table__amount">{{ m.balanceAfter ?? '—' }}</td>
-                  <td class="tb-table__time">{{ m.createdAt | date:'short' }}</td>
+                <!-- 2026-08-18, user-requested ("Look Up Current Balance's own Event Timeline should use
+                     the SAME status/display logic as Inquire Events — must not maintain its own
+                     independent STATUS mapping"): iterates InquiredEvent rows (the SAME toEventRows()
+                     split Inquire Events uses), not the raw BalanceMovement[] this table bound before.
+                     row.eventStatus (not row.movement.status) is required for correct EARMARKING/
+                     EARMARKED-vs-PENDING/APPROVED display; row.eventStatus is now the movement's own
+                     real, current status on every row including 'create' (business-mandated 2026-08-18 —
+                     see toEventRows()'s own doc comment, inquire-events.service.ts, for the full
+                     reversal of an earlier same-day design that forced 'create' to show a stale PENDING).
+                     Balance After likewise reads row.movement.balanceAfter unconditionally now — no more
+                     blanking for a 'create' row, same reasoning. -->
+                <tr *ngFor="let row of lookUp.activeLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
+                  <td><span class="tb-type-tag">{{ row.movement.movementType }}</span></td>
+                  <td class="tb-table__amount">{{ row.movement.amount }} <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount">(ceiling {{ row.movement.ceilingAmount }})</span></td>
+                  <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
+                  <td><span class="tb-status-badge" [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase)">{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase) }}</span></td>
+                  <td class="tb-table__amount">{{ row.movement.balanceAfter ?? '—' }}</td>
+                  <td class="tb-table__time">{{ row.eventTime | date:'short' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -840,7 +861,7 @@
                 <td class="tb-table__amount">{{ e.movement.amount }}</td>
                 <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
                 <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
-                <td><span class="tb-status-badge" [class.tb-status-badge--pending]="e.eventStatus === 'PENDING'" [class.tb-status-badge--approved]="e.eventStatus === 'RELEASED'" [class.tb-status-badge--negative]="e.eventStatus === 'REJECTED' || e.eventStatus === 'CANCELLED'" [class.tb-status-badge--neutral]="e.eventStatus === 'SUPERSEDED'">{{ displayStatus(e.eventStatus) }}</span></td>
+                <td><span class="tb-status-badge" [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase)">{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase) }}</span></td>
                 <td class="tb-table__time">{{ e.eventTime | date:'short' }}</td>
               </tr>
             </tbody>
@@ -871,14 +892,14 @@
           <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber"><span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.ibNumber }}</span></div>
           <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber"><span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.sgNumber }}</span></div>
           <formly-form [form]="inquireEvents.selectedEventForm" [fields]="inquireEvents.selectedEventFields" [model]="inquireEvents.selectedEventModel"></formly-form>
-          <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ displayStatus(sel.eventStatus) }}</span></div>
+          <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ displayStatus(sel.eventStatus, sel.contract.instrumentType, sel.movement.movementType, sel.phase) }}</span></div>
           <div class="tb-balance-row"><span class="tb-balance-row__label">Created</span><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date:'short' }}</span></div>
-          <!-- sel.eventStatus (not sel.movement.status) gates this — for a 'create'-phase row (see
-               InquiredEvent's own doc comment, the "A4 Sight Payment" bug fix) the movement has ALREADY
-               been released by the time this screen can be viewed, but showing "Released by/at" next to
-               a historically-accurate "Status: Pending" would be self-contradictory. -->
+          <!-- sel.eventStatus (not sel.movement.status directly, though as of 2026-08-18 they're always
+               the same value — see toEventRows()'s own doc comment) gates this. A 'create'-phase row for
+               an already-finalized movement now correctly shows "Released by/at" here too, same as its
+               sibling 'finalize' row — both are showing the SAME real fact about the SAME movement. -->
           <div class="tb-balance-row" *ngIf="sel.eventStatus !== 'PENDING' && sel.movement.releasedBy"><span class="tb-balance-row__label">Released</span><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date:'short' }}</span></div>
-          <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement)">Account Entries</button>
+          <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase)">Account Entries</button>
         </div>
 
         <!-- Balance Tabs (2026-08-17, user-specified — up to 3 tabs: LC/Confirmed LC Balance (always),
@@ -916,7 +937,7 @@
       <div class="tb-dialog__meta">
         <span class="tb-type-tag">{{ accountEntryDialogMovement.movementType }}</span>
         <span class="tb-muted">{{ accountEntryDialogMovement.sourceTransactionRef || ('eventSeq ' + accountEntryDialogMovement.eventSeq) }}</span>
-        <span class="tb-status-badge" [class.tb-status-badge--pending]="accountEntryDialogMovement.status === 'PENDING'" [class.tb-status-badge--approved]="accountEntryDialogMovement.status === 'RELEASED'" [class.tb-status-badge--negative]="accountEntryDialogMovement.status === 'REJECTED' || accountEntryDialogMovement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="accountEntryDialogMovement.status === 'SUPERSEDED'">{{ displayStatus(accountEntryDialogMovement.status) }}</span>
+        <span class="tb-status-badge" [ngClass]="statusBadgeClass(accountEntryDialogMovement.status, accountEntryDialogInstrumentType, accountEntryDialogMovement.movementType, accountEntryDialogPhase)">{{ displayStatus(accountEntryDialogMovement.status, accountEntryDialogInstrumentType, accountEntryDialogMovement.movementType, accountEntryDialogPhase) }}</span>
       </div>
       <table class="tb-table tb-table--static mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry as entry">
         <caption class="visually-hidden">Contingent liability account entries for {{ accountEntryDialogMovement.movementType }}</caption>

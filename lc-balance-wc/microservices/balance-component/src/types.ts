@@ -287,13 +287,23 @@ export interface BalanceSnapshot {
   pendingEarmarkTotal: string;
   /** §6.1 — null for instrumentTypes other than IPLC_LC/EPLC_LC. */
   offBalanceExposure?: string | null;
+  /**
+   * IPLC_LC/EPLC_LC: availableBalance minus offBalanceExposure (§6.1, outstanding SHGT exposure).
+   * EPLC_CONFIRMATION (2026-08-18, user-requested — "the same field for the Export Confirmed LC"):
+   * availableBalance minus computePresentDocsEarmark() (Pending+Approved combined) — the genuine
+   * Export-side analog, NOT the same computation as the Import case (EPLC_CONFIRMATION has no sibling
+   * SHGT exposure to net out; SHGT is always a child of IPLC_LC). Both share the same PURPOSE — "true
+   * remaining capacity before the next event" — via a different deduction. Null for every other
+   * instrumentType (SHGT/IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/the 3 ON_BALANCE_ASSET types).
+   */
   tightAvailableBalance?: string | null;
   /**
    * EPLC_CONFIRMATION only (2026-08-15, "Present Docs Earmark (Pending/Approved)") — null for every
    * other instrumentType. presentDocsEarmarkPending = Σ still-unacknowledged PENDING EPLC_EXAMINATION
    * CREATE amounts under this Confirmation; presentDocsEarmarkApproved = Σ Checker-acknowledged (B3's
    * own Release) but not-yet-B4-consumed ones. B3's own sufficiency check nets BOTH against
-   * availableBalance combined (see domain/offBalanceExposure.ts's computePresentDocsEarmark).
+   * availableBalance combined (see domain/offBalanceExposure.ts's computePresentDocsEarmark) — the same
+   * combined figure tightAvailableBalance above now also surfaces for this instrumentType.
    */
   presentDocsEarmarkPending?: string | null;
   presentDocsEarmarkApproved?: string | null;

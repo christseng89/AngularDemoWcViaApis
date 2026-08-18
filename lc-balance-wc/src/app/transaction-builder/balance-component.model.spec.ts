@@ -1,4 +1,4 @@
-import {
+﻿import {
   InstrumentType,
   INSTRUMENT_TYPE_OPTIONS,
   MOVEMENT_TYPES_BY_INSTRUMENT,
@@ -23,6 +23,7 @@ import {
   payExistingUtilizeFunctionFor,
   BALANCE_SNAPSHOT_LABEL,
   CURRENCY_OPTIONS,
+  isEarmarkFunction,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -721,8 +722,71 @@ describe('balance-component.model data invariants', () => {
       expect(resolveFunctionForMovement('EPLC_EXAMINATION', 'AMEND')).toBeUndefined();
     });
 
+    // Bug fixed 2026-08-18, reviewer-reported live (Inquire Events on LC U01 — the EPLC_ACCEPTANCE/
+    // CREATE row, B4's own Usance compound secondary leg, showed a blank "–" Function column). No
+    // EXPORT_FUNCTIONS entry has instrumentType EPLC_ACCEPTANCE + movementType CREATE — B4's own
+    // registry entry is instrumentType EPLC_CONFIRMATION, so the direct find() could never match this
+    // leg's own instrumentType (unlike A6 on the Import side, whose registry entry IS instrumentType
+    // IPLC_ACCEPTANCE/CREATE directly).
+    it("resolves EPLC_ACCEPTANCE/CREATE (B4's own Usance Acceptance-liability compound leg) to B4, via createsAcceptanceReimbReceivableOnCreate, not a direct instrumentType match", () => {
+      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'CREATE')?.code).toBe('B4');
+    });
+
+    it('the fallback above is scoped to EPLC_ACCEPTANCE/CREATE only — a different movementType on the same instrumentType still resolves normally (B5) rather than also falling back to B4', () => {
+      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
+    });
+
     it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
       expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
+    });
+  });
+
+  // 2026-08-18, business instruction — "APPROVED still required. EARMARK only applied for RELEASED
+  // event in Import LC Document Arrival and Export Present Docs" (narrowing an earlier same-day
+  // instruction that had, incorrectly, relabeled every RELEASED status to EARMARK universally).
+  describe('isEarmarkFunction', () => {
+    it('is true for Import LC Document Arrival (IPLC_LC/UTILIZE) — A3/A3S', () => {
+      expect(isEarmarkFunction('IPLC_LC', 'UTILIZE')).toBe(true);
+    });
+
+    it('is true for Export Present Docs (EPLC_EXAMINATION/CREATE) — B3', () => {
+      expect(isEarmarkFunction('EPLC_EXAMINATION', 'CREATE')).toBe(true);
+    });
+
+    it('is false for every other (instrumentType, movementType) pair, including a different movementType on the same two instrumentTypes', () => {
+      expect(isEarmarkFunction('IPLC_LC', 'ISSUE')).toBe(false);
+      expect(isEarmarkFunction('IPLC_LC', 'AMEND_INCREASE')).toBe(false);
+      expect(isEarmarkFunction('EPLC_EXAMINATION', 'AMEND')).toBe(false);
+      expect(isEarmarkFunction('EPLC_CONFIRMATION', 'ISSUE')).toBe(false);
+      expect(isEarmarkFunction('SHGT', 'ISSUE')).toBe(false);
+    });
+
+    it('is false for EPLC_LC — a reference-only instrumentType no function in this registry ever actually creates', () => {
+      expect(isEarmarkFunction('EPLC_LC', 'UTILIZE')).toBe(false);
+    });
+
+    it('handles a missing/undefined instrumentType or movementType gracefully (no instrumentType/movementType supplied at all)', () => {
+      expect(isEarmarkFunction(undefined, undefined)).toBe(false);
+      expect(isEarmarkFunction(null, null)).toBe(false);
+    });
+
+    // Bug fixed 2026-08-18, reviewer-caught live: "Import LC S01 => A4 · Sight Settlement / IPLC_LC /
+    // UTILIZE / ... / EARMARKED — 應該是 Approved 對嗎?" (shouldn't that be Approved?). A finalized Sight
+    // Document Arrival's own 'finalize' row (A4's own Release) shares the IDENTICAL (IPLC_LC, UTILIZE)
+    // as its sibling 'create' row (A3's own submission), but represents a DIFFERENT function's own real
+    // legal event — A4 is not A3/A3S, so it must NOT be treated as an earmark function.
+    it("is false for a 'finalize'-phase IPLC_LC/UTILIZE row (A4's own completion of a Sight Document Arrival) — the exact bug reported live on LC S01", () => {
+      expect(isEarmarkFunction('IPLC_LC', 'UTILIZE', 'finalize')).toBe(false);
+    });
+
+    it("stays true for the SAME (IPLC_LC, UTILIZE) pair under every OTHER phase — 'create' (A3's own submission), 'primary' (never split, e.g. a Usance Document Arrival), and omitted (callers that never split anything)", () => {
+      expect(isEarmarkFunction('IPLC_LC', 'UTILIZE', 'create')).toBe(true);
+      expect(isEarmarkFunction('IPLC_LC', 'UTILIZE', 'primary')).toBe(true);
+      expect(isEarmarkFunction('IPLC_LC', 'UTILIZE')).toBe(true);
+    });
+
+    it("'finalize' disqualifies unconditionally, regardless of instrumentType/movementType — B3/EPLC_EXAMINATION never actually splits in practice (this exact input can't occur from real data), but the guard is intentionally a blanket 'finalize is never an earmark function' rule, not narrowly scoped to just IPLC_LC/UTILIZE", () => {
+      expect(isEarmarkFunction('EPLC_EXAMINATION', 'CREATE', 'finalize')).toBe(false);
     });
   });
 

@@ -21,6 +21,7 @@ import {
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
   groupThousands,
+  isEarmarkFunction,
 } from './balance-component.model';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import { SubmitRulesContext, buildSubmitRequest as buildSubmitRequestRules, validateSubmit as validateSubmitRules } from './submit-rules';
@@ -296,6 +297,25 @@ export class TransactionBuilderComponent {
    * Relationship" requirement — never recalculated from the current balance at inquiry time).
    */
   accountEntryDialogMovement: BalanceMovement | null = null;
+  /**
+   * 2026-08-18 (EARMARK/APPROVED status split) — companion to accountEntryDialogMovement:
+   * `BalanceMovement` itself carries no `instrumentType` of its own (only its parent `BalanceContract`
+   * does), but `displayStatus()`'s own EARMARK-vs-APPROVED decision needs it. Set alongside
+   * `accountEntryDialogMovement` at every `openAccountEntryDialog()` call site, reset alongside it too.
+   */
+  accountEntryDialogInstrumentType: InstrumentType | null = null;
+  /**
+   * 2026-08-18, reviewer-caught bug fix — companion to accountEntryDialogMovement/
+   * accountEntryDialogInstrumentType: `displayStatus()`'s own EARMARKING/EARMARKED-vs-PENDING/APPROVED
+   * decision needs the Inquire Events 'primary'/'create'/'finalize' phase too (see
+   * `isEarmarkFunction()`'s own doc comment, balance-component.model.ts, for the full A4-Sight-
+   * Settlement bug this closes) — without it, opening the dialog from a 'finalize'-phase row (A4's own
+   * completion of a Sight Document Arrival) would show the SAME wrong "EARMARKED" the merged table's own
+   * fix corrects. `null`/omitted defaults `isEarmarkFunction()` to its non-'finalize' behavior, correct
+   * for every call site that never splits anything (the Maker Result panel's own buttons — always a
+   * freshly-PENDING movement, which `toEventRows()` can never phase as 'finalize' regardless).
+   */
+  accountEntryDialogPhase: 'primary' | 'create' | 'finalize' | null = null;
   /** A3 (Document Arrival (Sight)) only — set by approveArrival(), a Checker acknowledgment that does NOT call the backend release API. */
   arrivalApproved = false;
 
@@ -328,7 +348,11 @@ export class TransactionBuilderComponent {
     private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
     private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
   ) {
-    this.lookUp = new LookUpPanelService(api, () => (this.accountEntryDialogMovement = null));
+    this.lookUp = new LookUpPanelService(api, () => {
+      this.accountEntryDialogMovement = null;
+      this.accountEntryDialogInstrumentType = null;
+      this.accountEntryDialogPhase = null;
+    });
     this.inquireEvents = new InquireEventsService(api);
     this.catalogPicker = new CatalogPickerService(this.catalogPageSize, api);
     this.parentPicker = new CatalogPickerService(this.parentPageSize, api);
@@ -339,6 +363,8 @@ export class TransactionBuilderComponent {
   selectMode(mode: 'PROCESSING' | 'INQUIRE'): void {
     this.activeMode = mode;
     this.accountEntryDialogMovement = null;
+    this.accountEntryDialogInstrumentType = null;
+    this.accountEntryDialogPhase = null;
   }
 
   /*
@@ -441,6 +467,8 @@ export class TransactionBuilderComponent {
     this.submitError = null;
     this.releaseSuccessHint = null;
     this.accountEntryDialogMovement = null;
+    this.accountEntryDialogInstrumentType = null;
+    this.accountEntryDialogPhase = null;
     this.sgsForArrival = [];
     this.selectedArrivalSg = null;
     this.arrivalSgSnapshot = null;
@@ -832,23 +860,87 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * Business instruction 2026-08-14 ("Balance Update from Pending to
-   * Approved") — display-only relabeling of the movement status: the
-   * underlying API/domain status stays 'RELEASED' (OAS contract, tests,
-   * audit trail all key off that value), this only changes what the user
-   * reads on screen once a Checker has finalized it.
+   * Status display — **settled requirement, 2026-08-18** (business instruction, final locked-in form:
+   * "Both Look Up Current Balance and Inquire Events must use exactly the same Status mapping logic...
+   * do not get this wrong again"). Full mapping table — see `isEarmarkFunction()`'s own doc comment
+   * (balance-component.model.ts) for the authoritative version and exactly which two functions qualify:
+   *
+   * | Function                  | Not Released | Released  |
+   * |----------------------------|--------------|-----------|
+   * | Import LC — A3 / A3S       | EARMARKING   | EARMARKED |
+   * | Export Confirmed LC — B3   | EARMARKING   | EARMARKED |
+   * | All other functions        | PENDING      | APPROVED  |
+   *
+   * The underlying API/domain status stays PENDING/RELEASED regardless of which label this shows — pure
+   * display relabeling. `instrumentType`/`movementType` identify WHICH movement this status belongs to,
+   * needed to decide between the two label pairs for BOTH PENDING and RELEASED alike; REJECTED/
+   * CANCELLED/SUPERSEDED always pass through unchanged, all three params ignored for those. `phase`
+   * (Inquire Events' own 'primary'/'create'/'finalize', see InquiredEvent's own doc comment) is required
+   * to correctly exclude A4's own 'finalize' row for a Sight Document Arrival — see
+   * `isEarmarkFunction()`'s own doc comment (balance-component.model.ts) for the full bug this closes.
    */
-  displayStatus(status: string): string {
-    return status === 'RELEASED' ? 'Approved' : status;
+  displayStatus(
+    status: string,
+    instrumentType?: InstrumentType | string | null,
+    movementType?: string | null,
+    phase?: 'primary' | 'create' | 'finalize' | null,
+  ): string {
+    const earmark = isEarmarkFunction(instrumentType, movementType, phase);
+    if (status === 'PENDING') return earmark ? 'EARMARKING' : 'PENDING';
+    if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
+    return status;
   }
 
-  /** analysis/contingent-liability-ledger.html — opens the Account Entries pop-up for one specific movement. The movement's own contingentAccountEntry is already loaded (Submit response / Event Timeline list) — this never issues its own fetch. */
-  openAccountEntryDialog(movement: BalanceMovement): void {
+  /**
+   * Status badge CSS class (2026-08-18, user-requested — "EARMARK 可否用與APPROVED PENDING不同顏色區分",
+   * i.e. give the released-earmark label its own color distinct from both APPROVED and PENDING). Single
+   * source of truth for the 3 template call sites that render a colored status badge (Look Up Current
+   * Balance's own Event Timeline, Inquire Events' merged Events table, the Account Entries dialog) —
+   * each used to expand the same 4 `[class.tb-status-badge--x]` boolean bindings inline; consolidated
+   * into one method instead, bound via a single `[ngClass]`. Mirrors `displayStatus()`'s own EARMARKING/
+   * EARMARKED-vs-PENDING/APPROVED decision (same `isEarmarkFunction()` call) — the label and its color
+   * stay in sync by construction. EARMARKING deliberately shares PENDING's own amber class (not a new
+   * color) — the color axis this app draws is "not yet released" (amber) vs. "released, and which kind
+   * of released" (green APPROVED / violet EARMARKED); the label text itself, not a 4th color, is what
+   * distinguishes EARMARKING from plain PENDING.
+   */
+  statusBadgeClass(
+    status: string,
+    instrumentType?: InstrumentType | string | null,
+    movementType?: string | null,
+    phase?: 'primary' | 'create' | 'finalize' | null,
+  ): string {
+    if (status === 'PENDING') return 'tb-status-badge--pending';
+    if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
+    if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
+    if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
+    return '';
+  }
+
+  /**
+   * analysis/contingent-liability-ledger.html — opens the Account Entries pop-up for one specific
+   * movement. The movement's own contingentAccountEntry is already loaded (Submit response / Event
+   * Timeline list) — this never issues its own fetch. `instrumentType` (2026-08-18) is required
+   * alongside it purely for `displayStatus()`'s own EARMARK-vs-APPROVED decision — `BalanceMovement`
+   * itself carries no `instrumentType` of its own, only its parent `BalanceContract` does, so every
+   * call site must supply it explicitly (from whichever contract/function context it already has on
+   * hand — see each call site's own comment for where that value comes from). `phase` (optional,
+   * defaults to undefined) is the SAME Inquire Events 'primary'/'create'/'finalize' phase — required
+   * only by the 2 call sites that pass an actual `InquiredEvent` row (Look Up's own Event Timeline,
+   * Inquire Events' own "View" screen); every other call site (the Maker Result panel's 3 buttons)
+   * omits it, correct since those are always a freshly-PENDING movement `toEventRows()` can never phase
+   * as 'finalize' regardless — see `isEarmarkFunction()`'s own doc comment for the bug this closes.
+   */
+  openAccountEntryDialog(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined, phase?: 'primary' | 'create' | 'finalize'): void {
     this.accountEntryDialogMovement = movement;
+    this.accountEntryDialogInstrumentType = instrumentType ?? null;
+    this.accountEntryDialogPhase = phase ?? null;
   }
 
   closeAccountEntryDialog(): void {
     this.accountEntryDialogMovement = null;
+    this.accountEntryDialogInstrumentType = null;
+    this.accountEntryDialogPhase = null;
   }
 
   /** Escape closes the Account Entries dialog, same as the backdrop click / Close button. */

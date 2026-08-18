@@ -973,7 +973,90 @@ function movementTypeMatchesFunction(fn: TransactionFunction, movementType: stri
  * than guessing.
  */
 export function resolveFunctionForMovement(instrumentType: InstrumentType, movementType: string): TransactionFunction | undefined {
-  return [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].find((fn) => fn.instrumentType === instrumentType && movementTypeMatchesFunction(fn, movementType));
+  const direct = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].find((fn) => fn.instrumentType === instrumentType && movementTypeMatchesFunction(fn, movementType));
+  if (direct) return direct;
+  // Bug fixed 2026-08-18, reviewer-reported (Inquire Events on LC U01 showed a blank "–" Function
+  // column for the EPLC_ACCEPTANCE/CREATE row) — B4's own Usance compound Maker Submit
+  // (createsAcceptanceReimbReceivableOnCreate) creates this movement as a SECONDARY leg, but B4's own
+  // registry entry is instrumentType EPLC_CONFIRMATION, so the direct match above can never find it
+  // for this leg's own instrumentType (unlike A6 on the Import side, whose registry entry IS
+  // instrumentType IPLC_ACCEPTANCE/CREATE directly). This is a real, named, in-scope Balance Component
+  // ledger event (unlike the on-balance-sheet asset legs — EPLC_DUE_FROM_ISSUING_BANK/
+  // EPLC_ACCEPTANCE_REIMB_RECEIVABLE — which genuinely have no Balance Component function at all, per
+  // this file's own "Balance Component 只負責 Contingent Liability" scope boundary, and correctly stay
+  // unresolved), so it earns its own fallback rather than being left blank.
+  if (instrumentType === 'EPLC_ACCEPTANCE' && movementType === 'CREATE') {
+    return EXPORT_FUNCTIONS.find((fn) => fn.createsAcceptanceReimbReceivableOnCreate);
+  }
+  return undefined;
+}
+
+/**
+ * Status display — **settled requirement, 2026-08-18** (business instruction, final locked-in form
+ * after two same-day revisions: "PENDING: not yet released. EARMARK: released, but the balance is only
+ * earmarked/reserved..." → narrowed to "EARMARK only applies to... Import LC Document Arrival and
+ * Export Present Docs" → this function's own final table: "EARMARKING/EARMARKED replace PENDING/
+ * APPROVED for A3/A3S/B3 specifically; every other function keeps PENDING/APPROVED unchanged. Both
+ * Look Up Current Balance and Inquire Events MUST use exactly the same mapping — do not get this wrong
+ * again."). The full, authoritative mapping (see this file's own nested `CLAUDE.md` decision log for
+ * the full requirement writeup) — both the NOT-RELEASED and RELEASED label change together, driven by
+ * the SAME function classification:
+ *
+ * | Function                     | Not Released | Released    |
+ * |-------------------------------|--------------|-------------|
+ * | Import LC — A3 / A3S          | EARMARKING   | EARMARKED   |
+ * | Export Confirmed LC — B3      | EARMARKING   | EARMARKED   |
+ * | All other functions           | PENDING      | APPROVED    |
+ *
+ * The A3/A3S/B3 pair is STILL what earns the special label — both are D3 "physical event, not a legal
+ * event" earmarks (`cs-tf-balance-knowhow`'s own Design Principle — "Documents arriving is a physical
+ * event... Only legal events move balances", already cited throughout A3/A3S's/B3's own doc comments
+ * elsewhere in this file): the amount they reserve doesn't become the bank's own definitive contingent
+ * position until a LATER, separate legal event (A4/A6 Settlement for Import, B4 Honour/Acceptance for
+ * Export) actually posts it — true whether that reservation is still Maker-submitted-only (EARMARKING)
+ * or already Checker-released (EARMARKED). Every OTHER function's PENDING/RELEASED movement (LC Issue,
+ * SG Issue, Acceptance CREATE/Settlement, Confirmation Issue/Honour/Accept, etc.) IS the definitive
+ * legal event for its own leg at each of those two stages — those stay PENDING/APPROVED, unchanged.
+ *   - Import: `IPLC_LC`/`UTILIZE` (A3/A3S's own Document Arrival earmark).
+ *   - Export: `EPLC_EXAMINATION`/`CREATE` (B3's own Present Docs earmark).
+ * `EPLC_LC` is deliberately not included — it's a reference-only instrumentType never actually created
+ * by any function in this registry (see the Tolerance conversion section of this file's own nested
+ * CLAUDE.md), so there is no real "Export Document Arrival" leg to cover.
+ *
+ * Renamed from `isEarmarkOnlyRelease` (2026-08-18) — the ORIGINAL name only made sense back when this
+ * classification only affected the RELEASED label; now that it drives BOTH the PENDING-side
+ * (EARMARKING) and RELEASED-side (EARMARKED) label, "earmark function" is the accurate name for what
+ * this actually identifies: is this movement one of the two functions whose whole lifecycle (both
+ * before AND after Release) is an earmark, never the two functions' own PENDING/RELEASED movements one
+ * at a time.
+ *
+ * **Bug fixed same day, reviewer-caught live** ("Import LC S01 => A4 · Sight Settlement / IPLC_LC /
+ * UTILIZE / ... / EARMARKED — 應該是 Approved 對嗎?" — shouldn't that be Approved?): a raw
+ * `(instrumentType, movementType)` check alone cannot tell A3/A3S's own row apart from A4's own row for
+ * a FINALIZED Sight Document Arrival, because Inquire Events' own `toEventRows()` split (see
+ * `InquiredEvent`'s own doc comment, inquire-events.service.ts) represents them as TWO rows sharing the
+ * IDENTICAL `(IPLC_LC, UTILIZE)` — 'create' (A3's own submission, always PENDING) and 'finalize' (A4's
+ * own Release, the movement's real terminal status) — yet only the FIRST is actually A3/A3S's own
+ * earmark; the second is A4's own real legal settlement event, which the "Function" column already
+ * correctly labels "A4 · Sight Settlement", not A3. Showing EARMARKED there directly contradicted the
+ * very Function column sitting right next to it. The new optional `phase` parameter closes this: a
+ * `'finalize'`-phase row is NEVER an earmark function, regardless of instrumentType/movementType,
+ * because `'finalize'` is — by `toEventRows()`'s own design — used for exactly one case in this whole
+ * registry (A4 completing an EXISTING A3/A3S row) and no other. `'primary'`/`'create'` (the default when
+ * `phase` is omitted, e.g. a caller that never split anything) are unaffected — including a Usance
+ * Document Arrival's own single, never-split row, which stays attributed to A3/A3S (and therefore
+ * EARMARKING/EARMARKED) throughout its whole lifecycle even though A6's own compound Release is what
+ * actually flips its status, because A6 creates its OWN separate Acceptance CREATE movement/row rather
+ * than re-attributing the Document Arrival's own row the way A4 does — there is no Usance equivalent of
+ * this bug to fix.
+ */
+export function isEarmarkFunction(
+  instrumentType: InstrumentType | string | null | undefined,
+  movementType: string | null | undefined,
+  phase?: 'primary' | 'create' | 'finalize' | null,
+): boolean {
+  if (phase === 'finalize') return false;
+  return (instrumentType === 'IPLC_LC' && movementType === 'UTILIZE') || (instrumentType === 'EPLC_EXAMINATION' && movementType === 'CREATE');
 }
 
 /**

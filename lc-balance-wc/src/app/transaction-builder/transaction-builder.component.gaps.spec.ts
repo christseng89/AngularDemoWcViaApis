@@ -2,6 +2,7 @@ import { of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import type { InquiredEvent } from './inquire-events.service';
 
 /**
  * Closes coverage gaps left after the three method-slice agents finished
@@ -58,6 +59,16 @@ function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
     createdAt: '2026-08-16T00:00:00.000Z',
     ...overrides,
   };
+}
+
+/**
+ * 2026-08-18 ("Look Up Current Balance's own Event Timeline should use the SAME status/display logic as
+ * Inquire Events") — lookUp.lookupMovements/acceptanceMovements/sgMovements are now InquiredEvent[], not
+ * a raw BalanceMovement[]. These tests only exercise activeLookupMovements' own tab-routing (which array
+ * it reads from), never the row shape itself, so a 'primary'-phase wrapper is enough.
+ */
+function eventRow(overrides: Partial<{ movement: BalanceMovement; contract: BalanceContract }> = {}): InquiredEvent {
+  return { movement: movement(), contract: contract(), eventTime: movement().createdAt, eventStatus: movement().status, phase: 'primary', ...overrides };
 }
 
 function mockApi(overrides: Partial<Record<keyof BalanceComponentApiService, jest.Mock>> = {}) {
@@ -202,9 +213,9 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
 
     it('default (LC) tab reads from lookupMovements/lookupResult', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.lookUp.lookupMovements = [movement({ movementId: 'mv-1' })];
+      c.lookUp.lookupMovements = [eventRow({ movement: movement({ movementId: 'mv-1' }) })];
       withLookupResult(c);
-      expect(c.lookUp.activeLookupMovements).toEqual([movement({ movementId: 'mv-1' })]);
+      expect(c.lookUp.activeLookupMovements).toEqual([eventRow({ movement: movement({ movementId: 'mv-1' }) })]);
       expect(c.lookUp.activeLookupSnapshot).toEqual(snapshot());
       expect(c.lookUp.activeLookupContract).toEqual(contract());
       expect(c.lookUp.activeLookupLabel).toBe('LC S001');
@@ -213,11 +224,11 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('ACCEPTANCE tab reads from acceptanceMovements/acceptanceSnapshot/selectedLookupAcceptance, and appends IB Number when present', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.lookUp.lookupTab = 'ACCEPTANCE';
-      c.lookUp.acceptanceMovements = [movement({ movementId: 'mv-2' })];
+      c.lookUp.acceptanceMovements = [eventRow({ movement: movement({ movementId: 'mv-2' }) })];
       c.lookUp.acceptanceSnapshot = snapshot({ confirmedBalance: '5' });
       c.lookUp.selectedLookupAcceptance = contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } });
       withLookupResult(c);
-      expect(c.lookUp.activeLookupMovements).toEqual([movement({ movementId: 'mv-2' })]);
+      expect(c.lookUp.activeLookupMovements).toEqual([eventRow({ movement: movement({ movementId: 'mv-2' }) })]);
       expect(c.lookUp.activeLookupSnapshot).toEqual(snapshot({ confirmedBalance: '5' }));
       expect(c.lookUp.activeLookupContract).toEqual(contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB01' } }));
       expect(c.lookUp.activeLookupLabel).toBe('LC S001 / IB IB01');
@@ -234,11 +245,11 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('SG tab reads from sgMovements/sgSnapshot/selectedLookupSg, and appends SG Number when present', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.lookUp.lookupTab = 'SG';
-      c.lookUp.sgMovements = [movement({ movementId: 'mv-3' })];
+      c.lookUp.sgMovements = [eventRow({ movement: movement({ movementId: 'mv-3' }) })];
       c.lookUp.sgSnapshot = snapshot({ confirmedBalance: '9' });
       c.lookUp.selectedLookupSg = contract({ naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } });
       withLookupResult(c);
-      expect(c.lookUp.activeLookupMovements).toEqual([movement({ movementId: 'mv-3' })]);
+      expect(c.lookUp.activeLookupMovements).toEqual([eventRow({ movement: movement({ movementId: 'mv-3' }) })]);
       expect(c.lookUp.activeLookupSnapshot).toEqual(snapshot({ confirmedBalance: '9' }));
       expect(c.lookUp.activeLookupContract).toEqual(contract({ naturalKey: { lcNumber: 'S001', sgNumber: 'SG01' } }));
       expect(c.lookUp.activeLookupLabel).toBe('LC S001 / SG SG01');
@@ -461,11 +472,20 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.catalogPendingHint(contract({ balanceContractId: 'many' }))).toBe(' — Total Pending: 5,000');
     });
 
-    it('displayStatus relabels RELEASED to Approved and passes every other status through unchanged', () => {
+    it('displayStatus relabels RELEASED to APPROVED by default and passes every other status through unchanged', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      expect(c.displayStatus('RELEASED')).toBe('Approved');
+      expect(c.displayStatus('RELEASED')).toBe('APPROVED');
+      expect(c.displayStatus('RELEASED', 'IPLC_LC', 'ISSUE')).toBe('APPROVED');
       expect(c.displayStatus('PENDING')).toBe('PENDING');
       expect(c.displayStatus('REJECTED')).toBe('REJECTED');
+    });
+
+    it("displayStatus relabels RELEASED to EARMARKED and PENDING to EARMARKING specifically for Import Document Arrival (IPLC_LC/UTILIZE) and Export Present Docs (EPLC_EXAMINATION/CREATE)", () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      expect(c.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKED');
+      expect(c.displayStatus('RELEASED', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKED');
+      expect(c.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKING');
+      expect(c.displayStatus('PENDING', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKING');
     });
   });
 
@@ -1043,22 +1063,34 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         },
       });
       expect(c.accountEntryDialogMovement).toBeNull();
-      c.openAccountEntryDialog(m);
+      c.openAccountEntryDialog(m, 'IPLC_LC');
       expect(c.accountEntryDialogMovement).toBe(m);
     });
 
-    it('closeAccountEntryDialog resets accountEntryDialogMovement to null', () => {
+    // 2026-08-18 (EARMARK/APPROVED status split) — accountEntryDialogInstrumentType is the companion
+    // field displayStatus() needs alongside accountEntryDialogMovement, since BalanceMovement itself
+    // carries no instrumentType of its own.
+    it('openAccountEntryDialog also sets accountEntryDialogInstrumentType to the value passed in', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.openAccountEntryDialog(movement());
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
+      c.openAccountEntryDialog(movement(), 'EPLC_EXAMINATION');
+      expect(c.accountEntryDialogInstrumentType).toBe('EPLC_EXAMINATION');
+    });
+
+    it('closeAccountEntryDialog resets both accountEntryDialogMovement and accountEntryDialogInstrumentType to null', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.openAccountEntryDialog(movement(), 'IPLC_LC');
       c.closeAccountEntryDialog();
       expect(c.accountEntryDialogMovement).toBeNull();
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
     });
 
     it('onEscapeKey closes the dialog when one is open', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.openAccountEntryDialog(movement());
+      c.openAccountEntryDialog(movement(), 'IPLC_LC');
       c.onEscapeKey();
       expect(c.accountEntryDialogMovement).toBeNull();
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
     });
 
     it('onEscapeKey is a no-op when no dialog is open', () => {
@@ -1068,19 +1100,29 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.accountEntryDialogMovement).toBeNull();
     });
 
-    it('selectFunction() resets an open dialog when the Maker switches business function', () => {
+    it('selectFunction() resets an open dialog (both fields) when the Maker switches business function', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A1'));
-      c.openAccountEntryDialog(movement());
+      c.openAccountEntryDialog(movement(), 'IPLC_LC');
       c.selectFunction(fn('A2'));
       expect(c.accountEntryDialogMovement).toBeNull();
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
     });
 
-    it('runLookup() resets an open dialog before reloading the Event Timeline', () => {
+    it('runLookup() resets an open dialog (both fields) before reloading the Event Timeline', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      c.openAccountEntryDialog(movement());
+      c.openAccountEntryDialog(movement(), 'IPLC_LC');
       c.lookUp.runLookup();
       expect(c.accountEntryDialogMovement).toBeNull();
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
+    });
+
+    it('selectMode() resets an open dialog (both fields) when switching Transaction Processing <-> Inquire Events', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.openAccountEntryDialog(movement(), 'IPLC_LC');
+      c.selectMode('INQUIRE');
+      expect(c.accountEntryDialogMovement).toBeNull();
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
     });
   });
 });

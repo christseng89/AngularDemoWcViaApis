@@ -3641,6 +3641,18 @@ separately for the `'create'` row; both of a split movement's two rows read the 
 data. Only `impact` (which IS derivable per-phase, from the movement's already-known before/after) was
 corrected in this first pass.
 
+**SUPERSEDED, same day — see "Bug fixed — A3's own 'create' row Status was frozen at stale historical
+PENDING even after the transaction was truly RELEASED" further below.** This entry's own `eventStatus`-
+forced-`'PENDING'` design for the `'create'` row (the paragraph above ending "...historically accurate,
+Confirmed Balance genuinely hadn't moved yet)") and its own `impact`-suppression reasoning ("showing the
+actual current impact next to a historically-accurate 'Status: Pending' would be self-contradictory")
+were BOTH reversed later the same day, per an explicit business requirement that a `'create'` row must
+always show the movement's TRUE CURRENT release state, never a frozen historical snapshot of it — see
+that later entry for the fix and the reasoning. This does NOT affect the separate `phase`-based ROW
+SPLIT itself (still two rows, `'create'`/`'finalize'`, same triggering condition) or the Balance Snapshot
+tabs' own frozen-at-create-time behavior (`ownSnapshot`/`eventSnapshot`/`finalizeEventSnapshot`, see the
+very next entry below — unrelated, unchanged, still frozen by design).
+
 **Tests**: `inquire-events.service.spec.ts` — a new test reproduces LC S01 field-for-field from the live
 DB dump (A1/A3/A8/A4's own real timestamps) and asserts the merged, sorted `events` array is exactly
 `['mv-issue', 'mv-utilize'(create), 'mv-sg', 'mv-utilize'(finalize)]` with the right `phase`/`eventStatus`/
@@ -4234,3 +4246,554 @@ exclusion is opt-in) while WITH the flag it's correctly excluded (`total: 0`); t
 UI flow — searched `S99PENDINGTEST` under A4's own LC Index — and confirmed the picker now shows "No
 ACTIVE IPLC_LC contracts yet — use A1/B1 (Issue) first." for it, exactly matching the "next event cannot
 be accessed" rule. Zero console errors throughout. Test data (`S99PENDINGTEST`) cleaned up afterward.
+
+## `BalanceSnapshot.tightAvailableBalance` extended to Export Confirmed LC (2026-08-18, user-requested — "For the Import LC, there is a Tight Available Balance. Would it be possible to have the same field for the Export Confirmed LC?")
+
+Previously `tightAvailableBalance` (§6.1) was populated only for `IPLC_LC`/`EPLC_LC` — `availableBalance`
+minus `offBalanceExposure` (outstanding SHGT exposure). `EPLC_CONFIRMATION` has no sibling SHGT exposure
+to net out (SHGT is Import-only, always a child of `IPLC_LC`), so this is genuinely NOT the same
+computation reused — it's the Export-side analog: `availableBalance` minus the COMBINED
+`presentDocsEarmarkPending` + `presentDocsEarmarkApproved` (the exact figure B3's own Present Docs
+sufficiency check — `domain/offBalanceExposure.ts`'s `computePresentDocsEarmark` — already nets
+internally at `POST /balance-movements` creation time). Both share the same PURPOSE (a Checker's true
+remaining capacity before the next event, at a glance) via a different source figure. `offBalanceExposure`
+itself stays null for `EPLC_CONFIRMATION`, unchanged — only `tightAvailableBalance` gains this second,
+differently-computed population case.
+
+**Fix, microservice**: `service/balanceService.ts`'s single shared `assembleSnapshot()` helper (the one
+place every snapshot — `createMovement()`'s PENDING capture, `release()`'s RELEASED overwrite,
+`getBalanceSnapshot()`, `rootEventSnapshot`/sibling captures — all funnel through) now also computes
+`tightAvailableBalance = available.minus(computePresentDocsEarmark(examinationMovements))` inside the
+existing `contract.instrumentType === 'EPLC_CONFIRMATION'` branch that already computes
+`presentDocsEarmarkPending`/`presentDocsEarmarkApproved`. `computePresentDocsEarmark` was already
+imported (used elsewhere for the B3 sufficiency check itself) — no new domain function needed. Because
+every snapshot in this service funnels through the one `assembleSnapshot()` helper, this single change
+automatically applies to Look Up Current Balance, Inquire Events' Balance Tabs, `eventSnapshot`/
+`rootEventSnapshot`/`finalize*` — every existing snapshot surface, not just the live `GET .../balance`
+endpoint. `types.ts`'s own `BalanceSnapshot.tightAvailableBalance` doc comment updated to describe both
+population cases. OAS (`analysis/balance-component-api.yaml`) bumped to **v1.11.0** — both the
+`BalanceSnapshot` schema's own top-level description and `tightAvailableBalance`'s own field description
+updated, plus a changelog entry.
+
+**Fix, Angular**: found and fixed a real display bug while wiring this up — the Transaction Builder's
+own inline "selectedContractSnapshot" balance box (the live pre-Submit box shown next to the Amount
+field, used by every function with a resolved `selectedContract`, including B2/B4 which resolve an
+`EPLC_CONFIRMATION`) had its "Tight Available" row nested INSIDE the "Off-Balance Exposure" row's own
+`*ngIf` — correct when the two were always populated together (Import LC/EPLC_LC only), now wrong since
+`EPLC_CONFIRMATION` populates `tightAvailableBalance` while `offBalanceExposure` stays null. Split into
+two independently-gated rows (`transaction-builder.component.html`) — Off-Balance Exposure only when
+non-null, Tight Available only when non-null, no longer coupled. The already-shared `#balanceSnapshotBox`
+template (Look Up Current Balance / Inquire Events) already gated the two independently and needed no
+change — it picks up `EPLC_CONFIRMATION`'s new value automatically. No pre-submit "exceeds Tight
+Available" WARNING was added for B3 (`EPLC_EXAMINATION`/CREATE) — the existing warning at that same box
+is deliberately scoped to `model.movementType === 'UTILIZE'` (A3/A3S only, matching the server-side
+`checkUtilizeSufficiency` check it warns about) and B3 has no live `selectedContractSnapshot` box today
+(a `hasParent`-only creating function, never populates `selectedContract`) — extending client-side
+pre-submit warnings to B3 is a larger, separate feature than "add the field," left for its own request.
+
+**Tests**: 3 new assertions added to existing HTTP-integration tests in `test/unit/app.test.ts`'s own
+Export Confirmation describe block (no new test cases — extended the existing Present Docs earmark
+tests, which already set up the exact LC E001/EB03/EB05 scenario this needed): partial earmark (90,000
+against 100,000 Available → `tightAvailableBalance: '10000'`), full earmark (90,000+10,000 combined →
+`'0'`), and post-acknowledge (Pending/Approved buckets shift but the combined total — and therefore
+`tightAvailableBalance` — stays `'0'`, proving the figure nets Pending+Approved together, not either
+bucket alone). 321/321 microservice tests passing (3 new assertions, no new test count),
+99.26/96.51/100/99.49% coverage (all four clear the 95% floor), `npm run typecheck`/`npm run build`/
+`npm run lint` (0 errors, 11 pre-existing warnings) all clean. Angular: no test needed for the
+template-only gating fix, same established convention as every other template-only fix in this file
+(direct-instantiation component tests never render the DOM) — `npx tsc -p tsconfig.app.json --noEmit`/
+`ng build --configuration development`/`npm run lint` (0 errors, 212 pre-existing warnings) all clean,
+full suite 748/748 unchanged. `backend/` 33/33 unaffected (no files under it touched) — all three suites
+re-run per this file's own standing rule.
+
+**Live-verified end to end against the real running microservice**: Issued+released a fresh
+`EPLC_CONFIRMATION` (TIGHTCONF01, 100,000) — confirmed `tightAvailableBalance: '100000'` (no earmark
+yet, `offBalanceExposure: null` throughout, as expected for this instrumentType); submitted a 35,000
+Present Docs presentation (`EPLC_EXAMINATION`/CREATE) — confirmed the response's own `rootEventSnapshot`
+AND a follow-up `GET .../balance` both correctly show `tightAvailableBalance: '65000'`
+(`100000 − 35000`), `presentDocsEarmarkPending: '35000'`, matching the domain rule exactly. Test data
+(`TIGHTCONF01`) cleaned up afterward.
+
+## Bug fixed — B3 Present Docs → Submit → Release → "Look Up Current Balance" showed "No Logical Contract exists yet for this natural key" instead of the parent Export Confirmed LC (2026-08-18, reviewer-reported)
+
+Root cause: `syncLookupToContext()` (called after a Maker Submit and whenever the Checker queue loads —
+see `loadCheckerQueue()`) passes the FUNCTION's own `instrumentType` to
+`LookUpPanelService.syncFrom()`, which must map every CHILD instrumentType to its PARENT LC/Confirmation
+before resolving — a child instrumentType's own natural key needs a second field (`ibNumber`/`sgNumber`)
+`syncFrom()` always clears to `''`, so resolving the child instrumentType itself directly can never
+match. `syncFrom()`'s own private `lcInstrumentTypeFor()` already mapped `IPLC_ACCEPTANCE`/`SHGT` →
+`IPLC_LC` and `EPLC_ACCEPTANCE` → `EPLC_CONFIRMATION`, but **`EPLC_EXAMINATION` (B3) was missing
+entirely** and fell through to the `return instrumentType` default — so after any B3 action, Look Up
+Current Balance's own `lookup.instrumentType` stayed stuck at `'EPLC_EXAMINATION'` itself, and
+`resolveContract('EPLC_EXAMINATION', {lcNumber, ibNumber: null, sgNumber: null})` could never match
+anything, since `EPLC_EXAMINATION`'s own natural key requires `ibNumber` (the EB Number) too.
+
+**Fix**: `look-up-panel.service.ts`'s `lcInstrumentTypeFor()` gained the missing case —
+`EPLC_EXAMINATION` → `EPLC_CONFIRMATION` — matching the reasoning already established for its three
+siblings: `EPLC_EXAMINATION` is `MEMO_ONLY` and never itself a real Balance Component ledger worth
+looking up (same boundary `contingentAccountEntry`/`BALANCE_SNAPSHOT_LABEL` already enforce for it), so
+Look Up Current Balance should show its PARENT Confirmation instead. No other call site needed
+changes — the already-shared `#balanceSnapshotBox` template picks up the correct instrumentType
+automatically once `syncFrom()` resolves it correctly.
+
+**Tests**: no direct test of `lcInstrumentTypeFor()`/`syncFrom()` existed before this fix (a genuine
+coverage gap that let the bug ship) — added an `it.each` covering all four child→parent mappings plus
+both identity cases (`IPLC_ACCEPTANCE`/`SHGT` → `IPLC_LC`, `EPLC_ACCEPTANCE` → `EPLC_CONFIRMATION`,
+`EPLC_EXAMINATION` → `EPLC_CONFIRMATION` — the reported gap, `IPLC_LC`/`EPLC_CONFIRMATION` pass through
+unchanged), plus one end-to-end test reproducing the exact reported repro path
+(`selectFunction(B3)` → `approveArrival()`, B3's own `deferSettlementRequiresBackendAck` Checker action
+— asserting `comp.lookUp.lookup.instrumentType === 'EPLC_CONFIRMATION'` and `lookupError` stays null)
+in `transaction-builder.component.actions.spec.ts`. 755/755 Angular tests passing (7 new),
+99.55/96.48/99.53/99.57% coverage — `look-up-panel.service.ts` stays at **100/100/100/100** (it already
+was, even before this fix — the file's existing indirect tests happened to exercise every branch's own
+true/false outcome, just never with an `EPLC_EXAMINATION` argument specifically, which is exactly why
+100% line/branch coverage never caught this: the bug was a missing CASE, not an uncovered branch of an
+existing one. The new tests are the first to call `syncFrom()`/exercise `lcInstrumentTypeFor()` directly
+and by name, covering every mapping explicitly rather than incidentally). `npx tsc -p tsconfig.app.json
+--noEmit`/`ng build
+--configuration development`/`npm run lint` (0 errors, 213 warnings — 1 new `any` cast in the new
+`it.each`'s own type parameter, same accepted convention as every other test-fixture `any` in this file)
+all clean. `backend/` 33/33 and microservice 321/321 both unaffected and re-verified per this file's own
+standing rule (Angular-only change — no request/response contract change).
+
+**Live in-browser verification attempted, not completed this pass**: reproduced the exact repro live
+(Export Confirmed side, B1 Confirm LC → Release → about to submit B3) — the Claude in Chrome browser
+tab became unresponsive (`Page.captureScreenshot` timed out, "renderer may be frozen") partway through,
+the same class of flakiness this file's own history already records (e.g. the "Look Up panel" extraction
+pass). Stopped retrying per this session's own established "don't loop past 2-3 attempts" practice
+rather than forcing it. Confirmed via the same live session, before the freeze, that the earlier same-day
+`tightAvailableBalance` fix renders correctly in the real UI (the Look Up Current Balance box showed
+`Tight Available Balance: 60000` for a freshly-Issued Confirmation, unprompted, alongside this
+investigation). Static verification (typecheck, strict-template build, full lint, and a dedicated test
+reproducing the exact reported repro path end to end through the real `approveArrival()`/
+`syncCheckerToContext()`/`loadCheckerQueue()`/`syncLookupToContext()` call chain, not just the isolated
+mapping function) is unusually strong here; a human should still click through B1→B3→Submit→Release→Look
+Up Current Balance once to fully close the loop.
+
+## Bug fixed — Inquire Events' merged Events table showed a blank "–" Function column for B4's own Usance Acceptance-liability compound leg (2026-08-18, reviewer-reported live, LC U01)
+
+Reported table showed a row — `EPLC_ACCEPTANCE`/`CREATE`, 12345, Approved — with no `FUNCTION` value,
+sitting between the B4 `ACCEPT` row it belongs to and the next B3 `Present Docs` row. Root cause:
+`resolveFunctionForMovement(instrumentType, movementType)` (`balance-component.model.ts`) is a Strategy-
+table lookup requiring a registry entry whose OWN `instrumentType` field matches — but B4 (Honour /
+Acceptance) creates this exact movement as a SECONDARY leg of its own Usance compound Maker Submit
+(`createsAcceptanceReimbReceivableOnCreate`), while B4's own registry entry is `instrumentType:
+'EPLC_CONFIRMATION'` (it picks its target via the flat Catalog, not a Parent-LC picker for
+`EPLC_ACCEPTANCE`). So a direct `.find()` over `[...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]` could never
+match `(EPLC_ACCEPTANCE, CREATE)` to B4 — unlike the Import side, where A6 (Acceptance, Usance) IS
+registered directly as `instrumentType: 'IPLC_ACCEPTANCE'`/`movementType: 'CREATE'`. This is a real,
+named, in-scope Balance Component ledger event (unlike the on-balance-sheet asset legs —
+`EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE` — which genuinely have no Balance
+Component function at all, per this file's own "只負責 Contingent Liability" scope boundary, and
+correctly stay unresolved/blank) — so it earns a real fallback rather than being left blank.
+
+**Fix**: `resolveFunctionForMovement()` now falls back, only when the direct match finds nothing AND
+`instrumentType === 'EPLC_ACCEPTANCE' && movementType === 'CREATE'`, to
+`EXPORT_FUNCTIONS.find((fn) => fn.createsAcceptanceReimbReceivableOnCreate)` — resolving to B4, so
+Inquire Events' merged Events table now correctly shows "B4 · Honour / Acceptance" for this leg too
+(matching its own sibling ACCEPT row exactly, since both really were produced by the same B4 Maker
+Submit). Scoped narrowly to this one known gap (movementType `CREATE` specifically) — `EPLC_ACCEPTANCE`/
+`FULL_SETTLE`/`PARTIAL_SETTLE` still resolve to B5 via the pre-existing direct match, untouched (the
+fallback is only ever reached when the direct match already failed). Both `functionFor()` (the merged
+Events table's own Function column) and `selectEvent()` (the "View"/Original Transaction Screen
+reconstruction) read `resolveFunctionForMovement()` directly, so this one change fixes both surfaces at
+once, not just the reported table.
+
+**Tests**: 2 new tests in `balance-component.model.spec.ts`'s `resolveFunctionForMovement` describe
+block — the reported gap itself (`EPLC_ACCEPTANCE`/`CREATE` → `B4`), and a scoping guard proving the
+fallback doesn't shadow the pre-existing direct match for `EPLC_ACCEPTANCE`/`FULL_SETTLE` → `B5`. 757/757
+Angular tests passing (2 new), 99.56/96.5/99.53/99.57% coverage (all four clear the 95% floor;
+`balance-component.model.ts` itself 100/97.22/100/100). `npx tsc -p tsconfig.app.json --noEmit`/`ng
+build --configuration development`/`npm run lint` (0 errors, 213 warnings, unchanged — pure logic, no
+new `any`) all clean. `backend/` 33/33 and microservice 321/321 both unaffected and re-verified per this
+file's own standing rule (Angular-only change, pure function — no template/API change).
+
+**Live in-browser verification not attempted this pass** — the same Claude in Chrome tab freeze from the
+entry immediately above was still unresolved when this fix was made; static verification (typecheck,
+strict-template build, full lint, and a dedicated test asserting `resolveFunctionForMovement('EPLC_ACCEPTANCE',
+'CREATE')?.code === 'B4'` — the exact pair the reported table's own blank row carried) is strong evidence
+the fix is correct. A human should re-run the U01 Inquire Events lookup once the browser session recovers
+and confirm the previously-blank row now reads "B4 · Honour / Acceptance".
+
+## Movement status display gains a third label, EARMARK — scoped narrowly to Import Document Arrival / Export Present Docs, NOT every RELEASED status (2026-08-18, business instruction, then corrected same turn — "1. PENDING — not yet released. 2. EARMARK — released, but the balance is only earmarked/reserved, not yet permanently applied to the ledger balance", then: "Which is wrong, the APPROVED still required. The EARMARK only applied for RELEASED event in Import LC Document Arrival and Export Present Docs. Right?")
+
+`displayStatus()` (`transaction-builder.component.ts`) already relabeled the wire-level `RELEASED` status
+to "Approved" for display (business instruction 2026-08-14) — the underlying `status` field itself never
+changes; this is purely what the user reads on screen. First attempt at this request replaced "Approved"
+with "EARMARK" universally for every RELEASED movement — corrected within the same turn, before shipping,
+once the user clarified the actual rule: APPROVED stays the default; EARMARK applies ONLY to a RELEASED
+`IPLC_LC`/`UTILIZE` (Import Document Arrival — A3/A3S) or `EPLC_EXAMINATION`/`CREATE` (Export Present
+Docs — B3). Both of those are D3 "physical event, not a legal event" earmarks (the same principle A3/B3's
+own doc comments elsewhere in this file already cite) — the amount they reserve doesn't become the bank's
+own definitive contingent position until a LATER, separate legal event (A4/A6 Settlement for Import, B4
+Honour/Acceptance for Export) actually finalizes it, so even once Checker-Released, "earmarked, not yet
+permanent" is still the accurate description. Every OTHER RELEASED movement (LC Issue, SG Issue,
+Acceptance CREATE/Settlement, Confirmation Issue/Honour/Accept, etc.) IS that definitive legal event for
+its own leg — those correctly stay "Approved".
+
+**Fix**: new pure function `isEarmarkOnlyRelease(instrumentType, movementType)`
+(`balance-component.model.ts`) — true only for the two pairs above. `displayStatus()` gained two new
+optional params (`instrumentType`, `movementType`) — `status !== 'RELEASED'` still passes through
+unchanged (ignoring both), `RELEASED` now resolves to `isEarmarkOnlyRelease(...) ? 'EARMARK' : 'Approved'`.
+`BalanceMovement` itself carries no `instrumentType` of its own (only its parent `BalanceContract` does),
+so every one of the 6 template call sites needed its own source for it: `model.instrumentType` (Maker
+Result panel, both while Submitting and while displaying), `lookUp.activeLookupContract?.instrumentType`
+(Look Up Current Balance's own Event Timeline), `e.contract.instrumentType`/`sel.contract.instrumentType`
+(Inquire Events' merged table and "View" screen — both already `InquiredEvent`s pairing movement+contract).
+The Account Entries dialog (`accountEntryDialogMovement`) needed a new companion field,
+`accountEntryDialogInstrumentType: InstrumentType | null`, set by `openAccountEntryDialog()`'s own new
+required second parameter and reset everywhere `accountEntryDialogMovement` already resets
+(`closeAccountEntryDialog()`, `selectFunction()`, `runLookup()`'s `onBeforeLookup` callback, `selectMode()`)
+— all 5 `openAccountEntryDialog()` call sites updated: `model.instrumentType` (Maker Result panel), the
+literal `'SHGT'` (A3S's own SG-redemption leg button — always that type by definition) and
+`'EPLC_ACCEPTANCE'` (B4 Usance's own Acceptance-liability leg button, same reasoning), the Look Up Event
+Timeline row's `lookUp.activeLookupContract?.instrumentType`, and the Inquire Events "View" screen's
+`sel.contract.instrumentType`.
+
+**Tests**: `isEarmarkOnlyRelease` covered directly in `balance-component.model.spec.ts` (both true cases,
+false for a different movementType on the same two instrumentTypes, false for the reference-only `EPLC_LC`,
+graceful on missing/null args). `displayStatus()`'s own tests (`transaction-builder.component.spec.ts`/
+`.gaps.spec.ts`) rewritten for the new signature — default/no-args still "Approved", the two EARMARK pairs
+explicitly, a same-instrumentType-different-movementType negative case, every non-RELEASED status still
+passing through unchanged regardless of what instrumentType/movementType is supplied. The 6 pre-existing
+`openAccountEntryDialog()` test call sites (missing the now-required second argument) needed updating —
+own TypeScript compiler surfaced every one as a real compile error immediately, not a silent gap. 767/767
+Angular tests passing (11 net new/changed), 99.56/96.42/99.53/99.57% coverage (all four clear the 95%
+floor). `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint`
+(0 errors, 213 warnings, unchanged) all clean — the strict-template build in particular validated every
+one of the 11 updated template call sites. `backend/`/microservice unaffected (no wire-level status
+value changed anywhere — this is 100% a display-layer relabel, same posture as the original 2026-08-14
+"Approved" relabeling itself).
+
+**Live-verified end to end against the real running stack, both sides of the rule**: A1 (LC Issue) on a
+fresh LC, released — Event Timeline correctly showed "Approved" (unchanged from before this fix). Then
+A3 (Document Arrival) on the same LC, submitted (stayed PENDING, per A3's own acknowledgment-only Checker
+step) → A4 (Sight Settlement) Submit + Release (the real finalization) — the SAME UTILIZE movement's own
+Event Timeline row correctly flipped from "PENDING" to **"EARMARK"**, not "Approved", confirming the
+narrowed rule end to end through the real Maker-Submit → A3-acknowledge → A4-Submit → A4-Release chain,
+not just the isolated pure-function tests. Test data (`STATUSTEST01`) cleaned up afterward.
+
+## Status badge gains a distinct color for EARMARK — a 5th color, not reused from PENDING/APPROVED (2026-08-18, same day, user-requested — "EARMARK 可否用與APPROVED PENDING不同顏色區分")
+
+Follow-up to the EARMARK label split immediately above: the status badge's own CSS class binding
+(`[class.tb-status-badge--approved]="status === 'RELEASED'"`) was never updated when `displayStatus()`
+gained its EARMARK/Approved split, so both labels still rendered in the SAME green `--approved` color —
+the label text changed but the visual signal didn't. New `--violet`/`--violet-dark`/`--violet-bg` CSS
+custom properties added to `src/styles.scss`'s root token set (matching this project's own existing
+color/color-dark/color-bg triplet naming convention exactly — `--green`/`--amber`/`--red` already follow
+this shape) and a new `.tb-status-badge--earmark` rule in `transaction-builder.component.scss`. Violet
+was chosen deliberately over reusing the already-defined `--blue` token: blue is already used by
+`.tb-type-tag` (the adjacent Type column in every table row this badge appears in — Look Up's own Event
+Timeline, Inquire Events' merged table), so a blue EARMARK badge would have visually blended into the
+Type tag sitting right next to it in the same row, defeating the whole point of a genuinely distinct
+color.
+
+**Refactor alongside the fix**: the 3 template call sites rendering a colored status badge each
+duplicated the identical 4-way `[class.tb-status-badge--x]="..."` boolean-binding expansion inline
+(Look Up Current Balance's own Event Timeline, Inquire Events' merged Events table, the Account Entries
+dialog) — adding EARMARK as a 5th would have meant duplicating the same expanded condition a THIRD time.
+Consolidated into one new `statusBadgeClass(status, instrumentType, movementType)` method
+(`transaction-builder.component.ts`), mirroring `displayStatus()`'s own signature and calling the exact
+same `isEarmarkOnlyRelease()` check — the label and its color are guaranteed to stay in sync by
+construction, not by convention, since both read the identical underlying decision. All 3 call sites now
+bind via a single `[ngClass]="statusBadgeClass(...)"` instead of 4 separate `[class.x]` bindings each.
+
+**Tests**: 4 new tests in `transaction-builder.component.spec.ts`'s new `statusBadgeClass` describe block
+— PENDING, RELEASED-outside-the-two-functions (approved class), RELEASED-inside-the-two-functions
+(earmark class, explicitly asserted DIFFERENT from both the approved class AND the pending class), and
+REJECTED/CANCELLED/SUPERSEDED. 771/771 Angular tests passing (4 new), 99.5/96.45/99.53/99.5% coverage
+(all four clear the 95% floor; the one newly-uncovered line, `statusBadgeClass()`'s own trailing
+`return ''` fallback for a status value outside the closed `MovementStatus` enum, is the same class of
+defensive-fallback-never-reached-by-real-data gap already accepted elsewhere in this file, not untested
+business logic). `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run
+lint` (0 errors, 213 warnings, unchanged) all clean — the build in particular compiles the SCSS, so a
+malformed color token or selector would have failed it. `backend/`/microservice unaffected (no files
+under either touched — this is purely a CSS/template/display-layer change, no API/wire contract
+involved).
+
+**Live in-browser verification NOT completed this pass** — the Claude in Chrome extension froze
+(`Page.captureScreenshot` timed out, "renderer may be frozen or unresponsive") twice in a row across two
+fresh tabs while attempting this specific check, the same class of flakiness this file's own history
+already records repeatedly (e.g. the B3 Look Up fix, the "Look Up panel" extraction pass). Stopped
+retrying per this session's own established practice rather than forcing it further. Static verification
+is unusually strong here regardless: `ng build`'s own SCSS compilation succeeding is direct proof the new
+CSS is syntactically valid and the new class/token names resolve, and the dedicated `statusBadgeClass`
+tests directly assert the earmark class is genuinely distinct from both the pending and approved classes
+by name. A human should still open the app, release an LC Issue (expect green "Approved") and a Document
+Arrival via A3→A4 (expect the new violet "EARMARK") side by side to visually confirm the two are now
+distinguishable, not just textually different.
+
+## Look Up Current Balance's own Event Timeline now shares the EXACT SAME status/display logic as Inquire Events, not a second independent copy (2026-08-18, same day, reviewer-reported live — LC S01's own Event Timeline showed EARMARK on all 5 UTILIZE rows; user: "The STATUS displayed in Look Up Current Balance → Event Timeline should use the same status and display logic as Inquire Events... should not maintain its own independent STATUS mapping")
+
+Investigated the reported S01 data first, not assumed: confirmed via direct DB query that all 5 UTILIZE
+movements ARE genuinely `status: RELEASED` (each carries both `makerSubmittedAt` and `releasedAt` — real
+A4-finalized Document Arrivals), so EARMARK was the factually correct label per this file's own narrowed
+rule above — the report wasn't about a wrong VALUE. The actual inconsistency: Inquire Events (see the
+"Inquire Events now shows A4... as its own row" entry earlier this session) already splits a finalized
+Sight `IPLC_LC`/`UTILIZE` into TWO rows — 'create' (A3's own submission, historically forced `PENDING`)
+and 'finalize' (A4's own Release, the real current status) — via `InquireEventsService`'s own private
+`toEventRows()`. Look Up Current Balance's own Event Timeline never applied this split at all — it read
+`m.status` straight off the raw `BalanceMovement`, rendering exactly ONE row per movement showing only
+its CURRENT terminal status. For the SAME underlying movement, Inquire Events would show it as PENDING
+(at its own earlier position) then EARMARK (at its own later position), while Look Up showed it as a
+single EARMARK row — a real, structural inconsistency between the two screens for identical data, not
+merely a stale figure.
+
+**Fix — share the exact function, not duplicate the logic.** `toEventRows()` was a private
+`InquireEventsService` method; extracted to a module-level `export function toEventRows(movement,
+contract): InquiredEvent[]` in `inquire-events.service.ts` (the class now just calls the free function
+internally, unchanged behavior) so `LookUpPanelService` can import and call the IDENTICAL implementation
+rather than a second, separately-maintained copy — literally what the user's own "should not maintain its
+own independent STATUS mapping" asked for.
+
+`look-up-panel.service.ts`: `lookupMovements`/`acceptanceMovements`/`sgMovements` retyped from
+`BalanceMovement[]` to `InquiredEvent[]`; `activeLookupMovements` getter's return type updated to match.
+`loadSnapshotAndMovements()` (the one shared body behind all 3 tabs' own fetch pairs) gained a new
+`contract: BalanceContract` parameter — each of the 3 call sites (`runLookup()`'s own resolved contract,
+`selectLookupSg()`'s `selectedLookupSg`, `selectLookupAcceptance()`'s `selectedLookupAcceptance`) already
+had the relevant contract on hand — and now does `movements.flatMap(m => toEventRows(m, contract)).sort((a,
+b) => a.movement.eventSeq - b.movement.eventSeq)` before assigning, instead of a plain per-movement sort.
+The sort key stays `eventSeq` (not `eventTime`, unlike Inquire Events' own cross-contract merged timeline)
+since this is a single-contract, single-tab view where eventSeq's own Design doc §8 ordering guarantee
+already applies directly; a stable sort (guaranteed since ES2019) correctly preserves `toEventRows()`'s
+own `[create, finalize]` order for the two rows a split movement produces, since both share the identical
+`eventSeq`.
+
+**Template** (`transaction-builder.component.html`'s Event Timeline table, inside the Look Up panel):
+`*ngFor="let row of lookUp.activeLookupMovements"` now iterates `InquiredEvent` rows instead of raw
+movements — `row.movement.*` for the movement-level columns (Type/Amount/Reference), `row.eventStatus`/
+`row.eventTime` (not `row.movement.status`/`row.movement.createdAt`) for Status/Time, matching Inquire
+Events' own column semantics exactly so the two screens can never disagree again. `openAccountEntryDialog()`
+now passes `row.movement`/`row.contract.instrumentType` (reading `row.contract` directly rather than the
+separately-computed `lookUp.activeLookupContract` getter, since `InquiredEvent` already carries it).
+**Balance After also fixed as a natural extension of the same self-consistency principle**: blanked to
+"—" for a 'create'-phase row — showing the movement's own (later, A4-driven) real `balanceAfter` next to
+a historically-PENDING status would have been self-contradictory, the exact same reasoning this file's own
+Inquire Events "View" screen impact display already applies (`still PENDING — not yet affected until
+Released`).
+
+**Tests**: `look-up-panel.service.ts` needed no new dedicated spec file (still tested only indirectly
+through the component, its established convention) — 3 pre-existing `actions.spec.ts`/`gaps.spec.ts` call
+sites that directly assigned/asserted a bare `BalanceMovement[]`/`.movementId` shape against these now-
+`InquiredEvent[]`-typed fields needed mechanical fixture updates (`row.movement.movementId` instead of
+`m.movementId`; a new small `makeEventRow()`/`eventRow()` local fixture-builder helper per file, matching
+the established per-file local-fixture convention this codebase already uses elsewhere) — ts-jest's own
+real type-checking caught `gaps.spec.ts`'s 3 mismatches as genuine compile errors immediately, not silently
+passed. One new dedicated regression test added to `actions.spec.ts`'s own `runLookup()` describe block,
+reproducing the exact reported LC S01 shape end to end through the real pipeline (a finalized Sight
+`IPLC_LC`/`UTILIZE` with distinct `createdAt`/`releasedAt`) — asserts exactly 2 rows come back, the
+`phase`/`eventStatus`/`eventTime` of each, and that both rows share the identical underlying `movement`
+object (the split is presentational, not two real records). 772/772 Angular tests passing (1 net new, 3
+fixture-mechanical updates), 99.5/96.45/99.53/99.51% coverage (all four clear the 95% floor;
+`look-up-panel.service.ts` itself stays at 100/100/100/100). `npx tsc -p tsconfig.app.json --noEmit`/`ng
+build --configuration development`/`npm run lint` (0 errors, 217 warnings — 4 new `any`-typed test-fixture
+casts, same accepted convention as every other test-fixture `any` in this file, zero new warnings in any
+production file) all clean. `backend/` 33/33 and microservice 321/321 both unaffected and re-verified per
+this file's own standing rule (Angular-only change — no request/response contract, no template/service
+outside `look-up-panel.service.ts`/`inquire-events.service.ts`/the one template block touched).
+
+**Live in-browser verification NOT completed this pass** — the Claude in Chrome extension's own first-
+click-after-navigate reliably failed to register across 3 separate attempts on a fresh tab this pass (no
+freeze this time, just clicks silently not landing despite exactly matching the visible button's own
+coordinates each time) — the same general class of this-session browser-tooling flakiness already
+recorded repeatedly elsewhere in this file, just a different symptom than the earlier freezes. Stopped
+retrying per this session's own established practice. Static verification is unusually strong here: the
+strict-template `ng build` directly validates every `row.movement.*`/`row.eventStatus`/`row.eventTime`
+binding compiles against the real `InquiredEvent` type, and the new dedicated test reproduces the exact
+reported LC S01 shape (a finalized Sight UTILIZE with real, distinct `createdAt`/`releasedAt`) through the
+actual `runLookup()` code path, not a synthetic isolated call. A human should still search LC S01 under
+Look Up Current Balance and confirm the Event Timeline now shows the SAME row count and PENDING→EARMARK
+split for each Document Arrival that Inquire Events already shows for the identical LC.
+
+## REQUIREMENT — Event Status Display Mapping (2026-08-18, business-mandated, settled — "把此要求正式記錄到需求文檔中... 不要再搞錯了")
+
+This is the authoritative, locked-in specification for how a `BalanceMovement`'s own PENDING/RELEASED
+status is DISPLAYED across this entire application. Treat this section as settled — do not re-derive or
+re-litigate it; any future change to this mapping needs an explicit new business instruction, and must
+update this section in place.
+
+**Mapping table** (verbatim from the business instruction):
+
+| Function                     | Transaction NOT Released | Transaction Released |
+|-------------------------------|---------------------------|------------------------|
+| Import LC — A3 / A3S          | EARMARKING                | EARMARKED              |
+| Export Confirmed LC — B3      | EARMARKING                | EARMARKED              |
+| All other functions           | PENDING                   | APPROVED               |
+
+**RELEASE definition** (business instruction, verbatim intent — "RELEASE 是指該筆交易是否已完成
+RELEASE，而不是 Balance、Event 或其他資料的狀態"): "Released" here means ONE thing only — the specific
+`BalanceMovement` row's own `status` field equals `'RELEASED'`. It is never inferred from, or confused
+with: whether a Balance snapshot has already been recomputed, whether an Inquire Events row already
+exists for it, whether a sibling/linked movement has been released, or any other side effect. The
+PENDING/RELEASED distinction itself must always reflect the movement's genuine, CURRENT release state —
+including for a split A3/A4 `'create'`-phase row (see `toEventRows()`'s own doc comment): both the
+`'create'` row and its sibling `'finalize'` row read the SAME underlying movement's real, current
+`status`, never a frozen snapshot of what that status was back when the `'create'` row's own event first
+happened. An earlier same-day design forced the `'create'` row's own status to a hardcoded `'PENDING'`
+regardless of the movement's real state — reversed later the same day (2026-08-18, business-caught: "
+EARMARKING是指A3交易未被RELEASE 但是已經RELEASED了 就該是EARMARKED 不是嗎?") once confirmed via
+AskUserQuestion — see "Bug fixed — A3's own 'create' row Status was frozen at stale historical PENDING
+even after the transaction was truly RELEASED" further below for the fix. This does NOT apply to the
+separate Balance Snapshot tabs (`ownSnapshot`/`eventSnapshot`/`finalizeEventSnapshot`), which remain
+deliberately frozen at Create-time by an unrelated, still-current business decision — see the "A3's own
+Event Snapshot now stays frozen at Create-time..." entry above.
+
+**Mandatory consistency requirement**: `Look Up Current Balance` and `Inquire Events` MUST use exactly
+the same Status Mapping Logic — implemented as a single shared function (`isEarmarkFunction()` in
+`balance-component.model.ts`, called by both `displayStatus()`/`statusBadgeClass()` in
+`transaction-builder.component.ts`, which both screens' own templates call identically), never two
+independently-maintained classification schemes. See the two implementation entries immediately above
+and below this one for the concrete mechanism and the bug that specifically enforces this (A4's own
+`'finalize'`-phase row must NOT inherit A3's own EARMARKED label, even though it shares the identical
+`(instrumentType, movementType)` — the row's own real FUNCTION, not just its data shape, decides).
+
+**Which functions qualify** (`isEarmarkFunction()`'s own exact scope): `IPLC_LC`/`UTILIZE` (A3/A3S) and
+`EPLC_EXAMINATION`/`CREATE` (B3) — AND ONLY when the row's own `phase` is not `'finalize'` (a `'finalize'`
+row is A4's own real legal-settlement event, not A3/A3S's own earmark, even sharing the identical
+instrumentType/movementType — see the entry below). Every other `(instrumentType, movementType)` pair,
+including B4 (`EPLC_CONFIRMATION`/`HONOUR`/`ACCEPT`) and A4 itself, falls into "all other functions".
+
+## Bug fixed — a finalized Sight Document Arrival's own A4 "finalize" row wrongly inherited A3's own EARMARKED label (2026-08-18, same day, reviewer-caught live on LC S01 — "Import LC S01 => A4 · Sight Settlement / IPLC_LC / UTILIZE / 12000 / B01 / — / EARMARKED / 8/18/26, 9:04 AM 應該是 Approved 對嗎?")
+
+Directly caused by the entry immediately above shipping with a scope that was too broad. Root cause:
+`isEarmarkFunction(instrumentType, movementType)` classified purely by `(instrumentType, movementType)` —
+correct for the common case, but Inquire Events' own `toEventRows()` split (see `InquiredEvent`'s own doc
+comment, `inquire-events.service.ts`, "A4 Sight Payment" bug fix earlier this session) represents a
+FINALIZED Sight Document Arrival as TWO rows sharing the IDENTICAL `(IPLC_LC, UTILIZE)` — `'create'` (A3's
+own submission, always PENDING) and `'finalize'` (A4's own Release, the movement's real terminal status).
+Only the FIRST is genuinely A3/A3S's own earmark; the second is A4's own real legal settlement event —
+the very "Function" column sitting right next to the Status badge already correctly said "A4 · Sight
+Settlement", directly contradicting the "EARMARKED" label shown beside it. Same shape applies (in
+principle) to B3/B4, though B3 never actually splits in practice (B4's own compound release creates its
+own separate movement rather than re-attributing B3's row — see `isEarmarkFunction()`'s own doc comment
+for why there's no live B3 equivalent of this bug to fix), and to Usance Document Arrivals released via
+A6's own compound action — also unaffected, since A6 likewise never re-attributes the Document Arrival's
+own single row, it creates its own separate Acceptance movement instead.
+
+**Fix**: `isEarmarkFunction()` gained a third, optional `phase: 'primary' | 'create' | 'finalize'`
+parameter — `phase === 'finalize'` now unconditionally disqualifies, regardless of instrumentType/
+movementType (a blanket rule, not narrowly scoped to just the one live case, since `'finalize'` is —
+by `toEventRows()`'s own design — used for exactly the one A4-completing-an-A3/A3S-row case and no
+other in this whole registry). `displayStatus()`/`statusBadgeClass()` both gained the same optional
+`phase` parameter, threaded through to every call site that has a real `InquiredEvent` row to read it
+from: Look Up Current Balance's own Event Timeline (`row.phase`), Inquire Events' merged table (`e.phase`)
+and "View" screen (`sel.phase`). A new `accountEntryDialogPhase` field (mirroring the existing
+`accountEntryDialogInstrumentType` from the earlier EARMARK-color entry) carries it into the shared
+Account Entries dialog too, set by `openAccountEntryDialog()`'s own new optional third parameter — the
+Maker Result panel's own 3 buttons correctly omit it (a fresh Submit response is always PENDING, which
+`toEventRows()` can never phase as `'finalize'` regardless, so the omission is safe by construction, not
+a gap).
+
+**Tests**: `isEarmarkFunction` gained 4 new cases in `balance-component.model.spec.ts` (the exact
+`'finalize'` disqualification; unaffected under `'create'`/`'primary'`/omitted; the blanket-not-narrow
+scoping proven against `EPLC_EXAMINATION`/`CREATE` too, even though that exact input can't occur from
+real data). `displayStatus()` gained 2 new cases in `transaction-builder.component.spec.ts` reproducing
+the exact reported LC S01 pair (`'finalize'` → APPROVED; `'create'`/`'primary'`/omitted → still
+EARMARKED, unaffected). Most importantly, `transaction-builder.component.actions.spec.ts`'s own
+`runLookup()` regression test (added in the entry immediately above, reproducing LC S01's own finalized
+Sight UTILIZE end to end through the real Look Up pipeline) was extended with 2 new assertions proving
+`comp.displayStatus(...)` resolves the `'create'` row to `'EARMARKING'` and the `'finalize'` row to
+`'APPROVED'` — a genuine end-to-end proof through the real data pipeline, not just the isolated unit
+tests. 779/779 Angular tests passing (8 net new), 99.5/96.47/99.53/99.51% coverage (all four clear the
+95% floor). `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint`
+(0 errors, 217 warnings, unchanged) all clean — the strict-template build caught one real, necessary
+follow-up fix along the way: `displayStatus()`/`statusBadgeClass()`/`isEarmarkFunction()`'s own `phase`
+parameter type needed widening to also accept `null` (not just `undefined`), since
+`accountEntryDialogPhase` is typed `... | null` to match this file's own established convention for
+`accountEntryDialogInstrumentType`. `backend/` 33/33 and microservice 321/321 both unaffected and
+re-verified per this file's own standing rule (Angular-only change, pure display logic).
+
+**Live-verified end to end against the real running stack, BOTH Import and Export sides on LC S01
+specifically, per the business's own explicit request ("Use S01 for both Import LC and Confirmed LC to
+prove it")**: Inquire Events, Import LC S01 — confirmed the exact previously-wrong row now reads
+correctly: `A4 · Sight Settlement | IPLC_LC | UTILIZE | 12000 | B01 | APPROVED` (green), immediately
+below its own sibling `A3 · Document Arrival | IPLC_LC | UTILIZE | 12000 | B01 | EARMARKING` (amber) row
+— confirmed for a SECOND finalized pair too (B02, 32000). `A8 · Shipping Gtee (Issue)` and
+`A9 · Shipping Gtee (Redemption)` rows on the same timeline correctly show PENDING/APPROVED throughout
+(never EARMARKING/EARMARKED — proving the fix didn't over-broaden the OTHER direction). Inquire Events,
+Export Confirmed LC S01 — `B1 · Confirm LC` → APPROVED, `B3 · Present Docs` → EARMARKED (violet, all 4
+presentations), `B4 · Honour / Acceptance` → APPROVED (correctly NOT earmarked, mirroring the Import
+side's own A3-vs-A4 distinction exactly for B3-vs-B4). Zero console errors throughout.
+
+## Bug fixed — A3's own 'create' row Status was frozen at stale historical PENDING even after the transaction was truly RELEASED (2026-08-18, same day, reviewer-caught live against real DB ground truth — "EARMARKING是指A3交易未被RELEASE 但是已經RELEASED了 就該是EARMARKED 不是嗎?", reconfirmed "EARMARKING是指A3交易未被RELEASE 但是已經 RELEASED了 就該是EARMARKED 不是嗎?")
+
+Directly caused by the same-day "Inquire Events now shows A4... as its own row" entry's own original
+design (see that entry's own new supersession note, and the REQUIREMENT section's own corrected RELEASE
+definition, both above) — `toEventRows()`'s `'create'`-phase row hardcoded `eventStatus: 'PENDING'`
+regardless of the underlying movement's real, current `status`, on the reasoning that this was
+"historically accurate" (Confirmed Balance genuinely hadn't moved at the moment A3 itself was submitted).
+Live-caught by directly comparing the UI against the DB: LC S01's own B03 Document Arrival (`IPLC_LC`/
+`UTILIZE`) had already been fully finalized via A4 (`status: 'RELEASED'`, confirmed by direct SQLite
+query), yet its own `'create'` row in both Inquire Events and Look Up Current Balance's own Event
+Timeline still showed **EARMARKING** — violating this file's own "REQUIREMENT — Event Status Display
+Mapping" section's own RELEASE definition literally: "RELEASE 是指該筆交易是否已完成 RELEASE，而不是
+Balance、Event 或其他資料的狀態" (RELEASE means whether the transaction itself has actually completed
+RELEASE — not Balance, Event, or any other data's state). A frozen, forced-PENDING `'create'` row is
+exactly the kind of "misjudge from a side effect" this requirement's own wording already prohibits, just
+in the opposite direction from what that requirement's own original text anticipated (it warned against
+wrongly showing RELEASED early; this bug wrongly kept showing PENDING/EARMARKING late).
+
+**Design question, resolved via `AskUserQuestion`, since this touched a pre-existing, deliberately-
+designed historical-snapshot feature with real ripple effects (the Balance Impact display, the split-row
+design's own original justification) rather than being a simple one-line fix**: should the `'create'`
+row show (a) the transaction's TRUE CURRENT release state, or (b) stay a historical snapshot of its
+state at Create-time (the original design)? User selected **(a), True current status** — reconfirmed
+immediately after with the exact same question restated, removing any doubt.
+
+**Fix, `inquire-events.service.ts`**:
+- `toEventRows(movement, contract)` — the `'create'` row's own `eventStatus` changed from a hardcoded
+  `'PENDING'` literal to `movement.status` (the exact same expression the `'finalize'` row already used) —
+  both rows of a split movement now read the SAME real, current status; the row split itself (still
+  triggered by `isFinalizedSightUtilize`) and each row's own `eventTime` (`createdAt` vs `releasedAt`)
+  are completely unchanged — only WHICH status value each row displays changed.
+- `selectEvent()`'s own `ownImpact` construction — the phase-based null-forcing removed:
+  `const ownImpact = { before: movement.balanceBefore, after: movement.balanceAfter };` (was
+  `event.phase === 'create' ? { before: null, after: null } : { before: movement.balanceBefore, after:
+  movement.balanceAfter }`) — disclosed explicitly as a related, consequential change rather than
+  silently bundled, since suppressing this impact was the ORIGINAL design's own direct consequence of
+  forcing the status to PENDING (showing a real impact next to a fake "Pending" status would have been
+  self-contradictory; once the status is real, the impact must be shown too, for the same reason in
+  reverse).
+- The Look Up panel's own Event Timeline template (`transaction-builder.component.html`) — the
+  `row.phase === 'create' ? '—' : ...` blanking on the Balance After column removed, now
+  `{{ row.movement.balanceAfter ?? '—' }}` unconditionally — the same consequential fix applied to Look
+  Up Current Balance's own copy of the identical display, keeping the two screens' behavior identical per
+  this file's own Mandatory Consistency Requirement.
+
+**Explicitly OUT of scope, unaffected**: `ownSnapshot` (the Balance Snapshot tabs — LC/Acceptance/SG
+Balance boxes, backed by `eventSnapshot`/`finalizeEventSnapshot`/the sibling-snapshot fields) stays
+frozen at Create-time exactly as the "A3's own Event Snapshot now stays frozen at Create-time..." entry
+above already established, by its own separate, still-current business decision ("只存PENDING 或
+APPROVED 其中一個" — only Create OR Release captures a stored snapshot, and it's deliberately never
+recomputed afterward). This fix touches only the Status BADGE and the Balance Impact arrow
+(`balanceBefore`/`balanceAfter`), never the Balance Snapshot box's own figures.
+
+**Tests**: `inquire-events.service.spec.ts`'s own LC-S01-reproduction test (added by the entry
+immediately above) updated in place — `svc.events.map((e) => e.eventStatus)` now expects
+`['RELEASED', 'RELEASED', 'RELEASED', 'RELEASED']` (was `['RELEASED', 'PENDING', 'RELEASED', 'RELEASED']`
+— the `'create'` row's own entry flips from the old forced value to the movement's real status,
+matching its `'finalize'` sibling since both read the same underlying RELEASED movement), and the
+`selectedEventTabs`'s own LC-tab `impact` assertion now expects the real
+`{before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter}` (was
+`{before: null, after: null}`). `transaction-builder.component.actions.spec.ts`'s own `runLookup()`
+split-row test updated the same way (`createRow.eventStatus` now `'RELEASED'`, was `'PENDING'`; the
+`displayStatus()` assertion for the create row now expects `'EARMARKED'`, was `'EARMARKING'`). One NEW
+test added, covering the companion case this fix must NOT affect: a Sight `IPLC_LC`/`UTILIZE` that is
+still GENUINELY PENDING (never finalized via A4) stays a single, unsplit row showing EARMARKING — proving
+the fix only changes WHAT a split row's `'create'` half displays, never whether the split itself happens.
+780/780 Angular tests passing, coverage clears the 95% floor on all four metrics unchanged from the prior
+entry's own figures. `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/
+`npm run lint` (0 errors, 217 warnings, unchanged) all clean. `backend/` 33/33 and microservice 321/321
+both unaffected and re-verified per this file's own standing rule (Angular-only change).
+
+**Live-verified end to end against the real running stack, both Inquire Events and Look Up Current
+Balance, reproducing the user's own exact complaint on LC S01's own B03 record**: Inquire Events — the
+B03 `'create'` row (`A3 · Document Arrival`, `IPLC_LC`/`UTILIZE`, 22000, B03) now correctly shows
+**EARMARKED**, not EARMARKING; opening it shows `Status: EARMARKED`, `Released: checker1 — 8/18/26,
+9:48 AM` (previously blank/absent for this row), and a real `Confirmed Balance: 56000 → 34000` (previously
+suppressed) on its own LC Balance tab. Look Up Current Balance — the identical LC S01 Event Timeline
+(same shared `toEventRows()`, per the Mandatory Consistency Requirement) shows the SAME correction across
+every one of its 5 split UTILIZE pairs (B01–B05): each pair's own `'create'` row now reads EARMARKED with
+its own real Balance After figure (e.g. B03's own create row: EARMARKED, 34000 — matching Inquire
+Events' own figure exactly) rather than the previous EARMARKING/blank-then-frozen pairing. Zero console
+errors throughout.
