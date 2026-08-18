@@ -206,12 +206,20 @@
               <ng-template #existingContract>
                 <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
                   <label class="tb-field__label">Search Existing Contract — LC Number + {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} (both mandatory — a single LC can have multiple {{ ibNumberLabel }}s)</label>
+                  <!-- Business instruction 2026-08-18 ("除了A1 B1允許輸入 LC NUMBER 其他都應該是帶入的" — except
+                       A1/B1, LC Number should be carried in, not freely typed) — once Search resolves a
+                       contract, these fields lock immediately (same timing as Currency's own carriedCurrency
+                       protection: locks the moment selectedContract/selectedParent resolves, not just at
+                       Submit) rather than staying editable until formLocked. Switching function (which already
+                       clears selectedContract/searchNaturalKey via selectFunction()'s own reset) is the only
+                       way to search again — same "no undo, pick a different function to restart" convention
+                       the flat Catalog picker's own selectedContract already uses. -->
                   <div class="tb-grid-3">
-                    <input class="tb-input tb-input--required" placeholder="LC Number (mandatory)" [(ngModel)]="searchNaturalKey.lcNumber" [disabled]="formLocked">
-                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="searchNaturalKey.ibNumber" [disabled]="formLocked">
-                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="searchNaturalKey.sgNumber" [disabled]="formLocked">
+                    <input class="tb-input tb-input--required" placeholder="LC Number (mandatory)" [(ngModel)]="searchNaturalKey.lcNumber" [disabled]="formLocked || !!selectedContract">
+                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="searchNaturalKey.ibNumber" [disabled]="formLocked || !!selectedContract">
+                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="searchNaturalKey.sgNumber" [disabled]="formLocked || !!selectedContract">
                   </div>
-                  <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked">Search</button>
+                  <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked || !!selectedContract">Search</button>
                   <div class="tb-error mt-2" *ngIf="searchError">{{ searchError }}</div>
                   <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}</div>
 

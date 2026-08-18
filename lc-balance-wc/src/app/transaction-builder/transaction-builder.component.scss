@@ -67,9 +67,19 @@
   // text on the near-white :hover background instead of blue — invisible, not literally blank.
   // `:not(--active)` fixes the specificity fight directly instead of just tie-breaking on source
   // order (which would leave the selected chip losing its own hover feedback entirely).
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+
   &:hover:not(.tb-function-chip--active) {
     border-color: var(--blue-border);
     background: var(--blue-bg-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
   }
 
   &--active {
@@ -129,6 +139,7 @@
   background: #fff;
   border: 1px solid var(--gray-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
@@ -224,6 +235,9 @@
   outline: none;
   background: #fff;
   color: var(--gray-body);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 
   &:focus {
     border-color: var(--blue);
@@ -322,15 +336,30 @@
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform 80ms ease;
 
   &:disabled {
     opacity: 0.55;
     cursor: not-allowed;
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
   &--primary {
     background: var(--blue);
     color: #fff;
+    box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
 
     &:hover:not(:disabled) {
       background: var(--blue-dark);
@@ -350,6 +379,7 @@
   &--success {
     background: var(--green);
     color: #fff;
+    box-shadow: 0 1px 2px rgba(22, 163, 74, 0.25);
 
     &:hover:not(:disabled) {
       background: var(--green-dark);
@@ -374,10 +404,15 @@
     background: #fff;
     border-color: var(--blue-border);
     color: var(--blue-dark);
+    box-shadow: none;
 
     &:hover:not(:disabled) {
       background: var(--blue-bg-soft);
       border-color: var(--blue);
+    }
+
+    &:focus-visible {
+      outline-offset: 1px;
     }
   }
 }
@@ -447,7 +482,7 @@
   }
 
   &__title {
-    font-family: 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
     font-weight: 700;
     font-size: 11px;
     text-transform: uppercase;
@@ -512,6 +547,20 @@
   gap: 4px;
   max-height: 200px;
   overflow-y: auto;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-input-border);
+    border-radius: var(--radius-pill);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 .tb-quick-pick__row {
@@ -526,9 +575,16 @@
   cursor: pointer;
   text-align: left;
 
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
   // Same &:hover/&--active specificity pitfall as .tb-function-chip above (2026-08-15 fix).
   &:hover:not(.tb-quick-pick__row--active) {
     background: var(--blue-bg-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
 
   &--active {
@@ -586,11 +642,20 @@
   padding: 8px 12px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 
   // Harmless today (both rules resolve to the same blue), guarded anyway for consistency with the
   // fixed pattern above — a future edit to either color alone would otherwise silently reopen it.
   &:hover:not(.tb-tab--active) {
     color: var(--blue);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
   }
 
   &--active {
@@ -622,6 +687,24 @@
 .tb-table-scroll {
   overflow-x: auto;
   max-width: 100%;
+
+  // Thin, low-contrast scrollbar for the (rare) case a table needs horizontal scroll — Firefox
+  // via the standard property, WebKit/Blink via the pseudo-elements; both degrade harmlessly to
+  // the browser default on anything that supports neither.
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-input-border);
+    border-radius: var(--radius-pill);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 // Business instruction 2026-08-15 ("Event Timeline does not look pretty") — status badges (color-coded
@@ -633,6 +716,12 @@
   font-size: 12px;
   border: 1px solid var(--gray-border);
   border-radius: var(--radius-lg);
+  // `border-radius` alone doesn't clip a collapsed table's own cell backgrounds (the classic
+  // rounded-table gotcha) — the header row's square corners were poking past the rounded border.
+  // `overflow: hidden` clips content to the table's own border-box without constraining its
+  // natural (possibly-wider-than-viewport) width, so `.tb-table-scroll`'s horizontal scroll still
+  // works exactly as before.
+  overflow: hidden;
 
   th {
     text-align: left;
@@ -678,11 +767,14 @@
   }
 }
 
+// Right-aligned — standard financial-table convention (figures line up on their own decimal/ones
+// place for at-a-glance comparison down a column), not previously applied here.
 .tb-table__amount {
   font-family: var(--font-mono);
   font-weight: 700;
   color: var(--navy);
   white-space: nowrap;
+  text-align: right;
 }
 
 .tb-table__ref {
@@ -712,6 +804,7 @@
   display: inline-block;
   font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.02em;
   padding: 2px 9px;
   border-radius: var(--radius-pill);
   background: var(--gray-bg);
@@ -766,15 +859,30 @@
   justify-content: center;
   padding: 16px;
   z-index: 1000;
+  animation: tb-dialog-fade-in 150ms ease;
 }
 
 .tb-dialog {
   background: #fff;
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.28);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 460px;
   padding: 18px 20px;
+  animation: tb-dialog-rise-in 150ms ease;
+}
+
+@keyframes tb-dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tb-dialog-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
 }
 
 .tb-dialog__header {
@@ -804,6 +912,11 @@
   &:hover {
     background: var(--gray-bg);
     color: var(--gray-body);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
 }
 

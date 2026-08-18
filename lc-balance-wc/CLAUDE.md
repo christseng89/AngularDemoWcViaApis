@@ -5097,3 +5097,78 @@ touched, no `.ts` change. Verified: `ng build --configuration development` (stri
 Angular suite 783/783 unchanged (this project's own direct-instantiation test convention never renders
 the DOM, so template-only reorders were never covered by a test either before or after, same as every
 prior template-only fix in this file).
+
+## Stylesheet professional-polish pass — all three SCSS files, pure CSS/no template or logic change (2026-08-18, user-requested — "Refer to your UI/UX skills, fine tune the Balance Component stylesheet in a professional L&F way")
+
+Refined `src/styles.scss`, `transaction-builder.component.scss`, and `index-picker.component.scss` —
+the whole existing token-based design system (see the earlier 2026-08-15 "professional UI patterns"
+entry above) stayed the baseline; this pass added polish it never got, plus fixed one real rendering bug
+found along the way. Zero `.ts`/`.html` changes.
+
+- New tokens: `--font-sans` (explicit stack, was implicit via Bootstrap's own default), `--shadow-sm/md/lg`,
+  `--transition-fast`.
+- **Bug fixed**: `.tb-table`'s own `border-radius` never actually clipped the table (the classic
+  `border-collapse: collapse` + `border-radius` gotcha — a collapsed table's own cell backgrounds ignore
+  the table's rounded border unless the table itself also has `overflow: hidden`) — the header row's
+  square corners were visibly poking past the rounded border in every table in the app (Look Up's Event
+  Timeline, Inquire Events' merged table, the Account Entries/View Voucher dialog's static Dr/Cr table).
+  Fixed with one `overflow: hidden` line on `.tb-table` itself — doesn't constrain the table's own natural
+  width, so `.tb-table-scroll`'s horizontal scroll is unaffected.
+- `.tb-table__amount` gained `text-align: right` — standard financial-table convention (figures line up
+  for at-a-glance column comparison) that was missing.
+- Branded the top navbar (`app.component.ts`'s own inline template, styled via its existing Bootstrap
+  class names directly — `.navbar`/`.navbar-brand`/`.nav-link`, unused anywhere else in this app, so no
+  new class hook was needed) to match the rest of the app's navy/blue tokens instead of standing out as
+  unstyled Bootstrap defaults.
+- Business Case Runner's own trace-row colors (`.step-ok/warn/error`, previously one-off hex values)
+  moved onto the shared token palette.
+- Subtle `box-shadow` elevation on `.tb-section` cards; consistent `transition`s and `:focus-visible`
+  rings added across every interactive element that previously had none (function chips, tabs, quick-pick
+  rows, index-picker rows, buttons, the dialog's close button); tactile `:active` press feedback on
+  buttons; a subtle fade/rise entrance animation on the Account Entries dialog; thin custom scrollbars on
+  the scrollable lists/tables (`scrollbar-width: thin` + WebKit pseudo-elements, degrades harmlessly
+  elsewhere).
+
+**Deliberately out of scope**: Business Case Runner's own `.card`/`.btn` elements still render as plain
+default Bootstrap — no custom classes exist there to hook into without a template change, so only its
+trace-row colors (which already had a dedicated global class) were brought into the token system.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates — the SCSS itself compiles as part of this) both clean, `npm run lint` 0 errors (217
+pre-existing warnings, unaffected — ESLint doesn't lint `.scss`), full suite 783/783 unchanged, coverage
+unchanged. **Live-verified in browser**: branded nav (bold navy brand, blue active-route underline),
+card shadows, the Event Timeline table's now-genuinely-rounded corners with right-aligned amounts and
+color-coded status badges (green Approved / violet Earmarked), a visible focus ring on a picked LC Number
+input, and the Account Entries dialog's new shadow/entrance animation all confirmed rendering correctly
+end to end against the real running microservice (LC S01).
+
+## Two-field search fallback (LC Number/IB/SG Number) now locks the instant a contract is found, not just at Submit — matches Currency's own protection timing (2026-08-18, same day, business instruction: "除了A1 B1允許輸入 LC NUMBER 其他都應該是帶入的" — except A1/B1, LC Number should be carried in, not freely typed; confirmed via "所以鎖住沒事" that locking once found, not removing the search field outright, is the right fix)
+
+Follow-up to the same day's mandatory-reference-number requirement discussion above (that discussion's
+own broader "gate the whole form" question was explicitly deferred — "暫時不改" — this is a narrower,
+separately-confirmed fix). Audited the app's own three ways a non-A1/B1 function resolves its LC: (1) a
+`hasParent` function's own Parent LC picker (`app-index-picker`, pick-only, `!formLocked &&`-guarded) —
+already fully protected, no free-text LC Number field exists in this path at all; (2) a flat-Catalog
+function's own LC Index picker (A2/A3/A4/B2/B4) — same, pick-only, already protected; (3) the
+`usesTwoFieldSearch` fallback (a free-text "type LC Number + IB/SG Number, click Search" alternative some
+`hasParent` functions — A7/A9/B5 — offer alongside their own Parent LC picker, per that fallback's own
+2026-08-14 doc comment) — genuinely NOT protected the way Currency is: `searchNaturalKey.lcNumber`/
+`ibNumber`/`sgNumber` and the Search button were only ever `[disabled]="formLocked"`, i.e. locked at
+Submit, but stayed freely editable for the entire window between a successful Search (`selectedContract`
+resolved, "Found: ..." shown) and Submit — unlike `carriedCurrency`, which locks Currency the INSTANT
+`selectedParent`/`selectedContract` resolves.
+
+**Fix**: `transaction-builder.component.html`'s three `usesTwoFieldSearch` inputs and their Search button
+gained `|| !!selectedContract` alongside the existing `formLocked` disabled condition — locking the moment
+a contract is found (via either the free-text Search or the "2ndary Index" picker beneath it, both of
+which set the same `selectedContract`), matching Currency's own timing exactly. Switching function (which
+already clears `selectedContract`/`searchNaturalKey` via `selectFunction()`'s own reset) remains the only
+way to search again — same "no undo, pick a different function to restart" convention the flat Catalog
+picker's own `selectedContract` already uses. Pure template change, zero `.ts` logic touched.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates) clean, full suite 783/783 unchanged (template-only, this project's own direct-instantiation
+test convention never renders the DOM). **Live-verified end to end**: A9 (Shipping Gtee Redemption)
+against real LC S09/SG G01 — typed both fields, clicked Search, got "Found: S09 — ACTIVE"; confirmed via
+the live DOM that the LC Number field, SG Number field, AND the Search button all immediately show the
+disabled/greyed styling the instant the contract resolved, well before Submit.

@@ -36,36 +36,101 @@
   --violet-dark: #6d28d9;
   --violet-bg: #ede9fe;
 
-  --font-mono: Consolas, monospace;
+  --font-sans:
+    'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: Consolas, 'SFMono-Regular', Menlo, monospace;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-pill: 999px;
+
+  // Elevation — deliberately subtle (banking/back-office tool, not a marketing site): a soft
+  // 1-2px lift for resting cards, a slightly deeper one for anything that floats above the page
+  // (dialogs). Extracted from the dialog's own pre-existing inline shadow value, not new.
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 10px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 44px rgba(15, 23, 42, 0.28);
+  --transition-fast: 120ms ease;
 }
 
 body {
   background: #f5f6f8;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+::selection {
+  background: var(--blue-border);
+  color: var(--navy);
+}
+
+// Top-level app shell (app.component.ts's own inline template) — a plain default Bootstrap
+// navbar previously; branded to match the rest of the app's navy/blue token system instead of
+// standing out as unstyled. Targets Bootstrap's own classes directly (no custom hook needed —
+// `.navbar`/`.nav-link` aren't used anywhere else in this app) rather than adding a class to the
+// inline template.
+.navbar {
+  box-shadow: var(--shadow-sm);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  color: var(--navy) !important;
+  letter-spacing: -0.01em;
+}
+
+.navbar-nav .nav-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-muted);
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    color: var(--blue);
+  }
+
+  &.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+}
+
+// ── Business Case Runner trace rows ──────────────────────────────────────
+// Brought into the same design-token system as transaction-builder.component.scss's own
+// .tb-error/.tb-hint--ok (left-accent + tint, not a bare background fill) so this page reads as
+// part of the same product rather than plain framework defaults.
 .step-note {
-  color: #6c757d;
+  color: var(--gray-muted);
   font-style: italic;
 }
 
+// `box-shadow`/`border-left` are unreliable on `<tr>` across browsers (border-collapse quirks) —
+// these rows are colored via `background`/`color` only, same mechanism the original plain
+// implementation used, just sourced from the shared token palette instead of one-off hex values.
 .step-ok {
-  background: #f0fff4;
+  background: var(--green-bg);
+  color: var(--green-dark);
 }
 
 .step-warn {
-  background: #fff9db;
+  background: var(--amber-bg);
+  color: var(--amber-dark);
 }
 
 .step-error {
-  background: #fff0f0;
+  background: var(--red-bg);
+  color: var(--red-dark);
 }
 
 pre.step-detail {
   white-space: pre-wrap;
   margin: 0;
-  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--gray-body);
 }

@@ -24,6 +24,9 @@
   padding: 6px 10px;
   font-size: 13px;
   outline: none;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 
   &:focus {
     border-color: var(--blue);
@@ -40,9 +43,15 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--transition-fast);
 
   &:hover {
     background: var(--blue-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
 }
 
@@ -64,6 +73,20 @@
   border-radius: var(--radius-lg);
   padding: 4px;
   background: #fff;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-input-border);
+    border-radius: var(--radius-pill);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 .index-picker__row {
@@ -85,6 +108,11 @@
   &:hover:not(.index-picker__row--active) {
     background: var(--blue-bg);
     border-color: var(--blue-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
 
   &--active {
@@ -115,9 +143,15 @@
   padding: 3px 10px;
   font-size: 12px;
   cursor: pointer;
+  transition: background-color var(--transition-fast);
 
   &:hover:not(:disabled) {
     background: var(--gray-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
 
   &:disabled {
