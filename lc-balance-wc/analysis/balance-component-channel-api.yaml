@@ -68,17 +68,18 @@ info:
 
     Maker/Checker: every function follows the same 4-eyes shape — a Maker
     (`POST /channel/transactions`) creates a PENDING transaction; a Checker
-    then Releases (`.../release`), Rejects (`.../reject`), or — for the one
-    function that needs it, Present Docs — Acknowledges
-    (`.../acknowledge`) it. A Maker may Cancel their own still-PENDING
-    submission before a Checker acts (`.../cancel`). This channel layer
-    does not implement its own authentication/authorization — `createdBy`/
-    `releasedBy`/`cancelledBy`/`acknowledgedBy` are channel-session-supplied
-    identity claims, matching this prototype's own documented scope
-    boundary (real channel deployments must derive these server-side from
-    a verified session, never trust a request-body claim — see
-    lc-balance-wc/CLAUDE.md's own BAL-001 finding for the equivalent
-    microservice-level gap).
+    then Releases (`.../release`) or Rejects (`.../reject`) it — a genuine
+    `PENDING -> RELEASED`/`REJECTED` transition, no exceptions (see v1.2.0
+    below: Present Docs/B3 used to be the one function whose Checker action
+    was a separate acknowledgment rather than a release; it is not any
+    more). A Maker may Cancel their own still-PENDING submission before a
+    Checker acts (`.../cancel`). This channel layer does not implement its
+    own authentication/authorization — `createdBy`/`releasedBy`/
+    `cancelledBy` are channel-session-supplied identity claims, matching
+    this prototype's own documented scope boundary (real channel
+    deployments must derive these server-side from a verified session,
+    never trust a request-body claim — see lc-balance-wc/CLAUDE.md's own
+    BAL-001 finding for the equivalent microservice-level gap).
 
 
     Idempotency: identical to the microservice layer — `eventSeq` is
@@ -96,7 +97,24 @@ info:
     rule. A channel client's "Account Entries" button/pop-up (the reference
     Transaction Builder client's own UI pattern) reads this field directly;
     it is never recomputed by this channel layer.
-  version: "1.1.0"
+
+
+    v1.2.0 (2026-08-18, business instruction "所有交易要RELEASE過後 才能根據流程走下一個交易" — every
+    transaction must genuinely RELEASE before the next step in the flow can act on it) — mirrors the
+    Microservice API's own v1.12.0. `POST /channel/transactions/{transactionId}/acknowledge` is REMOVED:
+    Present Docs (B3) is no longer the one function whose Checker action is a separate acknowledgment —
+    it now uses the standard `.../release` path directly, same as every other function, a genuine
+    `PENDING -> RELEASED` transition. `TransactionFunctionCatalogEntry.acknowledgeOnly` (which used to
+    flag B3 as this one exception) is REMOVED from `GET /channel/functions` — every catalog entry now
+    follows the identical release/reject shape, so the flag has nothing left to distinguish.
+    `ChannelTransaction.acknowledgedBy`/`acknowledgedAt` remain on the schema for historical rows only
+    (pre-2026-08-18 data) — nothing writes them any more. The underlying "consumed by B4" tracking this
+    change introduced server-side (`BalanceMovement.presentDocsConsumedAt`/`presentDocsConsumedBy` on the
+    Microservice API) is deliberately NOT mirrored here — same established precedent as
+    `makerSubmittedAt`/`eventSnapshot` before it (see the Microservice API's own "Persisted Event
+    Snapshot" decision-log entry, lc-balance-wc/CLAUDE.md): internal Maker/Checker bookkeeping, not a
+    channel-facing projection a channel client's own UI actually needs.
+  version: "1.2.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -505,51 +523,10 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ChannelError' }
 
-  /channel/transactions/{transactionId}/acknowledge:
-    post:
-      tags: [Transactions]
-      summary: Checker acknowledges a still-PENDING Present Docs earmark (B3 only)
-      description: >
-        The one function on this channel (B3, Present Docs) whose Checker
-        action is an acknowledgment rather than a release — the underlying
-        movement deliberately stays PENDING so B4 (Honour/Acceptance) can
-        still find and consume it. See the Microservice API's own
-        `/balance-movements/{id}/acknowledge` for the full rule.
-      parameters:
-        - name: transactionId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [acknowledgedBy]
-              properties:
-                acknowledgedBy: { type: string }
-      responses:
-        '200':
-          description: Transaction acknowledged; status unchanged (still PENDING).
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ChannelTransaction' }
-        '400':
-          description: This transaction's function is not B3 (Present Docs).
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ChannelError' }
-        '404':
-          description: Transaction not found.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ChannelError' }
-        '409':
-          description: Transaction is not PENDING, or was already acknowledged.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ChannelError' }
+  # REMOVED v1.2.0 (2026-08-18, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
+  # /channel/transactions/{transactionId}/acknowledge, B3 (Present Docs)'s own former acknowledgment-
+  # only Checker action. B3 now uses the standard /release path directly, same as every other function
+  # — see the v1.2.0 changelog entry above and the Microservice API's own matching v1.12.0 entry.
 
   /channel/checker/queue:
     get:
@@ -661,9 +638,10 @@ components:
         submitsTransaction:
           type: boolean
           description: False only for A4 (Sight Settlement) — A4 has no Maker submission step; it resolves directly to an existing PENDING UTILIZE transaction (created by A3/A3S) and the Checker acts on it via POST /channel/transactions/{id}/release directly. True for every other function.
-        acknowledgeOnly:
-          type: boolean
-          description: True only for B3 (Present Docs) — this function's Checker action is POST .../acknowledge, not .../release; the underlying movement deliberately stays PENDING.
+        # REMOVED v1.2.0 (2026-08-18) — `acknowledgeOnly` used to flag B3 (Present Docs) as the one
+        # function whose Checker action was POST .../acknowledge instead of .../release. B3 now uses the
+        # standard release path like every other function, so every catalog entry has the identical
+        # shape here — nothing left for this flag to distinguish.
         compoundLegs:
           type: array
           description: >
@@ -745,8 +723,8 @@ components:
         createdAt: { type: string, format: date-time }
         releasedBy: { type: string, nullable: true }
         releasedAt: { type: string, format: date-time, nullable: true }
-        acknowledgedBy: { type: string, nullable: true }
-        acknowledgedAt: { type: string, format: date-time, nullable: true }
+        acknowledgedBy: { type: string, nullable: true, description: 'HISTORICAL FIELD, no longer written — v1.2.0 (2026-08-18) removed the B3-only acknowledge()-only Checker action; every function (B3 included) now uses the standard release path, which never sets this field. Present only on rows created before that date.' }
+        acknowledgedAt: { type: string, format: date-time, nullable: true, description: 'HISTORICAL FIELD, no longer written — see acknowledgedBy.' }
         contingentAccountEntry:
           allOf: [{ $ref: '#/components/schemas/ContingentAccountEntry' }]
           nullable: true
@@ -862,7 +840,6 @@ components:
           hasParent: false
           currencyMode: INPUT
           submitsTransaction: true
-          acknowledgeOnly: false
           tenorTypeOptions: [{ value: SIGHT, label: Sight }, { value: SELLERS_USANCE, label: "Seller's Usance" }, { value: BUYERS_USANCE, label: "Buyer's Usance" }]
           compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: ISSUE, description: "Establish the new Import LC." }]
         - code: A2
@@ -872,7 +849,6 @@ components:
           hasParent: false
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           secondaryRefLabel: "Amendment No./Times"
           movementTypeChoice: { label: Direction, options: [{ value: AMEND_INCREASE, label: Increase }, { value: AMEND_DECREASE, label: Decrease }] }
           compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: "AMEND_INCREASE | AMEND_DECREASE", description: "Amend the existing LC's own face amount." }]
@@ -884,7 +860,6 @@ components:
           hasParent: false
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           secondaryRefLabel: "IB Number"
           compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: UTILIZE, description: "Presentation earmark, any tenor." }]
         - code: A3S
@@ -895,7 +870,6 @@ components:
           hasParent: false
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           secondaryRefLabel: "IB Number"
           compoundLegs:
             - { legInstrumentType: SHGT, legMovementType: "FULL_REDEEM | PARTIAL_REDEEM", description: "Redeem the matched Shipping Guarantee first." }
@@ -908,7 +882,6 @@ components:
           hasParent: false
           currencyMode: CARRIED
           submitsTransaction: false
-          acknowledgeOnly: false
           compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: UTILIZE, description: "No Maker submission — releases the existing PENDING Document Arrival A3 already created." }]
         - code: A6
           label: Acceptance (Usance)
@@ -919,7 +892,6 @@ components:
           defaultParentInstrumentType: IPLC_LC
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           tenorTypeOptions: [{ value: SELLERS_USANCE, label: "Seller's Usance" }, { value: BUYERS_USANCE, label: "Buyer's Usance" }]
           compoundLegs: [{ legInstrumentType: IPLC_ACCEPTANCE, legMovementType: CREATE, description: "New Acceptance; Checker Release also finalizes the referenced Document Arrival." }]
         - code: A7
@@ -930,7 +902,6 @@ components:
           defaultParentInstrumentType: IPLC_LC
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           movementTypeChoice: { label: "Settlement type", options: [{ value: FULL_SETTLE, label: "Full Settle" }, { value: PARTIAL_SETTLE, label: "Partial Settle" }] }
           compoundLegs: [{ legInstrumentType: IPLC_ACCEPTANCE, legMovementType: "FULL_SETTLE | PARTIAL_SETTLE", description: "Settlement Due Date — never touches the LC Balance itself." }]
         - code: A8
@@ -942,7 +913,6 @@ components:
           defaultParentInstrumentType: IPLC_LC
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           compoundLegs: [{ legInstrumentType: SHGT, legMovementType: ISSUE, description: "Independent contingent liability against the LC as parent, capped at its Tight Available Balance." }]
         - code: A9
           label: "Shipping Gtee (Redemption)"
@@ -952,7 +922,6 @@ components:
           defaultParentInstrumentType: IPLC_LC
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           compoundLegs: [{ legInstrumentType: SHGT, legMovementType: "FULL_REDEEM | PARTIAL_REDEEM (server-derived from amount vs. Available Balance)", description: "Explicit, separate action — never auto-linked to a Document Arrival." }]
         - code: B1
           label: Confirm LC
@@ -962,7 +931,6 @@ components:
           hasParent: false
           currencyMode: INPUT
           submitsTransaction: true
-          acknowledgeOnly: false
           tenorTypeOptions: [{ value: SIGHT, label: Sight }, { value: SELLERS_USANCE, label: Usance }]
           compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: ISSUE, description: "This bank's own confirmation — obligor = issuing bank." }]
         - code: B2
@@ -973,7 +941,6 @@ components:
           hasParent: false
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           secondaryRefLabel: "Amendment No./Times"
           compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: AMEND, description: "Adjusts confirmed_amount only." }]
         - code: B3
@@ -985,7 +952,6 @@ components:
           defaultParentInstrumentType: EPLC_CONFIRMATION
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: true
           compoundLegs: [{ legInstrumentType: EPLC_EXAMINATION, legMovementType: CREATE, description: "MEMO_ONLY earmark — physical event only, never touches the Confirmation's own balance." }]
         - code: B4
           label: Honour / Acceptance
@@ -995,7 +961,6 @@ components:
           hasParent: false
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           secondaryRefLabel: "EB Number"
           compoundLegs:
             - { legInstrumentType: EPLC_CONFIRMATION, legMovementType: "HONOUR | ACCEPT", description: "The legal event — releases the picked B3 record and the Confirmation contingent." }
@@ -1011,7 +976,6 @@ components:
           defaultParentInstrumentType: EPLC_CONFIRMATION
           currencyMode: CARRIED
           submitsTransaction: true
-          acknowledgeOnly: false
           compoundLegs:
             - { legInstrumentType: EPLC_ACCEPTANCE, legMovementType: FULL_SETTLE, description: "Usance held-to-maturity only — CNF_MATURE." }
             - { legInstrumentType: EPLC_ACCEPTANCE_REIMB_RECEIVABLE, legMovementType: REIMBURSE, description: "Its matching Reimbursement Receivable, same amount, same Checker Release." }

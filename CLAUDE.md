@@ -338,9 +338,10 @@ remediation log — check it before assuming an area is unreviewed; it records w
   exports a `BalanceMovement` interface mirroring the microservice's own `src/types.ts` shape by hand
   (kept in sync manually, same convention `balance-component.model.ts`'s own design-doc field tables
   already use) — every mutating/listing method is typed against it rather than `Observable<any>`.
-  `transaction-builder.component.ts` is the single largest file in this repo (2,800+ lines — it owns
+  `transaction-builder.component.ts` is the single largest file in this repo (~2,200 lines, down from
+  2,800+ across a sequence of BAL-003 extractions logged in `lc-balance-wc/CLAUDE.md` — it owns
   function/side selection, three paginated catalog/parent/IB-index pickers, the Maker `submit()`
-  dispatch across all 14 named business functions, Checker release/reject/cancel/acknowledge, and the
+  dispatch across all 14 named business functions, Checker release/reject/cancel, and the
   Look Up panel); its three paginated-picker state machines share one private `loadPagedCatalog()`
   helper and its ~30 API-calling methods share one `describeApiError()` helper — both extracted to close
   duplication findings in `Quality-report-balance.md`, worth reusing rather than reintroducing the
@@ -350,7 +351,9 @@ remediation log — check it before assuming an area is unreviewed; it records w
 - `microservices/balance-component/` — the real Balance Component microservice:
   - `src/service/balanceService.ts` — orchestrates the routes; `src/routes/balanceContracts.ts` /
     `balanceMovements.ts` are the two Express routers (contract lookup/catalog/balance/movements-history
-    vs. movement post/release/reject/cancel/acknowledge — a maker-checker-style lifecycle per movement).
+    vs. movement post/release/reject/cancel/maker-submit — a maker-checker-style lifecycle per movement;
+    the `acknowledge` endpoint that used to sit here was removed 2026-08-18 — B3 now uses the standard
+    release path, see `lc-balance-wc/CLAUDE.md`'s own decision log for the redesign).
   - `src/domain/` — `balanceDerivation.ts`, `tolerance.ts`, `statusTransition.ts`, `amendDecrease.ts`,
     `offBalanceExposure.ts` — the actual accounting/exposure logic, cited to
     `analysis/TF_Balance_Component_Spec-{en,zh}.docx` / `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`

@@ -83,11 +83,12 @@ Three independently-versioned pieces talking over HTTP, not a shared in-process 
 - **`backend/server.js`** — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
   declarative registry of Import/Export Business Cases it replays (`createAndRelease()` collapses the
   common create-then-release step pair; `RELEASE_SHAPED_STEP_TYPES` dispatch table covers
-  `release`/`makerSubmit`/`acknowledge`).
+  `release`/`makerSubmit` — `acknowledge` was removed 2026-08-18 alongside the microservice's own
+  `/acknowledge` endpoint, see the decision log below).
 - **`microservices/balance-component/`** — the real ledger:
   - `src/service/balanceService.ts` orchestrates the two Express routers in `src/routes/`
     (`balanceContracts.ts`: lookup/catalog/balance/movement-history; `balanceMovements.ts`: post/release/
-    reject/cancel/acknowledge/maker-submit — a Maker-Checker lifecycle per movement).
+    reject/cancel/maker-submit — a Maker-Checker lifecycle per movement).
   - `src/domain/` — the actual accounting/exposure logic (`balanceDerivation.ts`, `tolerance.ts`,
     `statusTransition.ts`, `amendDecrease.ts`, `offBalanceExposure.ts`, `shgtRedeem.ts`,
     `contingentAccountEntry.ts`), each cited to `analysis/TF_Balance_Component_Spec-{en,zh}.docx`/
