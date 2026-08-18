@@ -148,8 +148,28 @@ export interface BalanceMovement {
    */
   balanceBefore?: string | null;
   balanceAfter?: string | null;
+  /**
+   * HISTORICAL FIELDS (v0.8.0) — superseded 2026-08-18 (business instruction, "所有交易要RELEASE過後
+   * 才能根據流程走下一個交易"): B3's own Checker Release is now the standard release()/status transition
+   * (releasedBy/releasedAt), not a separate acknowledgment that left status PENDING. Kept only so a
+   * pre-2026-08-18 row's own historical value still round-trips; nothing writes them any more — see
+   * presentDocsConsumedAt/By below for what backs Present Docs Earmark Approved now.
+   */
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
+  /**
+   * EPLC_EXAMINATION/CREATE only (2026-08-18, business instruction "所有交易要RELEASE過後 才能根據流程走
+   * 下一個交易" — superseding acknowledgedAt above). Set as a SIDE EFFECT of release() on the
+   * Confirmation's own linked HONOUR/ACCEPT movement (via that movement's own referencedTransactionId
+   * pointing back at this EPLC_EXAMINATION CREATE) — i.e. the moment B4 actually consumes this
+   * presentation, not when B3 itself is Released. A presentation with status RELEASED and this field
+   * still null continues to occupy Present Docs Earmark capacity (see the microservice's own
+   * domain/offBalanceExposure.ts doc comment). Null until consumed, and for movements predating this
+   * field.
+   */
+  presentDocsConsumedAt?: string | null;
+  /** Audit metadata only, paired with presentDocsConsumedAt above — the checkerId who released the consuming HONOUR/ACCEPT. */
+  presentDocsConsumedBy?: string | null;
   /**
    * A4 (Sight Settlement) only (2026-08-16, business instruction "Add real Maker Submit, then have
    * Checker to Release it. Exactly the same as A1."). Set via submitByMaker() below — see the
@@ -247,10 +267,11 @@ export class BalanceComponentApiService {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
   }
 
-  /** Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — B3's own Checker Release; a real backend acknowledgment (status stays PENDING — B4 still finds/consumes it), not the plain release() transition. */
-  acknowledge(movementId: string, acknowledgedBy: string): Observable<BalanceMovement> {
-    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
-  }
+  /**
+   * REMOVED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
+   * acknowledge() and its /acknowledge endpoint no longer exist. B3's own Checker Release is now the
+   * standard release() above (a genuine PENDING -> RELEASED transition), same as every other function.
+   */
 
   /** Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it. Exactly the same as A1.") — A4's own real Maker action; a genuine backend acknowledgment (status stays PENDING — the Checker's own release() below is still the real finalizing transition), not a new movement. */
   submitByMaker(movementId: string, makerSubmittedBy: string): Observable<BalanceMovement> {

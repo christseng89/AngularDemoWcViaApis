@@ -45,16 +45,20 @@ async function resolveLogicalContractId(captured, ref) {
   return entry.logicalContractId;
 }
 
-// Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release', 'makerSubmit'
-// (Import Case #6's own A4 real Maker Submit), and 'acknowledge' (BAL-131's own fix, below) are all
-// the identical shape — POST to a per-movement sub-path with one body key, same "skipped" handling
-// when the referenced createMovement step never captured a movementId. Consolidated into one dispatch
-// table + shared handler in runCase() below instead of three near-copies, closing BAL-124 at the exact
-// point a 3rd copy would otherwise have landed (the finding's own predicted risk).
+// Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release' and
+// 'makerSubmit' (Import Case #6's own A4 real Maker Submit) are the identical shape — POST to a
+// per-movement sub-path with one body key, same "skipped" handling when the referenced createMovement
+// step never captured a movementId. Consolidated into one dispatch table + shared handler in runCase()
+// below instead of separate near-copies.
+//
+// 'acknowledge' (added 2026-08-17 BAL-131 for B3's own former Present-Docs Checker acknowledgment) was
+// REMOVED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易" — every transaction must
+// genuinely RELEASE before the next step in the flow can act on it) — the /acknowledge endpoint itself
+// no longer exists server-side; B3 now uses the standard 'release' step type directly, same as every
+// other function. See businessCases.js's own Export Case #6/#7 for the updated step sequence.
 const RELEASE_SHAPED_STEP_TYPES = {
   release: { subPath: 'release', bodyKey: 'releasedBy' },
   makerSubmit: { subPath: 'maker-submit', bodyKey: 'makerSubmittedBy' },
-  acknowledge: { subPath: 'acknowledge', bodyKey: 'acknowledgedBy' },
 };
 
 /** Runs one business case's step list against the microservice, returning a full trace for the UI. */

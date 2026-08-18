@@ -707,21 +707,19 @@ export class BalanceService {
     // `contract.tenorType === 'SIGHT'` is false for `null` too.
     const isSightUtilizeFinalize = movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType === 'SIGHT';
 
-    // 2026-08-18 ("SAME AS EXPORT CONFIRMED LC... 不應該因為後續交易而改變" — the SAME "must not be
-    // silently overwritten by a later transaction" guarantee, on the Export side). Identifies B3's own
-    // Present Docs earmark (EPLC_EXAMINATION/CREATE) — like A3's own UTILIZE, this movement is ALWAYS
-    // finalized (for real) by a LATER, separate business action: B4's own compound release, which calls
-    // this SAME release() method on B3's own record as one of its three explicit /release calls (see
-    // the Business Case Registry's own "the B3 earmark, the Honour, the Due From Issuing Bank" note).
-    // Unlike A3/A4, this needs NO finalize* companion field: B3 already gets its own, correctly-timed
-    // row in Inquire Events' merged timeline (never split — B4 creates its OWN separate new movement,
-    // which gets its OWN separate row), so B3's own eventSnapshot/rootEventSnapshot/
-    // acceptanceEventSnapshot simply need to stay frozen at whatever createMovement() originally
-    // captured — B4's own much-later release() must not touch them at all, full stop (there is no
-    // acknowledge()-only path that finalizes B3's status for real, per deferSettlementRequiresBackendAck
-    // — status only ever reaches RELEASED via this exact call, so this condition is never a false
-    // positive against some OTHER, plain, non-compound release of an EPLC_EXAMINATION record).
-    const isPresentDocsFinalize = movement.movementType === 'CREATE' && contract.instrumentType === 'EPLC_EXAMINATION';
+    // SUPERSEDED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3
+    // must genuinely RELEASE before B4, the next step, can act on it). This release() call used to be
+    // reached ONLY via B4's own compound release (one of its three explicit /release calls — "the B3
+    // earmark, the Honour, the Due From Issuing Bank") — never a standalone Checker action on B3's own
+    // record — so B3's own eventSnapshot/rootEventSnapshot/siblings were deliberately kept FROZEN at
+    // whatever createMovement() originally captured, since this call represented B4's much-later
+    // finalization, not B3's own. Now this release() call IS B3's own, genuine, standalone Checker
+    // Release (the ONLY way an EPLC_EXAMINATION/CREATE ever reaches RELEASED — B4's own compound no
+    // longer re-releases it, since it's already RELEASED by the time B4 acts; see the
+    // markPresentDocsConsumed() side effect below for what replaced "B4 finalizes B3" instead) — so this
+    // movement now falls through to the SAME unconditional eventSnapshot/rootEventSnapshot/siblings
+    // overwrite every other movement type's own release() already gets, exactly like a normal PENDING ->
+    // RELEASED transition should. No special-casing needed here any more.
 
     // BAL-123's own Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be
     // enforced ONLY by the reference Transaction Builder client's own checkerAct(), never here, so any
@@ -763,11 +761,10 @@ export class BalanceService {
     // ADDITIONALLY, for a child-ledger movement, also capture the PARENT's own plain balance — see
     // resolveParentContract()'s own doc comment. Never replaces eventSnapshot above.
     //
-    // 2026-08-18 ("SAME AS EXPORT CONFIRMED LC") — for isPresentDocsFinalize (B3), this must NOT be
-    // (re)written at all: B3's own rootEventSnapshot ("Confirmed LC Balance" from B3's own point of
-    // view) was already correctly captured at createMovement() time; recomputing it here would silently
-    // replace it with B4's own much-later state. No finalize* counterpart needed (see isPresentDocsFinalize's
-    // own doc comment above for why) — the computed value is simply discarded for this one case.
+    // SUPERSEDED 2026-08-18 for B3/EPLC_EXAMINATION specifically — see the isSightUtilizeFinalize/
+    // isPresentDocsFinalize doc comment further above: B3's own release() call is now its own genuine
+    // finalization event, so rootEventSnapshot ("Confirmed LC Balance" as of THIS Release) is correctly
+    // (re)written here just like every other child-ledger movement, not discarded.
     const parent = this.resolveParentContract(contract);
     const rootEventSnapshot = parent ? this.captureRootEventSnapshot(parent, contract.instrumentType, releasedSelf) : null;
 
@@ -783,9 +780,9 @@ export class BalanceService {
     // yet" picture with SG G01's by-then-existing balance) — so this release-time recomputation goes
     // into the NEW finalizeAcceptanceEventSnapshot/finalizeSgEventSnapshot fields instead, and the keys
     // themselves are OMITTED (not merely passed null) from the updateStatus() call below, so
-    // hasAcceptanceEventSnapshot/hasSgEventSnapshot correctly compute to 0 there. isPresentDocsFinalize
-    // (B3) is simpler still — no finalize* counterpart at all, the keys are just omitted outright, same
-    // reasoning as rootEventSnapshot immediately above.
+    // hasAcceptanceEventSnapshot/hasSgEventSnapshot correctly compute to 0 there. B3/EPLC_EXAMINATION
+    // (SUPERSEDED 2026-08-18, see above) is no longer special-cased here either — its own siblings are
+    // (re)written at release() like any other child-ledger movement.
     const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
     const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
 
@@ -796,21 +793,42 @@ export class BalanceService {
       releasedAt,
       balanceBefore: before.toFixed(),
       balanceAfter: after.toFixed(),
-      eventSnapshot: isSightUtilizeFinalize || isPresentDocsFinalize ? null : JSON.stringify(releaseTimeSnapshot),
+      eventSnapshot: isSightUtilizeFinalize ? null : JSON.stringify(releaseTimeSnapshot),
       finalizeEventSnapshot: isSightUtilizeFinalize ? JSON.stringify(releaseTimeSnapshot) : null,
-      rootEventSnapshot: isPresentDocsFinalize ? null : rootEventSnapshot ? JSON.stringify(rootEventSnapshot) : null,
+      rootEventSnapshot: rootEventSnapshot ? JSON.stringify(rootEventSnapshot) : null,
       ...(isSightUtilizeFinalize
         ? {
             finalizeAcceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
             finalizeSgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
           }
-        : isPresentDocsFinalize
-          ? {}
-          : {
-              acceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
-              sgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
-            }),
+        : {
+            acceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
+            sgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
+          }),
     });
+
+    // 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 must
+    // genuinely RELEASE on its own before B4, the next step in the flow, can act on it; superseded the
+    // prior acknowledge()-only design). B3's own Present Docs earmark (EPLC_EXAMINATION/CREATE) is now
+    // released independently, for real, by its OWN Checker action — so by the time THIS release() call
+    // fires for the Confirmation's own linked HONOUR/ACCEPT (B4), the referenced B3 record is already
+    // RELEASED; B4's own client-side compound release no longer re-releases it (would be illegal —
+    // RELEASED has no further transitions per statusTransition.ts's own LEGAL_TRANSITIONS table). What
+    // still needs to happen HERE is marking that presentation "consumed" — the moment it should stop
+    // occupying Present Docs Earmark capacity (see domain/offBalanceExposure.ts's own
+    // computePresentDocsEarmark doc comment for why `status === 'RELEASED'` alone isn't enough: a
+    // RELEASED-but-not-yet-consumed presentation must still count, or the bank could over-commit beyond
+    // the LC's real capacity in the window between B3's own Release and B4's actual Honour/Accept
+    // decision). Scoped to the REFERENCED movement's own contract/movementType, not this movement's own —
+    // safe for A6's own referencedTransactionId use too (Import side, its own source is always an
+    // IPLC_LC/UTILIZE, never EPLC_EXAMINATION, so this branch can never fire there).
+    if (movement.referencedTransactionId) {
+      const referenced = this.movements.findById(movement.referencedTransactionId);
+      const referencedContract = referenced ? this.contracts.findById(referenced.balanceContractId) : undefined;
+      if (referenced && referencedContract?.instrumentType === 'EPLC_EXAMINATION' && referenced.movementType === 'CREATE') {
+        this.movements.markPresentDocsConsumed({ movementId: referenced.movementId, presentDocsConsumedBy: releasedBy, presentDocsConsumedAt: releasedAt });
+      }
+    }
 
     return this.movements.findById(movementId)!;
   }
@@ -850,31 +868,17 @@ export class BalanceService {
   }
 
   /**
-   * Business instruction 2026-08-15 ("Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
-   * 來控制") — B3's own Checker Release action. Used to be entirely client-side (a UI-only flag, lost
-   * on reload, invisible to any other Checker/session) — now a genuine backend acknowledgment: sets
-   * acknowledgedBy/acknowledgedAt, but deliberately does NOT call applyStatusTransition or touch
-   * status — the movement stays PENDING (B4 still needs to find and consume it via its own real
-   * release()). EPLC_EXAMINATION/CREATE only — this is specifically the Present Docs earmark
-   * acknowledgment, not a generic "acknowledge anything" action.
+   * REMOVED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" —
+   * superseding the 2026-08-15 "Present Docs Earmark" design this method implemented). B3's own Checker
+   * Release used to be a genuine backend acknowledgment that deliberately never touched status — the
+   * movement stayed PENDING forever, and only B4's own compound release ever finalized it for real. Now
+   * B3 uses the standard `release()` above directly, same as every other function's own Checker
+   * Release — a real PENDING -> RELEASED transition, on B3's own record, independent of B4. See
+   * `release()`'s own `markPresentDocsConsumed` side effect for what tracks "consumed by B4" now, and
+   * `domain/offBalanceExposure.ts`'s own doc comment for the accounting reasoning behind the split.
+   * `acknowledgedBy`/`acknowledgedAt` remain on `BalanceMovement`/the DB schema for historical rows only
+   * (see types.ts's own doc comment) — nothing writes them any more.
    */
-  acknowledge(movementId: string, acknowledgedBy: string): BalanceMovement {
-    return this.guardSecondaryAction(movementId, {
-      presentTense: 'acknowledge',
-      pastTense: 'acknowledged',
-      validate: (contract, movement) => {
-        if (!contract || contract.instrumentType !== 'EPLC_EXAMINATION' || movement.movementType !== 'CREATE') {
-          throw new RequestValidationError(
-            `acknowledge() only applies to an EPLC_EXAMINATION CREATE movement (Present Docs earmark) — ` +
-              `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
-          );
-        }
-      },
-      alreadyDoneAt: (movement) => movement.acknowledgedAt,
-      alreadyDoneBy: (movement) => movement.acknowledgedBy,
-      persist: (id, now) => this.movements.acknowledge({ movementId: id, acknowledgedBy, acknowledgedAt: now }),
-    });
-  }
 
   /**
    * Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
@@ -882,10 +886,9 @@ export class BalanceService {
    * function, A4 has no movement of its own to create at Submit time — it settles the PRE-EXISTING
    * UTILIZE A3/A3S already earmarked — so there is no createMovement() call to stand in as "the
    * Maker submitted." This is that missing, genuinely backend-persisted step: sets
-   * makerSubmittedBy/makerSubmittedAt, but — same posture as acknowledge() above — deliberately does
-   * NOT call applyStatusTransition or touch status; the movement stays PENDING (release() is still
-   * the real PENDING -> RELEASED transition). IPLC_LC/UTILIZE only, the exact movement shape A4's own
-   * picker ever targets.
+   * makerSubmittedBy/makerSubmittedAt, but deliberately does NOT call applyStatusTransition or touch
+   * status; the movement stays PENDING (release() is still the real PENDING -> RELEASED transition).
+   * IPLC_LC/UTILIZE only, the exact movement shape A4's own picker ever targets.
    *
    * Deliberately NOT enforced inside release() itself: the Business Case Runner's own orchestrated
    * Import Case 1/2 (backend/data/businessCases.js) release a UTILIZE directly with no separate
@@ -913,12 +916,12 @@ export class BalanceService {
   }
 
   /**
-   * Quality-report-balance.md BAL-130 (2026-08-17, "not yet urgent" per the finding's own text, fixed
-   * on explicit user request): `acknowledge()` and `submitByMaker()` above share the identical
-   * find-movement -> validate-shape -> guard-PENDING -> guard-not-already-done -> persist-and-refetch
-   * shape — only the shape validation, the "already done" field pair, and the persist call differ.
-   * Every guard order and every error-message string is unchanged from what this replaces — pure code
-   * motion, not a behavior change.
+   * Quality-report-balance.md BAL-130 (2026-08-17) — a shared find-movement -> validate-shape ->
+   * guard-PENDING -> guard-not-already-done -> persist-and-refetch shape, originally factored out
+   * because `acknowledge()` and `submitByMaker()` both needed it. `acknowledge()` was removed 2026-08-18
+   * (see its own former section above) — `submitByMaker()` is this helper's only caller now, kept as-is
+   * rather than inlined back, since the shape is still a real, independently-tested unit a future
+   * second-actor action (should one appear) can reuse without re-deriving it.
    */
   private guardSecondaryAction(
     movementId: string,

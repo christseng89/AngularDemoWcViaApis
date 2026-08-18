@@ -97,7 +97,6 @@ function makeApi() {
     release: jest.fn(() => of({ movementId: 'mv-released', status: 'RELEASED' })),
     reject: jest.fn(() => of({ movementId: 'mv-rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'mv-cancelled', status: 'CANCELLED' })),
-    acknowledge: jest.fn(() => of({ movementId: 'mv-ack', acknowledgedAt: '2026-08-16T00:00:00Z' })),
     resolveContract: jest.fn(() => of(makeContract())),
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(() => of(makeSnapshot())),
@@ -784,53 +783,71 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // ---------------------------------------------------------------------
   // approveArrival()
   // ---------------------------------------------------------------------
+  // SUPERSEDED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
+  // approveArrival() no longer has a deferSettlementRequiresBackendAck branch at all (B3 no longer sets
+  // it, or deferSettlement itself — see balance-component.model.ts's own doc comment). It always just
+  // sets arrivalApproved locally now — A3 (its only remaining caller) is unaffected, this method never
+  // calls the backend for anyone any more.
   describe('approveArrival()', () => {
-    it('plain A3: sets arrivalApproved locally without calling the backend', () => {
-      const { comp, api } = setup();
+    it('always sets arrivalApproved locally, never calls the backend', () => {
+      const { comp } = setup();
       comp.selectFunction(A3);
       comp.selectedCheckerMovement = makeMovement();
 
       comp.approveArrival();
 
       expect(comp.arrivalApproved).toBe(true);
-      expect(api.acknowledge).not.toHaveBeenCalled();
     });
 
-    it('B3 (deferSettlementRequiresBackendAck): calls api.acknowledge and sets arrivalApproved on success', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B3);
-      comp.checkerId = 'checker9';
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE' });
-
-      comp.approveArrival();
-
-      expect(api.acknowledge).toHaveBeenCalledWith('mv-b3', 'checker9');
-      expect(comp.arrivalApproved).toBe(true);
-      expect(comp.checkerBusy).toBe(false);
-    });
-
-    it('B3: a failed acknowledge sets checkerError and leaves arrivalApproved false', () => {
-      const { comp, api } = setup();
-      api.acknowledge.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-      comp.selectFunction(B3);
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-b3' });
-
-      comp.approveArrival();
-
-      expect(comp.checkerError).toBe('ILLEGAL_STATE_TRANSITION');
-      expect(comp.arrivalApproved).toBe(false);
-      expect(comp.checkerBusy).toBe(false);
-    });
-
-    it('B3 without a selectedCheckerMovement falls back to the plain local-only path', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B3);
+    it('with no selectedCheckerMovement, still just sets arrivalApproved locally', () => {
+      const { comp } = setup();
+      comp.selectFunction(A3);
       comp.selectedCheckerMovement = null;
 
       comp.approveArrival();
 
       expect(comp.arrivalApproved).toBe(true);
-      expect(api.acknowledge).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // arrivalAlreadyApproved
+  // ---------------------------------------------------------------------
+  // Bug fixed 2026-08-18, reviewer-reported live (LC U01 / IB E03 — "The pending transaction ... cannot
+  // be approved by the Checker", the Approve button and its own hint stayed keyed on `arrivalApproved`
+  // alone, a per-session flag reset by onSelectCheckerMovement() every time an item is (re-)picked. B3's
+  // own acknowledge() is a REAL, persisted API call (unlike plain A3's client-only approveArrival()), so
+  // re-searching an already-acknowledged item in a fresh session/page-load left the button re-enabled
+  // even though a second click would 409 as "already acknowledged" — surfacing to the user as "cannot be
+  // approved". This getter is what the template's own disabled/label/hint bindings now read instead of
+  // the bare `arrivalApproved` flag.
+  describe('arrivalAlreadyApproved', () => {
+    it('true when this session already clicked Approve (arrivalApproved), even with no persisted acknowledgedAt', () => {
+      const { comp } = setup();
+      comp.arrivalApproved = true;
+      comp.selectedCheckerMovement = makeMovement({ acknowledgedAt: null });
+      expect(comp.arrivalAlreadyApproved).toBe(true);
+    });
+
+    it('true when the selected item was already acknowledged in an EARLIER session — the exact reported gap', () => {
+      const { comp } = setup();
+      comp.arrivalApproved = false;
+      comp.selectedCheckerMovement = makeMovement({ acknowledgedAt: '2026-08-18T07:21:34.406Z', acknowledgedBy: 'checker1' });
+      expect(comp.arrivalAlreadyApproved).toBe(true);
+    });
+
+    it('false when neither signal is set (a genuinely not-yet-approved item)', () => {
+      const { comp } = setup();
+      comp.arrivalApproved = false;
+      comp.selectedCheckerMovement = makeMovement({ acknowledgedAt: null });
+      expect(comp.arrivalAlreadyApproved).toBe(false);
+    });
+
+    it('false with no selectedCheckerMovement at all', () => {
+      const { comp } = setup();
+      comp.arrivalApproved = false;
+      comp.selectedCheckerMovement = null;
+      expect(comp.arrivalAlreadyApproved).toBe(false);
     });
   });
 
@@ -863,19 +880,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.resolveContract).toHaveBeenCalledWith(expectedLookupType, expect.objectContaining({ lcNumber: 'E001' }));
     });
 
-    it('B3 end to end: approveArrival() (deferSettlementRequiresBackendAck) syncs the Checker queue, which resolves Look Up against EPLC_CONFIRMATION, not EPLC_EXAMINATION', () => {
-      const { comp } = setup();
-      comp.selectFunction(B3);
-      comp.selectedParent = makeContract({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'E001', ibNumber: null, sgNumber: null } });
-      comp.naturalKey.lcNumber = 'E001';
-      comp.naturalKey.ibNumber = 'E01'; // checkerSecondaryField('EPLC_EXAMINATION') === 'ibNumber' — searchCheckerLc() requires it before it will search at all
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE' });
-
-      comp.approveArrival();
-
-      expect(comp.lookUp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
-      expect(comp.lookUp.lookupError).toBeNull();
-    });
+    // REMOVED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — this test's own end-to-end
+    // path went through approveArrival() (B3's former deferSettlementRequiresBackendAck branch, which
+    // called syncCheckerToContext() in its own success callback). B3 no longer routes through
+    // approveArrival() at all (checkerAct() now sends it straight to the plain api.release() path,
+    // which already syncs the Checker context via the SAME mechanism every other plain-path function
+    // uses — see release()'s own tests). The underlying EPLC_EXAMINATION -> EPLC_CONFIRMATION mapping
+    // this test was ALSO proving is still directly covered by the it.each block immediately above.
   });
 
   // ---------------------------------------------------------------------
@@ -1059,7 +1070,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.submitError).toBe('Acceptance settled, but the matching Reimbursement Receivable failed to release: ILLEGAL_STATE_TRANSITION');
     });
 
-    it('B4 Sight full compound release: source (B3 record) -> Confirmation HONOUR -> Due from Issuing Bank asset', () => {
+    // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
+    // earmark) is now independently Checker-Released BEFORE B4 ever picks it, so B4's own compound
+    // release no longer re-releases it — the former "release source first" call is gone from every one
+    // of these tests, and every remaining api.release mock/assertion index shifts down by one.
+    it('B4 Sight full compound release: Confirmation HONOUR -> Due from Issuing Bank asset (does NOT re-release the already-RELEASED B3 source)', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'HONOUR';
@@ -1068,15 +1083,14 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
       api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-b3', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
 
       comp.release();
 
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-b3', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-honour', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-honour', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(2);
       // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B4);
       expect(comp.submitResult).toBeNull();
@@ -1093,7 +1107,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
       api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-b3', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
@@ -1102,7 +1115,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.submitError).toBe('Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ILLEGAL_STATE_TRANSITION');
     });
 
-    it('B4 Usance full compound release: source -> ACCEPT -> Acceptance liability -> Receivable asset', () => {
+    it('B4 Usance full compound release: ACCEPT -> Acceptance liability -> Receivable asset (does NOT re-release the already-RELEASED B3 source)', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'ACCEPT';
@@ -1112,17 +1125,16 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
       api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-b3', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
 
       comp.release();
 
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-b3', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-accept', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(3, 'mv-acceptance', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(4, 'mv-receivable', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-accept', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(3);
       // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B4);
       expect(comp.submitResult).toBeNull();
@@ -1139,13 +1151,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
       api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-b3', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
-      expect(api.release).toHaveBeenCalledTimes(3);
+      expect(api.release).toHaveBeenCalledTimes(2);
       expect(comp.submitError).toBe('Confirmation accepted, but the Acceptance liability failed to release: ILLEGAL_STATE_TRANSITION');
     });
 
@@ -1159,7 +1170,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
       api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-b3', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1465,17 +1475,21 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.reject).toHaveBeenCalledWith('mv-2', comp.checkerId, 'MANUAL_QUEUE_REJECT');
     });
 
-    it('deferSettlementMovementType (B3, CREATE): routes through approveArrival() for a CREATE movement', () => {
+    // SUPERSEDED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B3 no longer sets
+    // deferSettlement at all, so checkerAct('release') for it now falls all the way through to the
+    // plain api.release path, same as A2/A8/etc. — it never routes through approveArrival() any more.
+    it('B3 (no longer deferSettlement): checkerAct release calls api.release directly, never approveArrival()', () => {
       const { comp, api } = setup();
       comp.selectFunction(B3);
+      comp.checkerId = 'checker8';
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-3', movementType: 'CREATE' });
       comp.submitResult = null;
       const approveSpy = jest.spyOn(comp, 'approveArrival').mockImplementation(() => undefined);
 
       comp.checkerAct('release');
 
-      expect(approveSpy).toHaveBeenCalledTimes(1);
-      expect(api.release).not.toHaveBeenCalled();
+      expect(approveSpy).not.toHaveBeenCalled();
+      expect(api.release).toHaveBeenCalledWith('mv-3', 'checker8');
     });
 
     it('plain path (A2, no defer/compound flags): release calls api.release directly', () => {
@@ -1636,13 +1650,18 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // runLookup()
   // ---------------------------------------------------------------------
   describe('runLookup()', () => {
-    it('success: resolves the contract, snapshot, and event timeline (sorted by eventSeq)', () => {
+    it('success: resolves the contract, snapshot, and event timeline (sorted by true Event Date/Time, not eventSeq)', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(
         of(makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } })) as any,
       );
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '750' })) as any);
-      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
+      api.listMovements.mockReturnValueOnce(
+        of([
+          makeMovement({ movementId: 'm2', eventSeq: 2, createdAt: '2026-08-18T02:00:00.000Z' }),
+          makeMovement({ movementId: 'm1', eventSeq: 1, createdAt: '2026-08-18T01:00:00.000Z' }),
+        ]) as any,
+      );
       comp.lookUp.lookup = { instrumentType: 'SHGT', lcNumber: 'LC001', ibNumber: '', sgNumber: 'SG01' };
 
       comp.lookUp.runLookup();
@@ -1775,6 +1794,44 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.catalog).not.toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001');
     });
 
+    // Bug fixed 2026-08-18, reviewer-reported live ("Look Up Current Balance → Event Timeline 明顯有漏
+    //資料...主要漏掉的是 B3 Present Docs / EPLC_EXAMINATION 的 Earmark Events") — the Confirmed LC's own
+    // Tab 1 Event Timeline previously only ever fetched movements for the LC's OWN contract, so every
+    // B3/EPLC_EXAMINATION Earmark event (each living on its own separate per-E01/E02/E03 contract) was
+    // invisible here even though Inquire Events' own already-merged timeline showed them correctly.
+    it('EPLC_CONFIRMATION contract: merges every B3/EPLC_EXAMINATION Earmark event into the LC tab timeline, sorted by true Event Date/Time across contracts', () => {
+      const { comp, api } = setup();
+      const confirmationLc = makeContract({ balanceContractId: 'bc-conf-1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } });
+      const examE01 = makeContract({ balanceContractId: 'bc-exam-e01', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'U01', ibNumber: 'E01', sgNumber: null } });
+      const examE02 = makeContract({ balanceContractId: 'bc-exam-e02', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'U01', ibNumber: 'E02', sgNumber: null } });
+      api.resolveContract.mockReturnValueOnce(of(confirmationLc) as any);
+      (api.catalog as any).mockImplementation((instrumentType: string) =>
+        instrumentType === 'EPLC_EXAMINATION'
+          ? of({ items: [examE01, examE02], total: 2, page: 1, pageSize: 50 })
+          : of({ items: [], total: 0, page: 1, pageSize: 50 }),
+      );
+      (api.listMovements as any).mockImplementation((contractId: string) => {
+        if (contractId === 'bc-conf-1') return of([makeMovement({ movementId: 'mv-issue', movementType: 'ISSUE', status: 'RELEASED', createdAt: '2026-08-18T01:00:00.000Z' })]);
+        if (contractId === 'bc-exam-e01') return of([makeMovement({ movementId: 'mv-exam-e01', movementType: 'CREATE', status: 'RELEASED', createdAt: '2026-08-18T02:00:00.000Z' })]);
+        if (contractId === 'bc-exam-e02') return of([makeMovement({ movementId: 'mv-exam-e02', movementType: 'CREATE', status: 'PENDING', createdAt: '2026-08-18T03:00:00.000Z' })]);
+        return of([]);
+      });
+      comp.lookUp.lookup = { instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'U01', ibNumber: '', sgNumber: '' };
+
+      comp.lookUp.runLookup();
+
+      expect(comp.lookUp.lookupMovements.map((row: any) => row.movement.movementId)).toEqual(['mv-issue', 'mv-exam-e01', 'mv-exam-e02']);
+      const [issueRow, e01Row, e02Row] = comp.lookUp.lookupMovements;
+      expect(issueRow.contract.instrumentType).toBe('EPLC_CONFIRMATION');
+      expect(e01Row.contract.instrumentType).toBe('EPLC_EXAMINATION');
+      expect(e01Row.contract.naturalKey.ibNumber).toBe('E01');
+      expect(e02Row.contract.naturalKey.ibNumber).toBe('E02');
+      // Status mapping stays the SAME shared logic (isEarmarkFunction) both screens use — B3 RELEASED →
+      // EARMARKED, B3 still-PENDING → EARMARKING — matching the reported table exactly.
+      expect(comp.displayStatus(e01Row.eventStatus, e01Row.contract.instrumentType, e01Row.movement.movementType, e01Row.phase)).toBe('EARMARKED');
+      expect(comp.displayStatus(e02Row.eventStatus, e02Row.contract.instrumentType, e02Row.movement.movementType, e02Row.phase)).toBe('EARMARKING');
+    });
+
     it('listMovements error resets lookupMovements to empty (independent of a successful resolveContract/getSnapshot)', () => {
       const { comp, api } = setup();
       api.resolveContract.mockReturnValueOnce(of(makeContract()) as any);
@@ -1887,11 +1944,16 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // selectLookupSg()
   // ---------------------------------------------------------------------
   describe('selectLookupSg()', () => {
-    it('found: loads snapshot + event timeline sorted by eventSeq', () => {
+    it('found: loads snapshot + event timeline sorted by true Event Date/Time, not eventSeq', () => {
       const { comp, api } = setup();
       comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' })];
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '250' })) as any);
-      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
+      api.listMovements.mockReturnValueOnce(
+        of([
+          makeMovement({ movementId: 'm2', eventSeq: 2, createdAt: '2026-08-18T02:00:00.000Z' }),
+          makeMovement({ movementId: 'm1', eventSeq: 1, createdAt: '2026-08-18T01:00:00.000Z' }),
+        ]) as any,
+      );
 
       comp.lookUp.selectLookupSg('bc-sg-1');
 
@@ -1931,12 +1993,17 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // selectLookupAcceptance()
   // ---------------------------------------------------------------------
   describe('selectLookupAcceptance()', () => {
-    it('found: loads snapshot + event timeline sorted by eventSeq, independent of the LC tab', () => {
+    it('found: loads snapshot + event timeline sorted by true Event Date/Time, not eventSeq, independent of the LC tab', () => {
       const { comp, api } = setup();
       comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
       comp.lookUp.lookupResult = { contract: makeContract({ balanceContractId: 'bc-lc-1' }), snapshot: makeSnapshot({ availableBalance: '999' }) };
       api.getSnapshot.mockReturnValueOnce(of(makeSnapshot({ availableBalance: '400' })) as any);
-      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'm2', eventSeq: 2 }), makeMovement({ movementId: 'm1', eventSeq: 1 })]) as any);
+      api.listMovements.mockReturnValueOnce(
+        of([
+          makeMovement({ movementId: 'm2', eventSeq: 2, createdAt: '2026-08-18T02:00:00.000Z' }),
+          makeMovement({ movementId: 'm1', eventSeq: 1, createdAt: '2026-08-18T01:00:00.000Z' }),
+        ]) as any,
+      );
 
       comp.lookUp.selectLookupAcceptance('bc-acc-1');
 

@@ -89,7 +89,19 @@ export class CheckerActionsService {
     // via resolveSettlesDocumentArrivalIds() (source: referencedTransactionId, stamped on the primary
     // at Submit time — businessEventId can't help here since the source predates this submission;
     // downstream legs: businessEventId lookup, same mechanism as A3S/B5) before this chain runs at all.
+    //
+    // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
+    // earmark) is now independently Checker-Released BEFORE B4 ever picks it (payableMovementRequiresRelease
+    // gates its Step-2 picker to already-RELEASED candidates only), so it must NOT be released again here
+    // — re-releasing an already-RELEASED movement is illegal (409). The microservice's own release()
+    // marks it "consumed" as a side effect of releasing the primary below (via referencedTransactionId),
+    // so B4 skips straight to that. A6's own source (a Usance Document Arrival, still acknowledgment-only
+    // — see balance-component.model.ts's own deferSettlement doc comment) is UNCHANGED — it has no
+    // payableMovementRequiresRelease flag, so it still takes the release-the-source-first path below.
     if (ctx.selectedFunction?.settlesDocumentArrival) {
+      if (ctx.selectedFunction?.payableMovementRequiresRelease) {
+        return this.resolveSettlesDocumentArrivalIds(ctx).pipe(switchMap((ids) => this.releaseAcceptance(checkerId, ctx, ids)));
+      }
       return this.resolveSettlesDocumentArrivalIds(ctx).pipe(
         switchMap((ids) => {
           if (!ids.sourceMovementId) {

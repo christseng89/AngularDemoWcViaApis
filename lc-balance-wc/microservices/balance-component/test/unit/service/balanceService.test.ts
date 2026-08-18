@@ -361,69 +361,26 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     expect(examCreate.movement.rootEventSnapshot!.presentDocsEarmarkPending).toBe('40000');
     expect(examCreate.movement.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('0');
 
-    // release() here is B4's own real finalization/consumption of the presentation — genuinely
-    // different from B3's own acknowledge() (which never touches status). 2026-08-18 ("SAME AS EXPORT
-    // CONFIRMED LC... 不應該因為後續交易而改變" — superseding this test's own prior "release() clears it
-    // to 0" expectation): B3's own rootEventSnapshot must stay frozen at whatever createMovement()
-    // captured (B3's own transaction time), unaffected by B4's own later release() — the isPresentDocsFinalize
-    // fix in release() now leaves it untouched instead of recomputing/clearing it.
+    // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B3's own release() is now a
+    // genuine, standalone finalization (PENDING -> RELEASED on its own record, not a side effect of B4)
+    // — the presentation moves from Pending to Approved (still occupying Present Docs Earmark capacity,
+    // per computePresentDocsEarmark's own doc comment, until B4 later consumes it — presentDocsConsumedAt
+    // stays null here since B4 hasn't acted). rootEventSnapshot is recomputed at release() time like any
+    // other child-ledger movement, reflecting this transition — superseding the prior, now-removed
+    // isPresentDocsFinalize freeze.
     const examReleased = service.release(examCreate.movement.movementId, 'checker1');
-    expect(examReleased.rootEventSnapshot).toEqual(examCreate.movement.rootEventSnapshot);
-    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('40000');
-    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('0');
+    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('0');
+    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('40000');
   });
 
-  test('EPLC_EXAMINATION rootEventSnapshot correctly shows Approved (not Pending) after B3 acknowledge()', () => {
-    const service = new BalanceService(createDb(':memory:'));
-    const cnfIssue = service.createMovement({
-      instrumentType: 'EPLC_CONFIRMATION',
-      naturalKey: { lcNumber: 'EVSNAP-008' },
-      movementType: 'ISSUE',
-      eventSeq: 1,
-      amount: '100000',
-      currency: 'USD',
-      createdBy: 'maker1',
-    });
-    if (!cnfIssue.created) throw new Error('expected a new movement');
-    service.release(cnfIssue.movement.movementId, 'checker1');
-    const confirmation = service.resolveContract('EPLC_CONFIRMATION', { lcNumber: 'EVSNAP-008' });
-    if (!confirmation) throw new Error('expected the just-issued Confirmation to resolve');
-
-    const examCreate = service.createMovement({
-      instrumentType: 'EPLC_EXAMINATION',
-      naturalKey: { lcNumber: 'EVSNAP-008', ibNumber: 'EB01' },
-      movementType: 'CREATE',
-      eventSeq: 1,
-      amount: '40000',
-      currency: 'USD',
-      parentLogicalContractId: confirmation.logicalContractId,
-      createdBy: 'maker1',
-    });
-    if (!examCreate.created) throw new Error('expected a new movement');
-
-    service.acknowledge(examCreate.movement.movementId, 'checker1');
-    // acknowledge() itself doesn't touch rootEventSnapshot (out of scope, not a create/release
-    // transition) — a fresh live query against the PARENT Confirmation's own contract independently
-    // proves the Approved bucket now correctly reflects the acknowledgment.
-    const acknowledgedParent = service.getBalanceSnapshot(confirmation.balanceContractId);
-    expect(acknowledgedParent.presentDocsEarmarkApproved).toBe('40000');
-
-    // 2026-08-18 ("SAME AS EXPORT CONFIRMED LC") — B3's own rootEventSnapshot stays frozen at its own
-    // Create-time value (Pending 40000/Approved 0) even after acknowledge() AND release() — neither
-    // touches it; superseding this test's own prior "release() clears it to 0" expectation.
-    const examReleased = service.release(examCreate.movement.movementId, 'checker1');
-    expect(examReleased.rootEventSnapshot).toEqual(examCreate.movement.rootEventSnapshot);
-    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('40000');
-    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('0');
-  });
-
-  // 2026-08-18, business instruction ("SAME AS EXPORT CONFIRMED LC — Confirmed LC Balance and Acceptance
-  // Balance snapshots must not change due to a later transaction") — the Export-side
-  // analog of the S01/SG case: B3's own Present Docs earmark is submitted BEFORE any Acceptance exists
-  // under a Usance Confirmed LC; its own acceptanceEventSnapshot must stay null (correctly reflecting
-  // "no Acceptance yet"), even after an Acceptance is later created AND B4's own compound release
-  // finalizes B3's own record for real.
-  test("B3's own acceptanceEventSnapshot stays frozen (null — no Acceptance existed yet) even after an Acceptance is later created and B4 finalizes B3's own record", () => {
+  // SUPERSEDED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") — the
+  // prior "SAME AS EXPORT CONFIRMED LC" freeze applied to B3 on the reasoning that its own release() was
+  // always B4's much-later finalization of an old submission, so the sibling snapshot had to stay frozen
+  // at Create-time to avoid retroactively populating it. B3's own release() is now a genuine, standalone
+  // Checker action — there is no "much later" gap to protect against — so this test now proves the
+  // OPPOSITE: acceptanceEventSnapshot is captured FRESH at B3's own release() time, same as every other
+  // child-ledger movement's own release()-time capture.
+  test("B3's own acceptanceEventSnapshot is captured fresh at its own real release() (not frozen at Create) — reflects an Acceptance created in between", () => {
     const service = new BalanceService(createDb(':memory:'));
     const cnfIssue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
@@ -469,10 +426,12 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     if (!acceptCreate.created) throw new Error('expected a new movement');
     service.release(acceptCreate.movement.movementId, 'checker1');
 
-    // B4 finalizes B3's own record for real, hours "later" — this must NOT retroactively populate B3's
-    // own acceptanceEventSnapshot with the Acceptance that didn't exist at B3's own transaction time.
+    // B3's own real, standalone Checker Release now happens — since an Acceptance genuinely exists by
+    // this moment, its own acceptanceEventSnapshot correctly captures it (not null), same as any other
+    // child-ledger movement's own release()-time sibling capture.
     const examReleased = service.release(examCreate.movement.movementId, 'checker1');
-    expect(examReleased.acceptanceEventSnapshot).toBeNull();
+    expect(examReleased.acceptanceEventSnapshot).not.toBeNull();
+    expect(examReleased.acceptanceEventSnapshot!.balanceContractId).toBe(acceptCreate.movement.balanceContractId);
   });
 
   test('Acceptance events ALSO get a rootEventSnapshot now (parent LC\'s own balance) — confirmed via the revised, generalized "Look Up Current Balance saved to DB" design; their own eventSnapshot stays their own ledger', () => {
@@ -819,5 +778,213 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       createdBy: 'maker1',
     });
     expect(sgIssue.created).toBe(true);
+  });
+});
+
+/**
+ * Business instruction 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易" — every transaction
+ * must genuinely RELEASE before the next step in the flow can act on it) — B3 (Present Docs,
+ * EPLC_EXAMINATION/CREATE) now RELEASEs on its own, real Checker action (the standard `release()`, same
+ * as every other function), superseding the prior acknowledge()-only design (see this file's own removed
+ * `service.acknowledge` test above and `domain/offBalanceExposure.ts`'s own basis-change doc comment).
+ * `presentDocsConsumedAt`/`presentDocsConsumedBy` (set as a side effect of `release()` on the
+ * Confirmation's own linked HONOUR/ACCEPT — via that movement's own `referencedTransactionId` pointing
+ * back at the EPLC_EXAMINATION CREATE) is what now tracks "consumed by B4", preserving the ORIGINAL
+ * Present Docs Earmark commitment-control intent across this now-real PENDING->RELEASED transition.
+ */
+describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely RELEASEs on its own, and B4 marks it consumed via referencedTransactionId', () => {
+  function issueConfirmation(service: BalanceService, lcNumber: string) {
+    const issue = service.createMovement({
+      instrumentType: 'EPLC_CONFIRMATION',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+    const confirmation = service.resolveContract('EPLC_CONFIRMATION', { lcNumber });
+    if (!confirmation) throw new Error('expected the just-issued Confirmation to resolve');
+    return confirmation;
+  }
+
+  test("B3's own release() genuinely transitions PENDING -> RELEASED, independent of B4 (no acknowledge() call involved)", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const confirmation = issueConfirmation(service, 'RELB3-001');
+    const exam = service.createMovement({
+      instrumentType: 'EPLC_EXAMINATION',
+      naturalKey: { lcNumber: 'RELB3-001', ibNumber: 'E01' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      parentLogicalContractId: confirmation.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!exam.created) throw new Error('expected a new movement');
+    expect(exam.movement.status).toBe('PENDING');
+
+    const released = service.release(exam.movement.movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+    expect(released.releasedBy).toBe('checker1');
+    expect(released.presentDocsConsumedAt).toBeNull();
+  });
+
+  test("releasing an already-RELEASED EPLC_EXAMINATION/CREATE throws (B4's own compound release must never attempt this any more)", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const confirmation = issueConfirmation(service, 'RELB3-002');
+    const exam = service.createMovement({
+      instrumentType: 'EPLC_EXAMINATION',
+      naturalKey: { lcNumber: 'RELB3-002', ibNumber: 'E01' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      parentLogicalContractId: confirmation.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!exam.created) throw new Error('expected a new movement');
+    service.release(exam.movement.movementId, 'checker1');
+    expect(() => service.release(exam.movement.movementId, 'checker1')).toThrow(IllegalStateTransitionError);
+  });
+
+  test("releasing B4's own linked HONOUR (referencedTransactionId -> the B3 CREATE) marks that presentation's own presentDocsConsumedAt/By as a side effect, without touching its status (already RELEASED)", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const confirmation = issueConfirmation(service, 'RELB3-003');
+    const exam = service.createMovement({
+      instrumentType: 'EPLC_EXAMINATION',
+      naturalKey: { lcNumber: 'RELB3-003', ibNumber: 'E01' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      parentLogicalContractId: confirmation.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!exam.created) throw new Error('expected a new movement');
+    service.release(exam.movement.movementId, 'checker1');
+
+    const honour = service.createMovement({
+      instrumentType: 'EPLC_CONFIRMATION',
+      balanceContractId: confirmation.balanceContractId,
+      movementType: 'HONOUR',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      referencedTransactionId: exam.movement.movementId,
+      createdBy: 'maker1',
+    });
+    if (!honour.created) throw new Error('expected a new movement');
+
+    service.release(honour.movement.movementId, 'checker2');
+
+    const consumedExam = service.listMovements(exam.movement.balanceContractId).find((m) => m.movementId === exam.movement.movementId);
+    expect(consumedExam?.status).toBe('RELEASED');
+    expect(consumedExam?.presentDocsConsumedAt).not.toBeNull();
+    expect(consumedExam?.presentDocsConsumedBy).toBe('checker2');
+  });
+
+  test('Present Docs Earmark stays fully occupied while a presentation is RELEASED-but-not-yet-consumed — an independent second presentation whose combined total would exceed Available Balance is still correctly rejected, and the earmark only drops once B4 actually consumes it (the exact over-commitment window the 2026-08-18 basis change protects)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const confirmation = issueConfirmation(service, 'RELB3-004');
+    const exam = service.createMovement({
+      instrumentType: 'EPLC_EXAMINATION',
+      naturalKey: { lcNumber: 'RELB3-004', ibNumber: 'E01' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '60000',
+      currency: 'USD',
+      parentLogicalContractId: confirmation.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!exam.created) throw new Error('expected a new movement');
+    service.release(exam.movement.movementId, 'checker1');
+    expect(service.getBalanceSnapshot(confirmation.balanceContractId).presentDocsEarmarkApproved).toBe('60000');
+
+    // Still occupies capacity (RELEASED, not yet consumed) — an independent 50,000 presentation against
+    // the same 100,000 Confirmation must still be rejected (combined 110,000 > 100,000 Available). If
+    // RELEASED alone had dropped E01 out of the earmark (the alternative design NOT chosen — see
+    // domain/offBalanceExposure.ts's own doc comment), this would have wrongly succeeded.
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'RELB3-004', ibNumber: 'E02' },
+        movementType: 'CREATE',
+        eventSeq: 2,
+        amount: '50000',
+        currency: 'USD',
+        parentLogicalContractId: confirmation.logicalContractId,
+        createdBy: 'maker1',
+      }),
+    ).toThrow(/Present Docs amount 50000 exceeds/);
+
+    // B4 now consumes E01 (Honour, referencing it) — its own earmark contribution drops to 0 once
+    // consumed (the SAME 60,000 capacity is now reflected as a real reduction of the Confirmation's own
+    // Available Balance instead — converted, not doubled or leaked).
+    const honour = service.createMovement({
+      instrumentType: 'EPLC_CONFIRMATION',
+      balanceContractId: confirmation.balanceContractId,
+      movementType: 'HONOUR',
+      eventSeq: 2,
+      amount: '60000',
+      currency: 'USD',
+      referencedTransactionId: exam.movement.movementId,
+      createdBy: 'maker1',
+    });
+    if (!honour.created) throw new Error('expected a new movement');
+    service.release(honour.movement.movementId, 'checker1');
+    expect(service.getBalanceSnapshot(confirmation.balanceContractId).presentDocsEarmarkApproved).toBe('0');
+  });
+
+  test("releasing A6's own linked Acceptance CREATE (referencedTransactionId -> an IPLC_LC/UTILIZE, Import side) never triggers the B3-consume side effect — scoped to EPLC_EXAMINATION only", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lcIssue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'RELB3-005' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      createdBy: 'maker1',
+    });
+    if (!lcIssue.created) throw new Error('expected a new movement');
+    service.release(lcIssue.movement.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber: 'RELB3-005' });
+    if (!lc) throw new Error('expected the just-issued LC to resolve');
+
+    const arrival = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: 2,
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!arrival.created) throw new Error('expected a new movement');
+    service.release(arrival.movement.movementId, 'checker1');
+
+    const acceptance = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'RELB3-005', ibNumber: 'B01' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '40000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.logicalContractId,
+      referencedTransactionId: arrival.movement.movementId,
+      createdBy: 'maker1',
+    });
+    if (!acceptance.created) throw new Error('expected a new movement');
+
+    // Must not throw and must not attempt to touch the (already-RELEASED, plain IPLC_LC/UTILIZE)
+    // referenced movement's own presentDocsConsumedAt — it isn't an EPLC_EXAMINATION/CREATE at all, so
+    // the auto-consume side effect's own type/instrumentType guard must correctly skip it.
+    expect(() => service.release(acceptance.movement.movementId, 'checker1')).not.toThrow();
   });
 });

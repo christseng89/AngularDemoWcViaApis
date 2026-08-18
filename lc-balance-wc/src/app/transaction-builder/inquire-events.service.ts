@@ -116,6 +116,43 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
   ];
 }
 
+/**
+ * Fetches one contract's own movements, flattened into InquiredEvent rows via toEventRows() — the base
+ * unit both InquireEventsService's own loadEvents() and LookUpPanelService's own Export Confirmed LC
+ * merge (see childMovementsOf$'s own doc comment below) build on. Exported as a free function, not a
+ * private class method, so both services call the exact same implementation rather than maintaining two
+ * copies — the same "share the function, not the behavior" convention toEventRows() itself already
+ * established for this pair of services.
+ */
+export function movementsOf$(api: BalanceComponentApiService, contract: BalanceContract): Observable<InquiredEvent[]> {
+  return api.listMovements(contract.balanceContractId).pipe(
+    map((movements) => movements.flatMap((movement) => toEventRows(movement, contract))),
+    catchError(() => of([] as InquiredEvent[])),
+  );
+}
+
+/**
+ * Fetches every movement under every contract of the given instrumentType matching lcNumber, flattened
+ * via movementsOf$() above. Used by InquireEventsService's own loadEvents() (every child instrumentType,
+ * to build its one merged cross-ledger timeline) and, since 2026-08-18, by LookUpPanelService's own LC
+ * tab for an Export Confirmed LC specifically (EPLC_EXAMINATION only) — bug fix, reviewer-reported live:
+ * "Look Up Current Balance → Event Timeline 明顯有漏資料...主要漏掉的是 B3 Present Docs /
+ * EPLC_EXAMINATION 的 Earmark Events". Root cause: B3/EPLC_EXAMINATION is MEMO_ONLY with no
+ * BALANCE_SNAPSHOT_LABEL entry, so it has no dedicated Balance Tab of its own in Look Up Current
+ * Balance (unlike Import LC's own SG/Acceptance children, which each already have one) — its own
+ * movements live on separate per-E01/E02/E03 BalanceContract rows the Confirmed LC's own Tab 1 Event
+ * Timeline never fetched, so they were invisible everywhere in that panel even though Inquire Events'
+ * own already-merged timeline (via childInstrumentTypesOf()) already showed them correctly. See
+ * LookUpPanelService's own loadSnapshotAndMovements() doc comment for the fix itself.
+ */
+export function childMovementsOf$(api: BalanceComponentApiService, instrumentType: InstrumentType, lcNumber: string): Observable<InquiredEvent[]> {
+  return api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).pipe(
+    switchMap((page) => (page.items.length ? forkJoin(page.items.map((c) => movementsOf$(api, c))) : of([] as InquiredEvent[][]))),
+    map((groups) => groups.flat()),
+    catchError(() => of([] as InquiredEvent[])),
+  );
+}
+
 /** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
 export interface EventBalanceTab {
   key: 'LC' | 'ACCEPTANCE' | 'SG';
@@ -336,27 +373,12 @@ export class InquireEventsService {
   private loadEvents(root: BalanceContract): void {
     this.eventsLoading = true;
     const childTypes = childInstrumentTypesOf(root.instrumentType);
-    forkJoin([this.movementsOf(root), ...childTypes.map((childType) => this.childMovementsOf(childType, root.naturalKey.lcNumber))]).subscribe((groups) => {
+    forkJoin([movementsOf$(this.api, root), ...childTypes.map((childType) => childMovementsOf$(this.api, childType, root.naturalKey.lcNumber))]).subscribe((groups) => {
       this.eventsLoading = false;
       this.events = groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
       this.eventsPaging.total = this.events.length;
       this.eventsPaging.page = 1;
     });
-  }
-
-  private movementsOf(contract: BalanceContract): Observable<InquiredEvent[]> {
-    return this.api.listMovements(contract.balanceContractId).pipe(
-      map((movements) => movements.flatMap((movement) => toEventRows(movement, contract))),
-      catchError(() => of([] as InquiredEvent[])),
-    );
-  }
-
-  private childMovementsOf(instrumentType: InstrumentType, lcNumber: string): Observable<InquiredEvent[]> {
-    return this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).pipe(
-      switchMap((page) => (page.items.length ? forkJoin(page.items.map((c) => this.movementsOf(c))) : of([] as InquiredEvent[][]))),
-      map((groups) => groups.flat()),
-      catchError(() => of([] as InquiredEvent[])),
-    );
   }
 
   /**

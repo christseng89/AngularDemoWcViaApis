@@ -148,18 +148,20 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.selectedPayMovement?.movementId).toBe('M1');
     });
 
-    it('B4 (movementTypeFromContractTenor + payableMovementInstrumentType): derives HONOUR for a Sight Confirmation and loads still-PENDING B3 CREATEs across child EPLC_EXAMINATION contracts', () => {
+    it('B4 (movementTypeFromContractTenor + payableMovementInstrumentType): derives HONOUR for a Sight Confirmation and loads already-RELEASED B3 CREATEs across child EPLC_EXAMINATION contracts', () => {
       const examinationContract = makeContract({
         balanceContractId: 'EX1',
         instrumentType: 'EPLC_EXAMINATION',
         naturalKey: { lcNumber: 'EXP1', ibNumber: 'EB01', sgNumber: null },
       });
-      const pendingCreate = { movementId: 'MX1', status: 'PENDING', movementType: 'CREATE', amount: '2000', acknowledgedAt: '2026-08-16T00:00:00Z' };
+      // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own candidate filter now
+      // looks for status === 'RELEASED' (B3's own genuine Checker Release), not 'PENDING'+acknowledgedAt.
+      const releasedCreate = { movementId: 'MX1', status: 'RELEASED', movementType: 'CREATE', amount: '2000' };
       const api = makeApi({
         catalog: jest.fn((instrumentType: InstrumentType) =>
           instrumentType === 'EPLC_EXAMINATION' ? of(makeCatalogPage([examinationContract])) : of(makeCatalogPage([])),
         ),
-        listMovements: jest.fn((id: string) => (id === 'EX1' ? of([pendingCreate]) : of([]))),
+        listMovements: jest.fn((id: string) => (id === 'EX1' ? of([releasedCreate]) : of([]))),
       });
       const comp = makeComponent(getFn('B4'), api);
       comp.catalogPicker.contracts = [
@@ -188,18 +190,20 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(api.catalog).toHaveBeenCalledWith('EPLC_EXAMINATION', 'ACTIVE', undefined, 1, 50, 'EXP1');
     });
 
-    it('B4: derives ACCEPT for a Usance Confirmation, and excludes a not-yet-acknowledged B3 record (payableMovementRequiresAcknowledgment)', () => {
+    it('B4: derives ACCEPT for a Usance Confirmation, and excludes a still-PENDING (not yet genuinely Released) B3 record (payableMovementRequiresRelease)', () => {
       const examinationContract = makeContract({
         balanceContractId: 'EX2',
         instrumentType: 'EPLC_EXAMINATION',
         naturalKey: { lcNumber: 'EXP2', ibNumber: 'EB02', sgNumber: null },
       });
-      const unacknowledgedCreate = { movementId: 'MX2', status: 'PENDING', movementType: 'CREATE', amount: '3000' }; // no acknowledgedAt
+      // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — a B3 record that hasn't been
+      // genuinely Checker-Released yet (still PENDING) must not be selectable by B4.
+      const stillPendingCreate = { movementId: 'MX2', status: 'PENDING', movementType: 'CREATE', amount: '3000' };
       const api = makeApi({
         catalog: jest.fn((instrumentType: InstrumentType) =>
           instrumentType === 'EPLC_EXAMINATION' ? of(makeCatalogPage([examinationContract])) : of(makeCatalogPage([])),
         ),
-        listMovements: jest.fn((id: string) => (id === 'EX2' ? of([unacknowledgedCreate]) : of([]))),
+        listMovements: jest.fn((id: string) => (id === 'EX2' ? of([stillPendingCreate]) : of([]))),
       });
       const comp = makeComponent(getFn('B4'), api);
       comp.catalogPicker.contracts = [
@@ -214,7 +218,48 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.onSelectContract('CNF2');
 
       expect(comp.model.movementType).toBe('ACCEPT');
-      expect(comp.payableMovements).toHaveLength(0); // filtered out — not acknowledged
+      expect(comp.payableMovements).toHaveLength(0); // filtered out — still PENDING, not yet Released
+    });
+
+    // Bug fixed 2026-08-18, reviewer-reported live ("Export Confirmed LC Sight B4 Submit後 不應該再出現
+    // S01 E01 E02" — a presentation B4 has ALREADY consumed kept showing up as a pickable candidate
+    // again): status alone isn't enough — an already-consumed record stays RELEASED forever (it never
+    // transitions again), so status === 'RELEASED' alone kept matching it. Must also exclude anything
+    // with presentDocsConsumedAt already set.
+    it('B4: excludes an already-consumed B3 record (RELEASED, but presentDocsConsumedAt already set by an earlier B4)', () => {
+      const examinationContract = makeContract({
+        balanceContractId: 'EX3',
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'EXP3', ibNumber: 'EB03', sgNumber: null },
+      });
+      const consumedCreate = {
+        movementId: 'MX3',
+        status: 'RELEASED',
+        movementType: 'CREATE',
+        amount: '4000',
+        presentDocsConsumedAt: '2026-08-18T11:10:14.392Z',
+        presentDocsConsumedBy: 'checker1',
+      };
+      const api = makeApi({
+        catalog: jest.fn((instrumentType: InstrumentType) =>
+          instrumentType === 'EPLC_EXAMINATION' ? of(makeCatalogPage([examinationContract])) : of(makeCatalogPage([])),
+        ),
+        listMovements: jest.fn((id: string) => (id === 'EX3' ? of([consumedCreate]) : of([]))),
+      });
+      const comp = makeComponent(getFn('B4'), api);
+      comp.catalogPicker.contracts = [
+        makeContract({
+          balanceContractId: 'CNF3',
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: 'EXP3', ibNumber: null, sgNumber: null },
+          tenorType: 'SIGHT',
+        }),
+      ];
+
+      comp.onSelectContract('CNF3');
+
+      expect(comp.model.movementType).toBe('HONOUR');
+      expect(comp.payableMovements).toHaveLength(0); // filtered out — already consumed by an earlier B4
     });
 
     it("A3S (documentArrivalWithSg): loads the LC's outstanding SHGT records and auto-picks/fetches the sole one's snapshot", () => {

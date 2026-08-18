@@ -3,8 +3,9 @@
  * business logic here (that lives in src/domain/). Design doc §3.2 —
  * append-only: this store never physically deletes a row, only inserts new
  * ones and updates `status`/`released_by`/`released_at`/`reason_code`/
- * `acknowledged_by`/`acknowledged_at` (2026-08-15, B3's own Present Docs
- * Earmark acknowledgment — see acknowledge() below).
+ * `present_docs_consumed_by`/`present_docs_consumed_at` (2026-08-18, B3's own
+ * Present Docs Earmark consumption by B4 — see markPresentDocsConsumed()
+ * below; supersedes the historical `acknowledged_by`/`acknowledged_at`).
  */
 import type { Db } from '../db';
 import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
@@ -53,6 +54,8 @@ interface MovementRow {
   finalize_event_snapshot: string | null;
   finalize_acceptance_event_snapshot: string | null;
   finalize_sg_event_snapshot: string | null;
+  present_docs_consumed_at: string | null;
+  present_docs_consumed_by: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -100,6 +103,8 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     finalizeEventSnapshot: row.finalize_event_snapshot ? (JSON.parse(row.finalize_event_snapshot) as BalanceSnapshot) : null,
     finalizeAcceptanceEventSnapshot: row.finalize_acceptance_event_snapshot ? (JSON.parse(row.finalize_acceptance_event_snapshot) as BalanceSnapshot) : null,
     finalizeSgEventSnapshot: row.finalize_sg_event_snapshot ? (JSON.parse(row.finalize_sg_event_snapshot) as BalanceSnapshot) : null,
+    presentDocsConsumedAt: row.present_docs_consumed_at,
+    presentDocsConsumedBy: row.present_docs_consumed_by,
   };
 }
 
@@ -356,14 +361,27 @@ export class BalanceMovementStore {
       });
   }
 
-  /** B3's own Checker acknowledgment (2026-08-15) — sets acknowledged_by/acknowledged_at only, never touches status. */
-  acknowledge(params: { movementId: string; acknowledgedBy: string; acknowledgedAt: string }): void {
+  /**
+   * 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — marks an EPLC_EXAMINATION CREATE
+   * (B3's own Present Docs earmark) as consumed by B4, as a side effect of `release()` on the
+   * Confirmation's own linked HONOUR/ACCEPT movement — see `BalanceService.release()`'s own doc comment
+   * for when this is called, and `domain/offBalanceExposure.ts`'s own doc comment for what reading
+   * `present_docs_consumed_at` actually controls. Sets present_docs_consumed_by/present_docs_consumed_at
+   * only, never touches status (this movement's own status already reached RELEASED independently, via
+   * its own earlier, real Checker Release — this call only marks WHEN it stopped occupying Present Docs
+   * Earmark capacity). Supersedes acknowledge() (removed) — same shape, different column pair, different
+   * trigger (this is a `release()`-driven side effect on a DIFFERENT movement, not its own direct
+   * Checker action).
+   */
+  markPresentDocsConsumed(params: { movementId: string; presentDocsConsumedBy: string; presentDocsConsumedAt: string }): void {
     this.db
-      .prepare('UPDATE balance_movements SET acknowledged_by = @acknowledgedBy, acknowledged_at = @acknowledgedAt WHERE movement_id = @movementId')
+      .prepare(
+        'UPDATE balance_movements SET present_docs_consumed_by = @presentDocsConsumedBy, present_docs_consumed_at = @presentDocsConsumedAt WHERE movement_id = @movementId',
+      )
       .run(params);
   }
 
-  /** A4's own real Maker Submit (2026-08-16) — sets maker_submitted_by/maker_submitted_at only, never touches status. Mirrors acknowledge() above, on the Maker side. */
+  /** A4's own real Maker Submit (2026-08-16) — sets maker_submitted_by/maker_submitted_at only, never touches status. Mirrors markPresentDocsConsumed() above, on the Maker side. */
   submitByMaker(params: { movementId: string; makerSubmittedBy: string; makerSubmittedAt: string }): void {
     this.db
       .prepare('UPDATE balance_movements SET maker_submitted_by = @makerSubmittedBy, maker_submitted_at = @makerSubmittedAt WHERE movement_id = @movementId')

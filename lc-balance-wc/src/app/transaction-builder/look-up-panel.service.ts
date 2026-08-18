@@ -1,7 +1,8 @@
+import { Observable, forkJoin } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
-import { InquiredEvent, toEventRows } from './inquire-events.service';
+import { InquiredEvent, childMovementsOf$, movementsOf$ } from './inquire-events.service';
 
 /**
  * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): the "Look Up Current Balance" panel's own
@@ -38,13 +39,18 @@ export class LookUpPanelService {
   lookupError: string | null = null;
 
   /**
-   * Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in eventSeq
-   * (time) order. `InquiredEvent[]` (2026-08-18, "should use the SAME status/display logic as Inquire
-   * Events"), not a raw `BalanceMovement[]` — a finalized Sight IPLC_LC/UTILIZE (A3/A3S earmarked, later
-   * A4-finalized) splits into its own 'create' + 'finalize' rows via the SAME `toEventRows()` Inquire
-   * Events itself uses (both rows show the movement's own real, current status — see `toEventRows()`'s
-   * own doc comment), so the two screens can never disagree on what status the same underlying movement
-   * shows.
+   * Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in true Event
+   * Date/Time order (`eventTime`, not `eventSeq` — see `loadSnapshotAndMovements()`'s own doc comment on
+   * why, once B3/EPLC_EXAMINATION events can be merged in from a different contract entirely).
+   * `InquiredEvent[]` (2026-08-18, "should use the SAME status/display logic as Inquire Events"), not a
+   * raw `BalanceMovement[]` — a finalized Sight IPLC_LC/UTILIZE (A3/A3S earmarked, later A4-finalized)
+   * splits into its own 'create' + 'finalize' rows via the SAME `toEventRows()` Inquire Events itself
+   * uses (both rows show the movement's own real, current status — see `toEventRows()`'s own doc
+   * comment), so the two screens can never disagree on what status the same underlying movement shows.
+   * For an Export Confirmed LC specifically, this ALSO includes every B3/EPLC_EXAMINATION Earmark event
+   * under this LC Number, merged in from their own separate per-E01/E02/E03 contracts (2026-08-18, bug
+   * fix — see `loadSnapshotAndMovements()`'s own `mergeChildTypes` doc comment) — B3 has no dedicated
+   * Balance Tab of its own to show them in otherwise, unlike Import LC's own SG/Acceptance children.
    */
   lookupMovements: InquiredEvent[] = [];
 
@@ -188,12 +194,17 @@ export class LookUpPanelService {
       })
       .subscribe({
         next: (contract) => {
+          // Bug fix 2026-08-18 (see loadSnapshotAndMovements()'s own doc comment) — Export Confirmed
+          // LC's own B3/EPLC_EXAMINATION Earmark events have no dedicated Balance Tab of their own, so
+          // they're merged directly into the Confirmed LC's own Tab 1 Event Timeline here; Import LC's
+          // own SG/Acceptance children already have dedicated tabs further below and need no such merge.
           this.loadSnapshotAndMovements(
             contract.balanceContractId,
             contract,
             (snapshot) => (this.lookupResult = { contract, snapshot }),
             (movements) => (this.lookupMovements = movements),
             (err) => (this.lookupError = describeApiError(err)),
+            contract.instrumentType === 'EPLC_CONFIRMATION' ? ['EPLC_EXAMINATION'] : [],
           );
           // Business instruction 2026-08-14 ("two tabs for Usance LC, one for LC Balance and one for
           // Acceptance Balance") — fetch every Acceptance carved out under this LC so the second tab has
@@ -268,10 +279,27 @@ export class LookUpPanelService {
   }
 
   /**
-   * Shared body behind this panel's three near-identical "fetch snapshot + fetch/sort movements by
-   * eventSeq" pairs (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG). `contract` (2026-08-18) is required by
-   * `toEventRows()` (a finalized Sight IPLC_LC/UTILIZE splits into two rows — see that function's own
-   * doc comment) — each of the 3 call sites already has the relevant contract on hand.
+   * Shared body behind this panel's three near-identical "fetch snapshot + fetch/sort movements" pairs
+   * (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG). `contract` is required by `movementsOf$()`/`toEventRows()`
+   * (a finalized Sight IPLC_LC/UTILIZE splits into two rows — see that function's own doc comment) —
+   * each of the 3 call sites already has the relevant contract on hand.
+   *
+   * `mergeChildTypes` (2026-08-18, bug fix, reviewer-reported live — "Look Up Current Balance →
+   * Event Timeline 明顯有漏資料...主要漏掉的是 B3 Present Docs / EPLC_EXAMINATION 的 Earmark Events"):
+   * optional extra child instrumentTypes whose OWN movements (across every one of their own contracts
+   * under this LC Number) get merged directly into this tab's own Event Timeline, exactly the way
+   * InquireEventsService's own loadEvents() already merges every child ledger into its one timeline —
+   * see childMovementsOf$()'s own doc comment for the full root cause. Only the LC tab's own call site
+   * passes this (`['EPLC_EXAMINATION']`, Export Confirmed LC only) — B3/EPLC_EXAMINATION is MEMO_ONLY
+   * with no dedicated Balance Tab of its own (unlike Import LC's own SG/Acceptance children, which
+   * already have one each further below), so merging its events directly into the Confirmed LC's own
+   * Tab 1 timeline is the only place they can ever be seen in this panel. The sort key switches from
+   * plain `eventSeq` to `eventTime` (a real timestamp) once more than one contract can contribute rows —
+   * eventSeq is only meaningful WITHIN a single contract (Design doc §8), so merging Confirmed LC events
+   * with B3's own, separately-eventSeq'd Examination events by eventSeq alone would interleave them
+   * incorrectly; `eventTime` is the same "true Event Date/Time" sort key InquireEventsService's own
+   * merged timeline already uses, and it degrades to the exact same chronological order eventSeq gave
+   * for the single-contract case (SG/Acceptance tabs, and the LC tab whenever nothing is merged in).
    */
   private loadSnapshotAndMovements(
     contractId: string,
@@ -279,21 +307,18 @@ export class LookUpPanelService {
     setSnapshot: (snapshot: BalanceSnapshot) => void,
     setMovements: (events: InquiredEvent[]) => void,
     onSnapshotError: (err: unknown) => void,
+    mergeChildTypes: InstrumentType[] = [],
   ): void {
     this.api.getSnapshot(contractId).subscribe({
       next: setSnapshot,
       error: onSnapshotError,
     });
-    // Event timeline, in eventSeq (time) order — Design doc §8: eventSeq is strictly increasing per
-    // contract; a stable sort (guaranteed since ES2019) preserves toEventRows()'s own [create, finalize]
-    // ordering for the two rows a split movement produces, since both share the same eventSeq.
-    this.api.listMovements(contractId).subscribe({
-      next: (movements) =>
-        setMovements(
-          movements
-            .flatMap((movement) => toEventRows(movement, contract))
-            .sort((a, b) => a.movement.eventSeq - b.movement.eventSeq),
-        ),
+    const sources: Observable<InquiredEvent[]>[] = [
+      movementsOf$(this.api, contract),
+      ...mergeChildTypes.map((childType) => childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber)),
+    ];
+    forkJoin(sources).subscribe({
+      next: (groups) => setMovements(groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime())),
       error: () => setMovements([]),
     });
   }

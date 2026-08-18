@@ -1139,7 +1139,6 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
   const app = createApp(createDb(':memory:'));
   let cnfLogicalId: string;
   let dfibId: string;
-  let dfibCreateMovementId: string;
   let examEb03MovementId: string;
 
   test('setup: Confirmation LC E001 issued and released', async () => {
@@ -1175,7 +1174,6 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
       })
       .expect(201);
     dfibId = dfib.body.balanceContractId;
-    dfibCreateMovementId = dfib.body.movementId;
     await request(app).post(`/balance-movements/${dfib.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const snapshot = await request(app).get(`/balance-contracts/${dfibId}/balance`).expect(200);
@@ -1328,14 +1326,17 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     expect(cnfSnapshot.body.tightAvailableBalance).toBe('0');
   });
 
-  // ("B3 Release => Present Docs Earmark Pending - Bill Amount, Present Docs Earmark Approved + Bill
-  // Amount") — acknowledging EB03 moves its 90,000 from Pending to Approved; status stays PENDING
-  // throughout (B4 must still be able to find and consume it).
-  test('POST /balance-movements/:id/acknowledge: EB03 moves Pending -> Approved, status stays PENDING', async () => {
-    const ack = await request(app).post(`/balance-movements/${examEb03MovementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
-    expect(ack.body.status).toBe('PENDING');
-    expect(ack.body.acknowledgedBy).toBe('checker1');
-    expect(ack.body.acknowledgedAt).toBeTruthy();
+  // SUPERSEDED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") — B3's
+  // own Checker action is now the standard, real /release call (PENDING -> RELEASED), not the removed
+  // /acknowledge acknowledgment-only endpoint. "B3 Release => Present Docs Earmark Pending - Bill Amount,
+  // Present Docs Earmark Approved + Bill Amount" now reads: releasing EB03 moves its 90,000 from Pending
+  // to Approved, status genuinely becomes RELEASED (EARMARKED) — and, per the SAME date's basis change,
+  // it still occupies the SAME 90,000 of capacity in Approved until B4 later consumes it.
+  test('POST /balance-movements/:id/release on a Present Docs (EPLC_EXAMINATION) movement: EB03 moves Pending -> Approved, status becomes RELEASED', async () => {
+    const released = await request(app).post(`/balance-movements/${examEb03MovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    expect(released.body.status).toBe('RELEASED');
+    expect(released.body.releasedBy).toBe('checker1');
+    expect(released.body.presentDocsConsumedAt).toBeNull();
 
     const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'E001' }).expect(200);
     const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
@@ -1346,24 +1347,82 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     expect(cnfSnapshot.body.tightAvailableBalance).toBe('0');
   });
 
-  test('POST /balance-movements/:id/acknowledge: acknowledging the same movement twice -> 409, rejected', async () => {
-    const res = await request(app).post(`/balance-movements/${examEb03MovementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(409);
-    expect(res.body.message).toMatch(/already acknowledged by checker1/);
-  });
-
-  test('POST /balance-movements/:id/acknowledge: rejects a non-EPLC_EXAMINATION movement -> 400', async () => {
-    const res = await request(app).post(`/balance-movements/${dfibCreateMovementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(400);
-    expect(res.body.message).toMatch(/acknowledge\(\) only applies to an EPLC_EXAMINATION CREATE movement/);
-  });
-
-  test('POST /balance-movements/:id/acknowledge: rejects an already-RELEASED movement -> 409, ILLEGAL_STATE_TRANSITION (acknowledge() only applies to a still-PENDING Present Docs earmark)', async () => {
-    // dfibCreateMovementId was RELEASED earlier in this describe block, and (as proven just above) it's
-    // also the wrong instrumentType — reuse examEb03MovementId instead, releasing it first so it's a
-    // legitimate EPLC_EXAMINATION/CREATE movement that is simply no longer PENDING.
-    await request(app).post(`/balance-movements/${examEb03MovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-    const res = await request(app).post(`/balance-movements/${examEb03MovementId}/acknowledge`).send({ acknowledgedBy: 'checker2' }).expect(409);
+  test('POST /balance-movements/:id/release on the SAME already-RELEASED Present Docs movement -> 409, ILLEGAL_STATE_TRANSITION (B4 must never attempt to re-release it — it consumes it via referencedTransactionId instead, see the dedicated describe block below)', async () => {
+    const res = await request(app).post(`/balance-movements/${examEb03MovementId}/release`).send({ releasedBy: 'checker2' }).expect(409);
     expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
-    expect(res.body.message).toMatch(/not PENDING/);
+    expect(res.body.message).toMatch(/not a legal transition/);
+  });
+});
+
+/**
+ * 2026-08-18, business instruction ("所有交易要RELEASE過後 才能根據流程走下一個交易") — HTTP-level,
+ * end-to-end proof of the full B3->B4 flow: B3's own real /release (a standalone Checker action, no
+ * longer acknowledge()), then B4's own compound /release on its linked HONOUR (which no longer
+ * re-releases the B3 record — it's already RELEASED — but instead marks it consumed as a side effect,
+ * via that HONOUR's own referencedTransactionId). Complements the direct-service tests in
+ * balanceService.test.ts (same behavior, proven through the real HTTP request/response cycle here).
+ */
+describe('HTTP integration — B3 (Present Docs) real Release, then B4 consumes it via referencedTransactionId (2026-08-18)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('B3 releases on its own (EARMARKED); B4\'s own linked HONOUR release then marks it consumed, dropping it out of Present Docs Earmark', async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'B3B4-HTTP-001' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'B3B4-HTTP-001' }).expect(200);
+
+    const exam = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'B3B4-HTTP-001', ibNumber: 'E01' },
+        parentLogicalContractId: cnfContract.body.logicalContractId,
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '30000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    // B3's own real, standalone Checker Release — the ONLY way this ever reaches RELEASED now.
+    const examReleased = await request(app).post(`/balance-movements/${exam.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    expect(examReleased.body.status).toBe('RELEASED');
+    expect(examReleased.body.presentDocsConsumedAt).toBeNull();
+
+    let cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
+    expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('30000');
+
+    // B4: Maker submits the linked Honour, referencing the (already-RELEASED) B3 record.
+    const honour = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        balanceContractId: cnfContract.body.balanceContractId,
+        movementType: 'HONOUR',
+        eventSeq: 2,
+        amount: '30000',
+        currency: 'USD',
+        referencedTransactionId: exam.body.movementId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    // B4's Checker Release — releases ONLY the Honour itself (never re-releases the B3 record, which
+    // would 409) — and, as a side effect, marks the B3 record consumed.
+    await request(app).post(`/balance-movements/${honour.body.movementId}/release`).send({ releasedBy: 'checker2' }).expect(200);
+
+    const examMovements = await request(app).get(`/balance-contracts/${exam.body.balanceContractId}/movements`).expect(200);
+    const consumedExam = examMovements.body.find((m: { movementId: string }) => m.movementId === exam.body.movementId);
+    expect(consumedExam.status).toBe('RELEASED');
+    expect(consumedExam.presentDocsConsumedAt).toBeTruthy();
+    expect(consumedExam.presentDocsConsumedBy).toBe('checker2');
+
+    cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
+    expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('0');
+    expect(cnfSnapshot.body.confirmedBalance).toBe('70000');
   });
 });
 
@@ -1804,11 +1863,6 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(res.body.code).toBe('NOT_FOUND');
   });
 
-  test('POST /balance-movements/:movementId/acknowledge with an unknown movementId -> 404', async () => {
-    const res = await request(app).post('/balance-movements/does-not-exist/acknowledge').send({ acknowledgedBy: 'checker1' }).expect(404);
-    expect(res.body.code).toBe('NOT_FOUND');
-  });
-
   test('POST /balance-movements/:movementId/maker-submit with an unknown movementId -> 404', async () => {
     const res = await request(app).post('/balance-movements/does-not-exist/maker-submit').send({ makerSubmittedBy: 'maker1' }).expect(404);
     expect(res.body.code).toBe('NOT_FOUND');
@@ -1914,42 +1968,9 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(res.body.message).toMatch(/releasedBy is required/);
   });
 
-  test('POST /balance-movements/:movementId/acknowledge without acknowledgedBy -> 400', async () => {
-    const cnf = await request(app)
-      .post('/balance-movements')
-      .send({
-        instrumentType: 'EPLC_CONFIRMATION',
-        naturalKey: { lcNumber: 'CNF-NOACK' },
-        movementType: 'ISSUE',
-        eventSeq: 1,
-        amount: '50000',
-        currency: 'USD',
-        createdBy: 'maker1',
-      })
-      .expect(201);
-    await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-    const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'CNF-NOACK' }).expect(200);
-    const exam = await request(app)
-      .post('/balance-movements')
-      .send({
-        instrumentType: 'EPLC_EXAMINATION',
-        naturalKey: { lcNumber: 'CNF-NOACK', ibNumber: 'EB01' },
-        parentLogicalContractId: cnfContract.body.logicalContractId,
-        movementType: 'CREATE',
-        eventSeq: 1,
-        amount: '1000',
-        currency: 'USD',
-        createdBy: 'maker1',
-      })
-      .expect(201);
-    const res = await request(app).post(`/balance-movements/${exam.body.movementId}/acknowledge`).send({}).expect(400);
-    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
-    expect(res.body.message).toMatch(/acknowledgedBy is required/);
-  });
-
   // Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
-  // Exactly the same as A1.") — A4's own real Maker action, mirroring the acknowledge() tests above
-  // on the Maker side. See service.submitByMaker()'s own doc comment for why this never touches status.
+  // Exactly the same as A1.") — A4's own real Maker action. See service.submitByMaker()'s own doc
+  // comment for why this never touches status.
   test('POST /balance-movements/:id/maker-submit: sets makerSubmittedBy/makerSubmittedAt, status stays PENDING (A4 real Maker Submit)', async () => {
     const lc = await request(app)
       .post('/balance-movements')

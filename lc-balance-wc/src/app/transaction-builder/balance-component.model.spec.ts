@@ -428,28 +428,30 @@ describe('balance-component.model data invariants', () => {
       expect(b2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
-    it('B3 (Present Docs) is EPLC_EXAMINATION/CREATE, defers settlement with a real backend acknowledgment, and has no secondaryRefLabel of its own', () => {
+    // Bug fixed 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易"): B3
+    // no longer defers settlement at all — it uses the standard release()/reject() Checker path
+    // directly, same as every other function that doesn't set deferSettlement.
+    it('B3 (Present Docs) is EPLC_EXAMINATION/CREATE, uses the standard Checker release() path, and has no secondaryRefLabel of its own', () => {
       const b3 = EXPORT_FUNCTIONS.find((f) => f.code === 'B3') as TransactionFunction;
       expect(b3.instrumentType).toBe('EPLC_EXAMINATION');
       expect(b3.movementType).toBe('CREATE');
       expect(b3.defaultParentInstrumentType).toBe('EPLC_CONFIRMATION');
-      expect(b3.deferSettlement).toBe(true);
-      expect(b3.deferSettlementMovementType).toBe('CREATE');
-      expect(b3.deferSettlementRequiresBackendAck).toBe(true);
+      expect(b3.deferSettlement).toBeFalsy();
+      expect(b3.deferSettlementMovementType).toBeUndefined();
       expect(b3.secondaryRefLabel).toBeUndefined();
     });
 
-    it('B3 is the only function with deferSettlementRequiresBackendAck', () => {
+    it('A3 is the only function with deferSettlement (B3 no longer sets it, 2026-08-18)', () => {
       for (const f of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
-        if (f.code === 'B3') {
-          expect(f.deferSettlementRequiresBackendAck).toBe(true);
+        if (f.code === 'A3' || f.code === 'A3S') {
+          expect(f.deferSettlement).toBe(true);
         } else {
-          expect(f.deferSettlementRequiresBackendAck).toBeFalsy();
+          expect(f.deferSettlement).toBeFalsy();
         }
       }
     });
 
-    it("B4 (Honour / Acceptance) is the unified legal-event step: movementTypeFromContractTenor, settlesDocumentArrival against B3's CREATE, and both compound-creation flags", () => {
+    it("B4 (Honour / Acceptance) is the unified legal-event step: movementTypeFromContractTenor, settlesDocumentArrival against B3's already-RELEASED CREATE, and both compound-creation flags", () => {
       const b4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4') as TransactionFunction;
       expect(b4.instrumentType).toBe('EPLC_CONFIRMATION');
       expect(b4.movementType).toBe('HONOUR');
@@ -457,19 +459,19 @@ describe('balance-component.model data invariants', () => {
       expect(b4.settlesDocumentArrival).toBe(true);
       expect(b4.payableMovementType).toBe('CREATE');
       expect(b4.payableMovementInstrumentType).toBe('EPLC_EXAMINATION');
-      expect(b4.payableMovementRequiresAcknowledgment).toBe(true);
+      expect(b4.payableMovementRequiresRelease).toBe(true);
       expect(b4.pendingItemSourceCode).toBe('B3');
       expect(b4.createsIssuingBankReceivableOnHonour).toBe(true);
       expect(b4.createsAcceptanceReimbReceivableOnCreate).toBe(true);
       expect(b4.secondaryRefLabel).toBe('EB Number');
     });
 
-    it('B4 is the only function with movementTypeFromContractTenor / payableMovementInstrumentType / payableMovementRequiresAcknowledgment', () => {
+    it('B4 is the only function with movementTypeFromContractTenor / payableMovementInstrumentType / payableMovementRequiresRelease', () => {
       for (const f of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
         if (f.code === 'B4') continue;
         expect(f.movementTypeFromContractTenor).toBeFalsy();
         expect(f.payableMovementInstrumentType).toBeUndefined();
-        expect(f.payableMovementRequiresAcknowledgment).toBeFalsy();
+        expect(f.payableMovementRequiresRelease).toBeFalsy();
       }
     });
 

@@ -43,6 +43,8 @@ describe('runMigrations (src/db/migrations.ts)', () => {
           'finalize_event_snapshot',
           'finalize_acceptance_event_snapshot',
           'finalize_sg_event_snapshot',
+          'present_docs_consumed_at',
+          'present_docs_consumed_by',
         ]),
       );
     } finally {

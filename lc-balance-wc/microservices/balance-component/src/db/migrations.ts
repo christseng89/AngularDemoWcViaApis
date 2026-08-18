@@ -107,6 +107,16 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('finalize_sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_sg_event_snapshot TEXT');
     },
   },
+  {
+    id: 10,
+    description:
+      'Add present_docs_consumed_at/present_docs_consumed_by to balance_movements (2026-08-18, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 now genuinely RELEASEs on its own; this is what Present Docs Earmark Approved reads instead of the now-historical acknowledged_at — see types.ts BalanceMovement.presentDocsConsumedAt)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('present_docs_consumed_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_at TEXT');
+      if (!columns.includes('present_docs_consumed_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_by TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

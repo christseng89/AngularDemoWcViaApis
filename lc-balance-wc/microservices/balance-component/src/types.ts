@@ -171,12 +171,37 @@ export interface BalanceMovement {
   releasedAt?: string | null;
   /**
    * EPLC_EXAMINATION only (2026-08-15, "Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
-   * 來控制") — a Checker's B3 "Release" acknowledgment of a still-PENDING Present Docs earmark,
-   * WITHOUT finalizing it (status stays PENDING — B4 still needs to find and consume it). Distinct
-   * from releasedBy/releasedAt (the real PENDING->RELEASED/REJECTED transition).
+   * 來控制"). HISTORICAL FIELD, no longer written — superseded 2026-08-18 (business instruction, "所有
+   * 交易要RELEASE過後 才能根據流程走下一個交易"): B3's own Checker action is now a genuine
+   * PENDING->RELEASED transition via the standard `release()` endpoint (releasedBy/releasedAt), not a
+   * separate acknowledgment that left status PENDING. `presentDocsConsumedAt`/`presentDocsConsumedBy`
+   * below are what the Present Docs Earmark Pending/Approved split reads now — see their own doc
+   * comments and `domain/offBalanceExposure.ts`'s own basis-change note. Kept on the type purely so a
+   * pre-2026-08-18 row's own historical value still round-trips through the API; `acknowledge()` and
+   * its `/acknowledge` route no longer exist.
    */
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
+  /**
+   * EPLC_EXAMINATION/CREATE only (2026-08-18, business instruction "所有交易要RELEASE過後 才能根據流程走
+   * 下一個交易" — superseding the prior acknowledgedAt-based design, see acknowledgedAt's own doc
+   * comment above). Set as a SIDE EFFECT of `release()` on the Confirmation's own linked HONOUR/ACCEPT
+   * movement (identified via that movement's own `referencedTransactionId` pointing back at this
+   * EPLC_EXAMINATION CREATE) — i.e. the moment B4 actually consumes this presentation, not when B3
+   * itself is Released. Distinct from `status`/`releasedAt` (B3's OWN Checker Release, which now happens
+   * independently and earlier) — a presentation can be `status: 'RELEASED'` (EARMARKED) for a while with
+   * `presentDocsConsumedAt` still null, exactly the window `computePresentDocsEarmark`'s own doc comment
+   * explains must still occupy Present Docs Earmark capacity. Null until B4 consumes it, and for
+   * movements predating this field (a pre-2026-08-18 row that was already fully processed by B4 under
+   * the OLD design — its own EPLC_EXAMINATION CREATE reached RELEASED via B4's own compound release call
+   * directly, not via this consume side effect, so it has no `presentDocsConsumedAt` value to backfill;
+   * harmless — `computePresentDocsEarmark`'s own filter only matters for a presentation that's still
+   * genuinely outstanding, and a fully-processed historical row's own real-world capacity was already
+   * retired regardless of which mechanism recorded it).
+   */
+  presentDocsConsumedAt?: string | null;
+  /** Audit metadata only, paired with presentDocsConsumedAt above — the checkerId who released the consuming HONOUR/ACCEPT. */
+  presentDocsConsumedBy?: string | null;
   /**
    * A4 (Sight Settlement) only (2026-08-16, business instruction "Add real Maker Submit, then have
    * Checker to Release it. Exactly the same as A1."). A4 has no movement of its own to create — it

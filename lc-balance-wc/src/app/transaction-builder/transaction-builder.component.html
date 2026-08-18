@@ -592,9 +592,15 @@
                  submission (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
                  "S001 B04 was settled, but the SG B04 still in Pending", A3S's compound release() was
                  unreachable before this check was added) — Release here is acknowledgment-only
-                 (checkerAct()), never the real release API, so A4/A6/B4 still find it PENDING. -->
-            <div class="tb-hint tb-hint--ok" *ngIf="selectedCheckerMovement && selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalApproved">
-              ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only). Balance stays <strong>Pending</strong> — go to {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
+                 (checkerAct()), never the real release API, so A4/A6/B4 still find it PENDING.
+                 Bug fixed 2026-08-18 (see arrivalAlreadyApproved's own doc comment) — this hint (and the
+                 button below) now also fires off the item's own PERSISTED acknowledgedAt, not only this
+                 session's own arrivalApproved click, so re-searching an already-acknowledged B3 item
+                 correctly shows it as already approved instead of offering a second attempt that would
+                 409. Shows who/when when that persisted field is the reason (this session's own click
+                 already says so via the ✓ wording alone). -->
+            <div class="tb-hint tb-hint--ok" *ngIf="selectedCheckerMovement && selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved">
+              ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"> — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date:'short' }}</span>. Balance stays <strong>Pending</strong> — go to {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
             </div>
 
             <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
@@ -606,7 +612,7 @@
                    ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
                    so clicking either immediately disables both, for every function including the
                    compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
-              <button class="tb-btn tb-btn--success" (click)="checkerAct('release')" [disabled]="checkerActionInFlight || (selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalApproved)">
+              <button class="tb-btn tb-btn--success" (click)="checkerAct('release')" [disabled]="checkerActionInFlight || (selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved)">
                 {{ checkerActionInFlight ? 'Working…' : (selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission ? 'Approve (acknowledgment only)' : 'Release') }}
               </button>
               <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
@@ -1005,7 +1011,6 @@
         <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'offBalanceExposure'">{{ snapshot.offBalanceExposure }}</span>
         <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'offBalanceExposure'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
       </div>
-      <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span></div>
       <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
       <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkPending !== null">
         <span class="tb-balance-row__label">Present Docs Earmark (Pending)</span>
@@ -1017,6 +1022,11 @@
         <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkApproved'">{{ snapshot.presentDocsEarmarkApproved }}</span>
         <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkApproved'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
       </div>
+      <!-- 2026-08-18, user-requested ("Tight Available Balance 放在最後一個") — moved to the end of the
+           box, after Present Docs Earmark (Pending)/(Approved), so the two figures that combine to
+           produce it (Available Balance minus the combined Present Docs Earmark) are already visible
+           above it. Purely a display-order change — no field's own value/visibility condition touched. -->
+      <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span></div>
     </div>
   </ng-template>
 </div>

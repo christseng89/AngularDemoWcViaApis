@@ -103,9 +103,9 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   created_at              TEXT NOT NULL,
   released_at             TEXT,
   -- Business instruction 2026-08-15 ("Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
-  -- 來控制") — a Checker's B3 "Release" acknowledges a still-PENDING Present Docs earmark WITHOUT
-  -- finalizing it (status stays PENDING — B4 still needs to find and consume it later). Distinct
-  -- from released_by/released_at, which mark the real PENDING->RELEASED/REJECTED transition.
+  -- 來控制"). HISTORICAL — superseded 2026-08-18: B3's own Checker action is now a genuine
+  -- PENDING->RELEASED transition via released_by/released_at (see present_docs_consumed_at below for
+  -- what replaced this column's own role in the Present Docs Earmark computation); no longer written.
   acknowledged_by         TEXT,
   acknowledged_at         TEXT,
   -- Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
@@ -147,7 +147,16 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- Null for every other movement. See types.ts's BalanceMovement.finalizeAcceptanceEventSnapshot/
   -- finalizeSgEventSnapshot doc comments.
   finalize_acceptance_event_snapshot TEXT,
-  finalize_sg_event_snapshot TEXT
+  finalize_sg_event_snapshot TEXT,
+  -- 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 now genuinely RELEASEs on its own;
+  -- acknowledged_by/acknowledged_at above are now historical-only, no longer written). Set as a side
+  -- effect of release() on the Confirmation's own linked HONOUR/ACCEPT movement (via that movement's own
+  -- referenced_transaction_id pointing back at this EPLC_EXAMINATION CREATE) — i.e. the moment B4
+  -- actually consumes this presentation, not when B3 itself is Released. See types.ts's
+  -- BalanceMovement.presentDocsConsumedAt doc comment and domain/offBalanceExposure.ts's own basis-change
+  -- note for why this, not status alone, now gates Present Docs Earmark occupancy.
+  present_docs_consumed_at TEXT,
+  present_docs_consumed_by TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

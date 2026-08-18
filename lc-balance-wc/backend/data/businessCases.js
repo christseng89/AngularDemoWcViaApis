@@ -15,16 +15,21 @@
  *     for Export Case #6/#7's own B3->B4 compound shape — resolves to an
  *     earlier captureAs step's own movementId, same as balanceContractIdRef
  *     but targeting movementId instead of balanceContractId).
- *   release / makerSubmit / acknowledge — all POST /balance-movements/:id/<sub-path>
- *     with one body key, `movementRef` pointing at a captured createMovement
+ *   release / makerSubmit — both POST /balance-movements/:id/<sub-path> with
+ *     one body key, `movementRef` pointing at a captured createMovement
  *     step; server.js's own RELEASE_SHAPED_STEP_TYPES dispatch table drives
- *     all three through one shared handler (Quality-report-balance.md
- *     BAL-124). `release` — Checker releases a PENDING movement.
- *     `makerSubmit` (added 2026-08-16 for Import Case #6's own A4 real-
- *     Maker-Submit step — IPLC_LC/UTILIZE only) — `movementRef` +
- *     `makerSubmittedBy`. `acknowledge` (added 2026-08-17, BAL-131 — B3's
- *     own Present-Docs Checker acknowledgment; EPLC_EXAMINATION/CREATE
- *     only, never transitions status) — `movementRef` + `acknowledgedBy`.
+ *     both through one shared handler (Quality-report-balance.md BAL-124).
+ *     `release` — Checker releases a PENDING movement (a genuine
+ *     PENDING -> RELEASED transition; B3/Present Docs uses this directly
+ *     too now, see the 2026-08-18 note below — no separate acknowledgment
+ *     step exists any more). `makerSubmit` (added 2026-08-16 for Import
+ *     Case #6's own A4 real-Maker-Submit step — IPLC_LC/UTILIZE only) —
+ *     `movementRef` + `makerSubmittedBy`.
+ *     (`acknowledge`, added 2026-08-17 BAL-131 for B3's own former Present-
+ *     Docs Checker acknowledgment, REMOVED 2026-08-18 — "所有交易要RELEASE
+ *     過後 才能根據流程走下一個交易": B3 now genuinely RELEASEs on its own,
+ *     the standard `release` step type above, superseding the acknowledge-
+ *     only design entirely. See Export Case #6/#7's own updated steps.)
  *   snapshot — GET /balance-contracts/:id/balance, `contractRef` points at
  *     a captured createMovement step (its balanceContractId).
  *   note — no API call; an informational line in the trace (e.g. EBL/IBL
@@ -1202,11 +1207,16 @@ function exportCase6(lc) {
         },
         'Checker releases Confirmation Issue',
       ),
-      {
-        type: 'createMovement',
-        label: 'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark; Design Principle D3, no GL/contingent effect on the Confirmation itself)',
-        captureAs: 'examination',
-        request: {
+      // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B3 (Present Docs) now genuinely
+      // RELEASEs on its own, real Checker action, BEFORE B4 ever picks it — supersedes the prior
+      // acknowledge()-only step (removed, along with the `acknowledge` step type itself — see
+      // server.js's own RELEASE_SHAPED_STEP_TYPES). B4's own compound Release below no longer
+      // re-releases this record (would 409, since it's already RELEASED) — it marks it "consumed"
+      // automatically as a side effect of releasing Honour instead (via referencedTransactionId).
+      ...createAndRelease(
+        'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark; Design Principle D3, no GL/contingent effect on the Confirmation itself)',
+        'examination',
+        {
           instrumentType: 'EPLC_EXAMINATION',
           naturalKey: { lcNumber: lc, ibNumber: 'E01' },
           parentLogicalContractIdRef: 'conf',
@@ -1216,17 +1226,11 @@ function exportCase6(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      {
-        type: 'acknowledge',
-        label:
-          "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
-        movementRef: 'examination',
-        acknowledgedBy: CHECKER,
-      },
+        'Checker releases Present Docs (B3 — a genuine standalone Release, EARMARKED; still occupies Present Docs Earmark capacity until B4 consumes it)',
+      ),
       {
         type: 'createMovement',
-        label: 'Issuing Bank Honour 10,000 (B4 — unified legal event; references the Present Docs earmark)',
+        label: 'Issuing Bank Honour 10,000 (B4 — unified legal event; references the already-RELEASED Present Docs earmark)',
         captureAs: 'honour',
         request: {
           instrumentType: 'EPLC_CONFIRMATION',
@@ -1258,11 +1262,10 @@ function exportCase6(lc) {
       },
       {
         type: 'release',
-        label: "Checker releases Present Docs' own earmark (resolved via referencedTransactionId, released first)",
-        movementRef: 'examination',
+        label: 'Checker releases Honour (the primary compound leg — also marks the Present Docs earmark consumed, via referencedTransactionId)',
+        movementRef: 'honour',
         releasedBy: CHECKER,
       },
-      { type: 'release', label: 'Checker releases Honour (the primary compound leg)', movementRef: 'honour', releasedBy: CHECKER },
       { type: 'release', label: 'Checker releases Due From Issuing Bank (the linked compound leg)', movementRef: 'dueFromIssuingBank', releasedBy: CHECKER },
       { type: 'snapshot', label: 'CONF LIAB after Honour (expect 90,000)', contractRef: 'conf' },
       { type: 'snapshot', label: 'Due From Issuing Bank Balance (expect 10,000)', contractRef: 'dueFromIssuingBank' },
@@ -1294,11 +1297,15 @@ function exportCase7(lc, ib) {
         },
         'Checker releases Confirmation Issue',
       ),
-      {
-        type: 'createMovement',
-        label: 'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark; Design Principle D3, no GL/contingent effect on the Confirmation itself)',
-        captureAs: 'examination',
-        request: {
+      // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B3 now genuinely RELEASEs on its
+      // own, real Checker action, BEFORE B4 ever picks it — supersedes the prior acknowledge()-only step
+      // (removed, along with the `acknowledge` step type itself — see server.js's own
+      // RELEASE_SHAPED_STEP_TYPES). B4's own compound Release below no longer re-releases this record
+      // (would 409) — it marks it "consumed" automatically as a side effect of releasing Accept instead.
+      ...createAndRelease(
+        'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark; Design Principle D3, no GL/contingent effect on the Confirmation itself)',
+        'examination',
+        {
           instrumentType: 'EPLC_EXAMINATION',
           naturalKey: { lcNumber: lc, ibNumber: ib },
           parentLogicalContractIdRef: 'conf',
@@ -1308,17 +1315,11 @@ function exportCase7(lc, ib) {
           currency: 'USD',
           createdBy: MAKER,
         },
-      },
-      {
-        type: 'acknowledge',
-        label:
-          "Checker acknowledges Present Docs (B3 — acknowledgment-only, stays PENDING; B4's own compound Release below still resolves and releases this earmark directly via referencedTransactionId)",
-        movementRef: 'examination',
-        acknowledgedBy: CHECKER,
-      },
+        'Checker releases Present Docs (B3 — a genuine standalone Release, EARMARKED; still occupies Present Docs Earmark capacity until B4 consumes it)',
+      ),
       {
         type: 'createMovement',
-        label: 'Issuing Bank Accept 10,000 (B4 — unified legal event; references the Present Docs earmark)',
+        label: 'Issuing Bank Accept 10,000 (B4 — unified legal event; references the already-RELEASED Present Docs earmark)',
         captureAs: 'accept',
         request: {
           instrumentType: 'EPLC_CONFIRMATION',
@@ -1369,11 +1370,10 @@ function exportCase7(lc, ib) {
       },
       {
         type: 'release',
-        label: "Checker releases Present Docs' own earmark (resolved via referencedTransactionId, released first)",
-        movementRef: 'examination',
+        label: 'Checker releases Accept (the primary compound leg — also marks the Present Docs earmark consumed, via referencedTransactionId)',
+        movementRef: 'accept',
         releasedBy: CHECKER,
       },
-      { type: 'release', label: 'Checker releases Accept (the primary compound leg)', movementRef: 'accept', releasedBy: CHECKER },
       { type: 'release', label: 'Checker releases Acceptance CREATE (linked compound leg)', movementRef: 'acceptance', releasedBy: CHECKER },
       { type: 'release', label: 'Checker releases Reimbursement Receivable CREATE (linked compound leg)', movementRef: 'reimbReceivable', releasedBy: CHECKER },
       { type: 'snapshot', label: 'CONF LIAB after Accept (expect 90,000)', contractRef: 'conf' },

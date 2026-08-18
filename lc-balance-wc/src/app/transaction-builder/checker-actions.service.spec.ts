@@ -253,7 +253,12 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
   });
 
-  it('B4 Sight/HONOUR, cross-session: resolves the Due from Issuing Bank leg via a real findByBusinessEventId lookup (dueFromIssuingBankMovementId unknown)', (done) => {
+  // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
+  // earmark) is now independently Checker-Released BEFORE B4 ever picks it, so B4's own compound
+  // release no longer re-releases it (would 409) — these tests updated to assert exactly that: the
+  // former "release source first" call is gone, and every remaining assertion's own call index shifts
+  // down by one.
+  it('B4 Sight/HONOUR, cross-session: resolves the Due from Issuing Bank leg via a real findByBusinessEventId lookup (dueFromIssuingBankMovementId unknown) — does NOT re-release the already-RELEASED B3 source', (done) => {
     const linked = [
       makeMovement({ movementId: 'honour-1', movementType: 'HONOUR', businessEventId: 'be-b4s' }),
       makeMovement({ movementId: 'dfib-1', movementType: 'CREATE', businessEventId: 'be-b4s' }),
@@ -270,9 +275,9 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');
       expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-b4s');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'source-b3', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'honour-1', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(3, 'dfib-1', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(1, 'honour-1', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'dfib-1', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(2);
       done();
     });
   });
@@ -289,15 +294,16 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
 
     service.release(ctx).subscribe((outcome) => {
       // The primary (HONOUR) still releases — only the downstream Due from Issuing Bank leg can't be
-      // resolved, so releaseAcceptance's own "neither downstream flag has an id" fallback applies.
+      // resolved, so releaseAcceptance's own "neither downstream flag has an id" fallback applies. Only
+      // ONE api.release call total now — the source is never released here (already RELEASED).
       expect(outcome.kind).toBe('released');
       expect(api.findByBusinessEventId).not.toHaveBeenCalled();
-      expect(api.release).toHaveBeenCalledTimes(2);
+      expect(api.release).toHaveBeenCalledTimes(1);
       done();
     });
   });
 
-  it('B4 Usance/ACCEPT, cross-session: resolves BOTH the Acceptance liability and Reimbursement Receivable by creation order among the linked CREATEs', (done) => {
+  it('B4 Usance/ACCEPT, cross-session: resolves BOTH the Acceptance liability and Reimbursement Receivable by creation order among the linked CREATEs — does NOT re-release the already-RELEASED B3 source', (done) => {
     const linked = [
       makeMovement({ movementId: 'accept-1', movementType: 'ACCEPT', businessEventId: 'be-b4u' }),
       makeMovement({ movementId: 'liability-1', movementType: 'CREATE', businessEventId: 'be-b4u' }),
@@ -315,10 +321,10 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
 
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'source-b3', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'accept-1', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(3, 'liability-1', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(4, 'receivable-1', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(1, 'accept-1', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'liability-1', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(3, 'receivable-1', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(3);
       done();
     });
   });
@@ -365,7 +371,7 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
   });
 
-  it('B4 Usance/ACCEPT: the Reimbursement Receivable cannot be resolved (only the liability found) — fails cleanly after releasing the liability, never attempts the receivable', (done) => {
+  it('B4 Usance/ACCEPT: the Reimbursement Receivable cannot be resolved (only the liability found) — fails cleanly after releasing the liability, never attempts the receivable, never re-releases the already-RELEASED B3 source', (done) => {
     const linked = [
       makeMovement({ movementId: 'accept-2', movementType: 'ACCEPT', businessEventId: 'be-b4u2' }),
       makeMovement({ movementId: 'liability-2', movementType: 'CREATE', businessEventId: 'be-b4u2' }),
@@ -383,7 +389,27 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') expect(outcome.message).toContain('Reimbursement Receivable could not be found');
-      expect(api.release).toHaveBeenCalledTimes(3);
+      expect(api.release).toHaveBeenCalledTimes(2);
+      done();
+    });
+  });
+
+  // New coverage, 2026-08-18: proves the payableMovementRequiresRelease branch itself — B4 skips
+  // resolveSettlesDocumentArrivalIds's own sourceMovementId entirely and never checks for it, unlike
+  // A6's own "fail cleanly if no source resolvable" path above.
+  it('B4: never attempts to resolve or release a source movement at all — the payableMovementRequiresRelease branch skips straight to the primary', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({
+      selectedFunction: B4,
+      selectedPayMovement: null,
+      selectedCheckerMovement: makeMovement({ movementId: 'honour-3', movementType: 'HONOUR', referencedTransactionId: null, businessEventId: null }),
+    });
+
+    service.release(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('released');
+      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledWith('honour-3', 'checker1');
       done();
     });
   });

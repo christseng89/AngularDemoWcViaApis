@@ -4797,3 +4797,302 @@ every one of its 5 split UTILIZE pairs (B01–B05): each pair's own `'create'` r
 its own real Balance After figure (e.g. B03's own create row: EARMARKED, 34000 — matching Inquire
 Events' own figure exactly) rather than the previous EARMARKING/blank-then-frozen pairing. Zero console
 errors throughout.
+
+## Bug fixed — Look Up Current Balance's own Event Timeline was missing every B3/EPLC_EXAMINATION Earmark event for Export Confirmed LC (2026-08-18, same day, reviewer-reported live, LC U01 — "Look Up Current Balance → Event Timeline 明顯有漏資料...主要漏掉的是 B3 Present Docs / EPLC_EXAMINATION 的 Earmark Events")
+
+Root cause: `LookUpPanelService`'s Tab 1 ("LC Balance"/"Confirmed LC Balance") Event Timeline only ever
+fetched movements for the LC's OWN `balanceContractId` — correct for every other function, but
+`EPLC_EXAMINATION` (B3, Present Docs) is `MEMO_ONLY` with no `BALANCE_SNAPSHOT_LABEL` entry of its own
+(same "只負責 Contingent Liability" scope boundary this file already documents for it elsewhere), so it
+has no dedicated Balance Tab in this panel at all — unlike Import LC's own SG/Acceptance children, which
+each already get one further below. Every B3 presentation's own CREATE movement lives on its OWN
+separate per-E01/E02/E03 `BalanceContract`, so it was invisible everywhere in Look Up Current Balance —
+even though Inquire Events' own already-merged cross-ledger timeline (`childInstrumentTypesOf()`) already
+showed the exact same events correctly, which is what made the discrepancy between the two screens
+visible side by side.
+
+**Fix, reusing rather than duplicating Inquire Events' own merge mechanism**: `movementsOf$(api,
+contract)`/`childMovementsOf$(api, instrumentType, lcNumber)` — the two observable-returning functions
+`InquireEventsService.loadEvents()` already built its own merged timeline from — extracted from private
+class methods to module-level exported free functions in `inquire-events.service.ts` (same "share the
+function, not the behavior" convention `toEventRows()` itself already established for this pair of
+services). `LookUpPanelService.loadSnapshotAndMovements()` (the shared body behind all 3 tabs' own
+"fetch snapshot + fetch/sort movements" pairs) gained an optional `mergeChildTypes: InstrumentType[] = []`
+parameter — only the LC tab's own call site in `runLookup()` passes `['EPLC_EXAMINATION']`, and only when
+`contract.instrumentType === 'EPLC_CONFIRMATION'` — merging every B3 presentation's own movements
+directly into the Confirmed LC's own Tab 1 timeline, `forkJoin`ed alongside the LC's own movements. The
+SG/Acceptance tabs and the Import LC tab call sites are unaffected (empty array, matching their previous
+behavior exactly) — Import LC's own SG/Acceptance children already have their own dedicated tabs and need
+no such merge.
+
+**Sort key changed from `eventSeq` to `eventTime`** (a real timestamp) once more than one contract can
+contribute rows to one timeline: `eventSeq` is only meaningful WITHIN a single contract (Design doc §8),
+so a Confirmed LC's own `eventSeq` sequence and an Examination contract's own, separately-numbered
+`eventSeq` sequence would interleave incorrectly if compared directly — the same reason
+`InquireEventsService`'s own merged timeline already sorts by `eventTime`, not `eventSeq`. This sort key
+degrades to the exact same chronological order `eventSeq` gave for every single-contract case (SG/
+Acceptance tabs, and the LC tab whenever nothing is merged in), so it's a safe, uniform replacement, not
+a special case only for the merged path.
+
+**Tests**: new regression test in `transaction-builder.component.actions.spec.ts`'s `runLookup()` describe
+block reproducing the reported shape (a Confirmed LC plus two separate `EPLC_EXAMINATION` contracts, E01
+RELEASED and E02 still PENDING) — asserts the merged `lookupMovements` array is sorted by true Event
+Date/Time across all three contracts (`['mv-issue', 'mv-exam-e01', 'mv-exam-e02']`), each row's own
+`contract.instrumentType`/`naturalKey.ibNumber` is correct, and the SAME shared status-mapping logic
+(`isEarmarkFunction`) resolves EARMARKED/EARMARKING for the two B3 rows exactly as Inquire Events already
+does. Three pre-existing tests (`runLookup()`, `selectLookupSg()`, `selectLookupAcceptance()`'s own
+"sorted by eventSeq" cases) needed their fixtures updated with distinct `createdAt` values — their
+original `makeMovement()` fixtures had no `createdAt` at all, which the OLD `eventSeq`-only sort tolerated
+but the new `eventTime`-based sort could not (a real, if narrow, test-fixture gap the sort-key change
+correctly surfaced, not a false positive). Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build
+--configuration development`/`npm run lint` (0 errors, 223 warnings — new any-typed test-fixture mock
+implementations, same accepted convention as every other test-fixture `any` in this file) all clean, full
+Angular suite 785/785 passing (4 net new/changed), coverage 99.44/96.48/99.3/99.44% (all four metrics
+clear the 95% floor; `look-up-panel.service.ts` itself at 99.25/100/97.56/99.14%). `backend/` 33/33 and
+microservice 321/321 both re-run per this file's own standing rule, unaffected (Angular-only change).
+
+**Live-verified end to end against the real running stack, reproducing the reported LC U01 exactly**:
+searched U01 under Export Confirmed's own Look Up Current Balance panel — the LC tab's own Event Timeline
+now shows all 5 events matching Inquire Events' own merged table byte-for-byte: `ISSUE 100000 APPROVED`,
+`CREATE 12345 EARMARKED` (E01), `CREATE 22345 EARMARKING` (E02), `ACCEPT 12345 E01 APPROVED` (B4's own
+Honour), `CREATE 32345 EARMARKING` (E03) — where before this fix only the ISSUE and ACCEPT rows (the
+Confirmed LC's own two direct movements) ever appeared. The Confirmed LC's own "Current Balance" box
+below (Present Docs Earmark Pending/Approved, Tight Available Balance) was already correct before this
+fix and is unaffected — this fix is purely about the Event Timeline table's own row set, not the balance
+figures below it. Zero console errors.
+
+## Bug fixed — B3's own Checker "Approve (acknowledgment only)" button stayed clickable on an ALREADY-acknowledged item, 409-ing on a retry and surfacing as "cannot be approved" (2026-08-18, same day, reviewer-reported live, LC U01 / IB E03 — "The pending transaction...cannot be approved by the Checker", then generalized to E02 too: "因為 U01 E02 E03 在 Inquire Events 是 Earmarking所以試著在B3交易做RELEASE 這兩筆交易 但是不成功")
+
+**Investigated with a direct DB/API query first, not assumed**: `GET /balance-contracts/{examId}/movements`
+for both E02 and E03 showed each was ALREADY acknowledged (`acknowledgedBy: 'checker1'`,
+`acknowledgedAt` set, `status` still `'PENDING'` — exactly as designed, see below) — confirming the
+Checker HAD already successfully clicked Approve on each earlier, but a later re-attempt (most likely
+because the item's own Status still read EARMARKING, not EARMARKED — see the "not a bug" clarification
+below) failed with the server's own correct `IllegalStateTransitionError` ("Movement ... was already
+acknowledged by checker1 at ...", `guardSecondaryAction()`'s own idempotency guard, unchanged and
+correct) — which surfaced client-side as a generic, confusing "cannot be approved."
+
+**Clarification, not a separate bug**: B3's own Checker "Release" is deliberately acknowledgment-ONLY
+(`deferSettlementRequiresBackendAck` → `api.acknowledge()`) and, per `guardSecondaryAction`'s own
+doc comment, NEVER transitions `status` away from PENDING — only B4 (Honour/Acceptance)'s own REAL
+`release()` call does that, which is the one and only thing that ever moves the Event Status Display
+Mapping's own EARMARKING → EARMARKED transition for a B3 row (the function's own help text already says
+this explicitly: "Checker Release here is acknowledgment-only — go to B4...once the actual Honour/Accept
+decision is made"). So E02/E03 staying EARMARKING after a successful B3 Approve is CORRECT, expected
+behavior, not a status-mapping regression — the real, fixable bug was narrower: the UI gave no visible
+signal that Approve had ALREADY succeeded, so a Checker who (reasonably) expected the Status badge itself
+to flip kept re-clicking Approve, hitting the same 409 every time.
+
+**Root cause, precisely**: `arrivalApproved` (the field the Approve button's own `[disabled]` binding and
+its own "✓ ... approved" hint both read) is a per-session, CLIENT-ONLY flag — set by `approveArrival()`'s
+own success callback, reset to `false` by `onSelectCheckerMovement()` every single time an item is
+(re-)picked, including a FRESH pick of the SAME already-acknowledged item after a page reload or a
+different Checker session. It carries no memory of the item's own REAL, persisted `acknowledgedAt`/
+`acknowledgedBy` fields (already present on `BalanceMovement`, already returned by `listMovements()` —
+the data was always there, just never read for this purpose) — the exact same class of bug this file's
+own A4 `makerSubmittedAt` gate was built to avoid (`checkerAct()`'s own `payExistingUtilize` branch reads
+the real persisted field, not a session flag) — B3's own Approve button simply never got the same
+treatment when it was added.
+
+**Fix, `transaction-builder.component.ts`**: new `get arrivalAlreadyApproved(): boolean { return
+this.arrivalApproved || !!this.selectedCheckerMovement?.acknowledgedAt; }` — combines BOTH signals: the
+ephemeral session flag (still needed for plain A3, which has no backend acknowledgment at all, so
+`acknowledgedAt` never populates for it) and the real persisted field (closes the gap for B3
+specifically). `transaction-builder.component.html`'s Approve button's own `[disabled]` binding and its
+"✓ ... approved" hint's own `*ngIf` both switched from `arrivalApproved` to `arrivalAlreadyApproved`; the
+hint text also gained a conditional `— by {{ acknowledgedBy }} at {{ acknowledgedAt | date }}` clause
+(shown only when the persisted field, not this session's own click, is the reason) so a Checker who finds
+an already-acknowledged item sees exactly who approved it and when, then the existing "go to B4..." text
+tells them the correct next step instead of retrying the same action.
+
+**Tests**: new `arrivalAlreadyApproved` describe block in `transaction-builder.component.actions.spec.ts`
+(4 cases: session-flag-only true, persisted-field-only true — the exact reported gap, reproducing E03's
+own real `acknowledgedAt`/`acknowledgedBy` values — neither-set false, and no-selected-item false).
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint`
+(0 errors, 223 warnings, unchanged) all clean, full Angular suite 785/785 passing (4 new), coverage
+99.44/96.48/99.3/99.44% (all four metrics clear the 95% floor). `backend/` 33/33 and microservice
+321/321 both re-run per this file's own standing rule, unaffected (Angular-only change — no request/
+response contract change; `acknowledge()`'s own server-side idempotency guard was already correct and is
+untouched).
+
+**Live-verified end to end against the real running stack, reproducing LC U01 / IB E03 exactly**: searched
+U01/E03 under Export Confirmed B3's own Checker panel — the Approve button is now genuinely `disabled`
+(confirmed via the live DOM, not just the template source), and the hint correctly reads "✓ Present Docs
+approved (acknowledgment only) — by checker1 at 8/18/26, 3:21 PM. Balance stays Pending — go to B4
+(Honour / Acceptance) to actually finalize it." — matching the real, persisted `acknowledgedBy`/
+`acknowledgedAt` values queried directly from the microservice beforehand. No further click can 409
+against this item from this UI anymore. Zero console errors.
+
+## B3 (Present Docs) redesigned to genuinely RELEASE on its own — supersedes acknowledge()-only design entirely (2026-08-18, same day, business instruction: "狀態是交易的狀態 而非BALANCE的狀態 所有交易要RELEASE過後 才能根據流程走下一個交易" — Status is the transaction's own status, not the Balance's; every transaction must genuinely RELEASE before the next step in the flow can act on it)
+
+The entry immediately above this one fixed the SYMPTOM (a stuck-disabled Approve button once already
+acknowledged). This entry reverses the underlying DESIGN the previous several entries all built on top
+of — B3's own acknowledgment-only Checker action (2026-08-15) and every "B4's own compound release
+releases the B3 record as ONE of its legs" mechanism built since. User confirmed, via `AskUserQuestion`
+after being warned of the real accounting consequence (see below), that this specific case — B3→B4 —
+should change; every OTHER `deferSettlement` pair (A3→A4/A6) stays exactly as designed.
+
+**The accounting risk this had to solve first, before any code changed.** `computePresentDocsEarmark()`
+(the check preventing E01+E02+...+En from exceeding a Confirmation's real Available Balance — the whole
+reason "Present Docs Earmark Pending/Approved" exists, 2026-08-15) filtered on `status === 'PENDING'`
+only — a presentation's own earmark contribution stopped counting the INSTANT it left PENDING. If B3
+were simply given a real, standalone Release with no other change, a presentation's own 32,345 would be
+freed from the earmark the moment its OWN Checker approved it — HOURS or DAYS before B4 ever decides
+Honour/Accept — opening a real window for the bank to over-commit beyond the LC's actual capacity.
+Confirmed via `AskUserQuestion`: the earmark must keep occupying capacity all the way from PENDING
+through B3's own genuine RELEASED state, releasing only once B4 actually *consumes* it — not merely once
+B3 approves it.
+
+**Fix, in two coordinated halves — `presentDocsConsumedAt` tracks "consumed by B4", separately from `status` tracking "released by B3":**
+
+**Microservice (`microservices/balance-component/`):**
+- `domain/offBalanceExposure.ts` — `computePresentDocsEarmark`/`Pending`/`Approved` basis changed:
+  `ExaminationMovement`'s `acknowledgedAt` field replaced with `presentDocsConsumedAt`.
+  **Pending** = `status === 'PENDING'` (unchanged in effect, different reasoning). **Approved** =
+  `status === 'RELEASED' && !presentDocsConsumedAt` — a presentation now stays in the earmark total
+  through its own real Release, dropping out ONLY once consumed. The combined check
+  (`computePresentDocsEarmark`, used for the actual sufficiency gate) sums both.
+- `service/balanceService.ts`'s `release()` — gained a new, generic side effect: when the movement being
+  released carries a `referencedTransactionId` pointing at an `EPLC_EXAMINATION`/`CREATE` movement (i.e.
+  this call is releasing B4's own linked HONOUR/ACCEPT), that referenced Present Docs record is marked
+  `presentDocsConsumedAt`/`presentDocsConsumedBy` — no domain-specific `if (B4)` check, just "does the
+  referenced movement's own contract type/movementType match" (safe for A6's own `referencedTransactionId`
+  use too — its source is always `IPLC_LC`/`UTILIZE`, never `EPLC_EXAMINATION`, so this branch can never
+  fire for Import). The `isPresentDocsFinalize` special-case that used to FREEZE B3's own
+  eventSnapshot/rootEventSnapshot/siblings at Create-time (reasoning: "B3's own release() call is really
+  B4 finalizing it, much later") is REMOVED entirely — B3's own `release()` call is now its OWN genuine
+  finalization event, so it falls through to the same unconditional snapshot-overwrite every other
+  movement type's `release()` already gets.
+- `acknowledge()` (the service method) and `POST /balance-movements/{id}/acknowledge` (the route) are
+  REMOVED outright — B3 uses the standard `release()`/`POST .../release` directly now, same as every
+  other function. `acknowledgedBy`/`acknowledgedAt` remain on `types.ts`/`schema.ts` (and the DB columns
+  stay, per this project's own "never drop a migrated column" convention) purely so a pre-2026-08-18 row's
+  historical value still round-trips — nothing writes them any more.
+- New migration `id: 10` — `present_docs_consumed_at`/`present_docs_consumed_by` columns (also added to
+  `schema.ts`'s base `CREATE TABLE`, per this project's own convention of keeping fresh-DB schema and the
+  migration in sync).
+- `store/balanceMovementStore.ts` — `acknowledge()` store method replaced with `markPresentDocsConsumed()`.
+
+**Angular (`src/app/transaction-builder/`):**
+- `balance-component.model.ts` — B3's registry entry: `deferSettlement`/`deferSettlementMovementType`/
+  `deferSettlementLabel`/`deferSettlementNextStepHint`/`deferSettlementRequiresBackendAck` all REMOVED —
+  B3 is now a plain function using the standard Checker `release()`/`reject()` path, same as A1/A2/A8/A9/
+  B1/B2 (this SIMPLIFIES the registry rather than adding to it — B3 needs zero special-case flags any
+  more). `deferSettlementRequiresBackendAck` itself removed from the `TransactionFunction` interface
+  entirely (B3 was its only-ever user, confirmed via the file's own pre-existing "B3 is the only function
+  with..." test). B4's own `payableMovementRequiresAcknowledgment` renamed to
+  `payableMovementRequiresRelease` — its own Step-2 picker filter (`transaction-builder.component.ts`,
+  `loadPayableMovementsAcrossChildContracts()`) now looks for `status === 'RELEASED'` instead of
+  `status === 'PENDING' && acknowledgedAt`.
+- `transaction-builder.component.ts`'s `approveArrival()` — its own `deferSettlementRequiresBackendAck`
+  branch (the real `api.acknowledge()` call) removed entirely; the method is now unconditionally
+  `this.arrivalApproved = true;` — A3 (its only remaining caller) is unaffected, since it never took
+  that branch anyway.
+- `checker-actions.service.ts`'s `release()` — the `settlesDocumentArrival` branch (shared by A6 and B4)
+  now checks `ctx.selectedFunction?.payableMovementRequiresRelease` FIRST: when true (B4), it skips
+  straight to `releaseAcceptance()` without ever calling `api.release()` on the resolved source —
+  releasing an already-RELEASED B3 record would be a 409 (`RELEASED` has no further legal transitions).
+  A6's own branch (no such flag) is completely unchanged — its own source (a Usance Document Arrival)
+  still needs releasing first, exactly as before.
+- `balance-component-api.service.ts` — `acknowledge()` client method removed; `acknowledgedBy`/
+  `acknowledgedAt` marked historical-only (same posture as the microservice's own types.ts); new
+  `presentDocsConsumedAt`/`presentDocsConsumedBy` fields added to the `BalanceMovement` interface.
+
+**Backend (`backend/`)** — Business Case Registry's Export Case #6/#7 (the only registry cases exercising
+B3/B4) rewritten: the `acknowledge` step for the Present Docs examination movement replaced with a real
+`release` step, moved to run immediately after the examination's own `createMovement` (via the existing
+`createAndRelease()` helper) — i.e. BEFORE B4's own Honour/Accept `createMovement` steps, matching the
+real new flow (B3 must be Released before B4 can even pick it). The later "release the examination
+record" step (previously the FIRST of B4's own three release calls) is removed — B4's own release
+sequence is now 2 calls (Sight) / 3 calls (Usance) instead of 3/4. `server.js`'s
+`RELEASE_SHAPED_STEP_TYPES` dispatch table drops the `'acknowledge'` entry (the `/acknowledge` endpoint
+it pointed at no longer exists server-side — leaving it in would have been actively misleading, not
+merely unused).
+
+**Tests**: microservice — `offBalanceExposure.test.ts`'s Present Docs Earmark describe block rewritten
+for the new basis; `balanceService.test.ts` gained a new describe block (`release()` — B3 genuinely
+RELEASEs; releasing an already-RELEASED examination throws; releasing B4's own linked HONOUR marks the
+referenced examination consumed; the earmark stays fully occupied through a RELEASED-but-not-consumed
+window and only drops once B4 consumes it — reproducing the exact over-commitment risk this whole fix
+protects against; A6's own `referencedTransactionId` use never triggers the consume side effect); two
+pre-existing snapshot-freeze tests rewritten for the reversed (no-longer-frozen) behavior; `app.test.ts`
+gained a new HTTP-integration describe block proving the same B3-release-then-B4-consumes flow end to end
+over real requests; the four old `/acknowledge`-specific HTTP tests replaced with two `/release`-based
+ones. Angular — `balance-component.model.spec.ts`, `checker-actions.service.spec.ts` (4 B4-specific tests
+rewritten for the dropped "release source first" leg, one new test proving B4 never attempts to resolve a
+source at all), `transaction-builder.component.actions.spec.ts` (`approveArrival()` describe block
+simplified to 2 tests; all 5 B4 compound-release tests updated; the now-obsolete "B3 end to end via
+approveArrival()" test removed, its own mapping coverage already held by an existing `it.each`),
+`transaction-builder.component.selection.spec.ts` (B4's own picker tests updated for the new
+status-RELEASED basis). Backend — `businessCases.test.js`'s `VALID_STEP_TYPES` drops `'acknowledge'`;
+`server.test.js`'s `acknowledge`-specific describe block rewritten to prove the new release-before-B4-submit
+ordering instead. Verified: microservice 322/322 (99.25/97.16/100/99.49% coverage), Angular 782/782
+(99.44/96.37/99.3/99.44%), `backend/` 33/33 (97.32/95.34/96.42/98.03%) — all three clear their own 95%
+floor on all four metrics; `npm run typecheck`/`npm run build`/`npm run lint` clean across all three
+sub-projects (microservice 0 errors/11 pre-existing warnings, Angular 0 errors/217 warnings, backend 0
+errors/0 warnings); `ng build --configuration development` (strict templates) clean; OAS
+(`analysis/balance-component-api.yaml`) bumped to **v1.12.0** with a full changelog entry, the removed
+`/acknowledge` path deleted, and `presentDocsConsumedAt`/`presentDocsConsumedBy` documented — re-validated
+clean via the project's own local `js-yaml` parse-and-check script.
+
+**Live-verified against the real running stack**: queried the microservice directly (curl) for a fresh
+B3→B4 sequence — B3's own `release()` correctly transitions `PENDING → RELEASED` independent of any B4
+action; B4's own linked HONOUR release correctly sets the referenced B3 record's own
+`presentDocsConsumedAt`/`presentDocsConsumedBy`, confirmed via a follow-up `GET .../movements` call.
+Existing pre-2026-08-18 Export Confirmed test data (S01, U01, and one stray `B3LIVETEST01` — 18 contracts,
+24 movements total) was **deliberately cleared** (user-requested, "Clean up all export confirmed
+events") rather than left in an inconsistent half-migrated state (old rows have `status: RELEASED` from
+the OLD acknowledge+B4-releases-source design but no `presentDocsConsumedAt`, since that field never
+existed when they were created) — Import-side data (S01/S02/...S11, U01, U02 and their SG/Acceptance
+children, 21 contracts) was left untouched, confirmed via a direct post-cleanup query.
+
+## Bug fixed the SAME day, found via the live cleanup above — B4's own Step-2 picker kept showing an ALREADY-CONSUMED Present Docs record as pickable again (2026-08-18, reviewer-reported live, fresh S01 — "Export Confirmed LC Sight [B4] Submit後 不應該再出現 S01 E01 E02")
+
+Direct fallout of the redesign above, caught immediately during live re-testing on fresh data. Root
+cause: `loadPayableMovementsAcrossChildContracts()`'s own candidate filter (`transaction-builder.
+component.ts`) checks `status === 'RELEASED'` (via the renamed `payableMovementRequiresRelease` flag) —
+correct for excluding a not-yet-Released presentation, but **an already-consumed presentation also stays
+`status: 'RELEASED'` forever** (consumption sets `presentDocsConsumedAt`, a SEPARATE field — it never
+touches `status` again, by design, see the entry immediately above). So once a Checker had already fully
+processed E01 through B4 (Honour Released, `presentDocsConsumedAt` correctly set server-side — confirmed
+via direct query, both E01 and E02 had it set exactly as designed), E01 still passed the picker's own
+status-only filter and kept reappearing as if still available for a FRESH B4 submission — which would
+have created a SECOND Honour/Accept movement against the same presentation, double-counting the
+Confirmed Balance reduction had a Maker actually submitted against it.
+
+**Fix**: `loadPayableMovementsAcrossChildContracts()`'s own filter gained one more condition —
+`&& !m.presentDocsConsumedAt` — excluding any candidate already marked consumed, on top of the existing
+movementType/status checks. A no-op for A6's own candidates (plain A3 UTILIZEs never set
+`presentDocsConsumedAt` at all, so the new clause is always true for them). `balance-component-api.
+service.ts`'s `BalanceMovement` interface already carried `presentDocsConsumedAt` from the entry above,
+so no new field was needed — purely a missing filter condition.
+
+**Tests**: new test in `transaction-builder.component.selection.spec.ts` — an `EPLC_EXAMINATION` CREATE
+with `status: 'RELEASED'` AND `presentDocsConsumedAt` set correctly yields zero payable candidates for
+B4, alongside the pre-existing "still-PENDING" exclusion test (both cases now covered side by side).
+Verified: Angular suite 783/783 passing (1 new), coverage 99.44/96.38/99.3/99.44% (all four metrics clear
+the 95% floor), `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run
+lint` (0 errors, 217 warnings, unchanged) all clean. `backend/`/microservice unaffected (no files under
+either touched — this is a pure Angular-side filter fix, the server-side data was already correct).
+
+**Live-verified against the real running stack, reproducing the exact reported LC S01 sequence**: queried
+S01's own E01/E02 Present Docs records directly post-fix — both correctly show `status: 'RELEASED'` AND
+`presentDocsConsumedAt` set (E01 by checker1, E02 by checker1) from the user's own live B3→B4 run against
+the just-redesigned code; the Confirmation's own `presentDocsEarmarkApproved` correctly reflects ONLY a
+newer, not-yet-consumed presentation's own amount (32,965) — not E01/E02's own already-retired 12,345/
+22,345 — confirming the earmark math itself was already correct end to end; the picker-level fix above
+closes the remaining "stale candidate" gap in the B4 Maker UI specifically.
+
+## Balance Snapshot box — Tight Available Balance moved to the last row (2026-08-18, same day, user-requested — "Tight Available Balance 放在最後一個 OK?")
+
+Pure display-order change in the shared `#balanceSnapshotBox` template (`transaction-builder.component.html`,
+reused by Look Up Current Balance/Inquire Events alike, per this file's own Mandatory Consistency posture)
+— `Tight Available Balance` now renders AFTER `Present Docs Earmark (Pending)`/`(Approved)` instead of
+before them, so the two figures that combine to derive it (`Available Balance` minus the combined Present
+Docs Earmark) are already visible above it when it appears. Only affects the Export Confirmed LC case in
+practice — Import LC's own `Tight Available Balance` (the SHGT-based figure) has no Present Docs Earmark
+rows to move past, so its position is visually unchanged. No field's own value/visibility condition
+touched, no `.ts` change. Verified: `ng build --configuration development` (strict templates) clean, full
+Angular suite 783/783 unchanged (this project's own direct-instantiation test convention never renders
+the DOM, so template-only reorders were never covered by a test either before or after, same as every
+prior template-only fix in this file).

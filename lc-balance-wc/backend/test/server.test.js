@@ -39,9 +39,6 @@ function createGenericFetchMock() {
     if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
       return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
     }
-    if (method === 'POST' && /\/balance-movements\/[^/]+\/acknowledge$/.test(url)) {
-      return jsonResponse(200, { status: 'PENDING', acknowledgedBy: 'checker1' });
-    }
     if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
       const [, contractId] = url.match(/\/balance-contracts\/([^/]+)\/balance$/);
       return jsonResponse(200, {
@@ -203,27 +200,31 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
     });
   });
 
-  // Quality-report-balance.md BAL-131 (2026-08-17): the Business Case Registry used to never exercise
-  // POST /balance-movements/:id/acknowledge at all — the one microservice write endpoint with zero
-  // orchestrator-level coverage. Export Case #6/#7 now both model B3's own Checker acknowledgment of
-  // the Present Docs earmark for real, via the new 'acknowledge' step type.
-  describe('POST /api/business-cases/export-case-6/run — acknowledge step (B3 Present Docs Checker acknowledgment)', () => {
-    it('POSTs to .../acknowledge for the Present Docs earmark, distinct from release, before B4\'s own compound release', async () => {
+  // SUPERSEDED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易" — every transaction must
+  // genuinely RELEASE before the next step in the flow can act on it). Quality-report-balance.md BAL-131
+  // (2026-08-17) originally closed a gap where the Business Case Registry never exercised B3's own
+  // Present Docs Checker action at all — that action is now the standard `release` step type (B3
+  // genuinely RELEASEs on its own), not the removed `acknowledge` step. This test proves the NEW
+  // ordering: B3's own real Release happens BEFORE B4 even Maker-Submits its own Honour/Accept —
+  // stronger evidence of the redesigned flow than the old acknowledge-based version could give.
+  describe('POST /api/business-cases/export-case-6/run — B3 (Present Docs) genuinely Releases before B4 ever submits', () => {
+    it("B3's own real /release call for the Present Docs earmark happens before B4's own Honour createMovement step", async () => {
       global.fetch = createGenericFetchMock();
 
       const res = await request(app).post('/api/business-cases/export-case-6/run').send({});
 
       expect(res.status).toBe(200);
+      expect(res.body.trace.some((t) => t.type === 'acknowledge')).toBe(false);
 
-      const acknowledges = res.body.trace.filter((t) => t.type === 'acknowledge');
-      expect(acknowledges).toHaveLength(1);
-      expect(acknowledges[0]).toMatchObject({ ok: true, status: 200, response: { status: 'PENDING', acknowledgedBy: 'checker1' } });
+      const examinationReleases = res.body.trace.filter((t) => t.type === 'release' && t.label.startsWith('Checker releases Present Docs ('));
+      expect(examinationReleases).toHaveLength(1);
+      expect(examinationReleases[0]).toMatchObject({ ok: true, status: 200, response: { status: 'RELEASED' } });
 
       const case6 = buildRegistry().find((c) => c.id === 'export-case-6');
-      const acknowledgeIdx = case6.steps.findIndex((s) => s.type === 'acknowledge');
-      const honourReleaseIdx = case6.steps.findIndex((s) => s.type === 'release' && s.label.includes('Present Docs'));
-      expect(acknowledgeIdx).toBeGreaterThanOrEqual(0);
-      expect(acknowledgeIdx).toBeLessThan(honourReleaseIdx);
+      const examinationReleaseIdx = case6.steps.findIndex((s) => s.type === 'release' && s.label.startsWith('Checker releases Present Docs ('));
+      const honourCreateIdx = case6.steps.findIndex((s) => s.type === 'createMovement' && s.label.includes('Issuing Bank Honour'));
+      expect(examinationReleaseIdx).toBeGreaterThanOrEqual(0);
+      expect(examinationReleaseIdx).toBeLessThan(honourCreateIdx);
     });
   });
 

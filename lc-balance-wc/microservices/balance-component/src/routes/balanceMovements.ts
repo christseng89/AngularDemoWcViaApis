@@ -60,14 +60,10 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     res.json(service.cancel(req.params.movementId, cancelledBy, reasonCode, remarks));
   });
 
-  // POST /balance-movements/:movementId/acknowledge — B3's own Checker Release on a Present Docs
-  // earmark (business instruction 2026-08-15, "Present Docs Earmark (Pending/Approved)"); EPLC_
-  // EXAMINATION/CREATE only, never changes status (see service.acknowledge()'s own doc comment).
-  router.post('/balance-movements/:movementId/acknowledge', (req, res) => {
-    const { acknowledgedBy } = req.body as { acknowledgedBy?: string };
-    if (!acknowledgedBy) throw new RequestValidationError('acknowledgedBy is required.');
-    res.json(service.acknowledge(req.params.movementId, acknowledgedBy));
-  });
+  // REMOVED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
+  // POST /balance-movements/:movementId/acknowledge, B3's own former Checker acknowledgment-only path.
+  // B3 now uses the standard /release route above directly — see service.ts's own removed acknowledge()
+  // section for the full rationale.
 
   // POST /balance-movements/:movementId/maker-submit — A4's own real Maker Submit (business
   // instruction 2026-08-16, "Add real Maker Submit, then have Checker to Release it. Exactly the

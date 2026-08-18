@@ -320,6 +320,27 @@ export class TransactionBuilderComponent {
   arrivalApproved = false;
 
   /**
+   * Bug fixed 2026-08-18, reviewer-reported live (LC U01 / IB E03 — Checker's own "Approve
+   * (acknowledgment only)" button stayed clickable on an item already acknowledged, and clicking it
+   * again 409'd as "already acknowledged", surfacing as "cannot be approved"): `arrivalApproved` alone
+   * is only a per-session CLIENT flag, reset to `false` by `onSelectCheckerMovement()` every time an
+   * item is (re-)picked — it says nothing about whether THIS item was already acknowledged in an
+   * EARLIER session/page-load. B3's own `deferSettlementRequiresBackendAck` path calls the real,
+   * persisted `acknowledge()` API (`selectedCheckerMovement.acknowledgedAt`/`acknowledgedBy` — see
+   * `approveArrival()`'s own doc comment), so a Checker searching the SAME still-PENDING item again
+   * later (by design — B3 never transitions status, see `guardSecondaryAction()`'s own doc comment on
+   * the microservice side) always saw the button re-enabled regardless of that persisted state. This
+   * getter combines both signals — the ephemeral session flag (still needed for plain A3, which has NO
+   * backend acknowledgment at all, `deferSettlementRequiresBackendAck` false, so `acknowledgedAt` never
+   * populates for it) and the real persisted field (closes the gap for B3 specifically) — so the button
+   * correctly disables/relabels either way, and a stale second acknowledge attempt can no longer be
+   * triggered from the UI.
+   */
+  get arrivalAlreadyApproved(): boolean {
+    return this.arrivalApproved || !!this.selectedCheckerMovement?.acknowledgedAt;
+  }
+
+  /**
    * BAL-003 (Checker Actions extraction): `checkerActions` defaults to a fresh
    * `CheckerActionsService` bound to the same `api` — preserves every existing `new
    * TransactionBuilderComponent(mockApi)` test call site (70+ across 4 spec files) unmodified. Angular's
@@ -1161,13 +1182,27 @@ export class TransactionBuilderComponent {
         ).subscribe((movementLists) => {
           this.payableMovementsLoading = false;
           // Business instruction 2026-08-15 ("B4 只能挑 Approved 的記錄") — B4 only: a B3 Present Docs
-          // record must have passed its OWN Checker acknowledgment (B3's own Release, acknowledgedAt
-          // set — see approveArrival()'s doc comment) before it can be picked here for Honour/Accept,
-          // enforcing the 4-eyes check on the presentation itself as a real gate, not just a courtesy.
-          const requiresAck = !!this.selectedFunction?.payableMovementRequiresAcknowledgment;
+          // record must have passed its OWN, genuine Checker Release before it can be picked here for
+          // Honour/Accept, enforcing the 4-eyes check on the presentation itself as a real gate, not
+          // just a courtesy. Basis changed 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易"):
+          // B3 now genuinely RELEASEs on its own (status RELEASED), superseding the prior
+          // acknowledgedAt-while-still-PENDING design — so B4's own candidate filter looks for
+          // status === 'RELEASED' instead of 'PENDING' when this flag is set; A6's own equivalent
+          // (still-PENDING A3 Document Arrivals) is unaffected, still filters on 'PENDING'.
+          //
+          // Bug fixed 2026-08-18, reviewer-reported live ("Export Confirmed LC Sight B4 Submit後 不應該
+          //再出現 S01 E01 E02" — after B4 has already consumed a presentation, it must stop appearing
+          // as a pickable candidate): status alone isn't enough once a presentation can be RELEASED
+          // (EARMARKED) YET ALSO already fully consumed by an earlier B4 — an already-consumed record
+          // never leaves PENDING or transitions again, so `status === 'RELEASED'` alone kept matching it
+          // forever. Also exclude anything with `presentDocsConsumedAt` already set (see
+          // BalanceMovement.presentDocsConsumedAt's own doc comment — set as a side effect of B4's own
+          // compound release). This check is a no-op for A6 (its own candidates, plain A3 UTILIZEs,
+          // never set presentDocsConsumedAt at all).
+          const requiresRelease = !!this.selectedFunction?.payableMovementRequiresRelease;
           this.payableMovements = movementLists
             .flat()
-            .filter((m: any) => m.status === 'PENDING' && m.movementType === wantedMovementType && (!requiresAck || m.acknowledgedAt));
+            .filter((m: any) => m.movementType === wantedMovementType && m.status === (requiresRelease ? 'RELEASED' : 'PENDING') && !m.presentDocsConsumedAt);
           if (this.payableMovements.length === 1) this.onSelectPayMovement(this.payableMovements[0].movementId);
         });
       },
@@ -2070,31 +2105,13 @@ export class TransactionBuilderComponent {
    * A4 (Sight Settlement) can still find and pay it. This only records a
    * local UI acknowledgment; it never claims the backend status changed.
    *
-   * B3 is the one exception (business instruction 2026-08-15, "Present Docs
-   * Earmark (Pending/Approved)" needs a real Pending-vs-Approved split that
-   * survives reload and is visible across Checker sessions) —
-   * deferSettlementRequiresBackendAck routes it through the real
-   * acknowledge() API instead, which still never touches status (movement
-   * stays PENDING for B4 to find), only acknowledgedBy/acknowledgedAt.
+   * B3's own former exception here (deferSettlementRequiresBackendAck, a real backend acknowledge()
+   * call) was REMOVED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易")
+   * — B3 no longer sets deferSettlement at all, so checkerAct() never routes it through this method any
+   * more; it uses the standard release()/reject() Checker path directly instead. A3 is this method's
+   * only caller now.
    */
   approveArrival(): void {
-    if (this.selectedFunction?.deferSettlementRequiresBackendAck && this.selectedCheckerMovement) {
-      this.checkerBusy = true;
-      this.checkerError = null;
-      this.api.acknowledge(this.selectedCheckerMovement.movementId, this.checkerId).subscribe({
-        next: () => {
-          this.checkerBusy = false;
-          this.arrivalApproved = true;
-          this.refreshSelectedContractSnapshot();
-          this.syncCheckerToContext();
-        },
-        error: (err) => {
-          this.checkerBusy = false;
-          this.checkerError = this.describeApiError(err);
-        },
-      });
-      return;
-    }
     this.arrivalApproved = true;
   }
 

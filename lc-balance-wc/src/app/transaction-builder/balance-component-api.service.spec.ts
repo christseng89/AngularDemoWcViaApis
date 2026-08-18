@@ -65,11 +65,6 @@ describe('BalanceComponentApiService', () => {
     });
   });
 
-  it('acknowledge() POSTs to the /acknowledge sub-path with acknowledgedBy', () => {
-    service.acknowledge('MV-1', 'checker2');
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/acknowledge', { acknowledgedBy: 'checker2' });
-  });
-
   it('submitByMaker() POSTs to the /maker-submit sub-path with makerSubmittedBy', () => {
     service.submitByMaker('MV-1', 'maker1');
     expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/maker-submit', { makerSubmittedBy: 'maker1' });

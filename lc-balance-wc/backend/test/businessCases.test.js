@@ -22,7 +22,7 @@ const EXPECTED_IDS = [
   'export-case-7',
 ];
 
-const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'acknowledge', 'snapshot'];
+const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
 
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
@@ -82,7 +82,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     });
   });
 
-  it('every *Ref (balanceContractIdRef / parentLogicalContractIdRef / referencedTransactionIdRef / movementRef / contractRef) points at a captureAs key already defined earlier in the SAME case, for release/makerSubmit/acknowledge steps alike', () => {
+  it('every *Ref (balanceContractIdRef / parentLogicalContractIdRef / referencedTransactionIdRef / movementRef / contractRef) points at a captureAs key already defined earlier in the SAME case, for release/makerSubmit steps alike', () => {
     registry.forEach((c) => {
       const defined = new Set();
       c.steps.forEach((step, idx) => {
@@ -103,7 +103,7 @@ describe('data/businessCases.js buildRegistry()', () => {
             expect(step.captureAs === req.balanceContractIdRef).toBe(false);
             defined.add(step.captureAs);
           }
-        } else if (step.type === 'release' || step.type === 'makerSubmit' || step.type === 'acknowledge') {
+        } else if (step.type === 'release' || step.type === 'makerSubmit') {
           expect(step.movementRef).toBeTruthy();
           expect(defined.has(step.movementRef)).toBe(true);
         } else if (step.type === 'snapshot') {

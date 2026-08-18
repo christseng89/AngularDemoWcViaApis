@@ -15,7 +15,7 @@ export function createApp(db: Db): Express {
   const service = new BalanceService(db);
   app.use(balanceContractsRouter(service));
   // Quality-report-balance.md BAL-104: rate limiting scoped to /balance-movements — the create/release/
-  // reject/cancel/acknowledge lifecycle (the actual Maker/Checker write surface) — rather than applied
+  // reject/cancel/maker-submit lifecycle (the actual Maker/Checker write surface) — rather than applied
   // globally, so the read-heavy /balance-contracts catalog/lookup/snapshot endpoints (used heavily by
   // the Business Case Runner's own replay-a-whole-scenario flow and the Transaction Builder's pickers)
   // are unaffected. Generous limit (over a real network, a Maker/Checker workflow is nowhere near this
