@@ -1,8 +1,8 @@
 import { Observable, forkJoin } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
-import { InstrumentType, defaultLcInstrumentTypeForSide } from './balance-component.model';
+import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
-import { InquiredEvent, childMovementsOf$, movementsOf$ } from './inquire-events.service';
+import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$ } from './inquire-events.service';
 
 /**
  * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): the "Look Up Current Balance" panel's own
@@ -97,6 +97,18 @@ export class LookUpPanelService {
     if (this.lookupTab === 'ACCEPTANCE') return this.selectedLookupAcceptance;
     if (this.lookupTab === 'SG') return this.selectedLookupSg;
     return this.lookupResult?.contract ?? null;
+  }
+
+  /**
+   * Business instruction 2026-08-19 ("Look Up Current Balance → Event Timeline" gains a FUNCTION
+   * column that "must use the same Function mapping as Inquire Events... Do not implement a separate
+   * Function mapping") — delegates to the SAME `functionForEvent()` free function
+   * `InquireEventsService.functionFor()` itself now delegates to (see that method's own doc comment),
+   * so both screens resolve every event's own Function badge identically by construction, not by
+   * convention.
+   */
+  functionFor(event: InquiredEvent): TransactionFunction | undefined {
+    return functionForEvent(event);
   }
 
   /**

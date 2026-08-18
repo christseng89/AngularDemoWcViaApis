@@ -61,9 +61,12 @@ function fieldByKey(fields: ReturnType<typeof buildFields>, key: string) {
 }
 
 describe('builder-fields', () => {
+  // Order updated 2026-08-19 ("Event Entry — 必填參考編號需求" — the applicable reference number must be
+  // the first input field on the transaction entry screen) — secondaryRef moved from after
+  // amount/currency to the very front; every other key's own relative order is unchanged.
   it('returns the 8 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
-    expect(fields.map((f) => f.key)).toEqual(['amount', 'currency', 'tolerancePct', 'secondaryRef', 'tenorType', 'tenorDays', 'eventSeq', 'createdBy']);
+    expect(fields.map((f) => f.key)).toEqual(['secondaryRef', 'amount', 'currency', 'tolerancePct', 'tenorType', 'tenorDays', 'eventSeq', 'createdBy']);
   });
 
   describe('Amount field', () => {

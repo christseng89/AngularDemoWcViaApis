@@ -1716,6 +1716,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       // PENDING), it correctly displays EARMARKED, not EARMARKING.
       expect(comp.displayStatus(createRow.eventStatus, createRow.contract.instrumentType, createRow.movement.movementType, createRow.phase)).toBe('EARMARKED');
       expect(comp.displayStatus(finalizeRow.eventStatus, finalizeRow.contract.instrumentType, finalizeRow.movement.movementType, finalizeRow.phase)).toBe('APPROVED');
+      // UX enhancement 2026-08-19 ("Look Up Current Balance → Event Timeline" gains a FUNCTION column
+      // that "must use the same Function mapping as Inquire Events... Do not implement a separate
+      // Function mapping") — lookUp.functionFor() delegates to the exact same functionForEvent() free
+      // function InquireEventsService.functionFor() itself now delegates to, so the 'create' row
+      // resolves to A3 and the 'finalize' row to A4, matching Inquire Events' own resolution exactly.
+      expect(comp.lookUp.functionFor(createRow)?.code).toBe('A3');
+      expect(comp.lookUp.functionFor(finalizeRow)?.code).toBe('A4');
     });
 
     // Companion to the test immediately above — a Sight Document Arrival that has NOT yet been

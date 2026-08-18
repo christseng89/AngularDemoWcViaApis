@@ -105,6 +105,22 @@ export interface InquiredEvent {
  * services import it from here rather than either owning it, since the underlying "A4 finalizes an
  * existing A3/A3S row" business rule this encodes belongs to neither screen specifically.
  */
+/**
+ * Module-level exported function (2026-08-19, user-requested — "Look Up Current Balance → Event
+ * Timeline" gains a FUNCTION column that "must use the same Function mapping as Inquire Events... Do
+ * not implement a separate Function mapping") — was a private InquireEventsService method; extracted so
+ * LookUpPanelService's own Event Timeline table can call the exact same resolution, not a second,
+ * separately-maintained copy of it. Same "share the function, not the behavior" convention toEventRows()
+ * itself already established for this pair of services, immediately above. Named `functionForEvent`,
+ * distinct from `InquireEventsService.functionFor()` below (which now just delegates to this) — same
+ * "avoid an unqualified call silently shadowing a same-named class method" readability guard this file's
+ * own BAL-136 fix already established for validateSubmit/buildSubmitRequest vs. submit-rules.ts.
+ */
+export function functionForEvent(event: InquiredEvent): TransactionFunction | undefined {
+  const { movement, contract } = event;
+  return (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType);
+}
+
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
   const isFinalizedSightUtilize = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType === 'SIGHT' && movement.status !== 'PENDING' && !!movement.releasedAt;
   if (!isFinalizedSightUtilize) {
@@ -439,8 +455,7 @@ export class InquireEventsService {
    * every other unresolved-function fallback in this file already uses.
    */
   functionFor(event: InquiredEvent): TransactionFunction | undefined {
-    const { movement, contract } = event;
-    return (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType);
+    return functionForEvent(event);
   }
 
   selectEvent(event: InquiredEvent): void {

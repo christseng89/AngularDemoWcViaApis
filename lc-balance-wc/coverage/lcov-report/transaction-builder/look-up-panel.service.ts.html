@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">99.25% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>133/134</span>
+                <span class='fraction'>134/135</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.56% </span>
+                <span class="strong">97.61% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>40/41</span>
+                <span class='fraction'>41/42</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">99.14% </span>
+                <span class="strong">99.15% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>116/117</span>
+                <span class='fraction'>117/118</span>
             </div>
         
             
@@ -430,7 +430,19 @@
 <a name='L365'></a><a href='#L365'>365</a>
 <a name='L366'></a><a href='#L366'>366</a>
 <a name='L367'></a><a href='#L367'>367</a>
-<a name='L368'></a><a href='#L368'>368</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
@@ -528,6 +540,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -799,9 +823,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Observable, forkJoin } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
-import { InstrumentType, defaultLcInstrumentTypeForSide } from './balance-component.model';
+import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
-import { InquiredEvent, childMovementsOf$, movementsOf$ } from './inquire-events.service';
+import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$ } from './inquire-events.service';
 &nbsp;
 /**
  * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): the "Look Up Current Balance" panel's own
@@ -896,6 +920,18 @@ export class LookUpPanelService {
     if (this.lookupTab === 'ACCEPTANCE') return this.selectedLookupAcceptance;
     if (this.lookupTab === 'SG') return this.selectedLookupSg;
     return this.lookupResult?.contract ?? null;
+  }
+&nbsp;
+  /**
+   * Business instruction 2026-08-19 ("Look Up Current Balance → Event Timeline" gains a FUNCTION
+   * column that "must use the same Function mapping as Inquire Events... Do not implement a separate
+   * Function mapping") — delegates to the SAME `functionForEvent()` free function
+   * `InquireEventsService.functionFor()` itself now delegates to (see that method's own doc comment),
+   * so both screens resolve every event's own Function badge identically by construction, not by
+   * convention.
+   */
+  functionFor(event: InquiredEvent): TransactionFunction | undefined {
+    return functionForEvent(event);
   }
 &nbsp;
   /**
@@ -1171,7 +1207,7 @@ export class LookUpPanelService {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-18T12:41:50.193Z
+                at 2026-08-18T13:30:42.410Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -78,6 +78,20 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const currencyIsDropdown = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
 
   const fields: FormlyFieldConfig[] = [
+    // Business instruction 2026-08-19 ("Event Entry — 必填參考編號需求": the applicable reference number
+    // — Amendment No. for A2/B2, IB Number for A3/A3S, EB Number for B4 — "必須固定顯示為交易輸入畫面的
+    // 第一個輸入欄位" i.e. must be the first input field on the transaction entry screen, mandatory,
+    // validated on blur exactly like Amount) — moved from its old position (after amount/currency) to
+    // the very front of this shared array. Its own `hide: !ctx.dynamicSecondaryRefLabel` is unchanged,
+    // so this is a no-op for every function that doesn't set secondaryRefLabel (A1/B1 included — their
+    // own LC Number reference lives outside this Formly array entirely, in its own natural-key section
+    // positioned before this <formly-form>, so it was already effectively "first" and stays that way).
+    {
+      key: 'secondaryRef',
+      type: 'input',
+      props: { label: ctx.dynamicSecondaryRefLabel ?? 'Reference No.', required: !!ctx.dynamicSecondaryRefLabel },
+      hide: !ctx.dynamicSecondaryRefLabel,
+    },
     {
       key: 'amount',
       type: 'input',
@@ -133,12 +147,6 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       type: 'input',
       props: { label: 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)', type: 'number' },
       hide: !toleranceApplicable(model),
-    },
-    {
-      key: 'secondaryRef',
-      type: 'input',
-      props: { label: ctx.dynamicSecondaryRefLabel ?? 'Reference No.', required: !!ctx.dynamicSecondaryRefLabel },
-      hide: !ctx.dynamicSecondaryRefLabel,
     },
     {
       key: 'tenorType',

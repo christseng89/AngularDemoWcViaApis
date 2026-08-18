@@ -224,6 +224,16 @@
   margin-bottom: 4px;
 }
 
+// Same red-asterisk visual signal as a required Formly field's own `span[aria-hidden='true']` (see
+// `:host ::ng-deep formly-field.tb-field--required` above) — a plain, non-Formly reusable class for
+// the handful of natural-key inputs (LC Number etc.) that live outside buildFields()'s own array and
+// so can't pick up that Formly-scoped rule.
+.tb-required-mark {
+  color: var(--red);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
 .tb-input,
 .tb-select {
   border: 1px solid var(--gray-input-border);
@@ -261,6 +271,25 @@
   background: var(--blue-bg-soft);
 
   &:focus {
+    background: #fff;
+  }
+}
+
+// Business instruction 2026-08-19 ("LC Number... leave blank and Tab out... no red validation box...
+// Amount... immediately highlighted") — this app's own non-Bootstrap-scoped equivalent of Bootstrap's
+// `.form-control.is-invalid` (which only Formly-rendered fields, e.g. Amount, qualify for — they alone
+// carry the `.form-control` class Bootstrap's own selector requires). Placed after `.tb-input--required`
+// in source order (not `!important` — matches this file's own established "win on source order, not
+// !important" convention, e.g. the .tb-table--static hover-suppression fix) so a touched+empty mandatory
+// field's full red border-left-color wins over the plain blue one — "genuinely invalid" is a stronger
+// signal than merely "required, not yet touched".
+.tb-input--invalid {
+  border-color: var(--red);
+  background: var(--red-bg-soft);
+
+  &:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
     background: #fff;
   }
 }

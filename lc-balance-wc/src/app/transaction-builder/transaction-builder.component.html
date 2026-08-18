@@ -194,13 +194,54 @@
                      Formly array, so formLocked's displayFields() rewrite never reached them) grey out via
                      the same .tb-input:disabled styling every other locked field already uses. -->
                 <div class="tb-grid-3">
-                  <input class="tb-input tb-input--required" *ngIf="!lcNumberFromParent" placeholder="LC Number" [(ngModel)]="naturalKey.lcNumber" [disabled]="formLocked">
+                  <!-- Business instruction 2026-08-19 ("LC Number must be a mandatory field for both A1
+                       and B1, with the same mandatory-field validation and visual indication (*) as the
+                       Amount field") — validation already existed (validateSubmit() rejects a blank LC
+                       Number, see the doc comment above); this closes the missing VISUAL half. A1/B1's own
+                       LC Number is the only input in this grid cell whenever !lcNumberFromParent is true
+                       (that branch is unreachable with a non-empty requiredNaturalKeyFields — every
+                       hasParent creating function that DOES need ibNumber/sgNumber, e.g. A8/B3, always has
+                       lcNumberFromParent true instead), so adding a real label here can't misalign the
+                       grid against a sibling IB/SG Number cell that would need the same treatment. -->
+                  <div *ngIf="!lcNumberFromParent">
+                    <label class="tb-field__label">LC Number <span class="tb-required-mark">*</span></label>
+                    <!-- Business instruction 2026-08-19 ("leave LC Number blank and press Tab... no red
+                         validation box... Amount... immediately highlighted with a red validation box") —
+                         Amount's own red-on-blur comes from ngx-formly-bootstrap's FieldType applying
+                         [class.is-invalid] the instant its own Angular FormControl (required: true) becomes
+                         touched+invalid (input.type.mjs). LC Number is a plain ngModel outside that Formly
+                         FormGroup, so it never had an Angular validator/touched-tracking to drive the same
+                         behavior — `required` gives it Angular's own RequiredValidator (same mechanism
+                         Amount's own `props.required: true` compiles down to), `#lcNumberCtrl="ngModel"`
+                         exposes .invalid/.touched, and tb-input--invalid (below) is this app's own
+                         non-Bootstrap-scoped equivalent of is-invalid (LC Number isn't a .form-control, so
+                         Bootstrap's own is-invalid selector wouldn't match it). -->
+                    <input class="tb-input tb-input--required" [class.tb-input--invalid]="lcNumberCtrl.invalid && lcNumberCtrl.touched" placeholder="LC Number" name="lcNumberA1B1" required [(ngModel)]="naturalKey.lcNumber" #lcNumberCtrl="ngModel" [disabled]="formLocked">
+                    <div class="tb-error mt-1" *ngIf="lcNumberCtrl.invalid && lcNumberCtrl.touched">LC Number is mandatory.</div>
+                  </div>
                   <div *ngIf="lcNumberFromParent">
                     <input class="tb-input" placeholder="LC Number" [ngModel]="naturalKey.lcNumber" disabled>
                     <div class="tb-hint" *ngIf="!naturalKey.lcNumber">Pick the Parent LC above first.</div>
                   </div>
-                  <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="naturalKey.ibNumber" [disabled]="formLocked">
-                  <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="naturalKey.sgNumber" [disabled]="formLocked">
+                  <!-- Business instruction 2026-08-19 ("A8 SG Number / B3 EB Number" — same mandatory +
+                       blur-validation requirement as LC Number above, "不得各自實作不同的驗證方式" — must
+                       not each implement a different validation mechanism) — identical pattern: a real
+                       label with the red asterisk, `required` + `#ctrl="ngModel"` for Angular's own
+                       RequiredValidator/touched-tracking, tb-input--invalid + an inline error message on
+                       blur-while-empty. These two fields are the ONLY ones ever shown in this specific
+                       grid cell (requiredNaturalKeyFields.includes('ibNumber')/'sgNumber' are mutually
+                       exclusive across every registered function — no function needs both), so there is
+                       no risk of two labels rendering in the same cell simultaneously. -->
+                  <div *ngIf="requiredNaturalKeyFields.includes('ibNumber')">
+                    <label class="tb-field__label">{{ ibNumberLabel }} <span class="tb-required-mark">*</span></label>
+                    <input class="tb-input tb-input--required" [class.tb-input--invalid]="ibNumberCtrl.invalid && ibNumberCtrl.touched" [placeholder]="ibNumberLabel" name="naturalKeyIbNumber" required [(ngModel)]="naturalKey.ibNumber" #ibNumberCtrl="ngModel" [disabled]="formLocked">
+                    <div class="tb-error mt-1" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
+                  </div>
+                  <div *ngIf="requiredNaturalKeyFields.includes('sgNumber')">
+                    <label class="tb-field__label">SG Number <span class="tb-required-mark">*</span></label>
+                    <input class="tb-input tb-input--required" [class.tb-input--invalid]="sgNumberCtrl.invalid && sgNumberCtrl.touched" placeholder="SG Number" name="naturalKeySgNumber" required [(ngModel)]="naturalKey.sgNumber" #sgNumberCtrl="ngModel" [disabled]="formLocked">
+                    <div class="tb-error mt-1" *ngIf="sgNumberCtrl.invalid && sgNumberCtrl.touched">SG Number is mandatory.</div>
+                  </div>
                 </div>
               </ng-container>
               <ng-template #existingContract>
@@ -742,7 +783,14 @@
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
                    visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
-              <thead><tr><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th></tr></thead>
+              <!-- UX enhancement (2026-08-19, "Look Up Current Balance → Event Timeline" gains a FUNCTION
+                   column that "must use the same Function mapping as Inquire Events... Do not implement
+                   a separate Function mapping") — lookUp.functionFor() delegates to the SAME
+                   functionForEvent() free function InquireEventsService.functionFor() itself now
+                   delegates to (inquire-events.service.ts), so both screens resolve every row's own
+                   Function badge identically by construction. Markup mirrors Inquire Events' own Function
+                   column exactly (same .tb-type-tag/tb-muted shapes, same "—" fallback for legacy data). -->
+              <thead><tr><th>Function</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th></tr></thead>
               <tbody>
                 <!-- Business instruction 2026-08-14 "Lookup should show the 2ndary reference number" — sourceTransactionRef
                      (Amendment No./Times, IB/EB Number, …); ISSUE/CREATE have none, shown as an em dash.
@@ -772,6 +820,10 @@
                      Balance After likewise reads row.movement.balanceAfter unconditionally now — no more
                      blanking for a 'create' row, same reasoning. -->
                 <tr *ngFor="let row of lookUp.activeLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
+                  <td>
+                    <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
+                    <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
+                  </td>
                   <td><span class="tb-type-tag">{{ row.movement.movementType }}</span></td>
                   <td class="tb-table__amount">{{ row.movement.amount }} <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount">(ceiling {{ row.movement.ceilingAmount }})</span></td>
                   <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>

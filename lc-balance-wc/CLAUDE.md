@@ -5172,3 +5172,167 @@ test convention never renders the DOM). **Live-verified end to end**: A9 (Shippi
 against real LC S09/SG G01 — typed both fields, clicked Search, got "Found: S09 — ACTIVE"; confirmed via
 the live DOM that the LC Number field, SG Number field, AND the Search button all immediately show the
 disabled/greyed styling the instant the contract resolved, well before Submit.
+
+## Look Up Current Balance's own Event Timeline gains a FUNCTION column — reuses Inquire Events' own resolution, not a second mapping (2026-08-19, user-requested, with an explicit worked example table for LC S01 and the instruction "Do not implement a separate Function mapping")
+
+Direct sibling of the earlier same-week "Look Up Current Balance's own Event Timeline now shares the
+EXACT SAME status/display logic as Inquire Events" fix (see that entry above, same Mandatory Consistency
+posture) — that fix unified STATUS; this one unifies the new FUNCTION column Inquire Events' own merged
+Events table already has (see "Two more Inquire Events UX enhancements" above, `functionFor()`).
+
+**Fix, `inquire-events.service.ts`**: `InquireEventsService.functionFor()`'s own body (a pure computation
+reading only `event.phase`/`event.movement`/`event.contract`, no internal service state) extracted to a
+module-level `export function functionForEvent(event: InquiredEvent)` — same "share the function, not the
+behavior" convention `toEventRows()` itself already established for this exact pair of services.
+`InquireEventsService.functionFor()` is now a one-line delegator. Named `functionForEvent`, deliberately
+NOT reusing the bare name `functionFor` for the free function (which would have been callable unqualified
+from inside the class method body, silently shadowing `this.functionFor` — the exact same readability trap
+this file's own BAL-136 fix already caught and fixed for `validateSubmit`/`buildSubmitRequest`).
+
+**`look-up-panel.service.ts`**: new `functionFor(event: InquiredEvent)` method, delegating to the same
+`functionForEvent()` import — mirrors `InquireEventsService`'s own public method name/shape for API
+symmetry between the two sibling services, while its own body reuses the identical free function rather
+than reimplementing the Strategy-table lookup.
+
+**Template**: Look Up's own Event Timeline table (`transaction-builder.component.html`) gained a new
+leading `<th>Function</th>` column, markup copied verbatim from Inquire Events' own Function column
+(`<span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>` /
+`<span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>`) — same `.tb-type-tag`/`.tb-muted`
+shapes, same "—" fallback for legacy data neither current mapping resolves.
+
+**Tests**: the existing LC-S01-reproduction test in `transaction-builder.component.actions.spec.ts`
+("a finalized Sight IPLC_LC/UTILIZE splits into its own create+finalize rows...") — already asserting the
+shared status split — extended with two new assertions: `comp.lookUp.functionFor(createRow)?.code` is
+`'A3'`, `comp.lookUp.functionFor(finalizeRow)?.code` is `'A4'`, proving the 'create'/'finalize' phase
+split resolves to the correct distinct function on the Look Up side exactly as it already does on the
+Inquire Events side. `inquire-events.service.ts` itself stays at 100% statements/functions/lines (its own
+existing `functionFor` tests cover the now-delegated logic unchanged); `look-up-panel.service.ts`'s new
+method is covered by the extended test above.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates) both clean, `npm run lint` 0 errors (217 pre-existing warnings, unchanged), full Angular suite
+783/783 (net zero new tests — an existing test extended, not a new `it()` block), coverage
+99.44/96.38/99.3/99.44% (all four back at the exact same figures as before this change — the two new
+uncovered-then-covered lines cancel out). **Live-verified end to end against the real running stack**:
+searched B1/S01 under Export Confirmed's own Look Up Current Balance — the Event Timeline table now
+renders byte-for-byte identical to the user's own worked example table (`B1 · Confirm LC` / `B3 · Present
+Docs` ×4 / `B4 · Honour / Acceptance` ×4, in the exact row order and Function/Type/Amount/Reference/
+Status values specified). `backend/`/microservice suites unaffected (no files under either touched).
+
+## A1/B1 LC Number gains a visible "LC Number *" label — closes the missing visual half of an already-enforced mandatory check (2026-08-19, user-requested — "LC Number must be a mandatory field for both A1 and B1, with the same mandatory-field validation and visual indication (*) as the Amount field")
+
+**Validation was never the gap** — `validateSubmit()` (`submit-rules.ts`) has rejected a blank LC Number
+for A1/B1 since 2026-08-14 ("Business-reported gap... A1/B1 never had this check"), re-confirmed live this
+same day (both A1 and B1 correctly show a "LC Number is mandatory." error in the MAKER RESULT panel on an
+empty-LC-Number Submit attempt). The actual gap, once the user pointed at the Amount field's own "*"
+specifically: LC Number is a plain `<input>` living outside `buildFields()`'s own Formly array (see the
+2026-08-17 "Protected System-Controlled Fields"-era doc comment above it), so it never had a real `<label>`
+at all — only a `placeholder="LC Number"` attribute (which disappears the instant the Maker starts typing,
+and carries no `*`) — unlike a Formly-rendered field like Amount, whose `props.required: true` already
+gets it a real `<label>` plus a red `<span aria-hidden="true">*</span>` via `:host ::ng-deep
+formly-field.tb-field--required`'s own existing rule (see the 2026-08-15 mandatory-field-styling entry
+above). `.tb-input--required`'s own blue-left-accent treatment WAS already present on the input itself —
+only the label + asterisk were missing.
+
+**Fix**: new `.tb-required-mark` CSS class (`transaction-builder.component.scss`) — same red/bold/
+margin-left visual as the Formly-scoped `span[aria-hidden='true']` rule, but a plain reusable class since
+this input lives outside any `formly-field` host for that existing rule to reach. `transaction-builder.component.html`'s
+A1/B1 LC Number cell gained a real `<label class="tb-field__label">LC Number <span
+class="tb-required-mark">*</span></label>` directly above the input. Scoped precisely to the
+`!lcNumberFromParent` branch (A1/B1 only) — verified via `function-policy.ts`'s own `usesTwoFieldSearch`/
+`hasParent` logic that this branch is unreachable with a non-empty `requiredNaturalKeyFields` (every
+hasParent creating function that also needs ibNumber/sgNumber, e.g. A8/B3, always has `lcNumberFromParent`
+true instead and shows the DISABLED carried-from-parent LC Number variant) — so adding a label to just
+this one grid cell can't misalign `.tb-grid-3` against a label-less IB/SG Number sibling, because no such
+sibling ever renders alongside it.
+
+No test added — this project's own established convention (see many entries above, e.g. the Inquire
+Events row-click and Primary/2ndary Key protection passes) is that template-only additions with no new
+`.ts` logic aren't covered by this codebase's direct-instantiation component tests, which never render the
+DOM. Verified instead: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`
+(strict templates) both clean, `npm run lint` 0 errors (217 pre-existing warnings, unchanged), full
+suite 783/783 unchanged, coverage unchanged (99.44/96.38/99.3/99.44%).
+
+**Live-verified end to end**: both A1 and B1 now show "LC Number *" — bold label, red asterisk, positioned
+directly above the still-blue-accented input — visually matching "Amount (face-level, per Design doc
+§6.2) *" exactly, confirmed via zoomed screenshot side-by-side comparison on both screens.
+
+## LC Number gains a real on-blur validation state (red border + inline message), matching Amount's own blur behavior exactly — root cause traced, not guessed (2026-08-19, same day, reviewer-reported live — "leave LC Number blank and press Tab... no red validation box... Amount... immediately highlighted with a red validation box")
+
+**Root cause, found by reading `@ngx-formly/bootstrap`'s own source** (`node_modules/@ngx-formly/bootstrap/.../input/input.type.mjs`), not guessed: Amount's own red-on-blur comes from ngx-formly-bootstrap's `FormlyFieldInput` binding `[class.is-invalid]="showError"` directly on the rendered `<input class="form-control">` — `showError` (a `FieldType` base-class getter, `@ngx-formly/core`) is true once the field's own Angular `FormControl` (created from `props.required: true`, i.e. an Angular `Validators.required`) is BOTH `invalid` AND `touched`. Bootstrap's own `bootstrap.min.css` then renders `.form-control.is-invalid` with a red border (confirmed directly in the CSS: `.was-validated .form-control:invalid, .form-control.is-invalid { ... }`). LC Number is a **plain `[(ngModel)]`-bound `<input>`** living outside `buildFields()`'s own Formly `FormGroup` entirely (same reason it needed the 2026-08-19 "*" label fix immediately above this entry) — it has no Angular validator attached at all, so it structurally cannot become `invalid`/`touched` the way a real `FormControl` can, and therefore can never qualify for Bootstrap's `.is-invalid` red-border rule (which requires the `.form-control` class besides — LC Number doesn't carry that class either).
+
+**Fix, `transaction-builder.component.html`** (A1/B1's own LC Number input, the same `!lcNumberFromParent` branch the "*" label fix above already scopes to): added the plain HTML `required` attribute — Angular's `FormsModule` (already imported app-wide) automatically attaches its own `RequiredValidator` directive to any `ngModel`-bound element carrying `required`, the exact same mechanism `props.required: true` compiles down to for a Formly field — plus `name="lcNumberA1B1"` and `#lcNumberCtrl="ngModel"` to export the resulting `NgModel` instance (exposing `.invalid`/`.touched`, same as Formly's own `FormControl`). No wrapping `<form>`/`ngForm` was needed for this to work — confirmed via the strict-template `ng build` compiling clean — since standalone `ngModel` usage outside any form element already works this way in Angular; every other plain `[(ngModel)]` input in this same template (`searchNaturalKey.*`, `naturalKey.ibNumber/sgNumber`, etc.) already relies on the identical pattern.
+
+New `.tb-input--invalid` class (`transaction-builder.component.scss`) — this app's own non-Bootstrap-scoped equivalent of `.form-control.is-invalid`, since LC Number was never going to carry the `.form-control` class Bootstrap's own selector requires: red border + a light red background, with its own `:focus` treatment. Placed in source order AFTER `.tb-input--required` (not `!important`, matching this file's own established "win on source order" convention already used elsewhere — e.g. the `.tb-table--static` hover-suppression fix) so a touched+empty field's full red border correctly overrides the plain blue left-accent — "genuinely invalid" outranks "merely required, not yet touched" as a signal. `[class.tb-input--invalid]="lcNumberCtrl.invalid && lcNumberCtrl.touched"` on the input itself, plus a new inline `<div class="tb-error mt-1">LC Number is mandatory.</div>` shown under the SAME condition — giving LC Number the identical two-part on-blur signal (red box + explicit message) Formly's own `formly-validation-message` + `.invalid-feedback` block gives Amount, without needing Formly's own infrastructure.
+
+No test added — template-only, this project's own established convention (direct-instantiation component tests never render the DOM) applies here exactly as it did for the "*" label fix immediately above. Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict templates — this specifically proves `#lcNumberCtrl="ngModel"` resolves correctly against `FormsModule`) both clean, `npm run lint` 0 errors (217 pre-existing warnings, unchanged), full suite 783/783 unchanged, coverage unchanged (99.44/96.38/99.3/99.44%).
+
+**Live verification blocked this pass** — the Claude in Chrome extension's own click action reliably failed to register on this specific function chip across ~10 attempts spanning 3 separate fresh tabs (each screenshot showed the correct settled coordinates, but the click itself never activated the chip) — a more severe instance of the same class of this-session browser-tooling flakiness already recorded repeatedly elsewhere in this file. Stopped retrying per this session's own established practice rather than forcing it further. Confidence in the fix itself is unusually high despite this: the root cause was read directly from `@ngx-formly/bootstrap`'s own compiled source (not inferred), the fix reuses a pattern (`required` + `#ref="ngModel"` on a standalone, non-form-wrapped `ngModel`) already load-bearing elsewhere in this exact template, and the strict-template `ng build` — which fails loudly on any invalid template reference — compiled clean. A human should still Tab out of an empty LC Number field on both A1 and B1 once to fully close the loop.
+
+**User-confirmed the same day, live**: "A1/B1 已經改對" — the fix above is correct, closing the loop the entry itself left open.
+
+## Event Entry — Mandatory Reference Number requirement formalized: first-field ordering + consistent blur validation across A1/B1, A2/B2, A3/A3S, A8, B3 (2026-08-19, same day, user-directed formal requirement — "對應的參考編號必須固定放在交易輸入畫面的第一個輸入欄位...使用者必須輸入後才能繼續...blur 時...必須立即顯示紅色錯誤框...不得各自實作不同的驗證方式")
+
+Formal write-up of the requirement this session's own LC Number fix (immediately above) was the first
+instance of — extends the SAME mandatory + blur-validation treatment to every applicable reference
+number, and adds a new requirement not covered by the LC Number pass alone: **field ordering** (the
+reference number must be the first input field on the entry screen).
+
+**Scope audit, done before touching anything**: the five reference numbers named in the requirement split
+into two structurally different mechanisms already established elsewhere in this codebase, not one:
+- **A1/B1 LC Number** — a plain natural-key `[(ngModel)]` input outside `buildFields()`'s own Formly
+  array. Already fixed in the entry immediately above this one.
+- **A2/B2 Amendment No., A3/A3S IB Number** (and, as a side effect of sharing the same mechanism, B4's own
+  EB Number, not named in the requirement but structurally identical) — the Formly `secondaryRef` field
+  (`props.required: true` whenever `dynamicSecondaryRefLabel` is set). Being a genuine Formly-rendered
+  field already living inside the `<form [formGroup]="form">` Amount itself lives in, this field
+  **already had Amount's own exact blur-validation behavior for free** — same `[class.is-invalid]="showError"`
+  mechanism, same Angular `FormControl`/`touched` tracking — confirmed by re-reading `input.type.mjs`
+  again rather than assumed. The ONLY genuine gap for this group was field ORDER: `secondaryRef` sat
+  after `amount`/`currency` in the shared `fields` array, not first.
+- **A8 SG Number, B3 EB Number** — plain natural-key `[(ngModel)]` inputs, same shape as LC Number, sharing
+  its exact gap (no Angular validator, no touched-tracking, therefore no possible blur-invalid state).
+
+**Fix 1 — field order (`builder-fields.ts`)**: `secondaryRef` moved from its old position (after
+`tolerancePct`, before `tenorType`) to the very first entry in the shared `fields` array. Its own
+`hide: !ctx.dynamicSecondaryRefLabel` condition is unchanged — a no-op for A1/B1 and every other function
+that never sets `secondaryRefLabel`, so this reorder is invisible to them (Amount stays effectively first
+for those, exactly as before). `builder-fields.spec.ts`'s own field-order assertion updated to match
+(`'secondaryRef'` now first in the expected array).
+
+**Fix 2 — A8/B3 blur validation (`transaction-builder.component.html`)**: the `naturalKey.ibNumber`/
+`naturalKey.sgNumber` inputs (the `requiredNaturalKeyFields.includes('ibNumber')`/`'sgNumber')` grid
+cells) gained the IDENTICAL pattern the LC Number fix already established — a real `<label>` with
+`.tb-required-mark`, `required` + `name` + `#ibNumberCtrl="ngModel"`/`#sgNumberCtrl="ngModel"`,
+`[class.tb-input--invalid]="...ctrl.invalid && ...ctrl.touched"`, and an inline `.tb-error` message —
+reusing the exact same `.tb-input--invalid` CSS class (no new styling needed) and mirroring the LC
+Number fix's own doc comment verbatim rather than re-deriving the pattern. `requiredNaturalKeyFields`'s
+own contract (ibNumber/sgNumber are mutually exclusive across every registered function) means the two
+new label/input/error blocks can never render in the same grid cell simultaneously.
+
+**Field-order nuance for A8/B3, stated explicitly rather than silently assumed**: A8/B3 are both
+`hasParent` functions, so their own LC Number cell in this same grid shows the DISABLED, carried-from-
+parent variant (`lcNumberFromParent`), not the free-text A1/B1 one — meaning SG Number/EB Number is not
+literally the first DOM element in that row, but IS the first field the Maker actually has to type
+anything into (the LC Number cell next to it is pre-filled and non-interactive). Judged this satisfies
+the requirement's own intent ("使用者必須輸入" — the user must input it) without restructuring the shared
+`tb-grid-3` column order specifically for A8/B3, which would risk misaligning it against every other
+function using the same grid — flagged here rather than silently deviating from a literal reading of
+"first field," open to revisiting if a stricter literal interpretation is wanted.
+
+No test added for the HTML changes (template-only, same established convention as every other
+template-only fix in this file); `builder-fields.spec.ts`'s field-order test was updated since it's a
+genuine `.ts`-level assertion. Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration
+development` (strict templates) both clean, `npm run lint` 0 errors (217 pre-existing warnings, unchanged),
+full suite 783/783 (1 test updated in place, not added — the field-order assertion), coverage unchanged
+(99.44/96.38/99.3/99.44%).
+
+**Live verification blocked again this pass** — same class of Claude in Chrome extension flakiness as the
+LC Number entry immediately above (multiple fresh tabs, clicks not registering on the function chips).
+Stopped retrying per this session's own established practice. Confidence remains high for the same
+reasons as before: the blur-validation mechanism is a direct copy of the already-live-confirmed LC Number
+fix (user confirmed "A1/B1 已經改對" the same day), the field-reorder is a pure array-position change with
+zero conditional-logic change (confirmed byte-for-byte identical `hide`/`props` objects, just relocated),
+and the strict-template `ng build` compiled clean. A human should Tab out of an empty A8 SG Number and B3
+EB Number field once each, and confirm A2/B2/A3/A3S's own Amendment No./IB Number field now renders as
+the FIRST field on those screens, to fully close the loop.
