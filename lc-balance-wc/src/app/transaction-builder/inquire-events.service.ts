@@ -7,6 +7,7 @@ import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstr
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
 import { BuilderModel } from './function-policy';
 import { describeApiError } from './api-error';
+import { PagedListState } from './paged-list-state';
 
 /**
  * Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") —
@@ -136,6 +137,33 @@ export class InquireEventsService {
   events: InquiredEvent[] = [];
   eventsLoading = false;
 
+  /**
+   * UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?" — can Inquire Events be
+   * designed page-by-page?) — CLIENT-SIDE windowing over the already-fully-loaded, already-sorted
+   * `events` array, NOT a re-fetch per page (unlike CatalogPickerService's own use of the same
+   * PagedListState class): the whole point of loadEvents() is merging every contract's own movements
+   * into ONE globally-sorted timeline, so there is no per-page API call that would make sense here —
+   * everything is already in memory by the time pagination applies. Reused rather than reinvented:
+   * PagedListState already owns exactly the page/total/pageSize math this needs.
+   */
+  readonly eventsPaging = new PagedListState(10);
+
+  /** The current page's own slice of `events` — the template iterates this instead of `events` directly. */
+  get pagedEvents(): InquiredEvent[] {
+    const start = (this.eventsPaging.page - 1) * this.eventsPaging.pageSize;
+    return this.events.slice(start, start + this.eventsPaging.pageSize);
+  }
+
+  prevEventsPage(): void {
+    const target = this.eventsPaging.prevTarget();
+    if (target) this.eventsPaging.page = target;
+  }
+
+  nextEventsPage(): void {
+    const target = this.eventsPaging.nextTarget();
+    if (target) this.eventsPaging.page = target;
+  }
+
   selectedEvent: InquiredEvent | null = null;
   /** Null when resolveFunctionForMovement() found no match (e.g. legacy data) — the read-only screen still renders, using buildFields()'s own selectedFunction-null fallback path rather than guessing. */
   selectedEventFunction: TransactionFunction | null = null;
@@ -174,6 +202,7 @@ export class InquireEventsService {
     this.searchError = null;
     this.rootContract = null;
     this.events = [];
+    this.eventsPaging.reset();
     this.closeEvent();
   }
 
@@ -247,6 +276,8 @@ export class InquireEventsService {
     forkJoin([this.movementsOf(root), ...childTypes.map((childType) => this.childMovementsOf(childType, root.naturalKey.lcNumber))]).subscribe((groups) => {
       this.eventsLoading = false;
       this.events = groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
+      this.eventsPaging.total = this.events.length;
+      this.eventsPaging.page = 1;
     });
   }
 
@@ -340,10 +371,24 @@ export class InquireEventsService {
    * (still reading plain `eventSnapshot`) stay frozen at A3's own original value while the 'finalize'
    * row's own tab correctly shows the RELEASED-state figures instead.
    */
+  /**
+   * UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位" — put the
+   * Function name in the Events table's own first column) — the SAME per-phase resolution rule
+   * selectEvent() below already applies (payExistingUtilizeFunctionFor() for a 'finalize' row, else the
+   * generic resolveFunctionForMovement() Strategy-table lookup), extracted so the merged Events table
+   * can show it directly per row instead of only after clicking through to "View". Returns undefined for
+   * legacy data no current function produces — the template shows "—" for that case, same convention
+   * every other unresolved-function fallback in this file already uses.
+   */
+  functionFor(event: InquiredEvent): TransactionFunction | undefined {
+    const { movement, contract } = event;
+    return (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType);
+  }
+
   selectEvent(event: InquiredEvent): void {
     this.selectedEvent = event;
     const { movement, contract } = event;
-    const fn = (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType) ?? null;
+    const fn = this.functionFor(event) ?? null;
     this.selectedEventFunction = fn;
 
     const model: BuilderModel = {

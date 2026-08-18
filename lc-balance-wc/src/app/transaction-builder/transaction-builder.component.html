@@ -620,18 +620,30 @@
                (e.g. looking up an Acceptance/Confirmation/SG directly). -->
           <div class="tb-tabs mt-2" *ngIf="lookUp.lookupResult && (lookUp.lookupIsUsanceLc || lookUp.lookupHasSg)">
             <button type="button" class="tb-tab" [class.tb-tab--active]="lookUp.lookupTab === 'LC'" (click)="lookUp.selectLookupTab('LC')">LC Balance</button>
-            <button type="button" class="tb-tab" *ngIf="lookUp.lookupIsUsanceLc" [class.tb-tab--active]="lookUp.lookupTab === 'ACCEPTANCE'" (click)="lookUp.selectLookupTab('ACCEPTANCE')">Acceptance Balance</button>
+            <button type="button" class="tb-tab" *ngIf="lookUp.lookupIsUsanceLc" [class.tb-tab--active]="lookUp.lookupTab === 'ACCEPTANCE'" (click)="lookUp.selectLookupTab('ACCEPTANCE')">{{ lookUp.acceptanceBalanceLabel }}</button>
             <button type="button" class="tb-tab" *ngIf="lookUp.lookupHasSg" [class.tb-tab--active]="lookUp.lookupTab === 'SG'" (click)="lookUp.selectLookupTab('SG')">SG Balance</button>
           </div>
 
+          <!-- UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design": "there is no need to
+               create separate G01 and G02 catalog/cards after selecting SG Balance... one unified
+               Inquiry Catalog, with each SG identified by its Secondary Reference... avoids duplicating
+               the Secondary Reference as another selection layer") — each candidate row is now a
+               self-describing catalog entry (LC Number — Secondary Reference — Balance Type — Status,
+               e.g. "LC S01 — Secondary Ref. G02 / SG Balance — Active"), not a bare "G02 — ACTIVE" that
+               only becomes meaningful once you already know which tab/LC you're under. Same rule applied
+               to the Acceptance picker immediately above (Import "Acceptance Balance" / Export "Confirmed
+               LC Acceptance Balance" — reusing the SAME acceptanceInstrumentTypeFor()-driven side check
+               InquireEventsService already uses for the identical label, rather than a second hardcoded
+               copy). Selecting a row still reveals that SG's/Acceptance's own Event Timeline below,
+               unchanged — this is a row-content enrichment only, not a behavior change. -->
           <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupIsUsanceLc && lookUp.lookupTab === 'ACCEPTANCE'">
             <app-index-picker *ngIf="lookUp.acceptancesUnderLookup.length > 1"
               [items]="lookUp.acceptancesUnderLookup"
               [selectedId]="lookUp.selectedLookupAcceptance?.balanceContractId ?? null"
               (pick)="lookUp.selectLookupAcceptance($event)">
               <ng-template let-a>
-                <span class="tb-row-primary">{{ a.naturalKey.ibNumber }}</span>
-                <span class="tb-row-badge">{{ a.status }}</span>
+                <span class="tb-row-primary">LC {{ a.naturalKey.lcNumber }} — Secondary Ref. {{ a.naturalKey.ibNumber }}</span>
+                <span class="tb-row-badge">{{ lookUp.acceptanceBalanceLabel }} — {{ a.status }}</span>
               </ng-template>
             </app-index-picker>
             <div class="tb-hint" *ngIf="!lookUp.acceptancesUnderLookup.length">No Acceptance carved out under this LC yet — use A6 first.</div>
@@ -643,8 +655,8 @@
               [selectedId]="lookUp.selectedLookupSg?.balanceContractId ?? null"
               (pick)="lookUp.selectLookupSg($event)">
               <ng-template let-sg>
-                <span class="tb-row-primary">{{ sg.naturalKey.sgNumber }}</span>
-                <span class="tb-row-badge">{{ sg.status }}</span>
+                <span class="tb-row-primary">LC {{ sg.naturalKey.lcNumber }} — Secondary Ref. {{ sg.naturalKey.sgNumber }}</span>
+                <span class="tb-row-badge">SG Balance — {{ sg.status }}</span>
               </ng-template>
             </app-index-picker>
             <div class="tb-hint" *ngIf="!lookUp.sgsUnderLookup.length">No Shipping Guarantee issued under this LC yet — use A8 first.</div>
@@ -668,28 +680,31 @@
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
                    visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
-              <thead><tr><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th><th>Entries</th></tr></thead>
+              <thead><tr><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th></tr></thead>
               <tbody>
                 <!-- Business instruction 2026-08-14 "Lookup should show the 2ndary reference number" — sourceTransactionRef
                      (Amendment No./Times, IB/EB Number, …); ISSUE/CREATE have none, shown as an em dash.
                      Business instruction 2026-08-16 ("Event Timeline 上一行已經顯示了 不需再多選取") — Balance
                      After (the movement's own balanceAfter, set once it's RELEASED — see release()'s own
                      before/after computation) is a plain column here, so the earlier separate click-to-fetch
-                     "Balance as of event" panel (selectEvent()) stays removed. Rows themselves are still not
-                     clickable — the "Entries" column button below (business-requested 2026-08-16,
-                     analysis/contingent-liability-ledger.html) is a deliberately separate, explicit
-                     interaction, not a re-introduction of whole-row click. -->
-                <tr *ngFor="let m of lookUp.activeLookupMovements">
+                     "Balance as of event" panel (selectEvent()) stays removed.
+                     UX enhancement (2026-08-18, "Event Timeline — View Voucher... clicking an Event should
+                     open the corresponding View Voucher pop-up") — supersedes the 2026-08-16 design this
+                     comment used to describe (a separate "Entries" column button, deliberately NOT
+                     whole-row-clickable): the whole row now dispatches openAccountEntryDialog(m) directly,
+                     same "row itself is the pickable surface" convention Inquire Events' own merged Events
+                     table already uses (.tb-table's own tbody tr already carries cursor:pointer + hover-
+                     highlight styling, so no new CSS was needed) — reused here rather than reinvented. The
+                     dedicated "Entries" column/button is gone; the dialog itself (below) now shows a plain
+                     "No voucher entries" hint instead of a Dr/Cr table when the clicked event has none,
+                     closing the same "—" case the removed button's own empty state used to cover. -->
+                <tr *ngFor="let m of lookUp.activeLookupMovements" (click)="openAccountEntryDialog(m)">
                   <td><span class="tb-type-tag">{{ m.movementType }}</span></td>
                   <td class="tb-table__amount">{{ m.amount }} <span class="tb-muted" *ngIf="m.ceilingAmount !== m.amount">(ceiling {{ m.ceilingAmount }})</span></td>
                   <td class="tb-table__ref">{{ m.sourceTransactionRef || '—' }}</td>
                   <td><span class="tb-status-badge" [class.tb-status-badge--pending]="m.status === 'PENDING'" [class.tb-status-badge--approved]="m.status === 'RELEASED'" [class.tb-status-badge--negative]="m.status === 'REJECTED' || m.status === 'CANCELLED'" [class.tb-status-badge--neutral]="m.status === 'SUPERSEDED'">{{ displayStatus(m.status) }}</span></td>
                   <td class="tb-table__amount">{{ m.balanceAfter ?? '—' }}</td>
                   <td class="tb-table__time">{{ m.createdAt | date:'short' }}</td>
-                  <td>
-                    <button type="button" class="tb-btn tb-btn--tiny" *ngIf="m.contingentAccountEntry" (click)="openAccountEntryDialog(m)">Account Entries</button>
-                    <span class="tb-muted" *ngIf="!m.contingentAccountEntry">—</span>
-                  </td>
                 </tr>
               </tbody>
             </table>
@@ -752,10 +767,24 @@
                Transaction Details, Account Entries, and Balance Snapshot.") — the row-level Account
                Entries button/column was removed; View (below) already reaches the same dialog via the
                "Original Transaction Screen" panel's own Account Entries button, reusing
-               openAccountEntryDialog() unchanged. -->
-          <table class="tb-table" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
+               openAccountEntryDialog() unchanged.
+               2026-08-18 — wrapped in .tb-table-scroll (same fix as the Look Up panel's own Event
+               Timeline, 2026-08-17 "Time column truncated" bug): this table sits inside the same
+               .tb-section whose own overflow:hidden silently clips a nowrap column instead of scrolling
+               it into view; adding the new Function column below widens this table enough to risk the
+               identical bug, so it gets the same proactive fix rather than waiting for it to reproduce. -->
+          <div class="tb-table-scroll" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
+          <table class="tb-table">
             <caption class="visually-hidden">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</caption>
-            <thead><tr><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Secondary Ref.</th><th>Status</th><th>Time</th></tr></thead>
+            <!-- UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位" — put
+                 the Function name in the Events table's own first column) — reuses
+                 InquireEventsService.functionFor()'s own per-phase resolution (the SAME rule
+                 selectEvent() already applies for the "View" screen's own header — extracted there so
+                 both call sites share one Strategy-table lookup rather than two copies), so a 'finalize'
+                 row correctly shows "A4 · Sight Settlement" here too, not the sibling 'create' row's "A3
+                 · Document Arrival". "—" for legacy data no current function produces, same convention
+                 every other unresolved-function fallback in this app already uses. -->
+            <thead><tr><th>Function</th><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Secondary Ref.</th><th>Status</th><th>Time</th></tr></thead>
             <tbody>
               <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
                    itself should be clickable... hover → highlight/pointer → single click → View Event
@@ -763,7 +792,11 @@
                    the identical selectEvent() call the button used to. .tb-table's own tbody tr already
                    carries cursor:pointer + hover-highlight styling (the same pickable-row affordance every
                    other .tb-table in this app already uses), so no new CSS was needed. -->
-              <tr *ngFor="let e of inquireEvents.events" (click)="inquireEvents.selectEvent(e)">
+              <tr *ngFor="let e of inquireEvents.pagedEvents" (click)="inquireEvents.selectEvent(e)">
+                <td>
+                  <span class="tb-type-tag" *ngIf="inquireEvents.functionFor(e) as fn">{{ fn.code }} · {{ fn.label }}</span>
+                  <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e)">—</span>
+                </td>
                 <td><span class="tb-type-tag">{{ e.contract.instrumentType }}</span></td>
                 <td><span class="tb-type-tag">{{ e.movement.movementType }}</span></td>
                 <td class="tb-table__amount">{{ e.movement.amount }}</td>
@@ -774,6 +807,17 @@
               </tr>
             </tbody>
           </table>
+          </div>
+          <!-- UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — CLIENT-SIDE
+               pagination over the already-fully-loaded, already-sorted events array (no re-fetch per
+               page — see InquireEventsService.eventsPaging's own doc comment for why). Same Prev/Next +
+               "Page X / Y (Z total)" convention app-index-picker's own pagination uses elsewhere in this
+               app, reused rather than reinvented — only shown once there's more than one page. -->
+          <div class="tb-pagination" *ngIf="inquireEvents.eventsPaging.totalPages > 1">
+            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.eventsPaging.page <= 1" (click)="inquireEvents.prevEventsPage()">‹ Prev</button>
+            <span class="tb-muted">Page {{ inquireEvents.eventsPaging.page }} / {{ inquireEvents.eventsPaging.totalPages }} ({{ inquireEvents.eventsPaging.total }} total)</span>
+            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.eventsPaging.page >= inquireEvents.eventsPaging.totalPages" (click)="inquireEvents.nextEventsPage()">Next ›</button>
+          </div>
           <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
         </div>
 
@@ -817,15 +861,18 @@
     </div>
   </div>
 
-  <!-- ══════ Account Entries pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html) ══════
-       Opened from either the Maker Result panel (right after Submit) or an Event Timeline row's own
-       "Account Entries" button — both pass in the exact BalanceMovement object already returned by the
-       API, so this dialog only ever displays the historical entries stored WITH that event, never a
-       recalculation against the current balance. -->
+  <!-- ══════ View Voucher pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html;
+       retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement — same dialog, same
+       accountEntryDialogMovement/openAccountEntryDialog() mechanism, unchanged) ══════
+       Opened from the Maker Result panel (right after Submit), an Inquire Events row's own "Original
+       Transaction Screen" panel, or — 2026-08-18 — a whole Look Up Current Balance Event Timeline row
+       click; all pass in the exact BalanceMovement object already returned by the API, so this dialog
+       only ever displays the historical entries stored WITH that event, never a recalculation against
+       the current balance. -->
   <div class="tb-dialog-overlay" *ngIf="accountEntryDialogMovement" (click)="closeAccountEntryDialog()">
-    <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="Account Entries" (click)="$event.stopPropagation()">
+    <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="View Voucher" (click)="$event.stopPropagation()">
       <div class="tb-dialog__header">
-        <h3 class="tb-dialog__title">Account Entries</h3>
+        <h3 class="tb-dialog__title">View Voucher</h3>
         <button type="button" class="tb-dialog__close" (click)="closeAccountEntryDialog()" aria-label="Close">×</button>
       </div>
       <div class="tb-dialog__meta">
@@ -851,7 +898,13 @@
           </tr>
         </tbody>
       </table>
-      <p class="tb-hint mt-2">Historical entries recorded with this event — never recalculated from the current balance.</p>
+      <!-- 2026-08-18 — whole-row click (Look Up Current Balance's own Event Timeline) can now open this
+           dialog for an event with no contingentAccountEntry at all (e.g. B3/EPLC_EXAMINATION, or any
+           instrumentType outside the contingent-liability scope contingentAccountEntry.ts enforces) —
+           the removed per-row "Entries" button used to silently show a plain "—" for exactly this case;
+           this explicit hint replaces that, rather than leaving the dialog looking broken/empty. -->
+      <p class="tb-hint mt-2" *ngIf="!accountEntryDialogMovement.contingentAccountEntry">No voucher entries recorded for this event.</p>
+      <p class="tb-hint mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry">Historical entries recorded with this event — never recalculated from the current balance.</p>
       <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closeAccountEntryDialog()">Close</button>
     </div>
   </div>

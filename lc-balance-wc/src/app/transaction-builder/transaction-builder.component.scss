@@ -397,6 +397,18 @@
   }
 }
 
+// UX enhancement (2026-08-18, Inquire Events "Page by Page" — client-side pagination over the already-
+// loaded events array) — same flex/gap/margin layout as index-picker.component.scss's own
+// .index-picker__pagination, mirrored here (not imported — that file's styles are view-encapsulated to
+// IndexPickerComponent's own template) since this Events table stays a plain .tb-table, not an
+// app-index-picker instance (which would collapse its 7-column layout into a 2-line row format instead).
+.tb-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .tb-error {
   font-size: 12px;
   color: var(--red-dark);

@@ -284,6 +284,110 @@ describe('InquireEventsService', () => {
     });
   });
 
+  // UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — client-side windowing
+  // over the already-loaded `events` array (eventsPaging.pageSize is 10, so 25 events -> 3 pages).
+  describe('pagedEvents / eventsPaging (client-side pagination)', () => {
+    function make25EventsService(): InquireEventsService {
+      const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC' });
+      const rootMovements = Array.from({ length: 25 }, (_, i) =>
+        makeMovement({ movementId: `mv-${i}`, movementType: 'ISSUE', createdAt: `2026-08-01T00:${String(i).padStart(2, '0')}:00.000Z` }),
+      );
+      const api = makeApi({
+        resolveContract: jest.fn(() => of(root)),
+        listMovements: jest.fn(() => of(rootMovements)),
+      });
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+      return svc;
+    }
+
+    it('pagedEvents returns the first pageSize (10) events on page 1, and totalPages reflects the full events.length', () => {
+      const svc = make25EventsService();
+      expect(svc.events.length).toBe(25);
+      expect(svc.eventsPaging.page).toBe(1);
+      expect(svc.eventsPaging.total).toBe(25);
+      expect(svc.eventsPaging.totalPages).toBe(3);
+      expect(svc.pagedEvents.length).toBe(10);
+      expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual(['mv-0', 'mv-1', 'mv-2', 'mv-3', 'mv-4', 'mv-5', 'mv-6', 'mv-7', 'mv-8', 'mv-9']);
+    });
+
+    it('nextEventsPage()/prevEventsPage() move between pages; the last page only has the remainder (5 events)', () => {
+      const svc = make25EventsService();
+      svc.nextEventsPage();
+      expect(svc.eventsPaging.page).toBe(2);
+      expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual(['mv-10', 'mv-11', 'mv-12', 'mv-13', 'mv-14', 'mv-15', 'mv-16', 'mv-17', 'mv-18', 'mv-19']);
+
+      svc.nextEventsPage();
+      expect(svc.eventsPaging.page).toBe(3);
+      expect(svc.pagedEvents.length).toBe(5);
+      expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual(['mv-20', 'mv-21', 'mv-22', 'mv-23', 'mv-24']);
+
+      // Already on the last page — nextEventsPage() is a no-op.
+      svc.nextEventsPage();
+      expect(svc.eventsPaging.page).toBe(3);
+
+      svc.prevEventsPage();
+      expect(svc.eventsPaging.page).toBe(2);
+    });
+
+    it('prevEventsPage() on page 1 is a no-op', () => {
+      const svc = make25EventsService();
+      svc.prevEventsPage();
+      expect(svc.eventsPaging.page).toBe(1);
+    });
+
+    it('a fresh search() resets eventsPaging back to page 1 with the new total — no stale page/total left behind from a prior search', () => {
+      const root = makeContract({ balanceContractId: 'bc-lc' });
+      const twentyFive = Array.from({ length: 25 }, (_, i) => makeMovement({ movementId: `mv-${i}` }));
+      const two = [makeMovement({ movementId: 'mv-a' }), makeMovement({ movementId: 'mv-b' })];
+      const listMovements = jest.fn().mockReturnValueOnce(of(twentyFive)).mockReturnValueOnce(of(two));
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements });
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+      svc.nextEventsPage();
+      expect(svc.eventsPaging.page).toBe(2);
+
+      // A second search (e.g. re-searching, or a different LC) must not leave stale page/total behind.
+      svc.search();
+
+      expect(svc.eventsPaging.page).toBe(1);
+      expect(svc.eventsPaging.total).toBe(2);
+      expect(svc.eventsPaging.totalPages).toBe(1);
+    });
+  });
+
+  // UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位") — extracted from
+  // selectEvent()'s own resolution logic so the merged Events table can show it per row too.
+  describe('functionFor', () => {
+    it('resolves a primary-phase event via the generic Strategy-table lookup (A1 — IPLC_LC/ISSUE)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      expect(svc.functionFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE' }), contract }))?.code).toBe('A1');
+    });
+
+    it("resolves a 'finalize' phase Sight UTILIZE to A4, not A3 (payExistingUtilizeFunctionFor(), not the generic resolver)", () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const finalizeEvent: InquiredEvent = { movement: makeMovement({ movementType: 'UTILIZE', status: 'RELEASED' }), contract, eventTime: '2026-08-18T00:00:00.000Z', eventStatus: 'RELEASED', phase: 'finalize' };
+      expect(svc.functionFor(finalizeEvent)?.code).toBe('A4');
+    });
+
+    it("resolves the SAME Sight UTILIZE's own 'create' phase to A3 — the generic resolver, unaffected by phase", () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const createEvent: InquiredEvent = { movement: makeMovement({ movementType: 'UTILIZE' }), contract, eventTime: '2026-08-18T00:00:00.000Z', eventStatus: 'PENDING', phase: 'create' };
+      expect(svc.functionFor(createEvent)?.code).toBe('A3');
+    });
+
+    it('returns undefined for legacy data no current function produces', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'EPLC_EXAMINATION' });
+      expect(svc.functionFor(makeEvent({ movement: makeMovement({ movementType: 'AMEND' }), contract }))).toBeUndefined();
+    });
+  });
+
   describe('selectEvent', () => {
     it('resolves the producing function, reconstructs a read-only field set, and stashes a fresh FormGroup', () => {
       const svc = new InquireEventsService(makeApi());

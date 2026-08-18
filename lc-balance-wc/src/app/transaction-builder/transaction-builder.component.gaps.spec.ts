@@ -289,6 +289,17 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       withLookupResult(c, { instrumentType: 'EPLC_LC' });
       expect(c.lookUp.lookupHasSg).toBe(false);
     });
+
+    // UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design") — the Acceptance picker's own
+    // catalog rows (and the Acceptance tab button itself) need this side-aware label.
+    it("acceptanceBalanceLabel is 'Acceptance Balance' with no lookupResult or for an Import LC, 'Confirmed LC Acceptance Balance' for an Export Confirmation", () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      expect(c.lookUp.acceptanceBalanceLabel).toBe('Acceptance Balance');
+      withLookupResult(c, { instrumentType: 'IPLC_LC' });
+      expect(c.lookUp.acceptanceBalanceLabel).toBe('Acceptance Balance');
+      withLookupResult(c, { instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.lookUp.acceptanceBalanceLabel).toBe('Confirmed LC Acceptance Balance');
+    });
   });
 
   describe('flattenedPayableRows, catalog/parent paging + filtering getters', () => {

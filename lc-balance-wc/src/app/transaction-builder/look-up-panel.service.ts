@@ -116,6 +116,17 @@ export class LookUpPanelService {
   }
 
   /**
+   * UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design") — the Acceptance picker's own
+   * catalog rows need a side-aware balance-type label (Import "Acceptance Balance" vs. Export "Confirmed
+   * LC Acceptance Balance"), same rule InquireEventsService.selectEvent() already applies for its own
+   * identically-named Balance Tab — reused via the resolved contract's own instrumentType (this service
+   * has no separate `side` field of its own, unlike InquireEventsService) rather than duplicated.
+   */
+  get acceptanceBalanceLabel(): string {
+    return this.lookupResult?.contract.instrumentType === 'EPLC_CONFIRMATION' ? 'Confirmed LC Acceptance Balance' : 'Acceptance Balance';
+  }
+
+  /**
    * Business instruction 2026-08-15 ("Look Up Current Balance... 如果選 Import LC Tab, 不用選 直接
    * Default Import LC 輸入LC Number... 如果選 Export Confirmed Tab, 不用選 直接Default Export
    * Confirmed") — switching the Import/Export tab also defaults this panel's own instrumentType to
