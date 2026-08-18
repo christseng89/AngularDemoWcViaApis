@@ -317,6 +317,31 @@
                   <div class="tb-error mt-2" *ngIf="model.amount && +model.amount > +selectedContractSnapshot.availableBalance">
                     ⚠ Typed amount ({{ model.amount }}) exceeds Available Balance — this will be rejected (Design doc §6).
                   </div>
+                  <!-- Business-reported gap 2026-08-18 ("It should show no warning, since the amount <= tight
+                       LC balance. Right?" — confirmed correct, then "fix it" for the OTHER direction): the
+                       warning above only ever compares against plain Available Balance, so an amount between
+                       Tight Available and plain Available (Design doc §6.1's own second, Tight-Available-based
+                       check — checkUtilizeSufficiency in offBalanceExposure.ts) was never warned about
+                       client-side even though the server will reject it. Scoped to movementType === 'UTILIZE'
+                       (A3/A3S) — the only movementType this server-side check actually applies to; A2's own
+                       AMEND_DECREASE check compares ceilingAmount against plain Available, never Tight, so
+                       showing this warning there would be misleading, not helpful. -->
+                  <div
+                    class="tb-error mt-2"
+                    *ngIf="
+                      model.amount &&
+                      +model.amount <= +selectedContractSnapshot.availableBalance &&
+                      model.movementType === 'UTILIZE' &&
+                      selectedContractSnapshot.tightAvailableBalance !== null &&
+                      selectedContractSnapshot.tightAvailableBalance !== undefined &&
+                      +model.amount > +selectedContractSnapshot.tightAvailableBalance
+                    "
+                  >
+                    ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ selectedContractSnapshot.tightAvailableBalance }}) — this will be rejected (Design doc §6.1: Available Balance minus outstanding off-balance-sheet (SHGT) exposure {{ selectedContractSnapshot.offBalanceExposure }}).
+                    <ng-container *ngIf="!selectedFunction?.documentArrivalWithSg"
+                      >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.</ng-container
+                    >
+                  </div>
                 </div>
               </div>
             </div>

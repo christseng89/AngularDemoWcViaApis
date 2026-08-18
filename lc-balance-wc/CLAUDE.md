@@ -4002,3 +4002,48 @@ afterward via direct DB query: both now have real, correctly-created `IPLC_ACCEP
 A6's documented "one Release click does BOTH" outcome, not a partial/inconsistent state. This session's
 own reproduction data (`BUTEST01`) was cleaned up afterward; the user's own U01/U02 records were left
 exactly as their own live testing produced them.
+
+## A3/A3S's own "exceeds Available Balance" warning gained a second tier for Tight Available Balance (2026-08-18, business-reported gap — "A1 Issue 10000, A3 Arrival 10000, warning fires wrongly" investigated and found NOT reproducible as reported, but surfaced a real, adjacent gap: "It should show no warning, since the amount <= tight lc balance. Right?" confirmed correct, then "fix it" for the missed direction — "amount > tight lc balance, then it is an error")
+
+**Investigated the original report first**: reproduced the exact scenario live (fresh Sight LC, Issue
+10000, released, Available Balance genuinely 10000) and typed Amount 10000 in A3 — the existing warning
+correctly did NOT fire (strict `>`, not `>=`, exactly as this file's prior investigation already
+established). The reported symptom didn't reproduce as a bug in that specific shape.
+
+**What the investigation surfaced instead, confirmed by the user and then fixed**: the existing warning
+(`transaction-builder.component.html`'s generic `selectedContract` balance box) only ever compares the
+typed amount against plain Available Balance — it has no knowledge of Tight Available Balance at all,
+even though `checkUtilizeSufficiency()` (`offBalanceExposure.ts`, §6.1) is a genuine two-tier check and
+Tight Available is the one that actually binds whenever the LC has outstanding SHGT exposure. An amount
+between Tight Available and plain Available was previously never warned about client-side, even though
+the server hard-rejects it — the Maker got no signal until a 409 on Submit.
+
+**Fix**: a second `.tb-error` block added right after the existing one, firing when
+`+model.amount > +selectedContractSnapshot.tightAvailableBalance` (only reachable once the FIRST warning
+has already NOT fired, i.e. amount is within plain Available but still exceeds Tight). Deliberately
+scoped to `model.movementType === 'UTILIZE'` — the one movementType `checkUtilizeSufficiency()` actually
+governs; A2's own AMEND_DECREASE sufficiency check compares the Tolerance-converted `ceilingAmount`
+against plain Available only, never Tight (see this file's own "AMEND_DECREASE sufficiency" section
+above), so showing a Tight-Available warning there would be actively misleading, not helpful. The
+message mirrors the server's own two-tier error text, and — since the current function itself might
+already BE the A3S netting mechanism — conditionally omits the "use Document Arrival w/ Shipping Gtee
+instead" hint when `selectedFunction?.documentArrivalWithSg` is true (A3S), so A3S never tells the Maker
+to switch to the function they're already on.
+
+No new spec added — this project's own established convention (see multiple entries above, e.g. the
+Inquire Events row-click and Primary/2ndary Key protection passes) is that template-only `*ngIf`
+conditions aren't covered by this codebase's direct-instantiation component tests, which never render
+the DOM. Verified instead: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration
+development` clean (strict templates), `npm run lint` 0 errors (212 pre-existing warnings, unchanged),
+full Angular suite 746/746 unchanged. `backend/`/microservice suites unaffected (no files under either
+touched).
+
+**Live-verified end to end**, exactly reproducing the boundary the user described: built a fresh LC
+(100,000, Sight) with a 60,000 SHGT issued and released against it (Available 100,000 / Tight Available
+40,000). Typing Amount 40,000 (== Tight) under A3 → no warning, confirming "amount ≤ tight → no warning"
+holds. Typing Amount 60,000 (> Tight, ≤ Available) → the new warning fired: "⚠ Typed amount (60000)
+exceeds Tight Available Balance (40000) — this will be rejected (Design doc §6.1: Available Balance minus
+outstanding off-balance-sheet (SHGT) exposure 60000). If this Document Arrival is meant to consume a
+specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee"
+instead — it nets that SG's own exposure out of this check." — confirming "amount > tight → error" holds
+too. Zero console errors throughout. Test data (`TIGHTTEST01`) cleaned up afterward.
