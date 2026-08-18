@@ -169,6 +169,82 @@ export function childMovementsOf$(api: BalanceComponentApiService, instrumentTyp
   );
 }
 
+/**
+ * One row of the LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC
+ * Master Records 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the same
+ * day, same wording, to Export Confirmed LC — "Same requirement for Export Confirmed"). Side-agnostic:
+ * one row shape backs both the Import LC (`IPLC_LC`) and Export Confirmed LC (`EPLC_CONFIRMATION`)
+ * index, selected purely by `InquireEventsService.side` — see `loadIndex()`'s own doc comment.
+ */
+export interface LcIndexRow {
+  contract: BalanceContract;
+  currency: string;
+  /** Face amount (Design doc §3.3/§6.2 LC 面額, or its Export Confirmed LC counterpart) — see deriveLcAmount()'s own doc comment for how this is derived and its one deliberate, disclosed simplification. */
+  lcAmount: string;
+  availableBalance: string;
+  status: string;
+  lastEventAt: string | null;
+}
+
+/**
+ * Client-side mirror of the microservice's own computeFaceAmount() (domain/balanceDerivation.ts, §3.3/
+ * §6.2 — "LC 面額 faceAmount, tracked independently of Confirmed Balance because UTILIZE reduces Confirmed
+ * Balance without ever touching the face amount") — that function is never wired to any route/service
+ * call site server-side (confirmed by inspection: defined, never invoked), so there is no existing API
+ * response field to read this from. Sums RELEASED face-amount-affecting `movement.amount` (face-level,
+ * never `ceilingAmount`) across the ROOT contract's own InquiredEvent rows — safe to iterate `rootEvents`
+ * (rather than raw movements) directly despite `toEventRows()`'s own create/finalize split, because that
+ * split only ever applies to a Sight `IPLC_LC`/`UTILIZE` movement, which is never a face-amount-affecting
+ * movementType.
+ *
+ * Two distinct movementType families, one per side, both sourced from the microservice's own
+ * MOVEMENT_DIRECTION table (domain/balanceDerivation.ts) — extended 2026-08-19 to cover Export Confirmed
+ * LC, per the user's own "Same requirement for Export Confirmed" follow-up:
+ * - `IPLC_LC`/`EPLC_LC` (Import): `ISSUE`(+)/`AMEND_INCREASE`(+)/`AMEND_DECREASE`(-) — direction lives in
+ *   the movementType itself, `amount` is always a positive magnitude (mirrors computeFaceAmount()'s own
+ *   `FACE_AMOUNT_MOVEMENT_TYPES` set exactly).
+ * - `EPLC_CONFIRMATION` (Export): `ISSUE`(+)/`AMEND` — Confirmation has no separate AMEND_INCREASE/
+ *   AMEND_DECREASE split; ONE `AMEND` movementType covers both, with direction folded into the SIGN of
+ *   `amount` itself (a decrease is submitted as a negative typed amount — MonetaryAmount's own pattern
+ *   permits a leading '-') rather than the movementType string, per the microservice's own
+ *   `domain/contingentAccountEntry.ts` doc comment ("Balance Component has no separate AMEND_INCREASE/
+ *   AMEND_DECREASE for EPLC_CONFIRMATION... a decrease is expressed as a negative typed amount instead").
+ *   So `AMEND` is summed as-is (no extra direction multiplier) — its own signed value already carries the
+ *   correct +/-.
+ * `ISSUE` is shared by both movementType vocabularies and always positive, so it needs no side-specific
+ * branching either.
+ *
+ * **Deliberate, disclosed simplification**: uses plain JS `Number` arithmetic rather than a decimal
+ * library — this Angular app has no `decimal.js` dependency (unlike the microservice's own `money.ts`,
+ * which this project's own CLAUDE.md establishes as the ONLY place allowed to construct a `Decimal` from
+ * a wire string). Judged acceptable here because this value is strictly DISPLAY-ONLY (the LC Master
+ * Records Index's own "LC Amount" column) — never fed back into any balance-affecting calculation,
+ * validation, or request payload. Should a future feature need this figure for anything beyond display,
+ * it should instead be computed server-side (e.g. wiring the existing, currently-dead `computeFaceAmount()`
+ * into a route, extended there too for EPLC_CONFIRMATION) rather than extending this client-side
+ * approximation.
+ */
+function deriveLcAmount(rootEvents: readonly InquiredEvent[]): string {
+  const total = rootEvents.reduce((sum, e) => {
+    if (e.eventStatus !== 'RELEASED') return sum;
+    const amount = Number(e.movement.amount);
+    if (!Number.isFinite(amount)) return sum;
+    switch (e.movement.movementType) {
+      case 'ISSUE':
+      case 'AMEND_INCREASE':
+        return sum + amount;
+      case 'AMEND_DECREASE':
+        return sum - amount;
+      case 'AMEND':
+        // EPLC_CONFIRMATION only — already signed (+ increase / - decrease), add as-is.
+        return sum + amount;
+      default:
+        return sum;
+    }
+  }, 0);
+  return String(total);
+}
+
 /** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
 export interface EventBalanceTab {
   key: 'LC' | 'ACCEPTANCE' | 'SG';
@@ -280,6 +356,31 @@ export class InquireEventsService {
     if (target) this.eventsPaging.page = target;
   }
 
+  /**
+   * LC Master Records Index (2026-08-19, Import LC; extended the same day to Export Confirmed LC — see
+   * this class's own `side`) — 'INDEX' is the default landing view for BOTH sides (see selectSide()
+   * below): a paginated, searchable browse of every LC on the currently-selected side, shown BEFORE any
+   * single LC is picked. 'EVENTS' is the existing single-LC merged timeline (unchanged) shown after
+   * selectLcFromIndex() drills in. The OLD single-exact-match "type LC Number, click Search" entry point
+   * (search()/lcNumber below) has been fully retired on both sides now that both get this Index —
+   * search()/lcNumber are kept only because selectLcFromIndex()/loadEvents() still populate `lcNumber`
+   * for display ("Found: ...") and because search() itself is still exercised by existing tests exactly
+   * as before; the template no longer renders a UI entry point for it on either side.
+   */
+  indexView: 'INDEX' | 'EVENTS' = 'INDEX';
+  /** Server-paginated (unlike eventsPaging above, which windows an already-fully-loaded array) — each page/search change re-fetches via loadIndex(). */
+  readonly indexPaging = new PagedListState(10);
+  indexRows: LcIndexRow[] = [];
+  /** The Index's own filter/search box — repurposes what used to be the sole "type exact LC Number, click Search" entry point (business instruction 2026-08-19: "原有的 LC Number + Search 功能可以保留，但其定位應改為 Index Filter/Search"). Substring match via the existing catalog() `q` param, applied server-side across ALL records, not just the currently-displayed page. */
+  indexSearch = '';
+  indexLoading = false;
+  indexError: string | null = null;
+
+  /** Side-aware entity label for the Index's own heading/hint text ("Import LC Master Records" / "Export Confirmed LC Master Records") — 2026-08-19, extended alongside the Index itself going side-agnostic. */
+  get indexEntityLabel(): string {
+    return this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed LC';
+  }
+
   selectedEvent: InquiredEvent | null = null;
   /** Null when resolveFunctionForMovement() found no match (e.g. legacy data) — the read-only screen still renders, using buildFields()'s own selectedFunction-null fallback path rather than guessing. */
   selectedEventFunction: TransactionFunction | null = null;
@@ -312,6 +413,13 @@ export class InquireEventsService {
     this.side = side;
     this.lcNumber = '';
     this.clearResults();
+    // LC Master Records Index (2026-08-19, Import LC; extended the same day, same wording, to Export
+    // Confirmed LC) — BOTH sides auto-populate their own Index the moment they're selected, per the
+    // user's own requirement ("系統應先顯示所有 Import LC Master Records 的 Index", "Same requirement for
+    // Export Confirmed").
+    this.indexView = 'INDEX';
+    this.indexSearch = '';
+    this.loadIndex(1);
   }
 
   private clearResults(): void {
@@ -395,6 +503,104 @@ export class InquireEventsService {
       this.eventsPaging.total = this.events.length;
       this.eventsPaging.page = 1;
     });
+  }
+
+  /**
+   * LC Master Records Index (2026-08-19, Import LC; extended the same day to Export Confirmed LC) —
+   * fetches one page of the CURRENT side's own catalog (`defaultLcInstrumentTypeForSide(this.side)` —
+   * `IPLC_LC` for Import, `EPLC_CONFIRMATION` for Export, already side-aware, no branching needed here),
+   * then for each row fans out its Available Balance (getSnapshot) and every event under it
+   * (movementsOf$/childMovementsOf$, the SAME two functions loadEvents() itself uses — for Export this
+   * naturally picks up `EPLC_ACCEPTANCE`/`EPLC_EXAMINATION` children via childInstrumentTypesOf(), same
+   * as the drill-down timeline) to derive `lcAmount`/`lastEventAt`. Deliberately does NOT pass
+   * `status`/`requireIssueReleased` to catalog() — unlike CatalogPickerService's own Maker-action
+   * pickers, this is an INQUIRY browse: every status is a legitimate thing to inquire about (same posture
+   * Look Up Current Balance/Inquire Events' own single-LC search already documents), so nothing is
+   * pre-filtered out.
+   */
+  loadIndex(page: number = this.indexPaging.page): void {
+    this.indexLoading = true;
+    this.indexError = null;
+    this.api.catalog(defaultLcInstrumentTypeForSide(this.side), undefined, this.indexSearch.trim() || undefined, page, this.indexPaging.pageSize).subscribe({
+      next: (result) => {
+        this.indexPaging.total = result.total;
+        this.indexPaging.page = result.page;
+        if (!result.items.length) {
+          this.indexRows = [];
+          this.indexLoading = false;
+          return;
+        }
+        forkJoin(result.items.map((contract) => this.loadIndexRow(contract))).subscribe((rows) => {
+          this.indexRows = rows;
+          this.indexLoading = false;
+        });
+      },
+      error: (err) => {
+        this.indexLoading = false;
+        this.indexError = describeApiError(err);
+        this.indexRows = [];
+        this.indexPaging.total = 0;
+      },
+    });
+  }
+
+  private loadIndexRow(contract: BalanceContract): Observable<LcIndexRow> {
+    const childTypes = childInstrumentTypesOf(contract.instrumentType);
+    return forkJoin({
+      snapshot: this.api.getSnapshot(contract.balanceContractId).pipe(catchError(() => of(null))),
+      root: movementsOf$(this.api, contract),
+      children: childTypes.length ? forkJoin(childTypes.map((childType) => childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber))) : of([] as InquiredEvent[][]),
+    }).pipe(
+      map(({ snapshot, root, children }) => {
+        const allEvents = [...root, ...children.flat()];
+        const lastEventAt = allEvents.length
+          ? allEvents.reduce((latest, e) => (new Date(e.eventTime).getTime() > new Date(latest).getTime() ? e.eventTime : latest), allEvents[0].eventTime)
+          : null;
+        return {
+          contract,
+          currency: contract.currency,
+          lcAmount: deriveLcAmount(root),
+          availableBalance: snapshot ? snapshot.availableBalance : '—',
+          status: contract.status,
+          lastEventAt,
+        };
+      }),
+    );
+  }
+
+  /** Resets to page 1 and re-fetches — the LC Number Search/Filter box's own Search button and Enter key. */
+  searchIndex(): void {
+    this.loadIndex(1);
+  }
+
+  prevIndexPage(): void {
+    const target = this.indexPaging.prevTarget();
+    if (target) this.loadIndex(target);
+  }
+
+  nextIndexPage(): void {
+    const target = this.indexPaging.nextTarget();
+    if (target) this.loadIndex(target);
+  }
+
+  /**
+   * Drill-down from an Index row (2026-08-19, both sides) — the row already IS the resolved contract, so
+   * this skips the redundant resolveContract() round-trip search() itself makes. Deliberately does NOT
+   * touch `indexRows`/`indexPaging`/`indexSearch` — those must survive the round trip so backToIndex()
+   * can return the user to the exact same Page/Search/Sorting state (user's own requirement #3: "從 Event
+   * Timeline 返回 Index 時，系統應盡可能保留使用者原先的 Page、Search/Filter 及 Sorting 狀態").
+   */
+  selectLcFromIndex(contract: BalanceContract): void {
+    this.clearResults();
+    this.lcNumber = contract.naturalKey.lcNumber;
+    this.rootContract = contract;
+    this.indexView = 'EVENTS';
+    this.loadEvents(contract);
+  }
+
+  /** Returns to the Index — `indexRows`/`indexPaging`/`indexSearch` are untouched (never cleared by selectLcFromIndex()/clearResults() above), so this alone is what preserves Page/Search/Sorting across the round trip. */
+  backToIndex(): void {
+    this.indexView = 'INDEX';
   }
 
   /**

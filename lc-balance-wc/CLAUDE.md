@@ -5336,3 +5336,248 @@ zero conditional-logic change (confirmed byte-for-byte identical `hide`/`props` 
 and the strict-template `ng build` compiled clean. A human should Tab out of an empty A8 SG Number and B3
 EB Number field once each, and confirm A2/B2/A3/A3S's own Amendment No./IB Number field now renders as
 the FIRST field on those screens, to fully close the loop.
+
+## Inquire Events → Import LC gains a paginated "Import LC Master Records Index" as its landing view — supersedes "type an exact LC Number to see anything" (2026-08-19, user-requested, full worked-example spec: "Display all Import LC Master Records as a paginated LC Number Index first. When the user clicks an LC Number, drill down to display the complete Balance Event Timeline for that LC")
+
+**Scope, stated up front**: deliberately Import LC only, per the user's own explicitly-titled requirement
+("Inquire Events — Import LC Master Record Index and Event Drill-Down") — the Export Confirmed side keeps
+its pre-existing single-LC-Number-search flow completely unchanged, both in code and in every existing
+test that exercises it.
+
+**Design — reused, not duplicated, wherever a fit already existed.** Investigated `CatalogPickerService`
+first (already used 3x for other paginated pickers) and found it genuinely wrong for this: it hardcodes
+`status: 'ACTIVE'` + `requireIssueReleased: true` in its own `load()` — correct for a Maker-action picker
+("only offer something safe to act on"), wrong for an INQUIRY browse, where a still-PENDING or CLOSED LC
+is still a legitimate thing to look up (same posture Look Up Current Balance/Inquire Events' own existing
+single-LC search already documents). Rather than adding an escape hatch to a class 3 other tested pickers
+already depend on exactly as-is, new state/logic was added directly to `InquireEventsService` — still
+reusing `PagedListState` for the page/total math, and, critically, reusing the SAME `movementsOf$()`/
+`childMovementsOf$()` free functions `loadEvents()` itself already uses to build the merged per-LC
+timeline, just fanned out once per Index row instead of once per drill-down.
+
+**New `InquireEventsService` state/methods**: `indexView: 'INDEX' | 'EVENTS'` (default `'INDEX'` —
+`EVENTS` is the existing single-LC timeline, entirely unchanged); `indexPaging` (a `PagedListState(10)`
+instance, but SERVER-paginated unlike `eventsPaging`'s own client-side windowing — each page/search
+change genuinely re-fetches, since the Index itself, unlike one LC's own merged timeline, is never fully
+loaded into memory at once); `indexRows: ImportLcIndexRow[]`; `indexSearch`/`indexLoading`/`indexError`.
+`loadIndex(page)` calls the existing `catalog()` endpoint (no `status`/`requireIssueReleased` — see
+above) for one page of Import LC contracts, then per row `forkJoin`s `getSnapshot()` (Available Balance),
+`movementsOf$()` (the root's own events, for `lcAmount`), and `childMovementsOf$()` per child instrument
+type (SHGT/IPLC_ACCEPTANCE — for `lastEventAt`, since a later SG event can be the LC's own true "last
+event" even when its own latest movement is earlier). `searchIndex()`/`prevIndexPage()`/`nextIndexPage()`
+wrap it with the same Prev/Next/reset-to-page-1 shape `eventsPaging`'s own methods already establish.
+`selectLcFromIndex(contract)` mirrors `search()`'s own success path WITHOUT the redundant
+`resolveContract()` round-trip (the clicked row already IS the resolved contract) — sets
+`indexView = 'EVENTS'` and calls the existing `loadEvents()` unchanged. `backToIndex()` is deliberately
+just `this.indexView = 'INDEX';` — nothing else — which is itself the entire mechanism that satisfies the
+user's own requirement #3 ("盡可能保留使用者原先的 Page、Search/Filter 及 Sorting 狀態"): `indexRows`/
+`indexPaging`/`indexSearch` were never cleared by `selectLcFromIndex()`/`clearResults()` in the first
+place, so there is nothing to "restore" — the state was simply never touched. `selectSide('IMPORT')`
+auto-calls `loadIndex(1)` (resets `indexView`/`indexSearch` first) so the Index appears immediately per
+the user's own requirement #1 ("系統應先顯示所有 Import LC Master Records 的 Index，而不是要求使用者必須
+先輸入單一 LC Number"), without needing a manual search first; `selectSide('EXPORT')` is completely
+unaffected. `TransactionBuilderComponent.selectMode('INQUIRE')` additionally calls
+`this.inquireEvents.loadIndex()` (no arg — re-fetches whatever page was last shown) whenever entering
+Inquire Events on the Import side, so re-opening the tab after time away/other work never shows a stale
+browse.
+
+**"LC Amount" column — a genuinely new, disclosed simplification**, since no existing API response field
+carries it: the microservice's own `computeFaceAmount()` (`domain/balanceDerivation.ts`, §3.3/§6.2 — sums
+RELEASED `ISSUE(+)`/`AMEND_INCREASE(+)`/`AMEND_DECREASE(-)` `amount`, never `ceilingAmount`) is defined but
+never wired to any route/service call site (confirmed by inspection — genuinely dead, not merely
+under-tested), so there was no field to read. New client-side `deriveLcAmount()`
+(`inquire-events.service.ts`) mirrors that exact formula over the root contract's own already-fetched
+`InquiredEvent[]` (safe to iterate directly despite `toEventRows()`'s own create/finalize split — that
+split only ever applies to a Sight `IPLC_LC`/`UTILIZE`, never one of the 3 face-amount movementTypes).
+**Deliberately uses plain JS `Number` arithmetic, not a decimal library** — this Angular app has no
+`decimal.js` dependency at all (unlike the microservice's own `money.ts`, this project's own CLAUDE.md-
+established "only place allowed to construct a Decimal from a wire string"). Judged acceptable because
+this is a DISPLAY-ONLY summary column — never fed back into any balance-affecting calculation, validation,
+or request payload. Flagged in the function's own doc comment: a future feature needing this figure for
+anything beyond display should instead wire the existing, currently-dead `computeFaceAmount()` into a real
+server-side route rather than extend this client-side approximation.
+
+**Template** (`transaction-builder.component.html`): the Export side's own pre-existing LC Number/Search
+box is now explicitly wrapped `*ngIf="inquireEvents.side === 'EXPORT'"` (previously unconditional,
+correct then since only one flow existed) — byte-for-byte unchanged markup inside. Import side gained two
+new mutually-exclusive blocks gated on `indexView`: the Index itself (a `.tb-table`/`.tb-table-scroll`
+table — LC Number/Currency/LC Amount/Available Balance/Status/Last Event Date/Time — reusing the exact
+same pickable-row `cursor:pointer`/hover styling every other `.tb-table` in this app already has, so no
+new CSS was needed there; a `.tb-pagination` block copied from the Events table's own existing Prev/Next/
+"Page X / Y (Z total)" markup) and, once drilled in, a "‹ Back to Import LC Index" button above the
+UNCHANGED existing Events-timeline markup.
+
+**Bug found and fixed during live verification, not by static checks**: the first live pass (see below)
+surfaced that clicking "Back to Import LC Index" correctly returned to the Index but left the PREVIOUS
+LC's own Events table/Original Transaction Screen/Balance Tabs still rendered underneath it — because
+that whole shared block was, and had always been, gated purely on `*ngIf="inquireEvents.rootContract"`,
+and `backToIndex()` deliberately does NOT clear `rootContract`/`selectedEvent` (by design, so re-picking
+the SAME LC from the Index doesn't need a redundant re-fetch). Fixed by wrapping that entire shared
+results block (Events table through the Balance Tabs' own `#balanceSnapshotBox` outlet) in one
+`<ng-container *ngIf="inquireEvents.side === 'EXPORT' || inquireEvents.indexView === 'EVENTS'">` — Export
+is unconditionally true there (unaffected, identical to its pre-existing behavior), Import is gated on
+genuinely being in the drill-down view. Re-verified live after the fix (see below).
+
+**Tests**: 10 new cases in `inquire-events.service.spec.ts`'s own new "Import LC Master Records Index"
+describe block — `loadIndex()`'s full success path (a realistic multi-movement S001/S002 fixture proving
+`lcAmount` correctly sums/excludes by movementType+status, including a RELEASED-but-non-face-amount
+UTILIZE that must contribute nothing, and that a later SHGT child event wins for `lastEventAt` over the
+root's own latest movement), a `getSnapshot()` failure degrading to a placeholder rather than failing the
+row, a contract with no child ledger types skipping the child fan-out entirely (branch coverage for
+`childInstrumentTypesOf()` returning `[]`), an empty page short-circuiting with zero fan-out calls, a
+`catalog()` failure setting `indexError`, `searchIndex()`'s trimmed-`q`-param + reset-to-page-1 behavior,
+`prevIndexPage()`/`nextIndexPage()`'s server-refetch + boundary no-ops, `selectLcFromIndex()`'s no-
+redundant-`resolveContract()`-call + state-preservation proof, `backToIndex()`'s narrow scope, and
+`selectSide('IMPORT')` auto-load vs `selectSide('EXPORT')` being fully unaffected. Verified: `npx tsc -p
+tsconfig.app.json --noEmit`/`ng build --configuration development` (strict templates) both clean, `npm run
+lint` 0 errors (217 pre-existing warnings, unchanged), full Angular suite **793/793 passing** (10 new —
+up from 783/783 at the prior entry), coverage **99.46/96.25/99.33/99.46%** (all four metrics clear the 95%
+floor; `inquire-events.service.ts` itself 100/96.87/100/100 — the handful of remaining uncovered branches
+are defensive/unreachable-in-practice cases, e.g. a non-finite parsed amount, already the same class of
+gap this file accepts elsewhere). `backend/` 33/33 and microservice 322/322 both re-run per this file's
+own standing rule, unaffected (Angular-only change).
+
+**Live-verified against the real running stack (already-running `ng serve`/backend/microservice, per this
+file's own "don't chase port conflicts" posture — connected directly rather than restarting anything)**:
+opened Inquire Events → Import LC and confirmed the Index renders immediately with zero prior search,
+real paginated data ("Page 1 / 2 (13 total)"), and every one of the 6 required columns populated with
+real figures. Clicked LC S01's own row — the drill-down reproduced the user's own worked-example table
+**byte-for-byte**: `A1 · LC Issue`/`A3 · Document Arrival`/`A8 · Shipping Gtee (Issue)`/`A4 · Sight
+Settlement`/... in the exact same order, amounts, references, and EARMARKED/APPROVED statuses the user's
+own spec message specified. This live pass is what surfaced the "Back to Index leaves stale content
+underneath" bug described above — confirmed fixed by re-running `ng build`/the full test suite clean, but
+the specific post-fix click-through (Back to Index → confirm the Events section is now genuinely gone)
+could **not** be re-verified live: the Claude in Chrome extension's clicks stopped registering entirely
+across 3 separate attempts (2 different tabs, including a fresh one), the same class of this-session
+browser-tooling flakiness this file's own history already records repeatedly (screenshot timeouts,
+clicks silently not landing). Stopped retrying per this session's own established practice rather than
+forcing it further. Confidence in the fix itself is unusually high despite this: it's a single, minimal
+`*ngIf` wrapper addition (no logic touched inside), the strict-template `ng build` (which fails loudly on
+a bad binding) compiled clean, and the SAME class of "hidden section" bug/fix pattern (a boolean-gated
+`*ngIf`) already has a long, successful track record throughout this file's own history. A human should
+still click into an LC from the Index, click "Back to Import LC Index," and confirm the Events section
+underneath is genuinely gone (not just visually below the fold) to fully close the loop.
+
+## LC Master Records Index extended to Export Confirmed LC — reused the just-shipped Import-LC-only implementation rather than duplicating it (2026-08-19, same day, user-requested — "Same requirement for Export Confirmed")
+
+Direct follow-up to the entry immediately above (the Import LC Master Records Index). Rather than writing
+a second, parallel Export-specific implementation, the whole feature was generalized in place — nearly
+every piece was already side-aware (`defaultLcInstrumentTypeForSide(this.side)`, `childInstrumentTypesOf()`)
+purely because it had been built as a method on the already-side-scoped `InquireEventsService`; the only
+genuine gating was one `if (side === 'IMPORT')` block in `selectSide()`, one `*ngIf="side === 'IMPORT'"`
+pair in the template, and `deriveLcAmount()`'s own movementType assumptions (Import-only, silently wrong
+for Export).
+
+**`inquire-events.service.ts`**:
+- `selectSide()` — the `if (side === 'IMPORT')` guard around `indexView`/`indexSearch` reset +
+  `loadIndex(1)` removed; both sides now auto-load their own Index unconditionally, matching the identical
+  wording the user used for both requests ("系統應先顯示所有 Import LC Master Records 的 Index" / "Same
+  requirement for Export Confirmed").
+- `transaction-builder.component.ts`'s `selectMode()` — its own `&& this.inquireEvents.side === 'IMPORT'`
+  guard on the re-entry `loadIndex()` refresh removed the same way.
+- `ImportLcIndexRow` renamed to `LcIndexRow` (one row shape backs both sides now — the interface itself
+  was never Import-specific, only its doc comment and name implied it was).
+- **`deriveLcAmount()` — the one place that needed real new logic, not just de-gating.** Import LC
+  (`IPLC_LC`/`EPLC_LC`) uses `ISSUE`(+)/`AMEND_INCREASE`(+)/`AMEND_DECREASE`(-), direction encoded in the
+  movementType itself. Export Confirmed LC (`EPLC_CONFIRMATION`) has no such split — per the microservice's
+  own `domain/contingentAccountEntry.ts` doc comment ("Balance Component has no separate AMEND_INCREASE/
+  AMEND_DECREASE for EPLC_CONFIRMATION... a decrease is expressed as a negative typed amount instead"), a
+  single `AMEND` movementType covers both, with direction folded into the SIGN of `amount` itself. Verified
+  by reading `microservices/balance-component/src/domain/balanceDerivation.ts`'s own `MOVEMENT_DIRECTION`
+  table directly before writing anything — confirms `AMEND: 1` is a fixed coefficient that, by itself,
+  cannot distinguish increase from decrease; the sign-folding is the ONLY place that information lives.
+  `deriveLcAmount()` rewritten from a lookup-table `FACE_AMOUNT_DIRECTION` map (which had no `AMEND` entry
+  at all — an Export Confirmed LC's own AMEND movements would have silently contributed `undefined` ×
+  amount = excluded, understating "LC Amount" for any Confirmation with amendments) to a `switch` handling
+  `ISSUE`/`AMEND_INCREASE`(+)/`AMEND_DECREASE`(-)/`AMEND` (added as-is, already signed) — `ISSUE` is shared
+  by both vocabularies and needs no side-specific branching.
+- `indexEntityLabel` getter added — `'Import LC'` / `'Export Confirmed LC'` — the one piece of genuinely
+  new (not just de-gated) code, driving the Index/heading/hint/back-button text so both sides get correct,
+  distinct labels from one shared template block rather than two copies with hardcoded strings.
+
+**`transaction-builder.component.html`**: the OLD single-exact-match "type LC Number, click Search" box
+(Export Confirmed's own only entry point before this pass) removed outright — both `*ngIf`s gating the
+Index/drill-down markup to `side === 'IMPORT'` widened to run on either side, with `{{ inquireEvents.
+indexEntityLabel }}` substituted for the hardcoded "Import LC" text throughout (table caption, loading/
+empty hints, "Back to ... Index" button). No new markup — the exact same block now serves both sides.
+
+**Tests**: `inquire-events.service.spec.ts`'s "Import LC Master Records Index" describe block renamed to
+"LC Master Records Index" and re-scoped as side-agnostic in its own doc comment; a new dedicated test
+proves the Export Confirmed `lcAmount` derivation directly (`ISSUE` 100000 + `AMEND` +20000 + `AMEND`
+-15000, a PENDING `AMEND` correctly excluded → `105000`) — the one case that would have silently produced
+a wrong (understated) figure under the old Import-only lookup table. The `selectSide()` test was rewritten
+to prove BOTH sides now auto-load (previously asserted Export was "deliberately unaffected"), and a new
+`indexEntityLabel` test locks in both label strings. 795/795 Angular tests passing (2 net new — the
+`selectSide()` test was rewritten in place, not duplicated), coverage **99.4/96.26/99.33/99.46%** (all four
+metrics clear the 95% floor). `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration
+development` (strict templates)/`npm run lint` (0 errors, 217 pre-existing warnings, unchanged) all clean.
+`backend/` 33/33 and microservice 322/322 both re-run per this file's own standing rule, unaffected
+(Angular-only change — no request/response contract change).
+
+**Live-verified against the real running stack** (already-running `ng serve`/backend/microservice, same
+"don't chase port conflicts" posture as the entry above): switched Inquire Events to the Export Confirmed
+side — "Export Confirmed LC Master Records" rendered immediately with 3 real rows (S01/S02/U01), correct
+non-zero LC Amounts (100000/10000/10000 — proving the AMEND-based derivation works, not silently zero).
+Clicked S01's own row — drilled into its full merged Events timeline (B1 Confirm LC → four B3 Present
+Docs/B4 Honour pairs, EARMARKED/APPROVED statuses correctly distinct) with a correctly-labeled "‹ Back to
+Export Confirmed LC Index" button; clicking it returned to the exact same 3-row Index with no reload
+flicker, confirming the state-preservation behavior the entry above already established works
+side-agnostically too. Unlike the entry immediately above, this pass's live verification completed
+without any browser-tooling flakiness (first attempt after the tab context was recreated fresh; the two
+earlier click-not-registering attempts in the SAME tab this pass observed, before recreating it, appear
+to have been the by-now-familiar stale-tab-state artifact this file's own history already records — not
+reproduced again on the fresh tab).
+
+## Bug fixed — A2 Amendment Increase wrongly showed "exceeds Available Balance... this will be rejected", contradicting this function's own registry help text (2026-08-19, reviewer-reported — "A2 — LC Amendment Increase: Incorrect Available Balance Warning", worked example: LC with Confirmed 10,000 / Available 0, Direction Increase, Amendment No. A03, Amount 10,000)
+
+Root cause, confirmed by reading both sides of the contract rather than assumed: the balance box's own
+"exceeds Available Balance" warning (`transaction-builder.component.html`, next to the Amount field) was
+never scoped by `movementType` at all — it fired for ANY function the instant `selectedContractSnapshot`
+was loaded and the typed amount exceeded plain Available Balance, with no regard for whether the
+microservice would ever actually reject it. Confirmed via `service/balanceService.ts`'s own
+`NO_CHECK_MOVEMENT_TYPES` (`ISSUE`/`AMEND_INCREASE`/`CREATE`/`AMEND`) that the server runs **no
+sufficiency check whatsoever** for those four movementTypes — A2's own registry help text was already
+correct ("Increase always succeeds; Decrease is checked against Available Balance, Design doc §6.2"), the
+client-side warning was simply never taught that rule. This wasn't A2-only: **B2 (`EPLC_CONFIRMATION`
+`AMEND`, a single signed movementType — no client Increase/Decrease split, direction is the sign of
+`amount`) has no server-side sufficiency check in EITHER direction**, so the same warning was equally
+misleading there regardless of sign, and would additionally have been directionally *wrong* even had it
+been gated on sign alone — comparing the raw signed `amount` against Available Balance means a genuine
+Decrease (typed negative) can never trip a `>` comparison against a positive Available Balance at all,
+so a real over-decrease would have silently shown no warning while a harmless Increase wrongly showed one.
+
+**Fix**: gated the warning on a new `TransactionBuilderComponent.movementTypeChecksAvailableBalance(movementType)`
+helper, which delegates to `DECREASING_MOVEMENT_TYPES` (`balance-component.model.ts`) — a set that
+**already exists and already mirrors the microservice's own checked-movementType union exactly**
+(`UTILIZE_SHAPED_MOVEMENT_TYPES` + `OUTSTANDING_CAPPED_MOVEMENT_TYPES` + `AMEND_DECREASE`, i.e.
+`UTILIZE`/`HONOUR`/`ACCEPT`/`PARTIAL_REDEEM`/`FULL_REDEEM`/`REIMBURSE`/`RECLASSIFY_OUT`/
+`PARTIAL_SETTLE`/`FULL_SETTLE`/`AMEND_DECREASE`) — already used elsewhere in this same file for the
+identical "don't offer/imply an action the server will never actually check this way" purpose (filtering
+0-balance contracts out of the Catalog/Parent-LC/IB-Index pickers), reused here rather than re-deriving a
+second list that could drift from the first. Since `AMEND` (B2) was never in that set to begin with, this
+single change correctly suppresses the warning for B2 in both directions too — matching the server's own
+`NO_CHECK_MOVEMENT_TYPES` truth exactly, rather than attempting (and getting wrong) a sign-based rule for
+a function this codebase's own server-side design deliberately never checks at all. The companion "exceeds
+Tight Available Balance" tier (added 2026-08-18, see that entry above) was already correctly scoped to
+`model.movementType === 'UTILIZE'` — a subset of `DECREASING_MOVEMENT_TYPES` — and needed no change.
+
+**Tests**: new `movementTypeChecksAvailableBalance` describe block in `transaction-builder.component.spec.ts`
+(false for all 4 `NO_CHECK_MOVEMENT_TYPES` including `AMEND`; true for all 10 `DECREASING_MOVEMENT_TYPES`
+entries; false for null/undefined/an unrecognized future type). The two template `*ngIf` conditions
+themselves are template-only changes — per this file's own repeated, established convention, this
+codebase's direct-instantiation component tests never render the DOM, so they're verified via
+`tsc --noEmit`/strict-template `ng build`/lint instead, not a new Jest assertion. Verified: `npx tsc -p
+tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean, `npm run lint` 0 errors
+(217 pre-existing warnings, unchanged), full Angular suite **798/798 passing** (3 new), coverage
+**99.4/96.27/99.33/99.46%** (all four metrics clear the 95% floor). `backend/` 33/33 and microservice
+322/322 both re-run per this file's own standing rule, unaffected (Angular-only change — no
+request/response contract change; the server-side rule was already correct and untouched).
+
+**Live in-browser verification not attempted this pass** — static verification is unusually strong here
+(the fix reuses an already-proven, already-tested set rather than introducing new logic, the strict-
+template `ng build` directly validates the new `*ngIf` binding compiles against the real component method,
+and the new dedicated tests enumerate every `NO_CHECK`/checked movementType by name against the exact
+server-side lists this fix is grounded in) — a human should still reproduce the reported example live (a
+real LC, Confirmed 10,000/Available 0, A2 Increase, Amount 10,000) and confirm no warning appears and
+Submit succeeds, then confirm A2 Decrease still correctly warns/rejects when the typed amount exceeds
+Available Balance, to fully close the loop.

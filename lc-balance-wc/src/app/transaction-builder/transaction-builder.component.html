@@ -382,7 +382,14 @@
                        Submit look freshly rejected. Both gated on `!formLocked` now — a pre-submit hint has
                        nothing left to warn about once the submission it was warning about has already gone
                        through. -->
-                  <div class="tb-error mt-2" *ngIf="!formLocked && model.amount && +model.amount > +selectedContractSnapshot.availableBalance">
+                  <!-- Bug fixed 2026-08-19, reviewer-reported ("A2 — LC Amendment Increase: Incorrect Available
+                       Balance Warning") — this warning used to fire for ANY movementType, including
+                       ISSUE/AMEND_INCREASE/CREATE/AMEND, none of which the microservice ever checks against
+                       Available Balance (Design doc §6.2: "Increase always succeeds; Decrease is checked").
+                       Now gated on movementTypeChecksAvailableBalance() (DECREASING_MOVEMENT_TYPES), the same
+                       set already used elsewhere in this file to filter 0-balance contracts out of the
+                       pickers — see that method's own doc comment for the full root cause. -->
+                  <div class="tb-error mt-2" *ngIf="!formLocked && model.amount && movementTypeChecksAvailableBalance(model.movementType) && +model.amount > +selectedContractSnapshot.availableBalance">
                     ⚠ Typed amount ({{ model.amount }}) exceeds Available Balance — this will be rejected (Design doc §6).
                   </div>
                   <!-- Business-reported gap 2026-08-18 ("It should show no warning, since the amount <= tight
@@ -873,16 +880,63 @@
           <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'EXPORT'" (click)="inquireEvents.selectSide('EXPORT')">Export Confirmed</button>
         </div>
 
-        <div class="tb-field tb-field--inline tb-field--search mt-2">
-          <label class="tb-field__label">LC Number</label>
-          <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="inquireEvents.lcNumber" (keyup.enter)="inquireEvents.search()">
-          <button type="button" class="tb-btn tb-btn--outline" [disabled]="!inquireEvents.lcNumber.trim() || inquireEvents.searching" (click)="inquireEvents.search()">
-            {{ inquireEvents.searching ? 'Searching…' : 'Search' }}
-          </button>
-        </div>
-        <div class="tb-error mt-2" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
-        <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}</div>
+        <!-- LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC Master
+             Records 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the
+             SAME day, same wording, to Export Confirmed LC — "Same requirement for Export Confirmed").
+             Side-agnostic: one index/drill-down flow backs both Import LC and Export Confirmed LC,
+             selected purely by inquireEvents.side/indexEntityLabel. Shown BEFORE any single LC is
+             picked; selectLcFromIndex() drills into the SAME merged Events timeline below (unchanged),
+             and backToIndex() returns here with Page/Search/Sorting state preserved (InquireEventsService
+             never clears indexRows/indexPaging/indexSearch on that round trip — see its own doc
+             comments). The OLD single-exact-match "type LC Number, click Search" box (formerly Export
+             Confirmed's only entry point) is fully retired — both sides now share this Index instead. -->
+        <ng-container *ngIf="inquireEvents.indexView === 'INDEX'">
+          <div class="tb-field tb-field--inline tb-field--search mt-2">
+            <label class="tb-field__label">LC Number Search / Filter</label>
+            <input class="tb-input" placeholder="e.g. S0 (matches any LC Number containing this text)" [(ngModel)]="inquireEvents.indexSearch" (keyup.enter)="inquireEvents.searchIndex()">
+            <button type="button" class="tb-btn tb-btn--outline" [disabled]="inquireEvents.indexLoading" (click)="inquireEvents.searchIndex()">
+              {{ inquireEvents.indexLoading ? 'Searching…' : 'Search' }}
+            </button>
+          </div>
+          <div class="tb-error mt-2" *ngIf="inquireEvents.indexError">{{ inquireEvents.indexError }}</div>
+          <div class="tb-hint mt-2" *ngIf="inquireEvents.indexLoading">Loading {{ inquireEvents.indexEntityLabel }} Master Records…</div>
 
+          <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
+            <table class="tb-table">
+              <caption class="visually-hidden">{{ inquireEvents.indexEntityLabel }} Master Records</caption>
+              <thead><tr><th>LC Number</th><th>Currency</th><th>LC Amount</th><th>Available Balance</th><th>Status</th><th>Last Event Date/Time</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)">
+                  <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
+                  <td>{{ row.currency }}</td>
+                  <td class="tb-table__amount">{{ row.lcAmount }}</td>
+                  <td class="tb-table__amount">{{ row.availableBalance }}</td>
+                  <td><span class="tb-type-tag">{{ row.status }}</span></td>
+                  <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date:'short') : '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tb-pagination" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexPaging.totalPages > 1">
+            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.indexPaging.page <= 1" (click)="inquireEvents.prevIndexPage()">‹ Prev</button>
+            <span class="tb-muted">Page {{ inquireEvents.indexPaging.page }} / {{ inquireEvents.indexPaging.totalPages }} ({{ inquireEvents.indexPaging.total }} total)</span>
+            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.indexPaging.page >= inquireEvents.indexPaging.totalPages" (click)="inquireEvents.nextIndexPage()">Next ›</button>
+          </div>
+          <div class="tb-hint mt-2" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError">No {{ inquireEvents.indexEntityLabel }} Master Records found{{ inquireEvents.indexSearch.trim() ? ' matching this filter' : '' }}.</div>
+        </ng-container>
+
+        <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
+          <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">‹ Back to {{ inquireEvents.indexEntityLabel }} Index</button>
+          <div class="tb-error mt-2" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
+          <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}</div>
+        </ng-container>
+
+        <!-- LC Master Records Index (2026-08-19) — this whole results section (Events table, Original
+             Transaction Screen, Balance Tabs) stays hidden while browsing the Index (indexView ===
+             'INDEX'), on BOTH sides, even though rootContract/selectedEvent themselves are deliberately
+             NOT cleared by backToIndex() (so a re-drill-down into the SAME LC doesn't need a re-fetch —
+             see InquireEventsService's own doc comments). -->
+        <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
         <div class="mt-3" *ngIf="inquireEvents.rootContract">
           <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
           <div class="tb-hint" *ngIf="inquireEvents.eventsLoading">Loading events…</div>
@@ -981,6 +1035,7 @@
           <button type="button" class="tb-tab" *ngFor="let tab of inquireEvents.selectedEventTabs" [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key" (click)="inquireEvents.selectEventTab(tab.key)">{{ tab.label }}</button>
         </div>
         <ng-container *ngIf="inquireEvents.selectedEvent as sel2" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: inquireEvents.activeEventTab?.title, status: sel2.contract.status, snapshot: inquireEvents.activeEventTab?.snapshot, impact: inquireEvents.activeEventTab?.impact }"></ng-container>
+        </ng-container>
         </div>
       </section>
     </div>

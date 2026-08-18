@@ -288,6 +288,256 @@ describe('InquireEventsService', () => {
     });
   });
 
+  /**
+   * LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC Master Records
+   * 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the SAME day, same
+   * wording, to Export Confirmed LC — "Same requirement for Export Confirmed"). Side-agnostic — the bulk
+   * of this describe block exercises the Import LC (`IPLC_LC`) shape (unchanged from the original,
+   * Import-only version), with a dedicated Export Confirmed (`EPLC_CONFIRMATION`) case for the one
+   * genuinely side-specific piece of logic (`deriveLcAmount()`'s ISSUE/AMEND vs. ISSUE/AMEND_INCREASE/
+   * AMEND_DECREASE branching) and a `selectSide()` case proving BOTH sides now auto-load their own Index.
+   */
+  describe('LC Master Records Index (loadIndex / searchIndex / paging / selectLcFromIndex / backToIndex)', () => {
+    function s001(): BalanceContract {
+      return makeContract({ balanceContractId: 'bc-s001', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' }, status: 'ACTIVE', currency: 'USD' });
+    }
+    function s002(): BalanceContract {
+      return makeContract({ balanceContractId: 'bc-s002', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S002' }, status: 'ACTIVE', currency: 'EUR' });
+    }
+    function sgUnderS001(): BalanceContract {
+      return makeContract({ balanceContractId: 'bc-sg-s001', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
+    }
+
+    it('loadIndex() populates indexRows — lcAmount sums RELEASED ISSUE(+)/AMEND_INCREASE(+)/AMEND_DECREASE(-) only (a PENDING UTILIZE contributes nothing), availableBalance comes from getSnapshot(), and lastEventAt is the max eventTime across the root AND every child ledger (a later SHGT event wins over the root\'s own latest movement)', () => {
+      const issueS001 = makeMovement({ movementId: 'mv-issue-1', balanceContractId: 'bc-s001', movementType: 'ISSUE', amount: '100000', createdAt: '2026-08-01T00:00:00.000Z' });
+      const incS001 = makeMovement({ movementId: 'mv-inc-1', balanceContractId: 'bc-s001', movementType: 'AMEND_INCREASE', amount: '20000', createdAt: '2026-08-02T00:00:00.000Z' });
+      const decS001 = makeMovement({ movementId: 'mv-dec-1', balanceContractId: 'bc-s001', movementType: 'AMEND_DECREASE', amount: '10000', createdAt: '2026-08-03T00:00:00.000Z' });
+      const pendingUtilizeS001 = makeMovement({ movementId: 'mv-utl-1', balanceContractId: 'bc-s001', movementType: 'UTILIZE', amount: '5000', status: 'PENDING', createdAt: '2026-08-04T00:00:00.000Z' });
+      // A RELEASED movement whose movementType isn't one of the 3 face-amount-affecting ones — proves
+      // deriveLcAmount() also filters by movementType, not just status.
+      const releasedUtilizeS001 = makeMovement({ movementId: 'mv-utl-2', balanceContractId: 'bc-s001', movementType: 'UTILIZE', amount: '7000', status: 'RELEASED', createdAt: '2026-08-04T12:00:00.000Z' });
+      const sgIssue = makeMovement({ movementId: 'mv-sg-issue', balanceContractId: 'bc-sg-s001', movementType: 'ISSUE', amount: '12345', createdAt: '2026-08-05T00:00:00.000Z' });
+      const issueS002 = makeMovement({ movementId: 'mv-issue-2', balanceContractId: 'bc-s002', movementType: 'ISSUE', amount: '9999', createdAt: '2026-07-01T00:00:00.000Z' });
+
+      const api = makeApi({
+        catalog: jest.fn((instrumentType: string, _status?: string, _q?: string, _page?: number, _pageSize?: number, lcNumber?: string) => {
+          if (instrumentType === 'IPLC_LC') return of({ items: [s001(), s002()], total: 2, page: 1, pageSize: 10 });
+          if (instrumentType === 'SHGT' && lcNumber === 'S001') return of({ items: [sgUnderS001()], total: 1, page: 1, pageSize: 50 });
+          return of(emptyCatalog());
+        }),
+        listMovements: jest.fn((contractId: string) =>
+          of(
+            contractId === 'bc-s001'
+              ? [issueS001, incS001, decS001, pendingUtilizeS001, releasedUtilizeS001]
+              : contractId === 'bc-sg-s001'
+                ? [sgIssue]
+                : contractId === 'bc-s002'
+                  ? [issueS002]
+                  : [],
+          ),
+        ),
+        getSnapshot: jest.fn((id: string) => of(makeSnapshot({ balanceContractId: id, availableBalance: id === 'bc-s001' ? '77000' : '5000' }))),
+      });
+
+      const svc = new InquireEventsService(api);
+      svc.loadIndex(1);
+
+      expect(svc.indexLoading).toBe(false);
+      expect(svc.indexPaging.total).toBe(2);
+      expect(svc.indexRows.length).toBe(2);
+
+      const row1 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S001')!;
+      expect(row1.lcAmount).toBe('110000'); // 100000 + 20000 - 10000; neither UTILIZE counts (one's PENDING, the other isn't a face-amount movementType at all).
+      expect(row1.availableBalance).toBe('77000');
+      expect(row1.currency).toBe('USD');
+      expect(row1.status).toBe('ACTIVE');
+      expect(row1.lastEventAt).toBe(sgIssue.createdAt); // 2026-08-05 — later than S001's own latest movement (2026-08-04).
+
+      const row2 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S002')!;
+      expect(row2.lcAmount).toBe('9999');
+      expect(row2.availableBalance).toBe('5000');
+      expect(row2.lastEventAt).toBe(issueS002.createdAt);
+    });
+
+    /**
+     * Export Confirmed LC (2026-08-19, "Same requirement for Export Confirmed") — EPLC_CONFIRMATION has
+     * no separate AMEND_INCREASE/AMEND_DECREASE split; ONE `AMEND` movementType covers both, direction
+     * folded into the SIGN of `amount` itself (see deriveLcAmount()'s own doc comment and the
+     * microservice's own domain/contingentAccountEntry.ts doc comment). Proves the LC Amount column is
+     * genuinely correct for Export, not silently zero (AMEND_INCREASE/AMEND_DECREASE never match a
+     * Confirmation contract's own movements at all).
+     */
+    it('loadIndex() on the Export Confirmed side derives lcAmount from ISSUE + signed AMEND (not AMEND_INCREASE/AMEND_DECREASE, which never apply to EPLC_CONFIRMATION)', () => {
+      const confirmation = makeContract({ balanceContractId: 'bc-cnf01', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE', currency: 'USD' });
+      const issue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf01', movementType: 'ISSUE', amount: '100000', createdAt: '2026-08-01T00:00:00.000Z' });
+      const amendIncrease = makeMovement({ movementId: 'mv-cnf-amend-inc', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '20000', createdAt: '2026-08-02T00:00:00.000Z' });
+      const amendDecrease = makeMovement({ movementId: 'mv-cnf-amend-dec', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '-15000', createdAt: '2026-08-03T00:00:00.000Z' });
+      // A PENDING AMEND must not contribute (same RELEASED-only rule as Import).
+      const pendingAmend = makeMovement({ movementId: 'mv-cnf-amend-pending', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '99999', status: 'PENDING', createdAt: '2026-08-04T00:00:00.000Z' });
+
+      const api = makeApi({
+        catalog: jest.fn((instrumentType: string) => of(instrumentType === 'EPLC_CONFIRMATION' ? { items: [confirmation], total: 1, page: 1, pageSize: 10 } : emptyCatalog())),
+        listMovements: jest.fn(() => of([issue, amendIncrease, amendDecrease, pendingAmend])),
+        getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '105000' }))),
+      });
+
+      const svc = new InquireEventsService(api);
+      svc.side = 'EXPORT';
+      svc.loadIndex(1);
+
+      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows[0].lcAmount).toBe('105000'); // 100000 + 20000 - 15000; the PENDING AMEND contributes nothing.
+      expect(svc.indexRows[0].contract.naturalKey.lcNumber).toBe('CNF01');
+    });
+
+    it('a getSnapshot() failure for one row degrades to a placeholder Available Balance rather than failing the whole index', () => {
+      const issue = makeMovement({ movementType: 'ISSUE', amount: '1000', createdAt: '2026-08-01T00:00:00.000Z' });
+      const api = makeApi({
+        catalog: jest.fn(() => of({ items: [s001()], total: 1, page: 1, pageSize: 10 })),
+        listMovements: jest.fn(() => of([issue])),
+        getSnapshot: jest.fn(() => throwError(() => new Error('boom'))),
+      });
+      const svc = new InquireEventsService(api);
+      svc.loadIndex(1);
+      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows[0].availableBalance).toBe('—');
+      expect(svc.indexRows[0].lcAmount).toBe('1000');
+    });
+
+    it('a row whose instrumentType has no child ledger types (childInstrumentTypesOf() returns []) skips the child fan-out entirely and derives lastEventAt from its own movements alone', () => {
+      const noChildContract = makeContract({ balanceContractId: 'bc-nc', instrumentType: 'EPLC_LC', naturalKey: { lcNumber: 'NC01' } });
+      const issue = makeMovement({ balanceContractId: 'bc-nc', movementType: 'ISSUE', amount: '4000', createdAt: '2026-08-01T00:00:00.000Z' });
+      const catalog = jest.fn(() => of({ items: [noChildContract], total: 1, page: 1, pageSize: 10 }));
+      const api = makeApi({ catalog, listMovements: jest.fn(() => of([issue])) });
+      const svc = new InquireEventsService(api);
+
+      svc.loadIndex(1);
+
+      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows[0].lastEventAt).toBe(issue.createdAt);
+      // Only ONE catalog() call — the index page itself; no child-catalog lookups were ever attempted.
+      expect(catalog).toHaveBeenCalledTimes(1);
+    });
+
+    it('an empty page (no matching contracts) clears indexRows without any per-row fan-out calls', () => {
+      const api = makeApi({ catalog: jest.fn(() => of(emptyCatalog())) });
+      const svc = new InquireEventsService(api);
+      svc.indexRows = [{ contract: s001(), currency: 'USD', lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
+      svc.loadIndex(1);
+      expect(svc.indexRows).toEqual([]);
+      expect(svc.indexLoading).toBe(false);
+      expect(api.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('a catalog() failure sets indexError, clears indexRows, and zeroes the total', () => {
+      const api = makeApi({ catalog: jest.fn(() => throwError(() => ({ error: { message: 'network down' } }))) });
+      const svc = new InquireEventsService(api);
+      svc.loadIndex(1);
+      expect(svc.indexLoading).toBe(false);
+      expect(svc.indexError).toBe('network down');
+      expect(svc.indexRows).toEqual([]);
+      expect(svc.indexPaging.total).toBe(0);
+    });
+
+    it('searchIndex() resets to page 1 and passes the trimmed indexSearch as the catalog() q param', () => {
+      const catalog = jest.fn(() => of(emptyCatalog()));
+      const api = makeApi({ catalog });
+      const svc = new InquireEventsService(api);
+      svc.indexPaging.page = 3;
+      svc.indexSearch = '  S0  ';
+
+      svc.searchIndex();
+
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, 'S0', 1, 10);
+    });
+
+    it('nextIndexPage()/prevIndexPage() re-fetch the target page (server-paginated, unlike eventsPaging) and are no-ops at the boundaries', () => {
+      const catalog = jest.fn((_instrumentType: string, _status?: string, _q?: string, page = 1) => of({ items: [], total: 25, page, pageSize: 10 }));
+      const api = makeApi({ catalog });
+      const svc = new InquireEventsService(api);
+      svc.loadIndex(1);
+      catalog.mockClear();
+
+      svc.nextIndexPage();
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 2, 10);
+
+      svc.prevIndexPage();
+      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, 10);
+
+      catalog.mockClear();
+      svc.prevIndexPage(); // already on page 1 — no-op, no extra fetch
+      expect(catalog).not.toHaveBeenCalled();
+    });
+
+    it('selectLcFromIndex() resolves the picked row directly (no resolveContract round-trip), switches to EVENTS view, and loads its Events timeline — without touching indexRows/indexPaging/indexSearch', () => {
+      const contract = s001();
+      const issue = makeMovement({ balanceContractId: 'bc-s001', movementType: 'ISSUE' });
+      const api = makeApi({ listMovements: jest.fn(() => of([issue])) });
+      const svc = new InquireEventsService(api);
+      svc.indexRows = [{ contract, currency: 'USD', lcAmount: '100', availableBalance: '100', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexPaging.page = 2;
+      svc.indexPaging.total = 15;
+      svc.indexSearch = 'S0';
+
+      svc.selectLcFromIndex(contract);
+
+      expect(api.resolveContract).not.toHaveBeenCalled();
+      expect(svc.rootContract).toBe(contract);
+      expect(svc.indexView).toBe('EVENTS');
+      expect(svc.events.length).toBe(1);
+      // Preserved across the round trip, per the user's own requirement #3.
+      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexPaging.page).toBe(2);
+      expect(svc.indexPaging.total).toBe(15);
+      expect(svc.indexSearch).toBe('S0');
+    });
+
+    it('backToIndex() only flips indexView back to INDEX — indexRows/indexPaging/indexSearch are untouched', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.indexView = 'EVENTS';
+      svc.indexRows = [{ contract: s001(), currency: 'USD', lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexPaging.page = 4;
+      svc.indexSearch = 'kept';
+
+      svc.backToIndex();
+
+      expect(svc.indexView).toBe('INDEX');
+      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexPaging.page).toBe(4);
+      expect(svc.indexSearch).toBe('kept');
+    });
+
+    it('selectSide() resets indexView/indexSearch and auto-loads the index on BOTH sides (2026-08-19, extended from Import-only to Export Confirmed the same day)', () => {
+      const catalog = jest.fn(() => of(emptyCatalog()));
+      const api = makeApi({ catalog });
+      const svc = new InquireEventsService(api);
+      svc.indexView = 'EVENTS';
+      svc.indexSearch = 'stale';
+
+      svc.selectSide('EXPORT');
+      expect(svc.indexView).toBe('INDEX');
+      expect(svc.indexSearch).toBe('');
+      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, 10);
+
+      catalog.mockClear();
+      svc.indexView = 'EVENTS';
+      svc.indexSearch = 'stale';
+
+      svc.selectSide('IMPORT');
+      expect(svc.indexView).toBe('INDEX');
+      expect(svc.indexSearch).toBe('');
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 10);
+    });
+
+    it('indexEntityLabel reflects the current side ("Import LC" / "Export Confirmed LC") — drives the Index/heading/hint text', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.side = 'IMPORT';
+      expect(svc.indexEntityLabel).toBe('Import LC');
+      svc.side = 'EXPORT';
+      expect(svc.indexEntityLabel).toBe('Export Confirmed LC');
+    });
+  });
+
   // UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — client-side windowing
   // over the already-loaded `events` array (eventsPaging.pageSize is 10, so 25 events -> 3 pages).
   describe('pagedEvents / eventsPaging (client-side pagination)', () => {

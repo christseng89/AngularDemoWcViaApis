@@ -380,12 +380,24 @@ export class TransactionBuilderComponent {
     this.ibIndexPicker = new CatalogPickerService(this.ibIndexPageSize, api);
   }
 
-  /** Inquire Events (2026-08-17) — top-level mode toggle, sibling to selectFunctionSide()'s own Import/Export toggle. Closes any open Account Entries dialog when leaving Inquire mode, same "close before the underlying data changes" convention lookUp.runLookup()'s own onBeforeLookup callback already follows. */
+  /**
+   * Inquire Events (2026-08-17) — top-level mode toggle, sibling to selectFunctionSide()'s own Import/
+   * Export toggle. Closes any open Account Entries dialog when leaving Inquire mode, same "close before
+   * the underlying data changes" convention lookUp.runLookup()'s own onBeforeLookup callback already
+   * follows. LC Master Records Index (2026-08-19, Import LC; extended the same day to Export Confirmed
+   * LC — both sides now share the same Index) — every time Inquire Events is (re-)entered, refresh the
+   * Index for whichever side is currently selected (preserving whatever page/search the user last had —
+   * loadIndex() with no argument re-fetches the CURRENT indexPaging.page) so a stale browse from an
+   * earlier visit never lingers; a harmless no-op re-fetch when nothing has changed.
+   */
   selectMode(mode: 'PROCESSING' | 'INQUIRE'): void {
     this.activeMode = mode;
     this.accountEntryDialogMovement = null;
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
+    if (mode === 'INQUIRE') {
+      this.inquireEvents.loadIndex();
+    }
   }
 
   /*
@@ -936,6 +948,36 @@ export class TransactionBuilderComponent {
     if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
     if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
     return '';
+  }
+
+  /**
+   * Bug fixed 2026-08-19, reviewer-reported ("A2 — LC Amendment Increase: Incorrect Available Balance
+   * Warning" — Amount 10000 against an LC with Available Balance 0 wrongly showed "exceeds Available
+   * Balance... this will be rejected" for an AMEND_INCREASE, even though this function's own registry
+   * help text already says "Increase always succeeds; Decrease is checked against Available Balance
+   * (Design doc §6.2)"). Root cause: the balance box's own "exceeds Available Balance" warning
+   * (`transaction-builder.component.html`) was never scoped by movementType at all — it fired for ANY
+   * function once `selectedContractSnapshot` was loaded and the typed amount exceeded Available
+   * Balance, including ISSUE/AMEND_INCREASE/CREATE/AMEND — movementTypes the microservice's own
+   * `NO_CHECK_MOVEMENT_TYPES` (`service/balanceService.ts`) never runs a sufficiency check against at
+   * all, so the warning was actively misleading (promising a rejection that would never happen) for
+   * every one of them, not just A2 Increase — including B2 (EPLC_CONFIRMATION `AMEND`, a single signed
+   * movementType with no client-side Increase/Decrease split), which has NO sufficiency check server-side
+   * in either direction.
+   *
+   * Fix: gate the warning on `DECREASING_MOVEMENT_TYPES` (`balance-component.model.ts`) instead of
+   * showing unconditionally — that set already mirrors the microservice's own checked-movementType union
+   * (`UTILIZE_SHAPED_MOVEMENT_TYPES` + `OUTSTANDING_CAPPED_MOVEMENT_TYPES` + `AMEND_DECREASE`) exactly,
+   * and is already used elsewhere in this file for the identical "don't offer/imply an action the server
+   * will never actually check this way" purpose (filtering 0-balance contracts out of the pickers) — reused
+   * here rather than re-deriving a second list. A1/A8's own ISSUE, A2/B2's own Increase, and every other
+   * NO_CHECK movementType now correctly show no warning regardless of Available Balance; A2's own
+   * AMEND_DECREASE, A3/A3S's UTILIZE, A6/B4's HONOUR/ACCEPT, A7/A9's SETTLE/REDEEM, and B5's
+   * REIMBURSE/RECLASSIFY_OUT are all unaffected — `DECREASING_MOVEMENT_TYPES` already covered every one
+   * of them before this fix, unchanged.
+   */
+  movementTypeChecksAvailableBalance(movementType?: string | null): boolean {
+    return !!movementType && DECREASING_MOVEMENT_TYPES.has(movementType);
   }
 
   /**

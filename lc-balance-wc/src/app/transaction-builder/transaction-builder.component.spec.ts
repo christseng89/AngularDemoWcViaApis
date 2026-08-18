@@ -840,4 +840,35 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.statusBadgeClass('SUPERSEDED')).toBe('tb-status-badge--neutral');
     });
   });
+
+  describe('movementTypeChecksAvailableBalance', () => {
+    it('returns false for movementTypes the microservice never checks against Available Balance (bug fix 2026-08-19 — A2 Amendment Increase false warning)', () => {
+      const { comp } = makeComponent();
+      expect(comp.movementTypeChecksAvailableBalance('ISSUE')).toBe(false);
+      expect(comp.movementTypeChecksAvailableBalance('AMEND_INCREASE')).toBe(false);
+      expect(comp.movementTypeChecksAvailableBalance('CREATE')).toBe(false);
+      expect(comp.movementTypeChecksAvailableBalance('AMEND')).toBe(false);
+    });
+
+    it('returns true for every movementType the microservice DOES check against Available Balance', () => {
+      const { comp } = makeComponent();
+      expect(comp.movementTypeChecksAvailableBalance('AMEND_DECREASE')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('UTILIZE')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('HONOUR')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('ACCEPT')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('PARTIAL_REDEEM')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('FULL_REDEEM')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('PARTIAL_SETTLE')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('FULL_SETTLE')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('REIMBURSE')).toBe(true);
+      expect(comp.movementTypeChecksAvailableBalance('RECLASSIFY_OUT')).toBe(true);
+    });
+
+    it('returns false for null/undefined/unrecognized movementType', () => {
+      const { comp } = makeComponent();
+      expect(comp.movementTypeChecksAvailableBalance(null)).toBe(false);
+      expect(comp.movementTypeChecksAvailableBalance(undefined)).toBe(false);
+      expect(comp.movementTypeChecksAvailableBalance('SOME_FUTURE_TYPE')).toBe(false);
+    });
+  });
 });
