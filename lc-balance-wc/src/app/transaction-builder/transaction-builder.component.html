@@ -314,7 +314,19 @@
                     <div class="tb-balance-row"><span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.offBalanceExposure }}</span></div>
                     <div class="tb-balance-row"><span class="tb-balance-row__label">Tight Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.tightAvailableBalance }}</span></div>
                   </ng-container>
-                  <div class="tb-error mt-2" *ngIf="model.amount && +model.amount > +selectedContractSnapshot.availableBalance">
+                  <!-- Bug fixed 2026-08-18, reviewer-reported ("A1 1000 A3 1000 Submit => get warning, which
+                       is wrong"): both warnings below are pre-submit HINTS computed live from model.amount vs
+                       the CURRENT selectedContractSnapshot — but a successful Submit calls
+                       refreshSelectedContractSnapshot() (applyMakerSubmitOutcome()), which correctly drops
+                       Available Balance to reflect the just-created PENDING earmark, while model.amount is
+                       never cleared. Neither warning is part of the Formly `fields`/`displayFields` array (the
+                       balance box is a hand-coded template block, not a Formly field), so formLocked's own
+                       "grey out every field once submitted" fix never reached them — the stale typed amount
+                       kept re-comparing against the NEW, already-reduced balance, making an already-successful
+                       Submit look freshly rejected. Both gated on `!formLocked` now — a pre-submit hint has
+                       nothing left to warn about once the submission it was warning about has already gone
+                       through. -->
+                  <div class="tb-error mt-2" *ngIf="!formLocked && model.amount && +model.amount > +selectedContractSnapshot.availableBalance">
                     ⚠ Typed amount ({{ model.amount }}) exceeds Available Balance — this will be rejected (Design doc §6).
                   </div>
                   <!-- Business-reported gap 2026-08-18 ("It should show no warning, since the amount <= tight
@@ -329,6 +341,7 @@
                   <div
                     class="tb-error mt-2"
                     *ngIf="
+                      !formLocked &&
                       model.amount &&
                       +model.amount <= +selectedContractSnapshot.availableBalance &&
                       model.movementType === 'UTILIZE' &&

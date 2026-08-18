@@ -4047,3 +4047,45 @@ outstanding off-balance-sheet (SHGT) exposure 60000). If this Document Arrival i
 specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee"
 instead — it nets that SG's own exposure out of this check." — confirming "amount > tight → error" holds
 too. Zero console errors throughout. Test data (`TIGHTTEST01`) cleaned up afterward.
+
+## Bug fixed — both A3/A3S balance-box warnings could fire AFTER a successful Submit, making an already-accepted transaction look freshly rejected (2026-08-18, same day, reviewer-reported live — "A1 1000 A3 1000 Submit => get warning, which is wrong")
+
+Directly caused by the section immediately above: adding the second (Tight Available) warning tier
+didn't introduce this bug, but reproducing the user's exact report ("A1 Issue 1000, A3 Arrival 1000")
+against their own live LC (`S07` — Confirmed 1000, `UTILIZE`/B01 already PENDING, Available correctly 0)
+surfaced it. The FIRST warning (plain Available), which has existed since before this session's own
+investigation began, has the identical bug — this was never specific to the newly-added Tight-Available
+warning.
+
+**Root cause**: both warnings are pre-submit hints computed live from `model.amount` vs. the CURRENT
+`selectedContractSnapshot` — plain template bindings, not part of the Formly `fields`/`displayFields`
+array. A SUCCESSFUL Submit calls `refreshSelectedContractSnapshot()` (`applyMakerSubmitOutcome()`) right
+away, per this file's own "Earmark takes effect immediately at PENDING, before Release" design — correctly
+dropping Available Balance to reflect the just-created PENDING earmark. But `model.amount` is never
+cleared after a successful Submit (by design — the Maker Result panel and the greyed-out Formly fields
+already show what was submitted). Since the balance box lives OUTSIDE the Formly field array, this
+session's own earlier "Submit locks all input fields read-only" fix (`formLocked`/`displayFields`, see
+that entry above) never reached it — the stale typed amount kept re-comparing against the NEW,
+already-reduced balance on every change-detection cycle, making an already-successful Submit immediately
+display "this will be rejected" for a transaction that had already gone through.
+
+**Fix**: both `.tb-error` blocks gated on `!formLocked` (`transaction-builder.component.html`) — the same
+signal that already greys out every Formly field once a Submit succeeds. A pre-submit hint has nothing
+left to warn about once the submission it was warning about has already gone through; once `formLocked`
+resets to false (a fresh `selectFunction()`/new pick), both warnings resume evaluating normally against
+whatever the Maker types next.
+
+No new spec added, same established convention as the section immediately above (template-only `*ngIf`
+conditions aren't covered by this codebase's direct-instantiation component tests). Verified: `npx tsc -p
+tsconfig.app.json --noEmit`/`ng build --configuration development` (strict templates) clean, `npm run
+lint` 0 errors (212 pre-existing warnings, unchanged), full Angular suite 746/746 unchanged.
+`backend/`/microservice suites unaffected (no files under either touched).
+
+**Live-verified end to end, reproducing the exact reported sequence**: built a fresh LC (`SUBMITWARN01`,
+1000, Sight), went to A3, picked it (Available 1000, no warning), typed Amount 1000 + IB Number, clicked
+Submit A3 — MAKER RESULT panel appeared (Status: PENDING, Account Entries, Delete Pending (EC)), every
+Formly field greyed out, balance box correctly updated to Available 0 / Tight Available 0 — and, critically,
+**no warning appeared**, confirming the fix. Before this fix, this exact sequence would have shown "⚠
+Typed amount (1000) exceeds Available Balance — this will be rejected" immediately after a Submit that had
+already succeeded. Zero console errors. Test data (`SUBMITWARN01`) cleaned up afterward; the user's own
+live `S07` record (which surfaced the bug) was left untouched.
