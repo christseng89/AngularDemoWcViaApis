@@ -911,7 +911,10 @@ export class TransactionBuilderComponent {
     const lcNumber = this.selectedContract?.naturalKey.lcNumber;
     if (!lcNumber) return;
     this.sgsForArrivalLoading = true;
-    this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lcNumber).subscribe({
+    // requireIssueReleased: true — business-reported gap 2026-08-18 ("There are function dependency, if
+    // pending in previous event, then next event cannot be accessed") — an SG whose own A8 Issue hasn't
+    // been Checker-Released yet shouldn't be redeemable via A3S.
+    this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).subscribe({
       next: (result) => {
         if (!result.items.length) {
           this.sgsForArrivalLoading = false;
@@ -1366,9 +1369,14 @@ export class TransactionBuilderComponent {
     }
     const types: InstrumentType[] = [fn.instrumentType];
     this.settleableBalancesLoading = true;
+    // requireIssueReleased: true — business-reported gap 2026-08-18 ("There are function dependency, if
+    // pending in previous event, then next event cannot be accessed"). Safe here (unlike B4's own
+    // loadPayableMovementsAcrossChildContracts() search below, which deliberately wants a still-PENDING
+    // EPLC_EXAMINATION CREATE): an Acceptance/receivable's own CREATE is released as part of B4's own
+    // compound Release, so any genuinely-settleable candidate already clears this by the time B5 looks.
     forkJoin(
       types.map((instrumentType) =>
-        this.api.catalog(instrumentType, 'ACTIVE', undefined, 1, 50, lcNumber).pipe(
+        this.api.catalog(instrumentType, 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).pipe(
           map((result) => result.items.map((c) => ({ contract: c, instrumentType }))),
           catchError(() => of([] as { contract: BalanceContract; instrumentType: InstrumentType }[])),
         ),

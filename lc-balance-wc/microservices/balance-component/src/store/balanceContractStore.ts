@@ -95,6 +95,21 @@ export interface CatalogFilter {
   page?: number;
   /** Defaults to 10. */
   pageSize?: number;
+  /**
+   * Business-reported gap 2026-08-18 ("S10 still shown in A4 function which is wrong" — S10's own
+   * ISSUE was still PENDING; "There are function dependency, if pending in previous event, then next
+   * event cannot be accessed"). Opt-in (default false/omitted, preserving every existing caller's own
+   * behavior unchanged — including this service's own internal SG-Issue-cap/Present-Docs-earmark/
+   * sibling-snapshot candidate searches, which legitimately need to see a not-yet-released candidate
+   * too) — when true, excludes any contract whose own CREATING movement (ISSUE for IPLC_LC/EPLC_LC/
+   * EPLC_CONFIRMATION/SHGT; CREATE for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION) is not yet
+   * RELEASED — i.e. a contract that exists but hasn't cleared Checker approval yet. The Angular client
+   * passes this from every Maker-side ACTION picker (CatalogPickerService, backing the flat-Catalog/
+   * Parent-LC/IB-SG-Index pickers every A1-A9/B1-B5 function uses) but NOT from inquiry-only contexts
+   * (Look Up Current Balance, Inquire Events) — a Maker/Checker can still legitimately look up a
+   * still-pending record's own current state, just can't pick it to act on further.
+   */
+  requireIssueReleased?: boolean;
 }
 
 export interface CatalogPage {
@@ -215,6 +230,12 @@ export class BalanceContractStore {
       clauses.push(`(tenor_type = 'SIGHT' OR tenor_type IS NULL)`);
     } else if (filter.tenorFamily === 'USANCE') {
       clauses.push(`(tenor_type != 'SIGHT' OR tenor_type IS NULL)`);
+    }
+    if (filter.requireIssueReleased) {
+      clauses.push(
+        `EXISTS (SELECT 1 FROM balance_movements m WHERE m.balance_contract_id = balance_contracts.balance_contract_id ` +
+          `AND m.movement_type IN ('ISSUE', 'CREATE') AND m.status = 'RELEASED')`,
+      );
     }
     const where = clauses.join(' AND ');
 

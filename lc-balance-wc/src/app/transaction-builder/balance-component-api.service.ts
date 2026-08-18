@@ -279,6 +279,12 @@ export class BalanceComponentApiService {
    *   page/total reflect the Sight/Usance-ELIGIBLE set, not the raw one —
    *   a client-side-only filter let a page of 10 raw rows contain almost
    *   none of the tenor actually wanted, hiding eligible LCs on other pages.
+   * @param requireIssueReleased — business-reported gap 2026-08-18 ("S10 still shown in A4 function
+   *   which is wrong" — S10's own ISSUE was still PENDING; "There are function dependency, if pending
+   *   in previous event, then next event cannot be accessed"): excludes a contract whose own creating
+   *   movement (ISSUE/CREATE) hasn't been Checker-Released yet. Opt-in — `CatalogPickerService` passes
+   *   `true` for every Maker-side ACTION picker; Look Up Current Balance / Inquire Events deliberately
+   *   omit it (a still-pending record's own current state is still a legitimate thing to inquire about).
    */
   catalog(
     instrumentType: InstrumentType,
@@ -288,12 +294,14 @@ export class BalanceComponentApiService {
     pageSize = 10,
     lcNumber?: string,
     tenorFamily?: 'SIGHT' | 'USANCE',
+    requireIssueReleased?: boolean,
   ): Observable<CatalogPage> {
     const params: Record<string, string | number> = { instrumentType, page, pageSize };
     if (status) params['status'] = status;
     if (q) params['q'] = q;
     if (lcNumber) params['lcNumber'] = lcNumber;
     if (tenorFamily) params['tenorFamily'] = tenorFamily;
+    if (requireIssueReleased) params['requireIssueReleased'] = 'true';
     return this.http.get<CatalogPage>(`${this.base}/balance-contracts/catalog`, { params });
   }
 

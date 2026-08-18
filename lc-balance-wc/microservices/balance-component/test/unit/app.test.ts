@@ -1849,6 +1849,44 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(res.body.pageSize).toBe(5);
   });
 
+  test('GET /balance-contracts/catalog?requireIssueReleased=true excludes a contract whose own ISSUE is still PENDING, but includes it once Released (business-reported gap 2026-08-18, "S10 still shown in A4 function which is wrong")', async () => {
+    const pending = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-ISSUEPENDING' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const beforeRelease = await request(app)
+      .get('/balance-contracts/catalog')
+      .query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-ISSUEPENDING', requireIssueReleased: 'true' })
+      .expect(200);
+    expect(beforeRelease.body.items).toHaveLength(0);
+    expect(beforeRelease.body.total).toBe(0);
+
+    // The SAME query without requireIssueReleased still finds it — confirms the exclusion is opt-in,
+    // not a change to the default catalog behavior every other caller (and every existing picker not
+    // yet updated) relies on.
+    const withoutFlag = await request(app).get('/balance-contracts/catalog').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-ISSUEPENDING' }).expect(200);
+    expect(withoutFlag.body.items).toHaveLength(1);
+
+    await request(app).post(`/balance-movements/${pending.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const afterRelease = await request(app)
+      .get('/balance-contracts/catalog')
+      .query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-ISSUEPENDING', requireIssueReleased: 'true' })
+      .expect(200);
+    expect(afterRelease.body.items).toHaveLength(1);
+    expect(afterRelease.body.items[0].naturalKey.lcNumber).toBe('LC-ISSUEPENDING');
+  });
+
   test('POST /balance-movements/:movementId/release without releasedBy -> 400', async () => {
     const lc = await request(app)
       .post('/balance-movements')

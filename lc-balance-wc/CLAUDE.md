@@ -4159,3 +4159,78 @@ from A2–A9's own LC Index pickers) — the user's own question was specificall
 picker-level filtering; a Maker who tries now gets a clear 409 with a "Release the Issue first" message
 rather than a silently-narrowed picker. Worth a follow-up if a Maker hitting this 409 live turns out to be
 a frequent, confusing occurrence rather than a rare edge case.
+
+## Follow-up, same day — the picker-level filter deferred above turned out to be needed after all ("S10 still shown in A4 function which is wrong", then confirmed generically: "There are function dependency, if pending in previous event, then next event cannot be accessed")
+
+Live-verified the exact report: S10's own ISSUE was still PENDING (confirmed via direct DB query), yet
+A4's own LC Index picker still listed it as a plain "ACTIVE" row. The server-side write guard added in
+the entry above (assertRootIssueReleased) was correct and sufficient to stop a WRITE, but did nothing
+about what the picker itself offers to click — a Maker could still select a not-yet-approved LC and get
+all the way to a confusing 409 on Submit, which is exactly the UX gap flagged (but deliberately deferred)
+above.
+
+**Design — new opt-in `requireIssueReleased` catalog filter, not a blanket change.** Considered filtering
+`listCatalog()` unconditionally, but rejected it: that one store method is also called internally for
+several OTHER purposes that legitimately need to see a not-yet-released candidate too (the SG-Issue-cap
+check, the Present-Docs-earmark check, `captureSiblingSnapshots()`'s own candidate search) — filtering
+those would have silently changed candidate counts for existing, already-tested business logic having
+nothing to do with pickers. New `CatalogFilter.requireIssueReleased?: boolean` (default
+false/undefined, so every existing caller — server-internal or client — keeps its exact current behavior
+unless it explicitly opts in), wired into `listCatalog()`'s own SQL as
+`EXISTS (SELECT 1 FROM balance_movements m WHERE m.balance_contract_id = balance_contracts.balance_contract_id
+AND m.movement_type IN ('ISSUE', 'CREATE') AND m.status = 'RELEASED')` — covers root contracts (ISSUE)
+and child contracts (CREATE) with the one clause, matching `CREATING_MOVEMENT_TYPES`'s own existing
+vocabulary. Threaded through the HTTP route (`GET /balance-contracts/catalog?requireIssueReleased=true`)
+and the Angular client's own `BalanceComponentApiService.catalog()`.
+
+**Applied on the Angular side to every Maker-side ACTION picker, but NOT to inquiry-only contexts** —
+the same distinction this file's own Look-Up/Inquire-Events sections already draw for OTHER reasons:
+- `CatalogPickerService.load()` — passes `true` unconditionally. This ONE service backs every A1–A9/
+  B1–B5 flat-Catalog, Parent-LC, AND IB/SG-Index picker (`catalogPicker`/`parentPicker`/`ibIndexPicker`),
+  so this single change is what actually fixes the reported A4 case, plus every sibling picker at once.
+- `loadSgsForArrival()` (A3S's own SG picker) and `loadSettleableBalances()` (B5's own Step 2) — also
+  pass `true`: an SG whose own A8 Issue isn't Released, or an Acceptance/receivable whose own CREATE
+  isn't Released, shouldn't be offered as a redemption/settlement target either.
+- `loadPayableMovementsAcrossChildContracts()` (B4's own Present Docs search) — **deliberately left
+  unfiltered**, the one exception. B3's own CREATE is DESIGNED to stay PENDING until B4's own compound
+  Release finalizes it (§ the "B4 gained a real Maker Submit" entries elsewhere in this file) — filtering
+  by "creating movement already Released" here would exclude every real candidate B4 needs to find, not
+  just an ineligible one. Confirmed via a dedicated regression test that this call site's own `api.catalog`
+  invocation does NOT carry the flag.
+- Look Up Current Balance (`look-up-panel.service.ts`) and Inquire Events (`inquire-events.service.ts`)
+  — also deliberately untouched: a Maker/Checker can still legitimately look up a still-pending record's
+  own current state; they just can't pick it to act further on via an action picker.
+
+**Test coverage**: microservice — new HTTP-integration test in `app.test.ts`
+(`GET /balance-contracts/catalog?requireIssueReleased=true excludes a contract whose own ISSUE is still
+PENDING, but includes it once Released`) — proves the exclusion, proves it's opt-in (the SAME query
+without the flag still finds it), and proves the post-Release inclusion, all in one test. Angular — new
+`balance-component-api.service.spec.ts` cases (adds `requireIssueReleased=true` to the query params when
+passed `true`; omits it entirely when `false`/omitted); new assertions on 3 existing
+`transaction-builder.component.selection.spec.ts` tests proving `catalog-picker.service.ts`'s own single
+change alone fixes A2–A9/B1–B5's shared pickers; a NEW assertion added to the SG-picker (A3S) and
+settleable-balances (B5) tests proving they ALSO pass the flag; and a NEW assertion on B4's own Present
+Docs test proving it does NOT. 13 pre-existing `catalog-picker.service.ts`-backed test assertions across
+`transaction-builder.component.spec.ts`/`.selection.spec.ts` needed their own expected-call-args updated
+(mechanical — appending the new trailing `true` argument, same "the new gate correctly caught a real gap
+in the assertion's own arg list, not a behavior regression" pattern this file's own history already uses
+repeatedly) — no assertion's actual intent changed.
+
+Verified: microservice `npm run typecheck`/`npm run build`/`npm run lint` (0 errors, 11 pre-existing
+warnings) all clean, full suite 321/321 (1 new), coverage 99.25/96.51/100/99.49%. Angular
+`npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint` (0 errors,
+212 pre-existing warnings) all clean, full suite 748/748 (2 new), coverage 99.55/96.48/99.53/99.57% — all
+four metrics clear the 95% floor on both projects. `backend/` 33/33 unaffected (its own orchestrator
+calls the microservice's create/release endpoints directly, never this catalog filter).
+
+**Live-verified end to end against the real running stack, reproducing the exact report and then the
+fix**: confirmed via direct DB query that the REAL S10 the user was looking at had, in the time since
+their report, already had its own ISSUE Released (Confirmed 1,000 → fully UTILIZE'd RELEASED → Confirmed/
+Available both correctly 0) — so it now correctly, legitimately appears in A4's picker; this was not a
+lingering bug on S10 itself, just its own state moving on. Built a genuinely fresh unreleased LC
+(`S99PENDINGTEST`, ISSUE left PENDING) to re-prove the original scenario cleanly: confirmed via direct
+curl that the SAME catalog query without `requireIssueReleased` still finds it (`total: 1`, proving the
+exclusion is opt-in) while WITH the flag it's correctly excluded (`total: 0`); then reproduced the exact
+UI flow — searched `S99PENDINGTEST` under A4's own LC Index — and confirmed the picker now shows "No
+ACTIVE IPLC_LC contracts yet — use A1/B1 (Issue) first." for it, exactly matching the "next event cannot
+be accessed" rule. Zero console errors throughout. Test data (`S99PENDINGTEST`) cleaned up afterward.

@@ -22,13 +22,15 @@ export function balanceContractsRouter(service: BalanceService): Router {
     res.json(contract);
   });
 
-  // GET /balance-contracts/catalog?instrumentType=&status=&q=&lcNumber=&tenorFamily=&page=&pageSize=
+  // GET /balance-contracts/catalog?instrumentType=&status=&q=&lcNumber=&tenorFamily=&page=&pageSize=&requireIssueReleased=
   // (business instruction 2026-08-14: ordered by Reference (lc_number), paginated;
   // lcNumber is an exact-match filter for the "LC Index -> IB Index" cascading picker;
   // tenorFamily filters server-side so pagination reflects the Sight/Usance-eligible set,
   // not the raw one — business-reported gap "Why U002 does not shown A5")
+  // requireIssueReleased — business-reported gap 2026-08-18 ("S10 still shown in A4 function which is
+  // wrong" — S10's own ISSUE was still PENDING), see CatalogFilter's own doc comment for the full rule.
   router.get('/balance-contracts/catalog', (req, res) => {
-    const { instrumentType, status, q, lcNumber, tenorFamily, page, pageSize } = req.query;
+    const { instrumentType, status, q, lcNumber, tenorFamily, page, pageSize, requireIssueReleased } = req.query;
     if (!instrumentType) throw new RequestValidationError('instrumentType is required.');
     if (tenorFamily && tenorFamily !== 'SIGHT' && tenorFamily !== 'USANCE') {
       throw new RequestValidationError('tenorFamily must be SIGHT or USANCE.');
@@ -42,6 +44,7 @@ export function balanceContractsRouter(service: BalanceService): Router {
         tenorFamily: tenorFamily as 'SIGHT' | 'USANCE' | undefined,
         page: page ? Number(page) : undefined,
         pageSize: pageSize ? Number(pageSize) : undefined,
+        requireIssueReleased: requireIssueReleased === 'true',
       }),
     );
   });

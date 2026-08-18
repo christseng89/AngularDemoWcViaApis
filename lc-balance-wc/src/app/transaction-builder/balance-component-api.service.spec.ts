@@ -166,6 +166,22 @@ describe('BalanceComponentApiService', () => {
         params: { instrumentType: 'IPLC_LC', page: 2, pageSize: 20, status: 'ACTIVE', q: 'S00', lcNumber: 'S001', tenorFamily: 'SIGHT' },
       });
     });
+
+    // Bug fixed 2026-08-18 ("S10 still shown in A4 function which is wrong") — see this method's own
+    // doc comment for the full rule.
+    it('adds requireIssueReleased=true when passed true', () => {
+      service.catalog('IPLC_LC', 'ACTIVE', undefined, 1, 10, undefined, undefined, true);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
+        params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, status: 'ACTIVE', requireIssueReleased: 'true' },
+      });
+    });
+
+    it('omits requireIssueReleased when false/omitted — the exclusion is opt-in, not the default', () => {
+      service.catalog('IPLC_LC', 'ACTIVE', undefined, 1, 10, undefined, undefined, false);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
+        params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, status: 'ACTIVE' },
+      });
+    });
   });
 
   it('getSnapshot() GETs the /balance sub-path for the given contract id', () => {

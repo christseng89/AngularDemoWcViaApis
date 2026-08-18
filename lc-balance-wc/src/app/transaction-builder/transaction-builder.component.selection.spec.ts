@@ -180,6 +180,12 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.naturalKey.ibNumber).toBe('EB01');
       expect(comp.model.secondaryRef).toBe('EB01');
       expect(comp.model.amount).toBe('2000');
+      // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
+      // event cannot be accessed") — deliberately NOT passed here, unlike every other action-picker call
+      // site: B3's own CREATE is designed to stay PENDING until B4's own compound Release finalizes it,
+      // so filtering by "creating movement already Released" would exclude every real candidate B4
+      // needs to find, not just an ineligible one.
+      expect(api.catalog).toHaveBeenCalledWith('EPLC_EXAMINATION', 'ACTIVE', undefined, 1, 50, 'EXP1');
     });
 
     it('B4: derives ACCEPT for a Usance Confirmation, and excludes a not-yet-acknowledged B3 record (payableMovementRequiresAcknowledgment)', () => {
@@ -225,6 +231,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.sgsForArrival).toHaveLength(1);
       expect(comp.selectedArrivalSg?.balanceContractId).toBe('SG1');
       expect(comp.arrivalSgSnapshot?.availableBalance).toBe('3000');
+      // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
+      // event cannot be accessed") — an SG whose own A8 Issue isn't Released yet shouldn't be offered
+      // as a redemption target.
+      expect(api.catalog).toHaveBeenCalledWith('SHGT', 'ACTIVE', undefined, 1, 50, 'LC1', undefined, true);
     });
   });
 
@@ -650,6 +660,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(comp.settleableBalances).toEqual([
         { balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' },
       ]);
+      // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
+      // event cannot be accessed") — an Acceptance whose own CREATE isn't Released yet shouldn't be
+      // offered as a settlement target.
+      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 50, 'EXP1', undefined, true);
     });
 
     it('B5 (settleableBalanceIndex): a catalog error for the candidate type is swallowed (catchError) and leaves settleableBalances empty', () => {
@@ -808,7 +822,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       // loadPagedCatalog helper, which always passes all 7 catalog() positional args (tenorFamily
       // explicitly undefined when unset) rather than omitting a trailing one — behaviorally identical
       // (catalog()'s own tenorFamily param is undefined either way), just a visible arg-count change.
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 10, 'LC1', undefined);
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 10, 'LC1', undefined, true);
     });
 
     it('ibIndexPrevPage is a no-op on page 1', () => {
@@ -830,7 +844,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.ibIndexNextPage();
 
       expect(comp.ibIndexPicker.page).toBe(2);
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 2, 10, 'LC1', undefined);
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 2, 10, 'LC1', undefined, true);
     });
 
     it('ibIndexNextPage is a no-op on the last page', () => {

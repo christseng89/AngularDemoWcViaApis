@@ -176,7 +176,7 @@ describe('TransactionBuilderComponent', () => {
 
       expect(comp.parentInstrumentType).toBe('IPLC_LC');
       // afterResolved() -> onParentInstrumentTypeChange() -> loadParentPage(1) -> api.catalog
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE');
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE', true);
     });
 
     it('leaves parentInstrumentType empty when the function has no defaultParentInstrumentType (A1)', () => {
@@ -312,7 +312,7 @@ describe('TransactionBuilderComponent', () => {
       // afterResolved -> rebuildFields (fields populated) and, since AMEND_INCREASE is not a creating
       // movementType and IPLC_LC needs no two-field search, reloadCatalog() fires.
       expect(comp.fields.length).toBeGreaterThan(0);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, undefined, true);
     });
 
     it('resolves a different sub-choice value to a different movementType (AMEND_DECREASE)', () => {
@@ -367,7 +367,7 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog(1);
 
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, 'SIGHT');
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, 'SIGHT', true);
       expect(comp.catalogPicker.contracts).toEqual([c1, c2]);
       expect(comp.catalogPicker.total).toBe(2);
       expect(comp.catalogPicker.page).toBe(1);
@@ -384,7 +384,7 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog(1);
 
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'S001', 1, comp.catalogPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'S001', 1, comp.catalogPageSize, undefined, undefined, true);
     });
 
     it('loads payable IB hints (catalogPayableIbs/catalogPayableMovements) when the function has payExistingUtilize', () => {
@@ -434,7 +434,7 @@ describe('TransactionBuilderComponent', () => {
       comp.onCatalogSearch();
 
       expect(comp.catalogPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U003', 1, comp.catalogPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U003', 1, comp.catalogPageSize, undefined, undefined, true);
     });
   });
 
@@ -532,7 +532,7 @@ describe('TransactionBuilderComponent', () => {
       comp.catalogPrevPage();
 
       expect(comp.catalogPicker.page).toBe(2);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined, true);
     });
 
     it('catalogNextPage is a no-op on the last page', () => {
@@ -554,7 +554,7 @@ describe('TransactionBuilderComponent', () => {
       comp.catalogNextPage();
 
       expect(comp.catalogPicker.page).toBe(2);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined, true);
     });
   });
 
@@ -574,7 +574,7 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.selectedParent).toBeNull();
       expect(comp.exposureNature).toBe('ACTUAL');
       expect(comp.parentPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE');
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE', true);
       expect(comp.parentPicker.contracts).toEqual([p1]);
       expect(comp.parentPicker.total).toBe(1);
     });
@@ -616,7 +616,7 @@ describe('TransactionBuilderComponent', () => {
       comp.onParentSearch();
 
       expect(comp.parentPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U002', 1, comp.parentPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U002', 1, comp.parentPageSize, undefined, undefined, true);
     });
   });
 
@@ -646,7 +646,7 @@ describe('TransactionBuilderComponent', () => {
       comp.parentPrevPage();
 
       expect(comp.parentPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, undefined, true);
     });
 
     it('parentNextPage is a no-op on the last page', () => {
@@ -668,7 +668,7 @@ describe('TransactionBuilderComponent', () => {
       comp.parentNextPage();
 
       expect(comp.parentPicker.page).toBe(2);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.parentPageSize, undefined, undefined);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.parentPageSize, undefined, undefined, true);
     });
   });
 

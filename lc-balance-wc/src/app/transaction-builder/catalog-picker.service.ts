@@ -76,18 +76,26 @@ export class CatalogPickerService {
       this.total = 0;
       return;
     }
-    this.api.catalog(args.instrumentType, 'ACTIVE', this.search || undefined, args.page, this.paging.pageSize, args.lcNumber, args.tenorFamily).subscribe({
-      next: (result) => {
-        this.contracts = result.items;
-        this.total = result.total;
-        this.loadSnapshotsInto(result.items);
-        args.onLoaded?.(result.items);
-      },
-      error: () => {
-        this.contracts = [];
-        this.total = 0;
-      },
-    });
+    // requireIssueReleased: true — business-reported gap 2026-08-18 ("S10 still shown in A4 function
+    // which is wrong"; "There are function dependency, if pending in previous event, then next event
+    // cannot be accessed") — every A1-A9/B1-B5 Maker-side ACTION picker (flat Catalog, Parent LC, IB/SG
+    // Index — this ONE service backs all three) should only ever offer a contract whose own creating
+    // movement has already cleared Checker approval. See BalanceComponentApiService.catalog()'s own
+    // doc comment for why this is opt-in rather than the catalog endpoint's default behavior.
+    this.api
+      .catalog(args.instrumentType, 'ACTIVE', this.search || undefined, args.page, this.paging.pageSize, args.lcNumber, args.tenorFamily, true)
+      .subscribe({
+        next: (result) => {
+          this.contracts = result.items;
+          this.total = result.total;
+          this.loadSnapshotsInto(result.items);
+          args.onLoaded?.(result.items);
+        },
+        error: () => {
+          this.contracts = [];
+          this.total = 0;
+        },
+      });
   }
 
   /** Business instruction 2026-08-14: fetch each candidate's live balance so the component's own filteredXxxCatalog getters can exclude 0-balance ones — never lets a picker offer a target an action would immediately fail against. */
