@@ -1,0 +1,2416 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for app/transaction-builder/inquire-events.service.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> inquire-events.service.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">99.49% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>197/198</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">96.96% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>128/132</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>55/55</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>179/179</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a>
+<a name='L510'></a><a href='#L510'>510</a>
+<a name='L511'></a><a href='#L511'>511</a>
+<a name='L512'></a><a href='#L512'>512</a>
+<a name='L513'></a><a href='#L513'>513</a>
+<a name='L514'></a><a href='#L514'>514</a>
+<a name='L515'></a><a href='#L515'>515</a>
+<a name='L516'></a><a href='#L516'>516</a>
+<a name='L517'></a><a href='#L517'>517</a>
+<a name='L518'></a><a href='#L518'>518</a>
+<a name='L519'></a><a href='#L519'>519</a>
+<a name='L520'></a><a href='#L520'>520</a>
+<a name='L521'></a><a href='#L521'>521</a>
+<a name='L522'></a><a href='#L522'>522</a>
+<a name='L523'></a><a href='#L523'>523</a>
+<a name='L524'></a><a href='#L524'>524</a>
+<a name='L525'></a><a href='#L525'>525</a>
+<a name='L526'></a><a href='#L526'>526</a>
+<a name='L527'></a><a href='#L527'>527</a>
+<a name='L528'></a><a href='#L528'>528</a>
+<a name='L529'></a><a href='#L529'>529</a>
+<a name='L530'></a><a href='#L530'>530</a>
+<a name='L531'></a><a href='#L531'>531</a>
+<a name='L532'></a><a href='#L532'>532</a>
+<a name='L533'></a><a href='#L533'>533</a>
+<a name='L534'></a><a href='#L534'>534</a>
+<a name='L535'></a><a href='#L535'>535</a>
+<a name='L536'></a><a href='#L536'>536</a>
+<a name='L537'></a><a href='#L537'>537</a>
+<a name='L538'></a><a href='#L538'>538</a>
+<a name='L539'></a><a href='#L539'>539</a>
+<a name='L540'></a><a href='#L540'>540</a>
+<a name='L541'></a><a href='#L541'>541</a>
+<a name='L542'></a><a href='#L542'>542</a>
+<a name='L543'></a><a href='#L543'>543</a>
+<a name='L544'></a><a href='#L544'>544</a>
+<a name='L545'></a><a href='#L545'>545</a>
+<a name='L546'></a><a href='#L546'>546</a>
+<a name='L547'></a><a href='#L547'>547</a>
+<a name='L548'></a><a href='#L548'>548</a>
+<a name='L549'></a><a href='#L549'>549</a>
+<a name='L550'></a><a href='#L550'>550</a>
+<a name='L551'></a><a href='#L551'>551</a>
+<a name='L552'></a><a href='#L552'>552</a>
+<a name='L553'></a><a href='#L553'>553</a>
+<a name='L554'></a><a href='#L554'>554</a>
+<a name='L555'></a><a href='#L555'>555</a>
+<a name='L556'></a><a href='#L556'>556</a>
+<a name='L557'></a><a href='#L557'>557</a>
+<a name='L558'></a><a href='#L558'>558</a>
+<a name='L559'></a><a href='#L559'>559</a>
+<a name='L560'></a><a href='#L560'>560</a>
+<a name='L561'></a><a href='#L561'>561</a>
+<a name='L562'></a><a href='#L562'>562</a>
+<a name='L563'></a><a href='#L563'>563</a>
+<a name='L564'></a><a href='#L564'>564</a>
+<a name='L565'></a><a href='#L565'>565</a>
+<a name='L566'></a><a href='#L566'>566</a>
+<a name='L567'></a><a href='#L567'>567</a>
+<a name='L568'></a><a href='#L568'>568</a>
+<a name='L569'></a><a href='#L569'>569</a>
+<a name='L570'></a><a href='#L570'>570</a>
+<a name='L571'></a><a href='#L571'>571</a>
+<a name='L572'></a><a href='#L572'>572</a>
+<a name='L573'></a><a href='#L573'>573</a>
+<a name='L574'></a><a href='#L574'>574</a>
+<a name='L575'></a><a href='#L575'>575</a>
+<a name='L576'></a><a href='#L576'>576</a>
+<a name='L577'></a><a href='#L577'>577</a>
+<a name='L578'></a><a href='#L578'>578</a>
+<a name='L579'></a><a href='#L579'>579</a>
+<a name='L580'></a><a href='#L580'>580</a>
+<a name='L581'></a><a href='#L581'>581</a>
+<a name='L582'></a><a href='#L582'>582</a>
+<a name='L583'></a><a href='#L583'>583</a>
+<a name='L584'></a><a href='#L584'>584</a>
+<a name='L585'></a><a href='#L585'>585</a>
+<a name='L586'></a><a href='#L586'>586</a>
+<a name='L587'></a><a href='#L587'>587</a>
+<a name='L588'></a><a href='#L588'>588</a>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a>
+<a name='L601'></a><a href='#L601'>601</a>
+<a name='L602'></a><a href='#L602'>602</a>
+<a name='L603'></a><a href='#L603'>603</a>
+<a name='L604'></a><a href='#L604'>604</a>
+<a name='L605'></a><a href='#L605'>605</a>
+<a name='L606'></a><a href='#L606'>606</a>
+<a name='L607'></a><a href='#L607'>607</a>
+<a name='L608'></a><a href='#L608'>608</a>
+<a name='L609'></a><a href='#L609'>609</a>
+<a name='L610'></a><a href='#L610'>610</a>
+<a name='L611'></a><a href='#L611'>611</a>
+<a name='L612'></a><a href='#L612'>612</a>
+<a name='L613'></a><a href='#L613'>613</a>
+<a name='L614'></a><a href='#L614'>614</a>
+<a name='L615'></a><a href='#L615'>615</a>
+<a name='L616'></a><a href='#L616'>616</a>
+<a name='L617'></a><a href='#L617'>617</a>
+<a name='L618'></a><a href='#L618'>618</a>
+<a name='L619'></a><a href='#L619'>619</a>
+<a name='L620'></a><a href='#L620'>620</a>
+<a name='L621'></a><a href='#L621'>621</a>
+<a name='L622'></a><a href='#L622'>622</a>
+<a name='L623'></a><a href='#L623'>623</a>
+<a name='L624'></a><a href='#L624'>624</a>
+<a name='L625'></a><a href='#L625'>625</a>
+<a name='L626'></a><a href='#L626'>626</a>
+<a name='L627'></a><a href='#L627'>627</a>
+<a name='L628'></a><a href='#L628'>628</a>
+<a name='L629'></a><a href='#L629'>629</a>
+<a name='L630'></a><a href='#L630'>630</a>
+<a name='L631'></a><a href='#L631'>631</a>
+<a name='L632'></a><a href='#L632'>632</a>
+<a name='L633'></a><a href='#L633'>633</a>
+<a name='L634'></a><a href='#L634'>634</a>
+<a name='L635'></a><a href='#L635'>635</a>
+<a name='L636'></a><a href='#L636'>636</a>
+<a name='L637'></a><a href='#L637'>637</a>
+<a name='L638'></a><a href='#L638'>638</a>
+<a name='L639'></a><a href='#L639'>639</a>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a>
+<a name='L643'></a><a href='#L643'>643</a>
+<a name='L644'></a><a href='#L644'>644</a>
+<a name='L645'></a><a href='#L645'>645</a>
+<a name='L646'></a><a href='#L646'>646</a>
+<a name='L647'></a><a href='#L647'>647</a>
+<a name='L648'></a><a href='#L648'>648</a>
+<a name='L649'></a><a href='#L649'>649</a>
+<a name='L650'></a><a href='#L650'>650</a>
+<a name='L651'></a><a href='#L651'>651</a>
+<a name='L652'></a><a href='#L652'>652</a>
+<a name='L653'></a><a href='#L653'>653</a>
+<a name='L654'></a><a href='#L654'>654</a>
+<a name='L655'></a><a href='#L655'>655</a>
+<a name='L656'></a><a href='#L656'>656</a>
+<a name='L657'></a><a href='#L657'>657</a>
+<a name='L658'></a><a href='#L658'>658</a>
+<a name='L659'></a><a href='#L659'>659</a>
+<a name='L660'></a><a href='#L660'>660</a>
+<a name='L661'></a><a href='#L661'>661</a>
+<a name='L662'></a><a href='#L662'>662</a>
+<a name='L663'></a><a href='#L663'>663</a>
+<a name='L664'></a><a href='#L664'>664</a>
+<a name='L665'></a><a href='#L665'>665</a>
+<a name='L666'></a><a href='#L666'>666</a>
+<a name='L667'></a><a href='#L667'>667</a>
+<a name='L668'></a><a href='#L668'>668</a>
+<a name='L669'></a><a href='#L669'>669</a>
+<a name='L670'></a><a href='#L670'>670</a>
+<a name='L671'></a><a href='#L671'>671</a>
+<a name='L672'></a><a href='#L672'>672</a>
+<a name='L673'></a><a href='#L673'>673</a>
+<a name='L674'></a><a href='#L674'>674</a>
+<a name='L675'></a><a href='#L675'>675</a>
+<a name='L676'></a><a href='#L676'>676</a>
+<a name='L677'></a><a href='#L677'>677</a>
+<a name='L678'></a><a href='#L678'>678</a>
+<a name='L679'></a><a href='#L679'>679</a>
+<a name='L680'></a><a href='#L680'>680</a>
+<a name='L681'></a><a href='#L681'>681</a>
+<a name='L682'></a><a href='#L682'>682</a>
+<a name='L683'></a><a href='#L683'>683</a>
+<a name='L684'></a><a href='#L684'>684</a>
+<a name='L685'></a><a href='#L685'>685</a>
+<a name='L686'></a><a href='#L686'>686</a>
+<a name='L687'></a><a href='#L687'>687</a>
+<a name='L688'></a><a href='#L688'>688</a>
+<a name='L689'></a><a href='#L689'>689</a>
+<a name='L690'></a><a href='#L690'>690</a>
+<a name='L691'></a><a href='#L691'>691</a>
+<a name='L692'></a><a href='#L692'>692</a>
+<a name='L693'></a><a href='#L693'>693</a>
+<a name='L694'></a><a href='#L694'>694</a>
+<a name='L695'></a><a href='#L695'>695</a>
+<a name='L696'></a><a href='#L696'>696</a>
+<a name='L697'></a><a href='#L697'>697</a>
+<a name='L698'></a><a href='#L698'>698</a>
+<a name='L699'></a><a href='#L699'>699</a>
+<a name='L700'></a><a href='#L700'>700</a>
+<a name='L701'></a><a href='#L701'>701</a>
+<a name='L702'></a><a href='#L702'>702</a>
+<a name='L703'></a><a href='#L703'>703</a>
+<a name='L704'></a><a href='#L704'>704</a>
+<a name='L705'></a><a href='#L705'>705</a>
+<a name='L706'></a><a href='#L706'>706</a>
+<a name='L707'></a><a href='#L707'>707</a>
+<a name='L708'></a><a href='#L708'>708</a>
+<a name='L709'></a><a href='#L709'>709</a>
+<a name='L710'></a><a href='#L710'>710</a>
+<a name='L711'></a><a href='#L711'>711</a>
+<a name='L712'></a><a href='#L712'>712</a>
+<a name='L713'></a><a href='#L713'>713</a>
+<a name='L714'></a><a href='#L714'>714</a>
+<a name='L715'></a><a href='#L715'>715</a>
+<a name='L716'></a><a href='#L716'>716</a>
+<a name='L717'></a><a href='#L717'>717</a>
+<a name='L718'></a><a href='#L718'>718</a>
+<a name='L719'></a><a href='#L719'>719</a>
+<a name='L720'></a><a href='#L720'>720</a>
+<a name='L721'></a><a href='#L721'>721</a>
+<a name='L722'></a><a href='#L722'>722</a>
+<a name='L723'></a><a href='#L723'>723</a>
+<a name='L724'></a><a href='#L724'>724</a>
+<a name='L725'></a><a href='#L725'>725</a>
+<a name='L726'></a><a href='#L726'>726</a>
+<a name='L727'></a><a href='#L727'>727</a>
+<a name='L728'></a><a href='#L728'>728</a>
+<a name='L729'></a><a href='#L729'>729</a>
+<a name='L730'></a><a href='#L730'>730</a>
+<a name='L731'></a><a href='#L731'>731</a>
+<a name='L732'></a><a href='#L732'>732</a>
+<a name='L733'></a><a href='#L733'>733</a>
+<a name='L734'></a><a href='#L734'>734</a>
+<a name='L735'></a><a href='#L735'>735</a>
+<a name='L736'></a><a href='#L736'>736</a>
+<a name='L737'></a><a href='#L737'>737</a>
+<a name='L738'></a><a href='#L738'>738</a>
+<a name='L739'></a><a href='#L739'>739</a>
+<a name='L740'></a><a href='#L740'>740</a>
+<a name='L741'></a><a href='#L741'>741</a>
+<a name='L742'></a><a href='#L742'>742</a>
+<a name='L743'></a><a href='#L743'>743</a>
+<a name='L744'></a><a href='#L744'>744</a>
+<a name='L745'></a><a href='#L745'>745</a>
+<a name='L746'></a><a href='#L746'>746</a>
+<a name='L747'></a><a href='#L747'>747</a>
+<a name='L748'></a><a href='#L748'>748</a>
+<a name='L749'></a><a href='#L749'>749</a>
+<a name='L750'></a><a href='#L750'>750</a>
+<a name='L751'></a><a href='#L751'>751</a>
+<a name='L752'></a><a href='#L752'>752</a>
+<a name='L753'></a><a href='#L753'>753</a>
+<a name='L754'></a><a href='#L754'>754</a>
+<a name='L755'></a><a href='#L755'>755</a>
+<a name='L756'></a><a href='#L756'>756</a>
+<a name='L757'></a><a href='#L757'>757</a>
+<a name='L758'></a><a href='#L758'>758</a>
+<a name='L759'></a><a href='#L759'>759</a>
+<a name='L760'></a><a href='#L760'>760</a>
+<a name='L761'></a><a href='#L761'>761</a>
+<a name='L762'></a><a href='#L762'>762</a>
+<a name='L763'></a><a href='#L763'>763</a>
+<a name='L764'></a><a href='#L764'>764</a>
+<a name='L765'></a><a href='#L765'>765</a>
+<a name='L766'></a><a href='#L766'>766</a>
+<a name='L767'></a><a href='#L767'>767</a>
+<a name='L768'></a><a href='#L768'>768</a>
+<a name='L769'></a><a href='#L769'>769</a>
+<a name='L770'></a><a href='#L770'>770</a>
+<a name='L771'></a><a href='#L771'>771</a>
+<a name='L772'></a><a href='#L772'>772</a>
+<a name='L773'></a><a href='#L773'>773</a>
+<a name='L774'></a><a href='#L774'>774</a>
+<a name='L775'></a><a href='#L775'>775</a>
+<a name='L776'></a><a href='#L776'>776</a>
+<a name='L777'></a><a href='#L777'>777</a>
+<a name='L778'></a><a href='#L778'>778</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">35x</span>
+<span class="cline-any cline-yes">35x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">138x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">90x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-yes">37x</span>
+<span class="cline-any cline-yes">37x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-yes">410x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">104x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">33x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { FormGroup } from '@angular/forms';
+import { FormlyFieldConfig } from '@ngx-formly/core';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, payExistingUtilizeFunctionFor, resolveFunctionForMovement, tenorTypeLabel } from './balance-component.model';
+import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
+import { BuilderModel } from './function-policy';
+import { describeApiError } from './api-error';
+import { PagedListState } from './paged-list-state';
+&nbsp;
+/**
+ * Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") —
+ * pairs a raw BalanceMovement with the BalanceContract that owns it (Adapter pattern): a movement alone
+ * carries neither instrumentType nor naturalKey, both of which the merged cross-ledger timeline and the
+ * read-only screen reconstruction below both need.
+ *
+ * Bug fixed 2026-08-18, business-reported live example — LC S01: "A1 Issue → A3 Document Arrival → A8
+ * Shipping Guarantee Issue → A4 Sight Payment" is the real chronological order, but the merged timeline
+ * only ever showed 3 rows (A1/A3/A8), with A4 nowhere to be found — because A4 (Sight Settlement) does
+ * NOT create its own movement (`payExistingUtilize`, see balance-component.model.ts's own A4 entry): it
+ * only Maker-Submits then Checker-Releases the SAME UTILIZE row A3 already created. That one row carries
+ * only ONE `createdAt` (A3's own, at Document Arrival submission) — A4's own, much-later Release
+ * (`releasedAt`) was invisible to the sort entirely, so the row stayed pinned at its EARLY, A3-labeled
+ * position (`resolveFunctionForMovement` always resolves this (instrumentType, movementType) pair to A3,
+ * the first registry match) even after A8 had already happened and A4 finalized hours later. Confirmed
+ * live against the real DB (`balance-component.sqlite`): S01's own UTILIZE row —
+ * `createdAt: 2026-08-17T11:30:35Z` (A3), `makerSubmittedAt: 2026-08-17T15:37:01Z` /
+ * `releasedAt: 2026-08-17T15:37:08Z` (A4) — vs. S01's own SHGT ISSUE (A8) at `createdAt:
+ * 2026-08-17T11:31:01Z`, sitting chronologically BETWEEN the two.
+ *
+ * `eventTime`/`eventStatus`/`phase` below are what fixes this: every OTHER movement in this app creates
+ * a brand-new row for its own later completion (A6/B4's own compound `referencedTransactionId`
+ * mechanism), so `phase` is 'primary' and `eventTime`/`eventStatus` are just the movement's own
+ * `createdAt`/`status` — but A4 is the one function in the whole registry that finalizes an EXISTING
+ * row instead of creating a new one, so THAT specific row is split into two InquiredEvent entries
+ * sharing the same underlying `movement`, each with its own accurate position: `phase: 'create'` (A3's
+ * own submission, `eventTime: movement.createdAt`) and `phase: 'finalize'` (A4's own Release,
+ * `eventTime: movement.releasedAt`). `eventStatus` is `movement.status` on BOTH — see `toEventRows()`'s
+ * own doc comment (settled 2026-08-18, business-mandated) for why an earlier same-day design that forced
+ * the 'create' row's own status to 'PENDING' regardless of the movement's real current status was
+ * reversed. See `selectEvent()`'s own doc comment for how `phase` still changes which function code (A3
+ * vs A4) and which Balance SNAPSHOT (a separate, independently-frozen concept) the "View" screen shows
+ * for each of the two rows.
+ */
+export interface InquiredEvent {
+  movement: BalanceMovement;
+  contract: BalanceContract;
+  /** The true Event Date/Time this ROW represents — sort/display MUST use this, never movement.createdAt directly (see this file's own doc comment above). */
+  eventTime: string;
+  /**
+   * The movement's own TRUE, CURRENT `status` — identical to `movement.status` for every phase,
+   * including 'create' (2026-08-18, business-mandated — "RELEASE 是指該筆交易是否已完成 RELEASE...Status
+   * 必須根據該筆交易實際的 RELEASE 狀態決定，不得...誤判為 RELEASED" — RELEASE means whether THIS
+   * transaction has actually completed release; status must reflect that real fact, never a historical
+   * reconstruction). Superseded an EARLIER same-day design (forcing 'PENDING' on the 'create' row for
+   * "historical accuracy") once the business clarified live, reproducing LC S01's own B03 exactly, that
+   * forcing a stale PENDING onto an ALREADY-RELEASED transaction's own row violates this rule outright —
+   * see `toEventRows()`'s own doc comment for the full before/after.
+   */
+  eventStatus: BalanceMovement['status'];
+  /** 'primary' — the common case, this row IS the movement's only real-world event. 'create'/'finalize' — see this file's own doc comment: A4 (Sight Settlement) finalizing an EXISTING A3/A3S row, the one case in this registry where one movement spans two materially separate, independently-timed business actions. */
+  phase: 'primary' | 'create' | 'finalize';
+}
+&nbsp;
+/**
+ * Splits one BalanceMovement into its one or two real-world event rows — see InquiredEvent's own doc
+ * comment for the full "A4 Sight Payment" bug this originally fixed. Every movement produces exactly one
+ * 'primary' row UNLESS it is a Sight-tenor IPLC_LC UTILIZE (A3/A3S's own Document Arrival earmark) that
+ * has since been finalized (`status !== 'PENDING'`, `releasedAt` set) — the one case A4's own
+ * `payExistingUtilize` flag identifies, where a LATER business action (Maker-Submit + Checker-Release)
+ * completes an EXISTING movement instead of creating a new one — in which case it produces two: 'create'
+ * (the original submission, at its own createdAt) and 'finalize' (the Release, at releasedAt). `phase`
+ * alone is what still differs between the two — WHICH function/time each row is attributed to (A3 at
+ * createdAt vs. A4 at releasedAt) — `eventStatus` is now the SAME real value on both, see below.
+ * `releasedAt` is reused (not a new field) — it's set for ANY second-actor outcome on this row (release/
+ * reject/cancel, see balanceService.ts's own release()/reject() — both call updateStatus() with
+ * releasedAt: this.now()), not release specifically, so a Sight Document Arrival that was instead
+ * rejected/cancelled still correctly splits into its own 'create' + 'finalize' pair.
+ *
+ * **`eventStatus` is `movement.status` unconditionally, including for the 'create' row — settled
+ * 2026-08-18, business-mandated, reversing this SAME function's own earlier same-day design.** The
+ * ORIGINAL version of this fix forced the 'create' row's own `eventStatus` to `'PENDING'` regardless of
+ * the movement's real current status, reasoning "historically accurate — Confirmed Balance genuinely
+ * hadn't moved yet at that earlier moment." The business found this live, reproducing LC S01's own B03
+ * exactly (a fully-RELEASED, A4-finalized Document Arrival whose OWN 'create' row still displayed
+ * "EARMARKING" — i.e. "not yet released" — days after it genuinely had been), and ruled it out flatly:
+ * "RELEASE 是指該筆交易是否已完成 RELEASE...Status 必須根據該筆交易實際的 RELEASE 狀態決定，不得因為
+ * Event 已建立、Balance 已更新或其他條件而誤判為 RELEASED" (RELEASE means whether THIS transaction has
+ * actually completed release; Status must reflect that real fact — never a historical reconstruction,
+ * and never inferred from Event/Balance side effects). The historical-accuracy framing was a genuine,
+ * good-faith design choice for the ORIGINAL "A4 Sight Payment" bug (which was about the row's own
+ * eventTIME/ordering and Function attribution, not its status) — but extending that same historical
+ * framing to the STATUS field itself directly violated this later, more specific, explicitly-confirmed
+ * requirement once the business examined it closely. Deliberately scoped to `eventStatus` ONLY — the
+ * separately-confirmed "Balance SNAPSHOT stays frozen at Create-time" behavior (`selectEvent()`'s own
+ * `ownSnapshot`/sibling-snapshot logic, "SNAP SHOT保留當時...不會因為後續交易改變") is a DIFFERENT,
+ * independently business-confirmed requirement and is UNCHANGED by this fix — only the raw PENDING/
+ * RELEASED status this function itself controls was ever in scope here.
+ *
+ * Module-level exported function (2026-08-18, user-requested — "Look Up Current Balance's own Event
+ * Timeline should use the SAME status/display logic as Inquire Events... must not maintain its own
+ * independent STATUS mapping") — was a private InquireEventsService method; extracted so
+ * LookUpPanelService can call the exact same split, not a second, separately-maintained copy of it. Both
+ * services import it from here rather than either owning it, since the underlying "A4 finalizes an
+ * existing A3/A3S row" business rule this encodes belongs to neither screen specifically.
+ */
+/**
+ * Module-level exported function (2026-08-19, user-requested — "Look Up Current Balance → Event
+ * Timeline" gains a FUNCTION column that "must use the same Function mapping as Inquire Events... Do
+ * not implement a separate Function mapping") — was a private InquireEventsService method; extracted so
+ * LookUpPanelService's own Event Timeline table can call the exact same resolution, not a second,
+ * separately-maintained copy of it. Same "share the function, not the behavior" convention toEventRows()
+ * itself already established for this pair of services, immediately above. Named `functionForEvent`,
+ * distinct from `InquireEventsService.functionFor()` below (which now just delegates to this) — same
+ * "avoid an unqualified call silently shadowing a same-named class method" readability guard this file's
+ * own BAL-136 fix already established for validateSubmit/buildSubmitRequest vs. submit-rules.ts.
+ */
+export function functionForEvent(event: InquiredEvent): TransactionFunction | undefined {
+  const { movement, contract } = event;
+  return (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType);
+}
+&nbsp;
+export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
+  const isFinalizedSightUtilize = contract.instrumentType === 'IPLC_LC' &amp;&amp; movement.movementType === 'UTILIZE' &amp;&amp; contract.tenorType === 'SIGHT' &amp;&amp; movement.status !== 'PENDING' &amp;&amp; !!movement.releasedAt;
+  if (!isFinalizedSightUtilize) {
+    return [{ movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'primary' }];
+  }
+  return [
+    { movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'create' },
+    { movement, contract, eventTime: movement.releasedAt as string, eventStatus: movement.status, phase: 'finalize' },
+  ];
+}
+&nbsp;
+/**
+ * Fetches one contract's own movements, flattened into InquiredEvent rows via toEventRows() — the base
+ * unit both InquireEventsService's own loadEvents() and LookUpPanelService's own Export Confirmed LC
+ * merge (see childMovementsOf$'s own doc comment below) build on. Exported as a free function, not a
+ * private class method, so both services call the exact same implementation rather than maintaining two
+ * copies — the same "share the function, not the behavior" convention toEventRows() itself already
+ * established for this pair of services.
+ */
+export function movementsOf$(api: BalanceComponentApiService, contract: BalanceContract): Observable&lt;InquiredEvent[]&gt; {
+  return api.listMovements(contract.balanceContractId).pipe(
+    map((movements) =&gt; movements.flatMap((movement) =&gt; toEventRows(movement, contract))),
+    catchError(() =&gt; of([] as InquiredEvent[])),
+  );
+}
+&nbsp;
+/**
+ * Fetches every movement under every contract of the given instrumentType matching lcNumber, flattened
+ * via movementsOf$() above. Used by InquireEventsService's own loadEvents() (every child instrumentType,
+ * to build its one merged cross-ledger timeline) and, since 2026-08-18, by LookUpPanelService's own LC
+ * tab for an Export Confirmed LC specifically (EPLC_EXAMINATION only) — bug fix, reviewer-reported live:
+ * "Look Up Current Balance → Event Timeline 明顯有漏資料...主要漏掉的是 B3 Present Docs /
+ * EPLC_EXAMINATION 的 Earmark Events". Root cause: B3/EPLC_EXAMINATION is MEMO_ONLY with no
+ * BALANCE_SNAPSHOT_LABEL entry, so it has no dedicated Balance Tab of its own in Look Up Current
+ * Balance (unlike Import LC's own SG/Acceptance children, which each already have one) — its own
+ * movements live on separate per-E01/E02/E03 BalanceContract rows the Confirmed LC's own Tab 1 Event
+ * Timeline never fetched, so they were invisible everywhere in that panel even though Inquire Events'
+ * own already-merged timeline (via childInstrumentTypesOf()) already showed them correctly. See
+ * LookUpPanelService's own loadSnapshotAndMovements() doc comment for the fix itself.
+ */
+export function childMovementsOf$(api: BalanceComponentApiService, instrumentType: InstrumentType, lcNumber: string): Observable&lt;InquiredEvent[]&gt; {
+  return api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).pipe(
+    switchMap((page) =&gt; (page.items.length ? forkJoin(page.items.map((c) =&gt; movementsOf$(api, c))) : of([] as InquiredEvent[][]))),
+    map((groups) =&gt; groups.flat()),
+    catchError(() =&gt; of([] as InquiredEvent[])),
+  );
+}
+&nbsp;
+/**
+ * One row of the LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC
+ * Master Records 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the same
+ * day, same wording, to Export Confirmed LC — "Same requirement for Export Confirmed"). Side-agnostic:
+ * one row shape backs both the Import LC (`IPLC_LC`) and Export Confirmed LC (`EPLC_CONFIRMATION`)
+ * index, selected purely by `InquireEventsService.side` — see `loadIndex()`'s own doc comment.
+ */
+export interface LcIndexRow {
+  contract: BalanceContract;
+  currency: string;
+  /** Human label ("Sight"/"Seller's Usance"/"Buyer's Usance"/Export's own "Usance", or "—") — see tenorTypeLabel()'s own doc comment (balance-component.model.ts) for the side-aware label reuse and the deliberately-deferred "Mixed Tenor" case. 2026-08-19, user-requested, positioned right after the LC Number column. */
+  tenorType: string;
+  /** Face amount (Design doc §3.3/§6.2 LC 面額, or its Export Confirmed LC counterpart) — see deriveLcAmount()'s own doc comment for how this is derived and its one deliberate, disclosed simplification. */
+  lcAmount: string;
+  availableBalance: string;
+  status: string;
+  lastEventAt: string | null;
+}
+&nbsp;
+/**
+ * Client-side mirror of the microservice's own computeFaceAmount() (domain/balanceDerivation.ts, §3.3/
+ * §6.2 — "LC 面額 faceAmount, tracked independently of Confirmed Balance because UTILIZE reduces Confirmed
+ * Balance without ever touching the face amount") — that function is never wired to any route/service
+ * call site server-side (confirmed by inspection: defined, never invoked), so there is no existing API
+ * response field to read this from. Sums RELEASED face-amount-affecting `movement.amount` (face-level,
+ * never `ceilingAmount`) across the ROOT contract's own InquiredEvent rows — safe to iterate `rootEvents`
+ * (rather than raw movements) directly despite `toEventRows()`'s own create/finalize split, because that
+ * split only ever applies to a Sight `IPLC_LC`/`UTILIZE` movement, which is never a face-amount-affecting
+ * movementType.
+ *
+ * Two distinct movementType families, one per side, both sourced from the microservice's own
+ * MOVEMENT_DIRECTION table (domain/balanceDerivation.ts) — extended 2026-08-19 to cover Export Confirmed
+ * LC, per the user's own "Same requirement for Export Confirmed" follow-up:
+ * - `IPLC_LC`/`EPLC_LC` (Import): `ISSUE`(+)/`AMEND_INCREASE`(+)/`AMEND_DECREASE`(-) — direction lives in
+ *   the movementType itself, `amount` is always a positive magnitude (mirrors computeFaceAmount()'s own
+ *   `FACE_AMOUNT_MOVEMENT_TYPES` set exactly).
+ * - `EPLC_CONFIRMATION` (Export): `ISSUE`(+)/`AMEND` — Confirmation has no separate AMEND_INCREASE/
+ *   AMEND_DECREASE split; ONE `AMEND` movementType covers both, with direction folded into the SIGN of
+ *   `amount` itself (a decrease is submitted as a negative typed amount — MonetaryAmount's own pattern
+ *   permits a leading '-') rather than the movementType string, per the microservice's own
+ *   `domain/contingentAccountEntry.ts` doc comment ("Balance Component has no separate AMEND_INCREASE/
+ *   AMEND_DECREASE for EPLC_CONFIRMATION... a decrease is expressed as a negative typed amount instead").
+ *   So `AMEND` is summed as-is (no extra direction multiplier) — its own signed value already carries the
+ *   correct +/-.
+ * `ISSUE` is shared by both movementType vocabularies and always positive, so it needs no side-specific
+ * branching either.
+ *
+ * **Deliberate, disclosed simplification**: uses plain JS `Number` arithmetic rather than a decimal
+ * library — this Angular app has no `decimal.js` dependency (unlike the microservice's own `money.ts`,
+ * which this project's own CLAUDE.md establishes as the ONLY place allowed to construct a `Decimal` from
+ * a wire string). Judged acceptable here because this value is strictly DISPLAY-ONLY (the LC Master
+ * Records Index's own "LC Amount" column) — never fed back into any balance-affecting calculation,
+ * validation, or request payload. Should a future feature need this figure for anything beyond display,
+ * it should instead be computed server-side (e.g. wiring the existing, currently-dead `computeFaceAmount()`
+ * into a route, extended there too for EPLC_CONFIRMATION) rather than extending this client-side
+ * approximation.
+ */
+function deriveLcAmount(rootEvents: readonly InquiredEvent[]): string {
+  const total = rootEvents.reduce((sum, e) =&gt; {
+    if (e.eventStatus !== 'RELEASED') return sum;
+    const amount = Number(e.movement.amount);
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!Number.isFinite(amount)) <span class="cstat-no" title="statement not covered" >return sum;</span>
+    switch (e.movement.movementType) {
+      case 'ISSUE':
+      case 'AMEND_INCREASE':
+        return sum + amount;
+      case 'AMEND_DECREASE':
+        return sum - amount;
+      case 'AMEND':
+        // EPLC_CONFIRMATION only — already signed (+ increase / - decrease), add as-is.
+        return sum + amount;
+      default:
+        return sum;
+    }
+  }, 0);
+  return String(total);
+}
+&nbsp;
+/** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
+export interface EventBalanceTab {
+  key: 'LC' | 'ACCEPTANCE' | 'SG';
+  /** Static per-side label for the tab-strip button itself, e.g. "LC Balance" — never includes the LC Number/suffix. */
+  label: string;
+  /** "{label} — LC {lc}[/ SG {sg}]" — the box's own title once this tab is active. */
+  title: string;
+  snapshot: BalanceSnapshot | null;
+  /** movement.balanceBefore/balanceAfter — set ONLY when `snapshot` is the event's own contract's own ledger, never when it's a redirected parent balance (see selectEvent()'s own doc comment). */
+  impact: { before: string | null | undefined; after: string | null | undefined } | null;
+}
+&nbsp;
+/**
+ * Facade over BalanceComponentApiService + the existing function registry + builder-fields.ts's
+ * buildFields() — same role LookUpPanelService already plays for "Look Up Current Balance", and built
+ * as a plain class for the exact same reason (see that file's own doc comment): a genuine child
+ * component would need @ViewChild/@Input-@Output wiring this file's own test suite (constructed via
+ * plain `new TransactionBuilderComponent(mockApi)`, no TestBed) can't resolve.
+ *
+ * Design principle (user-stated): reuse existing transaction inquiry/view screens, event data
+ * retrieval logic, and accounting-entry components/services rather than duplicating logic. This service
+ * introduces exactly two genuinely new pieces of behavior — merging movements across an LC's own child
+ * ledgers into one chronological timeline, and resolving+reconstructing a historical movement's own
+ * original screen — and reuses everything else: BalanceComponentApiService.resolveContract/catalog/
+ * listMovements/getBalanceAsOfMovement (no new HTTP methods), buildFields() (builder-fields.ts,
+ * unchanged, wrapped by the new toReadOnlyFields() Decorator there), and IMPORT_FUNCTIONS/
+ * EXPORT_FUNCTIONS as a Strategy table via the new resolveFunctionForMovement() (balance-component.
+ * model.ts). The Account Entries half of the requirement is not implemented here at all — the
+ * component calls its own existing openAccountEntryDialog(event.movement) directly, reusing
+ * accountEntryDialogMovement/the existing dialog template verbatim.
+ *
+ * Scope, matching the user's own wording ("適用於 Import LC 及 Confirmed LC"): the root LC is always
+ * IPLC_LC (Import) or EPLC_CONFIRMATION (Export Confirmed) — defaultLcInstrumentTypeForSide(), shared
+ * with LookUpPanelService.resetForSide(). Child ledgers are discovered via childInstrumentTypesOf(),
+ * which inverts the existing PARENT_INSTRUMENT_OPTIONS map — for IPLC_LC that's IPLC_ACCEPTANCE/SHGT;
+ * for EPLC_CONFIRMATION that's EPLC_ACCEPTANCE/EPLC_EXAMINATION. The three ON_BALANCE_ASSET
+ * instrumentTypes (EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/
+ * EPLC_EXPORT_BILLS_DISCOUNTED) are out of Balance Component's own "只負責 Contingent Liability" scope
+ * (same boundary contingentAccountEntry already enforces) and so are correctly excluded from this
+ * timeline too — childInstrumentTypesOf() never returns them, since PARENT_INSTRUMENT_OPTIONS never
+ * names EPLC_CONFIRMATION as their parent.
+ *
+ * 2026-08-17, third revision same day — **Balance Tabs**, precisely specified by the user after two
+ * earlier passes (a per-sibling "Closing Snapshot" design, then a single merged "Event Snapshot" box)
+ * each proved incomplete: up to 3 tabs — LC/Confirmed LC (always), Acceptance (Usance tenor only),
+ * Shipping Guarantee (Import only, any tenor) — gated purely by the root LC's own product type/tenor,
+ * mirroring `LookUpPanelService.lookupIsUsanceLc`/`lookupHasSg` exactly (`selectedEventIsUsanceLc`/
+ * `selectedEventHasSg` below — same rule, reused rather than reinvented). Confirmed via AskUserQuestion:
+ * a child tab (Acceptance/SG) is only ever POPULATED when the selected Event belongs to that specific
+ * child; the LC tab is always populated (the event's own contract's own eventSnapshot when the event IS
+ * the root, otherwise its rootEventSnapshot — see BalanceMovement's own doc comment on both fields).
+ * Business instruction, final framing: "不複雜 就是交易處理時 Look Up Current Balance 的SNAPSHOT
+ * (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE SNAPSHOT" — each tab's content is exactly what Look
+ * Up Current Balance would show for that same contract if queried live at that moment; no synthetic
+ * decoration beyond the pre-existing Confirmed Balance before→after (`impact`, from
+ * movement.balanceBefore/balanceAfter — unrelated to this feature, confirmed wanted earlier this
+ * session), which only ever applies to a tab showing the event's own ledger, never a redirected parent.
+ *
+ * 2026-08-17, fourth revision same day — live example (LC S02's 3rd event: a plain A3 Document Arrival
+ * UTILIZE with no direct SG movement, SG G01 already existing on the LC) surfaced that "only POPULATED
+ * when the selected Event belongs to that specific child" (above) was too narrow: a root-level event
+ * still needs the Acceptance/SG tab populated whenever exactly one such child exists under the LC — the
+ * Maker already sees both balances together at input time (A3's own sufficiency check nets the SG's
+ * exposure into Tight Available Balance), so Inquire Events should too ("就是交易當時LC所有的BALANCE的
+ * 拍照存檔" — a snapshot of ALL the LC family's balances at transaction time, saved to DB). Confirmed via
+ * AskUserQuestion, twice: first that this is the CURRENT balance (not a historical "as of this event"
+ * cross-contract computation), then — correcting an initial live-fetch implementation — that it must be
+ * PERSISTED at createMovement()/release() time (`movement.acceptanceEventSnapshot`/`sgEventSnapshot`,
+ * captured server-side by `BalanceService.captureSiblingSnapshots` whenever exactly one candidate
+ * exists), not fetched live when later viewed — consistent with every other field this class reads.
+ */
+export class InquireEventsService {
+  constructor(private readonly api: BalanceComponentApiService) {}
+&nbsp;
+  side: 'IMPORT' | 'EXPORT' = 'IMPORT';
+  lcNumber = '';
+  searching = false;
+  searchError: string | null = null;
+  rootContract: BalanceContract | null = null;
+&nbsp;
+  /** Every Event under the searched LC — root contract plus every child ledger's own movements — sorted by createdAt (true Event Date/Time), not the per-contract-scoped eventSeq. */
+  events: InquiredEvent[] = [];
+  eventsLoading = false;
+&nbsp;
+  /**
+   * UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?" — can Inquire Events be
+   * designed page-by-page?) — CLIENT-SIDE windowing over the already-fully-loaded, already-sorted
+   * `events` array, NOT a re-fetch per page (unlike CatalogPickerService's own use of the same
+   * PagedListState class): the whole point of loadEvents() is merging every contract's own movements
+   * into ONE globally-sorted timeline, so there is no per-page API call that would make sense here —
+   * everything is already in memory by the time pagination applies. Reused rather than reinvented:
+   * PagedListState already owns exactly the page/total/pageSize math this needs.
+   */
+  readonly eventsPaging = new PagedListState(10);
+&nbsp;
+  /** The current page's own slice of `events` — the template iterates this instead of `events` directly. */
+  get pagedEvents(): InquiredEvent[] {
+    const start = (this.eventsPaging.page - 1) * this.eventsPaging.pageSize;
+    return this.events.slice(start, start + this.eventsPaging.pageSize);
+  }
+&nbsp;
+  prevEventsPage(): void {
+    const target = this.eventsPaging.prevTarget();
+    if (target) this.eventsPaging.page = target;
+  }
+&nbsp;
+  nextEventsPage(): void {
+    const target = this.eventsPaging.nextTarget();
+    if (target) this.eventsPaging.page = target;
+  }
+&nbsp;
+  /**
+   * LC Master Records Index (2026-08-19, Import LC; extended the same day to Export Confirmed LC — see
+   * this class's own `side`) — 'INDEX' is the default landing view for BOTH sides (see selectSide()
+   * below): a paginated, searchable browse of every LC on the currently-selected side, shown BEFORE any
+   * single LC is picked. 'EVENTS' is the existing single-LC merged timeline (unchanged) shown after
+   * selectLcFromIndex() drills in. The OLD single-exact-match "type LC Number, click Search" entry point
+   * (search()/lcNumber below) has been fully retired on both sides now that both get this Index —
+   * search()/lcNumber are kept only because selectLcFromIndex()/loadEvents() still populate `lcNumber`
+   * for display ("Found: ...") and because search() itself is still exercised by existing tests exactly
+   * as before; the template no longer renders a UI entry point for it on either side.
+   */
+  indexView: 'INDEX' | 'EVENTS' = 'INDEX';
+  /** Server-paginated (unlike eventsPaging above, which windows an already-fully-loaded array) — each page/search change re-fetches via loadIndex(). */
+  readonly indexPaging = new PagedListState(10);
+  indexRows: LcIndexRow[] = [];
+  /** The Index's own filter/search box — repurposes what used to be the sole "type exact LC Number, click Search" entry point (business instruction 2026-08-19: "原有的 LC Number + Search 功能可以保留，但其定位應改為 Index Filter/Search"). Substring match via the existing catalog() `q` param, applied server-side across ALL records, not just the currently-displayed page. */
+  indexSearch = '';
+  indexLoading = false;
+  indexError: string | null = null;
+&nbsp;
+  /** Side-aware entity label for the Index's own heading/hint text ("Import LC Master Records" / "Export Confirmed LC Master Records") — 2026-08-19, extended alongside the Index itself going side-agnostic. */
+  get indexEntityLabel(): string {
+    return this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed LC';
+  }
+&nbsp;
+  selectedEvent: InquiredEvent | null = null;
+  /** Null when resolveFunctionForMovement() found no match (e.g. legacy data) — the read-only screen still renders, using buildFields()'s own selectedFunction-null fallback path rather than guessing. */
+  selectedEventFunction: TransactionFunction | null = null;
+  selectedEventFields: FormlyFieldConfig[] = [];
+  selectedEventModel: BuilderModel = {};
+  /** A fresh, throwaway FormGroup per selection — Formly requires one; nothing is ever submitted through it. */
+  selectedEventForm = new FormGroup({});
+&nbsp;
+  /** Up to 3 Balance Tabs, in fixed order (LC, then Acceptance if applicable, then SG if applicable) — see this class's own doc comment. */
+  selectedEventTabs: EventBalanceTab[] = [];
+  selectedEventTab: 'LC' | 'ACCEPTANCE' | 'SG' = 'LC';
+&nbsp;
+  get activeEventTab(): EventBalanceTab | null {
+    return this.selectedEventTabs.find((t) =&gt; t.key === this.selectedEventTab) ?? null;
+  }
+&nbsp;
+  /** A Sight LC never has an Acceptance (Design doc §7 Tenor Type Routing) — mirrors LookUpPanelService.lookupIsUsanceLc exactly, keyed off rootContract instead of a picked lookupResult. */
+  get selectedEventIsUsanceLc(): boolean {
+    const contract = this.rootContract;
+    if (!contract || (contract.instrumentType !== 'IPLC_LC' &amp;&amp; contract.instrumentType !== 'EPLC_CONFIRMATION')) return false;
+    return !!contract.tenorType &amp;&amp; contract.tenorType !== 'SIGHT';
+  }
+&nbsp;
+  /** SG applies to any IPLC_LC regardless of tenor (unlike Acceptance) — Import only. Mirrors LookUpPanelService.lookupHasSg. */
+  get selectedEventHasSg(): boolean {
+    return this.rootContract?.instrumentType === 'IPLC_LC';
+  }
+&nbsp;
+  selectSide(side: 'IMPORT' | 'EXPORT'): void {
+    this.side = side;
+    this.lcNumber = '';
+    this.clearResults();
+    // LC Master Records Index (2026-08-19, Import LC; extended the same day, same wording, to Export
+    // Confirmed LC) — BOTH sides auto-populate their own Index the moment they're selected, per the
+    // user's own requirement ("系統應先顯示所有 Import LC Master Records 的 Index", "Same requirement for
+    // Export Confirmed").
+    this.indexView = 'INDEX';
+    this.indexSearch = '';
+    this.loadIndex(1);
+  }
+&nbsp;
+  private clearResults(): void {
+    this.searchError = null;
+    this.rootContract = null;
+    this.events = [];
+    this.eventsPaging.reset();
+    this.closeEvent();
+  }
+&nbsp;
+  closeEvent(): void {
+    this.selectedEvent = null;
+    this.selectedEventFunction = null;
+    this.selectedEventFields = [];
+    this.selectedEventModel = {};
+    this.selectedEventForm = new FormGroup({});
+    this.selectedEventTabs = [];
+    this.selectedEventTab = 'LC';
+  }
+&nbsp;
+  selectEventTab(tab: 'LC' | 'ACCEPTANCE' | 'SG'): void {
+    this.selectedEventTab = tab;
+  }
+&nbsp;
+  /**
+   * 2026-08-17, Trade Finance lifecycle/audit-trail business instruction ("EPLC_EXAMINATION should carry
+   * E01/E02 as the Secondary Reference so that each Examination event can be clearly linked to its
+   * subsequent Honour/Acceptance event") — EPLC_EXAMINATION's own natural key (`ibNumber`, B3's own "EB
+   * Number" field) IS the exact same value B4's own Honour/Accept later carries as its own
+   * `sourceTransactionRef` (B4's `secondaryRefLabel: 'EB Number'`, carried-and-protected from the picked
+   * Present Docs record — see balance-component.model.ts's own B4 doc comment) — surfacing it here as a
+   * "Secondary Ref." column lets a reader visually connect "Examination E01" to "Honour E01" in the same
+   * merged timeline, without cross-referencing anything.
+   *
+   * Extended same day for SHGT ("the corresponding Shipping Guarantee Number (SG Number) should be
+   * displayed so the user can identify which Shipping Guarantee the event belongs to") — same purpose,
+   * SHGT's own natural key (`sgNumber`, A8's own "SG Number" field) prefixed "SG " per the business's own
+   * worked example ("SG G01"), unlike EPLC_EXAMINATION's bare "E01" — each type's own display format
+   * follows its own literal example rather than an imposed cross-type convention. Every other
+   * instrumentType still returns "—" — either its own identity is just the LC Number (root), it's
+   * already surfaced once a LATER event's own Reference column refers back to it (as for
+   * EPLC_EXAMINATION → HONOUR), or it hasn't been asked for yet (Acceptance's own IB Number).
+   */
+  secondaryReferenceFor(event: InquiredEvent): string {
+    if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
+    if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
+    return '—';
+  }
+&nbsp;
+  search(): void {
+    this.clearResults();
+    const lcNumber = this.lcNumber.trim();
+    if (!lcNumber) return;
+    this.searching = true;
+    this.api.resolveContract(defaultLcInstrumentTypeForSide(this.side), { lcNumber }).subscribe({
+      next: (contract) =&gt; {
+        this.searching = false;
+        this.rootContract = contract;
+        this.loadEvents(contract);
+      },
+      error: (err) =&gt; {
+        this.searching = false;
+        this.searchError = describeApiError(err);
+      },
+    });
+  }
+&nbsp;
+  /**
+   * Root's own movements, plus every child ledger's — same "catalog by lcNumber, then listMovements()
+   * per candidate" shape loadUnderLookupCandidates()/loadSgsForArrival() (look-up-panel.service.ts)
+   * already use, reused here rather than re-derived. No outer error handler: every source observable
+   * below (movementsOf()/childMovementsOf()) already catches its own errors and always emits a value,
+   * so the combined forkJoin can never itself error.
+   */
+  private loadEvents(root: BalanceContract): void {
+    this.eventsLoading = true;
+    const childTypes = childInstrumentTypesOf(root.instrumentType);
+    forkJoin([movementsOf$(this.api, root), ...childTypes.map((childType) =&gt; childMovementsOf$(this.api, childType, root.naturalKey.lcNumber))]).subscribe((groups) =&gt; {
+      this.eventsLoading = false;
+      this.events = groups.flat().sort((a, b) =&gt; new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
+      this.eventsPaging.total = this.events.length;
+      this.eventsPaging.page = 1;
+    });
+  }
+&nbsp;
+  /**
+   * LC Master Records Index (2026-08-19, Import LC; extended the same day to Export Confirmed LC) —
+   * fetches one page of the CURRENT side's own catalog (`defaultLcInstrumentTypeForSide(this.side)` —
+   * `IPLC_LC` for Import, `EPLC_CONFIRMATION` for Export, already side-aware, no branching needed here),
+   * then for each row fans out its Available Balance (getSnapshot) and every event under it
+   * (movementsOf$/childMovementsOf$, the SAME two functions loadEvents() itself uses — for Export this
+   * naturally picks up `EPLC_ACCEPTANCE`/`EPLC_EXAMINATION` children via childInstrumentTypesOf(), same
+   * as the drill-down timeline) to derive `lcAmount`/`lastEventAt`. Deliberately does NOT pass
+   * `status`/`requireIssueReleased` to catalog() — unlike CatalogPickerService's own Maker-action
+   * pickers, this is an INQUIRY browse: every status is a legitimate thing to inquire about (same posture
+   * Look Up Current Balance/Inquire Events' own single-LC search already documents), so nothing is
+   * pre-filtered out.
+   */
+  loadIndex(page: number = this.indexPaging.page): void {
+    this.indexLoading = true;
+    this.indexError = null;
+    this.api.catalog(defaultLcInstrumentTypeForSide(this.side), undefined, this.indexSearch.trim() || undefined, page, this.indexPaging.pageSize).subscribe({
+      next: (result) =&gt; {
+        this.indexPaging.total = result.total;
+        this.indexPaging.page = result.page;
+        if (!result.items.length) {
+          this.indexRows = [];
+          this.indexLoading = false;
+          return;
+        }
+        forkJoin(result.items.map((contract) =&gt; this.loadIndexRow(contract))).subscribe((rows) =&gt; {
+          this.indexRows = rows;
+          this.indexLoading = false;
+        });
+      },
+      error: (err) =&gt; {
+        this.indexLoading = false;
+        this.indexError = describeApiError(err);
+        this.indexRows = [];
+        this.indexPaging.total = 0;
+      },
+    });
+  }
+&nbsp;
+  private loadIndexRow(contract: BalanceContract): Observable&lt;LcIndexRow&gt; {
+    const childTypes = childInstrumentTypesOf(contract.instrumentType);
+    return forkJoin({
+      snapshot: this.api.getSnapshot(contract.balanceContractId).pipe(catchError(() =&gt; of(null))),
+      root: movementsOf$(this.api, contract),
+      children: childTypes.length ? forkJoin(childTypes.map((childType) =&gt; childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber))) : of([] as InquiredEvent[][]),
+    }).pipe(
+      map(({ snapshot, root, children }) =&gt; {
+        const allEvents = [...root, ...children.flat()];
+        const lastEventAt = allEvents.length
+          ? allEvents.reduce((latest, e) =&gt; (new Date(e.eventTime).getTime() &gt; new Date(latest).getTime() ? e.eventTime : latest), allEvents[0].eventTime)
+          : <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+        return {
+          contract,
+          currency: contract.currency,
+          tenorType: tenorTypeLabel(contract.tenorType, this.side),
+          lcAmount: deriveLcAmount(root),
+          availableBalance: snapshot ? snapshot.availableBalance : '—',
+          status: contract.status,
+          lastEventAt,
+        };
+      }),
+    );
+  }
+&nbsp;
+  /** Resets to page 1 and re-fetches — the LC Number Search/Filter box's own Search button and Enter key. */
+  searchIndex(): void {
+    this.loadIndex(1);
+  }
+&nbsp;
+  prevIndexPage(): void {
+    const target = this.indexPaging.prevTarget();
+    if (target) this.loadIndex(target);
+  }
+&nbsp;
+  nextIndexPage(): void {
+    const target = this.indexPaging.nextTarget();
+    if (target) this.loadIndex(target);
+  }
+&nbsp;
+  /**
+   * Drill-down from an Index row (2026-08-19, both sides) — the row already IS the resolved contract, so
+   * this skips the redundant resolveContract() round-trip search() itself makes. Deliberately does NOT
+   * touch `indexRows`/`indexPaging`/`indexSearch` — those must survive the round trip so backToIndex()
+   * can return the user to the exact same Page/Search/Sorting state (user's own requirement #3: "從 Event
+   * Timeline 返回 Index 時，系統應盡可能保留使用者原先的 Page、Search/Filter 及 Sorting 狀態").
+   */
+  selectLcFromIndex(contract: BalanceContract): void {
+    this.clearResults();
+    this.lcNumber = contract.naturalKey.lcNumber;
+    this.rootContract = contract;
+    this.indexView = 'EVENTS';
+    this.loadEvents(contract);
+  }
+&nbsp;
+  /** Returns to the Index — `indexRows`/`indexPaging`/`indexSearch` are untouched (never cleared by selectLcFromIndex()/clearResults() above), so this alone is what preserves Page/Search/Sorting across the round trip. */
+  backToIndex(): void {
+    this.indexView = 'INDEX';
+  }
+&nbsp;
+  /**
+   * Resolves which function produced this event (resolveFunctionForMovement — Strategy table lookup)
+   * and reconstructs its original screen data via the SAME buildFields() the live Maker form uses,
+   * decorated read-only (toReadOnlyFields()). tolerancePct/tenorType/tenorDays are read from the
+   * event's own CONTRACT (they're contract-level, not per-movement, in the underlying data model) —
+   * amount/currency/movementType/eventSeq/createdBy/sourceTransactionRef come from the movement itself.
+   * selectedPayMovement/selectedContractSnapshot/selectedParent are deliberately left null — those only
+   * ever affect buildFields()'s own cosmetic label wording (e.g. "carried from the Document Arrival,
+   * protected"), never which fields exist or their values, and every field is forced read-only
+   * regardless via toReadOnlyFields().
+   *
+   * Balance Tabs (see this class's own doc comment): builds up to 3 tabs, each reading directly off the
+   * already-loaded movement — zero extra network calls except the legacy-data fallback below.
+   * - LC tab: `movement.eventSnapshot` when the event IS the root, else `movement.rootEventSnapshot`.
+   * - Acceptance/SG tab: `movement.eventSnapshot` when the event belongs to that specific child; else
+   *   `movement.acceptanceEventSnapshot`/`movement.sgEventSnapshot` — the one unambiguous sibling's own
+   *   CURRENT balance, captured server-side at createMovement()/release() time (2026-08-17, "就是交易
+   *   當時LC所有的BALANCE的拍照存檔" — business-confirmed live example: LC S02's 3rd event, a plain A3
+   *   Document Arrival UTILIZE with no direct SG movement, still needs SG G01's own balance shown; then
+   *   explicitly confirmed via AskUserQuestion that this must be PERSISTED at transaction time, not a
+   *   live fetch when later viewed — see BalanceMovement.acceptanceEventSnapshot/sgEventSnapshot's own
+   *   doc comments and BalanceService.captureSiblingSnapshots on the microservice side).
+   * `impact` (movement.balanceBefore/balanceAfter) is attached ONLY alongside a tab showing
+   * `movement.eventSnapshot` (this movement's own ledger) — never alongside a sibling/redirected
+   * snapshot, where a different contract's own before/after would be meaningless. Legacy-data fallback
+   * (api.getBalanceAsOfMovement()) applies only to the ONE tab matching the event's own ledger, only
+   * when its eventSnapshot is null (a movement created before that field existed) — the LC/Acceptance/SG
+   * sibling fields have no live-fallback equivalent for such pre-migration rows; they simply stay empty.
+   *
+   * `event.phase` (2026-08-18, "A4 Sight Payment" ordering fix — see InquiredEvent's own doc comment):
+   * a 'finalize' row resolves its function via payExistingUtilizeFunctionFor() instead of the generic
+   * resolveFunctionForMovement() (which would always return A3, the earlier-registered, identically-
+   * shaped function) — so the "View" screen correctly shows "A4 · Sight Settlement" for that row, "A3 ·
+   * Document Arrival" for its sibling 'create' row. `impact` (movement.balanceBefore/balanceAfter) is the
+   * SAME real value on both rows (2026-08-18, business-mandated — see toEventRows()'s own doc comment
+   * for the full reversal of an earlier same-day design that forced the 'create' row's own impact to
+   * `{before: null, after: null}`; a 'create' row can only exist for an already-finalized movement in the
+   * first place, so these values are always genuinely populated).
+   *
+   * The Balance Tabs' own LC-tab `snapshot` IS also adjusted per phase (2026-08-18, business instruction
+   * "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" — closes what was, until this date, an
+   * honestly-flagged limitation right here): a 'finalize' row reads `movement.finalizeEventSnapshot`
+   * (falling back to `movement.eventSnapshot` for a movement created before that field existed) instead
+   * of `movement.eventSnapshot` directly — the microservice's own release() no longer overwrites
+   * eventSnapshot for this specific case, so `ownSnapshot` below is what makes the 'create' row's LC tab
+   * (still reading plain `eventSnapshot`) stay frozen at A3's own original value while the 'finalize'
+   * row's own tab correctly shows the RELEASED-state figures instead.
+   */
+  /**
+   * UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位" — put the
+   * Function name in the Events table's own first column) — the SAME per-phase resolution rule
+   * selectEvent() below already applies (payExistingUtilizeFunctionFor() for a 'finalize' row, else the
+   * generic resolveFunctionForMovement() Strategy-table lookup), extracted so the merged Events table
+   * can show it directly per row instead of only after clicking through to "View". Returns undefined for
+   * legacy data no current function produces — the template shows "—" for that case, same convention
+   * every other unresolved-function fallback in this file already uses.
+   */
+  functionFor(event: InquiredEvent): TransactionFunction | undefined {
+    return functionForEvent(event);
+  }
+&nbsp;
+  selectEvent(event: InquiredEvent): void {
+    this.selectedEvent = event;
+    const { movement, contract } = event;
+    const fn = this.functionFor(event) ?? null;
+    this.selectedEventFunction = fn;
+&nbsp;
+    const model: BuilderModel = {
+      instrumentType: contract.instrumentType,
+      movementType: movement.movementType,
+      amount: movement.amount,
+      currency: movement.currency,
+      tolerancePct: contract.tolerancePct ?? undefined,
+      eventSeq: movement.eventSeq,
+      createdBy: movement.createdBy,
+      secondaryRef: movement.sourceTransactionRef ?? undefined,
+      tenorType: contract.tenorType ?? undefined,
+      tenorDays: contract.tenorDays ?? undefined,
+    };
+    this.selectedEventModel = model;
+&nbsp;
+    const ctx: BuilderFieldsContext = {
+      model,
+      selectedFunction: fn,
+      selectedPayMovement: null,
+      selectedContract: contract,
+      selectedContractSnapshot: null,
+      selectedParent: null,
+      dynamicSecondaryRefLabel: fn?.secondaryRefLabel ?? (movement.sourceTransactionRef ? 'Reference No.' : null),
+    };
+    this.selectedEventFields = toReadOnlyFields(buildFields(ctx));
+    this.selectedEventForm = new FormGroup({});
+&nbsp;
+    const isRootEvent = contract.instrumentType === this.rootContract?.instrumentType;
+    const isAcceptanceEvent = contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE';
+    const isSgEvent = contract.instrumentType === 'SHGT';
+    // 2026-08-18, business-mandated (same fix as toEventRows()'s own eventStatus change) — no more
+    // 'create'-phase forcing to {null, null}. That forcing was justified purely by "impact next to a
+    // historically-forced Pending status would be self-contradictory"; now that eventStatus itself
+    // reflects the movement's real current status (see toEventRows()'s own doc comment for the full
+    // reversal), showing the SAME real before/after this row's own sibling 'finalize' row already shows
+    // is no longer contradictory — it's the same movement's own single real impact, visible from either
+    // row. A 'create' row can only ever exist for an ALREADY-finalized movement in the first place (see
+    // toEventRows()'s own isFinalizedSightUtilize condition — status !== 'PENDING' is a precondition of
+    // the split itself), so balanceBefore/balanceAfter are always genuinely populated here, never null.
+    const ownImpact = { before: movement.balanceBefore, after: movement.balanceAfter };
+    // 'finalize' reads finalizeEventSnapshot (falling back to eventSnapshot for a pre-migration
+    // movement) — release() no longer overwrites eventSnapshot for this case, so 'create'/'primary'
+    // correctly keep reading plain eventSnapshot below, unaffected.
+    const ownSnapshot = event.phase === 'finalize' ? (movement.finalizeEventSnapshot ?? movement.eventSnapshot ?? null) : (movement.eventSnapshot ?? null);
+    // Same "'finalize' reads the finalize-time figure, 'create'/'primary' stay frozen at whatever was
+    // captured at Create" rule as ownSnapshot above, extended to the SIBLING snapshots (2026-08-18,
+    // "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — reproduces LC S01 exactly: a
+    // 'create' row (A3) submitted before its LC's own SG even existed must keep showing "none", not
+    // A4's own much-later Release picture of it.
+    const siblingAcceptanceSnapshot = event.phase === 'finalize' ? (movement.finalizeAcceptanceEventSnapshot ?? movement.acceptanceEventSnapshot ?? null) : (movement.acceptanceEventSnapshot ?? null);
+    const siblingSgSnapshot = event.phase === 'finalize' ? (movement.finalizeSgEventSnapshot ?? movement.sgEventSnapshot ?? null) : (movement.sgEventSnapshot ?? null);
+    const lcNumber = this.rootContract?.naturalKey.lcNumber ?? this.lcNumber;
+    const rootLabel = this.rootContract ? (BALANCE_SNAPSHOT_LABEL[this.rootContract.instrumentType] ?? <span class="branch-1 cbranch-no" title="branch not covered" >this.rootContract.instrumentType)</span> : 'Balance';
+&nbsp;
+    const tabs: EventBalanceTab[] = [
+      {
+        key: 'LC',
+        label: rootLabel,
+        title: `${rootLabel} — LC ${lcNumber}`,
+        snapshot: isRootEvent ? ownSnapshot : (movement.rootEventSnapshot ?? null),
+        impact: isRootEvent ? ownImpact : null,
+      },
+    ];
+    if (this.selectedEventIsUsanceLc) {
+      const acceptanceLabel = this.side === 'IMPORT' ? 'Acceptance Balance' : 'Confirmed LC Acceptance Balance';
+      const suffix = isAcceptanceEvent &amp;&amp; contract.naturalKey.ibNumber ? ` / IB ${contract.naturalKey.ibNumber}` : '';
+      tabs.push({
+        key: 'ACCEPTANCE',
+        label: acceptanceLabel,
+        title: `${acceptanceLabel} — LC ${lcNumber}${suffix}`,
+        snapshot: isAcceptanceEvent ? ownSnapshot : siblingAcceptanceSnapshot,
+        impact: isAcceptanceEvent ? ownImpact : null,
+      });
+    }
+    if (this.selectedEventHasSg) {
+      const suffix = isSgEvent &amp;&amp; contract.naturalKey.sgNumber ? ` / SG ${contract.naturalKey.sgNumber}` : '';
+      tabs.push({
+        key: 'SG',
+        label: 'Shipping Guarantee Balance',
+        title: `Shipping Guarantee Balance — LC ${lcNumber}${suffix}`,
+        snapshot: isSgEvent ? ownSnapshot : siblingSgSnapshot,
+        impact: isSgEvent ? ownImpact : null,
+      });
+    }
+    this.selectedEventTabs = tabs;
+    this.selectedEventTab = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
+&nbsp;
+    if (!ownSnapshot) {
+      const ownTabKey: 'LC' | 'ACCEPTANCE' | 'SG' = isSgEvent ? 'SG' : isAcceptanceEvent ? <span class="branch-0 cbranch-no" title="branch not covered" >'ACCEPTANCE' </span>: 'LC';
+      this.api.getBalanceAsOfMovement(movement.movementId).subscribe({
+        next: (snapshot) =&gt; this.applyFallbackSnapshot(event, ownTabKey, snapshot),
+        error: () =&gt; {},
+      });
+    }
+  }
+&nbsp;
+  /** Guards against a stale async fallback response landing after the user has already selected a different Event. */
+  private applyFallbackSnapshot(forEvent: InquiredEvent, tabKey: 'LC' | 'ACCEPTANCE' | 'SG', snapshot: BalanceSnapshot): void {
+    if (this.selectedEvent !== forEvent) return;
+    const tab = this.selectedEventTabs.find((t) =&gt; t.key === tabKey);
+    if (tab) tab.snapshot = snapshot;
+  }
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-18T16:38:19.079Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

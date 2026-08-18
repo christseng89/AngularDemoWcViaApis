@@ -24,6 +24,7 @@
   --green: #16a34a;
   --green-dark: #15803d;
   --green-bg: #dcfce7;
+  --green-border: #86efac;
   --amber: #b45309;
   --amber-dark: #92400e;
   --amber-bg: #fef3c7;
@@ -35,6 +36,34 @@
   --violet: #7c3aed;
   --violet-dark: #6d28d9;
   --violet-bg: #ede9fe;
+  --indigo-bg: #eef2ff;
+  --indigo-border: #c7d2fe;
+
+  // Deliberately theme-CONSTANT (no dark-mode override below) — these back only a "solid fill +
+  // white text" button/chip role (`.tb-btn--primary/--success`, `.tb-function-chip--active`), never
+  // reused for plain text/links/borders. `--blue`/`--green` themselves ARE brightened for dark mode
+  // (see `dark-theme-tokens` below) because THEY separately back a "colored text/accent directly on
+  // the page background" role (tab/link active color, focus outlines, section top-borders) that needs
+  // to lighten for contrast against a dark page — but reusing that same brightened value as a BUTTON
+  // FILL would put white text on a pale blue/green background, failing WCAG contrast. Keeping a
+  // dedicated, constant "solid" pair for the fill role avoids that clash without touching the accent
+  // role's own dark-mode brightening.
+  --blue-solid: #1d4ed8;
+  --blue-solid-hover: #1e40af;
+  --green-solid: #16a34a;
+  --green-solid-hover: #15803d;
+
+  // Theme-aware surface tokens (2026-08-19, "Balance Component — Theme Support") — every literal
+  // `#fff` background and the page's own hardcoded body background were replaced with these two so
+  // dark mode (below) can override them in exactly one place. `--bg-page` is the `<body>`/page
+  // canvas; `--bg-surface` is any raised element sitting ON that canvas (cards/`.tb-section`,
+  // inputs, dialogs, quick-pick rows) — identical to page background in light mode (a subtle
+  // bordered-white-on-white-page look, unchanged from before this token existed) but ONE step
+  // lighter than the page in dark mode, so cards/inputs read as physically raised rather than
+  // vanishing into the page.
+  --bg-page: #f5f6f8;
+  --bg-surface: #ffffff;
+  --overlay: rgba(15, 23, 42, 0.5);
 
   --font-sans:
     'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -53,11 +82,98 @@
   --transition-fast: 120ms ease;
 }
 
+/**
+ * Dark-mode token overrides (2026-08-19, "Balance Component — Theme Support", user-requested as a
+ * common framework feature — see `src/app/theme.service.ts`, which is the ONLY code that ever reads/
+ * writes `data-theme`/`data-bs-theme`). Every consuming `.scss`/`.html` file keeps referencing the
+ * SAME custom-property names declared in the light `:root` block above — nothing was renamed — so
+ * this is the one and only place dark-mode colors are chosen; every screen (Transaction Processing,
+ * Inquire Events, Balance Details, Event Timeline, dialogs, status badges) picks the change up
+ * automatically via inheritance, with zero per-screen theme code (Requirement #5).
+ *
+ * Two identical blocks, standard robust light/dark CSS pattern:
+ *  - `@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { ... } }` — live system-
+ *    preference tracking BEFORE `ThemeService` has run (the brief pre-bootstrap window) and as a pure-
+ *    CSS fallback if JS is ever disabled; `:not([data-theme='light'])` keeps an explicit Light choice
+ *    from being overridden by a dark OS preference once the attribute IS set.
+ *  - `:root[data-theme='dark']` — the explicit-attribute selector `ThemeService.applyEffectiveTheme()`
+ *    actually drives once the app has booted (System resolved to dark, or an explicit Dark pick) —
+ *    this is what makes an explicit Dark choice win even on a light-OS system (Requirement #3).
+ *
+ * Palette choices, not a rote hex-inversion — this app is a banking/back-office tool ("deliberately
+ * subtle... not a marketing site", `transaction-builder.component.scss`'s own stated design
+ * philosophy): a near-black slate page (`#0f172a`) with a one-step-lighter slate surface (`#1e293b`)
+ * for anything raised above it, soft light-gray body text (`#e2e8f0`, not pure white — softer on a
+ * dark background), and the 4 status accents (green/amber/red/violet) each given a DIFFERENT
+ * treatment than their light-mode `-dark`/`-bg` pair rather than reused verbatim: a translucent tint
+ * of the hue over the dark surface (instead of light mode's solid pastel, which would itself clash
+ * visually on a dark background) paired with a BRIGHTENED foreground (light mode's `--green-dark:
+ * #15803d` reads as muted/desaturated against a dark background; `#4ade80` keeps the same hue family
+ * but is bright enough to clear WCAG AA's ~4.5:1 text-contrast floor against both the translucent tint
+ * AND the plain dark surface behind it — same reasoning applied to amber/red/violet below). `--navy`
+ * (used for headings/titles) is also brightened for dark mode specifically — the light-mode value is a
+ * deep, near-black navy that would be nearly invisible on a dark-slate background otherwise.
+ */
+@mixin dark-theme-tokens {
+  --navy: #93c5fd;
+  --blue: #60a5fa;
+  --blue-dark: #93c5fd;
+  --blue-bg: rgba(96, 165, 250, 0.16);
+  --blue-bg-soft: rgba(96, 165, 250, 0.08);
+  --blue-border: rgba(96, 165, 250, 0.35);
+  --gray-border: #334155;
+  --gray-input-border: #475569;
+  --gray-body: #e2e8f0;
+  --gray-muted: #94a3b8;
+  --gray-disabled: #64748b;
+  --gray-bg: #1e293b;
+  --gray-readonly-bg: #172033;
+  --green: #4ade80;
+  --green-dark: #86efac;
+  --green-bg: rgba(74, 222, 128, 0.16);
+  --green-border: rgba(74, 222, 128, 0.35);
+  --amber: #fbbf24;
+  --amber-dark: #fde68a;
+  --amber-bg: rgba(251, 191, 36, 0.16);
+  --red: #f87171;
+  --red-dark: #fca5a5;
+  --red-bg: rgba(248, 113, 113, 0.18);
+  --red-bg-soft: rgba(248, 113, 113, 0.1);
+  --red-border: rgba(248, 113, 113, 0.35);
+  --violet: #a78bfa;
+  --violet-dark: #c4b5fd;
+  --violet-bg: rgba(167, 139, 250, 0.18);
+  --indigo-bg: rgba(129, 140, 248, 0.16);
+  --indigo-border: rgba(129, 140, 248, 0.35);
+
+  --bg-page: #0f172a;
+  --bg-surface: #1e293b;
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 44px rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include dark-theme-tokens;
+  }
+}
+
+:root[data-theme='dark'] {
+  @include dark-theme-tokens;
+}
+
 body {
-  background: #f5f6f8;
+  background: var(--bg-page);
+  color: var(--gray-body);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 ::selection {
@@ -71,7 +187,34 @@ body {
 // `.navbar`/`.nav-link` aren't used anywhere else in this app) rather than adding a class to the
 // inline template.
 .navbar {
+  // Overrides Bootstrap's own `bg-white` utility class removed from the template below (2026-08-19,
+  // theme support) — `bg-white` is a literal, non-theme-aware white; this app's own `--bg-surface`
+  // token is what makes the navbar correctly darken alongside every other surface.
+  background: var(--bg-surface) !important;
   box-shadow: var(--shadow-sm);
+}
+
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-muted);
+  }
+
+  select {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-input-border);
+    background: var(--bg-surface);
+    color: var(--gray-body);
+  }
 }
 
 .navbar-brand {

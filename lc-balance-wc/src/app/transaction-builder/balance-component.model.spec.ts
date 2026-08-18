@@ -24,6 +24,7 @@
   BALANCE_SNAPSHOT_LABEL,
   CURRENCY_OPTIONS,
   isEarmarkFunction,
+  tenorTypeLabel,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -846,6 +847,28 @@ describe('balance-component.model data invariants', () => {
       const zeroDp = ['JPY', 'TWD', 'IDR'];
       for (const code of zeroDp) expect(decimalPlacesForCurrency(code)).toBe(0);
       for (const o of CURRENCY_OPTIONS.filter((c) => !zeroDp.includes(c.value))) expect(decimalPlacesForCurrency(o.value)).toBe(2);
+    });
+  });
+
+  // LC Master Records Index's own new "Tenor Type" column (2026-08-19, user-requested — positioned
+  // right after LC Number, both Import LC and Export Confirmed LC). Reuses A1's/B1's own tenorType
+  // Formly select option labels rather than a third copy of the same three strings.
+  describe('tenorTypeLabel', () => {
+    it('Import side spells out Seller\'s/Buyer\'s Usance (matches A1\'s own tenorTypeOptions exactly)', () => {
+      expect(tenorTypeLabel('SIGHT', 'IMPORT')).toBe('Sight');
+      expect(tenorTypeLabel('SELLERS_USANCE', 'IMPORT')).toBe("Seller's Usance");
+      expect(tenorTypeLabel('BUYERS_USANCE', 'IMPORT')).toBe("Buyer's Usance");
+    });
+
+    it('Export side labels SELLERS_USANCE as plain "Usance" (matches B1\'s own tenorTypeOptions exactly — Buyer\'s/Seller\'s is Import-only)', () => {
+      expect(tenorTypeLabel('SIGHT', 'EXPORT')).toBe('Sight');
+      expect(tenorTypeLabel('SELLERS_USANCE', 'EXPORT')).toBe('Usance');
+    });
+
+    it('falls back to "—" for null/undefined (legacy data) and for a value that never legitimately occurs on that side (BUYERS_USANCE on Export)', () => {
+      expect(tenorTypeLabel(null, 'IMPORT')).toBe('—');
+      expect(tenorTypeLabel(undefined, 'EXPORT')).toBe('—');
+      expect(tenorTypeLabel('BUYERS_USANCE', 'EXPORT')).toBe('—');
     });
   });
 });

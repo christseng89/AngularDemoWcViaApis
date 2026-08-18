@@ -904,10 +904,11 @@
           <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
             <table class="tb-table">
               <caption class="visually-hidden">{{ inquireEvents.indexEntityLabel }} Master Records</caption>
-              <thead><tr><th>LC Number</th><th>Currency</th><th>LC Amount</th><th>Available Balance</th><th>Status</th><th>Last Event Date/Time</th></tr></thead>
+              <thead><tr><th>LC Number</th><th>Tenor Type</th><th>Currency</th><th>LC Amount</th><th>Available Balance</th><th>Status</th><th>Last Event Date/Time</th></tr></thead>
               <tbody>
                 <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)">
                   <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
+                  <td>{{ row.tenorType }}</td>
                   <td>{{ row.currency }}</td>
                   <td class="tb-table__amount">{{ row.lcAmount }}</td>
                   <td class="tb-table__amount">{{ row.availableBalance }}</td>

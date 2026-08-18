@@ -3,7 +3,7 @@ import { FormlyFieldConfig } from '@ngx-formly/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, payExistingUtilizeFunctionFor, resolveFunctionForMovement } from './balance-component.model';
+import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, payExistingUtilizeFunctionFor, resolveFunctionForMovement, tenorTypeLabel } from './balance-component.model';
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
 import { BuilderModel } from './function-policy';
 import { describeApiError } from './api-error';
@@ -179,6 +179,8 @@ export function childMovementsOf$(api: BalanceComponentApiService, instrumentTyp
 export interface LcIndexRow {
   contract: BalanceContract;
   currency: string;
+  /** Human label ("Sight"/"Seller's Usance"/"Buyer's Usance"/Export's own "Usance", or "—") — see tenorTypeLabel()'s own doc comment (balance-component.model.ts) for the side-aware label reuse and the deliberately-deferred "Mixed Tenor" case. 2026-08-19, user-requested, positioned right after the LC Number column. */
+  tenorType: string;
   /** Face amount (Design doc §3.3/§6.2 LC 面額, or its Export Confirmed LC counterpart) — see deriveLcAmount()'s own doc comment for how this is derived and its one deliberate, disclosed simplification. */
   lcAmount: string;
   availableBalance: string;
@@ -559,6 +561,7 @@ export class InquireEventsService {
         return {
           contract,
           currency: contract.currency,
+          tenorType: tenorTypeLabel(contract.tenorType, this.side),
           lcAmount: deriveLcAmount(root),
           availableBalance: snapshot ? snapshot.availableBalance : '—',
           status: contract.status,

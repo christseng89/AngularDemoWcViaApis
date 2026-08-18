@@ -581,6 +581,30 @@ const ALL_TENOR_OPTIONS = [
   { value: 'BUYERS_USANCE', label: "Buyer's Usance" },
 ];
 
+/**
+ * Human label for a contract's own tenorType (2026-08-19, user-requested — LC Master Records Index's
+ * own new "Tenor Type" column, both Import LC and Export Confirmed LC) — side-aware because Export
+ * Confirmed LC deliberately labels SELLERS_USANCE as plain "Usance" (Buyer's/Seller's is an Import-side-
+ * only financing-structure distinction the confirming bank has no visibility into — see
+ * EXPORT_TENOR_OPTIONS's own doc comment below) while Import LC spells out which. Reuses the SAME two
+ * option arrays A1's/B1's own tenorType Formly `select` fields are already built from (ALL_TENOR_OPTIONS/
+ * EXPORT_TENOR_OPTIONS, both below) rather than a third, independently-maintained copy of these label
+ * strings. "—" for a null/unset tenorType (legacy data, or an instrumentType where tenorType doesn't
+ * apply) or a value that doesn't resolve for the given side (e.g. a BUYERS_USANCE Export Confirmation,
+ * which the business rules say should never happen — see EXPORT_TENOR_OPTIONS — but is handled the same
+ * defensive way as every other unresolved-lookup fallback in this file, not a thrown error).
+ *
+ * Deliberately does NOT attempt to detect or label a "Mixed Tenor" case — floated by the user, then
+ * explicitly deferred ("Not for the time-being") pending a still-undecided detection rule. A single
+ * BalanceContract's own tenorType is one fixed value, declared once at Issue and protected thereafter
+ * (Design doc §7), so there is no multi-value case for this function to resolve today.
+ */
+export function tenorTypeLabel(tenorType: string | null | undefined, side: 'IMPORT' | 'EXPORT'): string {
+  if (!tenorType) return '—';
+  const options = side === 'EXPORT' ? EXPORT_TENOR_OPTIONS : ALL_TENOR_OPTIONS;
+  return options.find((o) => o.value === tenorType)?.label ?? '—';
+}
+
 const USANCE_ONLY_TENOR_OPTIONS = [
   { value: 'SELLERS_USANCE', label: "Seller's Usance" },
   { value: 'BUYERS_USANCE', label: "Buyer's Usance" },

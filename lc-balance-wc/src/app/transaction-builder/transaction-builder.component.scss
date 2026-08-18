@@ -55,7 +55,7 @@
   padding: 6px 12px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--gray-border);
-  background: #fff;
+  background: var(--bg-surface);
   color: var(--gray-body);
   cursor: pointer;
 
@@ -82,9 +82,14 @@
     outline-offset: 2px;
   }
 
+  // `--blue-solid` (not `--blue`) — a solid-fill-behind-white-text role, deliberately kept theme-
+  // constant, distinct from `--blue`'s own dark-mode-brightened "colored text/accent" role. See
+  // `--blue-solid`'s own doc comment in styles.scss for why the two must not be conflated: reusing
+  // the brightened `--blue` here would put white text on a pale background in dark mode, failing
+  // contrast.
   &--active {
-    background: var(--blue);
-    border-color: var(--blue);
+    background: var(--blue-solid);
+    border-color: var(--blue-solid);
     color: #fff;
 
     .tb-function-chip__code {
@@ -136,7 +141,7 @@
 // ── Sections (Maker / Checker / Look Up) ─────────────────────────────────
 
 .tb-section {
-  background: #fff;
+  background: var(--bg-surface);
   border: 1px solid var(--gray-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -189,7 +194,7 @@
   &--checker {
     background: var(--green-bg);
     color: var(--green-dark);
-    border: 1px solid #86efac;
+    border: 1px solid var(--green-border);
   }
 }
 
@@ -243,7 +248,7 @@
   width: 100%;
   box-sizing: border-box;
   outline: none;
-  background: #fff;
+  background: var(--bg-surface);
   color: var(--gray-body);
   transition:
     border-color var(--transition-fast),
@@ -271,7 +276,7 @@
   background: var(--blue-bg-soft);
 
   &:focus {
-    background: #fff;
+    background: var(--bg-surface);
   }
 }
 
@@ -290,7 +295,7 @@
   &:focus {
     border-color: var(--red);
     box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
-    background: #fff;
+    background: var(--bg-surface);
   }
 }
 
@@ -385,18 +390,20 @@
     transform: translateY(1px);
   }
 
+  // `--blue-solid`/`--blue-solid-hover` (not `--blue`/`--blue-dark`) — same theme-constant
+  // solid-fill-behind-white-text reasoning as `.tb-function-chip--active` above.
   &--primary {
-    background: var(--blue);
+    background: var(--blue-solid);
     color: #fff;
     box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
 
     &:hover:not(:disabled) {
-      background: var(--blue-dark);
+      background: var(--blue-solid-hover);
     }
   }
 
   &--outline {
-    background: #fff;
+    background: var(--bg-surface);
     border-color: var(--blue);
     color: var(--blue);
 
@@ -405,18 +412,19 @@
     }
   }
 
+  // `--green-solid`/`--green-solid-hover` — same theme-constant solid-fill reasoning as `--primary` above.
   &--success {
-    background: var(--green);
+    background: var(--green-solid);
     color: #fff;
     box-shadow: 0 1px 2px rgba(22, 163, 74, 0.25);
 
     &:hover:not(:disabled) {
-      background: var(--green-dark);
+      background: var(--green-solid-hover);
     }
   }
 
   &--danger-outline {
-    background: #fff;
+    background: var(--bg-surface);
     border-color: var(--red);
     color: var(--red);
 
@@ -430,7 +438,7 @@
   &--tiny {
     padding: 3px 9px;
     font-size: 11px;
-    background: #fff;
+    background: var(--bg-surface);
     border-color: var(--blue-border);
     color: var(--blue-dark);
     box-shadow: none;
@@ -455,7 +463,7 @@
     color: var(--green-dark);
     font-style: normal;
     background: var(--green-bg);
-    border: 1px solid #86efac;
+    border: 1px solid var(--green-border);
     border-radius: var(--radius-md);
     padding: 8px 12px;
   }
@@ -506,8 +514,8 @@
   }
 
   &--asof {
-    background: #eef2ff;
-    border-color: #c7d2fe;
+    background: var(--indigo-bg);
+    border-color: var(--indigo-border);
   }
 
   &__title {
@@ -527,7 +535,7 @@
   gap: 16px;
   padding: 3px 0;
   font-size: 12px;
-  border-bottom: 1px dashed rgba(30, 58, 95, 0.12);
+  border-bottom: 1px dashed var(--gray-border);
 
   &:last-child {
     border-bottom: none;
@@ -598,7 +606,7 @@
   align-items: center;
   border: 1px solid var(--gray-border);
   border-radius: var(--radius-md);
-  background: #fff;
+  background: var(--bg-surface);
   padding: 7px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -882,7 +890,7 @@
 .tb-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -892,7 +900,7 @@
 }
 
 .tb-dialog {
-  background: #fff;
+  background: var(--bg-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 100%;

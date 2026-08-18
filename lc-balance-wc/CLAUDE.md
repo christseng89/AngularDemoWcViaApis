@@ -5581,3 +5581,220 @@ server-side lists this fix is grounded in) — a human should still reproduce th
 real LC, Confirmed 10,000/Available 0, A2 Increase, Amount 10,000) and confirm no warning appears and
 Submit succeeds, then confirm A2 Decrease still correctly warns/rejects when the typed amount exceeds
 Available Balance, to fully close the loop.
+
+## Theme support (System / Light / Dark) — a new common framework feature, not per-function (2026-08-19, user-requested: "I would make this a common UI/UX requirement for the Balance Component... rather than implementing theme handling separately in each A1–A9 / B1–B5 function")
+
+Requirements, verbatim intent: three modes (System — follows OS/browser `prefers-color-scheme`, default;
+Light; Dark), an explicit Light/Dark choice overrides System, the choice persists across reload/reopen,
+every screen (Transaction Processing, Inquire Events, Balance Details, Event Timeline, validation
+messages, tables, dialogs, status indicators) follows it consistently, switching is immediate with no
+reload, and status colors (APPROVED/PENDING/EARMARKED/warnings/errors) stay legible in both themes. UI
+control: a plain "Theme: [System ▼]" dropdown.
+
+**Architecture — one new framework-level service, zero per-function code:**
+
+- New `src/app/theme.service.ts` — `ThemeService` (`@Injectable({providedIn: 'root'})`), completely
+  independent of `TransactionBuilderComponent`/any A1–A9/B1–B5 code, matching the user's own explicit
+  "common framework feature" framing. Plain class fields/getters (`mode: 'system'|'light'|'dark'`,
+  `effectiveTheme` getter), not an RxJS `BehaviorSubject` — same "template reads properties directly"
+  convention `InquireEventsService`/`LookUpPanelService` already established elsewhere in this file, since
+  every theme change here originates from a user-driven DOM event Angular's own change detection already
+  picks up.
+- Persistence: `localStorage` (`lc-balance-wc-theme` key), read in the constructor (so `AppComponent`
+  injecting the service at bootstrap applies the theme before first paint — as early as achievable without
+  `APP_INITIALIZER` machinery, judged disproportionate for a demo app's brief pre-paint window), written on
+  every `setMode()`. Both read and write are wrapped in `try/catch` (a locked-down browser context losing
+  persistence is non-fatal — the theme still applies for the session, it just won't survive a reload).
+- System-mode resolution: `window.matchMedia('(prefers-color-scheme: dark)')`. A live `change` listener on
+  the `MediaQueryList` is attached ONLY while `mode === 'system'` and explicitly torn down the instant the
+  user picks Light/Dark (`syncSystemListener()`) — the concrete mechanism behind Requirement #3 ("explicit
+  selection overrides system preference... permanently, not just at the moment of picking").
+- Applies the resolved `effectiveTheme` to **two** DOM attributes on `<html>`: this app's own `data-theme`
+  (drives the custom CSS-variable overrides below) and Bootstrap's own `data-bs-theme` (Bootstrap 5.3+ —
+  confirmed via `package.json`, `"bootstrap": "^5.3.0"` — ships native dark-mode support keyed off this
+  exact attribute). Setting both from one resolved value is what gives Business Case Runner's own plain
+  default-Bootstrap `.card`/`.btn`/`.table` markup (deliberately left unstyled by the earlier
+  "professional L&F stylesheet pass" — see that entry above, "Deliberately out of scope") real dark-mode
+  support for free, with zero custom CSS needed for that page — satisfying Requirement #5's "ALL screens"
+  without writing Business-Case-Runner-specific theme code.
+
+**CSS tokens (`src/styles.scss`)** — every existing custom-property NAME kept unchanged (nothing consuming
+`var(--gray-bg)`/`var(--blue-border)`/etc. anywhere in this app needed touching); two new override blocks
+added beneath the existing light-mode `:root` block, the standard robust light/dark pattern:
+```scss
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { @include dark-theme-tokens; } }
+:root[data-theme='dark'] { @include dark-theme-tokens; }
+```
+(a `@mixin` holding the shared value list, `@include`d into both selectors rather than duplicated by hand
+— the bare `@media` block is defense-in-depth for the brief pre-JS-bootstrap window and a no-JS fallback;
+the explicit `[data-theme='dark']` selector is what `ThemeService` actually drives once booted, and is
+what makes an explicit Dark pick win even on a light-OS system).
+
+New tokens: `--bg-page`/`--bg-surface` (replacing a hardcoded `body { background: #f5f6f8 }` and every
+literal `background: #fff` across `transaction-builder.component.scss`/`index-picker.component.scss` —
+13 call sites total, greped and converted, not sampled), `--overlay` (the dialog backdrop, was
+`rgba(15, 23, 42, 0.5)`), `--green-border` (was a repeated literal `#86efac`), `--indigo-bg`/
+`--indigo-border` (the Look Up panel's "as-of" balance-box variant, was `#eef2ff`/`#c7d2fe`), and a
+dashed-divider border that was a bespoke `rgba(30, 58, 95, 0.12)` (a navy tint) simplified to reuse the
+existing `--gray-border` token rather than inventing a themed navy-alpha pair for one divider.
+
+**A real contrast bug found and fixed WHILE building the dark palette, not after**: `--blue`/`--green` (etc.)
+serve two genuinely different roles in this stylesheet today — (a) colored TEXT/link/outline/border
+directly on the page background (tab-active color, focus rings, section top-borders, badge text) and (b) a
+SOLID button/chip FILL with white text on top (`.tb-btn--primary/--success`, `.tb-function-chip--active`).
+Role (a) needs to get BRIGHTER in dark mode for legibility against a dark page (dark-mode `--blue: #60a5fa`,
+`--green: #4ade80`, etc. — see `dark-theme-tokens` in `styles.scss` for the full palette and its own doc
+comment's contrast reasoning). Reusing that same brightened value for role (b) would put white text on a
+now-pale background, failing contrast outright — the opposite problem from role (a). Fixed by splitting out
+two new, deliberately THEME-CONSTANT tokens — `--blue-solid`/`--blue-solid-hover`,
+`--green-solid`/`--green-solid-hover` (same value in both themes, unchanged from light mode's own original
+`--blue`/`--green`/`-dark` values) — and repointing the 3 solid-fill rule groups
+(`.tb-btn--primary`, `.tb-btn--success`, `.tb-function-chip--active`) at them instead. Every OTHER usage
+of `--blue`/`--green`/etc. (badges, type tags, outline buttons, focus rings, section borders, tab-active
+text) was individually audited and confirmed to already be role (a) — text/border on a tinted or surface
+background, correctly served by the brightened dark-mode value with no further change needed.
+
+**Dark palette design** (not a rote hex-inversion — this app is a "deliberately subtle... banking/back-
+office tool, not a marketing site" per this stylesheet's own pre-existing design philosophy, cited
+elsewhere in this file): page `#0f172a` (near-black slate, not pure black), surfaces one step lighter
+(`#1e293b`) so cards/inputs/dialogs read as physically raised, body text a soft `#e2e8f0` (not pure white).
+The four status-badge accents (green/amber/red/violet) each get a translucent tint of their own hue over
+the dark surface (e.g. `--green-bg: rgba(74, 222, 128, 0.16)`) instead of light mode's solid pastel
+(which would itself look wrong on a dark page), paired with a BRIGHTENED foreground beyond even light
+mode's own `-dark` variant (light mode's `--green-dark: #15803d` reads as muted against a dark background;
+dark mode uses `#86efac` — bright enough to clear WCAG AA's ~4.5:1 text-contrast floor against both the
+translucent tint and the plain dark surface behind it). `--navy` (headings) is also brightened
+(`#93c5fd`) for dark mode specifically — its light-mode value is a near-black navy that would be nearly
+invisible on a dark-slate page otherwise; this closes what would otherwise have been an easy-to-miss
+"the app's own branded navbar title vanishes in dark mode" gap.
+
+**UI control**: a plain native `<select>` in `app.component.ts`'s own branded navbar (`Theme: [System ▼]`),
+`[ngModel]="theme.mode" (ngModelChange)="theme.setMode($event)"` — matches this app's own established
+"plain native form control, no custom dropdown component" convention used everywhere else in this
+codebase. The navbar itself, previously hardcoded to Bootstrap's own non-theme-aware `navbar-light bg-white`
+utility classes, had those removed (a literal white background would never have darkened) — its background
+now comes from the app's own `--bg-surface` token via the existing `.navbar` rule in `styles.scss`, kept
+consistent with every other card/surface in the app rather than separately opting into `data-bs-theme`'s
+own navbar variant.
+
+**Tests**: new `theme.service.spec.ts` (15 tests) — default mode, a persisted mode read back, an
+unrecognized persisted value falling back to `'system'`, the theme applying to both `data-theme`/
+`data-bs-theme` at construction (before any user interaction), `setMode()` persisting + applying + an
+explicit Dark choice winning over a light-OS system, System-mode resolution both ways, a LIVE OS-preference
+change updating the DOM while still in System mode, the listener being torn down the instant an explicit
+mode is picked (and NOT reacting to a later OS flip once torn down), the listener re-attaching on a
+switch back to System, `matchMedia` being entirely unavailable (older-browser case) not throwing, and both
+`localStorage.getItem`/`setItem` throwing not crashing the service. `app.component.ts` itself stays outside
+`jest.config.js`'s own `collectCoverageFrom` (already excluded — "pure Angular bootstrap wiring", same as
+`app.config.ts`/`app.routes.ts`), so its own new dropdown binding is verified via the strict-template
+`ng build` (which fails loudly on an invalid `[ngModel]`/`(ngModelChange)` binding) rather than a dedicated
+component test, consistent with this project's own established convention for that file.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean (this
+specifically compiles the new SCSS `@mixin`/`@include` pair and both dark-mode override blocks — a syntax
+error there would fail this step), `npm run lint` 0 errors (217 pre-existing warnings, unchanged — the new
+files introduce none), full Angular suite **813/813 passing** (15 new), coverage
+**99.36/96.24/99.34/99.47%** (all four metrics clear the 95% floor; `theme.service.ts` itself
+97.67/94.73/100/100 — the one remaining uncovered branch, `applyEffectiveTheme()`'s own
+`typeof document === 'undefined'` SSR guard, is genuinely unreachable under jsdom, same class of
+defensive-fallback-never-reached-by-real-data gap already accepted elsewhere in this file). `backend/`
+33/33 and microservice 322/322 both re-run per this file's own standing rule, unaffected (Angular/CSS-only
+change).
+
+**Live in-browser verification — partially completed.** Confirmed live against the already-running dev
+stack (per this file's own "don't chase port conflicts, verify via build/tests instead" posture — a dev
+server from an earlier session in this long day was already up): switching Theme from System (rendered
+dark on this machine's own OS/browser default, confirmed by the very first screenshot before any test
+interaction) to Light instantly re-themed the ENTIRE page — navbar background/text, page background, the
+Transaction Processing function chips, tabs, and card borders — with **zero page reload** (the URL/route
+never changed); the new Import LC Master Records Index (LC Number/Currency/LC Amount/Available Balance/
+`ACTIVE` status badge/Last Event Date-Time) rendered correctly and legibly in Light mode, including its
+own search/filter box narrowing results live.
+
+**Not independently re-confirmed this pass**: the specific APPROVED/PENDING/EARMARKED badge palette in
+Dark mode side by side (the user's own explicitly named contrast requirement) — attempts to drill into a
+specific LC's own merged Event Timeline (which shows all three) were blocked by two separate,
+**pre-existing, unrelated-to-this-change** issues hit while navigating: (1) the same click-coordinate/
+screenshot flakiness this file's own history already documents extensively elsewhere (a click registering
+against a stale screenshot's coordinates after the viewport reflowed); (2) the already-running dev
+server's own live TypeScript overlay surfaced a real-looking `TS2322` error at
+`inquire-events.service.ts:551:4` (`LcIndexRow` missing `tenorType`) that this session's own from-scratch
+`npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` — run against the exact
+same current source, moments earlier in this same pass — both passed CLEAN against. This strongly
+indicates the long-running dev server's own incremental-compile cache was stale/desynced from disk (a
+known class of issue after a long session's worth of file edits across many prior forks), not a real
+defect in the committed source — consistent with this file's own standing guidance not to chase dev-server
+process issues. Not restarted (out of scope for this pass, and risks disrupting whatever else the user has
+running). A human should restart `ng serve` cleanly (or simply reload once it's healthy) and: (1) confirm
+Dark mode specifically for APPROVED (green)/PENDING (amber)/EARMARKED (violet)/error (red) badges side by
+side on a real LC's Event Timeline; (2) reload the page after picking Dark and confirm it stays Dark
+(persistence itself IS unit-tested directly, per the test list above, just not re-proven through an actual
+browser reload this pass); (3) if the browser supports emulating `prefers-color-scheme`, confirm System
+mode actually follows an emulated OS toggle.
+
+## Inquire Events — Tenor Type column added to the LC Master Records Index, both sides (2026-08-19, user-requested — "add one additional column: TENOR TYPE... displayed immediately after the LC Number / Reference Number", applied identically to Import LC and Export Confirmed LC)
+
+Adds one column to the LC Master Records Index (the paginated browse table added earlier this same day —
+see the "LC Master Records Index" entries above) — positioned right after LC Number, before Currency, per
+the user's own worked example table. Zero new HTTP calls: `contract.tenorType` is already present on the
+`BalanceContract` object `loadIndexRow()` already has in hand while assembling each row.
+
+**"Mixed Tenor" deliberately NOT implemented — explicitly deferred by the user.** The user first floated a
+"Mixed Tenor" display case (shown when an LC has multiple tenor types), then, when asked via
+`AskUserQuestion` to clarify the detection rule (their own first answer, "Mixed Tenor will have an LC
+Number + Mix Number as the LC Number," didn't pin down an exact, implementable pattern), replied "Not for
+the time-being" to a follow-up question offering three concrete pattern options. Per that explicit answer,
+NO Mixed Tenor detection logic was added — no substring/pattern matching on `naturalKey.lcNumber`, no TODO
+stub. This is a genuine deferral, not an oversight: a single `BalanceContract`'s own `tenorType` is one
+fixed value, declared once at Issue and protected thereafter (Design doc §7 Tenor Type Routing) — there is
+no existing multi-value case in the current data model for a "Mixed Tenor" label to resolve against. If
+this is picked up later, the exact LC-Number-encodes-a-"Mix-Number" pattern needs to be nailed down first
+(a real example LC Number, or the precise delimiter/format) before any detection logic can be written
+safely — guessing a pattern was explicitly avoided here per the user's own instruction not to proceed on
+this piece yet.
+
+**Implementation**: new exported `tenorTypeLabel(tenorType, side)` (`balance-component.model.ts`) — reuses
+the SAME two option arrays A1's/B1's own tenorType Formly `select` fields are already built from
+(`ALL_TENOR_OPTIONS` for Import: "Sight"/"Seller's Usance"/"Buyer's Usance"; `EXPORT_TENOR_OPTIONS` for
+Export: "Sight"/"Usance" — B1's own established rule that Buyer's/Seller's Usance is meaningless from the
+confirming bank's point of view, see that array's own pre-existing doc comment) rather than a third,
+independently-maintained copy of these three label strings. Returns "—" for a null/undefined `tenorType`
+(legacy data, or an instrumentType where it doesn't apply) or an unresolved combination (e.g. a
+`BUYERS_USANCE` value on the Export side, which the business rules say should never occur but is handled
+the same defensive way as every other unresolved-lookup fallback in this file, not a thrown error). New
+`LcIndexRow.tenorType: string` field, populated in `loadIndexRow()` via
+`tenorTypeLabel(contract.tenorType, this.side)` — `this.side` already correctly selects Import vs. Export
+wording since `loadIndexRow()` is only ever called from `loadIndex()`, itself already side-scoped. Template
+(`transaction-builder.component.html`): one new `<th>Tenor Type</th>`/`<td>{{ row.tenorType }}</td>` pair
+in the ALREADY-shared Index table markup (confirmed still genuinely one shared block serving both sides,
+not two — a single-location addition applies identically to both).
+
+**Tests**: `balance-component.model.spec.ts` gained a dedicated `tenorTypeLabel` describe block (Import's
+full three-value spelling; Export's "Usance" relabeling; the "—" fallback for null/undefined/an
+never-legitimate Export value). `inquire-events.service.spec.ts`'s existing Index describe block extended
+— the Import `loadIndex()` test's own two fixture contracts (`s001()`/`s002()`) now declare
+`tenorType: 'BUYERS_USANCE'`/`'SIGHT'` with new assertions proving `row.tenorType` resolves to "Buyer's
+Usance"/"Sight"; the Export `loadIndex()` test's own `confirmation` fixture gained `tenorType:
+'SELLERS_USANCE'` with a new assertion proving it resolves to plain "Usance," not "Seller's Usance" —
+directly proving the side-aware relabeling wired correctly end to end, not just at the pure-function level.
+Three pre-existing bare `LcIndexRow` object literals (in the empty-page/`selectLcFromIndex()`/
+`backToIndex()` tests) needed the new required field added for TS compile — mechanical, no assertion logic
+changed.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean
+(strict templates — the new `<td>` binding compiles against the real `LcIndexRow` type), `npm run lint` 0
+errors (217 pre-existing warnings, unchanged — no new `any` usage). Full Angular suite **816/816 passing**
+(6 net new/changed), coverage 99.36/96.26/99.35/99.47% (all four metrics clear the 95% floor).
+`backend/` 33/33 and microservice 322/322 both re-run per this file's own standing rule, unaffected
+(Angular-only change, no new HTTP call).
+
+This pass ran concurrently with the System/Light/Dark theme feature (entry immediately above) — scoped
+deliberately to avoid any file overlap: touched only `balance-component.model.ts`,
+`balance-component.model.spec.ts`, `inquire-events.service.ts`, `inquire-events.service.spec.ts`, and the
+Index table block inside `transaction-builder.component.html`; did not touch `styles.scss`,
+`app.component.ts`, `theme.service.ts`, or any `.scss` file. Live in-browser verification not attempted
+this pass (no live in-browser check was performed for this specific change) — static verification (strict-
+template build, full lint, and dedicated tests proving the side-aware label resolution end to end through
+`loadIndex()`) is strong; a human should open Inquire Events on both Import LC and Export Confirmed LC and
+confirm the Tenor Type column renders in the correct position with correct labels for real Sight/Usance LC
+data on each side.

@@ -299,10 +299,10 @@ describe('InquireEventsService', () => {
    */
   describe('LC Master Records Index (loadIndex / searchIndex / paging / selectLcFromIndex / backToIndex)', () => {
     function s001(): BalanceContract {
-      return makeContract({ balanceContractId: 'bc-s001', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' }, status: 'ACTIVE', currency: 'USD' });
+      return makeContract({ balanceContractId: 'bc-s001', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' }, status: 'ACTIVE', currency: 'USD', tenorType: 'BUYERS_USANCE' });
     }
     function s002(): BalanceContract {
-      return makeContract({ balanceContractId: 'bc-s002', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S002' }, status: 'ACTIVE', currency: 'EUR' });
+      return makeContract({ balanceContractId: 'bc-s002', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S002' }, status: 'ACTIVE', currency: 'EUR', tenorType: 'SIGHT' });
     }
     function sgUnderS001(): BalanceContract {
       return makeContract({ balanceContractId: 'bc-sg-s001', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
@@ -351,11 +351,13 @@ describe('InquireEventsService', () => {
       expect(row1.availableBalance).toBe('77000');
       expect(row1.currency).toBe('USD');
       expect(row1.status).toBe('ACTIVE');
+      expect(row1.tenorType).toBe("Buyer's Usance"); // 2026-08-19 — Tenor Type column, positioned right after LC Number.
       expect(row1.lastEventAt).toBe(sgIssue.createdAt); // 2026-08-05 — later than S001's own latest movement (2026-08-04).
 
       const row2 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S002')!;
       expect(row2.lcAmount).toBe('9999');
       expect(row2.availableBalance).toBe('5000');
+      expect(row2.tenorType).toBe('Sight');
       expect(row2.lastEventAt).toBe(issueS002.createdAt);
     });
 
@@ -368,7 +370,7 @@ describe('InquireEventsService', () => {
      * Confirmation contract's own movements at all).
      */
     it('loadIndex() on the Export Confirmed side derives lcAmount from ISSUE + signed AMEND (not AMEND_INCREASE/AMEND_DECREASE, which never apply to EPLC_CONFIRMATION)', () => {
-      const confirmation = makeContract({ balanceContractId: 'bc-cnf01', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE', currency: 'USD' });
+      const confirmation = makeContract({ balanceContractId: 'bc-cnf01', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE', currency: 'USD', tenorType: 'SELLERS_USANCE' });
       const issue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf01', movementType: 'ISSUE', amount: '100000', createdAt: '2026-08-01T00:00:00.000Z' });
       const amendIncrease = makeMovement({ movementId: 'mv-cnf-amend-inc', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '20000', createdAt: '2026-08-02T00:00:00.000Z' });
       const amendDecrease = makeMovement({ movementId: 'mv-cnf-amend-dec', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '-15000', createdAt: '2026-08-03T00:00:00.000Z' });
@@ -388,6 +390,9 @@ describe('InquireEventsService', () => {
       expect(svc.indexRows.length).toBe(1);
       expect(svc.indexRows[0].lcAmount).toBe('105000'); // 100000 + 20000 - 15000; the PENDING AMEND contributes nothing.
       expect(svc.indexRows[0].contract.naturalKey.lcNumber).toBe('CNF01');
+      // Export Confirmed LC labels SELLERS_USANCE as plain "Usance" (tenorTypeLabel()'s own side-aware rule) —
+      // NOT "Seller's Usance", which is Import-only wording (Buyer's/Seller's is meaningless to the confirming bank).
+      expect(svc.indexRows[0].tenorType).toBe('Usance');
     });
 
     it('a getSnapshot() failure for one row degrades to a placeholder Available Balance rather than failing the whole index', () => {
@@ -422,7 +427,7 @@ describe('InquireEventsService', () => {
     it('an empty page (no matching contracts) clears indexRows without any per-row fan-out calls', () => {
       const api = makeApi({ catalog: jest.fn(() => of(emptyCatalog())) });
       const svc = new InquireEventsService(api);
-      svc.indexRows = [{ contract: s001(), currency: 'USD', lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
       svc.loadIndex(1);
       expect(svc.indexRows).toEqual([]);
       expect(svc.indexLoading).toBe(false);
@@ -474,7 +479,7 @@ describe('InquireEventsService', () => {
       const issue = makeMovement({ balanceContractId: 'bc-s001', movementType: 'ISSUE' });
       const api = makeApi({ listMovements: jest.fn(() => of([issue])) });
       const svc = new InquireEventsService(api);
-      svc.indexRows = [{ contract, currency: 'USD', lcAmount: '100', availableBalance: '100', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexRows = [{ contract, currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '100', availableBalance: '100', status: 'ACTIVE', lastEventAt: null }];
       svc.indexPaging.page = 2;
       svc.indexPaging.total = 15;
       svc.indexSearch = 'S0';
@@ -495,7 +500,7 @@ describe('InquireEventsService', () => {
     it('backToIndex() only flips indexView back to INDEX — indexRows/indexPaging/indexSearch are untouched', () => {
       const svc = new InquireEventsService(makeApi());
       svc.indexView = 'EVENTS';
-      svc.indexRows = [{ contract: s001(), currency: 'USD', lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
       svc.indexPaging.page = 4;
       svc.indexSearch = 'kept';
 
