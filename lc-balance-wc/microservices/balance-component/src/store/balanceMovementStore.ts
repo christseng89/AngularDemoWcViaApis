@@ -50,6 +50,9 @@ interface MovementRow {
   root_event_snapshot: string | null;
   acceptance_event_snapshot: string | null;
   sg_event_snapshot: string | null;
+  finalize_event_snapshot: string | null;
+  finalize_acceptance_event_snapshot: string | null;
+  finalize_sg_event_snapshot: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -94,6 +97,9 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     rootEventSnapshot: row.root_event_snapshot ? (JSON.parse(row.root_event_snapshot) as BalanceSnapshot) : null,
     acceptanceEventSnapshot: row.acceptance_event_snapshot ? (JSON.parse(row.acceptance_event_snapshot) as BalanceSnapshot) : null,
     sgEventSnapshot: row.sg_event_snapshot ? (JSON.parse(row.sg_event_snapshot) as BalanceSnapshot) : null,
+    finalizeEventSnapshot: row.finalize_event_snapshot ? (JSON.parse(row.finalize_event_snapshot) as BalanceSnapshot) : null,
+    finalizeAcceptanceEventSnapshot: row.finalize_acceptance_event_snapshot ? (JSON.parse(row.finalize_acceptance_event_snapshot) as BalanceSnapshot) : null,
+    finalizeSgEventSnapshot: row.finalize_sg_event_snapshot ? (JSON.parse(row.finalize_sg_event_snapshot) as BalanceSnapshot) : null,
   };
 }
 
@@ -292,6 +298,27 @@ export class BalanceMovementStore {
      */
     acceptanceEventSnapshot?: string | null;
     sgEventSnapshot?: string | null;
+    /**
+     * 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變") — passed by release()
+     * ONLY for a Sight-tenor IPLC_LC/UTILIZE (A4's own finalize target), and ONLY then — every other
+     * release() call omits this key entirely, same COALESCE-preserves-existing-null posture as
+     * eventSnapshot/rootEventSnapshot above (this column never needs to be explicitly written back to
+     * null the way acceptance/sgEventSnapshot sometimes do, since a movement is only ever released once
+     * — RELEASED is terminal — so there is no "second release()" that could need to null it back out).
+     */
+    finalizeEventSnapshot?: string | null;
+    /**
+     * 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — same
+     * "release() passes it ONLY for isSightUtilizeFinalize, plain COALESCE" posture as
+     * finalizeEventSnapshot above. The COMPANION fix on this same date is what release() now does with
+     * `acceptanceEventSnapshot`/`sgEventSnapshot` above for that same case: it OMITS those two keys
+     * entirely (not merely passes null) — `hasAcceptanceEventSnapshot`/`hasSgEventSnapshot` below
+     * correctly compute to 0, leaving `acceptance_event_snapshot`/`sg_event_snapshot` frozen at whatever
+     * createMovement() originally captured — while these two new columns receive the freshly-recomputed
+     * release-time sibling figures instead.
+     */
+    finalizeAcceptanceEventSnapshot?: string | null;
+    finalizeSgEventSnapshot?: string | null;
   }): void {
     this.db
       .prepare(
@@ -302,7 +329,10 @@ export class BalanceMovementStore {
              event_snapshot = COALESCE(@eventSnapshot, event_snapshot),
              root_event_snapshot = COALESCE(@rootEventSnapshot, root_event_snapshot),
              acceptance_event_snapshot = CASE WHEN @hasAcceptanceEventSnapshot = 1 THEN @acceptanceEventSnapshot ELSE acceptance_event_snapshot END,
-             sg_event_snapshot = CASE WHEN @hasSgEventSnapshot = 1 THEN @sgEventSnapshot ELSE sg_event_snapshot END
+             sg_event_snapshot = CASE WHEN @hasSgEventSnapshot = 1 THEN @sgEventSnapshot ELSE sg_event_snapshot END,
+             finalize_event_snapshot = COALESCE(@finalizeEventSnapshot, finalize_event_snapshot),
+             finalize_acceptance_event_snapshot = COALESCE(@finalizeAcceptanceEventSnapshot, finalize_acceptance_event_snapshot),
+             finalize_sg_event_snapshot = COALESCE(@finalizeSgEventSnapshot, finalize_sg_event_snapshot)
          WHERE movement_id = @movementId`,
       )
       .run({
@@ -320,6 +350,9 @@ export class BalanceMovementStore {
         sgEventSnapshot: params.sgEventSnapshot ?? null,
         hasAcceptanceEventSnapshot: 'acceptanceEventSnapshot' in params ? 1 : 0,
         hasSgEventSnapshot: 'sgEventSnapshot' in params ? 1 : 0,
+        finalizeEventSnapshot: params.finalizeEventSnapshot ?? null,
+        finalizeAcceptanceEventSnapshot: params.finalizeAcceptanceEventSnapshot ?? null,
+        finalizeSgEventSnapshot: params.finalizeSgEventSnapshot ?? null,
       });
   }
 

@@ -206,6 +206,17 @@ export interface BalanceMovement {
    * field existed (pre-migration rows) and for reject()/cancel() (out of scope per business instruction
    * — those transitions leave whatever was captured at Create). Same "computed once, persisted
    * immutably, never recomputed at inquiry time" posture as contingentAccountEntry above.
+   *
+   * ONE exception to "OVERWRITTEN at release()", added 2026-08-18 (business instruction, "做完A4 A3
+   * 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" — after A4 finalizes, A3's own Event Snapshot must
+   * stay exactly as it was at A3's own transaction time, unchanged): for a Sight-tenor IPLC_LC/UTILIZE
+   * (the one movement type Inquire Events splits into a 'create' + 'finalize' row — see
+   * inquire-events.service.ts's own InquiredEvent doc comment on the Angular side, and
+   * BalanceService.release()'s own doc comment here), release() deliberately does NOT overwrite this
+   * field — it stays exactly what createMovement() captured (A3's own Document Arrival submission,
+   * PENDING) — and instead writes the release-time figure into the NEW finalizeEventSnapshot field
+   * below. Every OTHER movement type's own eventSnapshot is unaffected — still always overwritten at
+   * release(), same as before this date.
    */
   eventSnapshot?: BalanceSnapshot | null;
   /**
@@ -234,6 +245,37 @@ export interface BalanceMovement {
   acceptanceEventSnapshot?: BalanceSnapshot | null;
   /** Same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only — SHGT has no Export equivalent). */
   sgEventSnapshot?: BalanceSnapshot | null;
+  /**
+   * 2026-08-18, business instruction ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變") — the
+   * release-time counterpart to eventSnapshot's own new exception above: set ONLY when release() is
+   * finalizing a Sight-tenor IPLC_LC/UTILIZE (A4's own `payExistingUtilize` target — see
+   * BalanceService.release()'s own doc comment for the exact condition, reusing BAL-123's already-
+   * existing gate check). Holds the release-time balance (what eventSnapshot itself used to be
+   * overwritten with, before this date) WITHOUT touching eventSnapshot, which instead stays frozen at
+   * whatever createMovement() originally captured. Null for every other movement (the vast majority —
+   * this field only ever exists to give Inquire Events' own 'finalize' row, see
+   * inquire-events.service.ts's own InquiredEvent doc comment, something to read that its sibling
+   * 'create' row's eventSnapshot no longer provides once the two started genuinely diverging) and for
+   * movements predating this field.
+   */
+  finalizeEventSnapshot?: BalanceSnapshot | null;
+  /**
+   * 2026-08-18, business instruction ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變"
+   * — the LC/SG/Acceptance figures a snapshot preserves must NOT be changed by a later transaction) —
+   * the release-time counterpart to acceptanceEventSnapshot above, same rule finalizeEventSnapshot
+   * already established for eventSnapshot itself: set ONLY when release() finalizes a Sight-tenor
+   * IPLC_LC/UTILIZE (isSightUtilizeFinalize). Reproduces the live gap exactly: LC S01's own A3 Document
+   * Arrival happened BEFORE SG G01 was even issued (A8), so acceptanceEventSnapshot/sgEventSnapshot
+   * captured at A3's own createMovement() time correctly show "no such contract yet" — but
+   * captureSiblingSnapshots() was, before this date, unconditionally RE-RUN and OVERWRITTEN at every
+   * release() call regardless of movement type, silently replacing that correct "didn't exist yet"
+   * picture with whatever the sibling looked like by A4's own much-later Release. Without this field,
+   * A3's own 'create' row (Inquire Events) would incorrectly show A8's SG as if it already existed at
+   * A3's own transaction time. Null for every other movement and for movements predating this field.
+   */
+  finalizeAcceptanceEventSnapshot?: BalanceSnapshot | null;
+  /** Same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only). */
+  finalizeSgEventSnapshot?: BalanceSnapshot | null;
 }
 
 export interface BalanceSnapshot {

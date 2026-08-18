@@ -131,7 +131,23 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- of that type exists under this movement's own root LC/Confirmation. JSON. See types.ts's
   -- BalanceMovement.acceptanceEventSnapshot/sgEventSnapshot doc comments.
   acceptance_event_snapshot TEXT,
-  sg_event_snapshot        TEXT
+  sg_event_snapshot        TEXT,
+  -- 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變") — the release-time
+  -- counterpart to event_snapshot's own new exception (see that column's comment above and types.ts's
+  -- BalanceMovement.eventSnapshot doc comment): set ONLY when release() finalizes a Sight-tenor
+  -- IPLC_LC/UTILIZE (A4), so event_snapshot itself can stay frozen at whatever createMovement()
+  -- originally captured (A3's own submission) instead of being overwritten. JSON. Null for every other
+  -- movement. See types.ts's BalanceMovement.finalizeEventSnapshot doc comment.
+  finalize_event_snapshot TEXT,
+  -- 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — same
+  -- freeze-at-transaction-time fix as finalize_event_snapshot above, extended to the sibling snapshot
+  -- columns: acceptance_event_snapshot/sg_event_snapshot must also stay frozen at whatever
+  -- createMovement() originally captured for a Sight-tenor IPLC_LC/UTILIZE (A3's own transaction time,
+  -- possibly before the sibling even existed yet), never overwritten by A4's own later Release. JSON.
+  -- Null for every other movement. See types.ts's BalanceMovement.finalizeAcceptanceEventSnapshot/
+  -- finalizeSgEventSnapshot doc comments.
+  finalize_acceptance_event_snapshot TEXT,
+  finalize_sg_event_snapshot TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

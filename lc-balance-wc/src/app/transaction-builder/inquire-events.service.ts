@@ -3,7 +3,7 @@ import { FormlyFieldConfig } from '@ngx-formly/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, resolveFunctionForMovement } from './balance-component.model';
+import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, payExistingUtilizeFunctionFor, resolveFunctionForMovement } from './balance-component.model';
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
 import { BuilderModel } from './function-policy';
 import { describeApiError } from './api-error';
@@ -13,10 +13,43 @@ import { describeApiError } from './api-error';
  * pairs a raw BalanceMovement with the BalanceContract that owns it (Adapter pattern): a movement alone
  * carries neither instrumentType nor naturalKey, both of which the merged cross-ledger timeline and the
  * read-only screen reconstruction below both need.
+ *
+ * Bug fixed 2026-08-18, business-reported live example — LC S01: "A1 Issue → A3 Document Arrival → A8
+ * Shipping Guarantee Issue → A4 Sight Payment" is the real chronological order, but the merged timeline
+ * only ever showed 3 rows (A1/A3/A8), with A4 nowhere to be found — because A4 (Sight Settlement) does
+ * NOT create its own movement (`payExistingUtilize`, see balance-component.model.ts's own A4 entry): it
+ * only Maker-Submits then Checker-Releases the SAME UTILIZE row A3 already created. That one row carries
+ * only ONE `createdAt` (A3's own, at Document Arrival submission) — A4's own, much-later Release
+ * (`releasedAt`) was invisible to the sort entirely, so the row stayed pinned at its EARLY, A3-labeled
+ * position (`resolveFunctionForMovement` always resolves this (instrumentType, movementType) pair to A3,
+ * the first registry match) even after A8 had already happened and A4 finalized hours later. Confirmed
+ * live against the real DB (`balance-component.sqlite`): S01's own UTILIZE row —
+ * `createdAt: 2026-08-17T11:30:35Z` (A3), `makerSubmittedAt: 2026-08-17T15:37:01Z` /
+ * `releasedAt: 2026-08-17T15:37:08Z` (A4) — vs. S01's own SHGT ISSUE (A8) at `createdAt:
+ * 2026-08-17T11:31:01Z`, sitting chronologically BETWEEN the two.
+ *
+ * `eventTime`/`eventStatus`/`phase` below are what fixes this: every OTHER movement in this app creates
+ * a brand-new row for its own later completion (A6/B4's own compound `referencedTransactionId`
+ * mechanism), so `phase` is 'primary' and `eventTime`/`eventStatus` are just the movement's own
+ * `createdAt`/`status` — but A4 is the one function in the whole registry that finalizes an EXISTING
+ * row instead of creating a new one, so THAT specific row is split into two InquiredEvent entries
+ * sharing the same underlying `movement`, each with its own accurate position/status: `phase: 'create'`
+ * (A3's own submission, `eventTime: movement.createdAt`, `eventStatus` forced 'PENDING' — historically
+ * accurate, since Confirmed Balance genuinely hadn't moved yet at that moment) and `phase: 'finalize'`
+ * (A4's own Release, `eventTime: movement.releasedAt`, `eventStatus: movement.status` — the movement's
+ * real, current terminal status). See `toEventRows()` below for the exact split condition and
+ * `selectEvent()`'s own doc comment for how `phase` changes which function code (A3 vs A4) and which
+ * balance-impact figures the "View" screen shows for each of the two rows.
  */
 export interface InquiredEvent {
   movement: BalanceMovement;
   contract: BalanceContract;
+  /** The true Event Date/Time this ROW represents — sort/display MUST use this, never movement.createdAt directly (see this file's own doc comment above). */
+  eventTime: string;
+  /** movement.status AS OF eventTime — the movement's own current status for 'primary'/'finalize'; forced 'PENDING' for a 'create' row, which by definition precedes its own later 'finalize' row. */
+  eventStatus: BalanceMovement['status'];
+  /** 'primary' — the common case, this row IS the movement's only real-world event. 'create'/'finalize' — see this file's own doc comment: A4 (Sight Settlement) finalizing an EXISTING A3/A3S row, the one case in this registry where one movement spans two materially separate, independently-timed business actions. */
+  phase: 'primary' | 'create' | 'finalize';
 }
 
 /** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
@@ -213,15 +246,40 @@ export class InquireEventsService {
     const childTypes = childInstrumentTypesOf(root.instrumentType);
     forkJoin([this.movementsOf(root), ...childTypes.map((childType) => this.childMovementsOf(childType, root.naturalKey.lcNumber))]).subscribe((groups) => {
       this.eventsLoading = false;
-      this.events = groups.flat().sort((a, b) => new Date(a.movement.createdAt).getTime() - new Date(b.movement.createdAt).getTime());
+      this.events = groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
     });
   }
 
   private movementsOf(contract: BalanceContract): Observable<InquiredEvent[]> {
     return this.api.listMovements(contract.balanceContractId).pipe(
-      map((movements) => movements.map((movement) => ({ movement, contract }))),
+      map((movements) => movements.flatMap((movement) => this.toEventRows(movement, contract))),
       catchError(() => of([] as InquiredEvent[])),
     );
+  }
+
+  /**
+   * Splits one BalanceMovement into its one or two real-world Inquire Events rows — see InquiredEvent's
+   * own doc comment for the full "A4 Sight Payment" bug this fixes. Every movement produces exactly one
+   * 'primary' row UNLESS it is a Sight-tenor IPLC_LC UTILIZE (A3/A3S's own Document Arrival earmark)
+   * that has since been finalized (`status !== 'PENDING'`, `releasedAt` set) — the one case A4's own
+   * `payExistingUtilize` flag identifies, where a LATER business action (Maker-Submit + Checker-Release)
+   * completes an EXISTING movement instead of creating a new one — in which case it produces two:
+   * 'create' (the original submission, at its own createdAt, historically PENDING — Confirmed Balance
+   * genuinely hadn't moved yet) and 'finalize' (the Release, at releasedAt, showing the movement's real
+   * current status). `releasedAt` is reused (not a new field) — it's set for ANY second-actor outcome on
+   * this row (release/reject/cancel, see balanceService.ts's own release()/reject() — both call
+   * updateStatus() with releasedAt: this.now()), not release specifically, so a Sight Document Arrival
+   * that was instead rejected/cancelled still correctly splits into its own 'create' + 'finalize' pair.
+   */
+  private toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
+    const isFinalizedSightUtilize = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType === 'SIGHT' && movement.status !== 'PENDING' && !!movement.releasedAt;
+    if (!isFinalizedSightUtilize) {
+      return [{ movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'primary' }];
+    }
+    return [
+      { movement, contract, eventTime: movement.createdAt, eventStatus: 'PENDING', phase: 'create' },
+      { movement, contract, eventTime: movement.releasedAt as string, eventStatus: movement.status, phase: 'finalize' },
+    ];
   }
 
   private childMovementsOf(instrumentType: InstrumentType, lcNumber: string): Observable<InquiredEvent[]> {
@@ -260,11 +318,32 @@ export class InquireEventsService {
    * (api.getBalanceAsOfMovement()) applies only to the ONE tab matching the event's own ledger, only
    * when its eventSnapshot is null (a movement created before that field existed) — the LC/Acceptance/SG
    * sibling fields have no live-fallback equivalent for such pre-migration rows; they simply stay empty.
+   *
+   * `event.phase` (2026-08-18, "A4 Sight Payment" ordering fix — see InquiredEvent's own doc comment):
+   * a 'finalize' row resolves its function via payExistingUtilizeFunctionFor() instead of the generic
+   * resolveFunctionForMovement() (which would always return A3, the earlier-registered, identically-
+   * shaped function) — so the "View" screen correctly shows "A4 · Sight Settlement" for that row, "A3 ·
+   * Document Arrival" for its sibling 'create' row. A 'create' row's own `impact` is forced to
+   * `{before: null, after: null}` regardless of the movement's real (already-finalized) balanceBefore/
+   * balanceAfter — showing the ACTUAL current impact figures next to a historically-accurate "Status:
+   * Pending" would be self-contradictory (Confirmed Balance genuinely hadn't moved yet at that earlier
+   * moment); the existing #balanceSnapshotBox template already renders a null `impact.after` as "still
+   * PENDING — not yet affected until Released", so this reuses that rendering verbatim rather than
+   * needing a template change.
+   *
+   * The Balance Tabs' own LC-tab `snapshot` IS also adjusted per phase (2026-08-18, business instruction
+   * "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" — closes what was, until this date, an
+   * honestly-flagged limitation right here): a 'finalize' row reads `movement.finalizeEventSnapshot`
+   * (falling back to `movement.eventSnapshot` for a movement created before that field existed) instead
+   * of `movement.eventSnapshot` directly — the microservice's own release() no longer overwrites
+   * eventSnapshot for this specific case, so `ownSnapshot` below is what makes the 'create' row's LC tab
+   * (still reading plain `eventSnapshot`) stay frozen at A3's own original value while the 'finalize'
+   * row's own tab correctly shows the RELEASED-state figures instead.
    */
   selectEvent(event: InquiredEvent): void {
     this.selectedEvent = event;
     const { movement, contract } = event;
-    const fn = resolveFunctionForMovement(contract.instrumentType, movement.movementType) ?? null;
+    const fn = (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType) ?? null;
     this.selectedEventFunction = fn;
 
     const model: BuilderModel = {
@@ -296,7 +375,18 @@ export class InquireEventsService {
     const isRootEvent = contract.instrumentType === this.rootContract?.instrumentType;
     const isAcceptanceEvent = contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE';
     const isSgEvent = contract.instrumentType === 'SHGT';
-    const ownImpact = { before: movement.balanceBefore, after: movement.balanceAfter };
+    const ownImpact = event.phase === 'create' ? { before: null, after: null } : { before: movement.balanceBefore, after: movement.balanceAfter };
+    // 'finalize' reads finalizeEventSnapshot (falling back to eventSnapshot for a pre-migration
+    // movement) — release() no longer overwrites eventSnapshot for this case, so 'create'/'primary'
+    // correctly keep reading plain eventSnapshot below, unaffected.
+    const ownSnapshot = event.phase === 'finalize' ? (movement.finalizeEventSnapshot ?? movement.eventSnapshot ?? null) : (movement.eventSnapshot ?? null);
+    // Same "'finalize' reads the finalize-time figure, 'create'/'primary' stay frozen at whatever was
+    // captured at Create" rule as ownSnapshot above, extended to the SIBLING snapshots (2026-08-18,
+    // "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — reproduces LC S01 exactly: a
+    // 'create' row (A3) submitted before its LC's own SG even existed must keep showing "none", not
+    // A4's own much-later Release picture of it.
+    const siblingAcceptanceSnapshot = event.phase === 'finalize' ? (movement.finalizeAcceptanceEventSnapshot ?? movement.acceptanceEventSnapshot ?? null) : (movement.acceptanceEventSnapshot ?? null);
+    const siblingSgSnapshot = event.phase === 'finalize' ? (movement.finalizeSgEventSnapshot ?? movement.sgEventSnapshot ?? null) : (movement.sgEventSnapshot ?? null);
     const lcNumber = this.rootContract?.naturalKey.lcNumber ?? this.lcNumber;
     const rootLabel = this.rootContract ? (BALANCE_SNAPSHOT_LABEL[this.rootContract.instrumentType] ?? this.rootContract.instrumentType) : 'Balance';
 
@@ -305,7 +395,7 @@ export class InquireEventsService {
         key: 'LC',
         label: rootLabel,
         title: `${rootLabel} — LC ${lcNumber}`,
-        snapshot: isRootEvent ? movement.eventSnapshot ?? null : (movement.rootEventSnapshot ?? null),
+        snapshot: isRootEvent ? ownSnapshot : (movement.rootEventSnapshot ?? null),
         impact: isRootEvent ? ownImpact : null,
       },
     ];
@@ -316,7 +406,7 @@ export class InquireEventsService {
         key: 'ACCEPTANCE',
         label: acceptanceLabel,
         title: `${acceptanceLabel} — LC ${lcNumber}${suffix}`,
-        snapshot: isAcceptanceEvent ? (movement.eventSnapshot ?? null) : (movement.acceptanceEventSnapshot ?? null),
+        snapshot: isAcceptanceEvent ? ownSnapshot : siblingAcceptanceSnapshot,
         impact: isAcceptanceEvent ? ownImpact : null,
       });
     }
@@ -326,14 +416,14 @@ export class InquireEventsService {
         key: 'SG',
         label: 'Shipping Guarantee Balance',
         title: `Shipping Guarantee Balance — LC ${lcNumber}${suffix}`,
-        snapshot: isSgEvent ? (movement.eventSnapshot ?? null) : (movement.sgEventSnapshot ?? null),
+        snapshot: isSgEvent ? ownSnapshot : siblingSgSnapshot,
         impact: isSgEvent ? ownImpact : null,
       });
     }
     this.selectedEventTabs = tabs;
     this.selectedEventTab = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
 
-    if (!movement.eventSnapshot) {
+    if (!ownSnapshot) {
       const ownTabKey: 'LC' | 'ACCEPTANCE' | 'SG' = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
       this.api.getBalanceAsOfMovement(movement.movementId).subscribe({
         next: (snapshot) => this.applyFallbackSnapshot(event, ownTabKey, snapshot),

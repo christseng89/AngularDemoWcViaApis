@@ -2127,6 +2127,133 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       expect(res.body.status).toBe('RELEASED');
     });
+
+    // 2026-08-18, business instruction ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" —
+    // once A4 finalizes, A3's own Event Snapshot must stay exactly as it was at A3's own transaction
+    // time, unchanged) — reproduces LC S01's own live scenario: A3's Document Arrival earmark
+    // (eventSnapshot captured PENDING, Confirmed Balance still 0) later finalized by A4 (Maker-Submit +
+    // Release). eventSnapshot must be byte-for-byte unchanged by the release; the release-time figures
+    // land in the NEW finalizeEventSnapshot field instead.
+    test("A4's own Release does NOT overwrite the UTILIZE's own eventSnapshot (A3's Create-time view) — the release-time figures go into finalizeEventSnapshot instead", async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-S01-SNAPSHOT' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'B01', createdBy: 'maker1' })
+        .expect(201);
+
+      // A3's own Create-time snapshot: still PENDING, Confirmed Balance hasn't moved yet.
+      const createTimeSnapshot = utilize.body.eventSnapshot;
+      expect(createTimeSnapshot).not.toBeNull();
+      expect(createTimeSnapshot.confirmedBalance).toBe('100000');
+      expect(utilize.body.finalizeEventSnapshot).toBeNull();
+
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      const released = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      // eventSnapshot is byte-for-byte unchanged from Create — release() did NOT overwrite it.
+      expect(released.body.eventSnapshot).toEqual(createTimeSnapshot);
+      // finalizeEventSnapshot instead holds the RELEASED-state figures (Confirmed Balance now moved).
+      expect(released.body.finalizeEventSnapshot).not.toBeNull();
+      expect(released.body.finalizeEventSnapshot.confirmedBalance).toBe('60000');
+
+      // Re-fetched via the Event Timeline (not just the immediate response) — same guarantee holds.
+      const movements = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+      const utilizeRow = movements.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
+      expect(utilizeRow.eventSnapshot).toEqual(createTimeSnapshot);
+      expect(utilizeRow.finalizeEventSnapshot.confirmedBalance).toBe('60000');
+    });
+
+    test('a Usance LC UTILIZE (released via A6, not A4) still gets eventSnapshot overwritten normally — finalizeEventSnapshot stays null, this preservation is Sight-only', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: 'LC-USANCE-SNAPSHOT' },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          createdBy: 'maker1',
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .expect(201);
+      const createTimeSnapshot = utilize.body.eventSnapshot;
+
+      const released = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      expect(released.body.eventSnapshot).not.toEqual(createTimeSnapshot);
+      expect(released.body.eventSnapshot.confirmedBalance).toBe('60000');
+      expect(released.body.finalizeEventSnapshot).toBeNull();
+    });
+
+    // 2026-08-18, business instruction ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易
+    //改變" — a snapshot must preserve the LC/SG/Acceptance figures AS THEY WERE, never changed by a
+    // later transaction), reproducing LC S01's own real sequence exactly: A1 Issue → A3 Document Arrival
+    // (submitted BEFORE any Shipping Guarantee exists under this LC) → A8 Shipping Guarantee Issue → A4
+    // Sight Payment. At A3's own transaction time there was genuinely NO Shipping Guarantee yet — its
+    // own sgEventSnapshot must correctly show "none" then, and must STILL show "none" after A4 finalizes
+    // hours later, even though a real SG exists by then.
+    test("A4's own Release does NOT overwrite the UTILIZE's own acceptanceEventSnapshot/sgEventSnapshot either — reproduces LC S01: A3 submitted before SG G01 existed, so its own sgEventSnapshot must stay null even after A4 finalizes", async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-S01-SG-SNAPSHOT' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-S01-SG-SNAPSHOT' }).expect(200);
+
+      // A3: Document Arrival — submitted BEFORE any SG exists under this LC.
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '22345', currency: 'USD', sourceTransactionRef: 'B01', createdBy: 'maker1' })
+        .expect(201);
+      expect(utilize.body.sgEventSnapshot).toBeNull();
+      expect(utilize.body.finalizeSgEventSnapshot).toBeNull();
+
+      // A8: Shipping Guarantee Issue — now a real SG exists under this LC.
+      const sgIssue = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'SHGT',
+          naturalKey: { lcNumber: 'LC-S01-SG-SNAPSHOT', sgNumber: 'G01' },
+          parentLogicalContractId: lcContract.body.logicalContractId,
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '12345',
+          currency: 'USD',
+          createdBy: 'maker1',
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${sgIssue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      // A4: Sight Payment — finalizes A3's own UTILIZE, hours after SG G01 now exists.
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      const released = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      // A3's own sgEventSnapshot is STILL null — correctly reflecting "no SG existed" at A3's own
+      // transaction time, unaffected by A8/A4 happening later.
+      expect(released.body.sgEventSnapshot).toBeNull();
+      // finalizeSgEventSnapshot instead captures the real, by-then-existing SG balance as of A4's own
+      // Release — the two are genuinely different moments in time, now correctly kept separate.
+      expect(released.body.finalizeSgEventSnapshot).not.toBeNull();
+      expect(released.body.finalizeSgEventSnapshot.confirmedBalance).toBe('12345');
+
+      // Re-fetched via the Event Timeline (not just the immediate response) — same guarantee holds.
+      const movements = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+      const utilizeRow = movements.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
+      expect(utilizeRow.sgEventSnapshot).toBeNull();
+      expect(utilizeRow.finalizeSgEventSnapshot.confirmedBalance).toBe('12345');
+    });
   });
 });
 

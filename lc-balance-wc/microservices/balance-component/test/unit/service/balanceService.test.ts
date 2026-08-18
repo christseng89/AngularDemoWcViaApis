@@ -361,10 +361,14 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     expect(examCreate.movement.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('0');
 
     // release() here is B4's own real finalization/consumption of the presentation — genuinely
-    // different from B3's own acknowledge() (which never touches status). Since this presentation was
-    // never acknowledged, it was still contributing to Pending — release() clears it to 0.
+    // different from B3's own acknowledge() (which never touches status). 2026-08-18 ("SAME AS EXPORT
+    // CONFIRMED LC... 不應該因為後續交易而改變" — superseding this test's own prior "release() clears it
+    // to 0" expectation): B3's own rootEventSnapshot must stay frozen at whatever createMovement()
+    // captured (B3's own transaction time), unaffected by B4's own later release() — the isPresentDocsFinalize
+    // fix in release() now leaves it untouched instead of recomputing/clearing it.
     const examReleased = service.release(examCreate.movement.movementId, 'checker1');
-    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('0');
+    expect(examReleased.rootEventSnapshot).toEqual(examCreate.movement.rootEventSnapshot);
+    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('40000');
     expect(examReleased.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('0');
   });
 
@@ -403,9 +407,71 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const acknowledgedParent = service.getBalanceSnapshot(confirmation.balanceContractId);
     expect(acknowledgedParent.presentDocsEarmarkApproved).toBe('40000');
 
+    // 2026-08-18 ("SAME AS EXPORT CONFIRMED LC") — B3's own rootEventSnapshot stays frozen at its own
+    // Create-time value (Pending 40000/Approved 0) even after acknowledge() AND release() — neither
+    // touches it; superseding this test's own prior "release() clears it to 0" expectation.
     const examReleased = service.release(examCreate.movement.movementId, 'checker1');
-    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('0');
+    expect(examReleased.rootEventSnapshot).toEqual(examCreate.movement.rootEventSnapshot);
+    expect(examReleased.rootEventSnapshot!.presentDocsEarmarkPending).toBe('40000');
     expect(examReleased.rootEventSnapshot!.presentDocsEarmarkApproved).toBe('0');
+  });
+
+  // 2026-08-18, business instruction ("SAME AS EXPORT CONFIRMED LC — Confirmed LC Balance and Acceptance
+  // Balance snapshots must not change due to a later transaction") — the Export-side
+  // analog of the S01/SG case: B3's own Present Docs earmark is submitted BEFORE any Acceptance exists
+  // under a Usance Confirmed LC; its own acceptanceEventSnapshot must stay null (correctly reflecting
+  // "no Acceptance yet"), even after an Acceptance is later created AND B4's own compound release
+  // finalizes B3's own record for real.
+  test("B3's own acceptanceEventSnapshot stays frozen (null — no Acceptance existed yet) even after an Acceptance is later created and B4 finalizes B3's own record", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const cnfIssue = service.createMovement({
+      instrumentType: 'EPLC_CONFIRMATION',
+      naturalKey: { lcNumber: 'EVSNAP-B3ACC' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      createdBy: 'maker1',
+    });
+    if (!cnfIssue.created) throw new Error('expected a new movement');
+    service.release(cnfIssue.movement.movementId, 'checker1');
+    const confirmation = service.resolveContract('EPLC_CONFIRMATION', { lcNumber: 'EVSNAP-B3ACC' });
+    if (!confirmation) throw new Error('expected the just-issued Confirmation to resolve');
+
+    // B3: submitted BEFORE any Acceptance exists under this Confirmed LC.
+    const examCreate = service.createMovement({
+      instrumentType: 'EPLC_EXAMINATION',
+      naturalKey: { lcNumber: 'EVSNAP-B3ACC', ibNumber: 'EB01' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '40000',
+      currency: 'USD',
+      parentLogicalContractId: confirmation.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!examCreate.created) throw new Error('expected a new movement');
+    expect(examCreate.movement.acceptanceEventSnapshot).toBeNull();
+
+    // An Acceptance now comes into existence under this same Confirmed LC.
+    const acceptCreate = service.createMovement({
+      instrumentType: 'EPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'EVSNAP-B3ACC', ibNumber: 'EB02' },
+      movementType: 'CREATE',
+      eventSeq: 1,
+      amount: '30000',
+      currency: 'USD',
+      parentLogicalContractId: confirmation.logicalContractId,
+      tenorType: 'SELLERS_USANCE',
+      createdBy: 'maker1',
+    });
+    if (!acceptCreate.created) throw new Error('expected a new movement');
+    service.release(acceptCreate.movement.movementId, 'checker1');
+
+    // B4 finalizes B3's own record for real, hours "later" — this must NOT retroactively populate B3's
+    // own acceptanceEventSnapshot with the Acceptance that didn't exist at B3's own transaction time.
+    const examReleased = service.release(examCreate.movement.movementId, 'checker1');
+    expect(examReleased.acceptanceEventSnapshot).toBeNull();
   });
 
   test('Acceptance events ALSO get a rootEventSnapshot now (parent LC\'s own balance) — confirmed via the revised, generalized "Look Up Current Balance saved to DB" design; their own eventSnapshot stays their own ledger', () => {

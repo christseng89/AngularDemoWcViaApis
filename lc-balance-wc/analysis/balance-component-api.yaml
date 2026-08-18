@@ -325,7 +325,35 @@ info:
     later viewed; business-confirmed it must be captured/persisted AT TRANSACTION TIME instead, matching
     every other snapshot field in this contract. `sgEventSnapshot` is Import-side only (Shipping
     Guarantee has no Export equivalent). Null for movements predating this field.
-  version: "1.8.0"
+
+
+    v1.9.0 (2026-08-18, business instruction, "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變"
+    — after A4 finalizes a Sight Document Arrival, A3's own Event Snapshot must stay exactly as it was
+    at A3's own transaction time, unchanged): new `BalanceMovement.finalizeEventSnapshot`. For every
+    movement type EXCEPT one, `eventSnapshot` still behaves exactly as v1.6.0 described (captured PENDING
+    at Create, OVERWRITTEN RELEASED at Release) — unchanged. The ONE exception: `POST
+    /balance-movements/{id}/release` finalizing a Sight-tenor `IPLC_LC`/`UTILIZE` (the v1.4.0/v1.5.0 gate's
+    own scoping — A4/Sight Settlement completing an EXISTING A3/A3S Document Arrival rather than creating
+    a new movement) now leaves `eventSnapshot` UNTOUCHED — frozen at whatever the original `POST
+    /balance-movements` call captured — and instead writes the release-time figures into this new
+    `finalizeEventSnapshot` field. Null for every other movement (the vast majority) and for movements
+    predating this field.
+
+
+    v1.10.0 (2026-08-18, same day, business instruction "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE
+    不會因為後續交易而改變" then "SAME AS EXPORT CONFIRMED LC" — the snapshot preservation guarantee
+    extended beyond just `eventSnapshot`/A4): new `BalanceMovement.finalizeAcceptanceEventSnapshot`/
+    `finalizeSgEventSnapshot` — the v1.9.0-style release-time counterparts to `acceptanceEventSnapshot`/
+    `sgEventSnapshot`, written ONLY for the same Sight-tenor `IPLC_LC`/`UTILIZE` finalize case (A4);
+    `acceptanceEventSnapshot`/`sgEventSnapshot` themselves stay frozen at Create-time for that one case,
+    exactly mirroring `eventSnapshot`/`finalizeEventSnapshot`'s own v1.9.0 split. Separately, `POST
+    /balance-movements/{id}/release` finalizing an `EPLC_EXAMINATION`/`CREATE` movement (B3's own Present
+    Docs earmark, always finalized for real by B4's own compound release — the Export-side counterpart to
+    A4) now leaves that movement's `eventSnapshot`/`rootEventSnapshot`/`acceptanceEventSnapshot` entirely
+    UNTOUCHED too — no new field needed for this case, since B4 always creates its own separate movement
+    with its own correctly-timed figures, so B3's own row simply needs to stay frozen with no "finalize"
+    counterpart to read.
+  version: "1.10.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1219,6 +1247,32 @@ components:
           description: >
             v1.8.0 — same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract
             instead. Import-side only (Shipping Guarantee has no Export equivalent).
+        finalizeEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.9.0, business instruction 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣
+            不應改變") — set ONLY when POST /balance-movements/{id}/release finalizes a Sight-tenor
+            IPLC_LC/UTILIZE (A4/Sight Settlement completing an EXISTING A3/A3S Document Arrival): the
+            release-time BalanceSnapshot, WITHOUT overwriting eventSnapshot above, which instead stays
+            frozen at whatever POST /balance-movements originally captured. Null for every other movement
+            and for movements predating this field.
+        finalizeAcceptanceEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.10.0, business instruction 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE
+            不會因為後續交易而改變") — the release-time counterpart to acceptanceEventSnapshot above, same
+            exception finalizeEventSnapshot established for eventSnapshot itself: set ONLY when release()
+            finalizes a Sight-tenor IPLC_LC/UTILIZE. acceptanceEventSnapshot/sgEventSnapshot themselves
+            stay frozen at Create-time for that case. Null for every other movement and for movements
+            predating this field.
+        finalizeSgEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.10.0 — same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee
+            contract instead. Import-side only (Shipping Guarantee has no Export equivalent).
 
     BalanceMovementCreateRequest:
       type: object

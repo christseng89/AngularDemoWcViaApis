@@ -91,7 +91,8 @@ describe('TransactionBuilderComponent — Inquire Events wiring', () => {
 
   it('inquireEvents.selectEvent() reconstructs a real read-only field set through the shared component-level service instance', () => {
     const c = new TransactionBuilderComponent(mockApi());
-    c.inquireEvents.selectEvent({ movement: movement(), contract: contract() });
+    const m = movement();
+    c.inquireEvents.selectEvent({ movement: m, contract: contract(), eventTime: m.createdAt, eventStatus: m.status, phase: 'primary' });
     expect(c.inquireEvents.selectedEventFields.length).toBeGreaterThan(0);
     expect(c.inquireEvents.selectedEventFields.every((f) => f.props?.disabled === true)).toBe(true);
   });

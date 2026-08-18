@@ -20,6 +20,7 @@ import {
   defaultLcInstrumentTypeForSide,
   childInstrumentTypesOf,
   resolveFunctionForMovement,
+  payExistingUtilizeFunctionFor,
   BALANCE_SNAPSHOT_LABEL,
   CURRENCY_OPTIONS,
 } from './balance-component.model';
@@ -722,6 +723,20 @@ describe('balance-component.model data invariants', () => {
 
     it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
       expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
+    });
+  });
+
+  // 2026-08-18, "A4 Sight Payment" ordering bug fix — InquireEventsService uses this instead of
+  // resolveFunctionForMovement() specifically for the LATER (Release) half of a finalized Sight
+  // Document Arrival, since the generic resolver above always returns A3 for that same pair.
+  describe('payExistingUtilizeFunctionFor', () => {
+    it('resolves IPLC_LC to A4 — the one function in the registry with payExistingUtilize set', () => {
+      expect(payExistingUtilizeFunctionFor('IPLC_LC')?.code).toBe('A4');
+    });
+
+    it('returns undefined for any instrumentType with no payExistingUtilize function of its own (e.g. SHGT, EPLC_CONFIRMATION — no Export equivalent exists)', () => {
+      expect(payExistingUtilizeFunctionFor('SHGT')).toBeUndefined();
+      expect(payExistingUtilizeFunctionFor('EPLC_CONFIRMATION')).toBeUndefined();
     });
   });
 

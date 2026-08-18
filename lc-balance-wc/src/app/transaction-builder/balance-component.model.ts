@@ -975,3 +975,18 @@ function movementTypeMatchesFunction(fn: TransactionFunction, movementType: stri
 export function resolveFunctionForMovement(instrumentType: InstrumentType, movementType: string): TransactionFunction | undefined {
   return [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].find((fn) => fn.instrumentType === instrumentType && movementTypeMatchesFunction(fn, movementType));
 }
+
+/**
+ * Inquire Events (2026-08-18, "A4 Sight Payment" ordering bug fix, live example LC S01) — the ONE
+ * function in this whole registry that finalizes (Maker-Submits + Checker-Releases) an EXISTING
+ * movement instead of creating a new one (`payExistingUtilize`, A4 only today — see that flag's own doc
+ * comment on TransactionFunction). resolveFunctionForMovement() above always resolves this same
+ * (instrumentType, movementType) pair to A3 (the first registry match) since A3/A4 share an identical
+ * shape — correct for the movement's own CREATE event, but wrong for its later, separately-timed
+ * FINALIZE event (A4's own Release). InquireEventsService uses this instead, specifically for that
+ * later event, so the "View" screen correctly shows "A4 · Sight Settlement" rather than "A3 · Document
+ * Arrival" once a Sight-tenor Document Arrival has actually been Sight-Settled.
+ */
+export function payExistingUtilizeFunctionFor(instrumentType: InstrumentType): TransactionFunction | undefined {
+  return IMPORT_FUNCTIONS.find((fn) => fn.instrumentType === instrumentType && fn.payExistingUtilize);
+}

@@ -189,6 +189,31 @@ export interface BalanceMovement {
   acceptanceEventSnapshot?: BalanceSnapshot | null;
   /** Same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only). */
   sgEventSnapshot?: BalanceSnapshot | null;
+  /**
+   * Business instruction 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變") — set
+   * ONLY when the microservice's own release() finalizes a Sight-tenor IPLC_LC/UTILIZE (A4's own
+   * payExistingUtilize target): the RELEASE-time balance, WITHOUT overwriting eventSnapshot above, which
+   * instead stays frozen at whatever createMovement() originally captured (A3's own submission). See the
+   * microservice's own BalanceMovement.finalizeEventSnapshot doc comment. Read by InquireEventsService's
+   * own 'finalize'-phase row (see InquiredEvent's own doc comment) instead of eventSnapshot. Null for
+   * every other movement and for movements predating this field.
+   */
+  finalizeEventSnapshot?: BalanceSnapshot | null;
+  /**
+   * Business instruction 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變")
+   * — the release-time counterpart to acceptanceEventSnapshot above, same exception
+   * finalizeEventSnapshot already established for eventSnapshot itself: set ONLY when the microservice's
+   * own release() finalizes a Sight-tenor IPLC_LC/UTILIZE. Reproduces LC S01 exactly — A3's own Document
+   * Arrival happened BEFORE SG G01 was even issued, so acceptanceEventSnapshot/sgEventSnapshot as
+   * captured at A3's own createMovement() correctly show "no such contract yet"; without this field, A4's
+   * own much-later Release would silently overwrite that correct picture with the sibling's by-then-
+   * existing balance. See the microservice's own BalanceMovement.finalizeAcceptanceEventSnapshot doc
+   * comment. Read by InquireEventsService's own 'finalize'-phase row instead of acceptanceEventSnapshot.
+   * Null for every other movement and for movements predating this field.
+   */
+  finalizeAcceptanceEventSnapshot?: BalanceSnapshot | null;
+  /** Same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only). */
+  finalizeSgEventSnapshot?: BalanceSnapshot | null;
 }
 
 /**

@@ -3577,3 +3577,231 @@ the two entries immediately above — a human should Release one PENDING item (a
 the screen lands back on a fresh, same-function form with the success hint visible, then confirm a second
 Release on a DIFFERENT function still works correctly (proving `actionBusy` didn't get stuck from the
 first one).
+
+## Bug fixed — Event Timeline's own Time column was silently clipped, not truncated by insufficient width (2026-08-17, reviewer-reported — A1-A9/B1-B5's "Look Up Current Balance → Event Timeline")
+
+Root cause: the Event Timeline `<table class="tb-table">` (Transaction Processing's own Look Up panel)
+sits directly inside `.tb-section`, which has `overflow: hidden` (kept for its rounded-corner header
+background). `.tb-table__time` is `white-space: nowrap`, so `table-layout: auto` refuses to shrink that
+column below its own content width — with no scroll surface of its own, that overflow had nowhere to go
+but silently CLIPPED by the ancestor instead of scrolling into view.
+
+**Fix**: wrapped the table in a new `.tb-table-scroll` container (`overflow-x: auto`,
+`transaction-builder.component.scss`) — `transaction-builder.component.html`'s Event Timeline `<table>`
+now renders inside it. Purely template/CSS, zero `.ts` change.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean,
+`npm run lint` 0 errors, full Angular suite 728/728 (unchanged count — template/CSS-only, this project's
+own direct-instantiation test convention never renders the DOM), coverage unaffected. `backend/` 33/33
+and microservice 311/311 both re-run per this file's own standing rule, unaffected.
+
+## Bug fixed — Inquire Events now shows A4 (Sight Settlement) as its own, correctly-timed row instead of hiding it inside A3's — reproduces LC S01 exactly (2026-08-18, business-reported — "A1 Issue → A3 Document Arrival → A8 Shipping Guarantee Issue → A4 Sight Payment" is the real order, "refer to S01 in DB")
+
+Root cause, confirmed live against `balance-component.sqlite`: S01's own `IPLC_LC`/`UTILIZE` movement
+(A3's own Document Arrival earmark) has `createdAt: 2026-08-17T11:30:08...35Z`-ish timestamps for
+A1/A3/A8 all within about a minute of each other, but its own `makerSubmittedAt`/`releasedAt`
+(A4's own real Maker-Submit + Checker-Release, per this file's own "A4 gained a REAL Maker Submit" entry
+above) — `15:37:01`/`15:37:08` — happened HOURS later, well after A8's own SG Issue. A4
+(`payExistingUtilize`) is the one function in the whole registry that finalizes an EXISTING movement
+instead of creating a new one, so this ONE row carries only a single `createdAt`, anchored at A3's own
+EARLY submission time — `InquireEventsService.loadEvents()`'s own createdAt-ascending sort (correct for
+every other function, which always creates a fresh movement for its own later completion — A6/B4's own
+`referencedTransactionId` mechanism) had no way to know A4's own, much-later Release ever happened: the
+row stayed pinned at its A3-labeled position, and A4 itself was invisible from the merged timeline
+entirely, never appearing as its own event even after A8.
+
+**Fix, `inquire-events.service.ts`**: `InquiredEvent` gained `eventTime`/`eventStatus`/`phase` — every
+sort/display in this service now reads `eventTime` (not `movement.createdAt` directly). New
+`toEventRows()` splits a movement into 2 rows ONLY when it's a finalized (`status !== 'PENDING'`,
+`releasedAt` set) Sight-tenor `IPLC_LC`/`UTILIZE` — the exact shape only A4 produces (a Usance Document
+Arrival is instead finalized by A6, which always creates its own separate Acceptance movement, so it
+never needs splitting): `phase: 'create'` (A3's own submission, `eventTime: createdAt`, `eventStatus`
+forced `'PENDING'` — historically accurate, Confirmed Balance genuinely hadn't moved yet) and
+`phase: 'finalize'` (A4's own Release, `eventTime: releasedAt`, `eventStatus: movement.status`).
+`releasedAt` is reused, not a new field — it's set for ANY second-actor outcome (release/reject/cancel),
+so a Sight Document Arrival that was instead rejected/cancelled still splits correctly.
+`selectEvent()`: a `'finalize'` row resolves its function via new `payExistingUtilizeFunctionFor()`
+(`balance-component.model.ts`) instead of the generic `resolveFunctionForMovement()` (which would always
+return A3, the earlier-registered, identically-shaped function) — so "View" correctly shows "A4 · Sight
+Settlement" for that row, "A3 · Document Arrival" for its sibling `'create'` row. A `'create'` row's own
+`impact` is forced to `{before: null, after: null}` regardless of the movement's real (already-finalized)
+balanceBefore/balanceAfter — showing the actual current impact next to a historically-accurate "Status:
+Pending" would be self-contradictory; the existing `#balanceSnapshotBox` template already renders a null
+`impact.after` as "still PENDING — not yet affected until Released", reused verbatim, no template change
+needed for that part. The merged Events table's Status/Time columns and the "Original Transaction
+Screen"'s own Status/Released rows were switched from `e.movement.status`/`e.movement.createdAt` to
+`e.eventStatus`/`e.eventTime` (`transaction-builder.component.html`) so the two rows read distinctly
+(Pending-then-Approved) instead of both showing the movement's current terminal state.
+
+**Known, honestly-scoped limitation as originally shipped — since CLOSED, same day, see the section
+immediately below**: the Balance Tabs' own `snapshot` figures were NOT originally adjusted per-phase —
+`movement.eventSnapshot` etc. are overwritten in place at Release time (business-confirmed 2026-08-17,
+"只存PENDING 或 APPROVED 其中一個"), so the ORIGINAL Pending-time snapshot no longer existed to show
+separately for the `'create'` row; both of a split movement's two rows read the same (current) snapshot
+data. Only `impact` (which IS derivable per-phase, from the movement's already-known before/after) was
+corrected in this first pass.
+
+**Tests**: `inquire-events.service.spec.ts` — a new test reproduces LC S01 field-for-field from the live
+DB dump (A1/A3/A8/A4's own real timestamps) and asserts the merged, sorted `events` array is exactly
+`['mv-issue', 'mv-utilize'(create), 'mv-sg', 'mv-utilize'(finalize)]` with the right `phase`/`eventStatus`/
+`eventTime` on each, plus `selectEvent()` resolving A3 vs A4 correctly and the `'create'` row's impact
+being suppressed; 2 more tests prove a Usance UTILIZE and a still-PENDING Sight UTILIZE do NOT split.
+`balance-component.model.spec.ts` — 2 new tests for `payExistingUtilizeFunctionFor()` (resolves `IPLC_LC`
+to A4; undefined for `SHGT`/`EPLC_CONFIRMATION`, no Export equivalent exists). ~29 pre-existing
+`InquiredEvent`-literal call sites across `inquire-events.service.spec.ts`/
+`transaction-builder.component.inquire.spec.ts` updated via a new `makeEvent()` fixture-builder helper
+(same convention this project's other spec files already use for `makeMovement()`/`makeContract()`) —
+mechanical, no assertion logic changed.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` clean,
+`npm run lint` 0 errors (211 pre-existing warnings, unchanged), full Angular suite 733/733 (5 new),
+coverage 99.55/96.3/99.52/99.56% (`inquire-events.service.ts` itself 100/96.9/100/100 — the few remaining
+uncovered branches are pre-existing, unrelated nullish-coalescing fallbacks). `backend/` 33/33 and
+microservice 311/311 both re-run per this file's own standing rule, unaffected (Angular-only change).
+Live in-browser verification not attempted this pass — static verification (typecheck, strict-template
+build, full lint, and a dedicated test reproducing the exact live DB scenario byte-for-byte) is unusually
+strong here; a human should still open Inquire Events on LC S01 and confirm the 4 rows now render in the
+order A1 → A3 (Pending) → A8 → A4 (Approved), and that clicking the A3 row shows "Status: Pending" with
+no Confirmed Balance impact while clicking the A4 row shows "Status: Approved" with the real impact.
+
+## A3's own Event Snapshot now stays frozen at Create-time even after A4 finalizes it — closes the limitation the entry above left open, SAME DAY (2026-08-18, business instruction: "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" — after A4 completes, A3's own Event Snapshot must stay exactly as it was at A3's own transaction time, not change to A4's result)
+
+Directly closes the "known, honestly-scoped limitation" the entry above shipped with — the user asked
+for it fixed the same day. Root cause (in the microservice, not the split-row logic itself): `release()`
+computes a fresh RELEASED-state balance and, for every movement, writes it into `eventSnapshot` via
+`COALESCE(@eventSnapshot, event_snapshot)` — which ALWAYS overwrites, since release() always supplies a
+non-null value. For the ONE movement Inquire Events splits into a `'create'` + `'finalize'` row (a Sight-
+tenor `IPLC_LC`/`UTILIZE`, `isSightUtilizeFinalize` — reusing BAL-123's own already-existing gate
+condition, extracted to a named const for both uses), this meant the `'create'` row's own LC tab —
+supposedly A3's own historical view — was silently showing A4's own release-time figures, since both
+rows read the SAME `movement.eventSnapshot` field off the SAME underlying movement object.
+
+**Fix, microservice (`microservices/balance-component/`)**: new `BalanceMovement.finalizeEventSnapshot`
+field (migration `id: 8`, `finalize_event_snapshot TEXT`, same JSON-column/`rowToMovement` round-trip
+convention as every other `*EventSnapshot` field) — `release()` now branches on `isSightUtilizeFinalize`:
+for that ONE case, `eventSnapshot: null` (a no-op through COALESCE — A3's own value survives completely
+untouched) and the release-time figure goes into `finalizeEventSnapshot` instead; for every OTHER
+movement, behavior is byte-for-byte unchanged (`eventSnapshot` still gets overwritten normally,
+`finalizeEventSnapshot` stays null forever). `store/balanceMovementStore.ts`'s `updateStatus()` gained a
+plain `COALESCE(@finalizeEventSnapshot, finalize_event_snapshot)` column — no "was this key provided"
+flag needed (unlike `acceptanceEventSnapshot`/`sgEventSnapshot`'s own trick) since a movement is only
+ever released once (RELEASED is terminal), so there's no second release() call that could need to null
+it back out.
+
+**Fix, Angular (`inquire-events.service.ts`)**: `selectEvent()`'s new `ownSnapshot` local —
+`event.phase === 'finalize' ? (movement.finalizeEventSnapshot ?? movement.eventSnapshot ?? null) :
+(movement.eventSnapshot ?? null)` (the `?? movement.eventSnapshot` fallback covers a movement finalized
+before this migration existed) — replaces the bare `movement.eventSnapshot ?? null` in all 3 tabs' own
+"own ledger" branch (LC/Acceptance/SG) and the legacy-fallback trigger (`if (!ownSnapshot)`, was
+`if (!movement.eventSnapshot)`). For every movement OTHER than a split Sight UTILIZE, `ownSnapshot`
+always equals `movement.eventSnapshot` exactly as before (phase is never `'finalize'` for those) — purely
+additive, zero behavior change outside the one case this whole feature is about.
+
+**Tests**: microservice — 2 new HTTP-integration tests in `app.test.ts`'s own "A4 (Sight Settlement) 4-
+eyes gate" describe block: one reproduces LC S01 end-to-end (create A3's UTILIZE, capture its
+`eventSnapshot`, Maker-Submit + Release via A4, assert the response's `eventSnapshot` is byte-for-byte
+`toEqual` the pre-release value while `finalizeEventSnapshot` holds the new RELEASED-state figures —
+re-verified via a follow-up `GET .../movements` call too, not just the immediate response) and one proves
+a Usance LC's own UTILIZE (released via A6, not A4) is UNAFFECTED — `eventSnapshot` still gets overwritten
+normally, `finalizeEventSnapshot` stays null, confirming the fix is genuinely Sight-only. `migrations.test.ts`
+asserts `finalize_event_snapshot` is added on a fresh run. 313/313 microservice tests passing (2 new),
+99.23/96.6/100/99.48% coverage, `npm run typecheck`/`npm run build`/`npm run lint` (0 errors, same 11
+pre-existing warnings) all clean. Angular — the LC S01 reproduction test extended with real
+`eventSnapshot`/`finalizeEventSnapshot` fixture values, asserting the `'create'` row's own LC tab
+`snapshot` is the EXACT `eventSnapshot` object (not merely equal-by-value) while the `'finalize'` row's
+own tab is the separate `finalizeEventSnapshot` object — directly proving object identity, not just
+matching numbers; plus one new test for the legacy-fallback-to-`eventSnapshot` path. 734/734 Angular
+tests passing (1 new), 99.55/96.31/99.52/99.56% coverage (`inquire-events.service.ts` itself 100/96.93/
+100/100 — the couple of remaining uncovered branches are edge-case fallback permutations, e.g. a
+`'finalize'` row where BOTH `finalizeEventSnapshot` and `eventSnapshot` are null, not untested business
+logic), `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint` (0
+errors) all clean. `backend/` 33/33 unaffected (no files under it touched).
+
+Live in-browser verification not attempted this pass, for the same reason as the entry immediately
+above — static verification (typecheck both projects, strict-template build, full lint, and dedicated
+tests reproducing the exact live DB scenario end-to-end through a real HTTP round-trip on the microservice
+side) is unusually strong here; a human should still run LC S01's own A1→A3→A8→A4 sequence live and
+confirm the A3 row's own Event Snapshot tab shows the SAME figures both before and after clicking through
+to release A4 (i.e., re-viewing the A3 row after A4 completes shows no change from what it showed right
+after A3 was first submitted).
+
+## Snapshot-preservation extended to the SIBLING (SG/Acceptance) fields, then to Export Confirmed LC (B3/B4) — closes the full "must not change due to a later transaction" guarantee (2026-08-18, same day, business instruction: "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變", live example "用S01 Inquire Event 選第二筆 查詢SG Balance 就會發現不對 — 當時沒SG BALANCE才對", then "SAME AS EXPORT CONFIRMED LC")
+
+Two follow-ups, same day, both closing gaps the section immediately above didn't yet cover — the
+eventSnapshot-only fix there was necessary but not sufficient.
+
+**Round 1 — SG/Acceptance siblings, reproducing LC S01's own 2nd Event exactly.** Live-tested by the
+user: viewing S01's own A3 'create' row (the 2nd Event) still showed a populated SG Balance tab, when at
+A3's own transaction time (BEFORE A8's own SG Issue) no SG existed yet — the tab should show nothing.
+Root cause: `release()`'s own `captureSiblingSnapshots()` (which recomputes `acceptanceEventSnapshot`/
+`sgEventSnapshot` — "就是交易當時LC所有的BALANCE的拍照存檔") ran UNCONDITIONALLY for every release(),
+including A4's own much-later finalize of A3's UTILIZE — silently overwriting A3's own correct
+"no SG yet" picture (captured null at createMovement()) with SG G01's own by-then-existing balance.
+
+**Fix**: new `BalanceMovement.finalizeAcceptanceEventSnapshot`/`finalizeSgEventSnapshot` (migration
+`id: 9`) — same split as `eventSnapshot`/`finalizeEventSnapshot`: for `isSightUtilizeFinalize`,
+`acceptanceEventSnapshot`/`sgEventSnapshot` stay frozen (keys OMITTED from the `updateStatus()` call,
+not merely passed null — `hasAcceptanceEventSnapshot`/`hasSgEventSnapshot` correctly compute to 0) and
+the release-time recomputation goes into the two new `finalize*` fields instead.
+`InquireEventsService.selectEvent()` gained matching `siblingAcceptanceSnapshot`/`siblingSgSnapshot`
+locals (same `phase === 'finalize' ? finalizeX ?? X ?? null : X ?? null` shape as `ownSnapshot`), used
+in place of the bare `movement.acceptanceEventSnapshot`/`sgEventSnapshot ?? null` reads in the
+ACCEPTANCE/SG tabs. One real bug caught mid-pass: the SG tab's own edit was written but never actually
+landed in the file on the first pass (a dropped edit) — caught immediately by a failing new test
+(`expect(...).toBe(asOfFinalize)` returning `null`), not by review; fixed by re-applying it directly.
+
+**Round 2 — "SAME AS EXPORT CONFIRMED LC".** The user confirmed the identical guarantee must hold for
+Export's own "Confirmed LC Balance"/"Confirmed LC Acceptance Balance". Investigation found B3
+(`EPLC_EXAMINATION`/`CREATE`, the Present Docs earmark) has the EXACT same underlying shape as A3: it is
+ALWAYS finalized for real by a LATER, separate business action — B4's own compound release, which calls
+this same `release()` on B3's own record as one of its three explicit `/release` calls (see the Business
+Case Registry's own "the B3 earmark, the Honour, the Due From Issuing Bank" note) — never plainly (B3's
+own Checker "Release" is `acknowledge()`-only, per `deferSettlementRequiresBackendAck`; status only ever
+reaches RELEASED via B4's own compound flow, so this is never a false-positive against some other, plain
+release path). Confirmed live-reproducible via 2 pre-existing unit tests whose own comments explicitly
+encoded the OLD (now-superseded) expectation — "release() clears it to 0" — that these DID need updating
+to the new, correct expectation is itself evidence the bug was real and previously accepted as intended
+behavior, not a genuinely new regression.
+
+**Fix, notably SIMPLER than A3/A4**: new `isPresentDocsFinalize` condition (`movementType === 'CREATE' &&
+instrumentType === 'EPLC_EXAMINATION'`). B3 needs NO `finalize*` companion fields at all — unlike A3/A4
+(where Inquire Events shows the SAME row for both phases, needing a second field to read), B3 already
+gets its own, correctly-time-positioned row in the merged timeline (never split — B4 creates its OWN
+separate new movement with its OWN correctly-timed figures, filling the "finalize" role structurally) —
+so B3's own `eventSnapshot`/`rootEventSnapshot`/`acceptanceEventSnapshot` simply need to stay frozen,
+full stop. `release()`'s own `rootEventSnapshot`/`acceptanceEventSnapshot`/`sgEventSnapshot` writes are
+now gated `isPresentDocsFinalize ? null/{} : ...` (freeze) alongside the existing `isSightUtilizeFinalize`
+branch. **Zero Angular changes needed** — `InquireEventsService` already reads these fields directly for
+a `'primary'`-phase row (B3 is never split), so freezing them server-side alone fixes the display
+automatically. Deliberately did NOT generalize further to A6's own Usance UTILIZE source-leg release
+(the structurally analogous Import case) — unlike B3 (which has NO legitimate "plain release" path,
+confirmed by inspection), a Usance `IPLC_LC`/`UTILIZE` CAN be released plainly (Business Case Runner's
+own Import Case 1/2/3/5, or a generic non-A6 Checker action) with no companion "finalize" row to ever
+show the correct current-state figures again — freezing it unconditionally would have introduced a NEW,
+different bug (a plain Usance release's own single row permanently stuck showing stale PENDING figures).
+Flagged as a known, deliberately out-of-scope case rather than silently left inconsistent — revisit only
+alongside a reliable signal for "this release is part of A6's own compound flow" (e.g. a live
+`referencedTransactionId` lookup at release time), not by broadening the tenor check naively.
+
+**Tests**: microservice — 2 pre-existing `balanceService.test.ts` tests updated in place (their own
+"release() clears it to 0" assertions replaced with `toEqual(examCreate.movement.rootEventSnapshot)` —
+byte-for-byte frozen); 1 new test proving `acceptanceEventSnapshot` stays null through B3→[Acceptance
+created]→B4-releases-B3, mirroring the SG/S01 case exactly on the Export side; 1 new HTTP-integration
+test in `app.test.ts` reproducing LC S01's own SG scenario end-to-end (A3 before SG exists → A8 SG Issue
+→ A4 finalize → `sgEventSnapshot` still null, `finalizeSgEventSnapshot` holds the real figure, re-verified
+via the Event Timeline). One irregular-whitespace lint error caught and fixed (a full-width-character
+comment pasted verbatim from the user's own message — rewritten in plain ASCII). 315/315 microservice
+tests passing (3 new), 99.24/96.58/100/99.48% coverage, `npm run typecheck`/`npm run build`/`npm run lint`
+(0 errors, 11 pre-existing warnings) all clean. Angular — 2 new `inquire-events.service.spec.ts` tests
+proving the `'finalize'`-row SG/Acceptance tab reads read `finalizeSgEventSnapshot`/
+`finalizeAcceptanceEventSnapshot` rather than the frozen sibling fields. 736/736 Angular tests passing (2
+new), 99.55/96.45/99.52/99.56% coverage, `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration
+development`/`npm run lint` (0 errors) all clean. `backend/` 33/33 unaffected. OAS bumped to v1.10.0
+(both new microservice-side fields documented; the channel API deliberately not touched, same established
+precedent as `eventSnapshot`/`finalizeEventSnapshot` — internal Maker/Checker bookkeeping, not a
+channel-facing projection need).
+
+Live in-browser verification not attempted this pass, same posture as the entries immediately above — a
+human should confirm live on a Usance Confirmed LC case (B3 submitted before any Acceptance exists, later
+finalized by B4) that Inquire Events' 2nd row (B3) shows an EMPTY Acceptance Balance tab both before and
+after B4 completes, matching the SG/S01 worked example on the Import side.

@@ -88,6 +88,25 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN sg_event_snapshot TEXT');
     },
   },
+  {
+    id: 8,
+    description:
+      'Add finalize_event_snapshot to balance_movements (2026-08-18, "A4 Sight Payment" Inquire Events fix — preserves A3\'s own original Create-time eventSnapshot unchanged once A4 later finalizes it, instead of release() overwriting it — see types.ts BalanceMovement.finalizeEventSnapshot)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('finalize_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_event_snapshot TEXT');
+    },
+  },
+  {
+    id: 9,
+    description:
+      'Add finalize_acceptance_event_snapshot/finalize_sg_event_snapshot to balance_movements (2026-08-18, "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變" — same freeze-at-transaction-time fix as migration 8, extended to the sibling snapshot fields — see types.ts BalanceMovement.finalizeAcceptanceEventSnapshot/finalizeSgEventSnapshot)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('finalize_acceptance_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_acceptance_event_snapshot TEXT');
+      if (!columns.includes('finalize_sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_sg_event_snapshot TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

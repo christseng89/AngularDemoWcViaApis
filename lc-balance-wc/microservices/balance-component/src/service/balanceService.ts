@@ -589,6 +589,9 @@ export class BalanceService {
       rootEventSnapshot: null,
       acceptanceEventSnapshot: null,
       sgEventSnapshot: null,
+      finalizeEventSnapshot: null,
+      finalizeAcceptanceEventSnapshot: null,
+      finalizeSgEventSnapshot: null,
     };
 
     // 2026-08-17 ("不複雜 就是交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED)
@@ -628,22 +631,41 @@ export class BalanceService {
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
 
-    // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found): A4 (Sight Settlement)'s own
-    // Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be enforced ONLY by
-    // the reference Transaction Builder client's own checkerAct(), never here, so any other caller
-    // (curl, a future second UI, an integration test) could release an A4-type UTILIZE that was never
-    // Maker-submitted, defeating the whole point of the gate. Scoped to Sight-tenor IPLC_LC/UTILIZE
-    // ONLY — checking contract.tenorType, not just instrumentType/movementType — because a Usance LC's
-    // own UTILIZE is released through the EXACT SAME endpoint via A6's own compound flow
-    // (referencedTransactionId-based), which never calls submitByMaker() and was never meant to: A4's
-    // gate is Sight-only by design (catalogTenorFilter: 'SIGHT' on the client, mirrored here). A
-    // blanket "any IPLC_LC/UTILIZE requires makerSubmittedAt" rule would have incorrectly blocked every
-    // Usance Acceptance release; this narrower check cannot, since contract.tenorType is never 'SIGHT'
-    // for a Usance LC. Movements whose parent contract never declared an explicit tenorType (e.g. the
-    // Business Case Runner's own older Import Case #1/#3/#4/#5, which predate this fix and don't set
-    // one) are also unaffected — `contract.tenorType === 'SIGHT'` is false for `null` too, so this is
-    // purely additive for genuine Sight LCs, never a behavior change for anything that isn't one.
-    if (movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType === 'SIGHT' && !movement.makerSubmittedAt) {
+    // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found) / 2026-08-18 (reused again below,
+    // for the eventSnapshot-preservation fix) — identifies a Sight-tenor IPLC_LC/UTILIZE, i.e. this
+    // release() call is A4 (Sight Settlement) finalizing an EXISTING A3/A3S Document Arrival. Scoped to
+    // Sight-tenor IPLC_LC/UTILIZE ONLY — checking contract.tenorType, not just instrumentType/
+    // movementType — because a Usance LC's own UTILIZE is released through the EXACT SAME endpoint via
+    // A6's own compound flow (referencedTransactionId-based), which never calls submitByMaker() and was
+    // never meant to: A4's gate is Sight-only by design (catalogTenorFilter: 'SIGHT' on the client,
+    // mirrored here). A blanket "any IPLC_LC/UTILIZE" rule would incorrectly match every Usance
+    // Acceptance release too; this narrower check cannot, since contract.tenorType is never 'SIGHT' for
+    // a Usance LC. Movements whose parent contract never declared an explicit tenorType (e.g. the
+    // Business Case Runner's own older Import Case #1/#3/#4/#5) are also unaffected —
+    // `contract.tenorType === 'SIGHT'` is false for `null` too.
+    const isSightUtilizeFinalize = movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType === 'SIGHT';
+
+    // 2026-08-18 ("SAME AS EXPORT CONFIRMED LC... 不應該因為後續交易而改變" — the SAME "must not be
+    // silently overwritten by a later transaction" guarantee, on the Export side). Identifies B3's own
+    // Present Docs earmark (EPLC_EXAMINATION/CREATE) — like A3's own UTILIZE, this movement is ALWAYS
+    // finalized (for real) by a LATER, separate business action: B4's own compound release, which calls
+    // this SAME release() method on B3's own record as one of its three explicit /release calls (see
+    // the Business Case Registry's own "the B3 earmark, the Honour, the Due From Issuing Bank" note).
+    // Unlike A3/A4, this needs NO finalize* companion field: B3 already gets its own, correctly-timed
+    // row in Inquire Events' merged timeline (never split — B4 creates its OWN separate new movement,
+    // which gets its OWN separate row), so B3's own eventSnapshot/rootEventSnapshot/
+    // acceptanceEventSnapshot simply need to stay frozen at whatever createMovement() originally
+    // captured — B4's own much-later release() must not touch them at all, full stop (there is no
+    // acknowledge()-only path that finalizes B3's status for real, per deferSettlementRequiresBackendAck
+    // — status only ever reaches RELEASED via this exact call, so this condition is never a false
+    // positive against some OTHER, plain, non-compound release of an EPLC_EXAMINATION record).
+    const isPresentDocsFinalize = movement.movementType === 'CREATE' && contract.instrumentType === 'EPLC_EXAMINATION';
+
+    // BAL-123's own Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be
+    // enforced ONLY by the reference Transaction Builder client's own checkerAct(), never here, so any
+    // other caller (curl, a future second UI, an integration test) could release an A4-type UTILIZE
+    // that was never Maker-submitted, defeating the whole point of the gate.
+    if (isSightUtilizeFinalize && !movement.makerSubmittedAt) {
       throw new IllegalStateTransitionError(
         `Cannot release movement ${movementId} — A4 (Sight Settlement) requires a Maker Submit ` +
           `(POST /balance-movements/${movementId}/maker-submit) before the Checker can Release it.`,
@@ -656,25 +678,52 @@ export class BalanceService {
     // rather than a second DB round-trip — cheaper and avoids a two-write window.
     const after = before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
 
-    // 2026-08-17 ("...SAVED TO DB == EVENT BALANCE SNAPSHOT") — eventSnapshot is ALWAYS this movement's
-    // own contract's own plain balance, overwriting whatever was captured at Create. Same in-memory
-    // simulation posture as before/after above: flip this one movement to RELEASED in the already-
-    // fetched movement list rather than reading the DB again after updateStatus() below writes it.
+    // 2026-08-17 ("...SAVED TO DB == EVENT BALANCE SNAPSHOT") — this movement's own contract's own plain
+    // balance AS OF THIS RELEASE. Same in-memory simulation posture as before/after above: flip this one
+    // movement to RELEASED in the already-fetched movement list rather than reading the DB again after
+    // updateStatus() below writes it.
+    //
+    // 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變") — for every OTHER movement
+    // this figure is written into eventSnapshot itself, overwriting whatever createMovement() captured
+    // (unchanged from before this date). But for a Sight-tenor IPLC_LC/UTILIZE (isSightUtilizeFinalize —
+    // this release() call IS A4 finalizing A3's own earlier submission), eventSnapshot must instead stay
+    // frozen at A3's own original Create-time value — Inquire Events' own 'create' row reads it directly
+    // — so this release-time figure goes into the NEW finalizeEventSnapshot field instead (read by the
+    // 'finalize' row). See types.ts's BalanceMovement.eventSnapshot/finalizeEventSnapshot doc comments.
     const releasedSelf = { ...movement, status: 'RELEASED' as const };
     const ownMovements = this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movementId ? releasedSelf : m));
     const ownShgtMovements =
       contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
     const ownExaminationMovements =
       contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
-    const eventSnapshot = this.assembleSnapshot(contract, ownMovements, ownShgtMovements, ownExaminationMovements);
+    const releaseTimeSnapshot = this.assembleSnapshot(contract, ownMovements, ownShgtMovements, ownExaminationMovements);
 
     // ADDITIONALLY, for a child-ledger movement, also capture the PARENT's own plain balance — see
     // resolveParentContract()'s own doc comment. Never replaces eventSnapshot above.
+    //
+    // 2026-08-18 ("SAME AS EXPORT CONFIRMED LC") — for isPresentDocsFinalize (B3), this must NOT be
+    // (re)written at all: B3's own rootEventSnapshot ("Confirmed LC Balance" from B3's own point of
+    // view) was already correctly captured at createMovement() time; recomputing it here would silently
+    // replace it with B4's own much-later state. No finalize* counterpart needed (see isPresentDocsFinalize's
+    // own doc comment above for why) — the computed value is simply discarded for this one case.
     const parent = this.resolveParentContract(contract);
     const rootEventSnapshot = parent ? this.captureRootEventSnapshot(parent, contract.instrumentType, releasedSelf) : null;
 
     // ADDITIONALLY, capture the one unambiguous sibling Acceptance's/SG's own CURRENT plain balance —
     // see captureSiblingSnapshots()'s own doc comment ("就是交易當時LC所有的BALANCE的拍照存檔").
+    //
+    // 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — same exception
+    // as eventSnapshot/finalizeEventSnapshot above, extended to these two sibling fields: for
+    // isSightUtilizeFinalize, acceptanceEventSnapshot/sgEventSnapshot must stay frozen at whatever
+    // createMovement() originally captured (A3's own transaction time — reproduces LC S01 exactly: SG
+    // G01 didn't exist yet when A3 was submitted, so its own sgEventSnapshot was correctly null then;
+    // without this fix, A4's own much-later Release would silently overwrite that correct "didn't exist
+    // yet" picture with SG G01's by-then-existing balance) — so this release-time recomputation goes
+    // into the NEW finalizeAcceptanceEventSnapshot/finalizeSgEventSnapshot fields instead, and the keys
+    // themselves are OMITTED (not merely passed null) from the updateStatus() call below, so
+    // hasAcceptanceEventSnapshot/hasSgEventSnapshot correctly compute to 0 there. isPresentDocsFinalize
+    // (B3) is simpler still — no finalize* counterpart at all, the keys are just omitted outright, same
+    // reasoning as rootEventSnapshot immediately above.
     const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
     const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
 
@@ -685,10 +734,20 @@ export class BalanceService {
       releasedAt,
       balanceBefore: before.toFixed(),
       balanceAfter: after.toFixed(),
-      eventSnapshot: JSON.stringify(eventSnapshot),
-      rootEventSnapshot: rootEventSnapshot ? JSON.stringify(rootEventSnapshot) : null,
-      acceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
-      sgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
+      eventSnapshot: isSightUtilizeFinalize || isPresentDocsFinalize ? null : JSON.stringify(releaseTimeSnapshot),
+      finalizeEventSnapshot: isSightUtilizeFinalize ? JSON.stringify(releaseTimeSnapshot) : null,
+      rootEventSnapshot: isPresentDocsFinalize ? null : rootEventSnapshot ? JSON.stringify(rootEventSnapshot) : null,
+      ...(isSightUtilizeFinalize
+        ? {
+            finalizeAcceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
+            finalizeSgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
+          }
+        : isPresentDocsFinalize
+          ? {}
+          : {
+              acceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
+              sgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
+            }),
     });
 
     return this.movements.findById(movementId)!;

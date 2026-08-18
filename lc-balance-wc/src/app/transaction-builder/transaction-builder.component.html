@@ -769,8 +769,8 @@
                 <td class="tb-table__amount">{{ e.movement.amount }}</td>
                 <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
                 <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
-                <td><span class="tb-status-badge" [class.tb-status-badge--pending]="e.movement.status === 'PENDING'" [class.tb-status-badge--approved]="e.movement.status === 'RELEASED'" [class.tb-status-badge--negative]="e.movement.status === 'REJECTED' || e.movement.status === 'CANCELLED'" [class.tb-status-badge--neutral]="e.movement.status === 'SUPERSEDED'">{{ displayStatus(e.movement.status) }}</span></td>
-                <td class="tb-table__time">{{ e.movement.createdAt | date:'short' }}</td>
+                <td><span class="tb-status-badge" [class.tb-status-badge--pending]="e.eventStatus === 'PENDING'" [class.tb-status-badge--approved]="e.eventStatus === 'RELEASED'" [class.tb-status-badge--negative]="e.eventStatus === 'REJECTED' || e.eventStatus === 'CANCELLED'" [class.tb-status-badge--neutral]="e.eventStatus === 'SUPERSEDED'">{{ displayStatus(e.eventStatus) }}</span></td>
+                <td class="tb-table__time">{{ e.eventTime | date:'short' }}</td>
               </tr>
             </tbody>
           </table>
@@ -789,9 +789,13 @@
           <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber"><span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.ibNumber }}</span></div>
           <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber"><span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.sgNumber }}</span></div>
           <formly-form [form]="inquireEvents.selectedEventForm" [fields]="inquireEvents.selectedEventFields" [model]="inquireEvents.selectedEventModel"></formly-form>
-          <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ displayStatus(sel.movement.status) }}</span></div>
+          <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ displayStatus(sel.eventStatus) }}</span></div>
           <div class="tb-balance-row"><span class="tb-balance-row__label">Created</span><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date:'short' }}</span></div>
-          <div class="tb-balance-row" *ngIf="sel.movement.releasedBy"><span class="tb-balance-row__label">Released</span><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date:'short' }}</span></div>
+          <!-- sel.eventStatus (not sel.movement.status) gates this — for a 'create'-phase row (see
+               InquiredEvent's own doc comment, the "A4 Sight Payment" bug fix) the movement has ALREADY
+               been released by the time this screen can be viewed, but showing "Released by/at" next to
+               a historically-accurate "Status: Pending" would be self-contradictory. -->
+          <div class="tb-balance-row" *ngIf="sel.eventStatus !== 'PENDING' && sel.movement.releasedBy"><span class="tb-balance-row__label">Released</span><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date:'short' }}</span></div>
           <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement)">Account Entries</button>
         </div>
 
