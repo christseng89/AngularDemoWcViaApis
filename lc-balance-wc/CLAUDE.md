@@ -4089,3 +4089,73 @@ Formly field greyed out, balance box correctly updated to Available 0 / Tight Av
 Typed amount (1000) exceeds Available Balance — this will be rejected" immediately after a Submit that had
 already succeeded. Zero console errors. Test data (`SUBMITWARN01`) cleaned up afterward; the user's own
 live `S07` record (which surfaced the bug) was left untouched.
+
+## Bug fixed, microservice-side — a root LC/Confirmation's own ISSUE being still PENDING never blocked ANY other event from being created (or even Released) against it, and could produce a genuinely NEGATIVE Confirmed Balance (2026-08-18, same day, business-reported — "S10 A1 Issue still in pending, then it should not allow for other events A2-A9, right?")
+
+**Investigated live before touching anything, per this file's own standing practice.** Confirmed the gap
+is real and worse than the question implied: `createContract()` sets `status: 'ACTIVE'` on a contract row
+at Maker Submit time (before any Checker Release), and `computeAvailableBalance()`'s own §3.3 PENDING-
+delta convention means Available Balance already reflects the ISSUE's own PENDING contribution — so a
+freshly-Issued, not-yet-Released LC looked, to every OTHER function's own picker and sufficiency check,
+indistinguishable from a genuinely-approved one. Reproduced via direct API calls: Issued a Sight LC
+(10,000), left it PENDING, then successfully created AND RELEASED a Document Arrival UTILIZE (5,000)
+against it — the release response came back with `balanceAfter: "-5000"`, `confirmedBalance: "-5000"` —
+a genuinely negative contingent liability. Root cause: Confirmed Balance only ever sums RELEASED
+movements (`computeConfirmedBalance`), so the UTILIZE's own −5,000 contribution landed with nothing yet
+on the +side to net against, since the ISSUE itself was still PENDING and therefore not yet counted.
+This is a real accounting-integrity violation, not just a UX inconvenience — confirms the user's own
+"should not allow" instinct was correct, and identifies the actual mechanism.
+
+**Fix, `microservices/balance-component/src/service/balanceService.ts`**: new
+`ROOT_INSTRUMENT_TYPES = {'IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION'}` — the only two instrumentTypes with
+no parent of their own (every other instrumentType — SHGT/IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/
+EPLC_EXAMINATION/the 3 asset-side types — is always a CHILD of one of these), and a new private
+`assertRootIssueReleased(rootContract, actionDescription)` — finds the contract's own `ISSUE` movement
+and throws `IllegalStateTransitionError` (409, the same error class this project's own BAL-123 gate
+already uses for an analogous "second actor acted too early" case) unless it's `RELEASED`. Wired into
+`createMovement()` at exactly two points:
+1. An EXISTING root contract (`ROOT_INSTRUMENT_TYPES.has(contract.instrumentType)`) taking any
+   movementType OTHER than `ISSUE` itself (i.e. `AMEND_INCREASE`/`AMEND_DECREASE`/`UTILIZE`/`HONOUR`/
+   `ACCEPT` — covers A2/A3/A3S/B2/B4) — checked right after contract resolution, before the pre-existing
+   re-ISSUE guard's sibling logic.
+2. Creating a brand-new CHILD contract with `parentLogicalContractId` set (A6/A7-CREATE, A8 SHGT ISSUE,
+   B3 EPLC_EXAMINATION CREATE) — the PARENT's own ISSUE must already be Released. Resolved defensively
+   (each instrument-specific sufficiency check below it re-resolves the same parent independently for
+   its own purposes) — a not-found/inactive parent still falls through to that block's own, more specific
+   error, not a generic one from this new guard.
+
+A CHILD's own LATER actions (SG redemption, Acceptance settlement, etc.) need no separate check — by the
+time a child contract exists at all, guard #2 already proved its parent's ISSUE was Released at the
+child's own creation time, and ISSUE approval is a one-time, permanent state (never reverts to PENDING),
+so nothing downstream can silently invalidate that proof. `ISSUE` itself is exempt from guard #1 (it's
+the movement establishing the root's own approval state in the first place — blocking it would make it
+impossible to ever Issue anything).
+
+**Test coverage**: new `describe('BalanceService — assertRootIssueReleased...')` in
+`test/unit/service/balanceService.test.ts` (5 tests, direct-service-call, no HTTP: AMEND_DECREASE and
+UTILIZE against a PENDING-ISSUE root LC both rejected; a new child SHGT ISSUE under a PENDING-ISSUE
+parent rejected; ISSUE itself is never blocked; once Released, the SAME AMEND_DECREASE and SG-ISSUE both
+succeed) — closes a real coverage gap the fix's own PR-review pass caught (the guard's own `throw` line
+was initially 0%-covered, only exercised incidentally via other tests' pass-through paths, not by a test
+proving the rejection itself). Three PRE-EXISTING `app.test.ts` tests needed a `/release` call added
+before their own second POST, once the new guard correctly caught that their own test setup had always
+skipped releasing the ISSUE first (same "the new gate correctly caught a real gap in test setup, not a
+false positive" pattern this file's own BAL-123 entry already established) — none of the three tests'
+own actual assertions changed.
+
+Verified: `npm run typecheck`/`npm run build`/`npm run lint` (0 errors, 11 pre-existing warnings) all
+clean, full microservice suite 320/320 passing (5 new), coverage 99.25/96.5/100/99.49% (all four metrics
+clear the 95% floor). **Live-verified all 14 Business Case Registry entries individually** against the
+real running stack (not just the mocked-fetch `backend/` unit suite) — every case still returns success
+end to end, confirming `createAndRelease()`'s own existing "release immediately after every create"
+convention already satisfies this new guard with zero registry changes needed. Test data from both the
+reproduction (`S10TEST01`) and the full 14-case live re-run (`IMP-C%`/`EXP-C%`) cleaned up afterward,
+leaving the user's own S01–S10/U01/U02 records untouched. `backend/` 33/33 (unaffected — mocked fetch,
+never reaches the real guard) and Angular app 746/746 (unaffected — no files under `src/app/` touched)
+both re-run per this file's own standing rule.
+
+**Deliberately NOT extended to a client-side UX filter this pass** (e.g. excluding a not-yet-Released LC
+from A2–A9's own LC Index pickers) — the user's own question was specifically about the block itself, not
+picker-level filtering; a Maker who tries now gets a clear 409 with a "Release the Issue first" message
+rather than a silently-narrowed picker. Worth a follow-up if a Maker hitting this 409 live turns out to be
+a frequent, confusing occurrence rather than a rare edge case.

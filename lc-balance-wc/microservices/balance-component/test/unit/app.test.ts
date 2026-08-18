@@ -887,6 +887,10 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
       })
       .expect(201);
     await request(app)
+      .post(`/balance-movements/${otherLc.body.movementId}/release`)
+      .send({ releasedBy: 'checker1' })
+      .expect(200);
+    await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_LC',
@@ -2285,6 +2289,14 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
   test('IPLC_LC AMEND_DECREASE reverses the pair; UTILIZE (Honour) reverses it again — both persisted, both retrievable unmodified via the Event Timeline', async () => {
     const issueContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'CAE-LC1' }).expect(200);
     const balanceContractId = issueContract.body.balanceContractId;
+
+    // Bug fixed 2026-08-18 (assertRootIssueReleased) — AMEND_DECREASE/UTILIZE below now require the
+    // root LC's own ISSUE (from the previous test) to be Checker-Released first; the previous test
+    // deliberately leaves it PENDING (its own scope is just the ISSUE response shape), so release it
+    // here instead of there.
+    const issueMovements = await request(app).get(`/balance-contracts/${balanceContractId}/movements`).expect(200);
+    const issueMovementId = issueMovements.body.find((m: { movementType: string }) => m.movementType === 'ISSUE').movementId;
+    await request(app).post(`/balance-movements/${issueMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const decrease = await request(app)
       .post('/balance-movements')

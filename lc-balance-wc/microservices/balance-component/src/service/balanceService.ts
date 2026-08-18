@@ -70,6 +70,16 @@ const OUTSTANDING_CAPPED_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
   'FULL_SETTLE',
 ]);
 
+/**
+ * Business-reported gap 2026-08-18 ("S10 A1 Issue still in pending, then it should not allow for
+ * other events... right?") — the only two instrumentTypes with no parent of their own; every OTHER
+ * instrumentType (SHGT/IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/the 3 asset-side types) is
+ * always a CHILD of one of these, so checking a child's own creation against ITS parent's ISSUE
+ * (assertRootIssueReleased below) transitively covers every later action taken on that child — the
+ * child could never have been created in the first place if the root wasn't already Released.
+ */
+const ROOT_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set(['IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION']);
+
 export interface CreateMovementRequest {
   instrumentType: InstrumentType;
   naturalKey?: NaturalKey;
@@ -341,6 +351,30 @@ export class BalanceService {
     return this.movements.findByBusinessEventId(businessEventId);
   }
 
+  /**
+   * Business-reported gap 2026-08-18 ("S10 A1 Issue still in pending, then it should not allow for
+   * other events A2-A9, right?"). Live-reproduced before this fix: a contract's own row is created
+   * with `status: 'ACTIVE'` at Maker Submit time (createContract(), before any Checker Release), and
+   * Available Balance already reflects the ISSUE's own PENDING contribution (§3.3's PENDING-delta
+   * convention) — so nothing stopped a second movement, on the SAME root contract (A2/A3) or on a
+   * brand-new CHILD contract (A6/A7/A8/B3), from being created or even Released before the root
+   * LC/Confirmation's own foundational ISSUE had ever been Checker-approved. Reproduced consequence:
+   * Checker-Releasing a UTILIZE while its own parent's ISSUE was still PENDING produced a genuinely
+   * NEGATIVE Confirmed Balance (Confirmed Balance only ever sums RELEASED movements, so the UTILIZE's
+   * own −amount landed with nothing yet on the +side to net against) — a real contingent-liability
+   * integrity violation, not just a UX inconvenience.
+   */
+  private assertRootIssueReleased(rootContract: BalanceContract, actionDescription: string): void {
+    const issueMovement = this.movements.listByContract(rootContract.balanceContractId).find((m) => m.movementType === 'ISSUE');
+    if (!issueMovement || issueMovement.status !== 'RELEASED') {
+      throw new IllegalStateTransitionError(
+        `Cannot ${actionDescription} — ${rootContract.instrumentType} ${rootContract.naturalKey.lcNumber} ` +
+          `(balanceContractId ${rootContract.balanceContractId}) has not been Checker-Released yet ` +
+          `(its own ISSUE is still ${issueMovement?.status ?? 'missing'}). Release the Issue first.`,
+      );
+    }
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
     let contract = req.balanceContractId
       ? this.contracts.findById(req.balanceContractId)
@@ -363,10 +397,28 @@ export class BalanceService {
       );
     }
 
+    // See assertRootIssueReleased's own doc comment — an existing root contract (IPLC_LC/EPLC_LC/
+    // EPLC_CONFIRMATION) can't take any OTHER movementType (AMEND_INCREASE/AMEND_DECREASE/UTILIZE/
+    // HONOUR/ACCEPT) until its own ISSUE has actually been Checker-Released. Skipped for ISSUE itself
+    // (the re-ISSUE guard above already handles a duplicate ISSUE attempt).
+    if (contract && ROOT_INSTRUMENT_TYPES.has(contract.instrumentType) && req.movementType !== 'ISSUE') {
+      this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
+    }
+
     if (!contract) {
       if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
       if (!CREATING_MOVEMENT_TYPES.has(req.movementType)) {
         throw new NotFoundError(`No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`);
+      }
+
+      // See assertRootIssueReleased's own doc comment — creating a NEW CHILD contract (A6/A7 Acceptance,
+      // A8 SG Issue, B3 Present Docs) under a parent LC/Confirmation requires that parent's own ISSUE to
+      // already be Checker-Released. Resolved defensively here (each instrument-specific block below
+      // re-resolves the same parent for its own sufficiency check) — a not-found/inactive parent falls
+      // through to that block's own, more specific error instead of a generic one here.
+      if (req.parentLogicalContractId) {
+        const parentForIssueCheck = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+        if (parentForIssueCheck) this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
       }
 
       // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE

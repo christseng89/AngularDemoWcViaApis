@@ -12,6 +12,7 @@
 import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { InvalidMonetaryAmountError } from '../../../src/money';
+import { IllegalStateTransitionError } from '../../../src/errors';
 
 describe('BalanceService.createMovement — parseMonetaryAmount enforcement at the service layer (BAL-115)', () => {
   test('AMEND_DECREASE with a malformed amount throws InvalidMonetaryAmountError, not a silent NaN comparison', () => {
@@ -678,5 +679,145 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
     expect(sgIssue.movement.acceptanceEventSnapshot!.balanceContractId).toBe(acceptance.movement.balanceContractId);
     expect(sgIssue.movement.acceptanceEventSnapshot!.confirmedBalance).toBe('0');
     expect(sgIssue.movement.acceptanceEventSnapshot!.availableBalance).toBe('30000');
+  });
+});
+
+describe('BalanceService — assertRootIssueReleased (business-reported gap 2026-08-18, "S10 A1 Issue still in pending, then it should not allow for other events A2-A9, right?")', () => {
+  test('AMEND_DECREASE against a root LC whose own ISSUE is still PENDING is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'S10-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    // ISSUE deliberately left PENDING — not released.
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.movement.balanceContractId,
+        movementType: 'AMEND_DECREASE',
+        eventSeq: 2,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(IllegalStateTransitionError);
+  });
+
+  test('UTILIZE (A3) against a root LC whose own ISSUE is still PENDING is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'S10-002' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.movement.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '1000',
+        currency: 'USD',
+        sourceTransactionRef: 'B01',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(IllegalStateTransitionError);
+  });
+
+  test('creating a new CHILD contract (SHGT ISSUE) under a parent LC whose own ISSUE is still PENDING is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'S10-003' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S10-003', sgNumber: 'G01' },
+        parentLogicalContractId: issue.movement.eventSnapshot!.logicalContractId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(IllegalStateTransitionError);
+  });
+
+  test('ISSUE itself is never blocked by this guard (would otherwise be unable to ever create the very first movement)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'S10-004' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    expect(issue.created).toBe(true);
+  });
+
+  test('once the root ISSUE is Released, a subsequent AMEND_DECREASE and a new child SG ISSUE both succeed', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'S10-005' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const decrease = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_DECREASE',
+      eventSeq: 2,
+      amount: '1000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    expect(decrease.created).toBe(true);
+
+    const sgIssue = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'S10-005', sgNumber: 'G01' },
+      parentLogicalContractId: issue.movement.eventSnapshot!.logicalContractId,
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '2000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    expect(sgIssue.created).toBe(true);
   });
 });
