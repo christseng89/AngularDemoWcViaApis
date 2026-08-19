@@ -7048,3 +7048,76 @@ reusability for a read-only browse — discussed and explicitly deferred this se
 `AskUserQuestion` exchange immediately preceding this entry for why it's now a bigger design question
 than the finding's own text implies, given this session's own separate CatalogPickerService pagination
 redesign), F-10–F-13 (Low, no action recommended by the review itself).
+
+## desiger-comments.md F-03 reassessed, then a narrowly-scoped 9th BAL-003 pass — `DocumentArrivalHintsService` extracted (2026-08-19, user-directed — "Refer to the design-comments.md" again, then explicitly asked to reassess F-03's current state before acting, then confirmed the narrow scope: "只抽這個 session 新增的 paging/eligibility 狀態")
+
+**Reassessment, done before touching anything**: re-measured `transaction-builder.component.ts` fresh
+rather than trusting the review's own cited "2,288 lines" — it's genuinely **2,653 lines** as of this
+pass (grown, not shrunk, since the review was written), because this SAME session's own two immediately-
+preceding features (Page-by-Page pagination + A4/A6/B4 LC Index eligibility, both entries above) added
+~68 lines of new paging-state/hint-fetching code directly onto the component. This is the documented,
+user-confirmed consequence of an EARLIER "8th pass" decision (see that entry's own doc comment,
+reaffirmed by `CatalogPickerService`'s own module note) — the component keeps SELECTION and business-rule
+FILTERING deliberately, since both are Maker-flow orchestration entangled with `model`/`selectedFunction`/
+`selectedContract`, but everything else (fetch/paging bookkeeping) is fair game to extract. All three of
+F-03's own named categories (6 load/select/paginate subsystems, dialog state, Checker-queue search) are
+confirmed still present and, if anything, the first category got measurably worse this session — not
+because of carelessness, but because of legitimate new business functionality landing without its own
+extraction pass.
+
+**The genuinely unresolved CORE of F-03** (function/side selection, the three pickers' own selection
+handlers, the imperative `loadX()`/`xLoading` pairs) was confirmed to be a UI/testing-architecture
+problem, not a "haven't gotten to it yet" one — re-explained to the user directly (their own follow-up,
+"所以F03是UI + 測試的問題 對嗎?"): a genuine Angular child component (with its own template) or a
+signals-based migration were both already investigated and explicitly declined earlier this session (see
+the "BAL-003 — three pure-function extractions" entry's own "three scopes offered, pure extractions only
+chosen" record), because this project's own established direct-instantiation, no-TestBed test convention
+(`new TransactionBuilderComponent(mockApi)`) structurally can never exercise `@ViewChild`/`@Input`/
+`@Output` bindings — those only resolve during Angular's real view-initialization lifecycle, which never
+runs for ~40-77+ existing Checker/selection test assertions that read/write component fields directly.
+Neither option is being revisited by this pass.
+
+**Fix, matching the confirmed narrow scope**: new `document-arrival-hints.service.ts` —
+`DocumentArrivalHintsService`, a plain class (same "not `@Component`, just a field the template/other
+methods read directly" convention `LookUpPanelService`/`InquireEventsService`/`CatalogPickerService`
+already established) owning the per-candidate "does this LC/Confirmation have an eligible outstanding
+Document Arrival of its own" hint maps for all three of A4/A6/B4's own LC Index pickers:
+`catalogPayableIbs`/`catalogPayableMovements` (A4 — predates this session, business instruction
+2026-08-14, originally hint-display-only; moved together with the other two anyway since all three are
+genuinely the SAME concept, not a strict "only literally-new-this-session lines" cut), `parentPayableIbs`/
+`parentPayableMovements` (A6, new this session), `catalogChildPayableIbs` (B4, new this session) — plus
+the three fetch methods that populate them (`loadCatalogHints`/`loadParentHints`, sharing one private
+`loadDocumentArrivalHints` body; `loadChildHints`, B4's own cross-contract two-step resolution). The
+component's own `reloadCatalog()`/`loadParent()` onLoaded hooks now call these instead of the removed
+private methods; `filteredCatalogContracts`/`filteredParentCatalog` (which still correctly stay on the
+component — they read `model`/`selectedFunctionStrategy` too) now read
+`this.documentArrivalHints.catalogPayableIbs`/etc. instead. `catalogIbHint()`/`catalogPendingHint()`
+(the A4-only inline hint-text methods used by the template) stayed as thin methods ON the component,
+internally delegating to the new service's maps — their own public signature is unchanged, so neither
+needed a template edit nor a test-assertion change beyond the internal field reads.
+
+**Mechanical rename, same "scripted word-boundary pass" convention this session's prior extractions
+already used**: ~35 raw references in the component and ~36 across the two spec files
+(`transaction-builder.component.spec.ts`/`.gaps.spec.ts`) renamed from bare `catalogPayableIbs`/etc. to
+`documentArrivalHints.catalogPayableIbs`/etc. via `sed`, scoped to a leading `.` to avoid touching prose
+in doc comments incorrectly. Zero test LOGIC changed — every existing assertion (`comp.catalogPayableIbs.set(...)`
+→ `comp.documentArrivalHints.catalogPayableIbs.set(...)`, etc.) is a pure rename, same values/expectations.
+
+**Verification**: full Angular suite **841/841 passing with ZERO test logic changes** (only the mechanical
+rename above) — the same strongest-possible evidence of exact behavior preservation this session's every
+prior extraction has used. Coverage **97.87/95.14/97.04/98.14%** (all four metrics clear the 95% floor;
+`document-arrival-hints.service.ts` itself 97.87/82.35/95.45/97.61 — the one uncovered branch, the outer
+`catchError` on B4's own child-catalog fetch failing, is the identical pre-existing defensive-fallback
+gap this exact code already had before the move, not a new one). `npx tsc -p tsconfig.app.json --noEmit`/
+`ng build --configuration development` (strict templates)/`npm run lint` (0 errors, 226 warnings,
+unchanged) all clean. `backend/` 34/34 and microservice 335/335 both re-run per this file's own standing
+rule, unaffected (Angular-only change).
+
+**Net effect on F-03**: `transaction-builder.component.ts` **2,653 → 2,537 lines** — a genuine, if modest,
+reduction (never primarily a line-count exercise, same posture every prior BAL-003 pass in this file has
+taken). F-03 stays open at Major — the three genuinely-irreducible categories (selection, dialog state,
+Checker-queue search) are unchanged — but this closes out the one part of the finding that WAS newly
+introduced by this session's own work, without touching the part that's already been investigated and
+correctly left alone.
+
+Not committed (not requested).

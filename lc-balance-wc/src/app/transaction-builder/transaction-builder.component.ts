@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { forkJoin, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
@@ -11,6 +11,7 @@ import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './ma
 import { LookUpPanelService } from './look-up-panel.service';
 import { CatalogPickerService } from './catalog-picker.service';
 import { InquireEventsService } from './inquire-events.service';
+import { DocumentArrivalHintsService } from './document-arrival-hints.service';
 import { PagedListState } from './paged-list-state';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
@@ -114,36 +115,15 @@ export class TransactionBuilderComponent {
   /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see catalogPicker below. */
   readonly catalogPicker: CatalogPickerService;
   /**
-   * A4 (Sight Settlement) only — business instruction 2026-08-14: LC Index shows the pending IB Number(s)
-   * inline (e.g. "810 — IB00001 — ACTIVE — Pending: 25,000") so the user can identify which Document
-   * Arrival is being settled without opening Step 2 first. Business requirement 2026-08-19 ("A4 — LC
-   * Index Eligibility Criteria"): this same map now ALSO drives `filteredCatalogContracts`'s own
-   * eligibility filter for A4 — an LC only appears in A4's own LC Index once it has at least one entry
-   * here (a still-PENDING A3/A3S Document Arrival), not simply for being an ACTIVE Sight LC.
+   * BAL-003 (9th same-day pass, desiger-comments.md F-03 reassessment 2026-08-19 — user-confirmed narrow
+   * scope: "只抽這個 session 新增的 paging/eligibility 狀態"). Owns A4/A6/B4's own per-candidate LC Index
+   * "eligible outstanding Document Arrival" hint maps — see `DocumentArrivalHintsService`'s own module
+   * doc comment for the full reasoning (A4's own `catalogPayableIbs`/`catalogPayableMovements` predate
+   * this session as a hint-display-only feature; A6's own `parentPayableIbs`/`parentPayableMovements`
+   * and B4's own `catalogChildPayableIbs` are new this session, added when the SAME maps were given a
+   * second job — driving `filteredCatalogContracts`/`filteredParentCatalog`'s own eligibility filter).
    */
-  catalogPayableIbs = new Map<string, string[]>();
-  /** Full movement objects backing catalogPayableIbs, keyed the same way — business-reported gap "select S001 IB03 or S001 IB04 separately". */
-  catalogPayableMovements = new Map<string, BalanceMovement[]>();
-  /**
-   * A6 (Acceptance, Usance) only — business requirement 2026-08-19 ("A6 — LC Index Eligibility
-   * Criteria"): the Parent LC picker's own analog of catalogPayableIbs/catalogPayableMovements above —
-   * populated by `loadParent()`'s own onLoaded hook (loadDocumentArrivalHints(), shared with A4) — drives
-   * `filteredParentCatalog`'s own eligibility filter, so A6's LC Index only shows LCs with at least one
-   * still-PENDING A3/A3S Document Arrival of their own, not simply every ACTIVE Usance LC.
-   */
-  parentPayableIbs = new Map<string, string[]>();
-  parentPayableMovements = new Map<string, BalanceMovement[]>();
-  /**
-   * B4 (Honour / Acceptance) only — business requirement 2026-08-19 ("B4 也是一樣的業務要求
-   * (EARMARKING EVENTS ONLY) 差別是不分SIGHT/USANCE" — same LC Index eligibility requirement as A4/A6,
-   * just without a Sight/Usance split, since B4 handles both from the one flat Catalog picker). Unlike
-   * catalogPayableIbs/parentPayableIbs (same-contract PENDING UTILIZE), B4's own eligible source is
-   * CROSS-contract (a child EPLC_EXAMINATION contract's own CREATE, already RELEASED and not yet
-   * consumed — the exact candidate shape `loadPayableMovementsAcrossChildContracts()` already resolves
-   * for the picked LC's own Step 2) — populated by `loadEligibleChildDocumentHints()`, called from
-   * `reloadCatalog()`'s own onLoaded hook.
-   */
-  catalogChildPayableIbs = new Map<string, string[]>();
+  readonly documentArrivalHints: DocumentArrivalHintsService;
   selectedContract: BalanceContract | null = null;
   /**
    * Business instruction 2026-08-14: for instrumentTypes whose natural key
@@ -460,6 +440,7 @@ export class TransactionBuilderComponent {
     this.catalogPicker = new CatalogPickerService(this.catalogPageSize, api);
     this.parentPicker = new CatalogPickerService(this.parentPageSize, api);
     this.ibIndexPicker = new CatalogPickerService(this.ibIndexPageSize, api);
+    this.documentArrivalHints = new DocumentArrivalHintsService(api);
   }
 
   /**
@@ -681,11 +662,15 @@ export class TransactionBuilderComponent {
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
       qualifies: () => this.filteredCatalogContracts.length,
       onLoaded: (items) => {
-        if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) this.loadPayableIbHints(items);
+        if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+          this.documentArrivalHints.loadCatalogHints(items, () => {
+            this.catalogPicker.total = this.filteredCatalogContracts.length;
+          });
+        }
         // Business requirement 2026-08-19 ("B4 也是一樣的業務要求 (EARMARKING EVENTS ONLY) 差別是不分
         // SIGHT/USANCE") — B4 only (the one function with payableMovementInstrumentType set).
         if (this.selectedFunction?.payableMovementInstrumentType) {
-          this.loadEligibleChildDocumentHints(
+          this.documentArrivalHints.loadChildHints(
             items,
             this.selectedFunction.payableMovementInstrumentType,
             this.selectedFunction.payableMovementType ?? 'UTILIZE',
@@ -695,49 +680,6 @@ export class TransactionBuilderComponent {
           );
         }
       },
-    });
-  }
-
-  /**
-   * B4 (Honour / Acceptance) only — business requirement 2026-08-19, see catalogChildPayableIbs's own
-   * doc comment. Mirrors `loadPayableMovementsAcrossChildContracts()`'s own two-step candidate-resolution
-   * shape (catalog-search the child instrumentType by lcNumber, then fetch each child's own movements)
-   * exactly, run once per LC Index candidate rather than for the one already-picked LC — same RELEASED +
-   * not-yet-consumed condition, since B4 only ever picks an ALREADY-Released B3 record (a same-day-only
-   * PENDING one isn't eligible, unlike A4/A6's own same-contract PENDING check).
-   */
-  private loadEligibleChildDocumentHints(list: BalanceContract[], childInstrumentType: InstrumentType, wantedMovementType: string, onDone: () => void): void {
-    this.catalogChildPayableIbs.clear();
-    if (!list.length) {
-      onDone();
-      return;
-    }
-    forkJoin(
-      list.map((c) =>
-        this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
-          switchMap((result) => {
-            if (!result.items.length) return of([] as string[]);
-            return forkJoin(
-              result.items.map((child) =>
-                this.api.listMovements(child.balanceContractId).pipe(
-                  map((movs) =>
-                    (movs as any[])
-                      .filter((m: any) => m.movementType === wantedMovementType && m.status === 'RELEASED' && !m.presentDocsConsumedAt)
-                      .map((m: any) => m.sourceTransactionRef || child.naturalKey.ibNumber || '(no EB Number)'),
-                  ),
-                  catchError(() => of([] as string[])),
-                ),
-              ),
-            ).pipe(map((lists) => lists.flat()));
-          }),
-          catchError(() => of([] as string[])),
-        ),
-      ),
-    ).subscribe((results) => {
-      list.forEach((c, i) => {
-        if (results[i].length) this.catalogChildPayableIbs.set(c.balanceContractId, results[i]);
-      });
-      onDone();
     });
   }
 
@@ -760,59 +702,6 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * A4 (Sight Settlement) LC Index only — business instruction 2026-08-14:
-   * "LC Index should display the associated IB Number together with the LC
-   * Number and Pending Amount". Fetches each candidate LC's still-PENDING
-   * UTILIZE movements (the same filter used for Step 2's IB Index) so the
-   * IB Number(s) can be shown inline in Step 1, without waiting for the
-   * user to drill into Step 2 first. Business requirement 2026-08-19: this
-   * same data now also drives filteredCatalogContracts's own eligibility
-   * filter — see loadDocumentArrivalHints()'s own doc comment, shared with A6.
-   *
-   * Business-reported gap 2026-08-14 ("user would like to select S001 IB03
-   * or S001 IB04 for A4 separately" — "buyer may settle IB04 today then
-   * IB03 by tomorrow"): stores the FULL movement objects (not just ref
-   * strings) so flattenedPayableRows() below can offer each (LC, IB) pair
-   * as ONE directly-clickable row — settling IB04 today and coming back
-   * for IB03 tomorrow shouldn't require re-picking the LC first each time.
-   */
-  private loadPayableIbHints(list: BalanceContract[]): void {
-    this.loadDocumentArrivalHints(list, this.catalogPayableIbs, this.catalogPayableMovements, () => {
-      this.catalogPicker.total = this.filteredCatalogContracts.length;
-    });
-  }
-
-  /**
-   * Business requirement 2026-08-19 ("A4/A6 — LC Index Eligibility Criteria"): shared by A4's own flat
-   * Catalog picker (catalogPayableIbs/catalogPayableMovements, via loadPayableIbHints() above) and A6's
-   * own Parent LC picker (parentPayableIbs/parentPayableMovements, via loadParent() below) — both
-   * functions' own "eligible LC" definition is identical (a still-PENDING A3/A3S Document Arrival — an
-   * IPLC_LC/UTILIZE movement — on the SAME contract, not cross-contract like B4's own EPLC_EXAMINATION
-   * check), so this is one fetch/populate body rather than two copies of the same forkJoin.
-   */
-  private loadDocumentArrivalHints(list: BalanceContract[], ibs: Map<string, string[]>, movements: Map<string, BalanceMovement[]>, onDone: () => void): void {
-    ibs.clear();
-    movements.clear();
-    if (!list.length) {
-      onDone();
-      return;
-    }
-    forkJoin(list.map((c) => this.api.listMovements(c.balanceContractId).pipe(catchError(() => of([] as any[]))))).subscribe((results) => {
-      list.forEach((c, i) => {
-        const pending = (results[i] ?? []).filter((m: any) => m.status === 'PENDING' && m.movementType === 'UTILIZE');
-        if (pending.length) {
-          ibs.set(
-            c.balanceContractId,
-            pending.map((m: any) => m.sourceTransactionRef || '(no IB Number)'),
-          );
-          movements.set(c.balanceContractId, pending);
-        }
-      });
-      onDone();
-    });
-  }
-
-  /**
    * Business-reported gap 2026-08-14 ("select S001 IB03 or S001 IB04 for A4
    * separately") — one row per still-PENDING (LC, IB) pair across the
    * current LC Index page, so picking a specific presentation to settle is
@@ -822,7 +711,7 @@ export class TransactionBuilderComponent {
   get flattenedPayableRows(): { contract: BalanceContract; movement: any }[] {
     const rows: { contract: BalanceContract; movement: any }[] = [];
     for (const c of this.pagedFilteredCatalogContracts) {
-      const movements = this.catalogPayableMovements.get(c.balanceContractId) ?? [];
+      const movements = this.documentArrivalHints.catalogPayableMovements.get(c.balanceContractId) ?? [];
       for (const m of movements) rows.push({ contract: c, movement: m });
     }
     rows.sort((a, b) => {
@@ -838,12 +727,12 @@ export class TransactionBuilderComponent {
    * S001 IB04 separately"). Deliberately does NOT call onSelectContract()
    * — that would kick off an async re-fetch of payableMovements that could
    * race with (and overwrite) the selection made here; everything needed
-   * is already sitting in catalogPayableMovements from the LC Index load.
+   * is already sitting in documentArrivalHints.catalogPayableMovements from the LC Index load.
    */
   onSelectFlattenedPayable(contractId: string, movementId: string): void {
     this.selectedContract = this.catalogPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     this.refreshSelectedContractSnapshot();
-    this.payableMovements = this.catalogPayableMovements.get(contractId) ?? [];
+    this.payableMovements = this.documentArrivalHints.catalogPayableMovements.get(contractId) ?? [];
     this.payableMovementsLoading = false;
     this.payableMovementsPaging.total = this.payableMovements.length;
     this.payableMovementsPaging.page = 1;
@@ -866,7 +755,7 @@ export class TransactionBuilderComponent {
    * entry; the "N pending:" prefix makes the separateness explicit instead.
    */
   catalogIbHint(c: BalanceContract): string {
-    const ibs = this.catalogPayableIbs.get(c.balanceContractId);
+    const ibs = this.documentArrivalHints.catalogPayableIbs.get(c.balanceContractId);
     if (!ibs?.length) return '';
     return ibs.length === 1 ? ` — ${ibs[0]}` : ` — ${ibs.length} pending: ${ibs.join(', ')}`;
   }
@@ -910,13 +799,13 @@ export class TransactionBuilderComponent {
       list = list.filter((c) => !c.tenorType || (tenorFilter === 'SIGHT' ? c.tenorType === 'SIGHT' : c.tenorType !== 'SIGHT'));
     }
     if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
-      return list.filter((c) => this.catalogPayableIbs.has(c.balanceContractId));
+      return list.filter((c) => this.documentArrivalHints.catalogPayableIbs.has(c.balanceContractId));
     }
     // Business requirement 2026-08-19 ("B4 也是一樣的業務要求 (EARMARKING EVENTS ONLY) 差別是不分
     // SIGHT/USANCE") — B4 only. See catalogChildPayableIbs's own doc comment for why this is a
     // cross-contract check, unlike A4's own same-contract one right above.
     if (this.selectedFunction?.payableMovementInstrumentType) {
-      return list.filter((c) => this.catalogChildPayableIbs.has(c.balanceContractId));
+      return list.filter((c) => this.documentArrivalHints.catalogChildPayableIbs.has(c.balanceContractId));
     }
     if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return list;
     return list.filter((c) => {
@@ -966,7 +855,7 @@ export class TransactionBuilderComponent {
         // Business requirement 2026-08-19 ("A6 — LC Index Eligibility Criteria") — A6 only, see
         // requiresEligibleParentDocumentArrival's own doc comment.
         if (this.requiresEligibleParentDocumentArrival) {
-          this.loadDocumentArrivalHints(items, this.parentPayableIbs, this.parentPayableMovements, () => {
+          this.documentArrivalHints.loadParentHints(items, () => {
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
@@ -1045,7 +934,7 @@ export class TransactionBuilderComponent {
     // — B4 never reaches this getter at all in practice anyway, see its own doc comment — so this branch
     // is genuinely A6-only.
     if (this.requiresEligibleParentDocumentArrival) {
-      return list.filter((c) => this.parentPayableIbs.has(c.balanceContractId));
+      return list.filter((c) => this.documentArrivalHints.parentPayableIbs.has(c.balanceContractId));
     }
     if (
       this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
@@ -1130,7 +1019,7 @@ export class TransactionBuilderComponent {
     if (!this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) return '';
     const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
     if (!snap || snap.pendingEarmarkTotal === '0') return '';
-    const ibs = this.catalogPayableIbs.get(c.balanceContractId);
+    const ibs = this.documentArrivalHints.catalogPayableIbs.get(c.balanceContractId);
     const label = ibs && ibs.length > 1 ? 'Total Pending' : 'Pending';
     return ` — ${label}: ${this.formatAmount(snap.pendingEarmarkTotal.replace('-', ''))}`;
   }

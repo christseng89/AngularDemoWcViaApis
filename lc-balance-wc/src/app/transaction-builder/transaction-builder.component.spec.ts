@@ -408,8 +408,8 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(comp.catalogPayableIbs.get('c1')).toEqual(['IB00001']);
-      expect(comp.catalogPayableMovements.get('c1')?.map((m: any) => m.movementId)).toEqual(['m1']);
+      expect(comp.documentArrivalHints.catalogPayableIbs.get('c1')).toEqual(['IB00001']);
+      expect(comp.documentArrivalHints.catalogPayableMovements.get('c1')?.map((m: any) => m.movementId)).toEqual(['m1']);
     });
 
     it('handles an error response by clearing catalogPicker.contracts/catalogPicker.total instead of throwing', () => {
@@ -450,7 +450,7 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(comp.catalogChildPayableIbs.get('c1')).toEqual(['E01']);
+      expect(comp.documentArrivalHints.catalogChildPayableIbs.get('c1')).toEqual(['E01']);
       expect(comp.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['c1']);
       expect(comp.catalogPicker.total).toBe(1);
     });
@@ -464,7 +464,7 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(comp.catalogChildPayableIbs.has('c1')).toBe(false);
+      expect(comp.documentArrivalHints.catalogChildPayableIbs.has('c1')).toBe(false);
       expect(comp.filteredCatalogContracts).toEqual([]);
       expect(comp.catalogPicker.total).toBe(0);
     });
@@ -480,7 +480,7 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(comp.catalogChildPayableIbs.has('c1')).toBe(false);
+      expect(comp.documentArrivalHints.catalogChildPayableIbs.has('c1')).toBe(false);
       expect(comp.filteredCatalogContracts).toEqual([]);
     });
 
@@ -497,7 +497,7 @@ describe('TransactionBuilderComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(comp.catalogChildPayableIbs.has('c1')).toBe(false);
+      expect(comp.documentArrivalHints.catalogChildPayableIbs.has('c1')).toBe(false);
       expect(comp.filteredCatalogContracts).toEqual([]);
     });
 
@@ -509,7 +509,7 @@ describe('TransactionBuilderComponent', () => {
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
 
       expect(() => comp.reloadCatalog()).not.toThrow();
-      expect(comp.catalogChildPayableIbs.size).toBe(0);
+      expect(comp.documentArrivalHints.catalogChildPayableIbs.size).toBe(0);
       expect(comp.catalogPicker.total).toBe(0);
     });
   });
@@ -536,7 +536,7 @@ describe('TransactionBuilderComponent', () => {
       const c1 = mkContract('c1', '810');
       comp.catalogPicker.contracts = [c1];
       const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
-      comp.catalogPayableMovements.set('c1', [movement]);
+      comp.documentArrivalHints.catalogPayableMovements.set('c1', [movement]);
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
 
       comp.onSelectFlattenedPayable('c1', 'm1');
@@ -555,7 +555,7 @@ describe('TransactionBuilderComponent', () => {
       comp.selectedFunction = A6; // settlesDocumentArrival: true
       comp.catalogPicker.contracts = [c1];
       const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
-      comp.catalogPayableMovements.set('c1', [movement]);
+      comp.documentArrivalHints.catalogPayableMovements.set('c1', [movement]);
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
 
       comp.onSelectFlattenedPayable('c1', 'm1');
@@ -585,14 +585,14 @@ describe('TransactionBuilderComponent', () => {
     it('renders a single pending IB inline', () => {
       const { comp } = makeComponent();
       const c1 = mkContract('c1', '810');
-      comp.catalogPayableIbs.set('c1', ['IB00001']);
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001']);
       expect(comp.catalogIbHint(c1)).toBe(' — IB00001');
     });
 
     it('renders multiple pending IBs with a count prefix', () => {
       const { comp } = makeComponent();
       const c1 = mkContract('c1', '810');
-      comp.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
       expect(comp.catalogIbHint(c1)).toBe(' — 2 pending: IB00001, IB00002');
     });
   });
@@ -848,7 +848,7 @@ describe('TransactionBuilderComponent', () => {
       comp.selectedFunction = A4;
       const c1 = mkContract('c1', '810');
       comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-25000' }));
-      comp.catalogPayableIbs.set('c1', ['IB00001']);
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001']);
       expect(comp.catalogPendingHint(c1)).toBe(' — Pending: 25,000');
     });
 
@@ -857,7 +857,7 @@ describe('TransactionBuilderComponent', () => {
       comp.selectedFunction = A4;
       const c1 = mkContract('c1', '810');
       comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-1234567.89' }));
-      comp.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
       expect(comp.catalogPendingHint(c1)).toBe(' — Total Pending: 1,234,567.89');
     });
   });

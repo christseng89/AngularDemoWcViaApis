@@ -324,8 +324,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         contract({ balanceContractId: 'b', naturalKey: { lcNumber: 'B001' } }),
         contract({ balanceContractId: 'a', naturalKey: { lcNumber: 'A001' } }),
       ];
-      c.catalogPayableMovements.set('b', [movement({ movementId: 'm-b2', sourceTransactionRef: 'IB02' })]);
-      c.catalogPayableMovements.set('a', [
+      c.documentArrivalHints.catalogPayableMovements.set('b', [movement({ movementId: 'm-b2', sourceTransactionRef: 'IB02' })]);
+      c.documentArrivalHints.catalogPayableMovements.set('a', [
         movement({ movementId: 'm-a2', sourceTransactionRef: 'IB02' }),
         movement({ movementId: 'm-a1', sourceTransactionRef: 'IB01' }),
       ]);
@@ -333,8 +333,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // (which flattenedPayableRows now windows via pagedFilteredCatalogContracts) requires a
       // catalogPayableIbs entry too — always populated alongside catalogPayableMovements in real usage
       // (loadDocumentArrivalHints()), so both need setting here.
-      c.catalogPayableIbs.set('b', ['IB02']);
-      c.catalogPayableIbs.set('a', ['IB02', 'IB01']);
+      c.documentArrivalHints.catalogPayableIbs.set('b', ['IB02']);
+      c.documentArrivalHints.catalogPayableIbs.set('a', ['IB02', 'IB01']);
       const rows = c.flattenedPayableRows;
       expect(rows.map((r) => r.movement.movementId)).toEqual(['m-a1', 'm-a2', 'm-b2']);
     });
@@ -365,7 +365,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         contract({ balanceContractId: 'ineligible', tenorType: 'SIGHT' }),
       ];
       (c as any).catalogPicker.snapshots.set('eligible', snapshot({ availableBalance: '0' }));
-      c.catalogPayableIbs.set('eligible', ['IB01']);
+      c.documentArrivalHints.catalogPayableIbs.set('eligible', ['IB01']);
       // 'ineligible' has no catalogPayableIbs entry at all — no outstanding Document Arrival of its own.
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['eligible']);
     });
@@ -394,8 +394,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): both surviving candidates
       // still need a catalogPayableIbs entry to pass A4's own eligibility filter — 'usance' is excluded
       // by the tenor filter regardless, so it deliberately gets none.
-      c.catalogPayableIbs.set('sight', ['IB01']);
-      c.catalogPayableIbs.set('legacy', ['IB02']);
+      c.documentArrivalHints.catalogPayableIbs.set('sight', ['IB01']);
+      c.documentArrivalHints.catalogPayableIbs.set('legacy', ['IB02']);
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'sight'].sort());
     });
 
@@ -422,7 +422,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       ];
       // Only 'match' has an outstanding Document Arrival of its own — 'match-but-ineligible' would
       // otherwise pass the tenor check too, but has no parentPayableIbs entry.
-      c.parentPayableIbs.set('match', ['IB01']);
+      c.documentArrivalHints.parentPayableIbs.set('match', ['IB01']);
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['match']);
     });
 
@@ -432,7 +432,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.model.tenorType = 'BUYERS_USANCE';
       c.parentPicker.contracts = [contract({ balanceContractId: 'fully-earmarked', tenorType: 'BUYERS_USANCE' })];
       (c as any).parentPicker.snapshots.set('fully-earmarked', snapshot({ availableBalance: '0' }));
-      c.parentPayableIbs.set('fully-earmarked', ['IB01']);
+      c.documentArrivalHints.parentPayableIbs.set('fully-earmarked', ['IB01']);
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['fully-earmarked']);
     });
 
@@ -496,11 +496,11 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.catalogPendingHint(contract({ balanceContractId: 'zero' }))).toBe('');
 
       (c as any).catalogPicker.snapshots.set('one', snapshot({ pendingEarmarkTotal: '-1234567.89' }));
-      (c as any).catalogPayableIbs.set('one', ['IB01']);
+      (c as any).documentArrivalHints.catalogPayableIbs.set('one', ['IB01']);
       expect(c.catalogPendingHint(contract({ balanceContractId: 'one' }))).toBe(' — Pending: 1,234,567.89');
 
       (c as any).catalogPicker.snapshots.set('many', snapshot({ pendingEarmarkTotal: '-5000' }));
-      (c as any).catalogPayableIbs.set('many', ['IB01', 'IB02']);
+      (c as any).documentArrivalHints.catalogPayableIbs.set('many', ['IB01', 'IB02']);
       expect(c.catalogPendingHint(contract({ balanceContractId: 'many' }))).toBe(' — Total Pending: 5,000');
     });
 
@@ -803,7 +803,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('A4'));
       c.onCatalogSearch();
-      expect(c.catalogPayableIbs.get('bc-1')).toEqual(['(no IB Number)']);
+      expect(c.documentArrivalHints.catalogPayableIbs.get('bc-1')).toEqual(['(no IB Number)']);
       const rows = c.flattenedPayableRows;
       expect(rows.length).toBe(2);
       expect(rows.every((r) => r.movement.sourceTransactionRef === undefined)).toBe(true);
