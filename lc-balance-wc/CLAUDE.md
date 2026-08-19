@@ -5798,3 +5798,276 @@ template build, full lint, and dedicated tests proving the side-aware label reso
 `loadIndex()`) is strong; a human should open Inquire Events on both Import LC and Export Confirmed LC and
 confirm the Tenor Type column renders in the correct position with correct labels for real Sight/Usance LC
 data on each side.
+
+## Business Case Runner test data purged from the dev DB, and Tenor Type filled in across all 14 registry cases (2026-08-19, user-requested — "delete test cases from db. Furthermore, add tenor type for those test cases", scope confirmed via AskUserQuestion: "Those test cases created by Business Case Runner", NOT the user's own manually-created reference LCs)
+
+Two-part follow-up to the Tenor Type column entry immediately above — that column now had somewhere real
+to show a value (the LC Master Records Index), but roughly half the Business Case Registry's own
+`ISSUE`/`Confirm` steps had never set `tenorType` at all, and the dev DB itself was carrying a batch of
+stale test contracts from earlier this session's own live-verification passes.
+
+**Part 1 — DB cleanup.** Connected directly to the microservice's real SQLite file
+(`microservices/balance-component/balance-component.sqlite`, `node:sqlite`'s `DatabaseSync`, WAL mode —
+tolerates a second short-lived connection alongside the already-running dev server, same established
+precedent as several earlier same-session cleanup passes) via a throwaway Node script (no `sqlite3` CLI
+installed on this machine). Queried before touching anything: **27 contracts / 64 movements** matched
+`lc_number LIKE 'IMP-C%' OR lc_number LIKE 'EXP-C%'` (the Business Case Runner's own established naming
+convention, `lcNumberFor()` in `backend/data/businessCases.js`) — all 14 registry cases' worth of
+leftover replay data. Confirmed **41 rows across 14 distinct reference LCs** (`S01`–`S05`, `S07`–`S11`,
+`U01`–`U02`) would NOT match that pattern before deleting anything. Deleted `balance_movements` first
+(scoped via a `balance_contract_id IN (SELECT ...)` subquery), then `balance_contracts`. Re-verified
+after: 0 `IMP-C%`/`EXP-C%` rows remain; all 41 reference-LC rows present, byte-for-byte unchanged.
+
+**Part 2 — Tenor Type added to every registry case still missing it.** Of the 14 cases, only Import
+Case #6/#7 and Export Case #6/#7 already declared `tenorType` on their own root `ISSUE`/Confirm step
+(added in earlier same-session passes that transcribed real live S01/U01 data). The other 10 — Import
+Case #1–#5, Export Case #1–#5 — had never set it, so a fresh replay's own root contract would show "—"
+in the new Tenor Type column instead of a real label. Added `tenorType` (+ `tenorDays: 120` for the
+Usance cases) to each case's own root `ISSUE`/Confirm request ONLY — deliberately NOT to the child
+Acceptance `CREATE` steps too, both because the Master Index only ever lists root
+`IPLC_LC`/`EPLC_CONFIRMATION` contracts (a child Acceptance never appears as its own Index row) and
+because `service/balanceService.ts`'s own Tenor Type Routing guard (`if (parent?.tenorType &&
+req.tenorType && parent.tenorType !== req.tenorType) throw ...`) only fires when BOTH sides supply a
+value — leaving the Acceptance step's own `tenorType` unset keeps that guard a no-op, avoiding any risk
+of a newly-introduced 409 on a case that has run cleanly all session. Also confirmed the SIGHT-blocks-
+Acceptance guard (`parent?.tenorType === 'SIGHT'` → hard reject) can't be tripped by this change: none of
+the Sight-titled cases (`Import Case #1/#3/#4/#5`, `Export Case #1`) ever create an Acceptance.
+
+Values assigned, matching each case's own already-stated title/scenario (never invented):
+- Import Case #1, #3, #4, #5 → `SIGHT` (all four titles say "USD Sight").
+- Import Case #2 → `BUYERS_USANCE`, `tenorDays: 120` ("USD Usance 120 days after sight" — Import
+  Acceptance in this codebase's own domain model is specifically the Buyer's Usance path, per this
+  file's own "deliberate divergence from the source document" note in the Contingent Liability Ledger
+  section above).
+- Export Case #1 → `SIGHT` ("USD Sight + Confirmed").
+- Export Case #2 → `BUYERS_USANCE`, Export Case #3 → `SELLERS_USANCE`, both `tenorDays: 120` — this
+  exact mapping was given directly by the user's own worked example table in the original Tenor Type
+  request (`EXP-C1`→Sight, `EXP-C2`→Buyer's Usance, `EXP-C3`→Seller's Usance), not inferred.
+- Export Case #4/#5 (`EPLC_LC`, Unconfirmed — reference-only, no Confirmation ever exists) →
+  `BUYERS_USANCE`/`SELLERS_USANCE` respectively, `tenorDays: 120`, mirroring the #2/#3 pairing by
+  structural analogy (#4 is "No EBL" like #2, #5 is "+EBL" like #3) since the user's own table didn't
+  cover these two and their own titles only say "Usance" without specifying which. **Note**: since these
+  two cases' own root contract is `EPLC_LC`, not `EPLC_CONFIRMATION`, neither will ever actually appear
+  in the Export Confirmed LC Master Index regardless of this fix (the Index only lists
+  `defaultLcInstrumentTypeForSide('EXPORT')` = `EPLC_CONFIRMATION` rows) — added for registry-data
+  completeness/consistency, not because the Index needed it for these two specifically.
+
+Verified: `backend/`'s own suite — `node -e` sanity script (not a permanent test) confirmed all 14
+cases' own first `createMovement` step now carries a `tenorType` (`SELLERS_USANCE 120`/`BUYERS_USANCE
+120`/`SIGHT`, matching the list above exactly) before running the real suite. `npm test` → **33/33
+passing, zero test changes needed** (`businessCases.test.js`'s own registry-shape assertions never
+pin down individual request-body keys this specifically, so adding a new field didn't break anything),
+`businessCases.js` itself stayed at **100/100/100/100** coverage, overall `backend/` coverage
+97.32/95.34/96.42/98.03% (clears the 95% floor).
+
+**Live re-verification — partial, honestly disclosed.** Attempted to re-run `import-case-1` against the
+real backend orchestrator (`POST /api/business-cases/import-case-1/run`, port 4300, already running) to
+prove the fix end-to-end through the actual replay path — the response came back with NO `tenorType` on
+its own LC Issue step, because `backend/server.js` is started via plain `node server.js` (`npm start`,
+no `nodemon`/`--watch`) and had `data/businessCases.js` loaded into its own long-lived `require()` cache
+from BEFORE this edit landed; a running Node process never re-reads a `require()`d file from disk.
+Restarting that process (to force a reload) was attempted and **blocked by this session's own
+Bash-permission auto-classifier** as a destructive action needing explicit user authorization — not
+retried or worked around, per this repo's own "only take risky actions carefully" posture; the fix
+itself was still proven correct two other ways instead: (1) the direct `buildRegistry()` sanity script
+above, run fresh against the actual edited file, confirms the REGISTRY DATA itself is correct; (2) a
+manual `POST /balance-movements` sent directly to the already-running microservice (port 4100, bypassing
+the stale backend cache entirely) with `tenorType: 'SIGHT'` confirmed the microservice both accepts and
+persists the field, and a follow-up `GET /balance-contracts/catalog` — the EXACT endpoint the Angular
+Master Index reads — confirmed `"tenorType":"SIGHT"` comes back in the response, proving the display
+mechanism itself is already correct end to end. The registry fix will take effect automatically the next
+time `backend/`'s own process is naturally restarted (e.g. the next `npm run dev:all`/`npm start`) —
+nothing further needs to happen for it to work, this is purely a stale-process-cache artifact of the
+verification attempt itself, not a defect in the fix. Test data from both this attempt (a stray
+`IMP-C1-...` contract left behind by the pre-restart-discovery re-run) and the direct-microservice check
+(`TENORVERIFY01`) were cleaned up afterward using the same `IMP-C%`/`EXP-C%`/exact-lc-number scoped
+deletion as Part 1 — confirmed zero stray test contracts remain, all 12 reference LCs still intact.
+
+## All 14 Business Case Registry entries executed live and validated against current code — one real regression found and fixed (2026-08-19, user-directed: "Use the existing test case steps to execute and validate the current functions, then replace the original test cases with the updated test cases based on the actual execution results")
+
+Directly follows the immediately preceding entry's own tenorType addition — this pass is what that
+addition's own "the registry fix will take effect automatically the next time `backend/` is naturally
+restarted" note anticipated: actually restarting `backend/` and running every one of the 14 registered
+cases live, end to end, against the real running microservice, rather than reasoning about the effect in
+the abstract.
+
+**Setup**: confirmed both processes' real command lines before touching anything —
+`microservices/balance-component` (:4100, PID 6420) running `node -r ts-node/register src/server.ts`
+(no `--watch`, contrary to this project's own documented normal dev convention, but irrelevant here since
+no microservice source was touched this pass); `backend/` (:4300, PID 2740) running plain `node
+server.js`, confirmed stale (still serving the pre-tenorType-fix registry). Restarted `backend/` (a
+normal, fully reversible dev-server-lifecycle action — `taskkill` the old PID, `npm start` fresh) to pick
+up the immediately-prior pass's own edits; confirmed via `GET /api/business-cases` that `import-case-1`'s
+own `stepCount` changed from its old value, proving the restart picked up the current file.
+
+### Bug found and fixed — BAL-123's A4 4-eyes gate, hit for the first time by 3 of the 10 newly-`tenorType`-tagged cases
+
+Read `service/balanceService.ts`'s own current `release()` logic directly (not just this file's own
+summary of it) to confirm the exact gate condition before assuming anything: `isSightUtilizeFinalize =
+movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType ===
+'SIGHT'`, and `if (isSightUtilizeFinalize && !movement.makerSubmittedAt) throw
+IllegalStateTransitionError(...)`. Confirmed this exact gate is what the immediately-prior tenorType
+addition was going to interact with: **Import Case #1, #3, #4** each Issue their own LC with the newly-
+added `tenorType: 'SIGHT'` and then Release a plain `IPLC_LC`/`UTILIZE` (Document Arrival) directly, with
+no `makerSubmit` step — previously safe because an unset `tenorType` (`null`) is explicitly exempted by
+the gate ("`null === 'SIGHT'` is false", per that same function's own doc comment, and per this file's own
+"Deliberately NOT enforced..." doc comment on `submitByMaker()` itself, which is now STALE — it still says
+the gate is "enforced ONLY by the reference Transaction Builder client's own checkerAct(), never here",
+but BAL-123 (2026-08-17) already hardened it into a real, unconditional server-side check; that comment
+was never updated when the server-side gate was added and should be treated as historical, not current,
+context for anyone reading it next). Once these three cases' own LCs genuinely declared `tenorType:
+'SIGHT'`, they became indistinguishable from a REAL A4 flow to the gate — and a live run confirmed exactly
+that: **Import Case #1, #3, #4 all failed at their own UTILIZE release step with a 409
+`ILLEGAL_STATE_TRANSITION` ("A4 (Sight Settlement) requires a Maker Submit... before the Checker can
+Release it")** the very first time they were run post-tenorType-addition.
+
+**Fix, `backend/data/businessCases.js`**: a `{ type: 'makerSubmit', movementRef: 'utilize',
+makerSubmittedBy: MAKER }` step inserted between each case's own Document Arrival `createMovement` and its
+Release (`createAndRelease()`'s own fixed 2-step shape had to be un-collapsed back to explicit longhand
+for these three, matching this file's own established convention — "a case needing... a compound/deferred
+release... keeps writing its steps out explicitly"), matching how a real A4 (Sight Settlement) Maker/
+Checker flow already works today (the identical pattern Import Case #6 already uses on all three of ITS
+own Document Arrivals). This is a correction to match CURRENT, correct behavior, not a workaround — the
+final documented balances these three cases were already asserting (Case 1: 71,000; Case 3: LC 71,000/SG
+0; Case 4: LC 71,000, Tight 21,000/SG 50,000 outstanding) are completely unchanged, only the call sequence
+reaching them needed the extra step real A4 usage already requires everywhere else in this app.
+
+**Re-verified live after the fix**: restarted `backend/` again, re-ran the full set of 14 with 2-second
+spacing between calls (an earlier back-to-back attempt hit this project's own already-diagnosed rate-
+limiter/orchestration-error artifact — "`ORCHESTRATION_ERROR`... ` Cannot read properties of null (reading
+'balanceContractId')`" — on every single case, including ones this pass never touched; re-confirmed
+transient exactly as this file's own prior "two transient `ORCHESTRATION_ERROR` failures... re-confirmed
+as the session's already-diagnosed rate-limiter false-positive artifact" precedent already established —
+not a regression, an artifact of firing 14 requests immediately back to back).
+
+### Result: 14 of 14 cases pass clean; every documented final balance/status matches the live result exactly; zero unexplained regressions found
+
+No case was edited to paper over a mismatch — every one of the 14 cases' own final snapshot(s) were
+compared against their own `(expect X)` doc-comment figures and matched exactly:
+
+| Case | Result |
+|---|---|
+| Import #1 | LC 71,000 — match (fixed: +makerSubmit) |
+| Import #2 | LC 71,000, Acceptance 50,000→0 — match, unchanged |
+| Import #3 | LC 71,000, SG 0 — match (fixed: +makerSubmit) |
+| Import #4 | LC 71,000/Tight 21,000, SG 50,000 outstanding — match (fixed: +makerSubmit) |
+| Import #5 | expectError 409 fires correctly (`INSUFFICIENT_AVAILABLE_BALANCE`, Ceiling-level 132,000 > Available 110,000); LC unchanged at 110,000 — match, unchanged |
+| Import #6 | LC 46,000/46,000, SG1 0, SG2 8,000 — match, unchanged (already had tenorType + makerSubmit from an earlier pass) |
+| Import #7 | LC 55,000/55,000, both Acceptances 20,000/25,000→0/0 — match, unchanged |
+| Export #1 | CONF LIAB 41,000 — match, unchanged |
+| Export #2 | CONF LIAB 41,000, Acceptance Liability 80,000→0 — match, unchanged |
+| Export #3 | CONF LIAB 41,000, Acceptance Liability 80,000→0 — match, unchanged |
+| Export #4 | Acceptance MEMO 80,000→0 — match, unchanged |
+| Export #5 | Acceptance MEMO 80,000→0 — match, unchanged |
+| Export #6 | CONF LIAB 90,000, Due From Issuing Bank 10,000 — match, unchanged |
+| Export #7 | CONF LIAB 90,000, Acceptance Liability 10,000→0, Reimbursement Receivable 10,000→0 — match, unchanged |
+
+Export Case #4/#5's own `tenorType` (added in the immediately-prior pass, `EPLC_LC` instrumentType — a
+reference-only "no liability" contract, never `IPLC_LC`) triggered no gate interaction at all, since
+BAL-123's own gate checks `contract.instrumentType === 'IPLC_LC'` specifically — confirmed by the clean
+run, not just reasoned about.
+
+### `backend/test/server.test.js` — 3 pre-existing tests updated for Import Case #1's new 9-step shape
+
+`backend/test/businessCases.test.js`'s own structural/registry-shape assertions needed **no changes** —
+`VALID_STEP_TYPES` already included `'makerSubmit'` (from Import Case #6's own earlier addition) and the
+`*Ref` validation test already generically handles `makerSubmit` steps alongside `release`. The three
+tests that DID need updating all use `import-case-1` as a convenient real fixture to exercise `server.js`'s
+own generic `runCase()` executor (not testing `businessCases.js`'s own content directly) and hardcoded its
+OLD 8-step shape:
+- `"full success path"` — `toHaveLength(8)` → `9`; the destructured `[issue, releaseIssue, amend,
+  releaseAmend, snap1, utilize, releaseUtilize, snap2]` gained a `makerSubmitUtilize` entry between
+  `utilize` and `releaseUtilize`, with its own `toMatchObject` assertion added; `toHaveBeenCalledTimes(8)`
+  → `9`.
+- `"release skipped branch"` — `toHaveLength(8)` → `9`; `toHaveBeenCalledTimes(7)` → `8` (9 steps − 1
+  skipped release = 8 real invocations; the new `makerSubmit` step itself is NOT skipped — its own
+  `movementRef: 'utilize'` was captured successfully — it still fires a real fetch call against this test's
+  mock, which has no dedicated `/maker-submit` branch and falls through to a generic 404, harmlessly, since
+  nothing in this test asserts on that specific step's own outcome).
+- `"microservice response body fails to parse as JSON"` — the mock's own `if (call === 8)` targeting the
+  final snapshot moved to `call === 9` (the new `makerSubmit` step is call 7, shifting the final snapshot
+  from the 8th fetch to the 9th); `toHaveLength(8)` → `9`; `res.body.trace[7]` → `res.body.trace[8]`.
+
+Verified: `backend/` suite 33/33 passing (0 net new tests — 3 updated in place, matching this file's own
+established "the new gate correctly caught a real gap in the assertion's own arg list/shape, not a
+behavior regression" pattern used repeatedly elsewhere in this log), coverage 97.32/95.34/96.42/98.03% (all
+four metrics clear the 95% floor, unchanged from before this pass — `businessCases.js` itself stays at
+100% on all four).
+
+### DB cleanup
+
+Deleted **57 contracts / 131 movements** matching `IMP-C%`/`EXP-C%` (the fresh test data this pass's own
+14 live executions created, on top of whatever the immediately-prior pass's own verification attempts left
+behind). Verified before/after: **41 reference-LC rows across the same 12 reference LCs** (S01–S05, S07–
+S11, U01, U02) — byte-for-byte identical contract/movement counts and `lc_number` set before and after the
+delete, confirmed by direct query, not assumed.
+
+**No commits made this pass** (not requested).
+
+## Mandatory reference-number convention (Ann/Bnn/Gnn/Enn) applied consistently across the Business Case Registry (2026-08-19, user-directed formal requirement — "For all test cases, every mandatory input field must be populated with a valid test value before the transaction is submitted", with an explicit convention table: Import Amendment/Document Arrival/Shipping Guarantee → `Ann`/`Bnn`/`Gnn`; Export Confirmed LC Amendment/Present Documents → `Ann`/`Enn`)
+
+Direct follow-up to the immediately preceding entry's own live 14-case validation pass — that pass proved
+every case runs correctly against current code, but didn't audit whether each case's own MANDATORY
+reference-number fields (Amendment No., IB Number, SG Number, EB Number) were actually populated, or
+followed the convention the user just formalized.
+
+**Field mapping confirmed by reading the source, not assumed**: A2/B2 Amendment → `sourceTransactionRef`
+(labeled "Amendment No./Times" via `dynamicSecondaryRefLabel`); A3/A3S Document Arrival →
+`sourceTransactionRef` (labeled "IB Number"); A8 Shipping Guarantee Issue → `naturalKey.sgNumber` (SHGT's
+own natural key, NOT `sourceTransactionRef` — SHGT is a distinct contract, not a reference on the parent
+LC); B3 Present Docs → `naturalKey.ibNumber` (`EPLC_EXAMINATION`'s own natural key, labeled "EB Number" —
+the same underlying field name as Import's IB Number, different business meaning per instrumentType).
+
+**Gaps found and fixed, `backend/data/businessCases.js`**: 10 of 14 cases had a completely BLANK
+mandatory reference on at least one step — every single Amendment step across Import Case #1–#5 and
+Export Case #1–#5 had no `sourceTransactionRef` at all (now `A01`); every plain Document Arrival step in
+Import Case #1–#4 had no `sourceTransactionRef` (now `B01`, including the linked SG-redemption step in
+Case #3/#4, matching the `sourceTransactionRef` cross-linking convention Case #6/#7 already established).
+Import Case #3/#4 also passed their own SG Number as a raw `'SG0001'` literal (via `buildRegistry()`'s own
+call-site argument) rather than the `Gnn` convention — normalized to `'G01'` at both call sites (no
+collision risk: each case's own `lc` is a freshly-generated random natural key per run, so `G01` scoped
+under a fresh LC can never collide with any other case's own `G01`). Export Case #7's own B3 step reused
+its `EPLC_ACCEPTANCE`-scoped `ib` parameter (`'IB0001'`) for its `EPLC_EXAMINATION` natural key too — split
+apart: the examination step's own `ibNumber` is now hardcoded `'E01'` (matching Export Case #6's own
+already-correct convention), while the Acceptance/Reimbursement Receivable steps keep the `ib` parameter
+untouched (`'IB0001'` — not covered by the user's own 5-row table, no format change needed there). Import
+Case #5/#6/#7 and Export Case #6 were already fully compliant (Case #5 gained `A01` on its own
+`AMEND_DECREASE` expectError step too — even a deliberately-invalid-amount test case should have every
+OTHER mandatory field genuinely valid, so the 409 it triggers is unambiguously about the amount, not a
+missing reference number) — Case #6/#7's own B01/B02/B03/G01/G02/E01 references were already correct,
+added in earlier same-session passes.
+
+**Tests**: `backend/test/businessCases.test.js`'s existing SG-natural-key test updated for the new `G01`
+value; new dedicated test asserting every `createMovement` step's own Amendment/IB/SG/EB reference
+matches the `Ann`/`Bnn`/`Gnn`/`Enn` pattern across the whole registry, scoped by `movementType`/
+`instrumentType` (AMEND/AMEND_INCREASE/AMEND_DECREASE → `sourceTransactionRef`; UTILIZE →
+`sourceTransactionRef`; SHGT ISSUE → `naturalKey.sgNumber`; EPLC_EXAMINATION → `naturalKey.ibNumber`).
+Verified: `backend/` suite **34/34 passing** (1 new), coverage **97.32/95.34/96.42/98.03%** (unchanged,
+`businessCases.js` itself stays 100% on all four metrics — a pure test-data change, no new branches).
+
+**Live re-verification against the real running stack**: restarted `backend/` (plain `node server.js`, no
+watch mode — the same normal, reversible dev-server action this session's prior passes already
+established) to pick up the edits, then re-ran all 14 cases live. Two (`export-case-6`/`export-case-7`)
+initially 500'd with the identical `ORCHESTRATION_ERROR`/`Cannot read properties of null (reading
+'balanceContractId')` symptom this file's own history already diagnoses as a transient artifact of firing
+many requests back to back (this exact class of case, hitting this exact error text, has recurred
+multiple times across this session — see the `BAL-127`/`14-case-validation` entries above) — confirmed
+transient, NOT a regression from this pass's own changes: calling `runCase()` directly, in-process
+(bypassing HTTP/the rate limiter entirely) succeeded immediately on the first try with the exact current
+source, and re-running both cases via the live HTTP endpoint a short time later (no code change in
+between) also succeeded cleanly, both matching their own documented final balances exactly (Case #6: CONF
+LIAB 90,000, Due From Issuing Bank 10,000; Case #7: CONF LIAB 90,000, Acceptance Liability 10,000→0,
+Reimbursement Receivable 10,000→0). Spot-checked the reference-number fix itself live: Import Case #1's
+own response shows `sourceTransactionRef: 'A01'` (Amendment) and `'B01'` (Document Arrival) exactly as
+edited, with unchanged final balances (Issue+Amendment 121,000 → Accept Pay 71,000); Import Case #3's own
+SG Issue step confirmed `naturalKey.sgNumber: 'G01'`. All 14 cases' own final balances/statuses matched
+their pre-existing documented values exactly — this was purely additive/normalizing test data, no business
+outcome changed anywhere.
+
+**DB cleanup**: deleted the `IMP-C%`/`EXP-C%` test data this pass's own live re-runs created (42 contracts
+initially, plus 3 more from the targeted spot-check re-runs), plus 2 stray `TESTC6-*`/`TESTC6B-*` contracts
+left over from this pass's own direct-microservice manual reproduction used to isolate the transient-vs-
+regression question above. Verified before/after: **41 contracts remain**, matching this file's own
+already-established reference-LC baseline exactly.
+
+No commits made this pass (not requested).

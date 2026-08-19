@@ -107,9 +107,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(res.body.id).toBe('import-case-1');
       expect(typeof res.body.title).toBe('string');
       expect(typeof res.body.description).toBe('string');
-      expect(res.body.trace).toHaveLength(8);
+      // 9 steps, not 8 — 2026-08-19 (BAL-123 A4 4-eyes gate, surfaced by live-execution validation once
+      // this case's own LC gained a real tenorType: 'SIGHT' at Issue): a `makerSubmit` step was added
+      // between the Document Arrival's own createMovement and its Release, matching the CURRENT, correct
+      // A4 (Sight Settlement) flow — see businessCases.js's own doc comment on this exact step.
+      expect(res.body.trace).toHaveLength(9);
 
-      const [issue, releaseIssue, amend, releaseAmend, snap1, utilize, releaseUtilize, snap2] = res.body.trace;
+      const [issue, releaseIssue, amend, releaseAmend, snap1, utilize, makerSubmitUtilize, releaseUtilize, snap2] = res.body.trace;
 
       expect(issue).toMatchObject({ type: 'createMovement', status: 201, ok: true, expectedError: false });
       expect(issue.request.balanceContractIdRef).toBeUndefined();
@@ -125,10 +129,11 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(snap1.response.balanceContractId).toBe('bc-1');
 
       expect(utilize.request.balanceContractId).toBe('bc-1');
+      expect(makerSubmitUtilize).toMatchObject({ type: 'makerSubmit', ok: true, status: 200 });
       expect(releaseUtilize).toMatchObject({ type: 'release', ok: true });
       expect(snap2).toMatchObject({ type: 'snapshot', ok: true });
 
-      expect(global.fetch).toHaveBeenCalledTimes(8);
+      expect(global.fetch).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -278,14 +283,20 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
 
       expect(res.status).toBe(200);
-      expect(res.body.trace).toHaveLength(8);
+      // 9 steps, not 8 — see the "full success path" test above for why (BAL-123 makerSubmit step added
+      // 2026-08-19).
+      expect(res.body.trace).toHaveLength(9);
 
       const skippedRelease = res.body.trace.find((t) => t.type === 'release' && t.skipped);
       expect(skippedRelease).toBeDefined();
       expect(skippedRelease.reason).toMatch(/No movementId captured under "lc"/);
 
-      // The skipped release itself made no fetch call: 8 steps - 1 skipped = 7 real invocations.
-      expect(global.fetch).toHaveBeenCalledTimes(7);
+      // The skipped release itself made no fetch call: 9 steps - 1 skipped = 8 real invocations (the new
+      // makerSubmit step DOES still fire a real fetch call here — its own movementRef, 'utilize', was
+      // captured successfully, so it isn't skipped; this mock has no dedicated /maker-submit branch, so
+      // it falls through to the generic 404, which is fine — nothing in this test asserts on that step's
+      // own outcome).
+      expect(global.fetch).toHaveBeenCalledTimes(8);
 
       // Downstream steps still completed normally off the error response's own balanceContractId.
       const amend = res.body.trace.find((t) => t.type === 'createMovement' && t.label.startsWith('LC Amendment'));
@@ -301,8 +312,10 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
         call += 1;
         const method = opts.method || 'GET';
 
-        if (call === 8) {
-          // The final snapshot's response body is not valid JSON.
+        if (call === 9) {
+          // The final snapshot's response body is not valid JSON. call 9, not 8 — 2026-08-19 (BAL-123
+          // makerSubmit step added, see the "full success path" test above), which shifts the final
+          // snapshot from the 8th fetch call to the 9th.
           return { status: 200, ok: true, json: () => Promise.reject(new Error('invalid json')) };
         }
         if (method === 'POST' && url.endsWith('/balance-movements')) {
@@ -321,8 +334,10 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
 
       expect(res.status).toBe(200);
-      expect(res.body.trace).toHaveLength(8);
-      expect(res.body.trace[7]).toMatchObject({ type: 'snapshot', ok: true, response: null });
+      // 9 steps, not 8 — see the "full success path" test above for why (BAL-123 makerSubmit step added
+      // 2026-08-19); the final snapshot is now index 8, not 7.
+      expect(res.body.trace).toHaveLength(9);
+      expect(res.body.trace[8]).toMatchObject({ type: 'snapshot', ok: true, response: null });
     });
   });
 

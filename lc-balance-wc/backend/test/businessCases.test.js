@@ -136,12 +136,35 @@ describe('data/businessCases.js buildRegistry()', () => {
     });
   });
 
-  it('Import Case 3/4 reuse the same SG natural key ("SG0001") — expected per the registry\'s own buildRegistry() call', () => {
+  it('Import Case 3/4 reuse the same SG natural key ("G01", the Gnn mandatory-reference convention) — expected per the registry\'s own buildRegistry() call', () => {
     const byId = Object.fromEntries(registry.map((c) => [c.id, c]));
     const sgStep3 = byId['import-case-3'].steps.find((s) => s.captureAs === 'sg');
     const sgStep4 = byId['import-case-4'].steps.find((s) => s.captureAs === 'sg');
-    expect(sgStep3.request.naturalKey.sgNumber).toBe('SG0001');
-    expect(sgStep4.request.naturalKey.sgNumber).toBe('SG0001');
+    expect(sgStep3.request.naturalKey.sgNumber).toBe('G01');
+    expect(sgStep4.request.naturalKey.sgNumber).toBe('G01');
+  });
+
+  it('every mandatory reference number (Amendment No./IB Number/SG Number/EB Number) on a createMovement step is populated and follows the Ann/Bnn/Gnn/Enn convention', () => {
+    const REF_PATTERN = /^[ABGE]\d{2}$/;
+    registry.forEach((c) => {
+      c.steps
+        .filter((s) => s.type === 'createMovement')
+        .forEach((s) => {
+          const { movementType, instrumentType, naturalKey } = s.request;
+          if (movementType === 'AMEND' || movementType === 'AMEND_INCREASE' || movementType === 'AMEND_DECREASE') {
+            expect(s.request.sourceTransactionRef).toMatch(REF_PATTERN);
+          }
+          if (movementType === 'UTILIZE') {
+            expect(s.request.sourceTransactionRef).toMatch(REF_PATTERN);
+          }
+          if (instrumentType === 'SHGT' && movementType === 'ISSUE') {
+            expect(naturalKey.sgNumber).toMatch(REF_PATTERN);
+          }
+          if (instrumentType === 'EPLC_EXAMINATION') {
+            expect(naturalKey.ibNumber).toMatch(REF_PATTERN);
+          }
+        });
+    });
   });
 
   it('is structurally deterministic across independent calls (ids, step types, step counts, MAKER/CHECKER usage) — only the natural-key random suffixes vary', () => {
