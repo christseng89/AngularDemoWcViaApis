@@ -1948,6 +1948,113 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
+  // pagedLookupMovements / lookupMovementsPaging (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN")
+  // ---------------------------------------------------------------------
+  describe('pagedLookupMovements / lookupMovementsPaging', () => {
+    it('windows a >10-item movements array to 10 per page and computes totalPages', () => {
+      const { comp } = setup();
+      comp.lookUp.lookupMovements = Array.from({ length: 23 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `m${i}` }) }));
+
+      const page1 = comp.lookUp.pagedLookupMovements;
+
+      expect(page1).toHaveLength(10);
+      expect(page1.map((r: any) => r.movement.movementId)).toEqual(Array.from({ length: 10 }, (_, i) => `m${i}`));
+      expect(comp.lookUp.lookupMovementsPaging.total).toBe(23);
+      expect(comp.lookUp.lookupMovementsPaging.totalPages).toBe(3);
+    });
+
+    it('nextLookupMovementsPage()/prevLookupMovementsPage() move within bounds and refuse past either edge', () => {
+      const { comp } = setup();
+      comp.lookUp.lookupMovements = Array.from({ length: 15 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `m${i}` }) }));
+      void comp.lookUp.pagedLookupMovements; // establish paging.total/totalPages for this array
+
+      comp.lookUp.prevLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(1); // already at page 1, refuses to go below
+
+      comp.lookUp.nextLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(2);
+      expect(comp.lookUp.pagedLookupMovements.map((r: any) => r.movement.movementId)).toEqual(['m10', 'm11', 'm12', 'm13', 'm14']);
+
+      comp.lookUp.nextLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(2); // already at the last page, refuses to advance further
+
+      comp.lookUp.prevLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(1);
+    });
+
+    it('resets to page 1 when a fresh runLookup() replaces the LC tab movements array', () => {
+      const { comp, api } = setup();
+      comp.lookUp.lookupMovements = Array.from({ length: 12 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `old${i}` }) }));
+      void comp.lookUp.pagedLookupMovements;
+      comp.lookUp.nextLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(2);
+
+      comp.lookUp.lookup.lcNumber = 'S01';
+      api.listMovements.mockReturnValueOnce(of([{ movementId: 'mv-issue', movementType: 'ISSUE', status: 'RELEASED', createdAt: '2026-01-01T00:00:00Z' }]));
+      comp.lookUp.runLookup();
+
+      expect(comp.lookUp.pagedLookupMovements).toHaveLength(1);
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(1);
+      expect(comp.lookUp.lookupMovementsPaging.total).toBe(1);
+    });
+
+    it('switching to an ALREADY-LOADED tab (no re-fetch) resets to page 1 against that tab\'s own array — must not carry over a stale page from a different tab', () => {
+      const { comp } = setup();
+      comp.lookUp.lookupMovements = Array.from({ length: 25 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `lc${i}` }) }));
+      comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];
+      comp.lookUp.selectedLookupAcceptance = makeContract({ balanceContractId: 'bc-acc-1' });
+      comp.lookUp.acceptanceMovements = Array.from({ length: 3 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `acc${i}` }) }));
+
+      // Drive the LC tab's own timeline to page 3 first.
+      void comp.lookUp.pagedLookupMovements;
+      comp.lookUp.nextLookupMovementsPage();
+      comp.lookUp.nextLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(3);
+
+      // Switch to the Acceptance tab — already has selectedLookupAcceptance set, so this does NOT re-fetch
+      // (see the "does not re-trigger auto-select when a selection already exists" test above), yet the
+      // paging must still land back on page 1 against the Acceptance tab's own (much shorter) array.
+      comp.lookUp.selectLookupTab('ACCEPTANCE');
+
+      const acceptancePage = comp.lookUp.pagedLookupMovements;
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(1);
+      expect(comp.lookUp.lookupMovementsPaging.total).toBe(3);
+      expect(acceptancePage.map((r: any) => r.movement.movementId)).toEqual(['acc0', 'acc1', 'acc2']);
+
+      // And switching back to LC must independently restore ITS OWN paging context (page 1 of 25, not a
+      // leftover page 3 or the Acceptance tab's own total of 3).
+      comp.lookUp.selectLookupTab('LC');
+      const lcPage = comp.lookUp.pagedLookupMovements;
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(1);
+      expect(comp.lookUp.lookupMovementsPaging.total).toBe(25);
+      expect(lcPage.map((r: any) => r.movement.movementId)).toEqual(Array.from({ length: 10 }, (_, i) => `lc${i}`));
+    });
+
+    it('regression — switching to a tab whose own array is currently EMPTY must not leave a stale total/page from the previous tab visible via activeLookupMovements/totalPages (bug caught live: the SG tab with 2+ un-auto-selected candidates showed "Page 2/2 (12 total)" over an empty table)', () => {
+      const { comp } = setup();
+      comp.lookUp.lookupMovements = Array.from({ length: 12 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `lc${i}` }) }));
+      comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' }), makeContract({ balanceContractId: 'bc-sg-2' })];
+      comp.lookUp.sgMovements = []; // no auto-select with 2+ candidates — mirrors the live-reproduced scenario exactly
+
+      // Drive the LC tab to page 2 of 2 first, exactly like the live repro.
+      void comp.lookUp.pagedLookupMovements;
+      comp.lookUp.nextLookupMovementsPage();
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(2);
+      expect(comp.lookUp.lookupMovementsPaging.total).toBe(12);
+
+      // Switch to the SG tab — no fetch fires (2 candidates, no auto-select), so pagedLookupMovements is
+      // never called by the template (activeLookupMovements.length is 0, the *ngIf table wrapper never
+      // renders) — only activeLookupMovements itself gets read, by the template's own *ngIf/hint bindings.
+      comp.lookUp.selectLookupTab('SG');
+      void comp.lookUp.activeLookupMovements; // the ONLY binding the template guarantees gets read here
+
+      expect(comp.lookUp.lookupMovementsPaging.total).toBe(0);
+      expect(comp.lookUp.lookupMovementsPaging.page).toBe(1);
+      expect(comp.lookUp.lookupMovementsPaging.totalPages).toBe(1); // Math.max(1, ceil(0/10)) — the .tb-pagination block's own totalPages > 1 guard correctly stays hidden
+    });
+  });
+
+  // ---------------------------------------------------------------------
   // selectLookupSg()
   // ---------------------------------------------------------------------
   describe('selectLookupSg()', () => {

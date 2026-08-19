@@ -3,6 +3,7 @@ import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './
 import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
 import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$ } from './inquire-events.service';
+import { PagedListState } from './paged-list-state';
 
 /**
  * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): the "Look Up Current Balance" panel's own
@@ -79,11 +80,72 @@ export class LookUpPanelService {
   sgSnapshot: BalanceSnapshot | null = null;
   sgMovements: InquiredEvent[] = [];
 
-  /** Business instruction 2026-08-14 ("two/three tabs...") — whichever tab is active supplies the Event Timeline table. */
+  /**
+   * Business instruction 2026-08-14 ("two/three tabs...") — whichever tab is active supplies the Event
+   * Timeline table.
+   *
+   * UX enhancement (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN") — this getter ALSO keeps
+   * `lookupMovementsPaging` (below) in sync via reference-identity tracking, deliberately placed HERE
+   * rather than only inside `pagedLookupMovements`. `activeLookupMovements` is read unconditionally by the
+   * template on every change-detection cycle (the `*ngIf="lookUp.activeLookupMovements.length"` table
+   * wrapper AND the `.tb-hint`/"No movements yet" fallback both read it directly), while
+   * `pagedLookupMovements` is read only from INSIDE that same `*ngIf` — i.e. only when the active array is
+   * non-empty. A first implementation put the sync logic in `pagedLookupMovements` alone and shipped a
+   * real bug, caught live: switching to a tab whose own array is currently EMPTY (e.g. the SG tab when an
+   * LC has 2+ candidate SGs, so nothing auto-selects and `sgMovements` stays `[]`) meant
+   * `pagedLookupMovements` was never called, so `lookupMovementsPaging` kept showing the PREVIOUS tab's
+   * stale total/page ("Page 2/2 (12 total)") underneath a table that had already gone empty. Syncing here
+   * instead guarantees the check runs every time the active array could possibly have changed, table
+   * rendered or not.
+   *
+   * Deliberately NOT the same "the mutating method sets `.total`/resets `.page`" convention
+   * `InquireEventsService.eventsPaging` itself uses — `InquireEventsService.events` is a single flat array
+   * with exactly one mutation point (`loadEvents()`); this getter switches between THREE independent
+   * arrays (`lookupMovements`/`acceptanceMovements`/`sgMovements`) across FOUR different call sites that
+   * can each replace one of them (`runLookup()`'s own LC-tab fetch, `selectLookupAcceptance()`/
+   * `selectLookupSg()`'s own fetches — including when auto-selected from `runLookup()` itself while the LC
+   * tab is still active — and a plain `selectLookupTab()` switch with no new fetch at all, when the target
+   * tab's data was already loaded earlier). Instrumenting all four by hand risks missing one (exactly the
+   * class of bug this doc comment's own earlier drafting caught: `selectLookupSg()`'s auto-select path can
+   * fire while `lookupTab` is still `'LC'`, so a naive "reset whenever SG movements are set" would wrongly
+   * clobber the LC tab's own still-current paging). Reference-identity tracking sidesteps the whole
+   * problem instead: every fetch assigns a BRAND NEW array to `lookupMovements`/`acceptanceMovements`/
+   * `sgMovements` (via `groups.flat().sort(...)` in `loadSnapshotAndMovements()`), and switching tabs
+   * changes which of those three references this getter returns — so simply noticing "the array reference
+   * I'm windowing has changed since last read" and resetting exactly then is correct for every one of the
+   * four cases at once, with no per-call-site bookkeeping to keep in sync. (A plain length comparison
+   * would NOT be safe here — two different tabs' own timelines coincidentally having the same row count
+   * would then wrongly look "unchanged" and carry over a stale page; an empty array is exactly this same
+   * risk in miniature — length 0 both before and after a tab switch to another currently-empty tab — but
+   * reference identity still correctly distinguishes them since each fetch/reset assigns its own new `[]`.)
+   */
+  private lastLookupMovementsRef: InquiredEvent[] | null = null;
+  readonly lookupMovementsPaging = new PagedListState(10);
+
   get activeLookupMovements(): InquiredEvent[] {
-    if (this.lookupTab === 'ACCEPTANCE') return this.acceptanceMovements;
-    if (this.lookupTab === 'SG') return this.sgMovements;
-    return this.lookupMovements;
+    const events = this.lookupTab === 'ACCEPTANCE' ? this.acceptanceMovements : this.lookupTab === 'SG' ? this.sgMovements : this.lookupMovements;
+    if (events !== this.lastLookupMovementsRef) {
+      this.lastLookupMovementsRef = events;
+      this.lookupMovementsPaging.total = events.length;
+      this.lookupMovementsPaging.page = 1;
+    }
+    return events;
+  }
+
+  get pagedLookupMovements(): InquiredEvent[] {
+    const events = this.activeLookupMovements;
+    const start = (this.lookupMovementsPaging.page - 1) * this.lookupMovementsPaging.pageSize;
+    return events.slice(start, start + this.lookupMovementsPaging.pageSize);
+  }
+
+  prevLookupMovementsPage(): void {
+    const target = this.lookupMovementsPaging.prevTarget();
+    if (target) this.lookupMovementsPaging.page = target;
+  }
+
+  nextLookupMovementsPage(): void {
+    const target = this.lookupMovementsPaging.nextTarget();
+    if (target) this.lookupMovementsPaging.page = target;
   }
 
   /** Business instruction 2026-08-14 ("don't show the JSON, start with Event Timeline") — whichever tab is active supplies the live Current Balance summary shown after the Event Timeline. */
@@ -189,6 +251,7 @@ export class LookUpPanelService {
     this.lookupError = null;
     this.lookupResult = null;
     this.lookupMovements = [];
+    this.lastLookupMovementsRef = null;
     this.lookupTab = 'LC';
     this.acceptancesUnderLookup = [];
     this.selectedLookupAcceptance = null;

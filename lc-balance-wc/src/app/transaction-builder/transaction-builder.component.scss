@@ -116,15 +116,41 @@
 
 // ── Workspace layout ─────────────────────────────────────────────────────
 
+// Business instruction 2026-08-19 ("目前畫面的左右欄位比例不合理...建議將整體畫面調整為 50 / 50 Split
+// Layout") — was `minmax(0, 1fr) 420px`: Transaction Processing took whatever was left over (often
+// 900px+ of mostly-empty space, since .tb-page itself caps at max-width: 1400px) while Look Up Current
+// Balance was pinned to a fixed 420px, cramping its own Event Timeline table into horizontal scroll.
+// Now genuinely equal — `minmax(0, 1fr)` on BOTH sides (not a bare `1fr`) so either panel's own content
+// (esp. the Event Timeline table) can shrink to fit its track instead of forcing the grid wider than
+// the row's own available space, same reasoning `.tb-main`/`.tb-side`'s own `min-width: 0` already
+// existed to support.
+//
+// Stacking breakpoint lowered 1100px -> 960px: a genuine 50/50 split needs each panel's own CONTENT to
+// cope with real narrowness while still side-by-side (handled below via container queries on the input
+// grids), not just the whole workspace collapsing to full-width sooner — 960px is where each ~454px-wide
+// panel starts being worth stacking to full width instead of squeezing further.
 .tb-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 
-  @media (max-width: 1100px) {
+  @media (max-width: 960px) {
     grid-template-columns: 1fr;
   }
+}
+
+// `container-type: inline-size` + a shared `container-name` — lets .tb-grid-3/.tb-grid-2 (below) respond
+// to THIS panel's own rendered width via @container queries, not the viewport's. Necessary now that
+// .tb-main is only ~50% of the workspace width instead of "most of it": a 3-column input grid keyed off
+// a VIEWPORT breakpoint would still try to render 3 columns inside a panel far narrower than the
+// viewport itself, reproducing the exact "cramped/overflowing input fields" problem from the opposite
+// direction. Given to .tb-side too, defensively, in case a future grid layout in that panel wants the
+// same container-relative behavior — it has no @container consumer of its own today.
+.tb-main,
+.tb-side {
+  container-type: inline-size;
+  container-name: tb-panel;
 }
 
 .tb-main {
@@ -330,12 +356,21 @@
   }
 }
 
+// Business instruction 2026-08-19 (50/50 workspace split) — breakpoints changed from viewport `@media`
+// to `@container tb-panel` (the container declared on .tb-main/.tb-side above): these grids only ever
+// appear inside .tb-main (confirmed by reading the template — all 3 call sites sit between the
+// `.tb-main`/`.tb-side` split), so keying off .tb-main's OWN rendered width, not the full viewport, is
+// what actually tracks the space these inputs have to work with post-split. Thresholds picked against
+// the new 50/50 math: .tb-main's own width ranges from ~454px (just above the 960px stacking breakpoint)
+// up to ~674px (at .tb-page's own 1400px max-width) while genuinely side-by-side — 3 columns only gets
+// uncomfortably tight (<~145px/column) in the LOWER part of that range, hence 520px, not the old
+// viewport-relative 700px carried over unexamined.
 .tb-grid-2 {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 10px;
 
-  @media (max-width: 600px) {
+  @container tb-panel (max-width: 420px) {
     grid-template-columns: 1fr;
   }
 }
@@ -345,7 +380,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 
-  @media (max-width: 700px) {
+  @container tb-panel (max-width: 520px) {
     grid-template-columns: 1fr;
   }
 }

@@ -826,7 +826,7 @@
                      reversal of an earlier same-day design that forced 'create' to show a stale PENDING).
                      Balance After likewise reads row.movement.balanceAfter unconditionally now — no more
                      blanking for a 'create' row, same reasoning. -->
-                <tr *ngFor="let row of lookUp.activeLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
+                <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
                   <td>
                     <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
                     <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
@@ -840,6 +840,14 @@
                 </tr>
               </tbody>
             </table>
+            </div>
+            <!-- UX enhancement (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN") — same Prev/Next +
+                 "Page X / Y (Z total)" control shape Inquire Events' own merged Events table already uses
+                 (InquireEventsService.eventsPaging), reused verbatim rather than a new design. -->
+            <div class="tb-pagination" *ngIf="lookUp.lookupMovementsPaging.totalPages > 1">
+              <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="lookUp.lookupMovementsPaging.page <= 1" (click)="lookUp.prevLookupMovementsPage()">‹ Prev</button>
+              <span class="tb-muted">Page {{ lookUp.lookupMovementsPaging.page }} / {{ lookUp.lookupMovementsPaging.totalPages }} ({{ lookUp.lookupMovementsPaging.total }} total)</span>
+              <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="lookUp.lookupMovementsPaging.page >= lookUp.lookupMovementsPaging.totalPages" (click)="lookUp.nextLookupMovementsPage()">Next ›</button>
             </div>
             <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
 

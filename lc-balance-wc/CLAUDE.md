@@ -6071,3 +6071,155 @@ regression question above. Verified before/after: **41 contracts remain**, match
 already-established reference-LC baseline exactly.
 
 No commits made this pass (not requested).
+
+## Transaction Processing / Look Up Current Balance rebalanced to a genuine 50/50 split (2026-08-19, user-requested — "目前畫面的左右欄位比例不合理...建議將整體畫面調整為 50 / 50 Split Layout")
+
+**Root cause**: `.tb-workspace` (`transaction-builder.component.scss`), the grid wrapping `.tb-main`
+(Transaction Processing's own Maker/Checker form) and `.tb-side` (Look Up Current Balance), was
+`grid-template-columns: minmax(0, 1fr) 420px` — Transaction Processing took whatever was left over
+(often 900px+ of mostly-empty space, since `.tb-page` itself caps at `max-width: 1400px`) while Look Up
+Current Balance was pinned to a fixed 420px, cramping its own Event Timeline table (Function/Type/
+Amount/Reference/Status/Balance After/Time — 7 columns) into horizontal scroll via the pre-existing
+`.tb-table-scroll` wrapper (added 2026-08-17 for exactly this reason, at the time treated as the fix
+rather than a symptom of the panel being too narrow in the first place).
+
+**Fix — three coordinated changes, all in `transaction-builder.component.scss`, zero `.ts`/template
+changes**:
+1. `.tb-workspace` → `grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)` — both tracks genuinely
+   equal-fr (not a bare `1fr`, so either panel's own content, especially the Event Timeline table, can
+   shrink to fit its track rather than forcing the row wider — same role `.tb-main`/`.tb-side`'s own
+   pre-existing `min-width: 0` already played for the old asymmetric layout). Stacking breakpoint lowered
+   `@media (max-width: 1100px)` → `960px` — a real 50/50 split needs each panel's own content to cope with
+   genuine narrowness while still side-by-side (via container queries, next point) rather than the whole
+   workspace bailing to full-width sooner than necessary.
+2. New `.tb-main, .tb-side { container-type: inline-size; container-name: tb-panel; }` — `.tb-grid-3`
+   (the A6/A8/A9-style Parent LC / IB-Index input rows) and `.tb-grid-2` (the Parent-LC select+picker row)
+   had their own responsive collapse rewritten from viewport `@media` (`700px`/`600px`) to
+   `@container tb-panel (max-width: 520px/420px)` — confirmed via `grep` that all 3 template call sites
+   for these two classes sit exclusively inside `.tb-main`, so this is a safe, fully-scoped rewrite, not a
+   global one. Necessary because once `.tb-main` is only ~50% of the workspace width, a 3-column grid keyed
+   off VIEWPORT width would still try to render 3 columns inside a panel far narrower than the viewport
+   itself — the exact "cramped/overflowing input fields" problem the user described, just triggered from
+   the opposite direction (panel too narrow now, not "too long" as originally reported). Breakpoint values
+   picked against the real post-split math: `.tb-main`'s own width ranges ~454px (just above the 960px
+   stacking threshold) to a hard ceiling of ~674px (`.tb-page`'s own 1400px max-width, minus 32px padding
+   and the 20px inter-panel gap, halved) while genuinely side-by-side — 520px/420px only trigger in the
+   narrower part of that range, not copied verbatim from the old viewport numbers.
+3. Event Timeline table itself needed NO additional tuning (font-size/padding/`table-layout` changes) —
+   verified live (see below) that it already fits within the new, much wider panel without modification;
+   the pre-existing `.tb-table-scroll` wrapper stays as defense-in-depth for any future wide content, not
+   because it's still load-bearing at the resolutions checked. Long Function labels (e.g. "A3 · Document
+   Arrival") wrap to a second line within their own cell rather than forcing the table wider — an
+   intentional, acceptable tradeoff (taller row, never a horizontal scrollbar) since only Amount/Reference/
+   Time are `white-space: nowrap` in this table; Function/Type/Status were never forced single-line.
+
+**Container queries, not another viewport media query, deliberately chosen for point 2** — the
+technically correct tool for "respond to MY OWN panel's width, not the viewport's." No `browserslist`/
+legacy-browser constraint exists in this project (checked — none found), and this is an internal demo
+tool, so the modern-browser-only requirement is a non-issue.
+
+**Verification**: `npx tsc -p tsconfig.app.json --noEmit` clean; `ng build --configuration development`
+(compiles the SCSS, would catch any syntax error) clean; `npm run lint` 0 errors (217 pre-existing
+warnings, unchanged — this is a pure CSS change, no new `.ts`); full Jest suite unaffected, **816/816
+passing**, coverage unchanged at 99.36/96.26/99.35/99.47% (no `.ts` touched, so no new lines to cover) —
+expected and confirmed, not just assumed, per this project's own established convention that
+direct-instantiation component tests never render the DOM and so were never going to catch a pure-CSS
+change either way.
+
+**Live verification, precise pixel measurements via direct DOM queries (not just eyeballing
+screenshots)**: at a wide viewport (`window.innerWidth` 2134, `.tb-page`'s own 1400px cap fully in
+effect), `.tb-main.getBoundingClientRect().width` and `.tb-side...width` both measured **exactly 674.0px
+each** — a genuinely pixel-equal 50/50 split, not merely "less lopsided." Searched LC S01 under Look Up
+Current Balance (12 events, every FUNCTION/TYPE/STATUS/TIME column populated, including long labels like
+"A9 · Shipping Gtee (Redemption)") and confirmed via `tableScroll.scrollWidth`(637) `<=`
+`tableScroll.clientWidth`(637) — **`hasHorizontalOverflow: false`**, i.e. genuinely zero horizontal
+scrollbar, not just visually absent in a screenshot. Screenshot confirmation matches: both panels render
+side by side, near-equal visual width, Event Timeline fully visible with wrapped (not clipped/scrolled)
+Function-column text on the longer labels.
+
+**Known verification gap, disclosed honestly rather than glossed over**: could NOT get this session's
+`resize_window` browser-automation tool to actually change this tab's rendered viewport — `window.
+innerWidth` stayed fixed at 2134 across three different requested sizes (1920×1080, 1366×900, 800×900),
+confirmed via direct `window.innerWidth` reads immediately after each resize call returned its own
+"success" message; a tooling/environment limitation (this Chrome instance's automation surface not
+propagating the resize to this specific tab), not a defect in the CSS itself. This means the sub-960px
+stacking behavior and the sub-520px/420px container-query collapse for `.tb-grid-3`/`.tb-grid-2` were
+**not directly, visually confirmed at a genuinely narrow real viewport** this pass. Partial mitigation:
+confirmed the `(max-width: 960px)` media query itself is syntactically valid and correctly NOT matching
+at the current (wide) viewport via `window.matchMedia(...).media`/`.matches`, and confirmed
+`CSS.supports('container-type', 'inline-size')` is `true` on this Chrome 151 instance (container queries
+have been supported since Chrome 105, September 2022, so there's no realistic browser-support risk) —
+strong indirect evidence the mechanism will work, but a human should still shrink the actual browser
+window below ~960px and confirm the workspace stacks correctly (Transaction Processing on top, Look Up
+Current Balance below, both full-width, no leftover 50%-width constraint), and separately confirm the
+input grids collapse to a single column before that point without ever looking cramped, to fully close
+the loop this pass's own tooling limitation left open.
+
+No commits made this pass (not requested).
+
+## Look Up Current Balance → Event Timeline gains the same Page-by-Page pattern Inquire Events already uses — one real bug found and fixed via live verification, not just written on paper (2026-08-19, same day, user-requested follow-up to the 50/50 layout fix — "+ Event Timeline 使用PAGE BY PAGE PATTERN")
+
+**Design — reused `PagedListState`, not a new pagination mechanism.** `LookUpPanelService` gained
+`lookupMovementsPaging = new PagedListState(10)` (the same shared pagination-state/math class already
+used by `InquireEventsService.eventsPaging` and the three Maker-side pickers) and `pagedLookupMovements`
+(a client-side windowing getter — the Event Timeline's own `lookupMovements`/`acceptanceMovements`/
+`sgMovements` are already fully loaded and sorted in memory by `loadSnapshotAndMovements()`, so this is
+never a re-fetch per page, same posture `InquireEventsService.pagedEvents` already established).
+`prevLookupMovementsPage()`/`nextLookupMovementsPage()` mirror `prevEventsPage()`/`nextEventsPage()`
+exactly. Template gained the identical `.tb-pagination` Prev/Next + "Page X / Y (Z total)" block Inquire
+Events' own Events table already uses, positioned the same way below the Event Timeline table.
+
+**The genuinely hard part, correctly anticipated up front**: `activeLookupMovements` is a COMPUTED getter
+switching between THREE independent arrays depending on `lookupTab` (LC/Acceptance/SG), populated across
+FOUR different call sites (`runLookup()`'s own LC-tab fetch, `selectLookupAcceptance()`/`selectLookupSg()`'s
+own fetches — including when auto-selected from `runLookup()` itself while the LC tab is still active —
+and a plain `selectLookupTab()` switch with no new fetch when the target tab's data was already loaded).
+Chose reference-identity tracking (`lastLookupMovementsRef`) over instrumenting all four mutation points
+by hand — every fetch assigns a BRAND NEW array (via `groups.flat().sort(...)`), and switching tabs
+changes which reference `activeLookupMovements` returns, so "has the array reference I'm windowing
+changed since I last looked?" resets page/total correctly for all four cases at once with zero
+per-call-site bookkeeping (a plain length comparison would NOT be safe — two different tabs'
+timelines coincidentally having the same row count would wrongly look "unchanged").
+
+**Real bug found and fixed via live verification, not caught by the unit tests written first**: the first
+implementation put the identity-check/reset logic inside `pagedLookupMovements` alone. Live-testing on LC
+S01 (drive the LC tab's own 12-event timeline to page 2, then switch to the SG tab, which has 2 candidate
+SGs and so does NOT auto-select — `sgMovements` stays `[]`) surfaced a real, visible bug: the Event
+Timeline table itself correctly went to "No movements yet." (gated on `*ngIf="lookUp.activeLookupMovements.
+length"`), but the `.tb-pagination` block below it kept showing the STALE "Page 2 / 2 (12 total)" from the
+LC tab — because `pagedLookupMovements` is only ever read from INSIDE that same `*ngIf`, so with zero
+movements it's never called, and the sync side-effect never fires. Root cause: the sync lived in the wrong
+getter. Fix: moved the identity-check/reset logic into `activeLookupMovements` itself — the ONE getter the
+template reads unconditionally every change-detection cycle (both the table's own `*ngIf` and the
+"No movements yet" hint's `*ngIf` read it directly), guaranteeing the sync fires whenever the active array
+could possibly have changed, whether or not the table itself ends up rendering. `pagedLookupMovements` is
+now a thin wrapper that just windows whatever `activeLookupMovements` already synced.
+
+**Tests**: 5 new tests in `transaction-builder.component.actions.spec.ts`'s new `pagedLookupMovements /
+lookupMovementsPaging` describe block — windowing a >10-item array + `totalPages`; `next`/`prev` boundary
+refusal at both edges; page resetting to 1 when a fresh `runLookup()` replaces the LC tab's own array;
+switching to an ALREADY-LOADED tab with no re-fetch still resetting to page 1 against that tab's own
+(different-length) array, and switching back restoring the first tab's own independent paging context; and
+a dedicated regression test reproducing the exact live-caught bug (drive LC tab to page 2 of 12, switch to
+an SG tab whose own array is empty, assert `total`/`page`/`totalPages` all correctly reset to 0/1/1 rather
+than leaking the LC tab's stale 12/2/2). Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build
+--configuration development`/`npm run lint` (0 errors, 221 warnings, up from 217 — 4 new test-fixture `any`
+casts, same accepted convention as every other test-fixture `any` in this file) all clean. Full Angular
+suite **821/821 passing** (5 new), coverage 99.37/96.28/99.35/99.48% (all four metrics clear the 95% floor;
+`look-up-panel.service.ts` itself at 99.32/100/97.77/99.24 — the one remaining uncovered line is a
+pre-existing, unrelated `forkJoin` error-path fallback, not something this change touched).
+`backend`/`microservices/balance-component` suites unaffected (34/34, 322/322) — Angular-only change.
+
+**Live-verified end to end, including the fix for the bug this same pass found**: searched LC S01 (which
+carries 12 root-ledger events, per this file's own "Inquire Events now shows A4..." history) — the Event
+Timeline correctly showed 10 rows + "‹ Prev Page 1 / 2 (12 total) Next ›", clicking Next correctly showed
+the remaining 2 rows on page 2. Switching to the SG Balance tab (S01 has 2 candidate SGs, G01/G02 — no
+auto-select) correctly showed the picker plus "Event Timeline — LC S01 / No movements yet." with **no**
+pagination footer underneath (confirming the fix — before it, this exact sequence showed a stale
+"Page 2 / 2 (12 total)" here). Switching back to LC Balance correctly restored page 1 of the LC's own
+12-event timeline (not stuck at page 2, and not showing the SG tab's own empty total). No horizontal
+scroll observed on the Event Timeline table at the current viewport, consistent with the 50/50 layout fix
+immediately before this pass. `ng serve`'s own watch mode picked up every source change automatically
+throughout — the same already-running dev stack from the layout-fix pass was reused, no restart needed.
+
+Nothing committed yet this pass (not requested).
