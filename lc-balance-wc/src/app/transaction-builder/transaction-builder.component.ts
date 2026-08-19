@@ -326,7 +326,9 @@ export class TransactionBuilderComponent {
   exposureNature: 'ACTUAL' | 'MEMO' = 'ACTUAL';
 
   submitting = false;
-  submitResult: any = null;
+  // desiger-comments.md F-08 (2026-08-19) — retyped from `any`. See maker-submit.service.ts's own module
+  // note above `MakerSubmitOutcome` for the runtime bug this closed alongside the retype.
+  submitResult: BalanceMovement | null = null;
   submitError: string | null = null;
   actionBusy = false;
   /**

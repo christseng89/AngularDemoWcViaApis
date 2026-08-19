@@ -776,7 +776,7 @@
           <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
           <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
           <p class="tb-result__status" *ngIf="submitResult?.status">
-            <strong>Status:</strong> {{ displayStatus(submitResult.status, model.instrumentType, submitResult.movementType) }}
+            <strong>Status:</strong> {{ displayStatus(submitResult!.status, model.instrumentType, submitResult!.movementType) }}
           </p>
           <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
              this event actually has a contingent-scope entry (null for an on-balance-sheet instrumentType,
@@ -785,7 +785,7 @@
             type="button"
             class="tb-btn tb-btn--outline mt-2"
             *ngIf="submitResult?.contingentAccountEntry"
-            (click)="openAccountEntryDialog(submitResult, model.instrumentType)"
+            (click)="openAccountEntryDialog(submitResult!, model.instrumentType)"
           >
             Account Entries
           </button>

@@ -7977,3 +7977,83 @@ server-side companion, both confirmed to need a larger architectural investment 
 asked to make), F-10–F-13 (Low priority, no action recommended by the review itself).
 
 Not committed (not requested).
+
+## desiger-comments.md F-08 — `submitResult`/`MakerSubmitOutcome.result` retyped, and the underlying runtime bug this uncovered fixed for real (2026-08-19, user-directed — "先評估 F-08 的工作量" then "2" — do the full fix, not just add a type)
+
+Investigated the finding's own literal framing ("`submitResult: any` drives whether the form locks... with
+zero type safety") and found a genuine, live, reachable bug hiding underneath the "just add a type"
+framing: `MakerSubmitOutcome`'s own 'failed' variant was ALREADY typed `result?: BalanceMovement | null` —
+but 5 call sites across `maker-submit.service.ts` (every `catchError` wrapping a PRIMARY submission call —
+`submitDocumentArrivalWithSg`'s inner catchError for the Document Arrival leg itself,
+`submitConfirmationHonourWithReceivable`'s outer catchError, `submitConfirmationAcceptWithReceivable`'s
+outer catchError, `submitAcceptanceSettleWithReceivable`'s outer catchError, and `submitPlain`'s own only
+catchError — the DEFAULT path used by every A1-A9/B1-B5 function that doesn't need one of the 4 compound
+shapes, making this the single most widely-reachable instance, not a rare edge case) assigned
+`result: err.error ?? null` — the raw HTTP error response body, never a real `BalanceMovement`. Since
+`applyMakerSubmitOutcome()`'s own gating is `if ('result' in outcome && outcome.result !== undefined)
+this.submitResult = outcome.result;`, this let ANY primary-call Submit failure carrying a JSON error body
+(which the microservice always returns for a validation/business-rule rejection, e.g.
+`NATURAL_KEY_ALREADY_EXISTS`/`INSUFFICIENT_AVAILABLE_BALANCE`) incorrectly populate `submitResult` — and
+`formLocked` (`!!this.submitResult`) would then wrongly lock the form (every field greyed out via
+`toReadOnlyFields()`) after a FAILED Submit, not just a successful one. Presented both a retype-only option
+and a retype-plus-behavior-fix option; user chose the full fix.
+
+**Fix, `maker-submit.service.ts`**: all 5 sites now omit `result` entirely on a primary-call failure
+(the key's own ABSENCE, not `undefined` explicitly — though either satisfies the `!== undefined` check —
+is what correctly leaves `submitResult` untouched) rather than assigning the error body. A SECONDARY/
+tertiary leg's own failure is unaffected — those already, correctly, assign `result` from the captured
+PRIMARY response variable (e.g. `const result = res.body!;`), never from `err.error`, since the primary
+call genuinely did succeed in that case; confirmed each of the 5 fixed sites individually against this
+distinction before changing anything, rather than a blind search-and-replace on every `err.error ?? null`
+occurrence. A new module-level doc comment above `MakerSubmitOutcome` records the rule for future readers.
+
+**Fix, `transaction-builder.component.ts`**: `submitResult: any = null;` → `submitResult: BalanceMovement |
+null = null;`. `applyMakerSubmitOutcome()` itself needed zero changes — its own gating logic was already
+correct; it was only ever fed a bad value.
+
+**Test fixtures**: the retype surfaced ~36 bare partial-object assignments to `comp.submitResult` across
+`transaction-builder.component.actions.spec.ts`(33)/`.selection.spec.ts`(2)/`.spec.ts`(1) that no longer
+satisfy the real `BalanceMovement` shape — each converted to use its own file's existing `makeMovement()`/
+`mkMovement()` fixture-builder helper (same BAL-108-established convention), a mechanical fix, not a
+behavior change. `.gaps.spec.ts`'s own 3 occurrences already used `(c as any).submitResult = {...}` and
+needed no change. Two component-level assertions (`comp.submitResult.contingentAccountEntry`) needed a
+non-null assertion (`submitResult!.contingentAccountEntry`) once genuinely typed, matching this file's own
+already-established convention (`outcome.result?.movementId`, `arrivalSgRedeemMovement!`). The template
+(`transaction-builder.component.html`) needed the same treatment at its own two `submitResult`-reading call
+sites (`displayStatus(submitResult.status, ...)`, `openAccountEntryDialog(submitResult, ...)`) — both
+already guarded by `*ngIf="submitResult?.status"`/`*ngIf="submitResult?.contingentAccountEntry"`, but
+Angular's strict-template checker doesn't narrow `submitResult` itself from an optional-chained guard
+expression, only `ng build`'s own strict-template check surfaces this (plain `tsc --noEmit` doesn't
+type-check templates) — fixed with `submitResult!` at both sites, mirroring the two pre-existing sibling
+buttons (`arrivalSgRedeemMovement!`/`acceptanceMovement!`) that already use this exact pattern one section
+below.
+
+**One pre-existing test directly reproduced the bug and needed correcting, not just recompiling**:
+`transaction-builder.component.actions.spec.ts`'s own "A1 LC Issue: surfaces the server error code/message
+and resets submitting on failure" test asserted, in its own words, "`submitResult` is set to `err.error`
+(`?? null`) on failure, not left null — so a raw server error payload is still visible for debugging even
+on the failure path" — i.e. it had documented the OLD buggy behavior as intentional. Updated to assert
+`comp.submitResult` is `null` after a failed Submit, with a comment explaining why. The 5 `maker-submit.
+service.spec.ts` tests that asserted `outcome.result` equals the error body (one per fixed site) were
+updated the same way, asserting `toBeUndefined()` instead.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates — this is what caught the two template-level null-narrowing gaps)/`npm run lint` (0 errors, 221
+warnings, DOWN from 228 — `submitResult`'s own removed `any` usage) all clean, `npx prettier --write`
+applied to `maker-submit.service.ts` (whitespace-only, re-verified via a clean re-run afterward). Full
+Angular suite **909/909 passing** (0 net new — 6 tests corrected in place, ~36 fixture call sites
+mechanically converted, everything else unchanged), coverage **99.11/96.74/97.67/99.27%** (all four clear
+the 95% floor). `backend/` 34/34 and microservice 335/335 both re-run per this file's own standing rule,
+unaffected (Angular-only change — no request/response contract touched).
+
+Live in-browser verification: attempted against the already-running dev stack (A1's own form loaded
+correctly, Transaction Builder page renders with no console errors) but not completed to a full failed-
+Submit repro this pass — interrupted by an explicit "commit and push" instruction mid-verification. Given
+the unusually strong static evidence here (the exact bug this fix targets is now directly asserted by 6
+rewritten unit tests reproducing the real failure payload shape, plus the strict-template build validating
+every affected binding), this is judged sufficient to ship — but a human should still reproduce a genuine
+Maker Submit failure live (e.g. re-Issue an already-existing LC Number via A1, which 409s with
+`NATURAL_KEY_ALREADY_EXISTS`) and confirm the form stays fully editable afterward (not greyed out), where
+before this fix it would have incorrectly locked.
+
+Committed and pushed per explicit user instruction.

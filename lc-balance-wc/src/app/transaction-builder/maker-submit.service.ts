@@ -67,6 +67,23 @@ export interface MakerSubmitSecondary {
   matchedReceivableMovementId?: string;
 }
 
+/**
+ * Bug fixed 2026-08-19 (desiger-comments.md F-08, "one field carries the whole Maker flow with no
+ * compile-time contract"). `result` on the 'failed' variant was already typed `BalanceMovement | null`,
+ * but every `catchError` wrapping a PRIMARY submission call (the `req` this outcome's own caller passed
+ * in — never a secondary/tertiary leg that only runs after the primary already succeeded) assigned
+ * `err.error ?? null` — the raw HTTP error response body, not a real `BalanceMovement`. Since
+ * `TransactionBuilderComponent.applyMakerSubmitOutcome()`'s own gating is `if ('result' in outcome &&
+ * outcome.result !== undefined) this.submitResult = outcome.result;`, this let ANY primary-call Submit
+ * failure carrying a JSON error body (which the microservice always returns for a validation/business-
+ * rule rejection) incorrectly populate `submitResult` — and `formLocked` (`!!this.submitResult`) would
+ * then wrongly lock the form after a failed Submit, not just a successful one. Fixed by omitting `result`
+ * entirely at every PRIMARY-call failure site (this key's own absence, not `undefined`, is what the
+ * `'result' in outcome` check needs to correctly leave `submitResult` untouched). A SECONDARY/tertiary
+ * leg's own failure is unaffected — those already, correctly, assign `result` from the captured PRIMARY
+ * response variable (e.g. `const result = res.body!;`), never from `err.error`, since the primary call
+ * genuinely did succeed in that case.
+ */
 export type MakerSubmitOutcome =
   | { kind: 'submitted'; result: BalanceMovement; secondary: MakerSubmitSecondary }
   | { kind: 'failed'; message: string; result?: BalanceMovement | null; secondary: MakerSubmitSecondary };
@@ -83,7 +100,11 @@ export class MakerSubmitService {
     if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && ctx.selectedArrivalSg && ctx.arrivalSgSnapshot) {
       return this.submitDocumentArrivalWithSg(req, ctx);
     }
-    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && ctx.model.movementType === 'HONOUR' && ctx.selectedContract) {
+    if (
+      strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') &&
+      ctx.model.movementType === 'HONOUR' &&
+      ctx.selectedContract
+    ) {
       return this.submitConfirmationHonourWithReceivable(req, ctx);
     }
     if (strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && ctx.selectedContract) {
@@ -121,7 +142,14 @@ export class MakerSubmitService {
             of<MakerSubmitOutcome>({
               kind: 'failed',
               message: `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${describeApiError(err)}`,
-              result: err.error ?? null,
+              // Bug fixed 2026-08-19 (desiger-comments.md F-08, "one field carries the whole Maker flow
+              // with no compile-time contract") — `req` itself (the primary submission) failed here, so no
+              // real BalanceMovement was ever created for THIS leg; `result` must stay absent (never the
+              // raw HTTP error body, which isn't a BalanceMovement at all) so applyMakerSubmitOutcome()'s
+              // own `'result' in outcome && outcome.result !== undefined` check correctly leaves
+              // submitResult untouched (null, per submit()'s own reset) rather than wrongly making
+              // formLocked true off an error object. secondary.arrivalSgRedeemMovementId/Movement above
+              // already carries the SG leg's own real, successful result — unaffected by this fix.
               secondary,
             }),
           ),
@@ -169,7 +197,11 @@ export class MakerSubmitService {
         );
       }),
       catchError((err) =>
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), result: err.error ?? null, secondary: {} }),
+        // Bug fixed 2026-08-19 (desiger-comments.md F-08) — `req` itself (the Confirmation's own HONOUR,
+        // the primary submission) failed here, nothing was created yet; `result` omitted (never the raw
+        // HTTP error body) for the same reason the inner catchError above already does this correctly —
+        // see this file's own module note.
+        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
       ),
     );
   }
@@ -241,7 +273,10 @@ export class MakerSubmitService {
         );
       }),
       catchError((err) =>
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), result: err.error ?? null, secondary: {} }),
+        // Bug fixed 2026-08-19 (desiger-comments.md F-08) — `req` itself (the primary submission) failed
+        // here, so `result` must stay absent, never the raw HTTP error body — see this file's own module
+        // note above `MakerSubmitOutcome` for the full reasoning.
+        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
       ),
     );
   }
@@ -294,7 +329,10 @@ export class MakerSubmitService {
           );
       }),
       catchError((err) =>
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), result: err.error ?? null, secondary: {} }),
+        // Bug fixed 2026-08-19 (desiger-comments.md F-08) — `req` itself (the primary submission) failed
+        // here, so `result` must stay absent, never the raw HTTP error body — see this file's own module
+        // note above `MakerSubmitOutcome` for the full reasoning.
+        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
       ),
     );
   }
@@ -304,7 +342,10 @@ export class MakerSubmitService {
     return this.api.createMovement(req).pipe(
       map((res) => ({ kind: 'submitted' as const, result: res.body!, secondary: {} })),
       catchError((err) =>
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), result: err.error ?? null, secondary: {} }),
+        // Bug fixed 2026-08-19 (desiger-comments.md F-08) — `req` itself (the primary submission) failed
+        // here, so `result` must stay absent, never the raw HTTP error body — see this file's own module
+        // note above `MakerSubmitOutcome` for the full reasoning.
+        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
       ),
     );
   }

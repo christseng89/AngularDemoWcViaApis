@@ -422,9 +422,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.submitting).toBe(false);
       expect(comp.submitError).toBe('NATURAL_KEY_ALREADY_EXISTS: LC001 already exists');
-      // submitResult is set to err.error (?? null) on failure, not left null — so a raw server error
-      // payload is still visible for debugging even on the failure path.
-      expect(comp.submitResult).toEqual({ message: 'NATURAL_KEY_ALREADY_EXISTS: LC001 already exists' });
+      // Bug fixed 2026-08-19 (desiger-comments.md F-08) — submitResult must stay null (not the raw HTTP
+      // error body) on a primary-call failure, since applyMakerSubmitOutcome() would otherwise wrongly
+      // copy it in and formLocked (!!submitResult) would incorrectly lock the form after a failed Submit.
+      expect(comp.submitResult).toBeNull();
     });
 
     it('A2 Amendment: builds via the existing balanceContractId path with sourceTransactionRef', () => {
@@ -566,7 +567,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.submit();
 
       expect(comp.arrivalSgRedeemMovement).toEqual({ movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry });
-      expect(comp.submitResult.contingentAccountEntry).toBeNull();
+      expect(comp.submitResult!.contingentAccountEntry).toBeNull();
     });
 
     it('a failed SG reservation never attempts the Document Arrival call', () => {
@@ -713,7 +714,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.submit();
 
       expect(comp.acceptanceMovement).toEqual({ movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry });
-      expect(comp.submitResult.contingentAccountEntry).toBeNull();
+      expect(comp.submitResult!.contingentAccountEntry).toBeNull();
     });
 
     it('a failed ACCEPT never creates the Acceptance', () => {
@@ -956,7 +957,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
       comp.model.createdBy = 'maker1';
-      comp.submitResult = { movementId: 'mv-amend', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-amend', status: 'PENDING' });
       api.release.mockReturnValueOnce(of({ movementId: 'mv-amend', status: 'RELEASED' }) as any);
 
       comp.release();
@@ -972,7 +973,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
       comp.model.createdBy = 'maker2';
-      comp.submitResult = { movementId: 'mv-amend', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-amend', status: 'PENDING' });
 
       comp.release();
 
@@ -983,7 +984,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
       comp.selectFunction(A2);
-      comp.submitResult = { movementId: 'mv-amend', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-amend', status: 'PENDING' });
 
       comp.release();
 
@@ -997,7 +998,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.createdBy = 'maker1';
       comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
       comp.selectedParent = makeContract({ balanceContractId: 'bc-parent-lc' });
-      comp.submitResult = { movementId: 'mv-acceptance', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
@@ -1018,7 +1019,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
-      comp.submitResult = { movementId: 'mv-acceptance', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' });
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
@@ -1032,7 +1033,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
-      comp.submitResult = { movementId: 'mv-acceptance', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1048,7 +1049,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(A3S);
       comp.selectedContract = makeContract({ balanceContractId: 'bc-lc' });
       comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = { movementId: 'mv-doc-arrival', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
       api.release.mockReturnValueOnce(of({ movementId: 'mv-sg-redeem', status: 'RELEASED' }) as any);
 
       comp.release();
@@ -1063,7 +1064,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
       comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = { movementId: 'mv-doc-arrival', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
@@ -1077,7 +1078,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
       comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-settle', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
@@ -1097,7 +1098,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
       comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-settle', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
@@ -1110,7 +1111,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
       comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-settle', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1131,7 +1132,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE', sourceTransactionRef: 'EB01' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
@@ -1155,7 +1156,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1173,7 +1174,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
@@ -1199,7 +1200,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1218,7 +1219,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
@@ -1245,7 +1246,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
     it('success: calls api.reject with checker1/MANUAL_TEST_REJECT and updates submitResult', () => {
       const { comp, api } = setup();
-      comp.submitResult = { movementId: 'mv-1', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
       api.reject.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'REJECTED' }) as any);
 
       comp.reject();
@@ -1257,7 +1258,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
     it('error: sets submitError and resets actionBusy', () => {
       const { comp, api } = setup();
-      comp.submitResult = { movementId: 'mv-1', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
       api.reject.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
 
       comp.reject();
@@ -1277,7 +1278,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.deleteMakerPending();
       expect(api.cancel).not.toHaveBeenCalled();
 
-      comp.submitResult = { movementId: 'mv-1', status: 'RELEASED' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'RELEASED' });
       comp.deleteMakerPending();
       expect(api.cancel).not.toHaveBeenCalled();
     });
@@ -1286,7 +1287,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
       comp.model.createdBy = 'maker1';
-      comp.submitResult = { movementId: 'mv-1', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
       api.cancel.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'CANCELLED' }) as any);
 
       comp.deleteMakerPending();
@@ -1300,7 +1301,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('plain path: a failed cancel sets submitError', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
-      comp.submitResult = { movementId: 'mv-1', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
@@ -1313,7 +1314,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(A3S);
       comp.model.createdBy = 'maker1';
       comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = { movementId: 'mv-doc-arrival', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-sg-redeem', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'CANCELLED' }) as any);
@@ -1329,7 +1330,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
       comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = { movementId: 'mv-doc-arrival', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
@@ -1344,7 +1345,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.movementType = 'HONOUR';
       comp.model.createdBy = 'maker1';
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'CANCELLED' }) as any);
@@ -1360,7 +1361,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(B4);
       comp.model.movementType = 'HONOUR';
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
@@ -1376,7 +1377,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.createdBy = 'maker1';
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'CANCELLED' }) as any)
@@ -1395,7 +1396,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.movementType = 'ACCEPT';
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
@@ -1410,7 +1411,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.movementType = 'ACCEPT';
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-accept', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1428,7 +1429,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(B5);
       comp.model.createdBy = 'maker1';
       comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-settle', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'CANCELLED' }) as any);
@@ -1443,7 +1444,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
       comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = { movementId: 'mv-settle', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
@@ -1473,7 +1474,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       // referencedTransactionId is required since the 2026-08-16 fix — a real A6 CREATE always carries
       // one (see isCheckerCompoundOwnSubmission's own doc comment); submitResult no longer needs to match.
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', referencedTransactionId: 'mv-source' });
-      comp.submitResult = { movementId: 'mv-1' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1' });
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
       const rejectSpy = jest.spyOn(comp, 'reject').mockImplementation(() => undefined);
 
@@ -1489,7 +1490,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       // businessEventId is required since the 2026-08-16 fix — a real A3S UTILIZE always carries one
       // (see isCheckerCompoundOwnSubmission's own doc comment); submitResult is no longer needed to match.
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', businessEventId: 'be-1' });
-      comp.submitResult = { movementId: 'mv-1' };
+      comp.submitResult = makeMovement({ movementId: 'mv-1' });
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
       const rejectSpy = jest.spyOn(comp, 'reject').mockImplementation(() => undefined);
 

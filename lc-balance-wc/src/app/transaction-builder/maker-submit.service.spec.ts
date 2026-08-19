@@ -232,7 +232,7 @@ describe('MakerSubmitService — submitDocumentArrivalWithSg (A3S)', () => {
     });
   });
 
-  it('SG succeeds but the Document Arrival fails: secondary still carries the SG redeem, result carries the DA error body', (done) => {
+  it('SG succeeds but the Document Arrival fails: secondary still carries the SG redeem, result stays absent (desiger-comments.md F-08 — the primary call itself failed, so no BalanceMovement was ever created for this leg)', (done) => {
     const api = makeApi({
       createMovement: jest
         .fn()
@@ -245,7 +245,7 @@ describe('MakerSubmitService — submitDocumentArrivalWithSg (A3S)', () => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
         expect(outcome.message).toContain('Document Arrival itself failed');
-        expect(outcome.result).toEqual({ message: 'ILLEGAL_STATE_TRANSITION' });
+        expect(outcome.result).toBeUndefined();
         expect(outcome.secondary.arrivalSgRedeemMovementId).toBe('sg-redeem-2');
       }
       done();
@@ -279,7 +279,7 @@ describe('MakerSubmitService — submitConfirmationHonourWithReceivable (B4 Sigh
     });
   });
 
-  it('Honour itself fails: result carries the error body', (done) => {
+  it('Honour itself fails: result stays absent (desiger-comments.md F-08 — the primary call itself failed)', (done) => {
     const api = makeApi({ createMovement: jest.fn(() => throwError(() => ({ error: { message: 'INSUFFICIENT_AVAILABLE_BALANCE' } }))) });
     const service = new MakerSubmitService(api);
 
@@ -287,7 +287,7 @@ describe('MakerSubmitService — submitConfirmationHonourWithReceivable (B4 Sigh
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
         expect(outcome.message).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-        expect(outcome.result).toEqual({ message: 'INSUFFICIENT_AVAILABLE_BALANCE' });
+        expect(outcome.result).toBeUndefined();
       }
       done();
     });
@@ -342,7 +342,7 @@ describe('MakerSubmitService — submitConfirmationAcceptWithReceivable (B4 Usan
     });
   });
 
-  it('Accept itself fails: result carries the error body, secondary empty', (done) => {
+  it('Accept itself fails: result stays absent (desiger-comments.md F-08 — the primary call itself failed), secondary empty', (done) => {
     const api = makeApi({ createMovement: jest.fn(() => throwError(() => ({ error: { message: 'INSUFFICIENT_AVAILABLE_BALANCE' } }))) });
     const service = new MakerSubmitService(api);
 
@@ -350,7 +350,7 @@ describe('MakerSubmitService — submitConfirmationAcceptWithReceivable (B4 Usan
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
         expect(outcome.message).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-        expect(outcome.result).toEqual({ message: 'INSUFFICIENT_AVAILABLE_BALANCE' });
+        expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
       done();
@@ -426,7 +426,7 @@ describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () 
     });
   });
 
-  it('Settle itself fails: result carries the error body, secondary empty', (done) => {
+  it('Settle itself fails: result stays absent (desiger-comments.md F-08 — the primary call itself failed), secondary empty', (done) => {
     const api = makeApi({ createMovement: jest.fn(() => throwError(() => ({ error: { message: 'INSUFFICIENT_AVAILABLE_BALANCE' } }))) });
     const service = new MakerSubmitService(api);
 
@@ -434,7 +434,7 @@ describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () 
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
         expect(outcome.message).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-        expect(outcome.result).toEqual({ message: 'INSUFFICIENT_AVAILABLE_BALANCE' });
+        expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
       done();
@@ -494,7 +494,7 @@ describe('MakerSubmitService — submitPlain (default path)', () => {
     });
   });
 
-  it('fails: result carries the error body', (done) => {
+  it('fails: result stays absent (desiger-comments.md F-08 — the only call IS the primary call, so it failed)', (done) => {
     const api = makeApi({ createMovement: jest.fn(() => throwError(() => ({ error: { message: 'REQUEST_VALIDATION_FAILED' } }))) });
     const service = new MakerSubmitService(api);
 
@@ -502,7 +502,7 @@ describe('MakerSubmitService — submitPlain (default path)', () => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
         expect(outcome.message).toBe('REQUEST_VALIDATION_FAILED');
-        expect(outcome.result).toEqual({ message: 'REQUEST_VALIDATION_FAILED' });
+        expect(outcome.result).toBeUndefined();
       }
       done();
     });

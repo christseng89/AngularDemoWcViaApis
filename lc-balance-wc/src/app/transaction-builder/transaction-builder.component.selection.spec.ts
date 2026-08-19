@@ -436,7 +436,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
       comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1' }), makeMovement({ movementId: 'M2' })];
-      comp.submitResult = { movementId: 'M1', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'M1', status: 'PENDING' });
       comp.submitError = 'stale error';
 
       comp.onSelectPayMovement('M2');
@@ -449,11 +449,11 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
       comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
-      comp.submitResult = { movementId: 'OLD', status: 'PENDING' };
+      comp.submitResult = makeMovement({ movementId: 'OLD', status: 'PENDING' });
 
       comp.onSelectPayMovement('M1');
 
-      expect(comp.submitResult).toEqual({ movementId: 'OLD', status: 'PENDING' });
+      expect(comp.submitResult).toEqual(makeMovement({ movementId: 'OLD', status: 'PENDING' }));
     });
   });
 
