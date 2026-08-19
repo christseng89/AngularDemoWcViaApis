@@ -1,3 +1,4 @@
+import { Injectable } from '@angular/core';
 import { Observable, forkJoin } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
@@ -14,26 +15,43 @@ import { PagedListState } from './paged-list-state';
  * balance/movement viewer, genuinely independent of the Maker/Checker submit-release lifecycle it sits
  * alongside on the same screen.
  *
- * Deliberately a PLAIN class, not an `@Component` with its own template — a genuine child component
- * would need `@ViewChild`/`@Input`-`@Output()` wiring to talk to the parent, but this file's own test
- * suite (`transaction-builder.component.spec.ts`/`.actions.spec.ts`) constructs
- * `TransactionBuilderComponent` via plain `new TransactionBuilderComponent(mockApi)` — no TestBed, no
- * Angular view rendering — so `@ViewChild` would never resolve in ~90 existing test assertions that read/
- * write this state directly. A plain class avoids that entirely: the component exposes it as a public
- * `readonly lookUp = new LookUpPanelService(api, ...)` field, the template binds straight to
- * `lookUp.xxx`, and existing tests only need a mechanical `comp.xxx` → `comp.lookUp.xxx` rename, not a
- * TestBed migration.
+ * Deliberately a PLAIN class with no template, not a `@Component` — a genuine child component would
+ * need `@ViewChild`/`@Input`-`@Output()` wiring to talk to the parent, but this file's own test suite
+ * (`transaction-builder.component.spec.ts`/`.actions.spec.ts`) constructs `TransactionBuilderComponent`
+ * via plain `new TransactionBuilderComponent(mockApi)` — no TestBed, no Angular view rendering — so
+ * `@ViewChild` would never resolve in ~90 existing test assertions that read/write this state directly.
+ * A plain-class-with-a-template-less-view avoids that entirely: the component exposes it as a public
+ * `readonly lookUp` field, the template binds straight to `lookUp.xxx`, and existing tests only need a
+ * mechanical `comp.xxx` → `comp.lookUp.xxx` rename, not a TestBed migration.
  *
- * `onBeforeLookup` (optional constructor callback) — the one piece of state this panel's own
- * `runLookup()` needs to reach OUTSIDE itself: closing any open Account Entries dialog before a fresh
- * lookup replaces the Event Timeline underneath it. The component wires this to
- * `() => (this.accountEntryDialogMovement = null)`.
+ * `@Injectable()` (desiger-comments.md F-04, 2026-08-19 — the ORIGINAL fix attempt tried to make this
+ * class a genuine constructor PARAMETER on `TransactionBuilderComponent` while still relying on a plain
+ * `new LookUpPanelService(api, callback)` constructor-default for test compatibility, without ANY real
+ * Angular provider registered anywhere — production's own Ivy-compiled DI factory unconditionally tries
+ * to inject every constructor parameter by TYPE regardless of TS default values, found no provider, and
+ * threw `NullInjectorError` on every single page load, confirmed live in the browser. Deliberately no
+ * `providedIn: 'root'` here — this class is genuinely PER-COMPONENT-INSTANCE mutable state (the whole
+ * point of this extraction), and a root-scoped singleton would silently share `lookupResult`/etc. across
+ * every `TransactionBuilderComponent` instance app-wide, a different real bug. Instead,
+ * `TransactionBuilderComponent`'s own `@Component({ providers: [LookUpPanelService, ...] })` registers a
+ * genuine, COMPONENT-SCOPED provider — Angular constructs exactly one instance per component instance,
+ * destroyed when the component is, and its own DI factory can now actually resolve this type. The
+ * constructor's own `new LookUpPanelService(api)` default value is UNCHANGED in purpose — it's what
+ * fires for the ~90 existing tests' own plain `new TransactionBuilderComponent(mockApi)` calls, which
+ * never go through Angular's compiled factory at all and so never see the `providers` array either; both
+ * paths coexist without conflict.
+ *
+ * `onBeforeLookup` moved from a CONSTRUCTOR callback to a CALL-TIME parameter on `runLookup()`/
+ * `syncFrom()` below, as part of this same F-04 fix — a constructor-time callback closing over the
+ * component's own `this` would need the component to inject itself into this service's own factory
+ * provider, which is a documented Angular DI trap (`NG0200: Circular dependency in DI`,
+ * https://github.com/angular/angular/issues/51639) rather than a safe pattern. A call-time parameter
+ * needs no such self-injection — `this` is already fully available at the component's own call site,
+ * exactly like every other method call in this codebase.
  */
+@Injectable()
 export class LookUpPanelService {
-  constructor(
-    private readonly api: BalanceComponentApiService,
-    private readonly onBeforeLookup?: () => void,
-  ) {}
+  constructor(private readonly api: BalanceComponentApiService) {}
 
   lookup = { instrumentType: 'IPLC_LC' as InstrumentType, lcNumber: '', ibNumber: '', sgNumber: '' };
   lookupResult: { contract: BalanceContract; snapshot: BalanceSnapshot } | null = null;
@@ -238,16 +256,22 @@ export class LookUpPanelService {
    * component's own caller, since both concepts belong to the Maker-side selection state this panel
    * deliberately doesn't own.
    */
-  syncFrom(lcNumber: string, instrumentType: InstrumentType): void {
+  syncFrom(lcNumber: string, instrumentType: InstrumentType, onBeforeLookup?: () => void): void {
     this.lookup.lcNumber = lcNumber;
     this.lookup.instrumentType = this.lcInstrumentTypeFor(instrumentType);
     this.lookup.ibNumber = '';
     this.lookup.sgNumber = '';
-    this.runLookup();
+    this.runLookup(onBeforeLookup);
   }
 
-  runLookup(): void {
-    this.onBeforeLookup?.();
+  /**
+   * `onBeforeLookup` (call-time parameter, F-04 2026-08-19 — see this class's own doc comment for why
+   * this moved off the constructor) — the one piece of state a fresh lookup needs to reach OUTSIDE
+   * itself: closing any open Account Entries dialog before it replaces the Event Timeline underneath it.
+   * The component passes `() => this.closeAccountEntryDialog()` at each of its own call sites.
+   */
+  runLookup(onBeforeLookup?: () => void): void {
+    onBeforeLookup?.();
     this.lookupError = null;
     this.lookupResult = null;
     this.lookupMovements = [];

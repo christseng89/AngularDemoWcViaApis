@@ -1,9 +1,17 @@
+import { Injectable } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { FormlyFieldConfig } from '@ngx-formly/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { BALANCE_SNAPSHOT_LABEL, InstrumentType, TransactionFunction, childInstrumentTypesOf, defaultLcInstrumentTypeForSide, tenorTypeLabel } from './balance-component.model';
+import {
+  BALANCE_SNAPSHOT_LABEL,
+  InstrumentType,
+  TransactionFunction,
+  childInstrumentTypesOf,
+  defaultLcInstrumentTypeForSide,
+  tenorTypeLabel,
+} from './balance-component.model';
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
 import { payExistingUtilizeFunctionFor, resolveFunctionForMovement } from './function-strategy';
 import { BuilderModel } from './function-policy';
@@ -119,11 +127,19 @@ export interface InquiredEvent {
  */
 export function functionForEvent(event: InquiredEvent): TransactionFunction | undefined {
   const { movement, contract } = event;
-  return (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ?? resolveFunctionForMovement(contract.instrumentType, movement.movementType);
+  return (
+    (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ??
+    resolveFunctionForMovement(contract.instrumentType, movement.movementType)
+  );
 }
 
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
-  const isFinalizedSightUtilize = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType === 'SIGHT' && movement.status !== 'PENDING' && !!movement.releasedAt;
+  const isFinalizedSightUtilize =
+    contract.instrumentType === 'IPLC_LC' &&
+    movement.movementType === 'UTILIZE' &&
+    contract.tenorType === 'SIGHT' &&
+    movement.status !== 'PENDING' &&
+    !!movement.releasedAt;
   if (!isFinalizedSightUtilize) {
     return [{ movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'primary' }];
   }
@@ -318,7 +334,17 @@ export interface EventBalanceTab {
  * PERSISTED at createMovement()/release() time (`movement.acceptanceEventSnapshot`/`sgEventSnapshot`,
  * captured server-side by `BalanceService.captureSiblingSnapshots` whenever exactly one candidate
  * exists), not fetched live when later viewed — consistent with every other field this class reads.
+ *
+ * `@Injectable()`, no `providedIn` (desiger-comments.md F-04, 2026-08-19) — this class is genuinely
+ * per-component-instance mutable state (its own `events`/`rootContract`/etc.), not an app-wide singleton
+ * — `providedIn: 'root'` would silently share that state across every `TransactionBuilderComponent`
+ * instance. `TransactionBuilderComponent`'s own `@Component({ providers: [InquireEventsService, ...] })`
+ * registers a genuine component-scoped provider instead, so Angular's real DI can construct exactly one
+ * instance per component instance. See `LookUpPanelService`'s own doc comment for the full story of why
+ * this matters (an earlier attempt skipped the `providers` array entirely and broke the real running app
+ * with a `NullInjectorError` — caught live, not by any static check).
  */
+@Injectable()
 export class InquireEventsService {
   constructor(private readonly api: BalanceComponentApiService) {}
 
@@ -500,12 +526,14 @@ export class InquireEventsService {
   private loadEvents(root: BalanceContract): void {
     this.eventsLoading = true;
     const childTypes = childInstrumentTypesOf(root.instrumentType);
-    forkJoin([movementsOf$(this.api, root), ...childTypes.map((childType) => childMovementsOf$(this.api, childType, root.naturalKey.lcNumber))]).subscribe((groups) => {
-      this.eventsLoading = false;
-      this.events = groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
-      this.eventsPaging.total = this.events.length;
-      this.eventsPaging.page = 1;
-    });
+    forkJoin([movementsOf$(this.api, root), ...childTypes.map((childType) => childMovementsOf$(this.api, childType, root.naturalKey.lcNumber))]).subscribe(
+      (groups) => {
+        this.eventsLoading = false;
+        this.events = groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
+        this.eventsPaging.total = this.events.length;
+        this.eventsPaging.page = 1;
+      },
+    );
   }
 
   /**
@@ -552,7 +580,9 @@ export class InquireEventsService {
     return forkJoin({
       snapshot: this.api.getSnapshot(contract.balanceContractId).pipe(catchError(() => of(null))),
       root: movementsOf$(this.api, contract),
-      children: childTypes.length ? forkJoin(childTypes.map((childType) => childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber))) : of([] as InquiredEvent[][]),
+      children: childTypes.length
+        ? forkJoin(childTypes.map((childType) => childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber)))
+        : of([] as InquiredEvent[][]),
     }).pipe(
       map(({ snapshot, root, children }) => {
         const allEvents = [...root, ...children.flat()];
@@ -722,8 +752,12 @@ export class InquireEventsService {
     // "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — reproduces LC S01 exactly: a
     // 'create' row (A3) submitted before its LC's own SG even existed must keep showing "none", not
     // A4's own much-later Release picture of it.
-    const siblingAcceptanceSnapshot = event.phase === 'finalize' ? (movement.finalizeAcceptanceEventSnapshot ?? movement.acceptanceEventSnapshot ?? null) : (movement.acceptanceEventSnapshot ?? null);
-    const siblingSgSnapshot = event.phase === 'finalize' ? (movement.finalizeSgEventSnapshot ?? movement.sgEventSnapshot ?? null) : (movement.sgEventSnapshot ?? null);
+    const siblingAcceptanceSnapshot =
+      event.phase === 'finalize'
+        ? (movement.finalizeAcceptanceEventSnapshot ?? movement.acceptanceEventSnapshot ?? null)
+        : (movement.acceptanceEventSnapshot ?? null);
+    const siblingSgSnapshot =
+      event.phase === 'finalize' ? (movement.finalizeSgEventSnapshot ?? movement.sgEventSnapshot ?? null) : (movement.sgEventSnapshot ?? null);
     const lcNumber = this.rootContract?.naturalKey.lcNumber ?? this.lcNumber;
     const rootLabel = this.rootContract ? (BALANCE_SNAPSHOT_LABEL[this.rootContract.instrumentType] ?? this.rootContract.instrumentType) : 'Balance';
 

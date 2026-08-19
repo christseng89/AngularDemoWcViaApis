@@ -7526,3 +7526,109 @@ posture already established elsewhere in this file; DI-wiring changes need the l
 nothing else about the change would normally call for one.
 
 Not committed (not requested).
+
+## F-04 fixed for real — component-scoped Angular `providers`, researched against official docs before writing any code (2026-08-19, same day, user-directed — "F-04 可否查一下官方文檔 以及GOOGLE 搜尋建議修改方案呢?" then "YES" to the researched plan)
+
+**Research phase, before touching any code** (per the user's own explicit request): searched
+angular.dev's own official DI guides plus community discussion. Confirmed the correct mechanism —
+`@Component({ providers: [...] })` creates a genuinely PER-COMPONENT-INSTANCE provider, exactly the
+semantics these services need (not an app-wide singleton, not a bare, unregistered constructor
+parameter type). Confirmed a second, real technique for multiple differently-configured instances of
+the SAME class: a distinct `InjectionToken` per instance, each with its own explicit `{ provide: TOKEN,
+useFactory: ... }` entry in the component's own `providers` array — `inject()` inside the factory is a
+legitimate, documented way to pull in a real dependency (`BalanceComponentApiService`) without any
+self-reference. **Also found, and specifically avoided, a real trap** one search result surfaced: a
+factory provider injecting the COMPONENT ITSELF (`deps: [SomeComponent]`) to give the factory access to
+`this` — cross-checked against a second, more specific search and confirmed this is a documented Angular
+DI failure mode (`NG0200: Circular dependency in DI`,
+[github.com/angular/angular/issues/51639](https://github.com/angular/angular/issues/51639)), not a safe
+pattern — the first search's own AI-generated summary had glossed over this risk. This directly shaped
+the fix for `LookUpPanelService`'s own constructor-time callback (below) — moved to a call-time
+parameter instead of attempting self-injection.
+
+**Design, confirmed compatible with the existing "no TestBed, direct `new TransactionBuilderComponent(mockApi)`"
+test convention before writing anything**: `@Component({ providers: [...] })` is consulted ONLY by
+Angular's own Ivy-compiled factory (real `<app-transaction-builder>` rendering) — a plain JS
+`new TransactionBuilderComponent(mockApi)` call (what all ~90 existing tests already do) never touches
+this array at all. So the constructor's own TS default values (`= new LookUpPanelService(api)`, etc.) can
+stay exactly as they were for test-construction purposes, while `providers` ADDITIONALLY gives Angular's
+real DI a genuine provider to resolve the same parameter — both mechanisms coexist without conflict, and
+this is precisely the piece the FIRST F-04 attempt skipped (see the immediately-preceding two entries).
+
+**Fix, four services**:
+- `LookUpPanelService`/`InquireEventsService`/`DocumentArrivalHintsService` — each gained `@Injectable()`
+  (no `providedIn` — genuinely per-instance state, `providedIn: 'root'` would wrongly make Angular hand
+  out ONE shared instance app-wide) and a bare class-type entry in the component's own
+  `providers: [LookUpPanelService, InquireEventsService, DocumentArrivalHintsService, ...]`.
+- `LookUpPanelService` additionally lost its own constructor-time `onBeforeLookup?: () => void`
+  parameter (the "close the Account Entries dialog before a fresh lookup" callback that used to close
+  over the component's own `this`) — moved to a CALL-TIME parameter on `runLookup(onBeforeLookup?)`/
+  `syncFrom(lcNumber, instrumentType, onBeforeLookup?)` instead, per the self-injection trap avoided
+  above. Both of its own two external call sites updated to supply it explicitly:
+  `syncLookupToContext()` (private component method, already had `this` available) and a NEW
+  `onLookUpClick()` wrapper method backing the template's own "Look Up" button (previously bound
+  directly to `lookUp.runLookup()`) — a plain template expression referencing `closeAccountEntryDialog`
+  bare would have passed an unbound method reference, silently losing its own `this`, so the binding
+  goes through this one real method call instead.
+- `catalogPicker`/`parentPicker`/`ibIndexPicker` (3 `CatalogPickerService` instances, each with a
+  different `fetchSize`) — 3 new `InjectionToken<CatalogPickerService>` constants (`CATALOG_PICKER`/
+  `PARENT_PICKER`/`IB_INDEX_PICKER`), each with an explicit `useFactory` provider entry reading its own
+  matching page-size constant and resolving `BalanceComponentApiService` via `inject()`. The constructor
+  parameters for these 3 use `@Inject(TOKEN)` (not plain type-based injection, which would only ever
+  resolve to ONE shared instance per class).
+- `catalogPageSize`/`parentPageSize`/`ibIndexPageSize` — the underlying `100` values moved from
+  `readonly` INSTANCE fields to plain MODULE-LEVEL `const`s (`CATALOG_PAGE_SIZE` etc., declared above the
+  `@Component` decorator) — needed because the `providers` array's own factory functions sit textually
+  OUTSIDE the class body (so a `private`/`static` class member wouldn't even be visible there), and a
+  module-level constant is visible to both the decorator and the class's own `catalogPageSize`-style
+  getters (kept, delegating to the same constant, so every existing `comp.catalogPageSize` test assertion
+  reads the identical unchanged public surface).
+
+**Result: the SAME 8 constructor parameters as the reverted first attempt, but with real Angular
+providers behind the 6 that previously had none** — `api` (required), `checkerActions`/`makerSubmit`
+(unchanged throughout, already-real `@Injectable({providedIn:'root'})` singletons), and the 6 that
+caused the original crash, now genuinely resolvable.
+
+**Tests**: one pre-existing test's own premise needed updating (`transaction-builder.component.gaps.spec.ts`,
+"runLookup() resets an open dialog... before reloading the Event Timeline") — it called
+`c.lookUp.runLookup()` directly, expecting the OLD constructor-callback behavior to fire on ANY call;
+correctly renamed to drive the real UI entry point (`c.onLookUpClick()`) instead, plus a NEW sibling test
+proving `lookUp.runLookup()` called directly with no callback (a legitimate use — e.g. re-running a
+search) correctly does NOT close the dialog by itself — both halves of the new call-time-parameter
+contract are now explicitly covered, not just the one that used to be implicit. No other existing test
+needed any change. **One new, structurally-accepted coverage gap**: the 3 `useFactory` provider
+functions inside `@Component({ providers: [...] })` are never executed by this project's own
+direct-instantiation Jest tests (they never touch Angular's compiled DI factory at all) — the same class
+of "structurally invisible to this test convention" gap this file already documents for template-scoping
+and DOM-value-coercion bugs elsewhere; not something a unit test can close under this project's own
+established no-TestBed convention, only a live check (see below) can prove correct. Coverage still clears
+the 95% floor comfortably on all four metrics regardless (97.66/95.41/96.1/97.93%).
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` (strict
+templates) clean, `npm run lint` 0 errors (228 warnings, unchanged), `npx prettier --write` applied to
+the touched files (whitespace-only, re-verified via a clean `tsc --noEmit`/full suite re-run afterward).
+Full Angular suite **881/881 passing** (1 net new test), coverage **97.66/95.41/96.1/97.93%** (all four
+metrics clear the 95% floor). `backend/`/microservice unaffected (no files under either touched).
+
+**Live-verified in the browser this time — the exact step the FIRST F-04 attempt skipped, per the
+explicit lesson recorded in the immediately-preceding entry.** Against the already-running `ng serve`
+(picked up every change automatically via its own watch mode): (1) fresh page load — zero console
+errors, confirming the `NullInjectorError` genuinely does not recur; (2) A1 (LC Issue) — full form
+renders (LC Number/Amount/Currency/Tolerance/Tenor Type) alongside a fully-rendered "Look Up Current
+Balance" panel, proving `LookUpPanelService`'s own real-DI construction works; (3) A3S (Document Arrival
+w/ Shipping Gtee) — the flat Catalog LC Index picker correctly loads and evaluates all 12 candidates
+("All 12 candidate(s) under this filter are 0-balance — nothing left to act on."), and the "No eligible
+records available for this transaction." gate correctly disables the IB Number/Bill Amount fields,
+proving both `documentArrivalHints` AND the token-injected `catalogPicker` instance work; (4) Inquire
+Events — the LC Master Records Index renders its full paginated table (13 real records), proving
+`inquireEvents` works; (5) clicked the "Look Up" button directly (the one real behavior change, not just
+DI wiring) with LC Number "S01" typed in — the panel correctly resolved and rendered the real Event
+Timeline (6+ rows, Function/Type/Amount/Reference/Status/Balance After/Time all populated correctly,
+LC/SG Balance tabs both present), proving `onLookUpClick()`'s own new callback-forwarding wiring works
+end to end against the real microservice, not just in isolation. Zero console errors across every one of
+these 5 checks. **F-04 is now genuinely closed** — the codebase's own 3-way construction-style
+inconsistency is resolved, all 8 constructor dependencies are behind one consistent
+parameter-with-default-value shape, and every one that's registered a real provider is now genuinely
+substitutable via Angular's own DI, not just syntactically parameter-shaped.
+
+Not committed (not requested).

@@ -1245,12 +1245,24 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.accountEntryDialogInstrumentType).toBeNull();
     });
 
-    it('runLookup() resets an open dialog (both fields) before reloading the Event Timeline', () => {
+    it('the Look Up button (onLookUpClick) resets an open dialog (both fields) before reloading the Event Timeline', () => {
+      // F-04 (2026-08-19) — the dialog-closing callback moved from LookUpPanelService's own constructor
+      // to a call-time parameter on runLookup() (see that class's own doc comment); calling
+      // lookUp.runLookup() directly, with no callback, is a valid use on its own (e.g. re-running a
+      // search) and correctly does NOT close the dialog by itself — the real UI entry point,
+      // onLookUpClick(), is what supplies the callback, so THAT is what this test now drives.
+      const c = new TransactionBuilderComponent(mockApi());
+      c.openAccountEntryDialog(movement(), 'IPLC_LC');
+      c.onLookUpClick();
+      expect(c.accountEntryDialogMovement).toBeNull();
+      expect(c.accountEntryDialogInstrumentType).toBeNull();
+    });
+
+    it('lookUp.runLookup() called directly with no callback (e.g. re-running a search) does NOT close an open dialog by itself', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.openAccountEntryDialog(movement(), 'IPLC_LC');
       c.lookUp.runLookup();
-      expect(c.accountEntryDialogMovement).toBeNull();
-      expect(c.accountEntryDialogInstrumentType).toBeNull();
+      expect(c.accountEntryDialogMovement).not.toBeNull();
     });
 
     it('selectMode() resets an open dialog (both fields) when switching Transaction Processing <-> Inquire Events', () => {

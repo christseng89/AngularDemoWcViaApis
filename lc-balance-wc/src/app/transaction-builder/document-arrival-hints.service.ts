@@ -1,3 +1,4 @@
+import { Injectable } from '@angular/core';
 import { catchError, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
@@ -28,7 +29,13 @@ import { InstrumentType } from './balance-component.model';
  * `filteredParentCatalog` stay on `TransactionBuilderComponent` — they also read `model`/
  * `selectedFunctionStrategy`, which is Maker-flow orchestration, same reasoning `CatalogPickerService`'s
  * own module doc comment already gives for not owning selection/filtering either).
+ *
+ * `@Injectable()`, no `providedIn` (desiger-comments.md F-04, 2026-08-19) — genuinely per-component-
+ * instance state (its own per-candidate hint maps), not an app-wide singleton — see `LookUpPanelService`'s
+ * own doc comment for the full reasoning and the `NullInjectorError` this class's own earlier F-04
+ * attempt caused by skipping a real component-level provider entirely.
  */
+@Injectable()
 export class DocumentArrivalHintsService {
   /** A4 (Sight Settlement) only — its own flat Catalog picker, same-contract still-PENDING UTILIZE. */
   readonly catalogPayableIbs = new Map<string, string[]>();

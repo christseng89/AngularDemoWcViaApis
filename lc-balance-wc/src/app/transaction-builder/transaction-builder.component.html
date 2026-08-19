@@ -1006,7 +1006,7 @@
                  field was ever needed to narrow to a specific one. -->
               <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber" />
             </div>
-            <button class="tb-btn tb-btn--outline mt-2" (click)="lookUp.runLookup()">Look Up</button>
+            <button class="tb-btn tb-btn--outline mt-2" (click)="onLookUpClick()">Look Up</button>
             <div class="tb-error mt-2" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
 
             <!-- Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC

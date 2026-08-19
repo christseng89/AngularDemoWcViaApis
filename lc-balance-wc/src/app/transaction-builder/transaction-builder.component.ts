@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, Inject, InjectionToken, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
@@ -37,6 +37,36 @@ import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
 
 /**
+ * Fetch-cap constants for the 3 `CatalogPickerService` instances this component owns (business
+ * requirement 2026-08-19 — NOT the display page size, fixed at 5 inside `CatalogPickerService` itself).
+ * Module-level `const`, not class members (desiger-comments.md F-04, 2026-08-19) — these values are
+ * needed both inside the `@Component` decorator's own `providers` array (textually OUTSIDE the class
+ * body, so a `private`/`static` class member wouldn't even be visible there) and inside the class as the
+ * `catalogPageSize`/`parentPageSize`/`ibIndexPageSize` getters below (kept for the ~8 existing tests that
+ * read `comp.catalogPageSize` etc. directly) — a plain module-scoped constant is visible to both without
+ * any class-visibility question at all.
+ */
+const CATALOG_PAGE_SIZE = 100;
+const PARENT_PAGE_SIZE = 100;
+const IB_INDEX_PAGE_SIZE = 100;
+
+/**
+ * Injection tokens for the 3 `CatalogPickerService` instances (desiger-comments.md F-04, 2026-08-19) —
+ * Angular's DI resolves a plain class-type provider (`providers: [CatalogPickerService]`) to exactly ONE
+ * instance; this component genuinely needs THREE, each with a different `fetchSize`, so each needs its
+ * own token rather than sharing the bare class as its own token. Provided via an explicit `useFactory`
+ * entry in this component's own `@Component({ providers: [...] })` below (component-scoped, not
+ * `providedIn: 'root'` — see `LookUpPanelService`'s own doc comment for why these 4 services must never
+ * be app-wide singletons), each factory reading the matching page-size constant above and resolving
+ * `BalanceComponentApiService` itself via `inject()` (safe here — `BalanceComponentApiService` is a real
+ * `providedIn: 'root'` service, not a self-injection of this component, which IS a documented Angular DI
+ * trap — see the constructor's own doc comment below for the pattern this deliberately avoids).
+ */
+const CATALOG_PICKER = new InjectionToken<CatalogPickerService>('TransactionBuilderComponent.catalogPicker');
+const PARENT_PICKER = new InjectionToken<CatalogPickerService>('TransactionBuilderComponent.parentPicker');
+const IB_INDEX_PICKER = new InjectionToken<CatalogPickerService>('TransactionBuilderComponent.ibIndexPicker');
+
+/**
  * Transaction Builder — organized as named Import (A-series) / Export
  * (B-series) business functions (business instruction 2026-08-14, "similar
  * as Payment Component A1-A4, B1-B5"), not a raw instrumentType/
@@ -52,6 +82,28 @@ import { BuilderModel } from './function-policy';
   imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
+  /**
+   * desiger-comments.md F-04 (2026-08-19) — component-scoped providers for the 4 services that are
+   * genuinely per-component-instance mutable state, not app-wide singletons (see each service's own
+   * `@Injectable()` doc comment for why `providedIn: 'root'` would be wrong for them). This is the piece
+   * the ORIGINAL F-04 attempt skipped entirely — it made these 4 (well, 6, counting the 3
+   * `CatalogPickerService` instances) genuine constructor parameters with TS default values but
+   * registered NO Angular provider anywhere, so production's own Ivy-compiled DI factory (which tries to
+   * inject every constructor parameter by type/token regardless of default values) found nothing and
+   * threw `NullInjectorError` on every single page load — confirmed live in the browser, not by any
+   * static check. With a real provider entry here, Angular's DI now genuinely succeeds; the constructor's
+   * own default values remain solely for the ~90 existing tests that construct this component via a
+   * plain `new TransactionBuilderComponent(mockApi)` call, which never goes through this `providers`
+   * array (or any other Angular machinery) at all — both paths coexist without conflict.
+   */
+  providers: [
+    LookUpPanelService,
+    InquireEventsService,
+    DocumentArrivalHintsService,
+    { provide: CATALOG_PICKER, useFactory: () => new CatalogPickerService(CATALOG_PAGE_SIZE, inject(BalanceComponentApiService)) },
+    { provide: PARENT_PICKER, useFactory: () => new CatalogPickerService(PARENT_PAGE_SIZE, inject(BalanceComponentApiService)) },
+    { provide: IB_INDEX_PICKER, useFactory: () => new CatalogPickerService(IB_INDEX_PAGE_SIZE, inject(BalanceComponentApiService)) },
+  ],
 })
 export class TransactionBuilderComponent {
   readonly importFunctions = IMPORT_FUNCTIONS;
@@ -122,21 +174,20 @@ export class TransactionBuilderComponent {
    * uniformly for every picker it backs). Bumped 10 -> 100 as part of the same fix: showing an accurate
    * "N total, qualified" figure requires knowing every candidate's own filter outcome up front, which
    * needs (almost) all of them fetched, not just the first page — see CatalogPickerService's own module
-   * doc comment for the full reasoning.
+   * doc comment for the full reasoning. Delegates to the module-level `CATALOG_PAGE_SIZE` constant
+   * (desiger-comments.md F-04, 2026-08-19 — see that constant's own doc comment) purely so every existing
+   * `comp.catalogPageSize` test assertion keeps reading the identical public surface unchanged.
    */
-  readonly catalogPageSize = 100;
-  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see catalogPicker below. */
-  readonly catalogPicker: CatalogPickerService;
-  /**
-   * BAL-003 (9th same-day pass, desiger-comments.md F-03 reassessment 2026-08-19 — user-confirmed narrow
-   * scope: "只抽這個 session 新增的 paging/eligibility 狀態"). Owns A4/A6/B4's own per-candidate LC Index
-   * "eligible outstanding Document Arrival" hint maps — see `DocumentArrivalHintsService`'s own module
-   * doc comment for the full reasoning (A4's own `catalogPayableIbs`/`catalogPayableMovements` predate
-   * this session as a hint-display-only feature; A6's own `parentPayableIbs`/`parentPayableMovements`
-   * and B4's own `catalogChildPayableIbs` are new this session, added when the SAME maps were given a
-   * second job — driving `filteredCatalogContracts`/`filteredParentCatalog`'s own eligibility filter).
-   */
-  readonly documentArrivalHints: DocumentArrivalHintsService;
+  get catalogPageSize(): number {
+    return CATALOG_PAGE_SIZE;
+  }
+  // catalogPicker (BAL-003, OOD/SOLID 8th pass — "Page by Page設計") and documentArrivalHints (BAL-003
+  // 9th same-day pass, desiger-comments.md F-03 reassessment 2026-08-19, "只抽這個 session 新增的
+  // paging/eligibility 狀態" — owns A4/A6/B4's own per-candidate LC Index "eligible outstanding Document
+  // Arrival" hint maps) are both constructor PARAMETER properties (desiger-comments.md F-04, 2026-08-19)
+  // — see the constructor's own doc comment below for why, and its own two parameters for their
+  // construction. Declared there instead of here so TypeScript's parameter-property syntax can
+  // auto-generate this same public `readonly` field declaration; a second one here would collide.
   selectedContract: BalanceContract | null = null;
   /**
    * Business instruction 2026-08-14: for instrumentTypes whose natural key
@@ -158,10 +209,12 @@ export class TransactionBuilderComponent {
    * (via the catalog's exact lcNumber filter, not the substring `q`), so
    * the user picks the IB/SG Number instead of typing it.
    */
-  /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above. */
-  readonly ibIndexPageSize = 100;
-  /** BAL-003 (OOD/SOLID, 8th pass): contracts/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see ibIndexPicker below. */
-  readonly ibIndexPicker: CatalogPickerService;
+  /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above (same module-level-constant reasoning, F-04). */
+  get ibIndexPageSize(): number {
+    return IB_INDEX_PAGE_SIZE;
+  }
+  // ibIndexPicker (BAL-003, OOD/SOLID 8th pass) is now a constructor parameter property — see the
+  // constructor's own doc comment (F-04) and its own `ibIndexPicker` parameter.
 
   /**
    * Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB Index —
@@ -343,10 +396,12 @@ export class TransactionBuilderComponent {
   checkerId = 'checker1';
 
   parentInstrumentType: InstrumentType | '' = '';
-  /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above. */
-  readonly parentPageSize = 100;
-  /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see parentPicker below. */
-  readonly parentPicker: CatalogPickerService;
+  /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above (same module-level-constant reasoning, F-04). */
+  get parentPageSize(): number {
+    return PARENT_PAGE_SIZE;
+  }
+  // parentPicker (BAL-003, OOD/SOLID 8th pass) is now a constructor parameter property — see the
+  // constructor's own doc comment (F-04) and its own `parentPicker` parameter.
   selectedParent: BalanceContract | null = null;
   exposureNature: 'ACTUAL' | 'MEMO' = 'ACTUAL';
 
@@ -416,45 +471,55 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * BAL-003 (Checker Actions extraction): `checkerActions` defaults to a fresh
-   * `CheckerActionsService` bound to the same `api` — preserves every existing `new
-   * TransactionBuilderComponent(mockApi)` test call site (70+ across 4 spec files) unmodified. Angular's
-   * own DI container always resolves BOTH constructor parameters when it constructs this component for
-   * real (default parameter values are never consulted by Angular's DI), so production wiring gets the
-   * real injected singleton exactly as if this were a normal required dependency.
-   */
-  /**
-   * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): `lookUp` is a plain field initialized in
-   * the constructor BODY (not a parameter-property default like `checkerActions`/`makerSubmit` above),
-   * specifically so its `onBeforeLookup` callback can close over `this` unambiguously — see
-   * `look-up-panel.service.ts`'s own doc comment for why this is a plain class, not an `@Component`.
-   */
-  readonly lookUp: LookUpPanelService;
-  /** Inquire Events (2026-08-17) — same "plain class, constructed in the body" convention as `lookUp` above, for the same reason (see look-up-panel.service.ts's own doc comment). */
-  readonly inquireEvents: InquireEventsService;
-  /**
-   * BAL-003 (8th same-day OOD/SOLID pass, "paginated pickers" — narrowed scope, see
-   * `catalog-picker.service.ts`'s own module note): `catalogPicker`/`parentPicker`/`ibIndexPicker`
-   * (declared next to their picker's other fields above) are all initialized here in the constructor
-   * body alongside `lookUp` — `this.catalogPageSize` etc. are only guaranteed assigned once field
-   * initializers have run, so this stays out of a field initializer.
+   * desiger-comments.md F-04 (2026-08-19, "three incompatible ways of constructing a dependency, in
+   * one constructor") — every dependency below now uses the SAME construction style: a constructor
+   * PARAMETER with a default value building the real thing, so `new TransactionBuilderComponent(mockApi)`
+   * (the single-arg form 90+ existing tests across 4 spec files already use) keeps working completely
+   * unmodified. `api` itself stays the one genuinely required parameter (no default — every other
+   * default reads it).
+   *
+   * **This is a SECOND attempt at F-04** — the FIRST one (same day) shipped a hard, page-breaking
+   * production regression: it made `lookUp`/`inquireEvents`/`catalogPicker`/`parentPicker`/
+   * `ibIndexPicker`/`documentArrivalHints` genuine constructor parameters with TS default values, but
+   * registered NO Angular provider anywhere for any of them. Production's own Ivy-compiled DI factory
+   * tries to inject EVERY constructor parameter by type/token, unconditionally, regardless of whether a
+   * TS default value exists — it found no provider for any of the six and threw `NullInjectorError` on
+   * every single page load, confirmed live in the browser (user-caught: "用UI測 全部不能用?" / "用
+   * BROWSER測 全部不能用?"), not by any static check (`tsc`/`ng build`/the 880-test suite all passed,
+   * since Jest constructs this component via a plain `new` call that never touches Angular's own
+   * compiled factory at all). That attempt was fully reverted. THIS attempt closes the actual gap the
+   * first one skipped: `TransactionBuilderComponent`'s own `@Component({ providers: [...] })` above
+   * registers a genuine, COMPONENT-SCOPED Angular provider for each of the six — Angular constructs
+   * exactly ONE instance per `TransactionBuilderComponent` instance (destroyed when the component is,
+   * never shared app-wide), and its own DI factory can now actually resolve every parameter below for
+   * real. Researched against Angular's own official docs (angular.dev/guide/di) plus community
+   * discussion of the specific "self-injection into a component's own provider factory" trap
+   * (github.com/angular/angular/issues/51639, `NG0200: Circular dependency in DI`) before writing this —
+   * see `LookUpPanelService`'s own doc comment for the one place that trap was a genuine risk here, and
+   * how it was avoided (a call-time parameter instead of a constructor-time callback), not worked around
+   * with `forwardRef()` or similar.
+   *
+   * `checkerActions`/`makerSubmit` are unchanged throughout both attempts — they were already correctly
+   * `@Injectable({providedIn: 'root'})` singletons with a real provider Angular could already satisfy;
+   * neither F-04 attempt touched them.
+   *
+   * The 3 `CatalogPickerService` parameters use `@Inject(TOKEN)` rather than plain type-based injection
+   * — Angular resolves a class-type provider to exactly ONE shared instance per token, but this
+   * component genuinely needs THREE (different `fetchSize` each), so each gets its own `InjectionToken`
+   * (declared above, alongside its own `useFactory` provider entry) instead of sharing the bare class as
+   * its own implicit token.
    */
   constructor(
     private readonly api: BalanceComponentApiService,
     private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
     private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
-  ) {
-    this.lookUp = new LookUpPanelService(api, () => {
-      this.accountEntryDialogMovement = null;
-      this.accountEntryDialogInstrumentType = null;
-      this.accountEntryDialogPhase = null;
-    });
-    this.inquireEvents = new InquireEventsService(api);
-    this.catalogPicker = new CatalogPickerService(this.catalogPageSize, api);
-    this.parentPicker = new CatalogPickerService(this.parentPageSize, api);
-    this.ibIndexPicker = new CatalogPickerService(this.ibIndexPageSize, api);
-    this.documentArrivalHints = new DocumentArrivalHintsService(api);
-  }
+    readonly lookUp: LookUpPanelService = new LookUpPanelService(api),
+    readonly inquireEvents: InquireEventsService = new InquireEventsService(api),
+    @Inject(CATALOG_PICKER) readonly catalogPicker: CatalogPickerService = new CatalogPickerService(CATALOG_PAGE_SIZE, api),
+    @Inject(PARENT_PICKER) readonly parentPicker: CatalogPickerService = new CatalogPickerService(PARENT_PAGE_SIZE, api),
+    @Inject(IB_INDEX_PICKER) readonly ibIndexPicker: CatalogPickerService = new CatalogPickerService(IB_INDEX_PAGE_SIZE, api),
+    readonly documentArrivalHints: DocumentArrivalHintsService = new DocumentArrivalHintsService(api),
+  ) {}
 
   /**
    * Inquire Events (2026-08-17) — top-level mode toggle, sibling to selectFunctionSide()'s own Import/
@@ -1215,6 +1280,18 @@ export class TransactionBuilderComponent {
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
     if (this.accountEntryDialogMovement) this.closeAccountEntryDialog();
+  }
+
+  /**
+   * Thin template-binding wrapper (F-04, 2026-08-19) — the "Look Up" button used to bind directly to
+   * `lookUp.runLookup()`, which closed the Account Entries dialog for free via a constructor-time
+   * callback; that callback moved to a call-time parameter (see `LookUpPanelService`'s own doc comment),
+   * so this wrapper supplies it explicitly. A template expression referencing `closeAccountEntryDialog`
+   * bare (without a wrapper) would pass an unbound method reference, losing its own `this` — a real,
+   * silent regression risk avoided by keeping the binding call as an actual method invocation here.
+   */
+  onLookUpClick(): void {
+    this.lookUp.runLookup(() => this.closeAccountEntryDialog());
   }
 
   onSelectContract(contractId: string): void {
@@ -2139,7 +2216,10 @@ export class TransactionBuilderComponent {
   private syncLookupToContext(): void {
     const lcNumber = this.contextLcNumber;
     if (!lcNumber || !this.model.instrumentType) return;
-    this.lookUp.syncFrom(lcNumber, this.model.instrumentType);
+    // F-04 (2026-08-19) — onBeforeLookup moved from LookUpPanelService's own constructor to a call-time
+    // parameter on syncFrom()/runLookup() (see LookUpPanelService's own doc comment); every call site
+    // that used to get this for free now supplies it explicitly.
+    this.lookUp.syncFrom(lcNumber, this.model.instrumentType, () => this.closeAccountEntryDialog());
   }
 
   /**
