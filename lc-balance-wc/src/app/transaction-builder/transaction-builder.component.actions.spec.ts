@@ -1,39 +1,40 @@
 import { of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
-import { BalanceComponentApiService, BalanceContract, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
-
-// submit()'s compound branches (A3S/B4/B5) call `crypto.randomUUID()` to link legs via
-// businessEventId — jsdom's test environment doesn't always implement it. Polyfill once, module-load
-// time, same posture as any other jsdom API gap. `maker-submit.service.spec.ts` carries an identical
-// copy of this same polyfill — each Jest test FILE gets its own fresh module registry/globalThis, so
-// there's no single shared place to hoist this to without a global Jest setup-file change.
-if (typeof (globalThis as any).crypto === 'undefined') {
-  (globalThis as any).crypto = {};
-}
-if (typeof (globalThis as any).crypto.randomUUID !== 'function') {
-  // jsdom's `window.crypto` is a non-configurable getter — mutate the existing object in place
-  // rather than reassigning `globalThis.crypto` (a plain reassignment silently no-ops).
-  (globalThis as any).crypto.randomUUID = () => 'test-uuid-' + Math.random().toString(36).slice(2);
-}
+import type { MakerCheckerContext } from './maker-panel.component';
 
 /**
- * Covers: loadCheckerQueue(), onSelectCheckerMovement(), checkerAct(), submit(), approveArrival(),
- * release(), reject(), deleteMakerPending(), runLookup(), selectLookupTab(), selectLookupSg(),
- * selectLookupAcceptance() — the Maker submit + Checker release/reject/acknowledge flow.
+ * Covers: approveArrival(), arrivalAlreadyApproved, lookUp.syncFrom(), release(), reject(),
+ * deleteMakerPending(), checkerAct(), onCheckerMovementPicked(), onCheckerQueueReloaded()/
+ * onCheckerQueueLoadSucceeded(), runLookup(), selectLookupTab(), pagedLookupMovements/
+ * lookupMovementsPaging, selectLookupSg(), selectLookupAcceptance() — the Checker-side release/reject/
+ * acknowledge flow plus the Look Up Current Balance panel, all still parent-owned after the
+ * MakerPanelComponent extraction (2026-08-19, desiger-comments.md "Feature Components + Facade" pilot
+ * #3).
+ *
+ * submit() and its 4 compound shapes (A3S/B4 Sight/B4 Usance/B5), plus isSubmitReady, moved entirely to
+ * MakerPanelComponent — see maker-panel.component.spec.ts.
+ *
+ * Wherever a test used to set up Maker context by poking comp.submitResult / comp.selectedPayMovement /
+ * comp.acceptanceMovementId / comp.model.createdBy etc directly, it now goes through
+ * `setMakerContext(comp, {...})`, which replaces the parent's own private `makerContext` mirror
+ * (MakerCheckerContext) — the same field release()/reject()/deleteMakerPending()/checkerAct() actually
+ * read via buildCheckerActionContext() now that MakerPanelComponent owns submitResult/selectedPayMovement/
+ * the 4 compound-leg movementIds directly. `comp.selectedParent`/`comp.model.movementType` assignments in
+ * the old tests are dropped — CheckerActionContext never carried either field (confirmed by reading
+ * checker-actions.service.ts directly), so they were already inert before this migration, not something
+ * this migration changes the meaning of.
  *
  * Direct instantiation (no TestBed), matching lc-payment-wc's business-case-runner.component.spec.ts
  * house style — `new TransactionBuilderComponent(mockApi as unknown as BalanceComponentApiService)`.
  */
 
-const A1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1')!;
 const A2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2')!;
 const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
 const A3S = IMPORT_FUNCTIONS.find((f) => f.code === 'A3S')!;
 const A4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!;
 const A6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6')!;
-const A8 = IMPORT_FUNCTIONS.find((f) => f.code === 'A8')!;
-const A9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9')!;
 const B3 = EXPORT_FUNCTIONS.find((f) => f.code === 'B3')!;
 const B4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4')!;
 const B5 = EXPORT_FUNCTIONS.find((f) => f.code === 'B5')!;
@@ -111,726 +112,28 @@ function setup() {
   return { comp, api };
 }
 
-function lastReq(api: ReturnType<typeof makeApi>, callIndex = 0): CreateMovementRequest {
-  return (api.createMovement.mock.calls as any[])[callIndex][0];
+/**
+ * Replaces the parent's own private `makerContext` mirror directly (the same `(x as any).privateField =
+ * ...` pattern already used elsewhere in this codebase's own test files) — the mechanism
+ * release()/reject()/deleteMakerPending()/checkerAct() actually read via buildCheckerActionContext()
+ * now that MakerPanelComponent owns submitResult/selectedPayMovement/the 4 compound-leg movementIds
+ * directly. Defaults mirror selectFunction()'s own fresh-makerContext shape exactly.
+ */
+function setMakerContext(comp: TransactionBuilderComponent, overrides: Partial<MakerCheckerContext> = {}): void {
+  (comp as any).makerContext = {
+    submitResult: null,
+    selectedPayMovement: null,
+    matchedReceivableMovementId: null,
+    dueFromIssuingBankMovementId: null,
+    acceptanceMovementId: null,
+    acceptanceReimbReceivableMovementId: null,
+    arrivalSgRedeemMovementId: null,
+    createdBy: 'maker1',
+    ...overrides,
+  };
 }
 
 describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
-  // ---------------------------------------------------------------------
-  // submit() — validation guards (no createMovement call)
-  // ---------------------------------------------------------------------
-  describe('submit() — validation guards', () => {
-    it('requires amount/currency/createdBy', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A1);
-      comp.naturalKey.lcNumber = 'LC001';
-      // model.amount left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Fill in amount, currency, createdBy.');
-      expect(comp.submitting).toBe(false);
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('rejects an Amount with more decimal places than the typed Currency allows (e.g. JPY has no cents)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A1);
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.model.amount = '10000.5';
-      comp.model.currency = 'JPY';
-      comp.model.createdBy = 'maker1';
-      comp.submit();
-      expect(comp.submitError).toBe('Amount 10000.5 has more decimal places than JPY allows (0).');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires the dynamic secondary reference label (A2)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A2);
-      comp.subChoiceValue = 'AMEND_INCREASE';
-      comp.onSubChoice();
-      comp.model.amount = '500';
-      comp.selectedContract = makeContract();
-      // model.secondaryRef left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Amendment No./Times is mandatory for A2.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires SG Number when issuing a Shipping Guarantee (A8)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A8);
-      comp.model.amount = '1000';
-      comp.naturalKey.lcNumber = 'LC001';
-      // naturalKey.sgNumber left unset
-      comp.submit();
-      expect(comp.submitError).toBe('SG Number is mandatory when issuing a Shipping Guarantee.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires the Parent LC to be picked first for a lcNumberFromParent function (A6)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A6);
-      comp.model.amount = '1000';
-      // naturalKey.lcNumber left unset — never picked a Parent LC
-      comp.submit();
-      expect(comp.submitError).toBe("Pick the Parent LC first — that selection supplies this record's LC Number.");
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires LC Number for a natural-key creating function with no parent (A1)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A1);
-      comp.model.amount = '1000';
-      // naturalKey.lcNumber left unset
-      comp.submit();
-      expect(comp.submitError).toBe('LC Number is mandatory.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires IB Number when the instrument natural key needs it (A6)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A6);
-      comp.model.amount = '1000';
-      comp.naturalKey.lcNumber = 'LC001';
-      // naturalKey.ibNumber left unset
-      comp.submit();
-      expect(comp.submitError).toBe('IB Number is mandatory.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires Tenor Type when tenorTypeOptions are declared (A6)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A6);
-      comp.model.amount = '1000';
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.naturalKey.ibNumber = 'IB01';
-      // model.tenorType left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Tenor Type is mandatory for A6.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it("requires Tenor Days > 0 for A1 Seller's/Buyer's Usance", () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A1);
-      comp.model.amount = '1000';
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.model.tenorType = 'SELLERS_USANCE';
-      // model.tenorDays left unset
-      comp.submit();
-      expect(comp.submitError).toBe("Tenor Days must be greater than 0 for Seller's/Buyer's Usance.");
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires picking the still-PENDING Document Arrival before creating an Acceptance (A6)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A6);
-      comp.model.amount = '1000';
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.naturalKey.ibNumber = 'IB01';
-      comp.model.tenorType = 'SELLERS_USANCE';
-      comp.model.tenorDays = 90;
-      // selectedPayMovement left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Pick the still-PENDING Document Arrival (2ndary Index) to convert first.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires picking a Shipping Guarantee for Document Arrival w/ Shipping Gtee (A3S)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A3S);
-      comp.model.amount = '1000';
-      comp.model.secondaryRef = 'IB01';
-      comp.selectedContract = makeContract();
-      // selectedArrivalSg / arrivalSgSnapshot left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Pick the Shipping Guarantee this Document Arrival is against first.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('A9 autoRedeemType: requires a snapshot before redeeming', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A9);
-      comp.model.amount = '500';
-      comp.selectedContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
-      // selectedContractSnapshot left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Search for the Shipping Guarantee to redeem first.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('A9 autoRedeemType: rejects an amount exceeding Available Balance', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A9);
-      comp.model.amount = '2000';
-      comp.selectedContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
-      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '1000' });
-      comp.submit();
-      expect(comp.submitError).toBe("Amount must not exceed the SG's Available Balance (1000).");
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('B5 settlesAcceptanceOnMature: requires a snapshot before settling', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      comp.model.amount = '500';
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC001', ibNumber: 'EB01', sgNumber: null } });
-      // selectedContractSnapshot left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Search for the Acceptance to settle first.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('B5 settlesAcceptanceOnMature: rejects an amount exceeding Available Balance', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      comp.model.amount = '2000';
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC001', ibNumber: 'EB01', sgNumber: null } });
-      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '1000' });
-      comp.submit();
-      expect(comp.submitError).toBe("Amount must not exceed the Acceptance's Available Balance (1000).");
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-
-    it('requires an existing contract to be picked for a non-creating function (A2)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A2);
-      comp.subChoiceValue = 'AMEND_DECREASE';
-      comp.onSubChoice();
-      comp.model.amount = '100';
-      comp.model.secondaryRef = 'AMD01';
-      // selectedContract left unset
-      comp.submit();
-      expect(comp.submitError).toBe('Pick a contract from the Catalog below.');
-      expect(api.createMovement).not.toHaveBeenCalled();
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // isSubmitReady — business requirement 2026-08-19 ("Submit Button Enablement — A1–A9 / B1–B5")
-  // ---------------------------------------------------------------------
-  describe('isSubmitReady', () => {
-    it('A1 (no eligible-target requirement) — false with mandatory fields missing, true once Amount/LC Number are filled in', () => {
-      const { comp } = setup();
-      comp.selectFunction(A1);
-      expect(comp.isSubmitReady).toBe(false); // no Amount, no LC Number yet
-
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.model.amount = '100000';
-      // model.currency/createdBy already default 'USD'/'maker1'; tenorType defaults to SIGHT via selectFunction()
-      expect(comp.isSubmitReady).toBe(true);
-    });
-
-    it('A2 — false before an eligible target is picked (mandatory fields otherwise valid)', () => {
-      const { comp } = setup();
-      comp.selectFunction(A2);
-      comp.subChoiceValue = 'AMEND_DECREASE';
-      comp.onSubChoice();
-      comp.model.amount = '100';
-      comp.model.secondaryRef = 'AMD01';
-      // selectedContract left unset — hasEligibleTargetSelected is false
-      expect(comp.isSubmitReady).toBe(false);
-    });
-
-    it('A2 — still false once an eligible target IS picked but a mandatory field (Amendment No.) is still blank', () => {
-      const { comp } = setup();
-      comp.selectFunction(A2);
-      comp.subChoiceValue = 'AMEND_DECREASE';
-      comp.onSubChoice();
-      comp.model.amount = '100';
-      comp.selectedContract = makeContract();
-      // model.secondaryRef left unset — validateSubmit() would still fail
-      expect(comp.hasEligibleTargetSelected).toBe(true);
-      expect(comp.isSubmitReady).toBe(false);
-    });
-
-    it('A2 — true once BOTH an eligible target is picked AND every mandatory field is valid', () => {
-      const { comp } = setup();
-      comp.selectFunction(A2);
-      comp.subChoiceValue = 'AMEND_DECREASE';
-      comp.onSubChoice();
-      comp.model.amount = '100';
-      comp.model.secondaryRef = 'AMD01';
-      comp.selectedContract = makeContract();
-      expect(comp.isSubmitReady).toBe(true);
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // submit() — request-building + happy/error paths
-  // ---------------------------------------------------------------------
-  describe('submit() — request building', () => {
-    it('A1 LC Issue: builds via the natural-key path, Sight omits tenorDays from the wire, and handles success', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A1);
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.model.amount = '100000';
-      comp.model.tolerancePct = '10';
-      comp.model.eventSeq = 42;
-      // tenorType defaults to SIGHT via selectFunction()
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
-      const req = lastReq(api);
-      expect(req).toMatchObject({
-        instrumentType: 'IPLC_LC',
-        movementType: 'ISSUE',
-        eventSeq: 42,
-        amount: '100000',
-        currency: 'USD',
-        createdBy: 'maker1',
-        tolerancePct: '10',
-        tenorType: 'SIGHT',
-        naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: null },
-      });
-      // 0 is falsy — `if (this.model.tenorDays)` never fires for Sight's forced 0.
-      expect(req.tenorDays).toBeUndefined();
-      expect(req.sourceTransactionRef).toBeUndefined();
-      expect(req.balanceContractId).toBeUndefined();
-
-      expect(comp.submitting).toBe(false);
-      expect(comp.submitResult).toEqual({ movementId: 'mv-new', status: 'PENDING' });
-      expect(comp.submitError).toBeNull();
-    });
-
-    it('A1 LC Issue Usance: includes tenorDays on the wire and defaults tolerancePct absent when not typed', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A1);
-      comp.naturalKey.lcNumber = 'LC002';
-      comp.model.amount = '50000';
-      comp.model.tenorType = 'BUYERS_USANCE';
-      comp.model.tenorDays = 90;
-      // tolerancePct left unset
-
-      comp.submit();
-
-      const req = lastReq(api);
-      expect(req.tenorDays).toBe(90);
-      expect(req.tenorType).toBe('BUYERS_USANCE');
-      expect(req.tolerancePct).toBeUndefined();
-    });
-
-    it('A1 LC Issue: surfaces the server error code/message and resets submitting on failure', () => {
-      const { comp, api } = setup();
-      api.createMovement.mockReturnValueOnce(apiErr('NATURAL_KEY_ALREADY_EXISTS: LC001 already exists') as any);
-      comp.selectFunction(A1);
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.model.amount = '100000';
-
-      comp.submit();
-
-      expect(comp.submitting).toBe(false);
-      expect(comp.submitError).toBe('NATURAL_KEY_ALREADY_EXISTS: LC001 already exists');
-      // Bug fixed 2026-08-19 (desiger-comments.md F-08) — submitResult must stay null (not the raw HTTP
-      // error body) on a primary-call failure, since applyMakerSubmitOutcome() would otherwise wrongly
-      // copy it in and formLocked (!!submitResult) would incorrectly lock the form after a failed Submit.
-      expect(comp.submitResult).toBeNull();
-    });
-
-    it('A2 Amendment: builds via the existing balanceContractId path with sourceTransactionRef', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A2);
-      comp.subChoiceValue = 'AMEND_INCREASE';
-      comp.onSubChoice();
-      comp.model.amount = '5000';
-      comp.model.secondaryRef = 'AMD01';
-      comp.selectedContract = makeContract({ balanceContractId: 'bc-42' });
-
-      comp.submit();
-
-      const req = lastReq(api);
-      expect(req.movementType).toBe('AMEND_INCREASE');
-      expect(req.balanceContractId).toBe('bc-42');
-      expect(req.naturalKey).toBeUndefined();
-      expect(req.sourceTransactionRef).toBe('AMD01');
-    });
-
-    it('sets exposureNature and parentLogicalContractId when the top-level request itself targets EPLC_ACCEPTANCE/CREATE with a parent picked', () => {
-      // None of the currently-registered UI functions route their OWN top-level `req` through
-      // instrumentType EPLC_ACCEPTANCE/movementType CREATE (A6 is IPLC_ACCEPTANCE; B4's Usance branch
-      // builds its EPLC_ACCEPTANCE leg on a SEPARATE sub-request, not `req` itself) — this exercises
-      // submit()'s own generic `model.instrumentType === 'EPLC_ACCEPTANCE' && movementType === 'CREATE'`
-      // branch directly via component state, same as the task brief's "set fields directly" guidance.
-      const { comp, api } = setup();
-      comp.selectedFunction = null;
-      comp.model = { instrumentType: 'EPLC_ACCEPTANCE', movementType: 'CREATE', amount: '1000', currency: 'USD', createdBy: 'maker1', eventSeq: 7 };
-      comp.naturalKey = { lcNumber: 'LC001', ibNumber: 'IB01', sgNumber: '' };
-      comp.selectedParent = makeContract({ logicalContractId: 'lgl-parent-1' });
-      comp.exposureNature = 'ACTUAL';
-
-      comp.submit();
-
-      const req = lastReq(api);
-      expect(req.parentLogicalContractId).toBe('lgl-parent-1');
-      expect(req.exposureNature).toBe('ACTUAL');
-    });
-
-    it('A9 autoRedeemType: derives FULL_REDEEM when the typed amount equals Available Balance', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A9);
-      comp.selectedContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
-      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '500' });
-      comp.model.amount = '500';
-
-      comp.submit();
-
-      expect(lastReq(api).movementType).toBe('FULL_REDEEM');
-    });
-
-    it('A9 autoRedeemType: derives PARTIAL_REDEEM when the typed amount is below Available Balance', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A9);
-      comp.selectedContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
-      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '500' });
-      comp.model.amount = '300';
-
-      comp.submit();
-
-      expect(lastReq(api).movementType).toBe('PARTIAL_REDEEM');
-    });
-
-    it('A6 (settlesDocumentArrival, plain): submit only creates the Acceptance and never releases anything — LC Balance stays untouched', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A6);
-      comp.naturalKey.lcNumber = 'LC001';
-      comp.naturalKey.ibNumber = 'IB01';
-      comp.model.amount = '1000';
-      comp.model.tenorType = 'SELLERS_USANCE';
-      comp.model.tenorDays = 60;
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1000' });
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
-      expect(lastReq(api)).toMatchObject({ instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' });
-      // The whole point of A6's Maker Submit: no release call touches the Document Arrival / LC Balance.
-      expect(api.release).not.toHaveBeenCalled();
-      expect(comp.submitResult).toEqual({ movementId: 'mv-new', status: 'PENDING' });
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // submit() — A3S compound (documentArrivalWithSg)
-  // ---------------------------------------------------------------------
-  describe('submit() — A3S documentArrivalWithSg compound', () => {
-    function primed(comp: TransactionBuilderComponent) {
-      comp.selectFunction(A3S);
-      comp.model.amount = '1000';
-      comp.model.secondaryRef = 'IB01';
-      comp.selectedContract = makeContract({ balanceContractId: 'bc-lc' });
-      comp.pickerSelection.selectedArrivalSg = makeContract({
-        balanceContractId: 'bc-sg',
-        instrumentType: 'SHGT',
-        naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null },
-      });
-      comp.pickerSelection.arrivalSgSnapshot = makeSnapshot({ confirmedBalance: '1000' });
-    }
-
-    it('creates the SG redemption THEN the Document Arrival, in that order, on full success', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'sg-redeem-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'utilize-1', status: 'PENDING' } }) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(2);
-      expect(lastReq(api, 0)).toMatchObject({ instrumentType: 'SHGT', balanceContractId: 'bc-sg', movementType: 'FULL_REDEEM', amount: '1000' });
-      expect(lastReq(api, 1)).toMatchObject({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc' });
-      // Both legs share one businessEventId.
-      expect(lastReq(api, 0).businessEventId).toBe(lastReq(api, 1).businessEventId);
-      expect(comp.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
-      expect(comp.submitResult).toEqual({ movementId: 'utilize-1', status: 'PENDING' });
-      expect(comp.submitting).toBe(false);
-    });
-
-    // Bug fixed 2026-08-16, reviewer-reported ("A3S does not generate the related SG redemption
-    // entries in Pending"): the SG's own FULL_REDEEM/PARTIAL_REDEEM is a REAL, in-scope contingent
-    // account family, but its entry was silently dropped since submitResult only ever tracked the
-    // second (LC UTILIZE) call. arrivalSgRedeemMovement now carries the FULL first-leg response
-    // (not just its movementId) so the Account Entries button can be offered for this leg too.
-    it("captures the SG redemption leg's own full response (including its contingentAccountEntry) separately from submitResult", () => {
-      const { comp, api } = setup();
-      const sgEntry = {
-        drAccount: 'Shipping Guarantees Outstanding',
-        crAccount: "Customers' Liability under Shipping Guarantees",
-        currency: 'USD',
-        amount: '1000',
-      };
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'utilize-1', status: 'PENDING', contingentAccountEntry: null } }) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.arrivalSgRedeemMovement).toEqual({ movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry });
-      expect(comp.submitResult!.contingentAccountEntry).toBeNull();
-    });
-
-    it('a failed SG reservation never attempts the Document Arrival call', () => {
-      const { comp, api } = setup();
-      api.createMovement.mockReturnValueOnce(apiErr('INSUFFICIENT_AVAILABLE_BALANCE') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not reserve the Shipping Guarantee redemption: INSUFFICIENT_AVAILABLE_BALANCE');
-      expect(comp.submitting).toBe(false);
-    });
-
-    it('SG reservation succeeds but the Document Arrival fails — surfaces the compound error, keeps the SG movementId', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'sg-redeem-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(apiErr('LEGS_UNBALANCED') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
-      expect(comp.submitError).toBe('Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: LEGS_UNBALANCED');
-      expect(comp.submitting).toBe(false);
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // submit() — B4 Sight/HONOUR compound (createsIssuingBankReceivableOnHonour)
-  // ---------------------------------------------------------------------
-  describe('submit() — B4 Sight/HONOUR compound', () => {
-    function primed(comp: TransactionBuilderComponent) {
-      comp.selectFunction(B4);
-      comp.model.movementType = 'HONOUR';
-      comp.model.amount = '2000';
-      comp.model.secondaryRef = 'EB01';
-      comp.selectedContract = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', logicalContractId: 'lgl-cnf' });
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementType: 'CREATE', sourceTransactionRef: 'EB01', amount: '2000' });
-    }
-
-    it('creates the Confirmation HONOUR then the Due from Issuing Bank asset', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'honour-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'receivable-1', status: 'PENDING' } }) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(2);
-      expect(lastReq(api, 0)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR' });
-      expect(lastReq(api, 1)).toMatchObject({ instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK', movementType: 'CREATE', parentLogicalContractId: 'lgl-cnf' });
-      expect(comp.submitResult).toEqual({ movementId: 'honour-1', status: 'PENDING' });
-      expect(comp.dueFromIssuingBankMovementId).toBe('receivable-1');
-    });
-
-    it('a failed HONOUR never creates the asset', () => {
-      const { comp, api } = setup();
-      api.createMovement.mockReturnValueOnce(apiErr('INSUFFICIENT_AVAILABLE_BALANCE') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-    });
-
-    it('HONOUR succeeds but the asset create fails — surfaces the compound error', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'honour-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(apiErr('REQUEST_VALIDATION_FAILED') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.submitError).toBe('Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: REQUEST_VALIDATION_FAILED');
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // submit() — B4 Usance/ACCEPT compound (createsAcceptanceReimbReceivableOnCreate)
-  // ---------------------------------------------------------------------
-  describe('submit() — B4 Usance/ACCEPT compound', () => {
-    function primed(comp: TransactionBuilderComponent) {
-      comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.model.amount = '3000';
-      comp.model.secondaryRef = 'EB02';
-      comp.selectedContract = makeContract({
-        balanceContractId: 'bc-cnf',
-        instrumentType: 'EPLC_CONFIRMATION',
-        logicalContractId: 'lgl-cnf',
-        tenorType: 'SELLERS_USANCE',
-        tenorDays: 90,
-      });
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementType: 'ACCEPT', sourceTransactionRef: 'EB02', amount: '3000' });
-    }
-
-    it('creates ACCEPT, then the Acceptance liability, then the Reimbursement Receivable asset', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'accept-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'acceptance-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'receivable-1', status: 'PENDING' } }) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(3);
-      expect(lastReq(api, 0)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'ACCEPT' });
-      expect(lastReq(api, 1)).toMatchObject({
-        instrumentType: 'EPLC_ACCEPTANCE',
-        movementType: 'CREATE',
-        exposureNature: 'ACTUAL',
-        tenorType: 'SELLERS_USANCE',
-        tenorDays: 90,
-      });
-      expect(lastReq(api, 2)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', movementType: 'CREATE' });
-      expect(comp.submitResult).toEqual({ movementId: 'accept-1', status: 'PENDING' });
-      expect(comp.acceptanceMovementId).toBe('acceptance-1');
-      expect(comp.acceptanceReimbReceivableMovementId).toBe('receivable-1');
-    });
-
-    // Same fix and reasoning as the A3S SG-redemption test above, applied to this compound's own
-    // second leg (the new EPLC_ACCEPTANCE CREATE) — a real, in-scope contingent account family whose
-    // entry was also being silently dropped, same root cause.
-    it("captures the Acceptance liability leg's own full response (including its contingentAccountEntry) separately from submitResult", () => {
-      const { comp, api } = setup();
-      const acceptanceEntry = {
-        drAccount: "Customers' Liability under Acceptances & DPU",
-        crAccount: 'Acceptances & DPU Outstanding',
-        currency: 'USD',
-        amount: '3000',
-      };
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'accept-1', status: 'PENDING', contingentAccountEntry: null } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'receivable-1', status: 'PENDING' } }) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.acceptanceMovement).toEqual({ movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry });
-      expect(comp.submitResult!.contingentAccountEntry).toBeNull();
-    });
-
-    it('a failed ACCEPT never creates the Acceptance', () => {
-      const { comp, api } = setup();
-      api.createMovement.mockReturnValueOnce(apiErr('INSUFFICIENT_AVAILABLE_BALANCE') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-    });
-
-    it('ACCEPT succeeds, Acceptance CREATE fails — surfaces the compound error, no Receivable call', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'accept-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(apiErr('REQUEST_VALIDATION_FAILED') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.createMovement).toHaveBeenCalledTimes(2);
-      expect(comp.submitError).toBe('Confirmation accepted (PENDING), but the Acceptance liability failed to record: REQUEST_VALIDATION_FAILED');
-    });
-
-    it('ACCEPT + Acceptance succeed, Receivable CREATE fails — surfaces the compound error', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'accept-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'acceptance-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(apiErr('REQUEST_VALIDATION_FAILED') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.submitError).toBe(
-        'Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: REQUEST_VALIDATION_FAILED',
-      );
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // submit() — B5 settlesAcceptanceOnMature compound
-  // ---------------------------------------------------------------------
-  describe('submit() — B5 settlesAcceptanceOnMature compound', () => {
-    function primed(comp: TransactionBuilderComponent) {
-      comp.selectFunction(B5);
-      comp.model.amount = '500';
-      comp.selectedContract = makeContract({
-        balanceContractId: 'bc-accept',
-        instrumentType: 'EPLC_ACCEPTANCE',
-        naturalKey: { lcNumber: 'LC001', ibNumber: 'EB01', sgNumber: null },
-      });
-      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '500' });
-    }
-
-    it('settles the Acceptance then resolves and reimburses the matching Receivable', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'reimb-1', status: 'PENDING' } }) as any);
-      api.resolveContract.mockReturnValueOnce(
-        of(makeContract({ balanceContractId: 'bc-receivable', instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE' })) as any,
-      );
-      primed(comp);
-
-      comp.submit();
-
-      expect(lastReq(api, 0)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE', balanceContractId: 'bc-accept', movementType: 'FULL_SETTLE' });
-      expect(api.resolveContract).toHaveBeenCalledWith('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', { lcNumber: 'LC001', ibNumber: 'EB01' });
-      expect(lastReq(api, 1)).toMatchObject({
-        instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-        balanceContractId: 'bc-receivable',
-        movementType: 'REIMBURSE',
-      });
-      expect(comp.submitResult).toEqual({ movementId: 'settle-1', status: 'PENDING' });
-      expect(comp.matchedReceivableMovementId).toBe('reimb-1');
-    });
-
-    it('a failed Acceptance settle never resolves the Receivable', () => {
-      const { comp, api } = setup();
-      api.createMovement.mockReturnValueOnce(apiErr('INSUFFICIENT_AVAILABLE_BALANCE') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(api.resolveContract).not.toHaveBeenCalled();
-      expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-    });
-
-    it('settle succeeds but resolveContract fails — surfaces the compound error', () => {
-      const { comp, api } = setup();
-      api.createMovement.mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any);
-      api.resolveContract.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.submitError).toBe('Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: NOT_FOUND');
-    });
-
-    it('settle + resolve succeed but the Receivable createMovement fails — surfaces the compound error', () => {
-      const { comp, api } = setup();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(apiErr('REQUEST_VALIDATION_FAILED') as any);
-      api.resolveContract.mockReturnValueOnce(of(makeContract({ balanceContractId: 'bc-receivable' })) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.submitError).toBe('Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: REQUEST_VALIDATION_FAILED');
-    });
-  });
-
   // ---------------------------------------------------------------------
   // approveArrival()
   // ---------------------------------------------------------------------
@@ -930,14 +233,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.lookUp.lookup.instrumentType).toBe(expectedLookupType);
       expect(api.resolveContract).toHaveBeenCalledWith(expectedLookupType, expect.objectContaining({ lcNumber: 'E001' }));
     });
-
-    // REMOVED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — this test's own end-to-end
-    // path went through approveArrival() (B3's former deferSettlementRequiresBackendAck branch, which
-    // called syncCheckerToContext() in its own success callback). B3 no longer routes through
-    // approveArrival() at all (checkerAct() now sends it straight to the plain api.release() path,
-    // which already syncs the Checker context via the SAME mechanism every other plain-path function
-    // uses — see release()'s own tests). The underlying EPLC_EXAMINATION -> EPLC_CONFIRMATION mapping
-    // this test was ALSO proving is still directly covered by the it.each block immediately above.
   });
 
   // ---------------------------------------------------------------------
@@ -946,7 +241,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('release()', () => {
     it('no-ops when there is no submitResult.movementId', () => {
       const { comp, api } = setup();
-      comp.submitResult = null;
+      // makerContext.submitResult is already null by default (selectFunction() never called).
 
       comp.release();
 
@@ -956,15 +251,16 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('plain path: single release call, success resets actionBusy and — per the 2026-08-17 auto-reset UX — returns to the SAME function with a fresh screen instead of leaving submitResult set', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
-      comp.model.createdBy = 'maker1';
-      comp.submitResult = makeMovement({ movementId: 'mv-amend', status: 'PENDING' });
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-amend', status: 'PENDING' }) });
       api.release.mockReturnValueOnce(of({ movementId: 'mv-amend', status: 'RELEASED' }) as any);
 
       comp.release();
 
       expect(api.release).toHaveBeenCalledWith('mv-amend', 'checker1');
       expect(comp.selectedFunction).toBe(A2);
-      expect(comp.submitResult).toBeNull();
+      // A genuine 'released' outcome re-invokes selectFunction(A2), whose own reset rebuilds a fresh
+      // makerContext — submitResult is null again, not left at the compound's own final leg response.
+      expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
       expect(comp.releaseSuccessHint).toBe('Release completed (movement mv-amend) — screen reset for a new A2 (LC Amendment) transaction.');
     });
@@ -972,8 +268,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('plain path: derives checker2 when createdBy is not maker1', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
-      comp.model.createdBy = 'maker2';
-      comp.submitResult = makeMovement({ movementId: 'mv-amend', status: 'PENDING' });
+      setMakerContext(comp, { createdBy: 'maker2', submitResult: makeMovement({ movementId: 'mv-amend', status: 'PENDING' }) });
 
       comp.release();
 
@@ -984,21 +279,22 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
       comp.selectFunction(A2);
-      comp.submitResult = makeMovement({ movementId: 'mv-amend', status: 'PENDING' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-amend', status: 'PENDING' }) });
 
       comp.release();
 
-      expect(comp.submitError).toBe('ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
       expect(comp.actionBusy).toBe(false);
     });
 
     it('A6 settlesDocumentArrival: releases the source Document Arrival FIRST, then the Acceptance', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
-      comp.model.createdBy = 'maker1';
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
-      comp.selectedParent = makeContract({ balanceContractId: 'bc-parent-lc' });
-      comp.submitResult = makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' });
+      setMakerContext(comp, {
+        createdBy: 'maker1',
+        selectedPayMovement: makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' }),
+        submitResult: makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
@@ -1010,7 +306,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       // 2026-08-17 auto-reset UX: a genuine 'released' outcome returns to the SAME function with a
       // fresh screen instead of leaving submitResult set to the compound's own final leg response.
       expect(comp.selectedFunction).toBe(A6);
-      expect(comp.submitResult).toBeNull();
+      expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
       expect(comp.releaseSuccessHint).toContain('mv-acceptance');
     });
@@ -1018,38 +314,46 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('A6: a failed source release NEVER attempts to release the Acceptance', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
-      comp.submitResult = makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' }),
+        submitResult: makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' }),
+      });
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
       expect(api.release).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not release the Document Arrival (IB01) — Acceptance NOT approved: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Could not release the Document Arrival (IB01) — Acceptance NOT approved: ILLEGAL_STATE_TRANSITION',
+      });
       expect(comp.actionBusy).toBe(false);
     });
 
     it('A6: source release succeeds but the Acceptance release fails', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
-      comp.submitResult = makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' }),
+        submitResult: makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
-      expect(comp.submitError).toBe('Document Arrival released, but the Confirmation Honour/Accept itself failed to release: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Document Arrival released, but the Confirmation Honour/Accept itself failed to release: ILLEGAL_STATE_TRANSITION',
+      });
       expect(comp.actionBusy).toBe(false);
     });
 
     it('A3S documentArrivalWithSg: releases the SG redemption for real, then acknowledges the Document Arrival WITHOUT a second real release call', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
-      comp.selectedContract = makeContract({ balanceContractId: 'bc-lc' });
-      comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
+      setMakerContext(comp, { arrivalSgRedeemMovementId: 'mv-sg-redeem', submitResult: makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' }) });
       api.release.mockReturnValueOnce(of({ movementId: 'mv-sg-redeem', status: 'RELEASED' }) as any);
 
       comp.release();
@@ -1063,13 +367,15 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('A3S: a failed SG release leaves the Document Arrival un-acknowledged', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
-      comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
+      setMakerContext(comp, { arrivalSgRedeemMovementId: 'mv-sg-redeem', submitResult: makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' }) });
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
-      expect(comp.submitError).toBe('Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ILLEGAL_STATE_TRANSITION',
+      });
       expect(comp.arrivalApproved).toBe(false);
       expect(comp.actionBusy).toBe(false);
     });
@@ -1077,8 +383,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B5 settlesAcceptanceOnMature: releases the Acceptance then the matching Receivable, then auto-resets to a fresh B5 screen', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
-      comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
+      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
@@ -1089,7 +394,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
       // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B5);
-      expect(comp.submitResult).toBeNull();
+      expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
       expect(comp.releaseSuccessHint).toContain('mv-settle');
     });
@@ -1097,28 +402,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B5: a failed Acceptance release never releases the Receivable', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
-      comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
+      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
       expect(api.release).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
     });
 
     it('B5: Acceptance release succeeds but the Receivable release fails', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
-      comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
+      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
-      expect(comp.submitError).toBe('Acceptance settled, but the matching Reimbursement Receivable failed to release: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Acceptance settled, but the matching Reimbursement Receivable failed to release: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
@@ -1128,11 +434,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B4 Sight full compound release: Confirmation HONOUR -> Due from Issuing Bank asset (does NOT re-release the already-RELEASED B3 source)', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'HONOUR';
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE', sourceTransactionRef: 'EB01' });
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
-      comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-b3', movementType: 'CREATE', sourceTransactionRef: 'EB01' }),
+        dueFromIssuingBankMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
@@ -1144,7 +450,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenCalledTimes(2);
       // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B4);
-      expect(comp.submitResult).toBeNull();
+      expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
       expect(comp.releaseSuccessHint).toContain('mv-honour');
     });
@@ -1152,29 +458,32 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B4 Sight: the final Due from Issuing Bank release failing surfaces its own compound error', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'HONOUR';
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
-      comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-b3' }),
+        dueFromIssuingBankMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.release();
 
-      expect(comp.submitError).toBe('Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     it('B4 Usance full compound release: ACCEPT -> Acceptance liability -> Receivable asset (does NOT re-release the already-RELEASED B3 source)', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'ACCEPT' });
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
-      comp.acceptanceMovementId = 'mv-acceptance';
-      comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-b3', movementType: 'ACCEPT' }),
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
@@ -1188,19 +497,19 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenCalledTimes(3);
       // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B4);
-      expect(comp.submitResult).toBeNull();
+      expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.releaseSuccessHint).toContain('mv-accept');
     });
 
     it('B4 Usance: the Acceptance liability release failing stops before the Receivable leg', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
-      comp.acceptanceMovementId = 'mv-acceptance';
-      comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-b3' }),
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1208,18 +517,21 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.release();
 
       expect(api.release).toHaveBeenCalledTimes(2);
-      expect(comp.submitError).toBe('Confirmation accepted, but the Acceptance liability failed to release: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Confirmation accepted, but the Acceptance liability failed to release: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     it('B4 Usance: the Receivable release failing is its own final compound error', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
-      comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
-      comp.acceptanceMovementId = 'mv-acceptance';
-      comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
+      setMakerContext(comp, {
+        selectedPayMovement: makeMovement({ movementId: 'mv-b3' }),
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
+      });
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
@@ -1227,7 +539,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(comp.submitError).toBe('Acceptance released, but the Reimbursement Receivable asset failed to release: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Acceptance released, but the Reimbursement Receivable asset failed to release: ILLEGAL_STATE_TRANSITION',
+      });
     });
   });
 
@@ -1237,7 +552,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('reject()', () => {
     it('no-ops when there is no submitResult.movementId', () => {
       const { comp, api } = setup();
-      comp.submitResult = null;
 
       comp.reject();
 
@@ -1246,24 +560,27 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
     it('success: calls api.reject with checker1/MANUAL_TEST_REJECT and updates submitResult', () => {
       const { comp, api } = setup();
-      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
       api.reject.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'REJECTED' }) as any);
 
       comp.reject();
 
       expect(api.reject).toHaveBeenCalledWith('mv-1', 'checker1', 'MANUAL_TEST_REJECT');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-1', status: 'REJECTED' });
+      // reject() forwards its outcome to the Maker child via makerOutcomeSignal rather than mutating
+      // makerContext directly (the parent has no submitResult field of its own to update) — see
+      // TransactionBuilderComponent.forwardOutcomeToMaker()'s own doc comment.
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'REJECTED' } });
       expect(comp.actionBusy).toBe(false);
     });
 
     it('error: sets submitError and resets actionBusy', () => {
       const { comp, api } = setup();
-      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
       api.reject.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
 
       comp.reject();
 
-      expect(comp.submitError).toBe('NOT_FOUND');
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'NOT_FOUND' });
       expect(comp.actionBusy).toBe(false);
     });
   });
@@ -1274,11 +591,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('deleteMakerPending()', () => {
     it('no-ops when there is no submitResult, or status is not PENDING', () => {
       const { comp, api } = setup();
-      comp.submitResult = null;
       comp.deleteMakerPending();
       expect(api.cancel).not.toHaveBeenCalled();
 
-      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'RELEASED' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'RELEASED' }) });
       comp.deleteMakerPending();
       expect(api.cancel).not.toHaveBeenCalled();
     });
@@ -1286,35 +602,36 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('plain path: calls api.cancel with createdBy/MAKER_EC, distinct from reject()', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
-      comp.model.createdBy = 'maker1';
-      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
       api.cancel.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'CANCELLED' }) as any);
 
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledWith('mv-1', 'maker1', 'MAKER_EC');
       expect(api.reject).not.toHaveBeenCalled();
-      expect(comp.submitResult).toEqual({ movementId: 'mv-1', status: 'CANCELLED' });
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'CANCELLED' }, syncLookup: true });
       expect(comp.actionBusy).toBe(false);
     });
 
     it('plain path: a failed cancel sets submitError', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
-      comp.submitResult = makeMovement({ movementId: 'mv-1', status: 'PENDING' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
 
-      expect(comp.submitError).toBe('ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
     });
 
     it('A3S: cancels the linked SG redemption FIRST, then the primary Document Arrival', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
-      comp.model.createdBy = 'maker1';
-      comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
+      setMakerContext(comp, {
+        createdBy: 'maker1',
+        arrivalSgRedeemMovementId: 'mv-sg-redeem',
+        submitResult: makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' }),
+      });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-sg-redeem', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'CANCELLED' }) as any);
@@ -1323,29 +640,32 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.cancel).toHaveBeenNthCalledWith(1, 'mv-sg-redeem', 'maker1', 'MAKER_EC');
       expect(api.cancel).toHaveBeenNthCalledWith(2, 'mv-doc-arrival', 'maker1', 'MAKER_EC');
-      expect(comp.submitResult).toEqual({ movementId: 'mv-doc-arrival', status: 'CANCELLED' });
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-doc-arrival', status: 'CANCELLED' }, syncLookup: true });
     });
 
     it('A3S: a failed SG cancel leaves the primary un-cancelled', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
-      comp.arrivalSgRedeemMovementId = 'mv-sg-redeem';
-      comp.submitResult = makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' });
+      setMakerContext(comp, { arrivalSgRedeemMovementId: 'mv-sg-redeem', submitResult: makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' }) });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     it('B4 Sight (createsIssuingBankReceivableOnHonour): cancels the asset FIRST, then the primary HONOUR', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'HONOUR';
-      comp.model.createdBy = 'maker1';
-      comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
+      setMakerContext(comp, {
+        createdBy: 'maker1',
+        dueFromIssuingBankMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }),
+      });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'CANCELLED' }) as any);
@@ -1359,25 +679,27 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B4 Sight: a failed asset cancel leaves the Confirmation Honour un-cancelled', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'HONOUR';
-      comp.dueFromIssuingBankMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-honour', status: 'PENDING' });
+      setMakerContext(comp, { dueFromIssuingBankMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }) });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     it('B4 Usance: cancels the Receivable, THEN the Acceptance, THEN the primary ACCEPT, in reverse-creation order', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.model.createdBy = 'maker1';
-      comp.acceptanceMovementId = 'mv-acceptance';
-      comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
+      setMakerContext(comp, {
+        createdBy: 'maker1',
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
+      });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'CANCELLED' }) as any)
@@ -1393,25 +715,30 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B4 Usance: a failed Receivable cancel never attempts the Acceptance/primary cancel', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.acceptanceMovementId = 'mv-acceptance';
-      comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
+      setMakerContext(comp, {
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
+      });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     it('B4 Usance: Receivable cancel succeeds but Acceptance cancel fails', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      comp.model.movementType = 'ACCEPT';
-      comp.acceptanceMovementId = 'mv-acceptance';
-      comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-accept', status: 'PENDING' });
+      setMakerContext(comp, {
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
+      });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
@@ -1419,17 +746,20 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledTimes(2);
-      expect(comp.submitError).toBe(
-        'Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ILLEGAL_STATE_TRANSITION',
-      );
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ILLEGAL_STATE_TRANSITION',
+      });
     });
 
     it('B5 settlesAcceptanceOnMature: cancels the matching Receivable FIRST, then the primary Settle', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
-      comp.model.createdBy = 'maker1';
-      comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
+      setMakerContext(comp, {
+        createdBy: 'maker1',
+        matchedReceivableMovementId: 'mv-receivable',
+        submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }),
+      });
       api.cancel
         .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
         .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'CANCELLED' }) as any);
@@ -1443,14 +773,16 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('B5: a failed Receivable cancel leaves the primary Settle un-cancelled', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
-      comp.matchedReceivableMovementId = 'mv-receivable';
-      comp.submitResult = makeMovement({ movementId: 'mv-settle', status: 'PENDING' });
+      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
       api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
       comp.deleteMakerPending();
 
       expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ILLEGAL_STATE_TRANSITION');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'failed',
+        message: 'Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ILLEGAL_STATE_TRANSITION',
+      });
     });
   });
 
@@ -1472,9 +804,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp } = setup();
       comp.selectFunction(A6);
       // referencedTransactionId is required since the 2026-08-16 fix — a real A6 CREATE always carries
-      // one (see isCheckerCompoundOwnSubmission's own doc comment); submitResult no longer needs to match.
+      // one (see isCheckerCompoundOwnSubmission's own doc comment); makerContext.submitResult no longer
+      // needs to match.
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', referencedTransactionId: 'mv-source' });
-      comp.submitResult = makeMovement({ movementId: 'mv-1' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1' }) });
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
       const rejectSpy = jest.spyOn(comp, 'reject').mockImplementation(() => undefined);
 
@@ -1488,9 +821,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp } = setup();
       comp.selectFunction(A3S);
       // businessEventId is required since the 2026-08-16 fix — a real A3S UTILIZE always carries one
-      // (see isCheckerCompoundOwnSubmission's own doc comment); submitResult is no longer needed to match.
+      // (see isCheckerCompoundOwnSubmission's own doc comment); makerContext.submitResult is no longer
+      // needed to match.
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', businessEventId: 'be-1' });
-      comp.submitResult = makeMovement({ movementId: 'mv-1' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1' }) });
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
       const rejectSpy = jest.spyOn(comp, 'reject').mockImplementation(() => undefined);
 
@@ -1504,7 +838,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-2', movementType: 'UTILIZE' });
-      comp.submitResult = null; // not the same submission -> isCheckerCompoundOwnSubmission false
+      // not the same submission -> isCheckerCompoundOwnSubmission false (default makerContext.submitResult is null)
       const approveSpy = jest.spyOn(comp, 'approveArrival').mockImplementation(() => undefined);
 
       comp.checkerAct('release');
@@ -1517,7 +851,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-2', movementType: 'UTILIZE' });
-      comp.submitResult = null;
       const approveSpy = jest.spyOn(comp, 'approveArrival').mockImplementation(() => undefined);
 
       comp.checkerAct('reject');
@@ -1534,7 +867,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(B3);
       comp.checkerId = 'checker8';
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-3', movementType: 'CREATE' });
-      comp.submitResult = null;
       const approveSpy = jest.spyOn(comp, 'approveArrival').mockImplementation(() => undefined);
 
       comp.checkerAct('release');
@@ -1548,7 +880,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(A2);
       comp.checkerId = 'checker7';
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
-      comp.submitResult = null;
 
       comp.checkerAct('release');
 
@@ -1568,7 +899,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(A4);
       comp.checkerId = 'checker9';
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-a4', movementType: 'UTILIZE', makerSubmittedAt: '2026-08-16T00:00:00.000Z' });
-      comp.submitResult = null;
 
       comp.checkerAct('release');
 
@@ -1584,7 +914,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A4);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-a4-unsubmitted', movementType: 'UTILIZE', makerSubmittedAt: null });
-      comp.submitResult = null;
 
       comp.checkerAct('release');
 
@@ -1596,7 +925,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A4);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-a4-unsubmitted', movementType: 'UTILIZE', makerSubmittedAt: null });
-      comp.submitResult = null;
 
       comp.checkerAct('reject');
 
@@ -1607,7 +935,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
-      comp.submitResult = null;
 
       comp.checkerAct('reject');
 
@@ -1619,7 +946,6 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
       comp.selectFunction(A2);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
-      comp.submitResult = null;
 
       comp.checkerAct('release');
 
@@ -1669,11 +995,14 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.checkerError).toBeNull();
     });
 
-    it('onCheckerQueueLoadSucceeded() delegates to syncLookupToContext() (via lookUp.syncFrom, same as the pre-extraction inline callback)', () => {
+    it("onCheckerQueueLoadSucceeded() delegates to syncLookupToContext() (via lookUp.syncFrom), reading the Maker's own last-known instrumentType/lcNumber carried by onMakerSyncRequested()", () => {
       const { comp } = setup();
       comp.selectFunction(A2);
-      comp.model.instrumentType = 'IPLC_LC'; // normally set by onSubChoice(); syncLookupToContext() requires it non-null.
-      comp.selectedContract = makeContract({ naturalKey: { lcNumber: 'LC-SYNC' } });
+      // Mirrors what a real MakerPanelComponent.emitSync() -> onMakerSyncRequested() call already
+      // carries (lastMakerSync) — the Maker-owned model.instrumentType/selectedContract fields this test
+      // used to poke directly moved to MakerPanelComponent, so this is now the real, current mechanism
+      // for supplying lastMakerSync in isolation.
+      comp.onMakerSyncRequested({ lcNumber: 'LC-SYNC', secondaryRef: null, alsoSyncLookup: false, instrumentType: 'IPLC_LC' });
       const syncFromSpy = jest.spyOn(comp.lookUp, 'syncFrom');
 
       comp.onCheckerQueueLoadSucceeded();

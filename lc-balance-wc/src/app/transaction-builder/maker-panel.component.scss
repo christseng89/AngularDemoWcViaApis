@@ -1,0 +1,996 @@
+// Copied verbatim from transaction-builder.component.scss (not promoted to a shared location), same
+// convention checker-panel.component.scss/account-entries-dialog.component.scss's own doc comments
+// already established: Angular's default Emulated view encapsulation scopes a component's own styles to
+// its own template only. Given this parent stylesheet's own size (~1000 lines) and how broadly its class
+// names are shared across every section of the app (`.tb-field`/`.tb-input`/`.tb-select`/`.tb-btn`/
+// `.tb-grid-2`/`.tb-grid-3`/`.tb-table`/`.tb-error`/`.tb-hint`/etc.), a hand-picked subset risked silently
+// missing a rule under time pressure — copied whole instead, a deliberate, disclosed simplification (some
+// duplication accepted) rather than a surgical per-selector extraction. `transaction-builder.component.scss`
+// itself is UNCHANGED — every section still living on the parent template (Checker's own projected
+// action block, Look Up Current Balance, Inquire Events) still needs these same rules too.
+/**
+ * Business instruction 2026-08-15 ("UI for Functions Import LC, Export LC
+ * then functions should be similar as lc-payment-wc" / "Stylesheet
+ * expertise" / "professional UI patterns without change the
+ * functionality") — a real, component-scoped stylesheet matched to
+ * lc-payment-wc's own navy/blue banking design tokens (src/styles.scss's
+ * :root vars), replacing the previous purely-inline-Bootstrap look.
+ */
+
+.tb-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.tb-header {
+  margin-bottom: 20px;
+}
+
+.tb-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+
+.tb-subtitle {
+  font-size: 13px;
+  color: var(--gray-muted);
+  max-width: 900px;
+  margin: 0;
+}
+
+// ── Function pickers ─────────────────────────────────────────────────────
+
+.tb-function-picker {
+  margin-bottom: 20px;
+}
+
+.tb-function-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+// Matches lc-payment-wc's own case-btn/module-pills pattern (business-case-runner.component.scss) —
+// a compact, wrapping row of chips instead of a tall vertical list, so the picked function's own
+// Maker/Checker panels get the vertical space (business instruction 2026-08-15).
+.tb-function-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--gray-border);
+  background: var(--bg-surface);
+  color: var(--gray-body);
+  cursor: pointer;
+
+  // Bug (reviewer-reported 2026-08-15, "when move cursor to the A1-A9 function, the function tab
+  // just blank out"): `&:hover` and `&--active` compile to two SEPARATE single-class selectors
+  // (`.tb-function-chip:hover` at specificity 0-2-0 vs. `.tb-function-chip--active` at 0-1-0) — with
+  // the cursor sitting over an already-selected chip (the normal state right after a click), the
+  // HIGHER-specificity :hover rule silently won the background, leaving --active's `color: #fff`
+  // text on the near-white :hover background instead of blue — invisible, not literally blank.
+  // `:not(--active)` fixes the specificity fight directly instead of just tie-breaking on source
+  // order (which would leave the selected chip losing its own hover feedback entirely).
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+
+  &:hover:not(.tb-function-chip--active) {
+    border-color: var(--blue-border);
+    background: var(--blue-bg-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  // `--blue-solid` (not `--blue`) — a solid-fill-behind-white-text role, deliberately kept theme-
+  // constant, distinct from `--blue`'s own dark-mode-brightened "colored text/accent" role. See
+  // `--blue-solid`'s own doc comment in styles.scss for why the two must not be conflated: reusing
+  // the brightened `--blue` here would put white text on a pale background in dark mode, failing
+  // contrast.
+  &--active {
+    background: var(--blue-solid);
+    border-color: var(--blue-solid);
+    color: #fff;
+
+    .tb-function-chip__code {
+      color: #fff;
+    }
+  }
+}
+
+.tb-function-chip__code {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.tb-function-chip__label {
+  font-weight: 600;
+}
+
+.tb-function-help {
+  font-size: 12px;
+  color: var(--gray-muted);
+  margin: 8px 0 0;
+}
+
+// ── Workspace layout ─────────────────────────────────────────────────────
+
+// Business instruction 2026-08-19 ("目前畫面的左右欄位比例不合理...建議將整體畫面調整為 50 / 50 Split
+// Layout") — was `minmax(0, 1fr) 420px`: Transaction Processing took whatever was left over (often
+// 900px+ of mostly-empty space, since .tb-page itself caps at max-width: 1400px) while Look Up Current
+// Balance was pinned to a fixed 420px, cramping its own Event Timeline table into horizontal scroll.
+// Made genuinely equal — `minmax(0, 1fr)` on BOTH sides (not a bare `1fr`) so either panel's own content
+// (esp. the Event Timeline table) can shrink to fit its track instead of forcing the grid wider than
+// the row's own available space, same reasoning `.tb-main`/`.tb-side`'s own `min-width: 0` already
+// existed to support.
+//
+// SUPERSEDED same day — 60/40, business instruction ("Adjust Transaction Processing / Look Up Current
+// Balance to 60/40 Split Layout... Transaction Input: 60%, Look Up Current Balance: 40%"). `3fr`/`2fr`
+// (not raw percentages) — the natural fr-unit expression of a 3:2 = 60:40 ratio, keeping the same
+// `minmax(0, ...)` shrink-safety the 50/50 pass deliberately used on both tracks. Verified live via
+// `getBoundingClientRect()`: .tb-main/.tb-side render at a genuine ~60/40 split (not merely "the CSS
+// says 3fr/2fr" — gap/border/padding all subtracted from the track math the same way before either
+// track is split, so the ratio holds exactly), same measurement rigor the 50/50 pass itself used.
+//
+// Stacking breakpoint RAISED 960px -> 1100px for this same reason, re-derived rather than carried over:
+// at 960px (the 50/50 pass's own breakpoint), a 60/40 split leaves .tb-side — the 7-column Event
+// Timeline table's own panel — only ~363px wide while still "side-by-side", genuinely too narrow for
+// that table even after the padding/font tightening below. Solving for the point where .tb-side's own
+// width is back to roughly the ~450-480px range the 50/50 pass's own .tb-side minimum sat at (the width
+// that pass's own live verification already proved workable) lands close to 1100px — restored to
+// (coincidentally) the ORIGINAL pre-50/50 breakpoint value, not because that number was blindly kept,
+// but because the same underlying "each panel needs a workable minimum width to stay side-by-side"
+// reasoning, re-solved for the new 60/40 ratio, independently arrives back at roughly the same place.
+.tb-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Business instruction 2026-08-19 — Inquire Events reuses .tb-workspace's shared properties (gap,
+// align-items) but supplies only ONE child (.tb-main, no .tb-side) — CSS Grid still reserves the
+// second 50%-width track regardless of whether anything occupies it, leaving half the screen unused.
+// A single full-width track lets Inquire Events' own content (especially the Event Timeline table)
+// use the whole available width instead. Deliberately a modifier on .tb-workspace, not a change to
+// its own base rule — Transaction Processing's genuine 50/50 split (Transaction Processing / Look Up
+// Current Balance) must stay exactly as-is.
+.tb-workspace--single {
+  grid-template-columns: 1fr;
+}
+
+// `container-type: inline-size` + a shared `container-name` — lets .tb-grid-3/.tb-grid-2 (below) respond
+// to THIS panel's own rendered width via @container queries, not the viewport's. Necessary now that
+// .tb-main is only ~50% of the workspace width instead of "most of it": a 3-column input grid keyed off
+// a VIEWPORT breakpoint would still try to render 3 columns inside a panel far narrower than the
+// viewport itself, reproducing the exact "cramped/overflowing input fields" problem from the opposite
+// direction. Given to .tb-side too, defensively, in case a future grid layout in that panel wants the
+// same container-relative behavior — it has no @container consumer of its own today.
+.tb-main,
+.tb-side {
+  container-type: inline-size;
+  container-name: tb-panel;
+}
+
+.tb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.tb-side {
+  min-width: 0;
+}
+
+// ── Sections (Maker / Checker / Look Up) ─────────────────────────────────
+
+.tb-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tb-section--maker {
+  border-top: 3px solid var(--blue);
+}
+
+.tb-section--checker {
+  border-top: 3px solid var(--green);
+}
+
+.tb-section__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--blue-bg-soft);
+  border-bottom: 1px solid var(--gray-border);
+}
+
+.tb-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+
+.tb-section__body {
+  padding: 18px;
+}
+
+.tb-role-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+
+  &--maker {
+    background: var(--blue-bg);
+    color: var(--blue-dark);
+    border: 1px solid var(--blue-border);
+  }
+
+  &--checker {
+    background: var(--green-bg);
+    color: var(--green-dark);
+    border: 1px solid var(--green-border);
+  }
+}
+
+// ── Form primitives ───────────────────────────────────────────────────────
+
+.tb-field {
+  margin-bottom: 14px;
+
+  &--inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0;
+
+    .tb-input {
+      width: 120px;
+    }
+  }
+
+  // Checker's own independent LC search (business instruction 2026-08-15) — needs more room than
+  // the 120px Checker-ID field .tb-field--inline was originally sized for.
+  &--search .tb-input {
+    width: 180px;
+  }
+}
+
+.tb-field__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-body);
+  margin-bottom: 4px;
+}
+
+// Same red-asterisk visual signal as a required Formly field's own `span[aria-hidden='true']` (see
+// `:host ::ng-deep formly-field.tb-field--required` above) — a plain, non-Formly reusable class for
+// the handful of natural-key inputs (LC Number etc.) that live outside buildFields()'s own array and
+// so can't pick up that Formly-scoped rule.
+.tb-required-mark {
+  color: var(--red);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.tb-input,
+.tb-select {
+  border: 1px solid var(--gray-input-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  background: var(--bg-surface);
+  color: var(--gray-body);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+
+  &:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.12);
+  }
+
+  &:disabled {
+    background: var(--gray-readonly-bg);
+    color: var(--gray-disabled);
+  }
+}
+
+// Mandatory-field visual treatment (UI/UX best practice — business instruction 2026-08-15,
+// "apply different style for mandatory fields for all functions"). Left-accent + tint uses --blue
+// (the app's existing "active/interactive" token) rather than --red, which this stylesheet already
+// reserves for real validation-error state (.tb-error, .has-error) — reusing red here would make
+// "required" indistinguishable from "invalid" at a glance.
+.tb-input--required,
+.tb-select--required {
+  border-left: 3px solid var(--blue);
+  background: var(--blue-bg-soft);
+
+  &:focus {
+    background: var(--bg-surface);
+  }
+}
+
+// Business instruction 2026-08-19 ("LC Number... leave blank and Tab out... no red validation box...
+// Amount... immediately highlighted") — this app's own non-Bootstrap-scoped equivalent of Bootstrap's
+// `.form-control.is-invalid` (which only Formly-rendered fields, e.g. Amount, qualify for — they alone
+// carry the `.form-control` class Bootstrap's own selector requires). Placed after `.tb-input--required`
+// in source order (not `!important` — matches this file's own established "win on source order, not
+// !important" convention, e.g. the .tb-table--static hover-suppression fix) so a touched+empty mandatory
+// field's full red border-left-color wins over the plain blue one — "genuinely invalid" is a stronger
+// signal than merely "required, not yet touched".
+.tb-input--invalid {
+  border-color: var(--red);
+  background: var(--red-bg-soft);
+
+  &:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+    background: var(--bg-surface);
+  }
+}
+
+.tb-select--inline {
+  width: auto;
+  display: inline-block;
+}
+
+// Same required-field treatment, applied to the Formly-rendered fields (amount/currency/tenorType/
+// eventSeq/createdBy/…) via the className: 'tb-field--required' set in rebuildFields(). formly-field
+// is a child component's host element, outside this component's own template, so ::ng-deep is needed
+// to reach its internal Bootstrap-wrapper markup — scoped under :host so it stays confined to this
+// component's own DOM and can't leak into other Formly usages elsewhere in the app (e.g.
+// business-case-runner).
+:host ::ng-deep formly-field.tb-field--required {
+  .mb-3 {
+    border-left: 3px solid var(--blue);
+    background: var(--blue-bg-soft);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+  }
+
+  .form-label {
+    font-weight: 700;
+
+    // The bootstrap form-field wrapper's own required marker (a bare "*").
+    span[aria-hidden='true'] {
+      color: var(--red);
+      font-weight: 700;
+      margin-left: 2px;
+    }
+  }
+}
+
+// Business instruction 2026-08-19 (50/50 workspace split, then same-day superseded by 60/40) —
+// breakpoints changed from viewport `@media` to `@container tb-panel` (the container declared on
+// .tb-main/.tb-side above): these grids only ever appear inside .tb-main (confirmed by reading the
+// template — all 3 call sites sit between the `.tb-main`/`.tb-side` split), so keying off .tb-main's OWN
+// rendered width, not the full viewport, is what actually tracks the space these inputs have to work
+// with post-split. Thresholds originally picked against the 50/50 math (.tb-main ranging ~454-674px
+// while side-by-side) — RE-CHECKED, not blindly carried over, against the new 60/40 numbers: with
+// Transaction Processing now the WIDER 60% panel and the stacking breakpoint raised to 1100px (see
+// .tb-workspace's own doc comment above), .tb-main's own width while side-by-side now ranges
+// ~627-808px — comfortably above both the 420px and 520px thresholds below across the WHOLE range, so
+// neither ever fires while genuinely side-by-side under 60/40 (both remain live, harmless safety nets
+// for anything narrower than expected, e.g. browser zoom) — a wider Transaction Processing panel simply
+// never needs to collapse its own input grid while sharing the row with Look Up Current Balance.
+.tb-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+
+  @container tb-panel (max-width: 420px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tb-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+
+  @container tb-panel (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tb-grid-lookup {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 8px;
+
+  > *:nth-child(1) {
+    grid-column: 1;
+  }
+}
+
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform 80ms ease;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  // `--blue-solid`/`--blue-solid-hover` (not `--blue`/`--blue-dark`) — same theme-constant
+  // solid-fill-behind-white-text reasoning as `.tb-function-chip--active` above.
+  &--primary {
+    background: var(--blue-solid);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
+
+    &:hover:not(:disabled) {
+      background: var(--blue-solid-hover);
+    }
+  }
+
+  &--outline {
+    background: var(--bg-surface);
+    border-color: var(--blue);
+    color: var(--blue);
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg);
+    }
+  }
+
+  // `--green-solid`/`--green-solid-hover` — same theme-constant solid-fill reasoning as `--primary` above.
+  &--success {
+    background: var(--green-solid);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(22, 163, 74, 0.25);
+
+    &:hover:not(:disabled) {
+      background: var(--green-solid-hover);
+    }
+  }
+
+  &--danger-outline {
+    background: var(--bg-surface);
+    border-color: var(--red);
+    color: var(--red);
+
+    &:hover:not(:disabled) {
+      background: var(--red-bg-soft);
+    }
+  }
+
+  // Business-requested 2026-08-16 (analysis/contingent-liability-ledger.html) — the Event Timeline's
+  // own "Account Entries" button, sized to sit inside a table cell without inflating row height.
+  &--tiny {
+    padding: 3px 9px;
+    font-size: 11px;
+    background: var(--bg-surface);
+    border-color: var(--blue-border);
+    color: var(--blue-dark);
+    box-shadow: none;
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg-soft);
+      border-color: var(--blue);
+    }
+
+    &:focus-visible {
+      outline-offset: 1px;
+    }
+  }
+}
+
+.tb-hint {
+  font-size: 11px;
+  color: var(--gray-muted);
+  font-style: italic;
+
+  &--ok {
+    color: var(--green-dark);
+    font-style: normal;
+    background: var(--green-bg);
+    border: 1px solid var(--green-border);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+  }
+}
+
+// UX enhancement (2026-08-18, Inquire Events "Page by Page" — client-side pagination over the already-
+// loaded events array) — same flex/gap/margin layout as index-picker.component.scss's own
+// .index-picker__pagination, mirrored here (not imported — that file's styles are view-encapsulated to
+// IndexPickerComponent's own template) since this Events table stays a plain .tb-table, not an
+// app-index-picker instance (which would collapse its 7-column layout into a 2-line row format instead).
+.tb-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tb-error {
+  font-size: 12px;
+  color: var(--red-dark);
+  background: var(--red-bg-soft);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.tb-subcard {
+  background: var(--blue-bg-soft);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+// Business instruction 2026-08-15 ("confirmedBalance... should be separated by each line") — a proper
+// label/value definition list, one field per row, instead of the old wrapping flex row of bare spans.
+.tb-balance-box {
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--navy);
+
+  &--current {
+    background: var(--gray-bg);
+    border-color: var(--gray-border);
+    color: var(--gray-body);
+  }
+
+  &--asof {
+    background: var(--indigo-bg);
+    border-color: var(--indigo-border);
+  }
+
+  &__title {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+}
+
+.tb-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 3px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed var(--gray-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.tb-balance-row__label {
+  color: var(--gray-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tb-balance-row__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: inherit;
+  text-align: right;
+}
+
+// ── Rows shared by IndexPicker's projected templates ─────────────────────
+
+.tb-row-primary {
+  display: block;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.tb-row-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--gray-muted);
+  margin-top: 2px;
+}
+
+.tb-row-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue-dark);
+  margin-top: 2px;
+}
+
+.tb-quick-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-input-border);
+    border-radius: var(--radius-pill);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+.tb-quick-pick__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  // Same &:hover/&--active specificity pitfall as .tb-function-chip above (2026-08-15 fix).
+  &:hover:not(.tb-quick-pick__row--active) {
+    background: var(--blue-bg-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  &--active {
+    background: var(--blue-bg);
+    border-color: var(--blue);
+  }
+}
+
+// ── Maker result banner ──────────────────────────────────────────────────
+
+.tb-result {
+  background: var(--blue-bg-soft);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+}
+
+.tb-result__title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+
+.tb-result__status {
+  font-size: 13px;
+  color: var(--gray-body);
+  margin: 0 0 6px;
+}
+
+.tb-checker-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+// ── Look Up tabs ──────────────────────────────────────────────────────────
+
+.tb-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--gray-border);
+  padding-bottom: 0;
+}
+
+.tb-tab {
+  border: none;
+  background: transparent;
+  color: var(--gray-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  // Harmless today (both rules resolve to the same blue), guarded anyway for consistency with the
+  // fixed pattern above — a future edit to either color alone would otherwise silently reopen it.
+  &:hover:not(.tb-tab--active) {
+    color: var(--blue);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+  }
+
+  &--active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+}
+
+// Import LC / Export LC switch above the function chip row — same tab mechanic as Look Up's own
+// sub-tabs, just larger/bolder since it's a top-level section switch, not a nested detail view.
+.tb-tabs--side .tb-tab {
+  font-size: 14px;
+  padding: 8px 18px;
+}
+
+// ── Event Timeline table ─────────────────────────────────────────────────
+
+.tb-subheading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+
+// Bug fix (reviewer-reported 2026-08-17, "Time column truncated for A1-A9/B1-B5") — gives a .tb-table
+// its own horizontal-scroll surface so a nowrap column (e.g. .tb-table__time) that can't shrink to fit
+// scrolls into view instead of being silently clipped by an ancestor .tb-section's own overflow:hidden
+// (kept there for its rounded-corner header background, not something this fix should touch).
+.tb-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+
+  // Thin, low-contrast scrollbar for the (rare) case a table needs horizontal scroll — Firefox
+  // via the standard property, WebKit/Blink via the pseudo-elements; both degrade harmlessly to
+  // the browser default on anything that supports neither.
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-input-border);
+    border-radius: var(--radius-pill);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+// Business instruction 2026-08-15 ("Event Timeline does not look pretty") — status badges (color-coded
+// by outcome, not bare text), a type tag, zebra striping, and column-specific alignment/typography
+// instead of six identically-styled plain <td>s.
+.tb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  // `border-radius` alone doesn't clip a collapsed table's own cell backgrounds (the classic
+  // rounded-table gotcha) — the header row's square corners were poking past the rounded border.
+  // `overflow: hidden` clips content to the table's own border-box without constraining its
+  // natural (possibly-wider-than-viewport) width, so `.tb-table-scroll`'s horizontal scroll still
+  // works exactly as before.
+  overflow: hidden;
+
+  th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-muted);
+    padding: 8px 10px;
+    background: var(--blue-bg-soft);
+    border-bottom: 1px solid var(--blue-border);
+  }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--gray-border);
+    color: var(--gray-body);
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+
+    // Same &:hover/:nth-child vs. an active-state class specificity pitfall as .tb-function-chip
+    // (fixed 2026-08-15) — :nth-child(even) and :hover both out-specificity a single active class.
+    &:nth-child(even):not(.tb-table__row--active) {
+      background: var(--blue-bg-soft);
+    }
+
+    &:hover:not(.tb-table__row--active) {
+      background: var(--blue-bg);
+    }
+
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  .tb-table__row--active {
+    background: var(--blue-bg);
+    box-shadow: inset 3px 0 0 var(--blue);
+  }
+}
+
+// Right-aligned — standard financial-table convention (figures line up on their own decimal/ones
+// place for at-a-glance comparison down a column), not previously applied here.
+.tb-table__amount {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tb-table__ref {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.tb-table__time {
+  color: var(--gray-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+// Business instruction 2026-08-19 (60/40 split, requirement #5 — "Reduce unnecessary padding/spacing
+// in the Event Timeline where necessary to accommodate all columns") — Look Up Current Balance's own
+// 7-column Event Timeline table (Function/Type/Amount/Reference/Status/Balance After/Time) is now the
+// tightest-fitting table in the app, sitting in the narrower 40% side of the split. Scoped to THIS
+// table specifically via a modifier class applied alongside .tb-table only on this one <table> — not a
+// global .tb-table change, which would also shrink Inquire Events' own merged Events table (already
+// tuned for its own full-width layout, see .tb-workspace--single above) and the LC Master Index, neither
+// of which needs this.
+.tb-table--lookup-timeline {
+  font-size: 11px;
+
+  th,
+  td {
+    padding: 6px 6px;
+  }
+
+  th {
+    font-size: 9px;
+  }
+
+  .tb-type-tag {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+}
+
+.tb-type-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue-dark);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.tb-status-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--gray-bg);
+  color: var(--gray-body);
+
+  &--pending {
+    background: var(--amber-bg);
+    color: var(--amber-dark);
+  }
+
+  &--approved {
+    background: var(--green-bg);
+    color: var(--green-dark);
+  }
+
+  // 2026-08-18, user-requested ("EARMARK 可否用與APPROVED PENDING不同顏色區分" — can EARMARK use a
+  // color distinct from both APPROVED and PENDING) — a third, visually distinct color for the RELEASED-
+  // but-not-yet-permanent case (see displayStatus()'s own doc comment for exactly which two functions
+  // this applies to). Violet, not reused from an existing status color — PENDING is amber, APPROVED is
+  // green, REJECTED/CANCELLED is red, SUPERSEDED is gray; blue was considered but rejected since it's
+  // already used by .tb-type-tag (the adjacent Type column in the same table rows), which would have
+  // made the two look like the same signal side by side.
+  &--earmark {
+    background: var(--violet-bg);
+    color: var(--violet-dark);
+  }
+
+  &--negative {
+    background: var(--red-bg);
+    color: var(--red-dark);
+  }
+
+  &--neutral {
+    background: var(--gray-bg);
+    color: var(--gray-muted);
+  }
+}
+
+.tb-muted {
+  color: var(--gray-muted);
+}
+
+// The "Account Entries pop-up" (business-requested 2026-08-16, analysis/contingent-liability-ledger.html)
+// itself was extracted into its own standalone AccountEntriesDialogComponent 2026-08-19 (BAL-003 pilot,
+// desiger-comments.md) — its own dialog-exclusive rules (`.tb-dialog*`, `.tb-drcr-tag*`, and the
+// `.tb-table.tb-table--static` override, none of which any OTHER section of this template ever used)
+// moved with it, into account-entries-dialog.component.scss. The shared "design-system atom" classes it
+// also needs (`.tb-table`/`.tb-status-badge`/`.tb-type-tag`/`.tb-muted`/`.tb-hint`/`.tb-btn`) are still
+// defined here too, since this file's OWN other sections (Look Up Current Balance's Event Timeline,
+// Inquire Events' merged table, the Maker Result panel, etc.) still use them — see that new component's
+// own stylesheet for why they're a disclosed, deliberate COPY rather than a shared/imported source.
