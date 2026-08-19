@@ -845,6 +845,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
   });
 
+  // Business requirement 2026-08-19 (fixing "Page 1/2 (12 total)" wrongly counting unfiltered
+  // candidates — see CatalogPickerService's own module doc comment): Prev/Next are now pure
+  // client-side windowing over the already-fetched, already-filtered set (display page size 5) —
+  // neither ever triggers a new api.catalog call any more, regardless of LC context.
   describe('ibIndexPrevPage / ibIndexNextPage', () => {
     function setup() {
       const api = makeApi();
@@ -855,25 +859,10 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       return { api, comp };
     }
 
-    it('ibIndexPrevPage decrements and reloads when not on page 1', () => {
-      const { api, comp } = setup();
-      comp.ibIndexPicker.page = 2;
-      comp.ibIndexPicker.total = 25; // pageSize 10 -> 3 pages
-
-      comp.ibIndexPrevPage();
-
-      expect(comp.ibIndexPicker.page).toBe(1);
-      // BAL-003 (Quality-report-balance.md): loadIbIndexPage now delegates to the shared
-      // loadPagedCatalog helper, which always passes all 7 catalog() positional args (tenorFamily
-      // explicitly undefined when unset) rather than omitting a trailing one — behaviorally identical
-      // (catalog()'s own tenorFamily param is undefined either way), just a visible arg-count change.
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 10, 'LC1', undefined, true);
-    });
-
     it('ibIndexPrevPage is a no-op on page 1', () => {
       const { api, comp } = setup();
       comp.ibIndexPicker.page = 1;
-      comp.ibIndexPicker.total = 25;
+      comp.ibIndexPicker.total = 12; // display pageSize 5 -> 3 pages
 
       comp.ibIndexPrevPage();
 
@@ -881,21 +870,21 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(api.catalog).not.toHaveBeenCalled();
     });
 
-    it('ibIndexNextPage increments and reloads when below the last page', () => {
+    it('ibIndexPrevPage moves back a page locally, without reloading', () => {
       const { api, comp } = setup();
-      comp.ibIndexPicker.page = 1;
-      comp.ibIndexPicker.total = 25;
+      comp.ibIndexPicker.page = 2;
+      comp.ibIndexPicker.total = 12;
 
-      comp.ibIndexNextPage();
+      comp.ibIndexPrevPage();
 
-      expect(comp.ibIndexPicker.page).toBe(2);
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 2, 10, 'LC1', undefined, true);
+      expect(comp.ibIndexPicker.page).toBe(1);
+      expect(api.catalog).not.toHaveBeenCalled();
     });
 
     it('ibIndexNextPage is a no-op on the last page', () => {
       const { api, comp } = setup();
-      comp.ibIndexPicker.page = 3;
-      comp.ibIndexPicker.total = 25; // totalPages = 3
+      comp.ibIndexPicker.page = 3; // totalPages = 3
+      comp.ibIndexPicker.total = 12;
 
       comp.ibIndexNextPage();
 
@@ -903,18 +892,50 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       expect(api.catalog).not.toHaveBeenCalled();
     });
 
-    it('ibIndexNextPage clears the index (no API call) when reached before any LC context is set', () => {
+    it('ibIndexNextPage moves forward a page locally, without reloading', () => {
+      const { api, comp } = setup();
+      comp.ibIndexPicker.page = 1;
+      comp.ibIndexPicker.total = 12;
+
+      comp.ibIndexNextPage();
+
+      expect(comp.ibIndexPicker.page).toBe(2);
+      expect(api.catalog).not.toHaveBeenCalled();
+    });
+
+    it('ibIndexNextPage moves the page locally even before any LC context is set (no reload, no API call either way)', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
-      comp.model.instrumentType = undefined; // no LC picked yet — loadIbIndexPage's own defensive guard
+      comp.model.instrumentType = undefined; // no LC picked yet
       comp.searchNaturalKey.lcNumber = '';
       comp.ibIndexPicker.page = 1;
-      comp.ibIndexPicker.total = 25;
+      comp.ibIndexPicker.total = 12;
       (api.catalog as jest.Mock).mockClear();
 
       comp.ibIndexNextPage();
 
       expect(comp.ibIndexPicker.page).toBe(2);
+      expect(api.catalog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loadIbIndex() guard (via onSelectParent) — clears the index when the guard fails', () => {
+    it('clears ibIndexPicker.contracts/total without calling the api when the picked Parent has no LC Number of its own', () => {
+      const api = makeApi();
+      const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
+      // A degenerate parent (empty lcNumber) still resolves via onSelectParent() and still reaches
+      // loadIbIndex() (usesTwoFieldSearch only depends on model.instrumentType/requiredNaturalKeyFields,
+      // both already set by makeComponent's own subChoice), but loadIbIndex()'s own guard
+      // (`!searchNaturalKey.lcNumber`) then correctly fails, since onSelectParent() carries the empty
+      // lcNumber straight through to searchNaturalKey.
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: '', ibNumber: null, sgNumber: null } })];
+      comp.ibIndexPicker.contracts = [makeContract({ balanceContractId: 'STALE' })];
+      comp.ibIndexPicker.total = 7;
+      (api.catalog as jest.Mock).mockClear();
+
+      comp.onSelectParent('P1');
+
+      expect(comp.searchNaturalKey.lcNumber).toBe('');
       expect(comp.ibIndexPicker.contracts).toEqual([]);
       expect(comp.ibIndexPicker.total).toBe(0);
       expect(api.catalog).not.toHaveBeenCalled();

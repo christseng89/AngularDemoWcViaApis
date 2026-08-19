@@ -27,7 +27,7 @@
       </button>
     </div>
 
-    <div class="index-picker__auto-hint" *ngIf="autoPickedHint && items.length === 1">{{ autoPickedHint }}</div>
+    <div class="index-picker__auto-hint" *ngIf="autoPickedHint && (total > 0 ? total === 1 : items.length === 1)">{{ autoPickedHint }}</div>
 
     <div class="index-picker__pagination" *ngIf="total > 0">
       <button type="button" class="index-picker__page-btn" [disabled]="page <= 1" (click)="prevPage.emit()">‹ Prev</button>

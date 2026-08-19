@@ -329,6 +329,12 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         movement({ movementId: 'm-a2', sourceTransactionRef: 'IB02' }),
         movement({ movementId: 'm-a1', sourceTransactionRef: 'IB01' }),
       ]);
+      // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): filteredCatalogContracts
+      // (which flattenedPayableRows now windows via pagedFilteredCatalogContracts) requires a
+      // catalogPayableIbs entry too — always populated alongside catalogPayableMovements in real usage
+      // (loadDocumentArrivalHints()), so both need setting here.
+      c.catalogPayableIbs.set('b', ['IB02']);
+      c.catalogPayableIbs.set('a', ['IB02', 'IB01']);
       const rows = c.flattenedPayableRows;
       expect(rows.map((r) => r.movement.movementId)).toEqual(['m-a1', 'm-a2', 'm-b2']);
     });
@@ -337,10 +343,12 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.catalogPicker.totalPages).toBe(1);
       expect(c.parentPicker.totalPages).toBe(1);
-      c.catalogPicker.total = 25;
+      // Business requirement 2026-08-19: display page size is 5 for every picker CatalogPickerService
+      // backs (uniform across Primary Key Index/2ndary Key Index) — see its own module doc comment.
+      c.catalogPicker.total = 13;
       expect(c.catalogPicker.totalPages).toBe(3);
       c.parentPicker.total = 21;
-      expect(c.parentPicker.totalPages).toBe(3);
+      expect(c.parentPicker.totalPages).toBe(5);
     });
 
     it('filteredCatalogContracts: no tenor filter / no movementType -> passthrough', () => {
@@ -349,12 +357,17 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.filteredCatalogContracts).toEqual([contract()]);
     });
 
-    it('filteredCatalogContracts: payExistingUtilize (A4) always returns the tenor-filtered list unfiltered by balance', () => {
+    it('filteredCatalogContracts: payExistingUtilize (A4) is eligibility-driven — keeps a 0-balance candidate WITH an outstanding Document Arrival, excludes one without (business requirement 2026-08-19, "A4/A6 — LC Index Eligibility Criteria")', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A4'));
-      c.catalogPicker.contracts = [contract({ balanceContractId: 'zero', tenorType: 'SIGHT' })];
-      (c as any).catalogPicker.snapshots.set('zero', snapshot({ availableBalance: '0' }));
-      expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['zero']);
+      c.catalogPicker.contracts = [
+        contract({ balanceContractId: 'eligible', tenorType: 'SIGHT' }),
+        contract({ balanceContractId: 'ineligible', tenorType: 'SIGHT' }),
+      ];
+      (c as any).catalogPicker.snapshots.set('eligible', snapshot({ availableBalance: '0' }));
+      c.catalogPayableIbs.set('eligible', ['IB01']);
+      // 'ineligible' has no catalogPayableIbs entry at all — no outstanding Document Arrival of its own.
+      expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['eligible']);
     });
 
     it('filteredCatalogContracts: a decreasing movementType (A3) excludes 0-available contracts but keeps ones with no snapshot yet', () => {
@@ -378,6 +391,11 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         contract({ balanceContractId: 'usance', tenorType: 'BUYERS_USANCE' }),
         contract({ balanceContractId: 'legacy' }),
       ];
+      // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): both surviving candidates
+      // still need a catalogPayableIbs entry to pass A4's own eligibility filter — 'usance' is excluded
+      // by the tenor filter regardless, so it deliberately gets none.
+      c.catalogPayableIbs.set('sight', ['IB01']);
+      c.catalogPayableIbs.set('legacy', ['IB02']);
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'sight'].sort());
     });
 
@@ -391,7 +409,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c2.parentTenorFamily).toBe('USANCE');
     });
 
-    it('filteredParentCatalog: tenorTypeOptions functions (A6) require an exact tenor match and exclude legacy/Sight', () => {
+    it('filteredParentCatalog: tenorTypeOptions functions (A6) require an exact tenor match, exclude legacy/Sight, AND (business requirement 2026-08-19) require an outstanding Document Arrival of their own', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A6'));
       c.model.tenorType = 'BUYERS_USANCE';
@@ -400,17 +418,30 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
         contract({ balanceContractId: 'other-tenor', tenorType: 'SELLERS_USANCE' }),
         contract({ balanceContractId: 'sight', tenorType: 'SIGHT' }),
         contract({ balanceContractId: 'legacy' }),
+        contract({ balanceContractId: 'match-but-ineligible', tenorType: 'BUYERS_USANCE' }),
       ];
+      // Only 'match' has an outstanding Document Arrival of its own — 'match-but-ineligible' would
+      // otherwise pass the tenor check too, but has no parentPayableIbs entry.
+      c.parentPayableIbs.set('match', ['IB01']);
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['match']);
     });
 
-    it('filteredParentCatalog: settlesDocumentArrival (A6) skips the 0-balance filter too — bug fixed 2026-08-18, "A6 has no record shown" for an LC fully earmarked by its own Document Arrival', () => {
+    it('filteredParentCatalog: settlesDocumentArrival (A6) is eligibility-driven (business requirement 2026-08-19, "A6 — LC Index Eligibility Criteria") — supersedes the old 2026-08-18 0-balance-bypass-only fix, now requires a real parentPayableIbs entry too', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('A6'));
       c.model.tenorType = 'BUYERS_USANCE';
       c.parentPicker.contracts = [contract({ balanceContractId: 'fully-earmarked', tenorType: 'BUYERS_USANCE' })];
       (c as any).parentPicker.snapshots.set('fully-earmarked', snapshot({ availableBalance: '0' }));
+      c.parentPayableIbs.set('fully-earmarked', ['IB01']);
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['fully-earmarked']);
+    });
+
+    it('filteredParentCatalog: settlesDocumentArrival (A6) excludes an otherwise-eligible-by-tenor LC that has no outstanding Document Arrival of its own', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A6'));
+      c.model.tenorType = 'BUYERS_USANCE';
+      c.parentPicker.contracts = [contract({ balanceContractId: 'no-arrival', tenorType: 'BUYERS_USANCE' })];
+      expect(c.filteredParentCatalog).toEqual([]);
     });
 
     it('filteredParentCatalog: catalogTenorFilter USANCE (A7) excludes only Sight, keeps legacy, and skips the 0-balance filter', () => {
@@ -481,7 +512,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.displayStatus('REJECTED')).toBe('REJECTED');
     });
 
-    it("displayStatus relabels RELEASED to EARMARKED and PENDING to EARMARKING specifically for Import Document Arrival (IPLC_LC/UTILIZE) and Export Present Docs (EPLC_EXAMINATION/CREATE)", () => {
+    it('displayStatus relabels RELEASED to EARMARKED and PENDING to EARMARKING specifically for Import Document Arrival (IPLC_LC/UTILIZE) and Export Present Docs (EPLC_EXAMINATION/CREATE)', () => {
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKED');
       expect(c.displayStatus('RELEASED', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKED');

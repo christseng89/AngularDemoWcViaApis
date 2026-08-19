@@ -97,13 +97,13 @@
                   <div *ngIf="parentInstrumentType">
                     <app-index-picker
                       label="LC Index — Existing Contract"
-                      [items]="filteredParentCatalog"
+                      [items]="pagedFilteredParentCatalog"
                       [selectedId]="selectedParent?.balanceContractId ?? null"
                       [searchable]="true"
                       [(searchValue)]="parentPicker.search"
                       searchPlaceholder="Search LC Number…"
                       (search)="onParentSearch()"
-                      emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
+                      emptyText="No eligible parent {{ parentInstrumentType }} contracts (Tenor Type / 0-balance filtered)."
                       [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
                       (pick)="!formLocked && onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
                       <ng-template let-c>
@@ -159,7 +159,7 @@
               <div class="tb-field mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && selectedParent">
                 <app-index-picker
                   label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
-                  [items]="filteredPayableMovements"
+                  [items]="pagedFilteredPayableMovements"
                   [loading]="payableMovementsLoading"
                   [selectedId]="selectedPayMovement?.movementId ?? null"
                   [searchable]="true"
@@ -168,7 +168,8 @@
                   searchPlaceholder="Search {{ ibNumberLabel }}…"
                   emptyText="No PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{ selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first' }}."
                   autoPickedHint="Only one PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                  (pick)="!formLocked && onSelectPayMovement($event)">
+                  [page]="payableMovementsPaging.page" [totalPages]="payableMovementsPaging.totalPages" [total]="payableMovementsPaging.total"
+                  (pick)="!formLocked && onSelectPayMovement($event)" (prevPage)="payableMovementsPrevPage()" (nextPage)="payableMovementsNextPage()">
                   <ng-template let-m>
                     <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
                     <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
@@ -274,9 +275,9 @@
                   <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
                     <app-index-picker
                       label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{ searchNaturalKey.lcNumber }}"
-                      [items]="filteredIbIndexCatalog"
+                      [items]="pagedFilteredIbIndexCatalog"
                       [selectedId]="selectedContract?.balanceContractId ?? null"
-                      emptyText="{{ ibIndexPicker.contracts.length ? 'All entries on this page are 0-balance (already fully settled/redeemed) — try Next page.' : 'No ' + model.instrumentType + ' records yet under this LC.' }}"
+                      emptyText="{{ ibIndexPicker.contracts.length ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).' : 'No ' + model.instrumentType + ' records yet under this LC.' }}"
                       [page]="ibIndexPicker.page" [totalPages]="ibIndexPicker.totalPages" [total]="ibIndexPicker.total"
                       (pick)="!formLocked && onSelectIbIndex($event)" (prevPage)="ibIndexPrevPage()" (nextPage)="ibIndexNextPage()">
                       <ng-template let-c>
@@ -294,11 +295,12 @@
                   <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
                     <app-index-picker
                       label="EB Index — Existing Contract (from B3)"
-                      [items]="settleableBalances"
+                      [items]="pagedSettleableBalances"
                       [loading]="settleableBalancesLoading"
                       [selectedId]="selectedContract?.balanceContractId ?? null"
                       emptyText="No outstanding balance under this LC — nothing left to settle."
-                      (pick)="!formLocked && onSelectSettleableBalance($event)">
+                      [page]="settleableBalancesPaging.page" [totalPages]="settleableBalancesPaging.totalPages" [total]="settleableBalancesPaging.total"
+                      (pick)="!formLocked && onSelectSettleableBalance($event)" (prevPage)="settleableBalancesPrevPage()" (nextPage)="settleableBalancesNextPage()">
                       <ng-template let-s>
                         <span class="tb-row-primary">{{ s.ibNumber || '(no EB Number recorded)' }}</span>
                         <span class="tb-row-sub">{{ s.availableBalance }} {{ s.currency }} — {{ s.instrumentType === 'EPLC_ACCEPTANCE' ? 'Acceptance Balance' : 'Due from Issuing Bank' }}</span>
@@ -310,13 +312,13 @@
               <ng-template #flatCatalogPicker>
                 <app-index-picker
                   label="{{ selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace ? 'LC Index — pick the LC to pay against' : 'LC Index — Existing Contract' }}"
-                  [items]="filteredCatalogContracts"
+                  [items]="pagedFilteredCatalogContracts"
                   [selectedId]="selectedContract?.balanceContractId ?? null"
                   [searchable]="true"
                   [(searchValue)]="catalogPicker.search"
                   searchPlaceholder="Search LC Number…"
                   (search)="onCatalogSearch()"
-                  emptyText="{{ catalogPicker.contracts.length ? 'All contracts on this page are 0-balance — try Next page.' : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.' }}"
+                  emptyText="{{ catalogPicker.contracts.length ? 'All ' + catalogPicker.contracts.length + ' candidate(s) under this filter are 0-balance — nothing left to act on.' : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.' }}"
                   [page]="catalogPicker.page" [totalPages]="catalogPicker.totalPages" [total]="catalogPicker.total"
                   (pick)="!formLocked && onSelectContract($event)" (prevPage)="catalogPrevPage()" (nextPage)="catalogNextPage()">
                   <ng-template let-c>
@@ -432,12 +434,13 @@
             <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract">
               <app-index-picker
                 label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
-                [items]="sgsForArrival"
+                [items]="pagedSgsForArrival"
                 [loading]="sgsForArrivalLoading"
                 [selectedId]="selectedArrivalSg?.balanceContractId ?? null"
                 emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
                 autoPickedHint="Only one Shipping Guarantee under this LC — picked automatically."
-                (pick)="!formLocked && onSelectArrivalSg($event)">
+                [page]="arrivalSgPaging.page" [totalPages]="arrivalSgPaging.totalPages" [total]="arrivalSgPaging.total"
+                (pick)="!formLocked && onSelectArrivalSg($event)" (prevPage)="arrivalSgPrevPage()" (nextPage)="arrivalSgNextPage()">
                 <ng-template let-sg>
                   <span class="tb-row-primary">{{ sg.naturalKey.sgNumber }}</span>
                   <span class="tb-row-badge">{{ sg.status }}</span>
@@ -465,7 +468,7 @@
             <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
               <app-index-picker
                 label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
-                [items]="filteredPayableMovements"
+                [items]="pagedFilteredPayableMovements"
                 [loading]="payableMovementsLoading"
                 [selectedId]="selectedPayMovement?.movementId ?? null"
                 [searchable]="true"
@@ -474,7 +477,8 @@
                 searchPlaceholder="Search {{ ibNumberLabel }}…"
                 emptyText="No Approved (Checker-acknowledged) {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{ selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first' }}, then Release it in B3's own Checker panel."
                 autoPickedHint="Only one Approved {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                (pick)="!formLocked && onSelectPayMovement($event)">
+                [page]="payableMovementsPaging.page" [totalPages]="payableMovementsPaging.totalPages" [total]="payableMovementsPaging.total"
+                (pick)="!formLocked && onSelectPayMovement($event)" (prevPage)="payableMovementsPrevPage()" (nextPage)="payableMovementsNextPage()">
                 <ng-template let-m>
                   <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
                   <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
@@ -489,12 +493,13 @@
             <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract">
               <app-index-picker
                 label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
-                [items]="payableMovements"
+                [items]="pagedFilteredPayableMovements"
                 [loading]="payableMovementsLoading"
                 [selectedId]="selectedPayMovement?.movementId ?? null"
                 emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."
                 autoPickedHint="Only one PENDING Document Arrival under this LC — picked automatically."
-                (pick)="!formLocked && onSelectPayMovement($event)">
+                [page]="payableMovementsPaging.page" [totalPages]="payableMovementsPaging.totalPages" [total]="payableMovementsPaging.total"
+                (pick)="!formLocked && onSelectPayMovement($event)" (prevPage)="payableMovementsPrevPage()" (nextPage)="payableMovementsNextPage()">
                 <ng-template let-m>
                   <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no IB Number recorded)' }}</span>
                   <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>

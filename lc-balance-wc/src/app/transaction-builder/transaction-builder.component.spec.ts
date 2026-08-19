@@ -26,6 +26,7 @@ const A2 = findFn(IMPORT_FUNCTIONS, 'A2'); // LC Amendment — subChoice, no fix
 const A4 = findFn(IMPORT_FUNCTIONS, 'A4'); // Sight Settlement — payExistingUtilize, catalogTenorFilter SIGHT
 const A6 = findFn(IMPORT_FUNCTIONS, 'A6'); // Acceptance (Usance) — defaultParentInstrumentType, tenorTypeOptions, settlesDocumentArrival
 const B1 = findFn(EXPORT_FUNCTIONS, 'B1'); // Confirm LC — export side, fixed movementType
+const B4 = findFn(EXPORT_FUNCTIONS, 'B4'); // Honour / Acceptance — payableMovementInstrumentType EPLC_EXAMINATION, flat Catalog picker
 
 function mkContract(id: string, lcNumber: string, overrides: Partial<BalanceContract> = {}): BalanceContract {
   return {
@@ -106,7 +107,7 @@ describe('TransactionBuilderComponent', () => {
       expect(typeof comp.model.eventSeq).toBe('number');
       expect(comp.naturalKey).toEqual({ lcNumber: '', ibNumber: '', sgNumber: '' });
       expect(comp.catalogPicker.page).toBe(1);
-      expect(comp.catalogPageSize).toBe(10);
+      expect(comp.catalogPageSize).toBe(100);
       expect(comp.catalogPicker.contracts).toEqual([]);
       expect(comp.selectedContract).toBeNull();
       expect(comp.submitResult).toBeNull();
@@ -363,9 +364,12 @@ describe('TransactionBuilderComponent', () => {
       const c2 = mkContract('c2', '002');
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([c1, c2], 2)));
       mockApi.getSnapshot.mockImplementation((id: string) => of(mkSnapshot(id)));
-      mockApi.listMovements.mockReturnValue(of([]));
+      // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): A4's own LC Index now
+      // requires each candidate to have a real outstanding Document Arrival — both c1/c2 need one to
+      // still show up in catalogPicker.total/contracts below.
+      mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01' }]));
 
-      comp.reloadCatalog(1);
+      comp.reloadCatalog();
 
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, 'SIGHT', true);
       expect(comp.catalogPicker.contracts).toEqual([c1, c2]);
@@ -382,7 +386,7 @@ describe('TransactionBuilderComponent', () => {
       comp.model.movementType = 'UTILIZE';
       comp.catalogPicker.search = 'S001';
 
-      comp.reloadCatalog(1);
+      comp.reloadCatalog();
 
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'S001', 1, comp.catalogPageSize, undefined, undefined, true);
     });
@@ -402,7 +406,7 @@ describe('TransactionBuilderComponent', () => {
         ]),
       );
 
-      comp.reloadCatalog(1);
+      comp.reloadCatalog();
 
       expect(comp.catalogPayableIbs.get('c1')).toEqual(['IB00001']);
       expect(comp.catalogPayableMovements.get('c1')?.map((m: any) => m.movementId)).toEqual(['m1']);
@@ -416,8 +420,96 @@ describe('TransactionBuilderComponent', () => {
       comp.catalogPicker.total = 3;
       mockApi.catalog.mockReturnValue(throwError(() => new Error('server down')));
 
-      expect(() => comp.reloadCatalog(1)).not.toThrow();
+      expect(() => comp.reloadCatalog()).not.toThrow();
       expect(comp.catalogPicker.contracts).toEqual([]);
+      expect(comp.catalogPicker.total).toBe(0);
+    });
+  });
+
+  // Business requirement 2026-08-19 ("B4 也是一樣的業務要求 (EARMARKING EVENTS ONLY) 差別是不分
+  // SIGHT/USANCE") — B4's own LC Index eligibility, cross-contract (a child EPLC_EXAMINATION contract's
+  // own CREATE, already RELEASED and not yet consumed), unlike A4/A6's same-contract check.
+  describe('reloadCatalog — B4 cross-contract LC Index eligibility (loadEligibleChildDocumentHints)', () => {
+    function setup(mockApi: ReturnType<typeof makeApiMock>, examMovements: any[]) {
+      const c1 = mkContract('c1', 'CU01', { instrumentType: 'EPLC_CONFIRMATION' });
+      const exam1 = mkContract('exam1', 'CU01', { instrumentType: 'EPLC_EXAMINATION' });
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'EPLC_CONFIRMATION' ? of(mkCatalogPage([c1], 1)) : of(mkCatalogPage([exam1], 1)),
+      );
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
+      mockApi.listMovements.mockReturnValue(of(examMovements));
+      return { c1, exam1 };
+    }
+
+    it('keeps a Confirmation with an already-RELEASED, not-yet-consumed child EPLC_EXAMINATION CREATE', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = B4;
+      comp.model.instrumentType = 'EPLC_CONFIRMATION';
+      comp.model.movementType = 'HONOUR';
+      setup(mockApi, [{ movementId: 'm1', status: 'RELEASED', movementType: 'CREATE', sourceTransactionRef: 'E01' }]);
+
+      comp.reloadCatalog();
+
+      expect(comp.catalogChildPayableIbs.get('c1')).toEqual(['E01']);
+      expect(comp.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['c1']);
+      expect(comp.catalogPicker.total).toBe(1);
+    });
+
+    it('excludes a Confirmation whose only child EPLC_EXAMINATION CREATE is still PENDING (not yet Released)', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = B4;
+      comp.model.instrumentType = 'EPLC_CONFIRMATION';
+      comp.model.movementType = 'HONOUR';
+      setup(mockApi, [{ movementId: 'm1', status: 'PENDING', movementType: 'CREATE', sourceTransactionRef: 'E01' }]);
+
+      comp.reloadCatalog();
+
+      expect(comp.catalogChildPayableIbs.has('c1')).toBe(false);
+      expect(comp.filteredCatalogContracts).toEqual([]);
+      expect(comp.catalogPicker.total).toBe(0);
+    });
+
+    it('excludes a Confirmation whose only otherwise-eligible CREATE was already consumed by an earlier B4', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = B4;
+      comp.model.instrumentType = 'EPLC_CONFIRMATION';
+      comp.model.movementType = 'HONOUR';
+      setup(mockApi, [
+        { movementId: 'm1', status: 'RELEASED', movementType: 'CREATE', sourceTransactionRef: 'E01', presentDocsConsumedAt: '2026-08-18T00:00:00.000Z' },
+      ]);
+
+      comp.reloadCatalog();
+
+      expect(comp.catalogChildPayableIbs.has('c1')).toBe(false);
+      expect(comp.filteredCatalogContracts).toEqual([]);
+    });
+
+    it('excludes a Confirmation with no child EPLC_EXAMINATION contracts at all', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = B4;
+      comp.model.instrumentType = 'EPLC_CONFIRMATION';
+      comp.model.movementType = 'HONOUR';
+      const c1 = mkContract('c1', 'CU01', { instrumentType: 'EPLC_CONFIRMATION' });
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'EPLC_CONFIRMATION' ? of(mkCatalogPage([c1], 1)) : of(mkCatalogPage([])),
+      );
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
+
+      comp.reloadCatalog();
+
+      expect(comp.catalogChildPayableIbs.has('c1')).toBe(false);
+      expect(comp.filteredCatalogContracts).toEqual([]);
+    });
+
+    it('resolves cleanly with no candidates at all (empty list short-circuit)', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = B4;
+      comp.model.instrumentType = 'EPLC_CONFIRMATION';
+      comp.model.movementType = 'HONOUR';
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
+
+      expect(() => comp.reloadCatalog()).not.toThrow();
+      expect(comp.catalogChildPayableIbs.size).toBe(0);
       expect(comp.catalogPicker.total).toBe(0);
     });
   });
@@ -505,17 +597,14 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
+  // Business requirement 2026-08-19 (fixing "Page 1/2 (12 total)" wrongly counting unfiltered
+  // candidates): Prev/Next are now pure client-side windowing over the already-fetched, already-filtered
+  // set (display page size 5 — see CatalogPickerService's own module doc comment) — neither ever
+  // triggers a new api.catalog call any more.
   describe('catalogPrevPage / catalogNextPage', () => {
-    function setupPaged(comp: TransactionBuilderComponent, mockApi: ReturnType<typeof makeApiMock>) {
-      comp.model.instrumentType = 'IPLC_LC';
-      comp.model.movementType = 'UTILIZE';
-      comp.catalogPicker.total = 25; // pageSize 10 -> 3 pages
-      mockApi.catalog.mockReturnValue(of(mkCatalogPage([], 25)));
-    }
-
     it('catalogPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
+      comp.catalogPicker.total = 12; // display pageSize 5 -> 3 pages
       comp.catalogPicker.page = 1;
 
       comp.catalogPrevPage();
@@ -524,21 +613,21 @@ describe('TransactionBuilderComponent', () => {
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it('catalogPrevPage reloads the previous page when not on page 1', () => {
+    it('catalogPrevPage moves back a page locally, without reloading', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
+      comp.catalogPicker.total = 12;
       comp.catalogPicker.page = 3;
 
       comp.catalogPrevPage();
 
       expect(comp.catalogPicker.page).toBe(2);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('catalogNextPage is a no-op on the last page', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
-      comp.catalogPicker.page = 3; // totalPages = 3
+      comp.catalogPicker.total = 12; // totalPages = 3
+      comp.catalogPicker.page = 3;
 
       comp.catalogNextPage();
 
@@ -546,15 +635,40 @@ describe('TransactionBuilderComponent', () => {
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it('catalogNextPage reloads the next page when not on the last page', () => {
+    it('catalogNextPage moves forward a page locally, without reloading', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
+      comp.catalogPicker.total = 12;
       comp.catalogPicker.page = 1;
 
       comp.catalogNextPage();
 
       expect(comp.catalogPicker.page).toBe(2);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.catalogPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CatalogPickerService.load() without a qualifies callback (a direct caller with no separate qualifying filter)', () => {
+    it('falls back to the raw fetched count, both immediately and after snapshots resolve', () => {
+      const { comp, mockApi } = makeComponent();
+      const c1 = mkContract('c1', '001');
+      const c2 = mkContract('c2', '002');
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([c1, c2])));
+      mockApi.getSnapshot.mockImplementation((id: string) => of(mkSnapshot(id)));
+
+      comp.catalogPicker.load({ guardFails: false, instrumentType: 'IPLC_LC' });
+
+      expect(comp.catalogPicker.contracts).toEqual([c1, c2]);
+      expect(comp.catalogPicker.total).toBe(2);
+    });
+
+    it('falls back to zero when the fetch returns nothing', () => {
+      const { comp, mockApi } = makeComponent();
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
+
+      comp.catalogPicker.load({ guardFails: false, instrumentType: 'IPLC_LC' });
+
+      expect(comp.catalogPicker.contracts).toEqual([]);
+      expect(comp.catalogPicker.total).toBe(0);
     });
   });
 
@@ -565,9 +679,15 @@ describe('TransactionBuilderComponent', () => {
       comp.parentInstrumentType = 'IPLC_LC';
       comp.selectedParent = mkContract('p1', '001');
       comp.exposureNature = 'MEMO';
-      const p1 = mkContract('p1', '001');
+      // A6's own filteredParentCatalog requires a real, non-SIGHT tenorType — business requirement
+      // 2026-08-19 (parentPicker.total now tracks the TRUE qualified count, not the server's raw total,
+      // see CatalogPickerService's own module doc comment), so p1 needs one to genuinely qualify.
+      const p1 = mkContract('p1', '001', { tenorType: 'BUYERS_USANCE' });
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([p1], 1)));
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('p1')));
+      // Business requirement 2026-08-19 ("A6 — LC Index Eligibility Criteria"): p1 also needs a real
+      // outstanding Document Arrival of its own to pass A6's own eligibility filter.
+      mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01' }]));
 
       comp.onParentInstrumentTypeChange();
 
@@ -620,16 +740,12 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
+  // Business requirement 2026-08-19: same client-side-only windowing as catalogPrevPage/catalogNextPage
+  // above — see CatalogPickerService's own module doc comment.
   describe('parentPrevPage / parentNextPage', () => {
-    function setupPaged(comp: TransactionBuilderComponent, mockApi: ReturnType<typeof makeApiMock>) {
-      comp.parentInstrumentType = 'IPLC_LC';
-      comp.parentPicker.total = 15; // pageSize 10 -> 2 pages
-      mockApi.catalog.mockReturnValue(of(mkCatalogPage([], 15)));
-    }
-
     it('parentPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
+      comp.parentPicker.total = 8; // display pageSize 5 -> 2 pages
       comp.parentPicker.page = 1;
 
       comp.parentPrevPage();
@@ -638,21 +754,21 @@ describe('TransactionBuilderComponent', () => {
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it('parentPrevPage reloads the previous page otherwise', () => {
+    it('parentPrevPage moves back a page locally, without reloading', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
+      comp.parentPicker.total = 8;
       comp.parentPicker.page = 2;
 
       comp.parentPrevPage();
 
       expect(comp.parentPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('parentNextPage is a no-op on the last page', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
-      comp.parentPicker.page = 2; // totalPages = 2
+      comp.parentPicker.total = 8; // totalPages = 2
+      comp.parentPicker.page = 2;
 
       comp.parentNextPage();
 
@@ -660,15 +776,15 @@ describe('TransactionBuilderComponent', () => {
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
-    it('parentNextPage reloads the next page otherwise', () => {
+    it('parentNextPage moves forward a page locally, without reloading', () => {
       const { comp, mockApi } = makeComponent();
-      setupPaged(comp, mockApi);
+      comp.parentPicker.total = 8;
       comp.parentPicker.page = 1;
 
       comp.parentNextPage();
 
       expect(comp.parentPicker.page).toBe(2);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 2, comp.parentPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).not.toHaveBeenCalled();
     });
   });
 

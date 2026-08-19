@@ -6741,3 +6741,219 @@ else) rather than unilaterally removed.
 the 11 flags at all; `function-strategy.ts`'s own hardcoded `FUNCTION_STRATEGY_DEFINITIONS` is the sole surviving
 source of truth for this behavior, exactly the inversion PR-2's own original doc comment anticipated as a future
 possibility. Not committed (not requested).
+
+## Page-by-Page pagination formalized as a common requirement — Primary Key Index AND 2ndary Key Index, every Transaction Function, page size 5 — plus a real bug fix in the process (2026-08-19, user-directed formal requirement, worked example: A3S — Document Arrival w/ Shipping Gtee)
+
+Formal requirement, settled (same "do not re-derive" posture this file already uses for other locked-in
+requirement sections): every A1–A9/B1–B5 Primary Key Index (LC Number — the flat Catalog picker / Parent
+LC picker) AND every 2ndary Key Index (Amendment No. / IB Number / SG Number / EB Number) must use the
+same reusable Search + Page-by-Page pagination pattern, not function-by-function bespoke behavior. User
+confirmed full scope via `AskUserQuestion` ("一次修完所有目前未分頁的 2ndary Index picker") after being shown
+exactly which 2ndary Index pickers were still unpaginated, then two follow-up clarifications arrived
+mid-implementation: (1) "Page by page for those selected qualified records per function not all
+records" + a concrete repro ("A3 — Document Arrival only 4 records are available, but it shows Page 1/2
+(12 total)... which is wrong"), and (2) "Page size to 5 records" — applied uniformly to both index types.
+
+**Part 1 — the 4 previously-unpaginated 2ndary Key Index pickers.** `IndexPickerComponent` itself already
+supported pagination (`page`/`totalPages`/`total`/`prevPage`/`nextPage`) — its own doc comment even named
+"the smaller, unpaginated pickers (A3S's SG Index...)" as a deliberate omission at the time. Fixed by
+adding client-side windowing (`PagedListState`, the same class `InquireEventsService.eventsPaging`/
+`LookUpPanelService.lookupMovementsPaging` already use for an identical "everything's already in memory,
+no per-page API call makes sense" reason) over each picker's own already-fully-loaded array — never a new
+server round-trip per page:
+- `arrivalSgPaging` / `pagedSgsForArrival` (A3S's own SG Index — the worked example) — `loadSgsForArrival()`
+  sets `total`/resets `page` once its own 0-balance filter is applied; the pre-existing "auto-pick if only
+  one SG exists" rule is unaffected (it already read the FULL, unwindowed `sgsForArrival`, matching the
+  business's own stated rule: "if only one outstanding SG exists, automatic selection can remain").
+- `payableMovementsPaging` / `pagedFilteredPayableMovements` — shared by all three template call sites
+  that read `payableMovements`/`filteredPayableMovements` (A4/A6's own picker, B4's two "from A3/B3"
+  pickers) — safe to share since exactly one is ever visible for a given `selectedFunction`, and A4/A6's
+  own case (no search box wired) already has `payableMovementSearch === ''`, so `filteredPayableMovements`
+  already just returns `payableMovements` unfiltered there. `onPayableMovementSearchChange()` also resets
+  the window to page 1 and recomputes `total` against the newly-filtered length.
+- `settleableBalancesPaging` / `pagedSettleableBalances` (B5's own EB Index) — no auto-pick concern (this
+  picker never had one).
+
+**Part 2 — the REAL bug this surfaced, reproduced live**: the Primary Key Index (flat Catalog picker /
+Parent LC picker, `catalogPicker`/`parentPicker`) had the identical gap all along, just less visible —
+the OLD `CatalogPickerService` paginated the RAW server response (10 raw contracts/page) and applied the
+caller's own qualifying filter (`filteredCatalogContracts`/`filteredParentCatalog`/`filteredIbIndexCatalog`
+— 0-balance exclusion, tenor match, etc.) AFTERWARD, client-side, on just that one page — so
+`total`/`totalPages` always reflected the unfiltered server count, never the true qualified count. A3's
+own LC Index showing "Page 1/2 (12 total)" for only 4 actually-qualified LCs is exactly this: 12 raw
+ACTIVE `IPLC_LC` contracts existed, but only 4 had a non-zero Available Balance (A3's `movementType`,
+`UTILIZE`, is in `DECREASING_MOVEMENT_TYPES`, so the 0-balance exclusion applies) — the OLD design had no
+way to show an accurate "N qualified, Page X of Y" figure without first knowing every candidate's own
+filter outcome, which fundamentally requires fetching (and snapshot-checking) essentially all of them, not
+just the current page.
+
+**Fix — `CatalogPickerService` redesigned** (used by all three Primary/2ndary pickers it backs: flat
+Catalog, Parent LC, IB/SG Index): `load()` now always fetches ONE generous, capped batch (`fetchSize` —
+`catalogPageSize`/`parentPageSize`/`ibIndexPageSize` bumped **10 → 100**, the same "capped single-shot
+fetch, not true server pagination" convention `loadSgsForArrival()`/`loadSettleableBalances()`/
+`loadPayableMovementsAcrossChildContracts()` already use for their own smaller pickers) instead of one
+server page per Prev/Next click — `page`/`totalPages` now come from a **separate, fixed display page size
+of 5** (`DISPLAY_PAGE_SIZE`, hardcoded inside the service, uniform for every picker it backs, per the
+business's own "Page size to 5 records" instruction), windowed client-side over the caller's own
+FILTERED result. New `qualifies?: () => number` callback on `load()`'s own args — called once immediately
+after `contracts` is set (before snapshots resolve) and again once `loadSnapshotsInto()` finishes (since
+the 0-balance filter depends on `snapshots`, which fills in asynchronously) — lets each of the three
+component wrapper methods (`reloadCatalog()`, `loadParent()`, `loadIbIndex()`, all three renamed from
+their old `xxxPage(page)` shape since there's no more per-page server argument) supply its own existing
+`filteredXxxCatalog` getter's own length, with zero duplicated filtering logic. `catalogPrevPage()`/
+`parentPrevPage()`/`ibIndexPrevPage()` (and their `Next` siblings) are now **pure client-side windowing —
+never a reload** (matching `InquireEventsService.pagedEvents`'s own Prev/Next, which never re-fetch
+either), the mechanism that actually fixes the reported bug: `total` is the true qualified count from the
+moment data lands, so Prev/Next can never show a wrong figure by re-deriving it from a fresh, potentially
+different server page.
+
+New `pagedFilteredCatalogContracts`/`pagedFilteredParentCatalog`/`pagedFilteredIbIndexCatalog` getters
+(component) window each `filteredXxxCatalog` getter by the picker's own `page`/`pageSize` — these are what
+the template now binds to instead of the raw `filteredXxxCatalog` getters directly. `flattenedPayableRows`
+(A4's own "Quick Pick — every still-PENDING presentation on this page" list) was re-scoped from
+`filteredCatalogContracts` to `pagedFilteredCatalogContracts` to keep matching its own "on this page"
+label under the new pagination model. `emptyText` strings that referenced the now-nonsensical "try Next
+page" (a page can no longer be entirely filtered-out, since filtering happens BEFORE windowing) were
+reworded to state the true qualified-vs-raw-candidate count instead.
+`IndexPickerComponent`'s own `autoPickedHint` condition (`items.length === 1`) was widened to
+`total > 0 ? total === 1 : items.length === 1` — the old bare `items.length === 1` could wrongly claim
+"picked automatically" on a partial LAST page showing exactly one leftover qualified row out of a larger
+total, now correctly reads the true across-all-pages count wherever a picker wires `[total]` (every
+picker that also sets `autoPickedHint` already does).
+
+**Tests**: `catalog-picker.service.ts` is still tested only indirectly through the component (no dedicated
+spec file — same established convention as `LookUpPanelService`; its behavior is exercised via
+`reloadCatalog()`/`loadParent()`/`loadIbIndex()`'s own existing test coverage across
+`transaction-builder.component.spec.ts`/`.selection.spec.ts`/`.gaps.spec.ts`), plus 2 new direct tests
+exercising `catalogPicker.load()` with no `qualifies` callback (the fallback-to-raw-count branch, not
+reachable via any of the 3 real component call sites, all of which always supply one). ~13 pre-existing
+`catalogPrevPage`/`catalogNextPage`/`parentPrevPage`/`parentNextPage`/`ibIndexPrevPage`/`ibIndexNextPage`
+tests rewritten in place for the new client-side-only behavior (no more `expect(api.catalog).toHaveBeenCalledWith(...)`
+on a Prev/Next click — genuinely no HTTP call fires any more); one test's own fixture (`onParentInstrumentTypeChange`,
+A6) needed a real `tenorType` added to its candidate contract, since `parentPicker.total` now correctly
+excludes it otherwise (the fixture was already relying on incidental, no-longer-accurate server-total
+behavior); one `ibIndexNextPage` guard-clears-the-index test rebuilt around a degenerate empty-lcNumber
+Parent (the old scenario, forcing `model.instrumentType` unset, no longer reaches `loadIbIndex()` at all
+under the new design, since `usesTwoFieldSearch` depends on that same field); one `totalPages` test's
+expected values updated for the new pageSize-5 math. Verified: `npx tsc -p tsconfig.app.json --noEmit`/
+`ng build --configuration development` (strict templates)/`npm run lint` (0 errors, 222 warnings — new
+test-fixture `any` casts, same accepted convention as every other test-fixture `any` in this file) all
+clean, full Angular suite **835/835 passing** (10 net new/changed), coverage **97.87/95.44/97.11/98.15%**
+(all four metrics clear the 95% floor; `catalog-picker.service.ts` itself now **100/100/100/100**).
+`backend/` 34/34 re-run per this file's own standing rule, unaffected (Angular-only change — no
+request/response contract change; the microservice's own `GET /balance-contracts/catalog` endpoint and
+its `pageSize`/`page` query params are unchanged, this is purely about how the CLIENT paginates/displays
+what it already fetches).
+
+Live in-browser verification not attempted this pass — static verification is unusually strong here
+(strict-template build, full typecheck, and dedicated regression tests reproducing both the reported bug
+shape — a raw-vs-qualified count mismatch — and the pageSize-5 math). A human should reproduce the
+original report live (A3, an LC with 12 raw candidates but only 4 with a non-zero Available Balance) and
+confirm the LC Index now shows "Page 1 / 1 (4 total)", and separately confirm A3S's own SG Index, A4/A6's
+own IB Index, and B5's own EB Index all now show real Prev/Next controls (5 per page) whenever more than
+5 qualified candidates exist under one LC.
+
+Not committed (not requested).
+
+## LC Index made eligibility-driven for A4, A6, and B4 — "outstanding EARMARKING events only" (2026-08-19, user-directed formal requirement, three successive messages: A4/A6's own table + selection flow, then a plain-language restatement — "only LC Numbers that still have outstanding EARMARKED events should be displayed... once no remaining, no longer appear" — then a follow-up extending the identical rule to B4, "差別是不分SIGHT/USANCE")
+
+Previously, A4's own flat Catalog picker (LC Index) and A6's own Parent LC picker showed **every** ACTIVE
+LC matching the function's own tenor family (Sight for A4, Usance for A6) — whether or not that LC
+actually had anything left for A4/A6 to act on. A user had to pick an LC first, then discover in Step 2
+("2ndary Index") that it had zero outstanding Document Arrivals. The requirement makes Step 1 itself
+eligibility-driven: an LC only appears at all once it has at least one still-outstanding (not yet
+finalized) A3/A3S Document Arrival of its own — "outstanding EARMARKED/EARMARKING events," read as this
+app's own established informal shorthand for "the earmark event class" (an A3/A3S UTILIZE), not literally
+the specific RELEASED-only `EARMARKED` display label from this file's own "Event Status Display Mapping"
+section above — confirmed against Step 2's own already-correct, unchanged filter (`status === 'PENDING'`),
+which the first message explicitly named as the reference behavior ("once fully processed by the
+applicable downstream event, it should no longer appear" — exactly what the PENDING filter already does).
+Step 2 itself needed **no changes** — it was already eligibility-correct.
+
+**A4 (`releasesExistingMovementInPlace`)** — `filteredCatalogContracts`'s own pre-existing exemption from
+the 0-balance filter ("return list unfiltered — a PENDING Document Arrival already drops
+availableBalance, that's exactly what Sight Payment needs to find") was a weaker PROXY for the real
+requirement; replaced with a genuine eligibility filter: `list.filter(c =>
+this.catalogPayableIbs.has(c.balanceContractId))`. `catalogPayableIbs` already existed (business
+instruction 2026-08-14, the "810 — IB00001 — Pending: 25,000" inline hint) and is already populated by
+`loadPayableIbHints()`, called from `reloadCatalog()`'s own `onLoaded` hook — this pass reused that same
+data for filtering instead of adding a new fetch.
+
+**A6 (`settlesDocumentArrival`, WITHOUT `sourceAlreadyReleasedBeforePick`)** — `parentPicker` had no
+equivalent per-candidate hint mechanism at all (Step 2's own `loadPayableMovements()` only ever fires
+AFTER a parent is picked). New `parentPayableIbs`/`parentPayableMovements` maps, populated by
+`loadParent()`'s own new `onLoaded` hook, and a new `filteredParentCatalog` branch (inserted BEFORE the
+old blanket `settlesDocumentArrival || catalogTenorFilter === 'USANCE' || usesSettleableBalanceIndex`
+bypass) filtering on `parentPayableIbs.has(...)`. New `requiresEligibleParentDocumentArrival` getter
+disambiguates A6 from B4 (`settlesDocumentArrival` is true for both, but B4 doesn't reach this picker at
+all — see below) via `!sourceAlreadyReleasedBeforePick`.
+
+**Shared fetch, both A4 and A6**: new `loadDocumentArrivalHints(list, ibs, movements, onDone)` — the SAME
+underlying check (a same-contract still-PENDING `IPLC_LC`/`UTILIZE`, i.e. an A3/A3S Document Arrival) for
+both, since A4/A6 pick from the exact same instrumentType/movementType shape; only which picker's own maps
+it fills differs. `CatalogPickerService.load()`'s own `onLoaded`/`qualifies` mechanism (from the pagination
+pass above) is what makes this land correctly: `total`/`filteredXxxCatalog` get re-synced a THIRD time
+(inside `loadDocumentArrivalHints`'s own completion callback), after the two existing sync points
+(immediate post-fetch, post-snapshot) — since eligibility data itself resolves asynchronously, later than
+either of those.
+
+**B4 (`payableMovementInstrumentType` set — B4-only field), same-day follow-up**: "B4 also has the same
+requirement, the difference is it doesn't distinguish Sight/Usance" — confirmed B4 uses the FLAT Catalog
+picker (`catalogPicker`), not `parentPicker` (per its own registry doc comment: "picks its target via the
+flat Catalog... NOT a Parent LC picker"), so B4's own eligibility gap lived in `filteredCatalogContracts`
+instead, previously falling through to the generic 0-balance exclusion (based on the Confirmation's own
+Available Balance — unrelated to whether an eligible B3 record exists). B4's own "eligible" definition is
+structurally different from A4/A6's — CROSS-contract (a child `EPLC_EXAMINATION` contract's own `CREATE`),
+and RELEASED rather than PENDING (B4 only ever picks an ALREADY-Checker-Released B3 record, per the
+2026-08-18 "B3 redesigned to genuinely RELEASE" decision — `loadPayableMovementsAcrossChildContracts()`'s
+own Step 2 candidate filter already requires `status === 'RELEASED' && !presentDocsConsumedAt` for exactly
+this reason). New `catalogChildPayableIbs` map + `loadEligibleChildDocumentHints(list, childInstrumentType,
+wantedMovementType, onDone)` — mirrors `loadPayableMovementsAcrossChildContracts()`'s own two-step
+candidate-resolution shape (catalog-search the child instrumentType by `lcNumber`, then fetch each child's
+own movements) exactly, run once per LC Index candidate via a per-candidate `forkJoin` of
+(catalog-search → movements-fetch) chains (`switchMap`, newly imported from `rxjs/operators`) rather than
+for the one already-picked LC. New `filteredCatalogContracts` branch (`this.selectedFunction
+?.payableMovementInstrumentType` — B4 is the only function with this field set) filters on
+`catalogChildPayableIbs.has(...)`, inserted between A4's own branch and the generic
+`DECREASING_MOVEMENT_TYPES` 0-balance fallback. Wired into `reloadCatalog()`'s own `onLoaded` hook
+alongside A4's `loadPayableIbHints()` call (both can coexist there safely — mutually exclusive in practice,
+since `releasesExistingMovementInPlace` and `payableMovementInstrumentType` are never both set on the same
+function).
+
+**Tests**: 4 pre-existing `filteredCatalogContracts`/`filteredParentCatalog` tests (A4's own "always
+returns unfiltered" test, A4's own tenor-filter test, A6's own tenor-match test, A6's own 2026-08-18
+0-balance-bypass regression test) rewritten in place for the new eligibility-driven behavior — each now
+sets a `catalogPayableIbs`/`parentPayableIbs` entry for the candidate(s) that should survive, and a new
+sibling assertion proves an otherwise-qualifying-by-every-other-criterion candidate is STILL excluded
+without one; `flattenedPayableRows`'s own test fixture gained matching `catalogPayableIbs` entries too
+(it now iterates `pagedFilteredCatalogContracts`, itself gated on this same eligibility check via the
+pagination pass above). 2 pre-existing `reloadCatalog()`/`onParentInstrumentTypeChange` tests (generic
+tests that happened to use A4/A6 as their own `selectedFunction`) needed a mocked `listMovements` response
+supplying a real outstanding UTILIZE, since their own candidates now correctly need one to appear at all.
+6 new tests: A4's own `filteredCatalogContracts` eligibility (kept-with-entry vs. excluded-without, even
+at 0 balance — proving the OLD balance-based proxy is gone); A6's own two new `filteredParentCatalog`
+cases (an otherwise-tenor-matching candidate excluded without an entry; the 2026-08-18 bug-fix scenario
+re-verified still passing WITH an entry, not just via the old bypass); a new `reloadCatalog — B4
+cross-contract LC Index eligibility` describe block (5 cases: kept with an already-RELEASED
+not-yet-consumed child CREATE; excluded when the child CREATE is still PENDING; excluded when already
+`presentDocsConsumedAt`; excluded when the candidate has no child `EPLC_EXAMINATION` contracts at all;
+the empty-candidate-list short-circuit). Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng
+build --configuration development` (strict templates) clean, `npm run lint` 0 errors (226 warnings —
+consistent with this file's own established test-fixture `any` convention), full Angular suite **841/841
+passing** (16 net new/changed), coverage **97.86/95.14/97.03/98.13%** (all four metrics clear the 95%
+floor). `backend/` 34/34 re-run per this file's own standing rule, unaffected (Angular-only change — no
+request/response contract change; every candidate resolution still goes through the microservice's own
+existing `GET /balance-contracts/catalog`/`GET .../movements` endpoints, just called more times and
+filtered differently client-side).
+
+Live in-browser verification not attempted this pass — static verification is unusually strong here
+(strict-template build, full typecheck, and 11 new/rewritten dedicated tests reproducing the exact
+eligible/ineligible shapes for all three functions, including B4's own cross-contract RELEASED-vs-PENDING
+distinction). A human should reproduce live: an LC with no A3/A3S Document Arrival at all should no longer
+appear under A4's or A6's own LC Index; one WITH a still-outstanding Document Arrival should; and a
+Confirmed LC should only appear under B4 once its own B3 Present Docs record has been genuinely Released
+(not merely Submitted) and not yet consumed by an earlier B4 — and, since A4/A6/B4 all now depend on an
+async per-candidate fetch completing before the LC Index reflects the true eligible set, confirm there's
+no jarring flash of ineligible LCs briefly showing before the real filter lands.
+
+Not committed (not requested).

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
@@ -11,6 +11,7 @@ import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './ma
 import { LookUpPanelService } from './look-up-panel.service';
 import { CatalogPickerService } from './catalog-picker.service';
 import { InquireEventsService } from './inquire-events.service';
+import { PagedListState } from './paged-list-state';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   DECREASING_MOVEMENT_TYPES,
@@ -101,13 +102,48 @@ export class TransactionBuilderComponent {
   fields: FormlyFieldConfig[] = [];
 
   naturalKey = { lcNumber: '', ibNumber: '', sgNumber: '' };
-  readonly catalogPageSize = 10;
+  /**
+   * How many raw candidates CatalogPickerService fetches from the server in ONE shot (business
+   * requirement 2026-08-19) — NOT the display page size (fixed at 5 inside CatalogPickerService itself,
+   * uniformly for every picker it backs). Bumped 10 -> 100 as part of the same fix: showing an accurate
+   * "N total, qualified" figure requires knowing every candidate's own filter outcome up front, which
+   * needs (almost) all of them fetched, not just the first page — see CatalogPickerService's own module
+   * doc comment for the full reasoning.
+   */
+  readonly catalogPageSize = 100;
   /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see catalogPicker below. */
   readonly catalogPicker: CatalogPickerService;
-  /** A4 (Sight Settlement) only — business instruction 2026-08-14: LC Index shows the pending IB Number(s) inline (e.g. "810 — IB00001 — ACTIVE — Pending: 25,000") so the user can identify which Document Arrival is being settled without opening Step 2 first. */
+  /**
+   * A4 (Sight Settlement) only — business instruction 2026-08-14: LC Index shows the pending IB Number(s)
+   * inline (e.g. "810 — IB00001 — ACTIVE — Pending: 25,000") so the user can identify which Document
+   * Arrival is being settled without opening Step 2 first. Business requirement 2026-08-19 ("A4 — LC
+   * Index Eligibility Criteria"): this same map now ALSO drives `filteredCatalogContracts`'s own
+   * eligibility filter for A4 — an LC only appears in A4's own LC Index once it has at least one entry
+   * here (a still-PENDING A3/A3S Document Arrival), not simply for being an ACTIVE Sight LC.
+   */
   catalogPayableIbs = new Map<string, string[]>();
   /** Full movement objects backing catalogPayableIbs, keyed the same way — business-reported gap "select S001 IB03 or S001 IB04 separately". */
   catalogPayableMovements = new Map<string, BalanceMovement[]>();
+  /**
+   * A6 (Acceptance, Usance) only — business requirement 2026-08-19 ("A6 — LC Index Eligibility
+   * Criteria"): the Parent LC picker's own analog of catalogPayableIbs/catalogPayableMovements above —
+   * populated by `loadParent()`'s own onLoaded hook (loadDocumentArrivalHints(), shared with A4) — drives
+   * `filteredParentCatalog`'s own eligibility filter, so A6's LC Index only shows LCs with at least one
+   * still-PENDING A3/A3S Document Arrival of their own, not simply every ACTIVE Usance LC.
+   */
+  parentPayableIbs = new Map<string, string[]>();
+  parentPayableMovements = new Map<string, BalanceMovement[]>();
+  /**
+   * B4 (Honour / Acceptance) only — business requirement 2026-08-19 ("B4 也是一樣的業務要求
+   * (EARMARKING EVENTS ONLY) 差別是不分SIGHT/USANCE" — same LC Index eligibility requirement as A4/A6,
+   * just without a Sight/Usance split, since B4 handles both from the one flat Catalog picker). Unlike
+   * catalogPayableIbs/parentPayableIbs (same-contract PENDING UTILIZE), B4's own eligible source is
+   * CROSS-contract (a child EPLC_EXAMINATION contract's own CREATE, already RELEASED and not yet
+   * consumed — the exact candidate shape `loadPayableMovementsAcrossChildContracts()` already resolves
+   * for the picked LC's own Step 2) — populated by `loadEligibleChildDocumentHints()`, called from
+   * `reloadCatalog()`'s own onLoaded hook.
+   */
+  catalogChildPayableIbs = new Map<string, string[]>();
   selectedContract: BalanceContract | null = null;
   /**
    * Business instruction 2026-08-14: for instrumentTypes whose natural key
@@ -129,7 +165,8 @@ export class TransactionBuilderComponent {
    * (via the catalog's exact lcNumber filter, not the substring `q`), so
    * the user picks the IB/SG Number instead of typing it.
    */
-  readonly ibIndexPageSize = 10;
+  /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above. */
+  readonly ibIndexPageSize = 100;
   /** BAL-003 (OOD/SOLID, 8th pass): contracts/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see ibIndexPicker below. */
   readonly ibIndexPicker: CatalogPickerService;
 
@@ -150,6 +187,15 @@ export class TransactionBuilderComponent {
     currency: string;
   }> = [];
   settleableBalancesLoading = false;
+  /**
+   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
+   * 2ndary Key Index, A3S's SG Index used as the worked example) — settleableBalances is a fully-loaded,
+   * unpaginated in-memory array (same shape as sgsForArrival/payableMovements below), so this windows it
+   * client-side rather than re-fetching per page — same "no per-page API call makes sense once everything
+   * is already in memory" reasoning InquireEventsService.eventsPaging already established for the merged
+   * Events table.
+   */
+  readonly settleableBalancesPaging = new PagedListState(10);
 
   /**
    * Business instruction 2026-08-14 ("pickup LC then pickup IB Number...
@@ -174,6 +220,15 @@ export class TransactionBuilderComponent {
    */
   payableMovementSearch = '';
   /**
+   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
+   * 2ndary Key Index) — windows filteredPayableMovements (below) client-side, same reasoning as
+   * settleableBalancesPaging/arrivalSgPaging. Shared by all three template call sites (A4/A6's own
+   * unfiltered picker and B4's two search-filtered ones) — safe, since exactly one is ever visible for a
+   * given selectedFunction, and when payableMovementSearch is '' (A4/A6's own case, which never wires a
+   * search box) filteredPayableMovements already just returns payableMovements unfiltered.
+   */
+  readonly payableMovementsPaging = new PagedListState(10);
+  /**
    * Live Confirmed/Available Balance for selectedContract — fetched the
    * instant a contract is picked (and refreshed after every submit) so the
    * Amount field is never filled in blind. Reviewer-reported gap
@@ -196,6 +251,18 @@ export class TransactionBuilderComponent {
    */
   sgsForArrival: BalanceContract[] = [];
   sgsForArrivalLoading = false;
+  /**
+   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern... A3S — Document Arrival
+   * w/ Shipping Gtee used as the worked example: Primary Key = LC Number [already Page-by-Page via
+   * parentPicker/catalogPicker], 2ndary Key = SG Number — this 2ndary Index should ALSO provide the same
+   * Page-by-Page design when multiple Shipping Guarantees exist under one LC"). sgsForArrival is a
+   * fully-loaded, unpaginated in-memory array (loadSgsForArrival() below), so this windows it client-side
+   * — same reasoning as InquireEventsService.eventsPaging. If exactly ONE SG exists under the LC,
+   * loadSgsForArrival()'s own pre-existing auto-pick (unaffected by this change — it reads the full,
+   * unwindowed sgsForArrival) still selects it automatically; pagination only ever matters once more than
+   * one SG exists, matching the business's own stated rule exactly.
+   */
+  readonly arrivalSgPaging = new PagedListState(10);
   selectedArrivalSg: BalanceContract | null = null;
   arrivalSgSnapshot: BalanceSnapshot | null = null;
   /** Set once Submit's first call (the SG's own FULL_REDEEM) succeeds — Release then needs it for the compound Checker action. */
@@ -283,7 +350,8 @@ export class TransactionBuilderComponent {
   checkerId = 'checker1';
 
   parentInstrumentType: InstrumentType | '' = '';
-  readonly parentPageSize = 10;
+  /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above. */
+  readonly parentPageSize = 100;
   /** Business instruction 2026-08-14 "Page by Page設計". BAL-003 (OOD/SOLID, 8th pass): contracts/search/snapshots/page/total/totalPages now owned by `CatalogPickerService` — see parentPicker below. */
   readonly parentPicker: CatalogPickerService;
   selectedParent: BalanceContract | null = null;
@@ -506,8 +574,10 @@ export class TransactionBuilderComponent {
     this.ibIndexPicker.resetPaging();
     this.settleableBalances = [];
     this.settleableBalancesLoading = false;
+    this.settleableBalancesPaging.reset();
     this.payableMovements = [];
     this.payableMovementSearch = '';
+    this.payableMovementsPaging.reset();
     this.selectedPayMovement = null;
     this.arrivalApproved = false;
     this.submitResult = null;
@@ -517,6 +587,7 @@ export class TransactionBuilderComponent {
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
     this.sgsForArrival = [];
+    this.arrivalSgPaging.reset();
     this.selectedArrivalSg = null;
     this.arrivalSgSnapshot = null;
     this.arrivalSgRedeemMovementId = null;
@@ -579,7 +650,11 @@ export class TransactionBuilderComponent {
       // ignores any OTHER redemption already reserved PENDING against this same SG; Available is what's
       // actually still redeemable right now (same distinction as the shgtRedeem.ts commitment-control fix).
       this.model.amount = this.selectedContractSnapshot.availableBalance;
-    } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContractSnapshot) {
+    } else if (
+      this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' &&
+      this.model.instrumentType === 'EPLC_ACCEPTANCE' &&
+      this.selectedContractSnapshot
+    ) {
       // B5 only — kept symmetric with FULL_SETTLE/autoRedeemType above; unreachable in practice since B5
       // has no subChoice to re-trigger this with a contract already selected (refreshSelectedContractSnapshot() does the real work).
       this.model.amount = this.selectedContractSnapshot.availableBalance;
@@ -589,22 +664,99 @@ export class TransactionBuilderComponent {
     if (this.parentInstrumentType) this.onParentInstrumentTypeChange();
   }
 
-  /** Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計" — page defaults to 1 (a fresh search), pass an explicit page to page through an already-loaded list. BAL-003 (8th pass): thin wrapper over `catalogPicker.load()` — guard/tenorFamily/onLoaded (this picker's own A4 payable-hint follow-up) are unchanged, only the fetch/populate/error body moved into the service. */
-  reloadCatalog(page = 1): void {
+  /**
+   * Business instruction 2026-08-14 "pickup 時 Order by Reference 而且需要 Page by Page設計". BAL-003
+   * (8th pass): thin wrapper over `catalogPicker.load()` — guard/tenorFamily/onLoaded (this picker's own
+   * A4 payable-hint follow-up) are unchanged, only the fetch/populate/error body moved into the service.
+   * Business requirement 2026-08-19 (fixing "Page 1/2 (12 total)" wrongly counting unfiltered candidates
+   * — see CatalogPickerService's own module doc comment): no longer takes a `page` argument — a fresh
+   * reload always fetches the full (capped) candidate batch and re-derives Page 1 of the QUALIFIED
+   * result via the new `qualifies` callback; Prev/Next are now pure client-side windowing
+   * (catalogPrevPage()/catalogNextPage() below), never a second reload.
+   */
+  reloadCatalog(): void {
     this.catalogPicker.load({
       guardFails: !this.model.instrumentType || this.isCreatingMovement,
       instrumentType: this.model.instrumentType!,
-      page,
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
+      qualifies: () => this.filteredCatalogContracts.length,
       onLoaded: (items) => {
         if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) this.loadPayableIbHints(items);
+        // Business requirement 2026-08-19 ("B4 也是一樣的業務要求 (EARMARKING EVENTS ONLY) 差別是不分
+        // SIGHT/USANCE") — B4 only (the one function with payableMovementInstrumentType set).
+        if (this.selectedFunction?.payableMovementInstrumentType) {
+          this.loadEligibleChildDocumentHints(
+            items,
+            this.selectedFunction.payableMovementInstrumentType,
+            this.selectedFunction.payableMovementType ?? 'UTILIZE',
+            () => {
+              this.catalogPicker.total = this.filteredCatalogContracts.length;
+            },
+          );
+        }
       },
     });
   }
 
-  /** Business-reported gap 2026-08-14 ("Why the U003 does not allow for Amendment?") — search resets to page 1. */
+  /**
+   * B4 (Honour / Acceptance) only — business requirement 2026-08-19, see catalogChildPayableIbs's own
+   * doc comment. Mirrors `loadPayableMovementsAcrossChildContracts()`'s own two-step candidate-resolution
+   * shape (catalog-search the child instrumentType by lcNumber, then fetch each child's own movements)
+   * exactly, run once per LC Index candidate rather than for the one already-picked LC — same RELEASED +
+   * not-yet-consumed condition, since B4 only ever picks an ALREADY-Released B3 record (a same-day-only
+   * PENDING one isn't eligible, unlike A4/A6's own same-contract PENDING check).
+   */
+  private loadEligibleChildDocumentHints(list: BalanceContract[], childInstrumentType: InstrumentType, wantedMovementType: string, onDone: () => void): void {
+    this.catalogChildPayableIbs.clear();
+    if (!list.length) {
+      onDone();
+      return;
+    }
+    forkJoin(
+      list.map((c) =>
+        this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
+          switchMap((result) => {
+            if (!result.items.length) return of([] as string[]);
+            return forkJoin(
+              result.items.map((child) =>
+                this.api.listMovements(child.balanceContractId).pipe(
+                  map((movs) =>
+                    (movs as any[])
+                      .filter((m: any) => m.movementType === wantedMovementType && m.status === 'RELEASED' && !m.presentDocsConsumedAt)
+                      .map((m: any) => m.sourceTransactionRef || child.naturalKey.ibNumber || '(no EB Number)'),
+                  ),
+                  catchError(() => of([] as string[])),
+                ),
+              ),
+            ).pipe(map((lists) => lists.flat()));
+          }),
+          catchError(() => of([] as string[])),
+        ),
+      ),
+    ).subscribe((results) => {
+      list.forEach((c, i) => {
+        if (results[i].length) this.catalogChildPayableIbs.set(c.balanceContractId, results[i]);
+      });
+      onDone();
+    });
+  }
+
+  /**
+   * Business requirement 2026-08-19 ("A6 — LC Index Eligibility Criteria"): true for A6 specifically —
+   * `settlesDocumentArrival` is also true for B4, but B4 resolves via the flat Catalog picker instead
+   * (never reaches `parentPicker`/`filteredParentCatalog` at all, see B4's own registry doc comment), so
+   * `sourceAlreadyReleasedBeforePick` (B4-only) is the safe disambiguator rather than relying on that
+   * routing fact alone.
+   */
+  private get requiresEligibleParentDocumentArrival(): boolean {
+    return (
+      !!this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && !this.selectedFunctionStrategy?.checkerRelease.sourceAlreadyReleasedBeforePick
+    );
+  }
+
+  /** Business-reported gap 2026-08-14 ("Why the U003 does not allow for Amendment?") — search resets to page 1 (reloadCatalog() itself always resets, via catalogPicker.load()'s own resetPaging() call). */
   onCatalogSearch(): void {
-    this.reloadCatalog(1);
+    this.reloadCatalog();
   }
 
   /**
@@ -613,7 +765,9 @@ export class TransactionBuilderComponent {
    * Number and Pending Amount". Fetches each candidate LC's still-PENDING
    * UTILIZE movements (the same filter used for Step 2's IB Index) so the
    * IB Number(s) can be shown inline in Step 1, without waiting for the
-   * user to drill into Step 2 first.
+   * user to drill into Step 2 first. Business requirement 2026-08-19: this
+   * same data now also drives filteredCatalogContracts's own eligibility
+   * filter — see loadDocumentArrivalHints()'s own doc comment, shared with A6.
    *
    * Business-reported gap 2026-08-14 ("user would like to select S001 IB03
    * or S001 IB04 for A4 separately" — "buyer may settle IB04 today then
@@ -623,20 +777,38 @@ export class TransactionBuilderComponent {
    * for IB03 tomorrow shouldn't require re-picking the LC first each time.
    */
   private loadPayableIbHints(list: BalanceContract[]): void {
-    this.catalogPayableIbs.clear();
-    this.catalogPayableMovements.clear();
-    if (!list.length) return;
+    this.loadDocumentArrivalHints(list, this.catalogPayableIbs, this.catalogPayableMovements, () => {
+      this.catalogPicker.total = this.filteredCatalogContracts.length;
+    });
+  }
+
+  /**
+   * Business requirement 2026-08-19 ("A4/A6 — LC Index Eligibility Criteria"): shared by A4's own flat
+   * Catalog picker (catalogPayableIbs/catalogPayableMovements, via loadPayableIbHints() above) and A6's
+   * own Parent LC picker (parentPayableIbs/parentPayableMovements, via loadParent() below) — both
+   * functions' own "eligible LC" definition is identical (a still-PENDING A3/A3S Document Arrival — an
+   * IPLC_LC/UTILIZE movement — on the SAME contract, not cross-contract like B4's own EPLC_EXAMINATION
+   * check), so this is one fetch/populate body rather than two copies of the same forkJoin.
+   */
+  private loadDocumentArrivalHints(list: BalanceContract[], ibs: Map<string, string[]>, movements: Map<string, BalanceMovement[]>, onDone: () => void): void {
+    ibs.clear();
+    movements.clear();
+    if (!list.length) {
+      onDone();
+      return;
+    }
     forkJoin(list.map((c) => this.api.listMovements(c.balanceContractId).pipe(catchError(() => of([] as any[]))))).subscribe((results) => {
       list.forEach((c, i) => {
         const pending = (results[i] ?? []).filter((m: any) => m.status === 'PENDING' && m.movementType === 'UTILIZE');
         if (pending.length) {
-          this.catalogPayableIbs.set(
+          ibs.set(
             c.balanceContractId,
             pending.map((m: any) => m.sourceTransactionRef || '(no IB Number)'),
           );
-          this.catalogPayableMovements.set(c.balanceContractId, pending);
+          movements.set(c.balanceContractId, pending);
         }
       });
+      onDone();
     });
   }
 
@@ -649,7 +821,7 @@ export class TransactionBuilderComponent {
    */
   get flattenedPayableRows(): { contract: BalanceContract; movement: any }[] {
     const rows: { contract: BalanceContract; movement: any }[] = [];
-    for (const c of this.filteredCatalogContracts) {
+    for (const c of this.pagedFilteredCatalogContracts) {
       const movements = this.catalogPayableMovements.get(c.balanceContractId) ?? [];
       for (const m of movements) rows.push({ contract: c, movement: m });
     }
@@ -673,6 +845,8 @@ export class TransactionBuilderComponent {
     this.refreshSelectedContractSnapshot();
     this.payableMovements = this.catalogPayableMovements.get(contractId) ?? [];
     this.payableMovementsLoading = false;
+    this.payableMovementsPaging.total = this.payableMovements.length;
+    this.payableMovementsPaging.page = 1;
     this.onSelectPayMovement(movementId);
     // 4-eyes redesign 2026-08-16: unlike onSelectContract() above (which this deliberately doesn't
     // call, see doc comment), this one-click path never pre-fills the Checker panel's own search box
@@ -697,14 +871,15 @@ export class TransactionBuilderComponent {
     return ibs.length === 1 ? ` — ${ibs[0]}` : ` — ${ibs.length} pending: ${ibs.join(', ')}`;
   }
 
+  /** Business requirement 2026-08-19: client-side windowing only, no reload — the full qualified set is already in memory (see CatalogPickerService's own module doc comment). */
   catalogPrevPage(): void {
     const page = this.catalogPicker.prevTarget();
-    if (page !== null) this.reloadCatalog(page);
+    if (page !== null) this.catalogPicker.page = page;
   }
 
   catalogNextPage(): void {
     const page = this.catalogPicker.nextTarget();
-    if (page !== null) this.reloadCatalog(page);
+    if (page !== null) this.catalogPicker.page = page;
   }
 
   /**
@@ -716,10 +891,17 @@ export class TransactionBuilderComponent {
    * recorded (legacy) are never filtered out.
    *
    * A4 (Sight Settlement, payExistingUtilize) is deliberately EXEMPT from the
-   * 0-balance exclusion: a PENDING Document Arrival already drops
-   * availableBalance before Release (Design doc §6, earmark takes effect
-   * immediately) — that's exactly the LC Sight Payment needs to find, so
-   * filtering it out here would hide the one thing this function looks for.
+   * plain 0-balance exclusion below — a PENDING Document Arrival already
+   * drops availableBalance before Release (Design doc §6, earmark takes
+   * effect immediately), so that heuristic alone would have been the wrong
+   * signal to filter A4's own LC Index on.
+   *
+   * Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): A4's own LC Index is now
+   * genuinely eligibility-driven instead — only an LC with at least one still-PENDING A3/A3S Document
+   * Arrival of its own (an entry in catalogPayableIbs, populated by loadPayableIbHints()) appears at
+   * all, not simply every ACTIVE Sight LC. catalogPayableIbs is empty until that async fetch resolves,
+   * so this list is (correctly) empty for one render tick right after a fresh reload, filling in once
+   * hints land — reloadCatalog()'s own onLoaded hook re-syncs catalogPicker.total at that point too.
    */
   get filteredCatalogContracts(): BalanceContract[] {
     let list = this.catalogPicker.contracts;
@@ -727,7 +909,15 @@ export class TransactionBuilderComponent {
     if (tenorFilter) {
       list = list.filter((c) => !c.tenorType || (tenorFilter === 'SIGHT' ? c.tenorType === 'SIGHT' : c.tenorType !== 'SIGHT'));
     }
-    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) return list;
+    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+      return list.filter((c) => this.catalogPayableIbs.has(c.balanceContractId));
+    }
+    // Business requirement 2026-08-19 ("B4 也是一樣的業務要求 (EARMARKING EVENTS ONLY) 差別是不分
+    // SIGHT/USANCE") — B4 only. See catalogChildPayableIbs's own doc comment for why this is a
+    // cross-contract check, unlike A4's own same-contract one right above.
+    if (this.selectedFunction?.payableMovementInstrumentType) {
+      return list.filter((c) => this.catalogChildPayableIbs.has(c.balanceContractId));
+    }
     if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return list;
     return list.filter((c) => {
       const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
@@ -735,48 +925,69 @@ export class TransactionBuilderComponent {
     });
   }
 
-  /** Instrument/status changed (or first resolved) — reset to page 1 and reload. */
+  /** Business requirement 2026-08-19 — the current page's own slice of filteredCatalogContracts (the QUALIFIED set), not the raw fetched candidates. This is what the template's LC Index picker now iterates. */
+  get pagedFilteredCatalogContracts(): BalanceContract[] {
+    const start = (this.catalogPicker.page - 1) * this.catalogPicker.pageSize;
+    return this.filteredCatalogContracts.slice(start, start + this.catalogPicker.pageSize);
+  }
+
+  /** Instrument/status changed (or first resolved) — reset selection and reload. */
   onParentInstrumentTypeChange(): void {
     this.selectedParent = null;
     // Business instruction 2026-08-15: EPLC_LC (Unconfirmed, MEMO) removed as a parent option — every
     // Acceptance is now exposureNature ACTUAL (real liability, rationale §7.6 Step 1).
     this.exposureNature = 'ACTUAL';
-    this.loadParentPage(1);
+    this.loadParent();
   }
 
   /**
-   * Business instruction 2026-08-14 "Page by Page設計" — fetches one page without resetting the
-   * current parent selection. BAL-003 (8th pass): thin wrapper over `parentPicker.load()` — the guard
-   * condition and every parameter below are unchanged, only the fetch/populate/error body moved.
+   * Business instruction 2026-08-14 "Page by Page設計" — fetches the parent candidate batch without
+   * resetting the current parent selection. BAL-003 (8th pass): thin wrapper over `parentPicker.load()`
+   * — the guard condition and every parameter below are unchanged, only the fetch/populate/error body
+   * moved.
    *
    * Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?", "A7 should filter out LC
    * records Tenor = Sight") — same class of bug as A5's flat Catalog picker: filtering client-side AFTER
    * server pagination let a page of raw rows contain almost none of the eligible (Usance) tenor. A6/B4
    * (tenorTypeOptions set) and A7/B5 (catalogTenorFilter — an Acceptance never exists under a Sight LC) both
-   * filter server-side; A8's SHGT parent (neither) stays unfiltered, same as before.
+   * filter server-side (via tenorFamily); A8's SHGT parent (neither) stays unfiltered, same as before.
+   *
+   * Business requirement 2026-08-19 (fixing "Page 1/2 (12 total)" wrongly counting unfiltered candidates
+   * — see CatalogPickerService's own module doc comment): no longer takes a `page` argument — Prev/Next
+   * are now pure client-side windowing (parentPrevPage()/parentNextPage() below), never a second reload.
    */
-  private loadParentPage(page: number): void {
+  private loadParent(): void {
     this.parentPicker.load({
       guardFails: !this.parentInstrumentType,
       instrumentType: this.parentInstrumentType as InstrumentType,
-      page,
       tenorFamily: this.parentTenorFamily,
+      qualifies: () => this.filteredParentCatalog.length,
+      onLoaded: (items) => {
+        // Business requirement 2026-08-19 ("A6 — LC Index Eligibility Criteria") — A6 only, see
+        // requiresEligibleParentDocumentArrival's own doc comment.
+        if (this.requiresEligibleParentDocumentArrival) {
+          this.loadDocumentArrivalHints(items, this.parentPayableIbs, this.parentPayableMovements, () => {
+            this.parentPicker.total = this.filteredParentCatalog.length;
+          });
+        }
+      },
     });
   }
 
-  /** Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?") — search resets to page 1. */
+  /** Business-reported gap 2026-08-14 ("Why the U002, IB02 does not shown in A6?") — search resets to page 1 (loadParent() itself always resets, via parentPicker.load()'s own resetPaging() call). */
   onParentSearch(): void {
-    this.loadParentPage(1);
+    this.loadParent();
   }
 
+  /** Business requirement 2026-08-19: client-side windowing only, no reload — the full qualified set is already in memory (see CatalogPickerService's own module doc comment). */
   parentPrevPage(): void {
     const page = this.parentPicker.prevTarget();
-    if (page !== null) this.loadParentPage(page);
+    if (page !== null) this.parentPicker.page = page;
   }
 
   parentNextPage(): void {
     const page = this.parentPicker.nextTarget();
-    if (page !== null) this.loadParentPage(page);
+    if (page !== null) this.parentPicker.page = page;
   }
 
   get parentTenorFamily(): 'SIGHT' | 'USANCE' | undefined {
@@ -824,6 +1035,18 @@ export class TransactionBuilderComponent {
     // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
     // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) and
     // settleableBalanceIndex now read through the Strategy too; behavior unchanged.
+    //
+    // Business requirement 2026-08-19 ("A6 — LC Index Eligibility Criteria", "only LC Numbers that
+    // still have outstanding EARMARKED events should be displayed... once no remaining, no longer
+    // appear"): supersedes the plain 0-balance bypass above FOR A6 SPECIFICALLY — an eligible LC is one
+    // with at least one still-outstanding (PENDING) A3/A3S Document Arrival of its own (an entry in
+    // parentPayableIbs, populated by loadParent()'s own onLoaded hook), not simply any non-zero-balance
+    // Usance LC. requiresEligibleParentDocumentArrival is false for B4 (sourceAlreadyReleasedBeforePick)
+    // — B4 never reaches this getter at all in practice anyway, see its own doc comment — so this branch
+    // is genuinely A6-only.
+    if (this.requiresEligibleParentDocumentArrival) {
+      return list.filter((c) => this.parentPayableIbs.has(c.balanceContractId));
+    }
     if (
       this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
       this.selectedFunction?.catalogTenorFilter === 'USANCE' ||
@@ -834,6 +1057,12 @@ export class TransactionBuilderComponent {
       const snap = this.parentPicker.snapshots.get(c.balanceContractId);
       return !snap || snap.availableBalance !== '0';
     });
+  }
+
+  /** Business requirement 2026-08-19 — the current page's own slice of filteredParentCatalog (the QUALIFIED set), not the raw fetched candidates. This is what the template's Parent LC picker now iterates. */
+  get pagedFilteredParentCatalog(): BalanceContract[] {
+    const start = (this.parentPicker.page - 1) * this.parentPicker.pageSize;
+    return this.filteredParentCatalog.slice(start, start + this.parentPicker.pageSize);
   }
 
   /**
@@ -850,15 +1079,40 @@ export class TransactionBuilderComponent {
   }
 
   /**
+   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
+   * 2ndary Key Index) — the current page's own slice of filteredPayableMovements, shared by all three
+   * template call sites (A4/A6's own unpaginated picker, B4's two search-filtered ones — see
+   * payableMovementsPaging's own doc comment for why one shared paging state is safe here).
+   */
+  get pagedFilteredPayableMovements(): any[] {
+    const start = (this.payableMovementsPaging.page - 1) * this.payableMovementsPaging.pageSize;
+    return this.filteredPayableMovements.slice(start, start + this.payableMovementsPaging.pageSize);
+  }
+
+  payableMovementsPrevPage(): void {
+    const target = this.payableMovementsPaging.prevTarget();
+    if (target) this.payableMovementsPaging.page = target;
+  }
+
+  payableMovementsNextPage(): void {
+    const target = this.payableMovementsPaging.nextTarget();
+    if (target) this.payableMovementsPaging.page = target;
+  }
+
+  /**
    * Business instruction 2026-08-15 ("Index Search") — the IndexPicker's own autoPickedHint text
    * ("picked automatically") fires purely off items.length === 1, but the actual auto-pick behavior
    * (loadPayableMovements()) only ever runs once, against the ORIGINAL unfiltered list at load time —
    * so narrowing to one match via search would show the hint without it being true. This re-runs that
    * same auto-pick whenever typing narrows filteredPayableMovements down to exactly one, keeping the
-   * hint and the actual behavior in sync.
+   * hint and the actual behavior in sync. Also resets the paging window to page 1 and recomputes its own
+   * total against the NEW filtered length (business requirement 2026-08-19) — a stale page 2 from before
+   * the search would otherwise show an empty window against a narrower filtered result set.
    */
   onPayableMovementSearchChange(value: string): void {
     this.payableMovementSearch = value;
+    this.payableMovementsPaging.total = this.filteredPayableMovements.length;
+    this.payableMovementsPaging.page = 1;
     if (this.filteredPayableMovements.length === 1) {
       this.onSelectPayMovement(this.filteredPayableMovements[0].movementId);
     }
@@ -1085,6 +1339,7 @@ export class TransactionBuilderComponent {
     this.selectedArrivalSg = null;
     this.arrivalSgSnapshot = null;
     this.sgsForArrival = [];
+    this.arrivalSgPaging.reset();
     const lcNumber = this.selectedContract?.naturalKey.lcNumber;
     if (!lcNumber) return;
     this.sgsForArrivalLoading = true;
@@ -1096,6 +1351,7 @@ export class TransactionBuilderComponent {
         if (!result.items.length) {
           this.sgsForArrivalLoading = false;
           this.sgsForArrival = [];
+          this.arrivalSgPaging.total = 0;
           return;
         }
         forkJoin(result.items.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null))))).subscribe((snapshots) => {
@@ -1104,15 +1360,37 @@ export class TransactionBuilderComponent {
             const snap = snapshots[i];
             return !!snap && snap.availableBalance !== '0';
           });
+          this.arrivalSgPaging.total = this.sgsForArrival.length;
+          this.arrivalSgPaging.page = 1;
           // UX 2026-08-14 "UX要做好 方便操作" — same "only one thing to pick, don't make the user pick it" pattern as loadPayableMovements().
+          // Business requirement 2026-08-19: this auto-pick deliberately still reads the FULL (unwindowed)
+          // sgsForArrival, not pagedSgsForArrival — "if LC S09 has only one outstanding SG, automatic
+          // selection can remain" applies to the true total across all pages, not just page 1's own count.
           if (this.sgsForArrival.length === 1) this.onSelectArrivalSg(this.sgsForArrival[0].balanceContractId);
         });
       },
       error: () => {
         this.sgsForArrivalLoading = false;
         this.sgsForArrival = [];
+        this.arrivalSgPaging.total = 0;
       },
     });
+  }
+
+  /** The current page's own slice of sgsForArrival — the template iterates this instead of sgsForArrival directly. */
+  get pagedSgsForArrival(): BalanceContract[] {
+    const start = (this.arrivalSgPaging.page - 1) * this.arrivalSgPaging.pageSize;
+    return this.sgsForArrival.slice(start, start + this.arrivalSgPaging.pageSize);
+  }
+
+  arrivalSgPrevPage(): void {
+    const target = this.arrivalSgPaging.prevTarget();
+    if (target) this.arrivalSgPaging.page = target;
+  }
+
+  arrivalSgNextPage(): void {
+    const target = this.arrivalSgPaging.nextTarget();
+    if (target) this.arrivalSgPaging.page = target;
   }
 
   /**
@@ -1177,6 +1455,7 @@ export class TransactionBuilderComponent {
   private loadPayableMovements(contractId: string | undefined): void {
     this.selectedPayMovement = null;
     this.payableMovementSearch = '';
+    this.payableMovementsPaging.reset();
     if (!contractId) {
       this.payableMovements = [];
       return;
@@ -1198,7 +1477,10 @@ export class TransactionBuilderComponent {
       next: (list) => {
         this.payableMovementsLoading = false;
         this.payableMovements = list.filter((m) => m.status === 'PENDING' && m.movementType === wantedMovementType);
+        this.payableMovementsPaging.total = this.payableMovements.length;
         // UX 2026-08-14 "UX要做好 方便操作" — when there's only one thing to pick, don't make the user pick it.
+        // Business requirement 2026-08-19: reads the FULL (unwindowed) payableMovements — "only one
+        // candidate in total" auto-selects regardless of page size, same rule as arrivalSgPaging above.
         if (this.payableMovements.length === 1) this.onSelectPayMovement(this.payableMovements[0].movementId);
       },
       error: () => {
@@ -1269,6 +1551,7 @@ export class TransactionBuilderComponent {
           this.payableMovements = movementLists
             .flat()
             .filter((m: any) => m.movementType === wantedMovementType && m.status === (requiresRelease ? 'RELEASED' : 'PENDING') && !m.presentDocsConsumedAt);
+          this.payableMovementsPaging.total = this.payableMovements.length;
           if (this.payableMovements.length === 1) this.onSelectPayMovement(this.payableMovements[0].movementId);
         });
       },
@@ -1359,7 +1642,10 @@ export class TransactionBuilderComponent {
         if (this.model.movementType === 'FULL_SETTLE') {
           this.model.amount = snap.availableBalance;
           this.rebuildFields();
-        } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && this.model.instrumentType === 'EPLC_ACCEPTANCE') {
+        } else if (
+          this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' &&
+          this.model.instrumentType === 'EPLC_ACCEPTANCE'
+        ) {
           // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance>0的EB交易") — same
           // "default to Available, freely editable down to Partial, capped at it" shape as autoRedeemType
           // below. NOTE: since B5's own registry entry now declares movementType: 'FULL_SETTLE' directly
@@ -1498,7 +1784,7 @@ export class TransactionBuilderComponent {
       this.searchError = null;
       this.selectedContract = null;
       this.selectedContractSnapshot = null;
-      this.loadIbIndexPage(1);
+      this.loadIbIndex();
     }
     // A6 only (business instruction 2026-08-14 "A6 => Approved LC Balance and Create Acceptance Balance") —
     // Step 2: still-PENDING Document Arrivals under the picked parent LC, ready to be released + converted.
@@ -1525,33 +1811,38 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * Step 2 of the "LC Index -> IB Index" cascading picker (business instruction 2026-08-14) — one page
-   * of IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows under the exact LC picked in Step 1. BAL-003 (8th
-   * pass): thin wrapper over `ibIndexPicker.load()`, guard/params unchanged.
+   * Step 2 of the "LC Index -> IB Index" cascading picker (business instruction 2026-08-14) — the
+   * IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows under the exact LC picked in Step 1. BAL-003 (8th pass):
+   * thin wrapper over `ibIndexPicker.load()`, guard/params unchanged. Business requirement 2026-08-19
+   * (fixing "Page 1/2 (12 total)" wrongly counting unfiltered candidates — see CatalogPickerService's own
+   * module doc comment): no longer takes a `page` argument — Prev/Next are now pure client-side windowing
+   * (ibIndexPrevPage()/ibIndexNextPage() below), never a second reload.
    */
-  private loadIbIndexPage(page: number): void {
+  private loadIbIndex(): void {
     this.ibIndexPicker.load({
       guardFails: !this.model.instrumentType || !this.searchNaturalKey.lcNumber,
       instrumentType: this.model.instrumentType!,
-      page,
       lcNumber: this.searchNaturalKey.lcNumber,
+      qualifies: () => this.filteredIbIndexCatalog.length,
     });
   }
 
+  /** Business requirement 2026-08-19: client-side windowing only, no reload — the full qualified set is already in memory (see CatalogPickerService's own module doc comment). */
   ibIndexPrevPage(): void {
     const page = this.ibIndexPicker.prevTarget();
-    if (page !== null) this.loadIbIndexPage(page);
+    if (page !== null) this.ibIndexPicker.page = page;
   }
 
   ibIndexNextPage(): void {
     const page = this.ibIndexPicker.nextTarget();
-    if (page !== null) this.loadIbIndexPage(page);
+    if (page !== null) this.ibIndexPicker.page = page;
   }
 
   /**
    * B5's own "EB Index" Step 2 (business instruction 2026-08-16) — still-outstanding candidates of
    * selectedFunction.instrumentType (EPLC_ACCEPTANCE, B5's own fixed type) under the given
-   * Confirmation's own LC Number. Unlike loadIbIndexPage() above (single type, server-paginated), this
+   * Confirmation's own LC Number. Unlike loadIbIndex() above (which now also just does a single-shot
+   * capped fetch, see CatalogPickerService's own 2026-08-19 module doc comment), this
    * loads its one catalog unpaginated (up to 50, same cap as loadPayableMovementsAcrossChildContracts())
    * and filters to Available > 0 — nothing left to settle isn't worth offering as a target. `types`
    * stays an array (rather than a single instrumentType) purely so the forkJoin below can stay written
@@ -1561,6 +1852,7 @@ export class TransactionBuilderComponent {
    * permanently unset.
    */
   private loadSettleableBalances(lcNumber: string): void {
+    this.settleableBalancesPaging.reset();
     const fn = this.selectedFunction;
     if (!fn?.instrumentType) {
       this.settleableBalances = [];
@@ -1608,8 +1900,34 @@ export class TransactionBuilderComponent {
             availableBalance: r.snap.availableBalance,
             currency: r.cand.contract.currency,
           }));
+        this.settleableBalancesPaging.total = this.settleableBalances.length;
       });
     });
+  }
+
+  /**
+   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
+   * 2ndary Key Index) — the current page's own slice of settleableBalances (B5's own EB Index).
+   */
+  get pagedSettleableBalances(): Array<{
+    balanceContractId: string;
+    instrumentType: InstrumentType;
+    ibNumber: string | null;
+    availableBalance: string;
+    currency: string;
+  }> {
+    const start = (this.settleableBalancesPaging.page - 1) * this.settleableBalancesPaging.pageSize;
+    return this.settleableBalances.slice(start, start + this.settleableBalancesPaging.pageSize);
+  }
+
+  settleableBalancesPrevPage(): void {
+    const target = this.settleableBalancesPaging.prevTarget();
+    if (target) this.settleableBalancesPaging.page = target;
+  }
+
+  settleableBalancesNextPage(): void {
+    const target = this.settleableBalancesPaging.nextTarget();
+    if (target) this.settleableBalancesPaging.page = target;
   }
 
   /** Pick handler for the "EB Index" picker above — routes to whichever real instrumentType that specific candidate actually is (currently always EPLC_ACCEPTANCE, B5's own fixed type — see loadSettleableBalances' own doc comment). */
@@ -1643,6 +1961,12 @@ export class TransactionBuilderComponent {
       const snap = this.ibIndexPicker.snapshots.get(c.balanceContractId);
       return !snap || snap.availableBalance !== '0';
     });
+  }
+
+  /** Business requirement 2026-08-19 — the current page's own slice of filteredIbIndexCatalog (the QUALIFIED set), not the raw fetched candidates. This is what the template's IB/SG Index picker now iterates. */
+  get pagedFilteredIbIndexCatalog(): BalanceContract[] {
+    const start = (this.ibIndexPicker.page - 1) * this.ibIndexPicker.pageSize;
+    return this.filteredIbIndexCatalog.slice(start, start + this.ibIndexPicker.pageSize);
   }
 
   /** Step 2 selection — sets selectedContract directly from the already-fetched row, no separate Search click needed. */
@@ -1794,7 +2118,10 @@ export class TransactionBuilderComponent {
     return (
       !!this.selectedCheckerMovement &&
       this.selectedCheckerMovement.movementType === 'UTILIZE' &&
-      !!(this.selectedFunctionStrategy?.checkerRelease.deferSettlement || this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg'))
+      !!(
+        this.selectedFunctionStrategy?.checkerRelease.deferSettlement ||
+        this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')
+      )
     );
   }
 
@@ -1990,7 +2317,11 @@ export class TransactionBuilderComponent {
     // backend-persisted gate that closes that gap — visible to any independent Checker session, not
     // just a same-session flag. Server-side release() deliberately does NOT enforce this itself (see
     // service.submitByMaker()'s own doc comment for why) — this client-side check is the real gate.
-    if (action === 'release' && this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace && !this.selectedCheckerMovement.makerSubmittedAt) {
+    if (
+      action === 'release' &&
+      this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace &&
+      !this.selectedCheckerMovement.makerSubmittedAt
+    ) {
       this.checkerError = 'This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.';
       return;
     }
