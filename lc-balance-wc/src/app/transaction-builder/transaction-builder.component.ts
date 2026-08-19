@@ -26,7 +26,12 @@ import {
   isEarmarkFunction,
 } from './balance-component.model';
 import { buildFields, toReadOnlyFields } from './builder-fields';
-import { SubmitRulesContext, buildSubmitRequest as buildSubmitRequestRules, validateSubmit as validateSubmitRules } from './submit-rules';
+import {
+  SubmitRulesContext,
+  buildSubmitRequest as buildSubmitRequestRules,
+  hasEligibleTargetSelected as hasEligibleTargetSelectedRule,
+  validateSubmit as validateSubmitRules,
+} from './submit-rules';
 import { deriveFunctionStrategy } from './function-strategy';
 import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
@@ -2300,13 +2305,60 @@ export class TransactionBuilderComponent {
   }
 
   /**
+   * Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — true for every function
+   * except A1/B1 (LC Issue / Confirm LC), which create a brand-new Logical Contract with no existing
+   * target to pick at all; every other function operates on (or hangs off) an existing record, so the
+   * "protect fields / disable Submit until an eligible record is selected" gate applies to it. Pure
+   * derivation, same "A1/B1 structurally never populate selectedParent/selectedContract" boundary
+   * `carriedCurrency` already uses elsewhere in this file.
+   */
+  get requiresEligibleTarget(): boolean {
+    return !!this.selectedFunction && !(policy.isCreatingMovement(this.model) && !policy.hasParent(this.model));
+  }
+
+  /**
+   * See `hasEligibleTargetSelected()`'s own doc comment (submit-rules.ts) for the full per-function
+   * rule — re-derived from the same Strategy fields `validateSubmit()`/`buildSubmitRequest()` already
+   * use for their own "pick a record first" guards, but independent of typed field VALUES (Amount/
+   * Currency/etc.) and of `validateSubmit()`'s own call path (A4's `submitA4()` never calls it at all,
+   * but still needs this same gate).
+   */
+  get hasEligibleTargetSelected(): boolean {
+    return hasEligibleTargetSelectedRule(this.submitRulesContext);
+  }
+
+  /** A2–A9/B2–B5's own currently-active picker (Parent LC for a `hasParent` function, else the flat Catalog) — whichever one determines "are there any eligible records at all" for the message below. Public — the template reads it directly to choose between the `.tb-error`/`.tb-hint` severity. */
+  get eligibleCandidateCount(): number {
+    return policy.hasParent(this.model) ? this.parentPicker.total : this.catalogPicker.total;
+  }
+
+  /**
+   * Business requirement 2026-08-19 — "Display a clear message such as: 'No eligible records available
+   * for this transaction.'" shown specifically when the active picker's own qualified candidate count
+   * is genuinely zero; a milder prompt otherwise (candidates exist, e.g. the LC Index itself, but the
+   * function's own Step 2 — a specific pending record/SG/Acceptance — hasn't been picked yet). `null`
+   * once `hasEligibleTargetSelected` is true, or for A1/B1 (`requiresEligibleTarget` false).
+   */
+  get noEligibleRecordsMessage(): string | null {
+    if (!this.requiresEligibleTarget || this.hasEligibleTargetSelected) return null;
+    return this.eligibleCandidateCount === 0
+      ? 'No eligible records available for this transaction.'
+      : 'Pick an eligible record from the list below to continue.';
+  }
+
+  /** Combines the post-Submit lock (`formLocked`) with the new pre-Submit "no eligible record selected yet" lock — `displayFields` below reads this one flag rather than two separate conditions. */
+  get fieldsLocked(): boolean {
+    return this.formLocked || (this.requiresEligibleTarget && !this.hasEligibleTargetSelected);
+  }
+
+  /**
    * Template binds to this instead of `fields` directly, so the live form flips to
    * `toReadOnlyFields()` (BAL-101/Decorator, already built for Inquire Events' own read-only
-   * reconstruction — reused here rather than duplicated) the instant `formLocked` goes true, with no
+   * reconstruction — reused here rather than duplicated) the instant `fieldsLocked` goes true, with no
    * change needed at any of `rebuildFields()`'s own call sites.
    */
   get displayFields(): FormlyFieldConfig[] {
-    return this.formLocked ? toReadOnlyFields(this.fields) : this.fields;
+    return this.fieldsLocked ? toReadOnlyFields(this.fields) : this.fields;
   }
 
   /**

@@ -221,3 +221,43 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
   }
   return { request, error: null };
 }
+
+/**
+ * Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records" — "Protect/disable all
+ * transaction input fields... Disable the Submit button... only be enabled after an eligible record
+ * has been selected"). A1/B1 are exempt by the requirement's own wording (they create a brand-new
+ * Logical Contract with no existing target to pick, same boundary `carriedCurrency`/every other
+ * "carried, once resolved" rule in this file already uses) — every OTHER function needs a genuinely
+ * resolved target before its own Amount/Currency/etc. fields and Submit button unlock.
+ *
+ * Deliberately NOT a call into `validateSubmit()` — that function only ever runs for the generic
+ * `submit()`/`submitPlain()` path and also gates on typed field VALUES (Amount/Currency/createdBy),
+ * which this check must not: the whole point is to unlock those fields once a target is picked, not
+ * require they already be filled in. A4 (`releasesExistingMovementInPlace`) never calls
+ * `validateSubmit()` at all (its own `submitA4()` bypasses the generic flow entirely) but still needs
+ * this same gate, so each "no target selected" condition below is re-derived directly from the same
+ * Strategy fields `validateSubmit()`/`buildSubmitRequest()` already use for their own "pick a record
+ * first" guards, rather than delegating to either of them.
+ */
+export function hasEligibleTargetSelected(ctx: SubmitRulesContext): boolean {
+  const { model, selectedFunction } = ctx;
+  if (!selectedFunction) return false;
+  if (isCreatingMovement(model) && !hasParent(model)) return true; // A1/B1 — requirement doesn't apply
+  const strategy = deriveFunctionStrategy(selectedFunction);
+  // A6/A8/B3 (creating + hasParent) — the Parent LC itself must be picked first.
+  if (lcNumberFromParent(model) && !ctx.selectedParent) return false;
+  // A4 — the specific still-PENDING record to finalize, not just the LC it lives on.
+  if (strategy.checkerRelease.releasesExistingMovementInPlace && !ctx.selectedPayMovement) return false;
+  // A6/B4 — the specific PENDING Document Arrival / Present Docs record to convert.
+  if (strategy.checkerRelease.settlesDocumentArrival && !ctx.selectedPayMovement) return false;
+  // A3S — the specific Shipping Guarantee this Document Arrival is against.
+  if (strategy.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) return false;
+  // A9 — the Shipping Guarantee to redeem.
+  if (strategy.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && !ctx.selectedContractSnapshot) return false;
+  // B5 — the Acceptance to settle.
+  if (strategy.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !ctx.selectedContractSnapshot)
+    return false;
+  // Every other non-creating function (A2/A3/A4/A7/B2/B4) — the flat-Catalog / two-field-search target.
+  if (!isCreatingMovement(model) && !ctx.selectedContract) return false;
+  return true;
+}

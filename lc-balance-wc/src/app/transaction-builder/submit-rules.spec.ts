@@ -1,4 +1,4 @@
-import { SubmitRulesContext, buildSubmitRequest, validateSubmit } from './submit-rules';
+import { SubmitRulesContext, buildSubmitRequest, hasEligibleTargetSelected, validateSubmit } from './submit-rules';
 import { BuilderModel } from './function-policy';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
@@ -409,7 +409,15 @@ describe('submit-rules', () => {
         const result = validateSubmit(
           ctx({
             selectedFunction: { ...fn('A1'), pendingItemLabel: fn('A6').pendingItemLabel },
-            model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', tenorDays: 999 },
+            model: {
+              instrumentType: 'IPLC_LC',
+              movementType: 'ISSUE',
+              amount: '1000',
+              currency: 'USD',
+              createdBy: 'maker1',
+              tenorType: 'SIGHT',
+              tenorDays: 999,
+            },
             selectedPayMovement: null,
           }),
         );
@@ -554,6 +562,98 @@ describe('submit-rules', () => {
       );
       expect(request?.tenorType).toBe('SIGHT');
       expect(request?.tenorDays).toBeUndefined();
+    });
+  });
+
+  describe('hasEligibleTargetSelected — business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records")', () => {
+    it('A1/B1 (creating, no parent) are always exempt — true regardless of any selection state', () => {
+      expect(hasEligibleTargetSelected(ctx())).toBe(true); // A1, default ctx()
+      expect(
+        hasEligibleTargetSelected(
+          ctx({
+            selectedFunction: fn('B1'),
+            model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1' },
+          }),
+        ),
+      ).toBe(true);
+    });
+
+    it('no selectedFunction at all — false', () => {
+      expect(hasEligibleTargetSelected(ctx({ selectedFunction: null }))).toBe(false);
+    });
+
+    it('A2 (flat Catalog, no special Strategy flags) — false with no selectedContract, true once picked', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' };
+      const base = ctx({ selectedFunction: fn('A2'), model });
+      expect(hasEligibleTargetSelected(base)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...base, selectedContract: contract() })).toBe(true);
+    });
+
+    it('A7 (flat/two-field target, no special Strategy flags) — same shape as A2', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' };
+      const base = ctx({ selectedFunction: fn('A7'), model });
+      expect(hasEligibleTargetSelected(base)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...base, selectedContract: contract() })).toBe(true);
+    });
+
+    it('A8 (creating + hasParent, no other Strategy flags) — false with no selectedParent, true once the Parent LC is picked, no Step-2 needed', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'SHGT', movementType: 'ISSUE' };
+      const base = ctx({ selectedFunction: fn('A8'), model });
+      expect(hasEligibleTargetSelected(base)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...base, selectedParent: contract() })).toBe(true);
+    });
+
+    it('B3 (creating + hasParent, no other Strategy flags, post-2026-08-18 redesign) — same shape as A8', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE' };
+      const base = ctx({ selectedFunction: fn('B3'), model, naturalKey: { lcNumber: 'S001', ibNumber: 'E01', sgNumber: '' } });
+      expect(hasEligibleTargetSelected(base)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...base, selectedParent: contract() })).toBe(true);
+    });
+
+    it('A4 (releasesExistingMovementInPlace) — false without selectedPayMovement even with selectedContract, true once the specific record is picked', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' };
+      const base = ctx({ selectedFunction: fn('A4'), model, selectedContract: contract() });
+      expect(hasEligibleTargetSelected(base)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...base, selectedPayMovement: movement() })).toBe(true);
+    });
+
+    it('A6 (settlesDocumentArrival, creating + hasParent) — false without selectedParent, still false with only selectedParent, true once selectedPayMovement is also picked', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' };
+      const withParentOnly = ctx({ selectedFunction: fn('A6'), model, selectedParent: contract() });
+      expect(hasEligibleTargetSelected(ctx({ selectedFunction: fn('A6'), model }))).toBe(false);
+      expect(hasEligibleTargetSelected(withParentOnly)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...withParentOnly, selectedPayMovement: movement() })).toBe(true);
+    });
+
+    it('B4 (settlesDocumentArrival, NOT creating — flat Catalog target) — false without selectedContract, still false with only selectedContract, true once selectedPayMovement is also picked', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR' };
+      const withContractOnly = ctx({ selectedFunction: fn('B4'), model, selectedContract: contract() });
+      expect(hasEligibleTargetSelected(ctx({ selectedFunction: fn('B4'), model }))).toBe(false);
+      expect(hasEligibleTargetSelected(withContractOnly)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...withContractOnly, selectedPayMovement: movement() })).toBe(true);
+    });
+
+    it('A3S (documentArrivalWithSg) — false without selectedArrivalSg/arrivalSgSnapshot even with selectedContract, true once both are also picked', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' };
+      const withContractOnly = ctx({ selectedFunction: fn('A3S'), model, selectedContract: contract() });
+      expect(hasEligibleTargetSelected(withContractOnly)).toBe(false);
+      expect(
+        hasEligibleTargetSelected({ ...withContractOnly, selectedArrivalSg: contract({ balanceContractId: 'sg-1' }), arrivalSgSnapshot: snapshot() }),
+      ).toBe(true);
+    });
+
+    it('A9 (amountVsAvailableDerivation REDEEM) — false without selectedContractSnapshot even with selectedContract, true once the snapshot is resolved', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'SHGT', movementType: 'PARTIAL_REDEEM' };
+      const withContractOnly = ctx({ selectedFunction: fn('A9'), model, selectedContract: contract() });
+      expect(hasEligibleTargetSelected(withContractOnly)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...withContractOnly, selectedContractSnapshot: snapshot() })).toBe(true);
+    });
+
+    it('B5 (amountVsAvailableDerivation SETTLE, EPLC_ACCEPTANCE) — false without selectedContractSnapshot even with selectedContract, true once the snapshot is resolved', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'EPLC_ACCEPTANCE', movementType: 'PARTIAL_SETTLE' };
+      const withContractOnly = ctx({ selectedFunction: fn('B5'), model, selectedContract: contract() });
+      expect(hasEligibleTargetSelected(withContractOnly)).toBe(false);
+      expect(hasEligibleTargetSelected({ ...withContractOnly, selectedContractSnapshot: snapshot() })).toBe(true);
     });
   });
 });

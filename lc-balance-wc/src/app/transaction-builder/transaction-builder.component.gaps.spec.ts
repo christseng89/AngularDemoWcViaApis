@@ -193,6 +193,13 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.formLocked).toBe(true);
 
       c.selectFunction(fn('A2'));
+      // Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — A2 is one of the
+      // functions the new pre-Submit eligibility gate applies to, so displayFields also needs a
+      // selectedContract here to isolate THIS test's own concern (formLocked resetting on a function
+      // switch) from that separate, later-added gate — see the dedicated
+      // "requiresEligibleTarget / hasEligibleTargetSelected / fieldsLocked" describe block below for
+      // that gate's own coverage.
+      c.selectedContract = contract();
       expect(c.formLocked).toBe(false);
       expect(c.displayFields).toBe(c.fields);
     });
@@ -204,6 +211,71 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.submitError = 'The secondary leg failed to post.';
       expect(c.formLocked).toBe(true);
       expect(c.displayFields).not.toBe(c.fields);
+    });
+  });
+
+  describe('requiresEligibleTarget / hasEligibleTargetSelected / fieldsLocked / noEligibleRecordsMessage — business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records")', () => {
+    it('A1 (exempt) — requiresEligibleTarget false, fieldsLocked false, no message, regardless of picker state', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A1'));
+      c.catalogPicker.total = 0;
+      expect(c.requiresEligibleTarget).toBe(false);
+      expect(c.hasEligibleTargetSelected).toBe(true);
+      expect(c.fieldsLocked).toBe(false);
+      expect(c.displayFields).toBe(c.fields);
+      expect(c.noEligibleRecordsMessage).toBeNull();
+    });
+
+    it('A2 (flat Catalog) with zero eligible candidates — requiresEligibleTarget true, fields locked, "No eligible records" message', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A2'));
+      c.catalogPicker.total = 0;
+      expect(c.requiresEligibleTarget).toBe(true);
+      expect(c.hasEligibleTargetSelected).toBe(false);
+      expect(c.fieldsLocked).toBe(true);
+      expect(c.displayFields).not.toBe(c.fields);
+      expect(c.eligibleCandidateCount).toBe(0);
+      expect(c.noEligibleRecordsMessage).toBe('No eligible records available for this transaction.');
+    });
+
+    it('A2 (flat Catalog) with candidates available but none picked yet — locked, softer "pick one" message', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A2'));
+      c.catalogPicker.total = 3;
+      expect(c.fieldsLocked).toBe(true);
+      expect(c.eligibleCandidateCount).toBe(3);
+      expect(c.noEligibleRecordsMessage).toBe('Pick an eligible record from the list below to continue.');
+    });
+
+    it('A2 (flat Catalog) once a contract is picked — unlocked, no message', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A2'));
+      c.catalogPicker.total = 3;
+      c.selectedContract = contract();
+      expect(c.hasEligibleTargetSelected).toBe(true);
+      expect(c.fieldsLocked).toBe(false);
+      expect(c.displayFields).toBe(c.fields);
+      expect(c.noEligibleRecordsMessage).toBeNull();
+    });
+
+    it('A6 (hasParent) reads eligibleCandidateCount off parentPicker.total, not catalogPicker.total', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A6'));
+      c.catalogPicker.total = 99; // must be ignored for a hasParent function
+      c.parentPicker.total = 0;
+      expect(c.eligibleCandidateCount).toBe(0);
+      expect(c.noEligibleRecordsMessage).toBe('No eligible records available for this transaction.');
+    });
+
+    it('formLocked (post-Submit) still locks fields even once an eligible target is selected', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A2'));
+      c.selectedContract = contract();
+      c.submitResult = movement({ movementId: 'mv-new', status: 'PENDING' });
+      expect(c.hasEligibleTargetSelected).toBe(true);
+      expect(c.formLocked).toBe(true);
+      expect(c.fieldsLocked).toBe(true);
+      expect(c.noEligibleRecordsMessage).toBeNull(); // formLocked is a different lock reason, not "no target"
     });
   });
 

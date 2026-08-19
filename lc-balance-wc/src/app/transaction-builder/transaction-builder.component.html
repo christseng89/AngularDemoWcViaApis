@@ -2,8 +2,8 @@
   <header class="tb-header">
     <h1 class="tb-title">Balance Component — Transaction Builder</h1>
     <p class="tb-subtitle">
-      Pick a named business function below (Import A-series / Export B-series — Design doc §5), then fill in
-      only what that function needs. For fixed end-to-end scenarios, use the Business Case Runner instead.
+      Pick a named business function below (Import A-series / Export B-series — Design doc §5), then fill in only what that function needs. For fixed end-to-end
+      scenarios, use the Business Case Runner instead.
     </p>
   </header>
 
@@ -22,171 +22,199 @@
   </div>
 
   <ng-container *ngIf="activeMode === 'PROCESSING'">
-
-  <!-- Business instruction 2026-08-15 ("A1-A9 B1-B5 should be horizental instead of vertical... the function
+    <!-- Business instruction 2026-08-15 ("A1-A9 B1-B5 should be horizental instead of vertical... the function
        input should be more important than the menu... Tab Import => A1...A9 horizontal, Tab Export B1...B5
        horizontal") — Import/Export is now a tab switch (one function row visible at a time, horizontal chips)
        instead of two always-visible vertical lists, so the vertical space goes to the picked function's own
        Maker/Checker panels below, not the menu itself. -->
-  <div class="tb-function-picker">
-    <div class="tb-tabs tb-tabs--side">
-      <button type="button" class="tb-tab" [class.tb-tab--active]="activeFunctionSide === 'IMPORT'" (click)="selectFunctionSide('IMPORT')">Import LC</button>
-      <!-- Business instruction 2026-08-15 ("EBL does not include in the Balance Component Scope,
+    <div class="tb-function-picker">
+      <div class="tb-tabs tb-tabs--side">
+        <button type="button" class="tb-tab" [class.tb-tab--active]="activeFunctionSide === 'IMPORT'" (click)="selectFunctionSide('IMPORT')">Import LC</button>
+        <!-- Business instruction 2026-08-15 ("EBL does not include in the Balance Component Scope,
            therefore the Export LC without confirmation should be removed from the Export") — renamed
            from "Export LC" to make explicit that this side only ever models Confirmed Export LC;
            EBL/Nego financing and plain (unconfirmed) advising are out of Balance Component scope. -->
-      <button type="button" class="tb-tab" [class.tb-tab--active]="activeFunctionSide === 'EXPORT'" (click)="selectFunctionSide('EXPORT')">Export Confirmed</button>
+        <button type="button" class="tb-tab" [class.tb-tab--active]="activeFunctionSide === 'EXPORT'" (click)="selectFunctionSide('EXPORT')">
+          Export Confirmed
+        </button>
+      </div>
+      <div class="tb-function-chips">
+        <button
+          type="button"
+          *ngFor="let fn of activeFunctionSide === 'IMPORT' ? importFunctions : exportFunctions"
+          class="tb-function-chip"
+          [class.tb-function-chip--active]="selectedFunction?.code === fn.code"
+          [title]="fn.help"
+          (click)="selectFunction(fn)"
+        >
+          <span class="tb-function-chip__code">{{ fn.code }}</span>
+          <span class="tb-function-chip__label">{{ fn.label }}</span>
+        </button>
+      </div>
+      <p class="tb-function-help" *ngIf="selectedFunction && selectedFunction.side === activeFunctionSide">{{ selectedFunction.help }}</p>
     </div>
-    <div class="tb-function-chips">
-      <button type="button" *ngFor="let fn of (activeFunctionSide === 'IMPORT' ? importFunctions : exportFunctions)"
-              class="tb-function-chip" [class.tb-function-chip--active]="selectedFunction?.code === fn.code"
-              [title]="fn.help" (click)="selectFunction(fn)">
-        <span class="tb-function-chip__code">{{ fn.code }}</span>
-        <span class="tb-function-chip__label">{{ fn.label }}</span>
-      </button>
-    </div>
-    <p class="tb-function-help" *ngIf="selectedFunction && selectedFunction.side === activeFunctionSide">{{ selectedFunction.help }}</p>
-  </div>
 
-  <div class="tb-workspace" *ngIf="selectedFunction">
-    <div class="tb-main">
+    <div class="tb-workspace" *ngIf="selectedFunction">
+      <div class="tb-main">
+        <!-- ══════════════════════════ MAKER ══════════════════════════ -->
+        <section class="tb-section tb-section--maker">
+          <div class="tb-section__header">
+            <span class="tb-role-badge tb-role-badge--maker">Maker</span>
+            <h2 class="tb-section__title">{{ selectedFunction.code }} — {{ selectedFunction.label }}</h2>
+          </div>
 
-      <!-- ══════════════════════════ MAKER ══════════════════════════ -->
-      <section class="tb-section tb-section--maker">
-        <div class="tb-section__header">
-          <span class="tb-role-badge tb-role-badge--maker">Maker</span>
-          <h2 class="tb-section__title">{{ selectedFunction.code }} — {{ selectedFunction.label }}</h2>
-        </div>
-
-        <div class="tb-section__body">
-          <!-- Business instruction 2026-08-17 ("After Release is successfully completed, the system
+          <div class="tb-section__body">
+            <!-- Business instruction 2026-08-17 ("After Release is successfully completed, the system
                should automatically return to the same transaction function and reset the screen for a
                new transaction") — release() re-invokes selectFunction() with the same function on
                success, which clears releaseSuccessHint too; this brief visible confirmation is set right
                AFTER that reset call so it survives it, and disappears the moment any other action
                (switching functions, a fresh Submit, etc.) touches state again. -->
-          <div class="tb-hint tb-hint--ok mb-2" *ngIf="releaseSuccessHint">{{ releaseSuccessHint }}</div>
+            <div class="tb-hint tb-hint--ok mb-2" *ngIf="releaseSuccessHint">{{ releaseSuccessHint }}</div>
 
-          <div class="tb-field" *ngIf="selectedFunction.subChoice">
-            <label class="tb-field__label">{{ selectedFunction.subChoice.label }}</label>
-            <select class="tb-select tb-select--required" [(ngModel)]="subChoiceValue" (change)="onSubChoice()">
-              <option value="">— select —</option>
-              <option *ngFor="let o of selectedFunction.subChoice.options" [value]="o.value">{{ o.label }}</option>
-            </select>
-          </div>
+            <div class="tb-field" *ngIf="selectedFunction.subChoice">
+              <label class="tb-field__label">{{ selectedFunction.subChoice.label }}</label>
+              <select class="tb-select tb-select--required" [(ngModel)]="subChoiceValue" (change)="onSubChoice()">
+                <option value="">— select —</option>
+                <option *ngFor="let o of selectedFunction.subChoice.options" [value]="o.value">{{ o.label }}</option>
+              </select>
+            </div>
 
-          <ng-container *ngIf="ready">
-            <!-- Parent LC (business instruction 2026-08-14): for A6/B4 (Acceptance) and A8 (Shipping Gtee Issue),
+            <ng-container *ngIf="ready">
+              <!-- Parent LC (business instruction 2026-08-14): for A6/B4 (Acceptance) and A8 (Shipping Gtee Issue),
                  the LC Number is NOT freely typed — an Acceptance/SG can only ever be created under an LC that
                  already exists, so it must be THE SAME LC picked here, not a second independent text field that
                  could drift from it. Shown first so the natural-key section below can source lcNumber from it. -->
-            <div class="tb-field" *ngIf="hasParent">
-              <!-- Business instruction 2026-08-15 ("B3 左側不需要" — Parent LC dropdown/label is redundant):
+              <div class="tb-field" *ngIf="hasParent">
+                <!-- Business instruction 2026-08-15 ("B3 左側不需要" — Parent LC dropdown/label is redundant):
                    every InstrumentType's own PARENT_INSTRUMENT_OPTIONS list has at most one entry, and
                    whenever hasParent is true, defaultParentInstrumentType already auto-selects it on
                    function pick (business instruction 2026-08-15, "Parent LC 是 Default 條件 不需要再選") —
                    so the "— none — / single option" <select> was pure clutter, never a real choice. Only
                    render it back if a future InstrumentType genuinely has >1 parent option. -->
-              <ng-container *ngIf="parentOptions.length > 1; else parentAutoSelected">
-                <label class="tb-field__label">Parent LC (Design doc §3.1 parentLogicalContractId)</label>
-                <div class="tb-grid-2">
-                  <select class="tb-select tb-select--required" [(ngModel)]="parentInstrumentType" (change)="onParentInstrumentTypeChange()">
-                    <option value="">— none —</option>
-                    <option *ngFor="let p of parentOptions" [value]="p">{{ p }}</option>
-                  </select>
-                  <div *ngIf="parentInstrumentType">
-                    <app-index-picker
-                      label="LC Index — Existing Contract"
-                      [items]="pagedFilteredParentCatalog"
-                      [selectedId]="selectedParent?.balanceContractId ?? null"
-                      [searchable]="true"
-                      [(searchValue)]="parentPicker.search"
-                      searchPlaceholder="Search LC Number…"
-                      (search)="onParentSearch()"
-                      emptyText="No eligible parent {{ parentInstrumentType }} contracts (Tenor Type / 0-balance filtered)."
-                      [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
-                      (pick)="!formLocked && onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
-                      <ng-template let-c>
-                        <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span>
-                        <span class="tb-row-badge">{{ c.status }}</span>
-                      </ng-template>
-                    </app-index-picker>
+                <ng-container *ngIf="parentOptions.length > 1; else parentAutoSelected">
+                  <label class="tb-field__label">Parent LC (Design doc §3.1 parentLogicalContractId)</label>
+                  <div class="tb-grid-2">
+                    <select class="tb-select tb-select--required" [(ngModel)]="parentInstrumentType" (change)="onParentInstrumentTypeChange()">
+                      <option value="">— none —</option>
+                      <option *ngFor="let p of parentOptions" [value]="p">{{ p }}</option>
+                    </select>
+                    <div *ngIf="parentInstrumentType">
+                      <app-index-picker
+                        label="LC Index — Existing Contract"
+                        [items]="pagedFilteredParentCatalog"
+                        [selectedId]="selectedParent?.balanceContractId ?? null"
+                        [searchable]="true"
+                        [(searchValue)]="parentPicker.search"
+                        searchPlaceholder="Search LC Number…"
+                        (search)="onParentSearch()"
+                        emptyText="No eligible parent {{ parentInstrumentType }} contracts (Tenor Type / 0-balance filtered)."
+                        [page]="parentPicker.page"
+                        [totalPages]="parentPicker.totalPages"
+                        [total]="parentPicker.total"
+                        (pick)="!formLocked && onSelectParent($event)"
+                        (prevPage)="parentPrevPage()"
+                        (nextPage)="parentNextPage()"
+                      >
+                        <ng-template let-c>
+                          <span class="tb-row-primary"
+                            >{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span
+                          >
+                          <span class="tb-row-badge">{{ c.status }}</span>
+                        </ng-template>
+                      </app-index-picker>
+                    </div>
                   </div>
-                </div>
-              </ng-container>
-              <!-- Business instruction 2026-08-15 ("Index LC and 2ndary Number should be the same style") —
+                </ng-container>
+                <!-- Business instruction 2026-08-15 ("Index LC and 2ndary Number should be the same style") —
                    one shared IndexPicker shell for every LC/IB/SG picker on this screen. Label matches
                    the flat Catalog picker's own "LC Index — Existing Contract" wording below (business
                    instruction 2026-08-15, "LC Index — Existing Contract then EB Index - Existing Contract
                    (from B3)") — same picker, same naming, just no dropdown/label wrapper above it since
                    there's only ever one parent instrumentType to pick from. -->
-              <ng-template #parentAutoSelected>
-                <div *ngIf="parentInstrumentType">
-                  <app-index-picker
-                    label="LC Index — Existing Contract"
-                    [items]="filteredParentCatalog"
-                    [selectedId]="selectedParent?.balanceContractId ?? null"
-                    [searchable]="true"
-                    [(searchValue)]="parentPicker.search"
-                    searchPlaceholder="Search LC Number…"
-                    (search)="onParentSearch()"
-                    emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
-                    [page]="parentPicker.page" [totalPages]="parentPicker.totalPages" [total]="parentPicker.total"
-                    (pick)="!formLocked && onSelectParent($event)" (prevPage)="parentPrevPage()" (nextPage)="parentNextPage()">
-                    <ng-template let-c>
-                      <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span>
-                      <span class="tb-row-badge">{{ c.status }}</span>
-                    </ng-template>
-                  </app-index-picker>
-                </div>
-              </ng-template>
-              <!-- Business instruction 2026-08-15: exposureNature select removed — EPLC_LC (Unconfirmed,
+                <ng-template #parentAutoSelected>
+                  <div *ngIf="parentInstrumentType">
+                    <app-index-picker
+                      label="LC Index — Existing Contract"
+                      [items]="filteredParentCatalog"
+                      [selectedId]="selectedParent?.balanceContractId ?? null"
+                      [searchable]="true"
+                      [(searchValue)]="parentPicker.search"
+                      searchPlaceholder="Search LC Number…"
+                      (search)="onParentSearch()"
+                      emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
+                      [page]="parentPicker.page"
+                      [totalPages]="parentPicker.totalPages"
+                      [total]="parentPicker.total"
+                      (pick)="!formLocked && onSelectParent($event)"
+                      (prevPage)="parentPrevPage()"
+                      (nextPage)="parentNextPage()"
+                    >
+                      <ng-template let-c>
+                        <span class="tb-row-primary"
+                          >{{ c.naturalKey.lcNumber }}<span *ngIf="c.tenorType"> ({{ c.tenorType }})</span></span
+                        >
+                        <span class="tb-row-badge">{{ c.status }}</span>
+                      </ng-template>
+                    </app-index-picker>
+                  </div>
+                </ng-template>
+                <!-- Business instruction 2026-08-15: exposureNature select removed — EPLC_LC (Unconfirmed,
                    MEMO) is no longer a selectable parent, so every EPLC_ACCEPTANCE is ACTUAL. The
                    component still sends exposureNature: 'ACTUAL' on submit (transaction-builder.component.ts). -->
 
-              <!-- Business instruction 2026-08-14 ("A6 => Approved LC Balance and Create Acceptance Balance"),
+                <!-- Business instruction 2026-08-14 ("A6 => Approved LC Balance and Create Acceptance Balance"),
                    generalized 2026-08-15 for B4 ("B4 should index records from B3") via pendingItemLabel/
                    pendingItemSourceHint (default "Document Arrival"/"use A3 (Document Arrival) first") —
                    Step 2: pick the still-PENDING record to convert. Submitting below releases it (finalizes
                    the source Balance) AND creates the new Acceptance in one Checker action. -->
-              <!-- Business instruction 2026-08-15 ("Index Search") — same search box every other picker
+                <!-- Business instruction 2026-08-15 ("Index Search") — same search box every other picker
                    on this screen already has; filteredPayableMovements (component.ts) filters client-side
                    by IB/EB Number since payableMovements is already fully loaded/unpaginated. -->
-              <!-- Business instruction 2026-08-15 ("LC Index — Existing Contract then EB Index - Existing
+                <!-- Business instruction 2026-08-15 ("LC Index — Existing Contract then EB Index - Existing
                    Contract (from B3)") — label matches Step 1's "LC Index — Existing Contract" naming
                    pattern; ibNumberLabel already reads "IB Number"/"EB Number" per instrumentType, so its
                    first word gives "IB"/"EB" here. -->
-              <div class="tb-field mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && selectedParent">
-                <app-index-picker
-                  label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
-                  [items]="pagedFilteredPayableMovements"
-                  [loading]="payableMovementsLoading"
-                  [selectedId]="selectedPayMovement?.movementId ?? null"
-                  [searchable]="true"
-                  [searchValue]="payableMovementSearch"
-                  (searchValueChange)="onPayableMovementSearchChange($event)"
-                  searchPlaceholder="Search {{ ibNumberLabel }}…"
-                  emptyText="No PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{ selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first' }}."
-                  autoPickedHint="Only one PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                  [page]="payableMovementsPaging.page" [totalPages]="payableMovementsPaging.totalPages" [total]="payableMovementsPaging.total"
-                  (pick)="!formLocked && onSelectPayMovement($event)" (prevPage)="payableMovementsPrevPage()" (nextPage)="payableMovementsNextPage()">
-                  <ng-template let-m>
-                    <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
-                    <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
-                  </ng-template>
-                </app-index-picker>
-                <div class="tb-hint tb-hint--ok" *ngIf="selectedPayMovement">{{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.</div>
+                <div class="tb-field mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && selectedParent">
+                  <app-index-picker
+                    label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
+                    [items]="pagedFilteredPayableMovements"
+                    [loading]="payableMovementsLoading"
+                    [selectedId]="selectedPayMovement?.movementId ?? null"
+                    [searchable]="true"
+                    [searchValue]="payableMovementSearch"
+                    (searchValueChange)="onPayableMovementSearchChange($event)"
+                    searchPlaceholder="Search {{ ibNumberLabel }}…"
+                    emptyText="No PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{
+                      selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first'
+                    }}."
+                    autoPickedHint="Only one PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
+                    [page]="payableMovementsPaging.page"
+                    [totalPages]="payableMovementsPaging.totalPages"
+                    [total]="payableMovementsPaging.total"
+                    (pick)="!formLocked && onSelectPayMovement($event)"
+                    (prevPage)="payableMovementsPrevPage()"
+                    (nextPage)="payableMovementsNextPage()"
+                  >
+                    <ng-template let-m>
+                      <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
+                      <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date: 'short' }}</span>
+                    </ng-template>
+                  </app-index-picker>
+                  <div class="tb-hint tb-hint--ok" *ngIf="selectedPayMovement">
+                    {{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <!-- Natural key: creating (ISSUE/CREATE) functions get free-text (except LC Number when
+              <!-- Natural key: creating (ISSUE/CREATE) functions get free-text (except LC Number when
                  lcNumberFromParent — see above); IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT existing-contract lookups
                  search by LC+IB(EB)/LC+SG (business instruction 2026-08-14); everything else (IPLC_LC/EPLC_LC/
                  EPLC_CONFIRMATION, natural key = lcNumber alone) browses the flat Catalog. -->
-            <div class="tb-field">
-              <ng-container *ngIf="isCreatingMovement; else existingContract">
-                <label class="tb-field__label">{{ lcNumberFromParent ? 'New Reference — Natural Key' : 'New Logical Contract — Natural Key' }}</label>
-                <!-- Business instruction 2026-08-17 ("the primary key and 2ndary key are mandatory field...
+              <div class="tb-field">
+                <ng-container *ngIf="isCreatingMovement; else existingContract">
+                  <label class="tb-field__label">{{ lcNumberFromParent ? 'New Reference — Natural Key' : 'New Logical Contract — Natural Key' }}</label>
+                  <!-- Business instruction 2026-08-17 ("the primary key and 2ndary key are mandatory field...
                      after Submit those key fields need to be protected as well") — LC Number is the
                      Primary Key, IB/SG Number the 2ndary Key, for every A1-A9/B1-B5 natural-key entry;
                      mandatory was already enforced at Submit time (validateSubmit(), submit-rules.ts), this
@@ -194,8 +222,8 @@
                      Formly-driven fields already lock on), these plain inputs (outside buildFields()'s own
                      Formly array, so formLocked's displayFields() rewrite never reached them) grey out via
                      the same .tb-input:disabled styling every other locked field already uses. -->
-                <div class="tb-grid-3">
-                  <!-- Business instruction 2026-08-19 ("LC Number must be a mandatory field for both A1
+                  <div class="tb-grid-3">
+                    <!-- Business instruction 2026-08-19 ("LC Number must be a mandatory field for both A1
                        and B1, with the same mandatory-field validation and visual indication (*) as the
                        Amount field") — validation already existed (validateSubmit() rejects a blank LC
                        Number, see the doc comment above); this closes the missing VISUAL half. A1/B1's own
@@ -204,9 +232,9 @@
                        hasParent creating function that DOES need ibNumber/sgNumber, e.g. A8/B3, always has
                        lcNumberFromParent true instead), so adding a real label here can't misalign the
                        grid against a sibling IB/SG Number cell that would need the same treatment. -->
-                  <div *ngIf="!lcNumberFromParent">
-                    <label class="tb-field__label">LC Number <span class="tb-required-mark">*</span></label>
-                    <!-- Business instruction 2026-08-19 ("leave LC Number blank and press Tab... no red
+                    <div *ngIf="!lcNumberFromParent">
+                      <label class="tb-field__label">LC Number <span class="tb-required-mark">*</span></label>
+                      <!-- Business instruction 2026-08-19 ("leave LC Number blank and press Tab... no red
                          validation box... Amount... immediately highlighted with a red validation box") —
                          Amount's own red-on-blur comes from ngx-formly-bootstrap's FieldType applying
                          [class.is-invalid] the instant its own Angular FormControl (required: true) becomes
@@ -217,14 +245,23 @@
                          exposes .invalid/.touched, and tb-input--invalid (below) is this app's own
                          non-Bootstrap-scoped equivalent of is-invalid (LC Number isn't a .form-control, so
                          Bootstrap's own is-invalid selector wouldn't match it). -->
-                    <input class="tb-input tb-input--required" [class.tb-input--invalid]="lcNumberCtrl.invalid && lcNumberCtrl.touched" placeholder="LC Number" name="lcNumberA1B1" required [(ngModel)]="naturalKey.lcNumber" #lcNumberCtrl="ngModel" [disabled]="formLocked">
-                    <div class="tb-error mt-1" *ngIf="lcNumberCtrl.invalid && lcNumberCtrl.touched">LC Number is mandatory.</div>
-                  </div>
-                  <div *ngIf="lcNumberFromParent">
-                    <input class="tb-input" placeholder="LC Number" [ngModel]="naturalKey.lcNumber" disabled>
-                    <div class="tb-hint" *ngIf="!naturalKey.lcNumber">Pick the Parent LC above first.</div>
-                  </div>
-                  <!-- Business instruction 2026-08-19 ("A8 SG Number / B3 EB Number" — same mandatory +
+                      <input
+                        class="tb-input tb-input--required"
+                        [class.tb-input--invalid]="lcNumberCtrl.invalid && lcNumberCtrl.touched"
+                        placeholder="LC Number"
+                        name="lcNumberA1B1"
+                        required
+                        [(ngModel)]="naturalKey.lcNumber"
+                        #lcNumberCtrl="ngModel"
+                        [disabled]="formLocked"
+                      />
+                      <div class="tb-error mt-1" *ngIf="lcNumberCtrl.invalid && lcNumberCtrl.touched">LC Number is mandatory.</div>
+                    </div>
+                    <div *ngIf="lcNumberFromParent">
+                      <input class="tb-input" placeholder="LC Number" [ngModel]="naturalKey.lcNumber" disabled />
+                      <div class="tb-hint" *ngIf="!naturalKey.lcNumber">Pick the Parent LC above first.</div>
+                    </div>
+                    <!-- Business instruction 2026-08-19 ("A8 SG Number / B3 EB Number" — same mandatory +
                        blur-validation requirement as LC Number above, "不得各自實作不同的驗證方式" — must
                        not each implement a different validation mechanism) — identical pattern: a real
                        label with the red asterisk, `required` + `#ctrl="ngModel"` for Angular's own
@@ -233,22 +270,43 @@
                        grid cell (requiredNaturalKeyFields.includes('ibNumber')/'sgNumber' are mutually
                        exclusive across every registered function — no function needs both), so there is
                        no risk of two labels rendering in the same cell simultaneously. -->
-                  <div *ngIf="requiredNaturalKeyFields.includes('ibNumber')">
-                    <label class="tb-field__label">{{ ibNumberLabel }} <span class="tb-required-mark">*</span></label>
-                    <input class="tb-input tb-input--required" [class.tb-input--invalid]="ibNumberCtrl.invalid && ibNumberCtrl.touched" [placeholder]="ibNumberLabel" name="naturalKeyIbNumber" required [(ngModel)]="naturalKey.ibNumber" #ibNumberCtrl="ngModel" [disabled]="formLocked">
-                    <div class="tb-error mt-1" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
+                    <div *ngIf="requiredNaturalKeyFields.includes('ibNumber')">
+                      <label class="tb-field__label">{{ ibNumberLabel }} <span class="tb-required-mark">*</span></label>
+                      <input
+                        class="tb-input tb-input--required"
+                        [class.tb-input--invalid]="ibNumberCtrl.invalid && ibNumberCtrl.touched"
+                        [placeholder]="ibNumberLabel"
+                        name="naturalKeyIbNumber"
+                        required
+                        [(ngModel)]="naturalKey.ibNumber"
+                        #ibNumberCtrl="ngModel"
+                        [disabled]="formLocked"
+                      />
+                      <div class="tb-error mt-1" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
+                    </div>
+                    <div *ngIf="requiredNaturalKeyFields.includes('sgNumber')">
+                      <label class="tb-field__label">SG Number <span class="tb-required-mark">*</span></label>
+                      <input
+                        class="tb-input tb-input--required"
+                        [class.tb-input--invalid]="sgNumberCtrl.invalid && sgNumberCtrl.touched"
+                        placeholder="SG Number"
+                        name="naturalKeySgNumber"
+                        required
+                        [(ngModel)]="naturalKey.sgNumber"
+                        #sgNumberCtrl="ngModel"
+                        [disabled]="formLocked"
+                      />
+                      <div class="tb-error mt-1" *ngIf="sgNumberCtrl.invalid && sgNumberCtrl.touched">SG Number is mandatory.</div>
+                    </div>
                   </div>
-                  <div *ngIf="requiredNaturalKeyFields.includes('sgNumber')">
-                    <label class="tb-field__label">SG Number <span class="tb-required-mark">*</span></label>
-                    <input class="tb-input tb-input--required" [class.tb-input--invalid]="sgNumberCtrl.invalid && sgNumberCtrl.touched" placeholder="SG Number" name="naturalKeySgNumber" required [(ngModel)]="naturalKey.sgNumber" #sgNumberCtrl="ngModel" [disabled]="formLocked">
-                    <div class="tb-error mt-1" *ngIf="sgNumberCtrl.invalid && sgNumberCtrl.touched">SG Number is mandatory.</div>
-                  </div>
-                </div>
-              </ng-container>
-              <ng-template #existingContract>
-                <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
-                  <label class="tb-field__label">Search Existing Contract — LC Number + {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} (both mandatory — a single LC can have multiple {{ ibNumberLabel }}s)</label>
-                  <!-- Business instruction 2026-08-18 ("除了A1 B1允許輸入 LC NUMBER 其他都應該是帶入的" — except
+                </ng-container>
+                <ng-template #existingContract>
+                  <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
+                    <label class="tb-field__label"
+                      >Search Existing Contract — LC Number + {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} (both mandatory
+                      — a single LC can have multiple {{ ibNumberLabel }}s)</label
+                    >
+                    <!-- Business instruction 2026-08-18 ("除了A1 B1允許輸入 LC NUMBER 其他都應該是帶入的" — except
                        A1/B1, LC Number should be carried in, not freely typed) — once Search resolves a
                        contract, these fields lock immediately (same timing as Currency's own carriedCurrency
                        protection: locks the moment selectedContract/selectedParent resolves, not just at
@@ -256,123 +314,197 @@
                        clears selectedContract/searchNaturalKey via selectFunction()'s own reset) is the only
                        way to search again — same "no undo, pick a different function to restart" convention
                        the flat Catalog picker's own selectedContract already uses. -->
-                  <div class="tb-grid-3">
-                    <input class="tb-input tb-input--required" placeholder="LC Number (mandatory)" [(ngModel)]="searchNaturalKey.lcNumber" [disabled]="formLocked || !!selectedContract">
-                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('ibNumber')" [placeholder]="ibNumberLabel + ' (mandatory)'" [(ngModel)]="searchNaturalKey.ibNumber" [disabled]="formLocked || !!selectedContract">
-                    <input class="tb-input tb-input--required" *ngIf="requiredNaturalKeyFields.includes('sgNumber')" placeholder="SG Number (mandatory)" [(ngModel)]="searchNaturalKey.sgNumber" [disabled]="formLocked || !!selectedContract">
-                  </div>
-                  <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked || !!selectedContract">Search</button>
-                  <div class="tb-error mt-2" *ngIf="searchError">{{ searchError }}</div>
-                  <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}</div>
+                    <div class="tb-grid-3">
+                      <input
+                        class="tb-input tb-input--required"
+                        placeholder="LC Number (mandatory)"
+                        [(ngModel)]="searchNaturalKey.lcNumber"
+                        [disabled]="formLocked || !!selectedContract"
+                      />
+                      <input
+                        class="tb-input tb-input--required"
+                        *ngIf="requiredNaturalKeyFields.includes('ibNumber')"
+                        [placeholder]="ibNumberLabel + ' (mandatory)'"
+                        [(ngModel)]="searchNaturalKey.ibNumber"
+                        [disabled]="formLocked || !!selectedContract"
+                      />
+                      <input
+                        class="tb-input tb-input--required"
+                        *ngIf="requiredNaturalKeyFields.includes('sgNumber')"
+                        placeholder="SG Number (mandatory)"
+                        [(ngModel)]="searchNaturalKey.sgNumber"
+                        [disabled]="formLocked || !!selectedContract"
+                      />
+                    </div>
+                    <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked || !!selectedContract">
+                      Search
+                    </button>
+                    <div class="tb-error mt-2" *ngIf="searchError">{{ searchError }}</div>
+                    <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">
+                      Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}
+                    </div>
 
-                  <!-- Business instruction 2026-08-14 "search LC Index, then the IB Index (page by page for both)
+                    <!-- Business instruction 2026-08-14 "search LC Index, then the IB Index (page by page for both)
                        to pick up the LC Number and IB Number" — Step 2. Once an LC is picked in the Parent LC
                        section above (Step 1 / "LC Index"), pick the specific IB/SG Number here instead of typing
                        it; selecting a row sets the contract directly, no Search click needed. The free-text
                        fields above (+ Search) remain as a manual fallback. B5 excluded — single-instrumentType
                        (model.instrumentType only), would silently miss the Usance/EPLC_ACCEPTANCE half; B5 gets
                        its own cross-instrumentType "EB Index" below instead. -->
-                  <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
-                    <app-index-picker
-                      label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{ searchNaturalKey.lcNumber }}"
-                      [items]="pagedFilteredIbIndexCatalog"
-                      [selectedId]="selectedContract?.balanceContractId ?? null"
-                      emptyText="{{ ibIndexPicker.contracts.length ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).' : 'No ' + model.instrumentType + ' records yet under this LC.' }}"
-                      [page]="ibIndexPicker.page" [totalPages]="ibIndexPicker.totalPages" [total]="ibIndexPicker.total"
-                      (pick)="!formLocked && onSelectIbIndex($event)" (prevPage)="ibIndexPrevPage()" (nextPage)="ibIndexNextPage()">
-                      <ng-template let-c>
-                        <span class="tb-row-primary">{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
-                        <span class="tb-row-badge">{{ c.status }}</span>
-                      </ng-template>
-                    </app-index-picker>
-                  </div>
+                    <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
+                      <app-index-picker
+                        label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{
+                          searchNaturalKey.lcNumber
+                        }}"
+                        [items]="pagedFilteredIbIndexCatalog"
+                        [selectedId]="selectedContract?.balanceContractId ?? null"
+                        emptyText="{{
+                          ibIndexPicker.contracts.length
+                            ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).'
+                            : 'No ' + model.instrumentType + ' records yet under this LC.'
+                        }}"
+                        [page]="ibIndexPicker.page"
+                        [totalPages]="ibIndexPicker.totalPages"
+                        [total]="ibIndexPicker.total"
+                        (pick)="!formLocked && onSelectIbIndex($event)"
+                        (prevPage)="ibIndexPrevPage()"
+                        (nextPage)="ibIndexNextPage()"
+                      >
+                        <ng-template let-c>
+                          <span class="tb-row-primary">{{
+                            requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber
+                          }}</span>
+                          <span class="tb-row-badge">{{ c.status }}</span>
+                        </ng-template>
+                      </app-index-picker>
+                    </div>
 
-                  <!-- Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB
+                    <!-- Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB
                        Index — Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5
                        only. Same Step 1/Step 2 shape as above, but merges candidates across BOTH of B5's own
                        possible instrumentTypes (Sight EPLC_DUE_FROM_ISSUING_BANK, Usance EPLC_ACCEPTANCE) since
                        the Maker doesn't know in advance which tenor a given EB Number was. -->
-                  <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
-                    <app-index-picker
-                      label="EB Index — Existing Contract (from B3)"
-                      [items]="pagedSettleableBalances"
-                      [loading]="settleableBalancesLoading"
-                      [selectedId]="selectedContract?.balanceContractId ?? null"
-                      emptyText="No outstanding balance under this LC — nothing left to settle."
-                      [page]="settleableBalancesPaging.page" [totalPages]="settleableBalancesPaging.totalPages" [total]="settleableBalancesPaging.total"
-                      (pick)="!formLocked && onSelectSettleableBalance($event)" (prevPage)="settleableBalancesPrevPage()" (nextPage)="settleableBalancesNextPage()">
-                      <ng-template let-s>
-                        <span class="tb-row-primary">{{ s.ibNumber || '(no EB Number recorded)' }}</span>
-                        <span class="tb-row-sub">{{ s.availableBalance }} {{ s.currency }} — {{ s.instrumentType === 'EPLC_ACCEPTANCE' ? 'Acceptance Balance' : 'Due from Issuing Bank' }}</span>
-                      </ng-template>
-                    </app-index-picker>
-                  </div>
-                </ng-container>
-              </ng-template>
-              <ng-template #flatCatalogPicker>
-                <app-index-picker
-                  label="{{ selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace ? 'LC Index — pick the LC to pay against' : 'LC Index — Existing Contract' }}"
-                  [items]="pagedFilteredCatalogContracts"
-                  [selectedId]="selectedContract?.balanceContractId ?? null"
-                  [searchable]="true"
-                  [(searchValue)]="catalogPicker.search"
-                  searchPlaceholder="Search LC Number…"
-                  (search)="onCatalogSearch()"
-                  emptyText="{{ catalogPicker.contracts.length ? 'All ' + catalogPicker.contracts.length + ' candidate(s) under this filter are 0-balance — nothing left to act on.' : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.' }}"
-                  [page]="catalogPicker.page" [totalPages]="catalogPicker.totalPages" [total]="catalogPicker.total"
-                  (pick)="!formLocked && onSelectContract($event)" (prevPage)="catalogPrevPage()" (nextPage)="catalogNextPage()">
-                  <ng-template let-c>
-                    <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}{{ catalogIbHint(c) }}</span>
-                    <span class="tb-row-badge">{{ c.status }}{{ catalogPendingHint(c) }}</span>
-                  </ng-template>
-                </app-index-picker>
+                    <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
+                      <app-index-picker
+                        label="EB Index — Existing Contract (from B3)"
+                        [items]="pagedSettleableBalances"
+                        [loading]="settleableBalancesLoading"
+                        [selectedId]="selectedContract?.balanceContractId ?? null"
+                        emptyText="No outstanding balance under this LC — nothing left to settle."
+                        [page]="settleableBalancesPaging.page"
+                        [totalPages]="settleableBalancesPaging.totalPages"
+                        [total]="settleableBalancesPaging.total"
+                        (pick)="!formLocked && onSelectSettleableBalance($event)"
+                        (prevPage)="settleableBalancesPrevPage()"
+                        (nextPage)="settleableBalancesNextPage()"
+                      >
+                        <ng-template let-s>
+                          <span class="tb-row-primary">{{ s.ibNumber || '(no EB Number recorded)' }}</span>
+                          <span class="tb-row-sub"
+                            >{{ s.availableBalance }} {{ s.currency }} —
+                            {{ s.instrumentType === 'EPLC_ACCEPTANCE' ? 'Acceptance Balance' : 'Due from Issuing Bank' }}</span
+                          >
+                        </ng-template>
+                      </app-index-picker>
+                    </div>
+                  </ng-container>
+                </ng-template>
+                <ng-template #flatCatalogPicker>
+                  <app-index-picker
+                    label="{{
+                      selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace
+                        ? 'LC Index — pick the LC to pay against'
+                        : 'LC Index — Existing Contract'
+                    }}"
+                    [items]="pagedFilteredCatalogContracts"
+                    [selectedId]="selectedContract?.balanceContractId ?? null"
+                    [searchable]="true"
+                    [(searchValue)]="catalogPicker.search"
+                    searchPlaceholder="Search LC Number…"
+                    (search)="onCatalogSearch()"
+                    emptyText="{{
+                      catalogPicker.contracts.length
+                        ? 'All ' + catalogPicker.contracts.length + ' candidate(s) under this filter are 0-balance — nothing left to act on.'
+                        : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.'
+                    }}"
+                    [page]="catalogPicker.page"
+                    [totalPages]="catalogPicker.totalPages"
+                    [total]="catalogPicker.total"
+                    (pick)="!formLocked && onSelectContract($event)"
+                    (prevPage)="catalogPrevPage()"
+                    (nextPage)="catalogNextPage()"
+                  >
+                    <ng-template let-c>
+                      <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}{{ catalogIbHint(c) }}</span>
+                      <span class="tb-row-badge">{{ c.status }}{{ catalogPendingHint(c) }}</span>
+                    </ng-template>
+                  </app-index-picker>
 
-                <!-- Business-reported gap 2026-08-14 ("user would like to select S001 IB03 or S001 IB04 for A4
+                  <!-- Business-reported gap 2026-08-14 ("user would like to select S001 IB03 or S001 IB04 for A4
                      separately... buyer may settle IB04 today then IB03 by tomorrow") — one click per (LC, IB)
                      pair, no need to pick the LC first and then drill into a second dropdown. -->
-                <div class="mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && flattenedPayableRows.length">
-                  <label class="tb-field__label">Quick Pick — every still-PENDING presentation on this page</label>
-                  <div class="tb-quick-pick">
-                    <button type="button" class="tb-quick-pick__row"
-                            *ngFor="let row of flattenedPayableRows"
-                            [class.tb-quick-pick__row--active]="selectedPayMovement?.movementId === row.movement.movementId"
-                            [disabled]="formLocked"
-                            (click)="onSelectFlattenedPayable(row.contract.balanceContractId, row.movement.movementId)">
-                      <span class="tb-row-primary">{{ row.contract.naturalKey.lcNumber }} / {{ row.movement.sourceTransactionRef || '(no IB Number)' }}</span>
-                      <span class="tb-row-badge">{{ row.movement.amount }} {{ row.movement.currency }}</span>
-                    </button>
+                  <div class="mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && flattenedPayableRows.length">
+                    <label class="tb-field__label">Quick Pick — every still-PENDING presentation on this page</label>
+                    <div class="tb-quick-pick">
+                      <button
+                        type="button"
+                        class="tb-quick-pick__row"
+                        *ngFor="let row of flattenedPayableRows"
+                        [class.tb-quick-pick__row--active]="selectedPayMovement?.movementId === row.movement.movementId"
+                        [disabled]="formLocked"
+                        (click)="onSelectFlattenedPayable(row.contract.balanceContractId, row.movement.movementId)"
+                      >
+                        <span class="tb-row-primary">{{ row.contract.naturalKey.lcNumber }} / {{ row.movement.sourceTransactionRef || '(no IB Number)' }}</span>
+                        <span class="tb-row-badge">{{ row.movement.amount }} {{ row.movement.currency }}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </ng-template>
+                </ng-template>
 
-              <!-- Reviewer-reported gap (2026-08-14): show live balance BEFORE the amount is typed, so a user can't
+                <!-- Reviewer-reported gap (2026-08-14): show live balance BEFORE the amount is typed, so a user can't
                    accidentally submit the entire Available Balance thinking it's a partial amount. -->
-              <!-- Business instruction 2026-08-15 ("B3 不須選 Sight/Usance 因為交易本身已經有此訊息了 — 登記
+                <!-- Business instruction 2026-08-15 ("B3 不須選 Sight/Usance 因為交易本身已經有此訊息了 — 登記
                    B1 時已經有此訊息了") — B3 no longer asks Sight/Usance via subChoice; it's read from the
                    picked Confirmation's own Tenor Type (declared at B1) via onSelectContract()
                    (component.ts). This just surfaces that derived decision so the Maker can see it before
                    Submit, since it's no longer something they explicitly picked themselves. -->
-              <div class="tb-hint tb-hint--ok mt-2" *ngIf="selectedFunctionStrategy?.movementDerivation?.derivesMovementTypeFromTenor && selectedContract">
-                Confirmation Tenor Type: <strong>{{ selectedContract.tenorType || '(none recorded)' }}</strong> → this will <strong>{{ model.movementType === 'HONOUR' ? 'Honour (Sight)' : 'Accept (Usance)' }}</strong>.
-              </div>
+                <div class="tb-hint tb-hint--ok mt-2" *ngIf="selectedFunctionStrategy?.movementDerivation?.derivesMovementTypeFromTenor && selectedContract">
+                  Confirmation Tenor Type: <strong>{{ selectedContract.tenorType || '(none recorded)' }}</strong> → this will
+                  <strong>{{ model.movementType === 'HONOUR' ? 'Honour (Sight)' : 'Accept (Usance)' }}</strong
+                  >.
+                </div>
 
-              <div class="mt-2" *ngIf="selectedContract">
-                <div class="tb-hint" *ngIf="snapshotLoading">Loading balance…</div>
-                <div class="tb-balance-box" *ngIf="!snapshotLoading && selectedContractSnapshot">
-                  <div class="tb-balance-row"><span class="tb-balance-row__label">Confirmed</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.confirmedBalance }}</span></div>
-                  <div class="tb-balance-row"><span class="tb-balance-row__label">Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.availableBalance }}</span></div>
-                  <div class="tb-balance-row" *ngIf="selectedContractSnapshot.offBalanceExposure !== null && selectedContractSnapshot.offBalanceExposure !== undefined">
-                    <span class="tb-balance-row__label">Off-Balance Exposure</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.offBalanceExposure }}</span>
-                  </div>
-                  <!-- 2026-08-18, user-requested ("the same [Tight Available Balance] field for the Export
+                <div class="mt-2" *ngIf="selectedContract">
+                  <div class="tb-hint" *ngIf="snapshotLoading">Loading balance…</div>
+                  <div class="tb-balance-box" *ngIf="!snapshotLoading && selectedContractSnapshot">
+                    <div class="tb-balance-row">
+                      <span class="tb-balance-row__label">Confirmed</span
+                      ><span class="tb-balance-row__value">{{ selectedContractSnapshot.confirmedBalance }}</span>
+                    </div>
+                    <div class="tb-balance-row">
+                      <span class="tb-balance-row__label">Available</span
+                      ><span class="tb-balance-row__value">{{ selectedContractSnapshot.availableBalance }}</span>
+                    </div>
+                    <div
+                      class="tb-balance-row"
+                      *ngIf="selectedContractSnapshot.offBalanceExposure !== null && selectedContractSnapshot.offBalanceExposure !== undefined"
+                    >
+                      <span class="tb-balance-row__label">Off-Balance Exposure</span
+                      ><span class="tb-balance-row__value">{{ selectedContractSnapshot.offBalanceExposure }}</span>
+                    </div>
+                    <!-- 2026-08-18, user-requested ("the same [Tight Available Balance] field for the Export
                        Confirmed LC") — this used to be nested inside the offBalanceExposure ngIf above,
                        which is IPLC_LC/EPLC_LC-only; EPLC_CONFIRMATION's own tightAvailableBalance (netting
                        the Present Docs earmark instead of SHGT exposure) is now populated with
                        offBalanceExposure staying null, so the two rows must gate independently. -->
-                  <div class="tb-balance-row" *ngIf="selectedContractSnapshot.tightAvailableBalance !== null && selectedContractSnapshot.tightAvailableBalance !== undefined">
-                    <span class="tb-balance-row__label">Tight Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.tightAvailableBalance }}</span>
-                  </div>
-                  <!-- Bug fixed 2026-08-18, reviewer-reported ("A1 1000 A3 1000 Submit => get warning, which
+                    <div
+                      class="tb-balance-row"
+                      *ngIf="selectedContractSnapshot.tightAvailableBalance !== null && selectedContractSnapshot.tightAvailableBalance !== undefined"
+                    >
+                      <span class="tb-balance-row__label">Tight Available</span
+                      ><span class="tb-balance-row__value">{{ selectedContractSnapshot.tightAvailableBalance }}</span>
+                    </div>
+                    <!-- Bug fixed 2026-08-18, reviewer-reported ("A1 1000 A3 1000 Submit => get warning, which
                        is wrong"): both warnings below are pre-submit HINTS computed live from model.amount vs
                        the CURRENT selectedContractSnapshot — but a successful Submit calls
                        refreshSelectedContractSnapshot() (applyMakerSubmitOutcome()), which correctly drops
@@ -384,17 +516,25 @@
                        Submit look freshly rejected. Both gated on `!formLocked` now — a pre-submit hint has
                        nothing left to warn about once the submission it was warning about has already gone
                        through. -->
-                  <!-- Bug fixed 2026-08-19, reviewer-reported ("A2 — LC Amendment Increase: Incorrect Available
+                    <!-- Bug fixed 2026-08-19, reviewer-reported ("A2 — LC Amendment Increase: Incorrect Available
                        Balance Warning") — this warning used to fire for ANY movementType, including
                        ISSUE/AMEND_INCREASE/CREATE/AMEND, none of which the microservice ever checks against
                        Available Balance (Design doc §6.2: "Increase always succeeds; Decrease is checked").
                        Now gated on movementTypeChecksAvailableBalance() (DECREASING_MOVEMENT_TYPES), the same
                        set already used elsewhere in this file to filter 0-balance contracts out of the
                        pickers — see that method's own doc comment for the full root cause. -->
-                  <div class="tb-error mt-2" *ngIf="!formLocked && model.amount && movementTypeChecksAvailableBalance(model.movementType) && +model.amount > +selectedContractSnapshot.availableBalance">
-                    ⚠ Typed amount ({{ model.amount }}) exceeds Available Balance — this will be rejected (Design doc §6).
-                  </div>
-                  <!-- Business-reported gap 2026-08-18 ("It should show no warning, since the amount <= tight
+                    <div
+                      class="tb-error mt-2"
+                      *ngIf="
+                        !formLocked &&
+                        model.amount &&
+                        movementTypeChecksAvailableBalance(model.movementType) &&
+                        +model.amount > +selectedContractSnapshot.availableBalance
+                      "
+                    >
+                      ⚠ Typed amount ({{ model.amount }}) exceeds Available Balance — this will be rejected (Design doc §6).
+                    </div>
+                    <!-- Business-reported gap 2026-08-18 ("It should show no warning, since the amount <= tight
                        LC balance. Right?" — confirmed correct, then "fix it" for the OTHER direction): the
                        warning above only ever compares against plain Available Balance, so an amount between
                        Tight Available and plain Available (Design doc §6.1's own second, Tight-Available-based
@@ -403,113 +543,156 @@
                        (A3/A3S) — the only movementType this server-side check actually applies to; A2's own
                        AMEND_DECREASE check compares ceilingAmount against plain Available, never Tight, so
                        showing this warning there would be misleading, not helpful. -->
-                  <div
-                    class="tb-error mt-2"
-                    *ngIf="
-                      !formLocked &&
-                      model.amount &&
-                      +model.amount <= +selectedContractSnapshot.availableBalance &&
-                      model.movementType === 'UTILIZE' &&
-                      selectedContractSnapshot.tightAvailableBalance !== null &&
-                      selectedContractSnapshot.tightAvailableBalance !== undefined &&
-                      +model.amount > +selectedContractSnapshot.tightAvailableBalance
-                    "
-                  >
-                    ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ selectedContractSnapshot.tightAvailableBalance }}) — this will be rejected (Design doc §6.1: Available Balance minus outstanding off-balance-sheet (SHGT) exposure {{ selectedContractSnapshot.offBalanceExposure }}).
-                    <ng-container *ngIf="!selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
-                      >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.</ng-container
+                    <div
+                      class="tb-error mt-2"
+                      *ngIf="
+                        !formLocked &&
+                        model.amount &&
+                        +model.amount <= +selectedContractSnapshot.availableBalance &&
+                        model.movementType === 'UTILIZE' &&
+                        selectedContractSnapshot.tightAvailableBalance !== null &&
+                        selectedContractSnapshot.tightAvailableBalance !== undefined &&
+                        +model.amount > +selectedContractSnapshot.tightAvailableBalance
+                      "
                     >
+                      ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ selectedContractSnapshot.tightAvailableBalance }}) — this will be
+                      rejected (Design doc §6.1: Available Balance minus outstanding off-balance-sheet (SHGT) exposure
+                      {{ selectedContractSnapshot.offBalanceExposure }}).
+                      <ng-container *ngIf="!selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
+                        >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/
+                        Shipping Gtee" instead — it nets that SG's own exposure out of this check.</ng-container
+                      >
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Business instruction 2026-08-15 ("SG redemption should support partial redemption... Bill
+              <!-- Business instruction 2026-08-15 ("SG redemption should support partial redemption... Bill
                  Amount = actual Document Arrival amount [free-typed]... SG Redemption Amount = system-calculated
                  MIN(Bill Amount, SG Outstanding)") — reverses the prior full-match-only design (Bill Amount used
                  to be locked to the SG's outstanding). A3S only. Step 2: pick which of the LC's own outstanding
                  Shipping Guarantees this arrival is matched against; the Formly form below still shows normally
                  (unlike A4's payExistingUtilize, A3S DOES create new movements via Submit) — Amount there is now
                  the real Bill Amount, freely typed; this box shows the derived SG-side numbers alongside it. -->
-            <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract">
-              <app-index-picker
-                label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
-                [items]="pagedSgsForArrival"
-                [loading]="sgsForArrivalLoading"
-                [selectedId]="selectedArrivalSg?.balanceContractId ?? null"
-                emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
-                autoPickedHint="Only one Shipping Guarantee under this LC — picked automatically."
-                [page]="arrivalSgPaging.page" [totalPages]="arrivalSgPaging.totalPages" [total]="arrivalSgPaging.total"
-                (pick)="!formLocked && onSelectArrivalSg($event)" (prevPage)="arrivalSgPrevPage()" (nextPage)="arrivalSgNextPage()">
-                <ng-template let-sg>
-                  <span class="tb-row-primary">{{ sg.naturalKey.sgNumber }}</span>
-                  <span class="tb-row-badge">{{ sg.status }}</span>
-                </ng-template>
-              </app-index-picker>
-              <div class="tb-balance-box mt-2" *ngIf="selectedArrivalSg && arrivalSgSnapshot">
-                <div class="tb-balance-row"><span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ selectedArrivalSg.naturalKey.sgNumber }}</span></div>
-                <div class="tb-balance-row"><span class="tb-balance-row__label">SG Outstanding</span><span class="tb-balance-row__value">{{ arrivalSgSnapshot.confirmedBalance }} {{ selectedArrivalSg.currency }}</span></div>
-                <ng-container *ngIf="arrivalSgRedeemAmount">
-                  <div class="tb-balance-row"><span class="tb-balance-row__label">SG Redemption Amount (MIN of Bill Amount, SG Outstanding) — {{ arrivalSgRedeemType }}</span><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount }} {{ selectedArrivalSg.currency }}</span></div>
-                  <div class="tb-balance-row"><span class="tb-balance-row__label">SG Remaining After This Redemption</span><span class="tb-balance-row__value">{{ arrivalSgRemaining }} {{ selectedArrivalSg.currency }}</span></div>
-                </ng-container>
-                <div class="tb-hint mt-2" *ngIf="model.amount && +model.amount > +arrivalSgSnapshot.confirmedBalance">
-                  Bill Amount exceeds this SG's Outstanding — the excess ({{ +model.amount - +arrivalSgSnapshot.confirmedBalance }} {{ selectedArrivalSg.currency }}) is ordinary incremental LC exposure, checked against Tight Available Balance as usual (Design doc §6.1).
+              <div
+                class="tb-subcard"
+                *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract"
+              >
+                <app-index-picker
+                  label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
+                  [items]="pagedSgsForArrival"
+                  [loading]="sgsForArrivalLoading"
+                  [selectedId]="selectedArrivalSg?.balanceContractId ?? null"
+                  emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
+                  autoPickedHint="Only one Shipping Guarantee under this LC — picked automatically."
+                  [page]="arrivalSgPaging.page"
+                  [totalPages]="arrivalSgPaging.totalPages"
+                  [total]="arrivalSgPaging.total"
+                  (pick)="!formLocked && onSelectArrivalSg($event)"
+                  (prevPage)="arrivalSgPrevPage()"
+                  (nextPage)="arrivalSgNextPage()"
+                >
+                  <ng-template let-sg>
+                    <span class="tb-row-primary">{{ sg.naturalKey.sgNumber }}</span>
+                    <span class="tb-row-badge">{{ sg.status }}</span>
+                  </ng-template>
+                </app-index-picker>
+                <div class="tb-balance-box mt-2" *ngIf="selectedArrivalSg && arrivalSgSnapshot">
+                  <div class="tb-balance-row">
+                    <span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ selectedArrivalSg.naturalKey.sgNumber }}</span>
+                  </div>
+                  <div class="tb-balance-row">
+                    <span class="tb-balance-row__label">SG Outstanding</span
+                    ><span class="tb-balance-row__value">{{ arrivalSgSnapshot.confirmedBalance }} {{ selectedArrivalSg.currency }}</span>
+                  </div>
+                  <ng-container *ngIf="arrivalSgRedeemAmount">
+                    <div class="tb-balance-row">
+                      <span class="tb-balance-row__label">SG Redemption Amount (MIN of Bill Amount, SG Outstanding) — {{ arrivalSgRedeemType }}</span
+                      ><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount }} {{ selectedArrivalSg.currency }}</span>
+                    </div>
+                    <div class="tb-balance-row">
+                      <span class="tb-balance-row__label">SG Remaining After This Redemption</span
+                      ><span class="tb-balance-row__value">{{ arrivalSgRemaining }} {{ selectedArrivalSg.currency }}</span>
+                    </div>
+                  </ng-container>
+                  <div class="tb-hint mt-2" *ngIf="model.amount && +model.amount > +arrivalSgSnapshot.confirmedBalance">
+                    Bill Amount exceeds this SG's Outstanding — the excess ({{ +model.amount - +arrivalSgSnapshot.confirmedBalance }}
+                    {{ selectedArrivalSg.currency }}) is ordinary incremental LC exposure, checked against Tight Available Balance as usual (Design doc §6.1).
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Business instruction 2026-08-15 ("B4 B5 B6除了先選LC NUMBER，還要再選B3輸入的EB NUMBER") — B4's
+              <!-- Business instruction 2026-08-15 ("B4 B5 B6除了先選LC NUMBER，還要再選B3輸入的EB NUMBER") — B4's
                  own settlesDocumentArrival 2ndary Index used to live only inside the hasParent-gated Parent
                  LC section above, so it never rendered for B4: hasParent is false for EPLC_CONFIRMATION (B4
                  resolves its LC via the flat Catalog picker just above, into selectedContract — not a Parent
                  LC into selectedParent). Mirrors A4's own payExistingUtilize subcard immediately below, just
                  for the cross-contract (B4 -> B3's EPLC_EXAMINATION) case instead of same-contract (A4 -> A3). -->
-            <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
-              <app-index-picker
-                label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
-                [items]="pagedFilteredPayableMovements"
-                [loading]="payableMovementsLoading"
-                [selectedId]="selectedPayMovement?.movementId ?? null"
-                [searchable]="true"
-                [searchValue]="payableMovementSearch"
-                (searchValueChange)="onPayableMovementSearchChange($event)"
-                searchPlaceholder="Search {{ ibNumberLabel }}…"
-                emptyText="No Approved (Checker-acknowledged) {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{ selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first' }}, then Release it in B3's own Checker panel."
-                autoPickedHint="Only one Approved {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                [page]="payableMovementsPaging.page" [totalPages]="payableMovementsPaging.totalPages" [total]="payableMovementsPaging.total"
-                (pick)="!formLocked && onSelectPayMovement($event)" (prevPage)="payableMovementsPrevPage()" (nextPage)="payableMovementsNextPage()">
-                <ng-template let-m>
-                  <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
-                  <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
-                </ng-template>
-              </app-index-picker>
-              <div class="tb-hint tb-hint--ok" *ngIf="selectedPayMovement">{{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.</div>
-            </div>
+              <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
+                <app-index-picker
+                  label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
+                  [items]="pagedFilteredPayableMovements"
+                  [loading]="payableMovementsLoading"
+                  [selectedId]="selectedPayMovement?.movementId ?? null"
+                  [searchable]="true"
+                  [searchValue]="payableMovementSearch"
+                  (searchValueChange)="onPayableMovementSearchChange($event)"
+                  searchPlaceholder="Search {{ ibNumberLabel }}…"
+                  emptyText="No Approved (Checker-acknowledged) {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{
+                    selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first'
+                  }}, then Release it in B3's own Checker panel."
+                  autoPickedHint="Only one Approved {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
+                  [page]="payableMovementsPaging.page"
+                  [totalPages]="payableMovementsPaging.totalPages"
+                  [total]="payableMovementsPaging.total"
+                  (pick)="!formLocked && onSelectPayMovement($event)"
+                  (prevPage)="payableMovementsPrevPage()"
+                  (nextPage)="payableMovementsNextPage()"
+                >
+                  <ng-template let-m>
+                    <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no ' + ibNumberLabel + ' recorded)' }}</span>
+                    <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date: 'short' }}</span>
+                  </ng-template>
+                </app-index-picker>
+                <div class="tb-hint tb-hint--ok" *ngIf="selectedPayMovement">
+                  {{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.
+                </div>
+              </div>
 
-            <!-- Business instruction 2026-08-14 ("pickup LC then pickup IB Number... Amount will be captured...
+              <!-- Business instruction 2026-08-14 ("pickup LC then pickup IB Number... Amount will be captured...
                  without further input") — A4 (Sight Settlement) only. Amount is never typed here: it's
                  whatever A3 (Document Arrival (Sight)) already recorded on the picked PENDING movement. -->
-            <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract">
-              <app-index-picker
-                label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
-                [items]="pagedFilteredPayableMovements"
-                [loading]="payableMovementsLoading"
-                [selectedId]="selectedPayMovement?.movementId ?? null"
-                emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."
-                autoPickedHint="Only one PENDING Document Arrival under this LC — picked automatically."
-                [page]="payableMovementsPaging.page" [totalPages]="payableMovementsPaging.totalPages" [total]="payableMovementsPaging.total"
-                (pick)="!formLocked && onSelectPayMovement($event)" (prevPage)="payableMovementsPrevPage()" (nextPage)="payableMovementsNextPage()">
-                <ng-template let-m>
-                  <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no IB Number recorded)' }}</span>
-                  <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date:'short' }}</span>
-                </ng-template>
-              </app-index-picker>
-              <div class="tb-balance-box mt-2" *ngIf="selectedPayMovement">
-                <div class="tb-balance-row"><span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ selectedPayMovement.sourceTransactionRef || '(none)' }}</span></div>
-                <div class="tb-balance-row"><span class="tb-balance-row__label">Amount (captured at Document Arrival, read-only)</span><span class="tb-balance-row__value">{{ selectedPayMovement.amount }} {{ selectedPayMovement.currency }}</span></div>
-              </div>
-              <!-- Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release
+              <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract">
+                <app-index-picker
+                  label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
+                  [items]="pagedFilteredPayableMovements"
+                  [loading]="payableMovementsLoading"
+                  [selectedId]="selectedPayMovement?.movementId ?? null"
+                  emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."
+                  autoPickedHint="Only one PENDING Document Arrival under this LC — picked automatically."
+                  [page]="payableMovementsPaging.page"
+                  [totalPages]="payableMovementsPaging.totalPages"
+                  [total]="payableMovementsPaging.total"
+                  (pick)="!formLocked && onSelectPayMovement($event)"
+                  (prevPage)="payableMovementsPrevPage()"
+                  (nextPage)="payableMovementsNextPage()"
+                >
+                  <ng-template let-m>
+                    <span class="tb-row-primary">{{ m.sourceTransactionRef || '(no IB Number recorded)' }}</span>
+                    <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date: 'short' }}</span>
+                  </ng-template>
+                </app-index-picker>
+                <div class="tb-balance-box mt-2" *ngIf="selectedPayMovement">
+                  <div class="tb-balance-row">
+                    <span class="tb-balance-row__label">IB Number</span
+                    ><span class="tb-balance-row__value">{{ selectedPayMovement.sourceTransactionRef || '(none)' }}</span>
+                  </div>
+                  <div class="tb-balance-row">
+                    <span class="tb-balance-row__label">Amount (captured at Document Arrival, read-only)</span
+                    ><span class="tb-balance-row__value">{{ selectedPayMovement.amount }} {{ selectedPayMovement.currency }}</span>
+                  </div>
+                </div>
+                <!-- Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release
                    it. Exactly the same as A1.") — A4's own dedicated "Pay (Release)" button (which
                    called payExisting(), a direct single-actor release) was removed by an earlier
                    same-day change in favor of a browse-only picker with no Maker action at all; per
@@ -519,45 +702,68 @@
                    function has (A1-A9/B1-B5) applies here too, not just a "go release it yourself"
                    hint. Disabled-once-submitResult-set convention matches the generic Submit button
                    below exactly (business instruction 2026-08-15, "按Submit...後 Button 直接灰掉"). -->
-              <button class="tb-btn tb-btn--primary mt-2" (click)="submitA4()" [disabled]="!selectedPayMovement || submitting || !!submitResult">
-                {{ submitting ? 'Submitting…' : 'Submit A4' }}
-              </button>
-            </div>
-
-            <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
-              <form [formGroup]="form">
-                <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
-              </form>
-
-              <div class="tb-error mt-2" *ngIf="amountDecimalMismatch">
-                ⚠ Amount ({{ model.amount }}) has more decimal places than {{ model.currency }} allows ({{ currencyDecimalPlaces }}) — this will be rejected.
+                <button class="tb-btn tb-btn--primary mt-2" (click)="submitA4()" [disabled]="!selectedPayMovement || submitting || !!submitResult">
+                  {{ submitting ? 'Submitting…' : 'Submit A4' }}
+                </button>
               </div>
 
-              <!-- Business instruction 2026-08-15 ("按Submit...後 Button 直接灰掉 不要重複提交") — stays
+              <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
+                <!-- Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — shown in
+                   place of a Submit hint whenever this function still needs an eligible record picked;
+                   `.tb-error` for the genuinely-zero-candidates case (nothing to pick at all), `.tb-hint`
+                   for "candidates exist, none picked yet" — same severity convention this file already
+                   uses elsewhere (`.tb-error` for a blocking condition, `.tb-hint` for a softer prompt). -->
+                <div class="tb-error mt-2" *ngIf="noEligibleRecordsMessage && eligibleCandidateCount === 0">⚠ {{ noEligibleRecordsMessage }}</div>
+                <div class="tb-hint mt-2" *ngIf="noEligibleRecordsMessage && eligibleCandidateCount !== 0">{{ noEligibleRecordsMessage }}</div>
+
+                <form [formGroup]="form">
+                  <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
+                </form>
+
+                <div class="tb-error mt-2" *ngIf="amountDecimalMismatch">
+                  ⚠ Amount ({{ model.amount }}) has more decimal places than {{ model.currency }} allows ({{ currencyDecimalPlaces }}) — this will be rejected.
+                </div>
+
+                <!-- Business instruction 2026-08-15 ("按Submit...後 Button 直接灰掉 不要重複提交") — stays
                    disabled once submitResult is set (a successful Submit already happened) too, not just
                    while submitting is true, so a second click can't fire a duplicate movement for the same
                    entry. selectFunction() resets submitResult to null, which is already how a Maker starts
-                   a genuinely new submission — re-picking the function chip (same or different). -->
-              <button class="tb-btn tb-btn--primary" (click)="submit()" [disabled]="submitting || !!submitResult">
-                {{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction.code }}
-              </button>
+                   a genuinely new submission — re-picking the function chip (same or different).
+                   Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — also disabled
+                   until an eligible record is selected, for every function this requirement applies to
+                   (requiresEligibleTarget is false for A1/B1, so this added condition is always false —
+                   a no-op — for those two). -->
+                <button
+                  class="tb-btn tb-btn--primary"
+                  (click)="submit()"
+                  [disabled]="submitting || !!submitResult || (requiresEligibleTarget && !hasEligibleTargetSelected)"
+                >
+                  {{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction.code }}
+                </button>
+              </ng-container>
             </ng-container>
-          </ng-container>
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <div class="tb-result" *ngIf="submitResult || submitError">
-        <h3 class="tb-result__title">Maker Result</h3>
-        <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
-        <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
-        <p class="tb-result__status" *ngIf="submitResult?.status"><strong>Status:</strong> {{ displayStatus(submitResult.status, model.instrumentType, submitResult.movementType) }}</p>
-        <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
+        <div class="tb-result" *ngIf="submitResult || submitError">
+          <h3 class="tb-result__title">Maker Result</h3>
+          <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
+          <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
+          <p class="tb-result__status" *ngIf="submitResult?.status">
+            <strong>Status:</strong> {{ displayStatus(submitResult.status, model.instrumentType, submitResult.movementType) }}
+          </p>
+          <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
              this event actually has a contingent-scope entry (null for an on-balance-sheet instrumentType,
              e.g. the DUE_FROM_ISSUING_BANK/ACCEPTANCE_REIMB_RECEIVABLE legs a B4 compound also creates). -->
-        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="submitResult?.contingentAccountEntry" (click)="openAccountEntryDialog(submitResult, model.instrumentType)">
-          Account Entries
-        </button>
-        <!-- Bug fixed 2026-08-16 (reviewer-reported — "A3S does not generate the related SG redemption
+          <button
+            type="button"
+            class="tb-btn tb-btn--outline mt-2"
+            *ngIf="submitResult?.contingentAccountEntry"
+            (click)="openAccountEntryDialog(submitResult, model.instrumentType)"
+          >
+            Account Entries
+          </button>
+          <!-- Bug fixed 2026-08-16 (reviewer-reported — "A3S does not generate the related SG redemption
              entries in Pending"): A3S's own SG FULL_REDEEM/PARTIAL_REDEEM leg is a separate, EARLIER API
              call than submitResult (which holds A3S's own LC UTILIZE) — its own contingentAccountEntry
              was being silently dropped. Same root cause also affected B4 Usance's own new Acceptance
@@ -565,14 +771,26 @@
              is always SHGT (A3S's own SG leg); acceptanceMovement is always EPLC_ACCEPTANCE (B4 Usance's own
              Acceptance-liability leg) — both instrumentTypes are fixed by which field they are, not read off
              the movement itself. -->
-        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="arrivalSgRedeemMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(arrivalSgRedeemMovement!, 'SHGT')">
-          Account Entries — SG Redemption
-        </button>
-        <button type="button" class="tb-btn tb-btn--outline mt-2" *ngIf="acceptanceMovement?.contingentAccountEntry" (click)="openAccountEntryDialog(acceptanceMovement!, 'EPLC_ACCEPTANCE')">
-          Account Entries — Acceptance
-        </button>
-        <p class="tb-hint" *ngIf="submitResult?.status === 'PENDING'">Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.</p>
-        <!-- Business instruction 2026-08-15 ("option for Maker to Delete Pending, i.e. EC... for all
+          <button
+            type="button"
+            class="tb-btn tb-btn--outline mt-2"
+            *ngIf="arrivalSgRedeemMovement?.contingentAccountEntry"
+            (click)="openAccountEntryDialog(arrivalSgRedeemMovement!, 'SHGT')"
+          >
+            Account Entries — SG Redemption
+          </button>
+          <button
+            type="button"
+            class="tb-btn tb-btn--outline mt-2"
+            *ngIf="acceptanceMovement?.contingentAccountEntry"
+            (click)="openAccountEntryDialog(acceptanceMovement!, 'EPLC_ACCEPTANCE')"
+          >
+            Account Entries — Acceptance
+          </button>
+          <p class="tb-hint" *ngIf="submitResult?.status === 'PENDING'">
+            Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.
+          </p>
+          <!-- Business instruction 2026-08-15 ("option for Maker to Delete Pending, i.e. EC... for all
              functions") — Maker-side withdrawal of their own still-PENDING entry, distinct from the
              Checker's Reject below. Same panel/condition for every function (A1-A9/B1-B5) EXCEPT A4.
 
@@ -586,13 +804,19 @@
              for every OTHER function, means "withdraw only my own just-created record". A4 offers no
              correct "delete my own pending thing" action at all (there is no such record), so hiding it
              is the fix, not relabeling it. -->
-        <button type="button" class="tb-btn tb-btn--danger-outline mt-2" *ngIf="submitResult?.status === 'PENDING' && !selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace" (click)="deleteMakerPending()" [disabled]="actionBusy">
-          {{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
-        </button>
-      </div>
+          <button
+            type="button"
+            class="tb-btn tb-btn--danger-outline mt-2"
+            *ngIf="submitResult?.status === 'PENDING' && !selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace"
+            (click)="deleteMakerPending()"
+            [disabled]="actionBusy"
+          >
+            {{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
+          </button>
+        </div>
 
-      <!-- ══════════════════════════ CHECKER ══════════════════════════ -->
-      <!-- Business instruction 2026-08-15 ("Seperate Maker and Checker for each functions... there is no way to
+        <!-- ══════════════════════════ CHECKER ══════════════════════════ -->
+        <!-- Business instruction 2026-08-15 ("Seperate Maker and Checker for each functions... there is no way to
            Approve pending. Would it be possible to have separate option in Amendment function to release those
            pending events? Same requirement for all other functions.") — a genuinely SEPARATE, standalone LC
            search (searchCheckerLc()), not a passive follower of whatever the Maker's own Direction/Parent-picker/
@@ -612,43 +836,51 @@
            was removed instead (see A4's subcard above) so THIS panel is now A4's only release path —
            the same standard pattern every other function already uses, with no dual-path trap possible
            since there is only one path. -->
-      <section class="tb-section tb-section--checker">
-        <div class="tb-section__header">
-          <span class="tb-role-badge tb-role-badge--checker">Checker</span>
-          <h2 class="tb-section__title">Pending Approvals<ng-container *ngIf="checkerContract"> — LC {{ checkerContract.naturalKey.lcNumber }}</ng-container></h2>
-        </div>
-        <div class="tb-section__body">
-          <div class="tb-field tb-field--inline tb-field--search">
-            <label class="tb-field__label">LC Number</label>
-            <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="checkerLcNumber" (keyup.enter)="searchCheckerLc()">
-            <!-- Business-reported gap 2026-08-15 ("Check[er] function is not working for Shipping
+        <section class="tb-section tb-section--checker">
+          <div class="tb-section__header">
+            <span class="tb-role-badge tb-role-badge--checker">Checker</span>
+            <h2 class="tb-section__title">
+              Pending Approvals<ng-container *ngIf="checkerContract"> — LC {{ checkerContract.naturalKey.lcNumber }}</ng-container>
+            </h2>
+          </div>
+          <div class="tb-section__body">
+            <div class="tb-field tb-field--inline tb-field--search">
+              <label class="tb-field__label">LC Number</label>
+              <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="checkerLcNumber" (keyup.enter)="searchCheckerLc()" />
+              <!-- Business-reported gap 2026-08-15 ("Check[er] function is not working for Shipping
                  Gtee (Issue)", repro'd with LC S001 / SG G01): SHGT/Acceptance are keyed by LC
                  Number + SG/IB Number (one LC can have multiple), so this second field is mandatory
                  whenever checkerSecondaryField is set — see searchCheckerLc()'s own doc comment. -->
-            <ng-container *ngIf="checkerSecondaryField">
-              <label class="tb-field__label">{{ checkerSecondaryLabel }}</label>
-              <input class="tb-input tb-input--required" [placeholder]="'e.g. ' + (checkerSecondaryField === 'sgNumber' ? 'G01' : 'B01')" [(ngModel)]="checkerSecondaryRef" (keyup.enter)="searchCheckerLc()">
-            </ng-container>
-            <button type="button" class="tb-btn tb-btn--outline" (click)="searchCheckerLc()" [disabled]="checkerSearching">
-              {{ checkerSearching ? 'Searching…' : 'Search' }}
-            </button>
-          </div>
-          <div class="tb-error mt-2" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
+              <ng-container *ngIf="checkerSecondaryField">
+                <label class="tb-field__label">{{ checkerSecondaryLabel }}</label>
+                <input
+                  class="tb-input tb-input--required"
+                  [placeholder]="'e.g. ' + (checkerSecondaryField === 'sgNumber' ? 'G01' : 'B01')"
+                  [(ngModel)]="checkerSecondaryRef"
+                  (keyup.enter)="searchCheckerLc()"
+                />
+              </ng-container>
+              <button type="button" class="tb-btn tb-btn--outline" (click)="searchCheckerLc()" [disabled]="checkerSearching">
+                {{ checkerSearching ? 'Searching…' : 'Search' }}
+              </button>
+            </div>
+            <div class="tb-error mt-2" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
 
-          <ng-container *ngIf="checkerContractId">
-            <app-index-picker
-              [items]="checkerItems"
-              [loading]="checkerLoading"
-              [selectedId]="selectedCheckerMovement?.movementId ?? null"
-              emptyText="Nothing PENDING on this contract right now."
-              (pick)="onSelectCheckerMovement($event)">
-              <ng-template let-m>
-                <span class="tb-row-primary">{{ m.movementType }} — {{ m.amount }} {{ m.currency }}</span>
-                <span class="tb-row-sub">{{ m.sourceTransactionRef || '—' }} · earmarked {{ m.createdAt | date:'short' }} · by {{ m.createdBy }}</span>
-              </ng-template>
-            </app-index-picker>
+            <ng-container *ngIf="checkerContractId">
+              <app-index-picker
+                [items]="checkerItems"
+                [loading]="checkerLoading"
+                [selectedId]="selectedCheckerMovement?.movementId ?? null"
+                emptyText="Nothing PENDING on this contract right now."
+                (pick)="onSelectCheckerMovement($event)"
+              >
+                <ng-template let-m>
+                  <span class="tb-row-primary">{{ m.movementType }} — {{ m.amount }} {{ m.currency }}</span>
+                  <span class="tb-row-sub">{{ m.sourceTransactionRef || '—' }} · earmarked {{ m.createdAt | date: 'short' }} · by {{ m.createdBy }}</span>
+                </ng-template>
+              </app-index-picker>
 
-            <!-- A3/B3 (deferSettlement), matching whichever movementType deferSettlementMovementType
+              <!-- A3/B3 (deferSettlement), matching whichever movementType deferSettlementMovementType
                  names (default UTILIZE), and NOT this Maker session's own A3S/A6/B3-HONOUR compound
                  submission (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
                  "S001 B04 was settled, but the SG B04 still in Pending", A3S's compound release() was
@@ -660,42 +892,74 @@
                  correctly shows it as already approved instead of offering a second attempt that would
                  409. Shows who/when when that persisted field is the reason (this session's own click
                  already says so via the ✓ wording alone). -->
-            <div class="tb-hint tb-hint--ok" *ngIf="selectedCheckerMovement && selectedFunctionStrategy?.checkerRelease?.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved">
-              ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"> — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date:'short' }}</span>. Balance stays <strong>Pending</strong> — go to {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
-            </div>
-
-            <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
-              <div class="tb-field tb-field--inline">
-                <label class="tb-field__label">Checker ID</label>
-                <input class="tb-input tb-input--required" [(ngModel)]="checkerId">
+              <div
+                class="tb-hint tb-hint--ok"
+                *ngIf="
+                  selectedCheckerMovement &&
+                  selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                  selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                  !isCheckerCompoundOwnSubmission &&
+                  arrivalAlreadyApproved
+                "
+              >
+                ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span
+                  *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"
+                >
+                  — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date: 'short' }}</span
+                >. Balance stays <strong>Pending</strong> — go to
+                {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
               </div>
-              <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
+
+              <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
+                <div class="tb-field tb-field--inline">
+                  <label class="tb-field__label">Checker ID</label>
+                  <input class="tb-input tb-input--required" [(ngModel)]="checkerId" />
+                </div>
+                <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
                    ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
                    so clicking either immediately disables both, for every function including the
                    compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
-              <button class="tb-btn tb-btn--success" (click)="checkerAct('release')" [disabled]="checkerActionInFlight || (selectedFunctionStrategy?.checkerRelease?.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved)">
-                {{ checkerActionInFlight ? 'Working…' : (selectedFunctionStrategy?.checkerRelease?.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission ? 'Approve (acknowledgment only)' : 'Release') }}
-              </button>
-              <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
-            </div>
-            <div class="tb-error mt-2" *ngIf="checkerError">{{ checkerError }}</div>
-          </ng-container>
-        </div>
-      </section>
-    </div>
+                <button
+                  class="tb-btn tb-btn--success"
+                  (click)="checkerAct('release')"
+                  [disabled]="
+                    checkerActionInFlight ||
+                    (selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                      selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                      !isCheckerCompoundOwnSubmission &&
+                      arrivalAlreadyApproved)
+                  "
+                >
+                  {{
+                    checkerActionInFlight
+                      ? 'Working…'
+                      : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                          selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                          !isCheckerCompoundOwnSubmission
+                        ? 'Approve (acknowledgment only)'
+                        : 'Release'
+                  }}
+                </button>
+                <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
+              </div>
+              <div class="tb-error mt-2" *ngIf="checkerError">{{ checkerError }}</div>
+            </ng-container>
+          </div>
+        </section>
+      </div>
 
-    <div class="tb-side">
-      <section class="tb-section tb-section--lookup">
-        <div class="tb-section__header">
-          <h2 class="tb-section__title">Look Up Current Balance</h2>
-        </div>
-        <div class="tb-section__body">
-          <!-- Business instruction 2026-08-15 ("Look Up Current Balance should use the existing LC Number on
+      <div class="tb-side">
+        <section class="tb-section tb-section--lookup">
+          <div class="tb-section__header">
+            <h2 class="tb-section__title">Look Up Current Balance</h2>
+          </div>
+          <div class="tb-section__body">
+            <!-- Business instruction 2026-08-15 ("Look Up Current Balance should use the existing LC Number on
                Screen... instead of keyin") — these fields are kept as a manual override/fallback (e.g. to look
                up an unrelated LC), but syncLookupToContext() (component.ts) already keeps them in sync with
                whatever LC is in context after a Submit or a Checker action, so re-typing is rarely needed. -->
-          <div class="tb-grid-lookup">
-            <!-- Business instruction 2026-08-15: EPLC_LC (Unconfirmed Export LC) removed from this
+            <div class="tb-grid-lookup">
+              <!-- Business instruction 2026-08-15: EPLC_LC (Unconfirmed Export LC) removed from this
                  list — Export Confirmed-only scope, no function creates one anymore (see the
                  EXPORT_FUNCTIONS module note in balance-component.model.ts). Only Import LC-side
                  (IPLC_LC/IPLC_ACCEPTANCE/SHGT) and Export Confirmed-side (EPLC_CONFIRMATION/
@@ -703,7 +967,7 @@
                  ("Import LC 不須出現 Export LC。Export Confirmed 不須出現 Import LC") — the option list
                  itself is now filtered to the active tab's own side, so switching tabs never leaves a
                  stale cross-side option visible/selectable. -->
-            <!-- Business instruction 2026-08-16 ("Dropdown是不需要的 因為Sight只處理Confirmed Balance
+              <!-- Business instruction 2026-08-16 ("Dropdown是不需要的 因為Sight只處理Confirmed Balance
                  Usance只處理Confirmed Balance與Acceptance Balance") — Export side, EPLC_CONFIRMATION is
                  the only genuine top-level lookup entry point: Acceptance Balance is always reachable
                  from it via the "Acceptance Balance" tab below (lookupIsUsanceLc), never a separate
@@ -714,7 +978,7 @@
                  via the existing "Acceptance Balance"/"SG Balance" tabs below instead. Neither side's own
                  dropdown exists anymore — lookup.instrumentType stays fixed at IPLC_LC/EPLC_CONFIRMATION
                  (set by selectFunctionSide()/selectFunction()), never user-editable here. -->
-            <!-- Business instruction 2026-08-16: the IB#/EB#/SG# fields that used to sit alongside this
+              <!-- Business instruction 2026-08-16: the IB#/EB#/SG# fields that used to sit alongside this
                  (paired with the now-removed instrumentType dropdown, to look up an Acceptance/SG
                  directly) are gone too — genuinely vestigial now that instrumentType is permanently fixed
                  to IPLC_LC/EPLC_CONFIRMATION here (their own natural key is lcNumber alone). Worse than
@@ -724,22 +988,38 @@
                  below already auto-list every Acceptance/SG under the picked LC (selectLookupAcceptance()/
                  selectLookupSg(), auto-picking the one if there's exactly one) — no separate top-level
                  field was ever needed to narrow to a specific one. -->
-            <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber">
-          </div>
-          <button class="tb-btn tb-btn--outline mt-2" (click)="lookUp.runLookup()">Look Up</button>
-          <div class="tb-error mt-2" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
+              <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber" />
+            </div>
+            <button class="tb-btn tb-btn--outline mt-2" (click)="lookUp.runLookup()">Look Up</button>
+            <div class="tb-error mt-2" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
 
-          <!-- Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC
+            <!-- Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC
                ... three tabs, LC Balance, Acceptance Balance, and SG Balance") — Acceptance only for Usance
                (Design doc §7); SG for either tenor (Import IPLC_LC only). Neither shown for a non-LC lookup
                (e.g. looking up an Acceptance/Confirmation/SG directly). -->
-          <div class="tb-tabs mt-2" *ngIf="lookUp.lookupResult && (lookUp.lookupIsUsanceLc || lookUp.lookupHasSg)">
-            <button type="button" class="tb-tab" [class.tb-tab--active]="lookUp.lookupTab === 'LC'" (click)="lookUp.selectLookupTab('LC')">LC Balance</button>
-            <button type="button" class="tb-tab" *ngIf="lookUp.lookupIsUsanceLc" [class.tb-tab--active]="lookUp.lookupTab === 'ACCEPTANCE'" (click)="lookUp.selectLookupTab('ACCEPTANCE')">{{ lookUp.acceptanceBalanceLabel }}</button>
-            <button type="button" class="tb-tab" *ngIf="lookUp.lookupHasSg" [class.tb-tab--active]="lookUp.lookupTab === 'SG'" (click)="lookUp.selectLookupTab('SG')">SG Balance</button>
-          </div>
+            <div class="tb-tabs mt-2" *ngIf="lookUp.lookupResult && (lookUp.lookupIsUsanceLc || lookUp.lookupHasSg)">
+              <button type="button" class="tb-tab" [class.tb-tab--active]="lookUp.lookupTab === 'LC'" (click)="lookUp.selectLookupTab('LC')">LC Balance</button>
+              <button
+                type="button"
+                class="tb-tab"
+                *ngIf="lookUp.lookupIsUsanceLc"
+                [class.tb-tab--active]="lookUp.lookupTab === 'ACCEPTANCE'"
+                (click)="lookUp.selectLookupTab('ACCEPTANCE')"
+              >
+                {{ lookUp.acceptanceBalanceLabel }}
+              </button>
+              <button
+                type="button"
+                class="tb-tab"
+                *ngIf="lookUp.lookupHasSg"
+                [class.tb-tab--active]="lookUp.lookupTab === 'SG'"
+                (click)="lookUp.selectLookupTab('SG')"
+              >
+                SG Balance
+              </button>
+            </div>
 
-          <!-- UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design": "there is no need to
+            <!-- UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design": "there is no need to
                create separate G01 and G02 catalog/cards after selecting SG Balance... one unified
                Inquiry Catalog, with each SG identified by its Secondary Reference... avoids duplicating
                the Secondary Reference as another selection layer") — each candidate row is now a
@@ -751,63 +1031,82 @@
                InquireEventsService already uses for the identical label, rather than a second hardcoded
                copy). Selecting a row still reveals that SG's/Acceptance's own Event Timeline below,
                unchanged — this is a row-content enrichment only, not a behavior change. -->
-          <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupIsUsanceLc && lookUp.lookupTab === 'ACCEPTANCE'">
-            <app-index-picker *ngIf="lookUp.acceptancesUnderLookup.length > 1"
-              [items]="lookUp.acceptancesUnderLookup"
-              [selectedId]="lookUp.selectedLookupAcceptance?.balanceContractId ?? null"
-              (pick)="lookUp.selectLookupAcceptance($event)">
-              <ng-template let-a>
-                <span class="tb-row-primary">LC {{ a.naturalKey.lcNumber }} — Secondary Ref. {{ a.naturalKey.ibNumber }}</span>
-                <span class="tb-row-badge">{{ lookUp.acceptanceBalanceLabel }} — {{ a.status }}</span>
-              </ng-template>
-            </app-index-picker>
-            <div class="tb-hint" *ngIf="!lookUp.acceptancesUnderLookup.length">No Acceptance carved out under this LC yet — use A6 first.</div>
-          </div>
+            <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupIsUsanceLc && lookUp.lookupTab === 'ACCEPTANCE'">
+              <app-index-picker
+                *ngIf="lookUp.acceptancesUnderLookup.length > 1"
+                [items]="lookUp.acceptancesUnderLookup"
+                [selectedId]="lookUp.selectedLookupAcceptance?.balanceContractId ?? null"
+                (pick)="lookUp.selectLookupAcceptance($event)"
+              >
+                <ng-template let-a>
+                  <span class="tb-row-primary">LC {{ a.naturalKey.lcNumber }} — Secondary Ref. {{ a.naturalKey.ibNumber }}</span>
+                  <span class="tb-row-badge">{{ lookUp.acceptanceBalanceLabel }} — {{ a.status }}</span>
+                </ng-template>
+              </app-index-picker>
+              <div class="tb-hint" *ngIf="!lookUp.acceptancesUnderLookup.length">No Acceptance carved out under this LC yet — use A6 first.</div>
+            </div>
 
-          <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupHasSg && lookUp.lookupTab === 'SG'">
-            <app-index-picker *ngIf="lookUp.sgsUnderLookup.length > 1"
-              [items]="lookUp.sgsUnderLookup"
-              [selectedId]="lookUp.selectedLookupSg?.balanceContractId ?? null"
-              (pick)="lookUp.selectLookupSg($event)">
-              <ng-template let-sg>
-                <span class="tb-row-primary">LC {{ sg.naturalKey.lcNumber }} — Secondary Ref. {{ sg.naturalKey.sgNumber }}</span>
-                <span class="tb-row-badge">SG Balance — {{ sg.status }}</span>
-              </ng-template>
-            </app-index-picker>
-            <div class="tb-hint" *ngIf="!lookUp.sgsUnderLookup.length">No Shipping Guarantee issued under this LC yet — use A8 first.</div>
-          </div>
+            <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupHasSg && lookUp.lookupTab === 'SG'">
+              <app-index-picker
+                *ngIf="lookUp.sgsUnderLookup.length > 1"
+                [items]="lookUp.sgsUnderLookup"
+                [selectedId]="lookUp.selectedLookupSg?.balanceContractId ?? null"
+                (pick)="lookUp.selectLookupSg($event)"
+              >
+                <ng-template let-sg>
+                  <span class="tb-row-primary">LC {{ sg.naturalKey.lcNumber }} — Secondary Ref. {{ sg.naturalKey.sgNumber }}</span>
+                  <span class="tb-row-badge">SG Balance — {{ sg.status }}</span>
+                </ng-template>
+              </app-index-picker>
+              <div class="tb-hint" *ngIf="!lookUp.sgsUnderLookup.length">No Shipping Guarantee issued under this LC yet — use A8 first.</div>
+            </div>
 
-          <!-- Event timeline (business instruction 2026-08-14): every movement, in eventSeq (time) order.
+            <!-- Event timeline (business instruction 2026-08-14): every movement, in eventSeq (time) order.
                Click one to see the balance right after THAT event, not the current live balance.
                Business instruction 2026-08-14 ("don't show the JSON, start with Event Timeline") — this is
                the FIRST thing shown for a lookup result, ahead of the Current Balance summary below. -->
-          <div class="mt-3" *ngIf="lookUp.lookupResult">
-            <h3 class="tb-subheading">Event Timeline — {{ lookUp.activeLookupLabel }}</h3>
-            <!-- Bug fix (reviewer-reported 2026-08-17, "Time column truncated for A1-A9/B1-B5") — the
+            <div class="mt-3" *ngIf="lookUp.lookupResult">
+              <h3 class="tb-subheading">Event Timeline — {{ lookUp.activeLookupLabel }}</h3>
+              <!-- Bug fix (reviewer-reported 2026-08-17, "Time column truncated for A1-A9/B1-B5") — the
                  ancestor .tb-section's own overflow:hidden (kept for its rounded-corner header background)
                  was silently CLIPPING this table's Time column instead of letting it scroll: .tb-table__time
                  is white-space:nowrap, so table-layout:auto refuses to shrink it below its content width,
                  and with no scroll container of its own the overflow had nowhere to go but clipped. This
                  wrapper gives that overflow a dedicated horizontal-scroll surface instead. -->
-            <div class="tb-table-scroll" *ngIf="lookUp.activeLookupMovements.length">
-            <!-- 2026-08-19 (60/40 split, requirement #5) — tb-table--lookup-timeline tightens this
+              <div class="tb-table-scroll" *ngIf="lookUp.activeLookupMovements.length">
+                <!-- 2026-08-19 (60/40 split, requirement #5) — tb-table--lookup-timeline tightens this
                  specific table's own cell padding/font-size (transaction-builder.component.scss) so its
                  7 columns fit the now-narrower 40% Look Up Current Balance panel without truncation. -->
-            <table class="tb-table tb-table--lookup-timeline">
-              <caption class="visually-hidden">Event Timeline — {{ lookUp.activeLookupLabel }}</caption>
-              <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
+                <table class="tb-table tb-table--lookup-timeline">
+                  <caption class="visually-hidden">
+                    Event Timeline —
+                    {{
+                      lookUp.activeLookupLabel
+                    }}
+                  </caption>
+                  <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
                    visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
-              <!-- UX enhancement (2026-08-19, "Look Up Current Balance → Event Timeline" gains a FUNCTION
+                  <!-- UX enhancement (2026-08-19, "Look Up Current Balance → Event Timeline" gains a FUNCTION
                    column that "must use the same Function mapping as Inquire Events... Do not implement
                    a separate Function mapping") — lookUp.functionFor() delegates to the SAME
                    functionForEvent() free function InquireEventsService.functionFor() itself now
                    delegates to (inquire-events.service.ts), so both screens resolve every row's own
                    Function badge identically by construction. Markup mirrors Inquire Events' own Function
                    column exactly (same .tb-type-tag/tb-muted shapes, same "—" fallback for legacy data). -->
-              <thead><tr><th>Function</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th><th>Balance After</th><th>Time</th></tr></thead>
-              <tbody>
-                <!-- Business instruction 2026-08-14 "Lookup should show the 2ndary reference number" — sourceTransactionRef
+                  <thead>
+                    <tr>
+                      <th>Function</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Reference</th>
+                      <th>Status</th>
+                      <th>Balance After</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Business instruction 2026-08-14 "Lookup should show the 2ndary reference number" — sourceTransactionRef
                      (Amendment No./Times, IB/EB Number, …); ISSUE/CREATE have none, shown as an em dash.
                      Business instruction 2026-08-16 ("Event Timeline 上一行已經顯示了 不需再多選取") — Balance
                      After (the movement's own balanceAfter, set once it's RELEASED — see release()'s own
@@ -823,7 +1122,7 @@
                      dedicated "Entries" column/button is gone; the dialog itself (below) now shows a plain
                      "No voucher entries" hint instead of a Dr/Cr table when the clicked event has none,
                      closing the same "—" case the removed button's own empty state used to cover. -->
-                <!-- 2026-08-18, user-requested ("Look Up Current Balance's own Event Timeline should use
+                    <!-- 2026-08-18, user-requested ("Look Up Current Balance's own Event Timeline should use
                      the SAME status/display logic as Inquire Events — must not maintain its own
                      independent STATUS mapping"): iterates InquiredEvent rows (the SAME toEventRows()
                      split Inquire Events uses), not the raw BalanceMovement[] this table bound before.
@@ -834,43 +1133,81 @@
                      reversal of an earlier same-day design that forced 'create' to show a stale PENDING).
                      Balance After likewise reads row.movement.balanceAfter unconditionally now — no more
                      blanking for a 'create' row, same reasoning. -->
-                <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
-                  <td>
-                    <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
-                    <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
-                  </td>
-                  <td><span class="tb-type-tag">{{ row.movement.movementType }}</span></td>
-                  <td class="tb-table__amount">{{ row.movement.amount }} <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount">(ceiling {{ row.movement.ceilingAmount }})</span></td>
-                  <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
-                  <td><span class="tb-status-badge" [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase)">{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase) }}</span></td>
-                  <td class="tb-table__amount">{{ row.movement.balanceAfter ?? '—' }}</td>
-                  <td class="tb-table__time">{{ row.eventTime | date:'short' }}</td>
-                </tr>
-              </tbody>
-            </table>
-            </div>
-            <!-- UX enhancement (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN") — same Prev/Next +
+                    <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
+                      <td>
+                        <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
+                        <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
+                      </td>
+                      <td>
+                        <span class="tb-type-tag">{{ row.movement.movementType }}</span>
+                      </td>
+                      <td class="tb-table__amount">
+                        {{ row.movement.amount }}
+                        <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount">(ceiling {{ row.movement.ceilingAmount }})</span>
+                      </td>
+                      <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
+                      <td>
+                        <span
+                          class="tb-status-badge"
+                          [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase)"
+                          >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase) }}</span
+                        >
+                      </td>
+                      <td class="tb-table__amount">{{ row.movement.balanceAfter ?? '—' }}</td>
+                      <td class="tb-table__time">{{ row.eventTime | date: 'short' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- UX enhancement (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN") — same Prev/Next +
                  "Page X / Y (Z total)" control shape Inquire Events' own merged Events table already uses
                  (InquireEventsService.eventsPaging), reused verbatim rather than a new design. -->
-            <div class="tb-pagination" *ngIf="lookUp.lookupMovementsPaging.totalPages > 1">
-              <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="lookUp.lookupMovementsPaging.page <= 1" (click)="lookUp.prevLookupMovementsPage()">‹ Prev</button>
-              <span class="tb-muted">Page {{ lookUp.lookupMovementsPaging.page }} / {{ lookUp.lookupMovementsPaging.totalPages }} ({{ lookUp.lookupMovementsPaging.total }} total)</span>
-              <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="lookUp.lookupMovementsPaging.page >= lookUp.lookupMovementsPaging.totalPages" (click)="lookUp.nextLookupMovementsPage()">Next ›</button>
-            </div>
-            <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
+              <div class="tb-pagination" *ngIf="lookUp.lookupMovementsPaging.totalPages > 1">
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  [disabled]="lookUp.lookupMovementsPaging.page <= 1"
+                  (click)="lookUp.prevLookupMovementsPage()"
+                >
+                  ‹ Prev
+                </button>
+                <span class="tb-muted"
+                  >Page {{ lookUp.lookupMovementsPaging.page }} / {{ lookUp.lookupMovementsPaging.totalPages }} ({{
+                    lookUp.lookupMovementsPaging.total
+                  }}
+                  total)</span
+                >
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  [disabled]="lookUp.lookupMovementsPaging.page >= lookUp.lookupMovementsPaging.totalPages"
+                  (click)="lookUp.nextLookupMovementsPage()"
+                >
+                  Next ›
+                </button>
+              </div>
+              <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
 
-            <!-- Current Balance — no raw JSON dump (business instruction 2026-08-14). One field per line
+              <!-- Current Balance — no raw JSON dump (business instruction 2026-08-14). One field per line
                  (business instruction 2026-08-15 — was a wrapping flex row before, hard to scan).
                  Inquire Events (2026-08-17): this box is now a shared #balanceSnapshotBox template
                  (defined once, near the end of this file) so Transaction Processing (here) and Event
                  Inquiry (below) render an identical box from one canonical markup, not two copies. -->
-            <ng-container *ngTemplateOutlet="balanceSnapshotBox; context: { title: 'Current Balance — ' + lookUp.activeLookupLabel, status: lookUp.activeLookupContract?.status, snapshot: lookUp.activeLookupSnapshot }"></ng-container>
+              <ng-container
+                *ngTemplateOutlet="
+                  balanceSnapshotBox;
+                  context: {
+                    title: 'Current Balance — ' + lookUp.activeLookupLabel,
+                    status: lookUp.activeLookupContract?.status,
+                    snapshot: lookUp.activeLookupSnapshot,
+                  }
+                "
+              ></ng-container>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
-  </div>
-
   </ng-container>
 
   <!-- ══════════════════════════ INQUIRE EVENTS (2026-08-17) ══════════════════════════
@@ -898,12 +1235,16 @@
            pass. -->
       <section class="tb-section tb-section--maker">
         <div class="tb-section__body">
-        <div class="tb-tabs tb-tabs--side">
-          <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'IMPORT'" (click)="inquireEvents.selectSide('IMPORT')">Import LC</button>
-          <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'EXPORT'" (click)="inquireEvents.selectSide('EXPORT')">Export Confirmed</button>
-        </div>
+          <div class="tb-tabs tb-tabs--side">
+            <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'IMPORT'" (click)="inquireEvents.selectSide('IMPORT')">
+              Import LC
+            </button>
+            <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'EXPORT'" (click)="inquireEvents.selectSide('EXPORT')">
+              Export Confirmed
+            </button>
+          </div>
 
-        <!-- LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC Master
+          <!-- LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC Master
              Records 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the
              SAME day, same wording, to Export Confirmed LC — "Same requirement for Export Confirmed").
              Side-agnostic: one index/drill-down flow backs both Import LC and Export Confirmed LC,
@@ -913,58 +1254,102 @@
              never clears indexRows/indexPaging/indexSearch on that round trip — see its own doc
              comments). The OLD single-exact-match "type LC Number, click Search" box (formerly Export
              Confirmed's only entry point) is fully retired — both sides now share this Index instead. -->
-        <ng-container *ngIf="inquireEvents.indexView === 'INDEX'">
-          <div class="tb-field tb-field--inline tb-field--search mt-2">
-            <label class="tb-field__label">LC Number Search / Filter</label>
-            <input class="tb-input" placeholder="e.g. S0 (matches any LC Number containing this text)" [(ngModel)]="inquireEvents.indexSearch" (keyup.enter)="inquireEvents.searchIndex()">
-            <button type="button" class="tb-btn tb-btn--outline" [disabled]="inquireEvents.indexLoading" (click)="inquireEvents.searchIndex()">
-              {{ inquireEvents.indexLoading ? 'Searching…' : 'Search' }}
+          <ng-container *ngIf="inquireEvents.indexView === 'INDEX'">
+            <div class="tb-field tb-field--inline tb-field--search mt-2">
+              <label class="tb-field__label">LC Number Search / Filter</label>
+              <input
+                class="tb-input"
+                placeholder="e.g. S0 (matches any LC Number containing this text)"
+                [(ngModel)]="inquireEvents.indexSearch"
+                (keyup.enter)="inquireEvents.searchIndex()"
+              />
+              <button type="button" class="tb-btn tb-btn--outline" [disabled]="inquireEvents.indexLoading" (click)="inquireEvents.searchIndex()">
+                {{ inquireEvents.indexLoading ? 'Searching…' : 'Search' }}
+              </button>
+            </div>
+            <div class="tb-error mt-2" *ngIf="inquireEvents.indexError">{{ inquireEvents.indexError }}</div>
+            <div class="tb-hint mt-2" *ngIf="inquireEvents.indexLoading">Loading {{ inquireEvents.indexEntityLabel }} Master Records…</div>
+
+            <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
+              <table class="tb-table">
+                <caption class="visually-hidden">
+                  {{
+                    inquireEvents.indexEntityLabel
+                  }}
+                  Master Records
+                </caption>
+                <thead>
+                  <tr>
+                    <th>LC Number</th>
+                    <th>Tenor Type</th>
+                    <th>Currency</th>
+                    <th>LC Amount</th>
+                    <th>Available Balance</th>
+                    <th>Status</th>
+                    <th>Last Event Date/Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)">
+                    <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
+                    <td>{{ row.tenorType }}</td>
+                    <td>{{ row.currency }}</td>
+                    <td class="tb-table__amount">{{ row.lcAmount }}</td>
+                    <td class="tb-table__amount">{{ row.availableBalance }}</td>
+                    <td>
+                      <span class="tb-type-tag">{{ row.status }}</span>
+                    </td>
+                    <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date: 'short') : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="tb-pagination" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexPaging.totalPages > 1">
+              <button
+                type="button"
+                class="tb-btn tb-btn--tiny tb-btn--outline"
+                [disabled]="inquireEvents.indexPaging.page <= 1"
+                (click)="inquireEvents.prevIndexPage()"
+              >
+                ‹ Prev
+              </button>
+              <span class="tb-muted"
+                >Page {{ inquireEvents.indexPaging.page }} / {{ inquireEvents.indexPaging.totalPages }} ({{ inquireEvents.indexPaging.total }} total)</span
+              >
+              <button
+                type="button"
+                class="tb-btn tb-btn--tiny tb-btn--outline"
+                [disabled]="inquireEvents.indexPaging.page >= inquireEvents.indexPaging.totalPages"
+                (click)="inquireEvents.nextIndexPage()"
+              >
+                Next ›
+              </button>
+            </div>
+            <div class="tb-hint mt-2" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError">
+              No {{ inquireEvents.indexEntityLabel }} Master Records found{{ inquireEvents.indexSearch.trim() ? ' matching this filter' : '' }}.
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
+            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">
+              ‹ Back to {{ inquireEvents.indexEntityLabel }} Index
             </button>
-          </div>
-          <div class="tb-error mt-2" *ngIf="inquireEvents.indexError">{{ inquireEvents.indexError }}</div>
-          <div class="tb-hint mt-2" *ngIf="inquireEvents.indexLoading">Loading {{ inquireEvents.indexEntityLabel }} Master Records…</div>
+            <div class="tb-error mt-2" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
+            <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">
+              Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}
+            </div>
+          </ng-container>
 
-          <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
-            <table class="tb-table">
-              <caption class="visually-hidden">{{ inquireEvents.indexEntityLabel }} Master Records</caption>
-              <thead><tr><th>LC Number</th><th>Tenor Type</th><th>Currency</th><th>LC Amount</th><th>Available Balance</th><th>Status</th><th>Last Event Date/Time</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)">
-                  <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
-                  <td>{{ row.tenorType }}</td>
-                  <td>{{ row.currency }}</td>
-                  <td class="tb-table__amount">{{ row.lcAmount }}</td>
-                  <td class="tb-table__amount">{{ row.availableBalance }}</td>
-                  <td><span class="tb-type-tag">{{ row.status }}</span></td>
-                  <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date:'short') : '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="tb-pagination" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexPaging.totalPages > 1">
-            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.indexPaging.page <= 1" (click)="inquireEvents.prevIndexPage()">‹ Prev</button>
-            <span class="tb-muted">Page {{ inquireEvents.indexPaging.page }} / {{ inquireEvents.indexPaging.totalPages }} ({{ inquireEvents.indexPaging.total }} total)</span>
-            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.indexPaging.page >= inquireEvents.indexPaging.totalPages" (click)="inquireEvents.nextIndexPage()">Next ›</button>
-          </div>
-          <div class="tb-hint mt-2" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError">No {{ inquireEvents.indexEntityLabel }} Master Records found{{ inquireEvents.indexSearch.trim() ? ' matching this filter' : '' }}.</div>
-        </ng-container>
-
-        <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
-          <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">‹ Back to {{ inquireEvents.indexEntityLabel }} Index</button>
-          <div class="tb-error mt-2" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
-          <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}</div>
-        </ng-container>
-
-        <!-- LC Master Records Index (2026-08-19) — this whole results section (Events table, Original
+          <!-- LC Master Records Index (2026-08-19) — this whole results section (Events table, Original
              Transaction Screen, Balance Tabs) stays hidden while browsing the Index (indexView ===
              'INDEX'), on BOTH sides, even though rootContract/selectedEvent themselves are deliberately
              NOT cleared by backToIndex() (so a re-drill-down into the SAME LC doesn't need a re-fetch —
              see InquireEventsService's own doc comments). -->
-        <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
-        <div class="mt-3" *ngIf="inquireEvents.rootContract">
-          <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
-          <div class="tb-hint" *ngIf="inquireEvents.eventsLoading">Loading events…</div>
-          <!-- Business instruction 2026-08-17 ("Since the View screen already provides access to Account
+          <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
+            <div class="mt-3" *ngIf="inquireEvents.rootContract">
+              <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
+              <div class="tb-hint" *ngIf="inquireEvents.eventsLoading">Loading events…</div>
+              <!-- Business instruction 2026-08-17 ("Since the View screen already provides access to Account
                Entries, remove the Account Entries button from the Event List... The View button should
                serve as the single entry point for reviewing the selected Event, including its
                Transaction Details, Account Entries, and Balance Snapshot.") — the row-level Account
@@ -976,10 +1361,16 @@
                .tb-section whose own overflow:hidden silently clips a nowrap column instead of scrolling
                it into view; adding the new Function column below widens this table enough to risk the
                identical bug, so it gets the same proactive fix rather than waiting for it to reproduce. -->
-          <div class="tb-table-scroll" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
-          <table class="tb-table">
-            <caption class="visually-hidden">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</caption>
-            <!-- UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位" — put
+              <div class="tb-table-scroll" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
+                <table class="tb-table">
+                  <caption class="visually-hidden">
+                    Events — LC
+                    {{
+                      inquireEvents.rootContract.naturalKey.lcNumber
+                    }}
+                    (all ledgers, Event Date/Time order)
+                  </caption>
+                  <!-- UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位" — put
                  the Function name in the Events table's own first column) — reuses
                  InquireEventsService.functionFor()'s own per-phase resolution (the SAME rule
                  selectEvent() already applies for the "View" screen's own header — extracted there so
@@ -987,66 +1378,131 @@
                  row correctly shows "A4 · Sight Settlement" here too, not the sibling 'create' row's "A3
                  · Document Arrival". "—" for legacy data no current function produces, same convention
                  every other unresolved-function fallback in this app already uses. -->
-            <thead><tr><th>Function</th><th>Ledger</th><th>Type</th><th>Amount</th><th>Reference</th><th>Secondary Ref.</th><th>Status</th><th>Time</th></tr></thead>
-            <tbody>
-              <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
+                  <thead>
+                    <tr>
+                      <th>Function</th>
+                      <th>Ledger</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Reference</th>
+                      <th>Secondary Ref.</th>
+                      <th>Status</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
                    itself should be clickable... hover → highlight/pointer → single click → View Event
                    Details") — the row-level View button/column was removed; the whole <tr> now dispatches
                    the identical selectEvent() call the button used to. .tb-table's own tbody tr already
                    carries cursor:pointer + hover-highlight styling (the same pickable-row affordance every
                    other .tb-table in this app already uses), so no new CSS was needed. -->
-              <tr *ngFor="let e of inquireEvents.pagedEvents" (click)="inquireEvents.selectEvent(e)">
-                <td>
-                  <span class="tb-type-tag" *ngIf="inquireEvents.functionFor(e) as fn">{{ fn.code }} · {{ fn.label }}</span>
-                  <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e)">—</span>
-                </td>
-                <td><span class="tb-type-tag">{{ e.contract.instrumentType }}</span></td>
-                <td><span class="tb-type-tag">{{ e.movement.movementType }}</span></td>
-                <td class="tb-table__amount">{{ e.movement.amount }}</td>
-                <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
-                <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
-                <td><span class="tb-status-badge" [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase)">{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase) }}</span></td>
-                <td class="tb-table__time">{{ e.eventTime | date:'short' }}</td>
-              </tr>
-            </tbody>
-          </table>
-          </div>
-          <!-- UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — CLIENT-SIDE
+                    <tr *ngFor="let e of inquireEvents.pagedEvents" (click)="inquireEvents.selectEvent(e)">
+                      <td>
+                        <span class="tb-type-tag" *ngIf="inquireEvents.functionFor(e) as fn">{{ fn.code }} · {{ fn.label }}</span>
+                        <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e)">—</span>
+                      </td>
+                      <td>
+                        <span class="tb-type-tag">{{ e.contract.instrumentType }}</span>
+                      </td>
+                      <td>
+                        <span class="tb-type-tag">{{ e.movement.movementType }}</span>
+                      </td>
+                      <td class="tb-table__amount">{{ e.movement.amount }}</td>
+                      <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
+                      <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
+                      <td>
+                        <span
+                          class="tb-status-badge"
+                          [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase)"
+                          >{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase) }}</span
+                        >
+                      </td>
+                      <td class="tb-table__time">{{ e.eventTime | date: 'short' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — CLIENT-SIDE
                pagination over the already-fully-loaded, already-sorted events array (no re-fetch per
                page — see InquireEventsService.eventsPaging's own doc comment for why). Same Prev/Next +
                "Page X / Y (Z total)" convention app-index-picker's own pagination uses elsewhere in this
                app, reused rather than reinvented — only shown once there's more than one page. -->
-          <div class="tb-pagination" *ngIf="inquireEvents.eventsPaging.totalPages > 1">
-            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.eventsPaging.page <= 1" (click)="inquireEvents.prevEventsPage()">‹ Prev</button>
-            <span class="tb-muted">Page {{ inquireEvents.eventsPaging.page }} / {{ inquireEvents.eventsPaging.totalPages }} ({{ inquireEvents.eventsPaging.total }} total)</span>
-            <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="inquireEvents.eventsPaging.page >= inquireEvents.eventsPaging.totalPages" (click)="inquireEvents.nextEventsPage()">Next ›</button>
-          </div>
-          <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
-        </div>
+              <div class="tb-pagination" *ngIf="inquireEvents.eventsPaging.totalPages > 1">
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  [disabled]="inquireEvents.eventsPaging.page <= 1"
+                  (click)="inquireEvents.prevEventsPage()"
+                >
+                  ‹ Prev
+                </button>
+                <span class="tb-muted"
+                  >Page {{ inquireEvents.eventsPaging.page }} / {{ inquireEvents.eventsPaging.totalPages }} ({{ inquireEvents.eventsPaging.total }} total)</span
+                >
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  [disabled]="inquireEvents.eventsPaging.page >= inquireEvents.eventsPaging.totalPages"
+                  (click)="inquireEvents.nextEventsPage()"
+                >
+                  Next ›
+                </button>
+              </div>
+              <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
+            </div>
 
-        <!-- Original transaction screen, restored, read-only — same buildFields()/<formly-form> the live
+            <!-- Original transaction screen, restored, read-only — same buildFields()/<formly-form> the live
              Maker Submit screen uses, decorated via toReadOnlyFields() (builder-fields.ts). -->
-        <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel">
-          <div class="tb-balance-box__title">
-            Original Transaction Screen —
-            <ng-container *ngIf="inquireEvents.selectedEventFunction as fn">{{ fn.code }} · {{ fn.label }}</ng-container>
-            <ng-container *ngIf="!inquireEvents.selectedEventFunction">(function not resolved — showing captured transaction data)</ng-container>
-          </div>
-          <div class="tb-balance-row"><span class="tb-balance-row__label">LC Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.lcNumber }}</span></div>
-          <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber"><span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.ibNumber }}</span></div>
-          <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber"><span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.sgNumber }}</span></div>
-          <formly-form [form]="inquireEvents.selectedEventForm" [fields]="inquireEvents.selectedEventFields" [model]="inquireEvents.selectedEventModel"></formly-form>
-          <div class="tb-balance-row"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ displayStatus(sel.eventStatus, sel.contract.instrumentType, sel.movement.movementType, sel.phase) }}</span></div>
-          <div class="tb-balance-row"><span class="tb-balance-row__label">Created</span><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date:'short' }}</span></div>
-          <!-- sel.eventStatus (not sel.movement.status directly, though as of 2026-08-18 they're always
+            <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel">
+              <div class="tb-balance-box__title">
+                Original Transaction Screen —
+                <ng-container *ngIf="inquireEvents.selectedEventFunction as fn">{{ fn.code }} · {{ fn.label }}</ng-container>
+                <ng-container *ngIf="!inquireEvents.selectedEventFunction">(function not resolved — showing captured transaction data)</ng-container>
+              </div>
+              <div class="tb-balance-row">
+                <span class="tb-balance-row__label">LC Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.lcNumber }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber">
+                <span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.ibNumber }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber">
+                <span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.sgNumber }}</span>
+              </div>
+              <formly-form
+                [form]="inquireEvents.selectedEventForm"
+                [fields]="inquireEvents.selectedEventFields"
+                [model]="inquireEvents.selectedEventModel"
+              ></formly-form>
+              <div class="tb-balance-row">
+                <span class="tb-balance-row__label">Status</span
+                ><span class="tb-balance-row__value">{{
+                  displayStatus(sel.eventStatus, sel.contract.instrumentType, sel.movement.movementType, sel.phase)
+                }}</span>
+              </div>
+              <div class="tb-balance-row">
+                <span class="tb-balance-row__label">Created</span
+                ><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date: 'short' }}</span>
+              </div>
+              <!-- sel.eventStatus (not sel.movement.status directly, though as of 2026-08-18 they're always
                the same value — see toEventRows()'s own doc comment) gates this. A 'create'-phase row for
                an already-finalized movement now correctly shows "Released by/at" here too, same as its
                sibling 'finalize' row — both are showing the SAME real fact about the SAME movement. -->
-          <div class="tb-balance-row" *ngIf="sel.eventStatus !== 'PENDING' && sel.movement.releasedBy"><span class="tb-balance-row__label">Released</span><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date:'short' }}</span></div>
-          <button type="button" class="tb-btn tb-btn--tiny mt-2" *ngIf="sel.movement.contingentAccountEntry" (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase)">Account Entries</button>
-        </div>
+              <div class="tb-balance-row" *ngIf="sel.eventStatus !== 'PENDING' && sel.movement.releasedBy">
+                <span class="tb-balance-row__label">Released</span
+                ><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date: 'short' }}</span>
+              </div>
+              <button
+                type="button"
+                class="tb-btn tb-btn--tiny mt-2"
+                *ngIf="sel.movement.contingentAccountEntry"
+                (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase)"
+              >
+                Account Entries
+              </button>
+            </div>
 
-        <!-- Balance Tabs (2026-08-17, user-specified — up to 3 tabs: LC/Confirmed LC Balance (always),
+            <!-- Balance Tabs (2026-08-17, user-specified — up to 3 tabs: LC/Confirmed LC Balance (always),
              Acceptance Balance (Usance tenor only), Shipping Guarantee Balance (Import only) — same
              gating rule as the Look Up panel's own LC/Acceptance/SG tabs above (lookupIsUsanceLc/
              lookupHasSg), reused here as selectedEventIsUsanceLc/selectedEventHasSg. A child tab is only
@@ -1055,11 +1511,28 @@
              own balance — rootEventSnapshot — for a child Event). Reuses the SAME #balanceSnapshotBox
              shared template Transaction Processing's own Look Up panel uses above, and the same
              .tb-tabs/.tb-tab tab-strip markup pattern as the Look Up panel's own LC/Acceptance/SG tabs. -->
-        <div class="tb-tabs mt-3" *ngIf="inquireEvents.selectedEventTabs.length > 1">
-          <button type="button" class="tb-tab" *ngFor="let tab of inquireEvents.selectedEventTabs" [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key" (click)="inquireEvents.selectEventTab(tab.key)">{{ tab.label }}</button>
-        </div>
-        <ng-container *ngIf="inquireEvents.selectedEvent as sel2" [ngTemplateOutlet]="balanceSnapshotBox" [ngTemplateOutletContext]="{ title: inquireEvents.activeEventTab?.title, status: sel2.contract.status, snapshot: inquireEvents.activeEventTab?.snapshot, impact: inquireEvents.activeEventTab?.impact }"></ng-container>
-        </ng-container>
+            <div class="tb-tabs mt-3" *ngIf="inquireEvents.selectedEventTabs.length > 1">
+              <button
+                type="button"
+                class="tb-tab"
+                *ngFor="let tab of inquireEvents.selectedEventTabs"
+                [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key"
+                (click)="inquireEvents.selectEventTab(tab.key)"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
+            <ng-container
+              *ngIf="inquireEvents.selectedEvent as sel2"
+              [ngTemplateOutlet]="balanceSnapshotBox"
+              [ngTemplateOutletContext]="{
+                title: inquireEvents.activeEventTab?.title,
+                status: sel2.contract.status,
+                snapshot: inquireEvents.activeEventTab?.snapshot,
+                impact: inquireEvents.activeEventTab?.impact,
+              }"
+            ></ng-container>
+          </ng-container>
         </div>
       </section>
     </div>
@@ -1081,12 +1554,37 @@
       </div>
       <div class="tb-dialog__meta">
         <span class="tb-type-tag">{{ accountEntryDialogMovement.movementType }}</span>
-        <span class="tb-muted">{{ accountEntryDialogMovement.sourceTransactionRef || ('eventSeq ' + accountEntryDialogMovement.eventSeq) }}</span>
-        <span class="tb-status-badge" [ngClass]="statusBadgeClass(accountEntryDialogMovement.status, accountEntryDialogInstrumentType, accountEntryDialogMovement.movementType, accountEntryDialogPhase)">{{ displayStatus(accountEntryDialogMovement.status, accountEntryDialogInstrumentType, accountEntryDialogMovement.movementType, accountEntryDialogPhase) }}</span>
+        <span class="tb-muted">{{ accountEntryDialogMovement.sourceTransactionRef || 'eventSeq ' + accountEntryDialogMovement.eventSeq }}</span>
+        <span
+          class="tb-status-badge"
+          [ngClass]="
+            statusBadgeClass(
+              accountEntryDialogMovement.status,
+              accountEntryDialogInstrumentType,
+              accountEntryDialogMovement.movementType,
+              accountEntryDialogPhase
+            )
+          "
+          >{{
+            displayStatus(accountEntryDialogMovement.status, accountEntryDialogInstrumentType, accountEntryDialogMovement.movementType, accountEntryDialogPhase)
+          }}</span
+        >
       </div>
       <table class="tb-table tb-table--static mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry as entry">
-        <caption class="visually-hidden">Contingent liability account entries for {{ accountEntryDialogMovement.movementType }}</caption>
-        <thead><tr><th>Dr/Cr</th><th>Account Name</th><th>Currency</th><th>Amount</th></tr></thead>
+        <caption class="visually-hidden">
+          Contingent liability account entries for
+          {{
+            accountEntryDialogMovement.movementType
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th>Dr/Cr</th>
+            <th>Account Name</th>
+            <th>Currency</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
         <tbody>
           <tr>
             <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
@@ -1108,7 +1606,9 @@
            the removed per-row "Entries" button used to silently show a plain "—" for exactly this case;
            this explicit hint replaces that, rather than leaving the dialog looking broken/empty. -->
       <p class="tb-hint mt-2" *ngIf="!accountEntryDialogMovement.contingentAccountEntry">No voucher entries recorded for this event.</p>
-      <p class="tb-hint mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry">Historical entries recorded with this event — never recalculated from the current balance.</p>
+      <p class="tb-hint mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry">
+        Historical entries recorded with this event — never recalculated from the current balance.
+      </p>
       <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closeAccountEntryDialog()">Close</button>
     </div>
   </div>
@@ -1132,40 +1632,64 @@
   <ng-template #balanceSnapshotBox let-title="title" let-status="status" let-snapshot="snapshot" let-impact="impact">
     <div class="tb-balance-box tb-balance-box--current mt-2" *ngIf="snapshot">
       <div class="tb-balance-box__title">{{ title }}</div>
-      <div class="tb-balance-row" *ngIf="status"><span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ status }}</span></div>
-      <div class="tb-balance-row"><span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ snapshot.currency }}</span></div>
+      <div class="tb-balance-row" *ngIf="status">
+        <span class="tb-balance-row__label">Status</span><span class="tb-balance-row__value">{{ status }}</span>
+      </div>
+      <div class="tb-balance-row">
+        <span class="tb-balance-row__label">Currency</span><span class="tb-balance-row__value">{{ snapshot.currency }}</span>
+      </div>
       <div class="tb-balance-row">
         <span class="tb-balance-row__label">Confirmed Balance</span>
         <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact || !impact">{{ snapshot.confirmedBalance }}</span>
-        <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && impact.after !== null && impact.after !== undefined">{{ impact.before ?? '—' }} → {{ impact.after }}</span>
-        <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && (impact.after === null || impact.after === undefined)">{{ snapshot.confirmedBalance }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span>
+        <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && impact.after !== null && impact.after !== undefined"
+          >{{ impact.before ?? '—' }} → {{ impact.after }}</span
+        >
+        <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && (impact.after === null || impact.after === undefined)"
+          >{{ snapshot.confirmedBalance }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span
+        >
       </div>
-      <div class="tb-balance-row"><span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ snapshot.availableBalance }}</span></div>
-      <div class="tb-balance-row"><span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal }}</span></div>
+      <div class="tb-balance-row">
+        <span class="tb-balance-row__label">Available Balance</span><span class="tb-balance-row__value">{{ snapshot.availableBalance }}</span>
+      </div>
+      <div class="tb-balance-row">
+        <span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal }}</span>
+      </div>
       <!-- 2026-08-17 ("REFER TO DB S01") — a redirected snapshot's own before→after lands on whichever
            field below its own redirectedImpact.label names, never on Confirmed Balance above (that
            field didn't move — see the microservice's own doc comment for why). -->
       <div class="tb-balance-row" *ngIf="snapshot.offBalanceExposure !== null">
         <span class="tb-balance-row__label">Off-Balance Exposure</span>
         <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'offBalanceExposure'">{{ snapshot.offBalanceExposure }}</span>
-        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'offBalanceExposure'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'offBalanceExposure'"
+          >{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span
+        >
       </div>
       <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
       <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkPending !== null">
         <span class="tb-balance-row__label">Present Docs Earmark (Pending)</span>
-        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkPending'">{{ snapshot.presentDocsEarmarkPending }}</span>
-        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkPending'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkPending'">{{
+          snapshot.presentDocsEarmarkPending
+        }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkPending'"
+          >{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span
+        >
       </div>
       <div class="tb-balance-row" *ngIf="snapshot.presentDocsEarmarkApproved !== null">
         <span class="tb-balance-row__label">Present Docs Earmark (Approved)</span>
-        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkApproved'">{{ snapshot.presentDocsEarmarkApproved }}</span>
-        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkApproved'">{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkApproved'">{{
+          snapshot.presentDocsEarmarkApproved
+        }}</span>
+        <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkApproved'"
+          >{{ snapshot.redirectedImpact.before }} → {{ snapshot.redirectedImpact.after }}</span
+        >
       </div>
       <!-- 2026-08-18, user-requested ("Tight Available Balance 放在最後一個") — moved to the end of the
            box, after Present Docs Earmark (Pending)/(Approved), so the two figures that combine to
            produce it (Available Balance minus the combined Present Docs Earmark) are already visible
            above it. Purely a display-order change — no field's own value/visibility condition touched. -->
-      <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null"><span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span></div>
+      <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null">
+        <span class="tb-balance-row__label">Tight Available Balance</span><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span>
+      </div>
     </div>
   </ng-template>
 </div>

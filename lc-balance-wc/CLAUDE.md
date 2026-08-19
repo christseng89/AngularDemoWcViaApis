@@ -7191,3 +7191,112 @@ the true eligible set (same caveat the A4/A6/B4 pass above already notes), confi
 of ineligible LCs briefly showing before the real filter lands.
 
 Not committed (not requested).
+
+## Protect/disable transaction input fields + Submit until an eligible record is selected — A2–A9/B2–B5 (2026-08-19, user-directed formal requirement, verbatim: "### A2–A9 / B2–B5 — No Eligible Records — For A2–A9 and B2–B5, if no eligible records are available for the selected Transaction Function, the system should: Protect/disable all transaction input fields. Disable the Submit button. Display a clear message such as: 'No eligible records available for this transaction.' The transaction input fields and Submit button should only be enabled after an eligible record has been selected.")
+
+**Scope**: A1/B1 are exempt by the requirement's own wording — they create a brand-new Logical Contract
+with no existing target to pick at all, the same boundary `carriedCurrency`'s own doc comment already
+established ("A1/B1 structurally never populate `selectedParent`/`selectedContract`"). Every other
+function operates on, or hangs off, an existing record — this requirement locks their own Amount/
+Currency/Tolerance/Tenor/Reference No. fields (the Formly `fields` array) and the Submit button until a
+genuinely eligible target has been resolved.
+
+**Design — the per-function "target resolved" rule, re-derived rather than guessed**: `validateSubmit()`/
+`buildSubmitRequest()` (`submit-rules.ts`) already encode exactly which "pick a record first" guard each
+of the 14 functions needs, via the same Strategy fields this session's own F-01 PR-1–PR-5 migration
+already established (`checkerRelease.releasesExistingMovementInPlace`/`settlesDocumentArrival`,
+`compoundSubmission.possibleShapes`, `movementDerivation.amountVsAvailableDerivation`) — reading each
+function's own registry entry fresh (not from memory) before writing anything confirmed the exact target
+shape per function: A1/B1 exempt; A2/A3/A4/A7/B2/B4 need `selectedContract` (flat-Catalog/two-field-search
+target); A6/A8/B3 (creating + `hasParent`) need `selectedParent`; A4 additionally needs
+`selectedPayMovement` (the specific still-PENDING record, not just the LC it lives on — A4's own
+`submitA4()` never calls `validateSubmit()` at all, so this had no existing guard to mirror and was
+re-derived directly from the Strategy field instead); A6/B4 additionally need `selectedPayMovement` too
+(via `settlesDocumentArrival`); A3S additionally needs `selectedArrivalSg`/`arrivalSgSnapshot`; A9
+additionally needs `selectedContractSnapshot` (via `amountVsAvailableDerivation === 'REDEEM'`); B5
+additionally needs `selectedContractSnapshot` too (via `amountVsAvailableDerivation === 'SETTLE'` +
+`instrumentType === 'EPLC_ACCEPTANCE'`).
+
+New `hasEligibleTargetSelected(ctx: SubmitRulesContext): boolean` (`submit-rules.ts`, exported alongside
+`validateSubmit`/`buildSubmitRequest`) — **deliberately NOT a call into `validateSubmit()` itself**, since
+that function also gates on typed field VALUES (Amount/Currency/createdBy) and only ever runs for the
+generic `submit()`/`submitPlain()` path (never A4's own `submitA4()`) — this new function re-derives each
+"no target selected" condition independently, checking ONLY record-selection state, so it can gate BOTH
+the generic Submit path AND A4's separate one, and can correctly unlock fields the instant a target is
+picked even before Amount/Currency are typed.
+
+**Component wiring** (`transaction-builder.component.ts`):
+- `requiresEligibleTarget` — true for every function except A1/B1 (same `isCreatingMovement(model) &&
+  !hasParent(model)` boundary `lcNumberFromParent`'s own negation already uses).
+- `hasEligibleTargetSelected` — thin delegation to the new `submit-rules.ts` function via
+  `this.submitRulesContext` (already existing, reused as-is — no new context plumbing needed).
+- `eligibleCandidateCount` — `parentPicker.total` for a `hasParent` function, else `catalogPicker.total`
+  (public — the template reads it directly to choose between the `.tb-error`/`.tb-hint` severity, same
+  visibility requirement Angular strict templates already forced on `selectedFunctionStrategy` earlier
+  this session).
+- `noEligibleRecordsMessage` — `null` once `hasEligibleTargetSelected` is true or `requiresEligibleTarget`
+  is false; otherwise the exact requirement-quoted message ("No eligible records available for this
+  transaction.") when `eligibleCandidateCount === 0`, or a softer "Pick an eligible record from the list
+  below to continue." when the Step-1 picker (LC Index / Parent LC picker) DOES have candidates but this
+  function's own further Step-2 target (e.g. A4/A6/B4's still-PENDING record, A3S's SG, A9/B5's snapshot)
+  hasn't been picked yet.
+- `fieldsLocked` — `formLocked || (requiresEligibleTarget && !hasEligibleTargetSelected)`, replacing
+  `displayFields`'s own previous direct `formLocked` read — a single flag combining the existing
+  post-Submit lock (2026-08-17) with this new pre-Submit "no eligible target yet" lock, both routed
+  through the same already-built `toReadOnlyFields()` Decorator.
+
+**Template** (`transaction-builder.component.html`): the generic `<formly-form>`/Submit block (shared by
+every function except A4, which is fully hidden behind its own `releasesExistingMovementInPlace`-gated
+branch and already disables its own "Submit A4" button on `!selectedPayMovement`, so it needed no separate
+wiring for this requirement — that check already IS this same rule, just pre-existing) gained the new
+message (`.tb-error` for the zero-candidates case, `.tb-hint` for the "pick one" case, matching this
+file's own established severity convention elsewhere) right above the `<formly-form>`, and the generic
+Submit button's own `[disabled]` binding gained `|| (requiresEligibleTarget && !hasEligibleTargetSelected)`
+alongside its existing `submitting || !!submitResult` conditions — a no-op addition for A1/B1, since
+`requiresEligibleTarget` is always false there. The Primary/2ndary Key search inputs and pickers
+themselves are deliberately UNTOUCHED by this pass — those are the very mechanism used to SELECT the
+eligible record in the first place; disabling them before a record is picked would make it impossible to
+ever pick one (same reasoning the 2026-08-19 "Primary Key / 2ndary Key... protected after Submit" pass
+already applied when scoping ITS OWN lock to post-Submit only).
+
+**Tests**: 12 new unit tests in `submit-rules.spec.ts` (`hasEligibleTargetSelected` describe block) — one
+per distinct target shape (A1/B1 exempt; no-selectedFunction; A2/A7 generic; A8/B3 creating+hasParent;
+A4's own extra `selectedPayMovement` requirement; A6's two-step Parent-then-PayMovement requirement; B4's
+Catalog-then-PayMovement requirement; A3S's SG+snapshot requirement; A9's and B5's own snapshot
+requirement) — each proving both the "false before" and "true after" transition explicitly. 6 new
+component-level tests in `transaction-builder.component.gaps.spec.ts` (new
+`requiresEligibleTarget / hasEligibleTargetSelected / fieldsLocked / noEligibleRecordsMessage` describe
+block) — A1 fully exempt regardless of picker state; A2 with zero candidates (the exact requirement-quoted
+message); A2 with candidates but none picked (the softer message); A2 once picked (unlocked, no message);
+A6 reading `eligibleCandidateCount` off `parentPicker.total` specifically, not `catalogPicker.total`; and
+`formLocked` still locking fields even once an eligible target IS selected (proving the two lock reasons
+compose correctly via OR, and that `noEligibleRecordsMessage` stays `null` for the `formLocked` case since
+that's a different lock reason). One pre-existing test
+(`transaction-builder.component.gaps.spec.ts`'s own "formLocked resets to false... once selectFunction()
+moves to a different function") needed a `selectedContract` added to its own A2 fixture — the new gate
+correctly caught that this test's own premise (switching to A2 alone, with nothing picked, should leave
+`displayFields === fields`) no longer holds now that A2 is one of the functions this new gate applies to;
+fixed by giving that one assertion a `selectedContract` so it stays isolated to the specific behavior it
+was actually testing (formLocked's own reset), same "the new gate correctly caught a real gap in the
+test's own assumption, not a regression" pattern this file's own history has used repeatedly.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` (strict
+templates — validates both the new `[disabled]`/`*ngIf` bindings and the newly-public
+`eligibleCandidateCount` getter) clean, `npm run lint` 0 errors (228 warnings, unchanged), `npx prettier
+--write` applied to the touched files (whitespace-only, re-verified via a clean `tsc --noEmit`/full suite
+re-run afterward). Full Angular suite **867/867 passing** (18 net new/changed), coverage
+**97.84/95.36/96.79/98.13%** (all four metrics clear the 95% floor; `submit-rules.ts` itself back to
+**100/100/100/100**). `backend/` 34/34 and microservice 335/335 both re-run per this file's own standing
+rule, unaffected (Angular-only change — no request/response contract change).
+
+Live in-browser verification not attempted this pass — static verification is unusually strong here
+(strict-template build, full typecheck, and 18 new dedicated tests covering every one of the 12
+non-A1/B1 functions' own distinct target-resolution shape, both the "before" and "after" transition). A
+human should reproduce live: pick A2 (or any other non-A1/B1 function) before selecting any LC from the
+Catalog/Parent picker and confirm the Amount/Currency/etc. fields are greyed out, the Submit button is
+disabled, and the correct message shows (the exact requirement-quoted text when the picker itself has zero
+eligible candidates, the softer prompt when candidates exist but nothing's picked yet); then pick an
+eligible record and confirm both the fields and Submit button immediately unlock with no page
+reload/re-render glitch.
+
+Not committed (not requested).
