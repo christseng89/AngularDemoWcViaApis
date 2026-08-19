@@ -25,6 +25,7 @@ import {
   statusBadgeClass as statusBadgeClassShared,
 } from './balance-component.model';
 import { AccountEntriesDialogComponent } from './account-entries-dialog.component';
+import { CheckerPanelComponent, CheckerSyncSignal } from './checker-panel.component';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import {
   SubmitRulesContext,
@@ -79,7 +80,7 @@ const IB_INDEX_PICKER = new InjectionToken<CatalogPickerService>('TransactionBui
 @Component({
   selector: 'app-transaction-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, AccountEntriesDialogComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, AccountEntriesDialogComponent, CheckerPanelComponent],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
   /**
@@ -281,39 +282,29 @@ export class TransactionBuilderComponent {
   matchedReceivableMovementId: string | null = null;
 
   /**
-   * Business instruction 2026-08-15 ("Seperate Maker and Checker for each
-   * functions. Which allow Check to release unrelease Pending events." —
-   * refined same day: "there is no way to Approve pending. Would it be
-   * possible to have separate option in Amendment function to release
-   * those pending events? Same requirement for all other functions.") —
-   * a Checker queue with its OWN independent LC search (checkerLcNumber/
-   * searchCheckerLc() below), reachable without going through the Maker's
-   * own subChoice/natural-key flow at all (A2's "Direction" pick, A6/A8's
-   * Parent picker, etc.) — genuinely separate, not just "whatever the
-   * Maker happens to have selected". Still auto-fills/auto-searches from
-   * whatever the Maker DOES pick or submit (syncCheckerToContext(), called
-   * alongside syncLookupToContext()) purely as a convenience default; the
-   * field stays freely editable/searchable on its own regardless. Uses the
-   * exact same api.release()/api.reject() calls as everywhere else — a new
-   * UI surface onto existing capability, no new business rule.
+   * BAL-003 "Feature Components + Facade" pilot #2 (2026-08-19, desiger-comments.md) — the Checker's own
+   * independent search box + PENDING-queue picker moved into `CheckerPanelComponent` (`checkerPanel`
+   * below, `@Component({ providers: [...] })`, same F-04-era component-scoped-provider construction
+   * style as the other 4). `selectedCheckerMovement`/`checkerBusy`/`checkerError`/`checkerId` stay HERE
+   * — this component's own class doc comment explains why the release/reject/compound-routing ACTION
+   * layer wasn't also extracted this pass. `selectedCheckerMovement` below is now a MIRROR of the
+   * child's own copy, kept in sync via `onCheckerMovementPicked()` (bound to the child's `movementPicked`
+   * output) rather than written directly.
    */
-  checkerLcNumber = '';
-  // Business-reported gap 2026-08-15 ("Check[er] function is not working for Shipping Gtee (Issue)",
-  // repro'd with LC S001 / SG G01): SHGT/Acceptance contracts are keyed by LC Number + SG/IB Number
-  // (one LC can have multiple SG/IB records — schema.ts's unique index is on all three), but
-  // searchCheckerLc() only ever sent lcNumber, so it 404'd on every SHGT/Acceptance lookup
-  // regardless of which SG/IB Number was intended. Mirrors searchNaturalKey's ibNumber/sgNumber,
-  // which searchExistingContract() above already got right.
-  checkerSecondaryRef = '';
-  checkerContract: BalanceContract | null = null;
-  checkerSearching = false;
-  checkerSearchError: string | null = null;
-  checkerItems: BalanceMovement[] = [];
-  checkerLoading = false;
   selectedCheckerMovement: BalanceMovement | null = null;
   checkerBusy = false;
   checkerError: string | null = null;
   checkerId = 'checker1';
+  /**
+   * The Checker's own independent LC search (business instruction 2026-08-15) — see
+   * `CheckerSyncSignal`'s own doc comment (checker-panel.component.ts) for why this is a freshly-
+   * constructed object at every trigger point, not a value re-read from elsewhere. `checkerResetNonce`
+   * is the companion trigger for `selectFunction()`'s own per-function reset — see
+   * `CheckerPanelComponent.resetTrigger`'s own doc comment.
+   */
+  checkerSyncSignal: CheckerSyncSignal | null = null;
+  /** Public so the template can bind `[resetTrigger]="checkerResetNonce"` — Angular templates can only read public members. */
+  checkerResetNonce = 0;
 
   parentInstrumentType: InstrumentType | '' = '';
   /** Fetch-cap, not display page size — see catalogPageSize's own doc comment above (same module-level-constant reasoning, F-04). */
@@ -580,12 +571,15 @@ export class TransactionBuilderComponent {
     this.acceptanceMovementId = null;
     this.acceptanceMovement = null;
     this.matchedReceivableMovementId = null;
-    // checkerLcNumber is deliberately NOT reset here — a Checker moving from one function to
-    // another (e.g. A2 to A9) very plausibly wants to keep checking the SAME LC; only the resolved
+    // checkerLcNumber (child-owned) is deliberately NOT reset here — a Checker moving from one function
+    // to another (e.g. A2 to A9) very plausibly wants to keep checking the SAME LC; only the resolved
     // contract needs clearing, since it was resolved against the OLD function's own instrumentType.
-    this.checkerContract = null;
-    this.checkerSearchError = null;
-    this.checkerItems = [];
+    // checkerResetNonce tells CheckerPanelComponent (via its own resetTrigger @Input) to clear its OWN
+    // checkerContract/checkerSearchError/checkerItems/its own selectedCheckerMovement copy — this
+    // component's own selectedCheckerMovement/checkerError mirror is reset directly below instead of
+    // waiting on that round-trip, so it stays correct even under this project's own direct-instantiation
+    // test convention, which never runs Angular's real change-detection/ngOnChanges lifecycle.
+    this.checkerResetNonce++;
     this.selectedCheckerMovement = null;
     this.checkerError = null;
 
@@ -1600,25 +1594,6 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * The specific contract the Checker queue below lists PENDING movements
-   * for — resolved via the Checker's OWN independent search
-   * (searchCheckerLc()), never a direct read of the Maker's own
-   * selectedContract/submitResult. See checkerLcNumber's own doc comment
-   * for why this was deliberately decoupled 2026-08-15.
-   */
-  get checkerContractId(): string | null {
-    return this.checkerContract?.balanceContractId ?? null;
-  }
-
-  get checkerSecondaryField(): 'ibNumber' | 'sgNumber' | null {
-    return policy.checkerSecondaryField(this.selectedFunction);
-  }
-
-  get checkerSecondaryLabel(): string {
-    return policy.checkerSecondaryLabel(this.selectedFunction);
-  }
-
-  /**
    * Mirrors checkerAct()'s own isCompoundOwnSubmission check (see its doc comment) — single source of
    * truth so the template's "Approve (acknowledgment only)" vs "Release" label/disabled-state can never
    * disagree with what a click will actually do (that exact drift was the 2026-08-15 bug: A3S's
@@ -1723,59 +1698,6 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * Business instruction 2026-08-15 ("there is no way to Approve pending.
-   * Would it be possible to have separate option in Amendment function to
-   * release those pending events? Same requirement for all other
-   * functions.") — resolves checkerLcNumber via THIS function's own
-   * instrumentType (selectedFunction.instrumentType, the static field —
-   * available immediately on function selection, unlike model.instrumentType
-   * which stays unset until a subChoice like A2's Direction is picked), so
-   * a Checker can search and act on a PENDING item without ever touching
-   * the Maker's own Direction/Parent-picker/natural-key flow. Independent
-   * of loadCheckerQueue() below only in HOW the contract is found — once
-   * found, the queue/release/reject mechanics are identical either way.
-   *
-   * Business-reported gap 2026-08-15 ("Check[er] function is not working for
-   * Shipping Gtee (Issue)", repro'd with LC S001 / SG G01): this used to send
-   * lcNumber alone, which 404'd on every SHGT/Acceptance lookup — an LC can
-   * have multiple SG/IB records, so lcNumber alone doesn't identify one (same
-   * reasoning already applied to searchExistingContract() above).
-   */
-  searchCheckerLc(): void {
-    this.checkerSearchError = null;
-    this.checkerContract = null;
-    this.checkerItems = [];
-    this.selectedCheckerMovement = null;
-    if (!this.selectedFunction) return;
-    if (!this.checkerLcNumber) {
-      this.checkerSearchError = 'Type an LC Number to search.';
-      return;
-    }
-    const secondaryField = this.checkerSecondaryField;
-    if (secondaryField && !this.checkerSecondaryRef) {
-      this.checkerSearchError = `Type a ${this.checkerSecondaryLabel} to search — this LC may have multiple ${this.checkerSecondaryLabel} records, and LC Number alone doesn't identify which one.`;
-      return;
-    }
-    this.checkerSearching = true;
-    const naturalKey = {
-      lcNumber: this.checkerLcNumber,
-      ibNumber: secondaryField === 'ibNumber' ? this.checkerSecondaryRef : null,
-      sgNumber: secondaryField === 'sgNumber' ? this.checkerSecondaryRef : null,
-    };
-    this.api.resolveContract(this.selectedFunction.instrumentType, naturalKey).subscribe({
-      next: (contract) => {
-        this.checkerSearching = false;
-        this.checkerContract = contract;
-        this.loadCheckerQueue();
-      },
-      error: (err) => {
-        this.checkerSearching = false;
-        this.checkerSearchError = this.describeApiError(err);
-      },
-    });
-  }
-
-  /**
    * Business instruction 2026-08-15 ("Look Up Current Balance should use
    * the existing LC Number on Screen... Once Maker Submit or Checker
    * display, it will just use the LC Number instead of keyin") — syncs the
@@ -1799,56 +1721,43 @@ export class TransactionBuilderComponent {
   }
 
   /**
-   * Convenience auto-fill for the Checker's OWN independent LC search
-   * (business instruction 2026-08-15) — pre-fills checkerLcNumber from
-   * whatever the Maker just picked/typed/submitted and runs the search,
-   * purely so a Maker who just submitted doesn't have to retype the same
-   * LC Number a second time. The field and searchCheckerLc() stay fully
-   * usable on their own regardless — this is a default, not a binding.
+   * Convenience auto-fill for the Checker's OWN independent LC search (business instruction 2026-08-15)
+   * — pre-fills `checkerPanel`'s own LC Number from whatever the Maker just picked/typed/submitted and
+   * runs the search, purely so a Maker who just submitted doesn't have to retype the same LC Number a
+   * second time. `CheckerPanelComponent` stays fully searchable on its own regardless — this is a
+   * default, not a binding. BAL-003 pilot #2 (2026-08-19) — was a direct field/method call before the
+   * extraction; now sets `checkerSyncSignal` to a FRESH object, see `CheckerSyncSignal`'s own doc comment
+   * (checker-panel.component.ts) for why a fresh reference every call — not just the value — is what
+   * makes `CheckerPanelComponent.ngOnChanges()` reliably re-fire.
    */
   private syncCheckerToContext(): void {
     const lcNumber = this.contextLcNumber;
     if (!lcNumber) return;
-    this.checkerLcNumber = lcNumber;
-    // Business-reported gap 2026-08-15: without this, the auto-search below always ran with a
-    // blank SG/IB Number on SHGT/Acceptance functions and 404'd — see searchCheckerLc()'s own doc
-    // comment.
-    this.checkerSecondaryRef = this.contextSecondaryRef ?? '';
-    this.searchCheckerLc();
+    this.checkerSyncSignal = { lcNumber, secondaryRef: this.contextSecondaryRef };
   }
 
   /**
-   * Business instruction 2026-08-15 ("Seperate Maker and Checker... allow
-   * Check to release unrelease Pending events") — every PENDING movement
-   * on checkerContractId, independent of submitResult. Re-run after any
-   * action that could change what's PENDING on this contract (a Maker
-   * Submit, or a Checker Release/Reject from this same queue).
+   * BAL-003 pilot #2 (2026-08-19) — bound to `CheckerPanelComponent`'s own `movementPicked` output;
+   * fires both for a genuine user pick (`onSelectCheckerMovement()` inside the child) and for the
+   * child's own implicit reset at the top of a fresh search/queue-reload (mirrors the original inline
+   * `onSelectCheckerMovement()`'s `arrivalApproved = false` reset — harmless to also apply it on an
+   * implicit reset, since every template condition that reads `arrivalApproved` already requires
+   * `selectedCheckerMovement` to be non-null too, which an implicit reset always clears in the same
+   * breath, so this has zero observable difference from the original's own narrower reset scope).
    */
-  loadCheckerQueue(): void {
-    this.selectedCheckerMovement = null;
-    this.checkerItems = [];
-    this.checkerError = null;
-    const contractId = this.checkerContractId;
-    if (!contractId) return;
-    this.checkerLoading = true;
-    this.api.listMovements(contractId).subscribe({
-      next: (list) => {
-        this.checkerLoading = false;
-        this.checkerItems = list.filter((m: any) => m.status === 'PENDING');
-        this.syncLookupToContext();
-      },
-      error: () => {
-        this.checkerLoading = false;
-        this.checkerItems = [];
-      },
-    });
+  onCheckerMovementPicked(movement: BalanceMovement | null): void {
+    this.selectedCheckerMovement = movement;
+    this.arrivalApproved = false;
   }
 
-  onSelectCheckerMovement(movementId: string): void {
-    this.selectedCheckerMovement = this.checkerItems.find((m) => m.movementId === movementId) ?? null;
-    // Clear any stale acknowledgment from a PREVIOUSLY selected queue item — see checkerAct()'s
-    // deferSettlement branch below; this flag must be scoped to whichever item is selected right now.
-    this.arrivalApproved = false;
+  /** Bound to `CheckerPanelComponent`'s own `queueReloaded` output — mirrors the original inline `loadCheckerQueue()`'s own unconditional `checkerError = null` at the top of every reload. */
+  onCheckerQueueReloaded(): void {
+    this.checkerError = null;
+  }
+
+  /** Bound to `CheckerPanelComponent`'s own `queueLoadSucceeded` output — mirrors the original inline `loadCheckerQueue()`'s own success-path `syncLookupToContext()` call exactly. */
+  onCheckerQueueLoadSucceeded(): void {
+    this.syncLookupToContext();
   }
 
   /**

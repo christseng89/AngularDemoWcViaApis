@@ -1629,71 +1629,56 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
-  // loadCheckerQueue()
+  // BAL-003 "Feature Components + Facade" pilot #2 (2026-08-19, desiger-comments.md) — loadCheckerQueue()/
+  // onSelectCheckerMovement() moved to CheckerPanelComponent; equivalent coverage (no-op with no
+  // contract, PENDING-only filtering, listMovements failure, movement pick/not-found) now lives in
+  // checker-panel.component.spec.ts. onCheckerMovementPicked()'s own arrivalApproved-reset behavior is
+  // covered below, under checkerAct()/release() (the actual parent-side consumer).
   // ---------------------------------------------------------------------
-  describe('loadCheckerQueue()', () => {
-    it('no-ops (no listMovements call) when there is no checker contract resolved', () => {
-      const { comp, api } = setup();
-      comp.checkerContract = null;
 
-      comp.loadCheckerQueue();
-
-      expect(api.listMovements).not.toHaveBeenCalled();
-      expect(comp.checkerItems).toEqual([]);
-    });
-
-    it('success: filters to PENDING movements only', () => {
-      const { comp, api } = setup();
-      comp.checkerContract = makeContract({ balanceContractId: 'bc-9' });
-      api.listMovements.mockReturnValueOnce(
-        of([
-          makeMovement({ movementId: 'm1', status: 'PENDING' }),
-          makeMovement({ movementId: 'm2', status: 'RELEASED' }),
-          makeMovement({ movementId: 'm3', status: 'PENDING' }),
-        ]) as any,
-      );
-
-      comp.loadCheckerQueue();
-
-      expect(api.listMovements).toHaveBeenCalledWith('bc-9');
-      expect(comp.checkerItems.map((m: any) => m.movementId)).toEqual(['m1', 'm3']);
-      expect(comp.checkerLoading).toBe(false);
-    });
-
-    it('error: resets checkerItems to empty and checkerLoading to false', () => {
-      const { comp, api } = setup();
-      comp.checkerContract = makeContract({ balanceContractId: 'bc-9' });
-      api.listMovements.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
-
-      comp.loadCheckerQueue();
-
-      expect(comp.checkerItems).toEqual([]);
-      expect(comp.checkerLoading).toBe(false);
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // onSelectCheckerMovement()
-  // ---------------------------------------------------------------------
-  describe('onSelectCheckerMovement()', () => {
-    it('selects the matching movement and clears any stale arrivalApproved flag', () => {
+  describe('onCheckerMovementPicked()', () => {
+    it('mirrors the picked movement and clears any stale arrivalApproved flag', () => {
       const { comp } = setup();
-      comp.checkerItems = [makeMovement({ movementId: 'm1' }), makeMovement({ movementId: 'm2' })];
       comp.arrivalApproved = true;
 
-      comp.onSelectCheckerMovement('m2');
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'm2' }));
 
       expect(comp.selectedCheckerMovement?.movementId).toBe('m2');
       expect(comp.arrivalApproved).toBe(false);
     });
 
-    it('sets null when the movementId is not found in the current queue', () => {
+    it('mirrors a null pick (implicit reset from the child) the same way', () => {
       const { comp } = setup();
-      comp.checkerItems = [makeMovement({ movementId: 'm1' })];
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'stale' });
+      comp.arrivalApproved = true;
 
-      comp.onSelectCheckerMovement('does-not-exist');
+      comp.onCheckerMovementPicked(null);
 
       expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.arrivalApproved).toBe(false);
+    });
+  });
+
+  describe('onCheckerQueueReloaded() / onCheckerQueueLoadSucceeded()', () => {
+    it('onCheckerQueueReloaded() clears a stale checkerError', () => {
+      const { comp } = setup();
+      comp.checkerError = 'stale';
+
+      comp.onCheckerQueueReloaded();
+
+      expect(comp.checkerError).toBeNull();
+    });
+
+    it('onCheckerQueueLoadSucceeded() delegates to syncLookupToContext() (via lookUp.syncFrom, same as the pre-extraction inline callback)', () => {
+      const { comp } = setup();
+      comp.selectFunction(A2);
+      comp.model.instrumentType = 'IPLC_LC'; // normally set by onSubChoice(); syncLookupToContext() requires it non-null.
+      comp.selectedContract = makeContract({ naturalKey: { lcNumber: 'LC-SYNC' } });
+      const syncFromSpy = jest.spyOn(comp.lookUp, 'syncFrom');
+
+      comp.onCheckerQueueLoadSucceeded();
+
+      expect(syncFromSpy).toHaveBeenCalledWith('LC-SYNC', 'IPLC_LC', expect.any(Function));
     });
   });
 

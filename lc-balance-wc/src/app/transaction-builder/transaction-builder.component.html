@@ -862,116 +862,83 @@
            was removed instead (see A4's subcard above) so THIS panel is now A4's only release path —
            the same standard pattern every other function already uses, with no dual-path trap possible
            since there is only one path. -->
-        <section class="tb-section tb-section--checker">
-          <div class="tb-section__header">
-            <span class="tb-role-badge tb-role-badge--checker">Checker</span>
-            <h2 class="tb-section__title">
-              Pending Approvals<ng-container *ngIf="checkerContract"> — LC {{ checkerContract.naturalKey.lcNumber }}</ng-container>
-            </h2>
+        <!-- BAL-003 "Feature Components + Facade" pilot #2 (2026-08-19, desiger-comments.md) — the
+           search box + PENDING-queue picker above moved into CheckerPanelComponent; the Release/Reject
+           action block below is projected INTO it (ng-content), since it's gated by the SAME
+           checkerContractId condition the child now owns internally — see checker-panel.component.ts's
+           own class doc comment for why the action layer itself stayed here. -->
+        <app-checker-panel
+          [selectedFunction]="selectedFunction"
+          [syncSignal]="checkerSyncSignal"
+          [resetTrigger]="checkerResetNonce"
+          (movementPicked)="onCheckerMovementPicked($event)"
+          (queueReloaded)="onCheckerQueueReloaded()"
+          (queueLoadSucceeded)="onCheckerQueueLoadSucceeded()"
+        >
+          <!-- A3/B3 (deferSettlement), matching whichever movementType deferSettlementMovementType
+             names (default UTILIZE), and NOT this Maker session's own A3S/A6/B3-HONOUR compound
+             submission (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
+             "S001 B04 was settled, but the SG B04 still in Pending", A3S's compound release() was
+             unreachable before this check was added) — Release here is acknowledgment-only
+             (checkerAct()), never the real release API, so A4/A6/B4 still find it PENDING.
+             Bug fixed 2026-08-18 (see arrivalAlreadyApproved's own doc comment) — this hint (and the
+             button below) now also fires off the item's own PERSISTED acknowledgedAt, not only this
+             session's own arrivalApproved click, so re-searching an already-acknowledged B3 item
+             correctly shows it as already approved instead of offering a second attempt that would
+             409. Shows who/when when that persisted field is the reason (this session's own click
+             already says so via the ✓ wording alone). -->
+          <div
+            class="tb-hint tb-hint--ok"
+            *ngIf="
+              selectedCheckerMovement &&
+              selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+              selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+              !isCheckerCompoundOwnSubmission &&
+              arrivalAlreadyApproved
+            "
+          >
+            ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span
+              *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"
+            >
+              — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date: 'short' }}</span
+            >. Balance stays <strong>Pending</strong> — go to
+            {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
           </div>
-          <div class="tb-section__body">
-            <div class="tb-field tb-field--inline tb-field--search">
-              <label class="tb-field__label">LC Number</label>
-              <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="checkerLcNumber" (keyup.enter)="searchCheckerLc()" />
-              <!-- Business-reported gap 2026-08-15 ("Check[er] function is not working for Shipping
-                 Gtee (Issue)", repro'd with LC S001 / SG G01): SHGT/Acceptance are keyed by LC
-                 Number + SG/IB Number (one LC can have multiple), so this second field is mandatory
-                 whenever checkerSecondaryField is set — see searchCheckerLc()'s own doc comment. -->
-              <ng-container *ngIf="checkerSecondaryField">
-                <label class="tb-field__label">{{ checkerSecondaryLabel }}</label>
-                <input
-                  class="tb-input tb-input--required"
-                  [placeholder]="'e.g. ' + (checkerSecondaryField === 'sgNumber' ? 'G01' : 'B01')"
-                  [(ngModel)]="checkerSecondaryRef"
-                  (keyup.enter)="searchCheckerLc()"
-                />
-              </ng-container>
-              <button type="button" class="tb-btn tb-btn--outline" (click)="searchCheckerLc()" [disabled]="checkerSearching">
-                {{ checkerSearching ? 'Searching…' : 'Search' }}
-              </button>
+
+          <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
+            <div class="tb-field tb-field--inline">
+              <label class="tb-field__label">Checker ID</label>
+              <input class="tb-input tb-input--required" [(ngModel)]="checkerId" />
             </div>
-            <div class="tb-error mt-2" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
-
-            <ng-container *ngIf="checkerContractId">
-              <app-index-picker
-                [items]="checkerItems"
-                [loading]="checkerLoading"
-                [selectedId]="selectedCheckerMovement?.movementId ?? null"
-                emptyText="Nothing PENDING on this contract right now."
-                (pick)="onSelectCheckerMovement($event)"
-              >
-                <ng-template let-m>
-                  <span class="tb-row-primary">{{ m.movementType }} — {{ m.amount }} {{ m.currency }}</span>
-                  <span class="tb-row-sub">{{ m.sourceTransactionRef || '—' }} · earmarked {{ m.createdAt | date: 'short' }} · by {{ m.createdBy }}</span>
-                </ng-template>
-              </app-index-picker>
-
-              <!-- A3/B3 (deferSettlement), matching whichever movementType deferSettlementMovementType
-                 names (default UTILIZE), and NOT this Maker session's own A3S/A6/B3-HONOUR compound
-                 submission (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
-                 "S001 B04 was settled, but the SG B04 still in Pending", A3S's compound release() was
-                 unreachable before this check was added) — Release here is acknowledgment-only
-                 (checkerAct()), never the real release API, so A4/A6/B4 still find it PENDING.
-                 Bug fixed 2026-08-18 (see arrivalAlreadyApproved's own doc comment) — this hint (and the
-                 button below) now also fires off the item's own PERSISTED acknowledgedAt, not only this
-                 session's own arrivalApproved click, so re-searching an already-acknowledged B3 item
-                 correctly shows it as already approved instead of offering a second attempt that would
-                 409. Shows who/when when that persisted field is the reason (this session's own click
-                 already says so via the ✓ wording alone). -->
-              <div
-                class="tb-hint tb-hint--ok"
-                *ngIf="
-                  selectedCheckerMovement &&
-                  selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+            <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
+               ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
+               so clicking either immediately disables both, for every function including the
+               compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
+            <button
+              class="tb-btn tb-btn--success"
+              (click)="checkerAct('release')"
+              [disabled]="
+                checkerActionInFlight ||
+                (selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
                   selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
                   !isCheckerCompoundOwnSubmission &&
-                  arrivalAlreadyApproved
-                "
-              >
-                ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span
-                  *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"
-                >
-                  — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date: 'short' }}</span
-                >. Balance stays <strong>Pending</strong> — go to
-                {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
-              </div>
-
-              <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
-                <div class="tb-field tb-field--inline">
-                  <label class="tb-field__label">Checker ID</label>
-                  <input class="tb-input tb-input--required" [(ngModel)]="checkerId" />
-                </div>
-                <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
-                   ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
-                   so clicking either immediately disables both, for every function including the
-                   compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
-                <button
-                  class="tb-btn tb-btn--success"
-                  (click)="checkerAct('release')"
-                  [disabled]="
-                    checkerActionInFlight ||
-                    (selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                  arrivalAlreadyApproved)
+              "
+            >
+              {{
+                checkerActionInFlight
+                  ? 'Working…'
+                  : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
                       selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
-                      !isCheckerCompoundOwnSubmission &&
-                      arrivalAlreadyApproved)
-                  "
-                >
-                  {{
-                    checkerActionInFlight
-                      ? 'Working…'
-                      : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
-                          selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
-                          !isCheckerCompoundOwnSubmission
-                        ? 'Approve (acknowledgment only)'
-                        : 'Release'
-                  }}
-                </button>
-                <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
-              </div>
-              <div class="tb-error mt-2" *ngIf="checkerError">{{ checkerError }}</div>
-            </ng-container>
+                      !isCheckerCompoundOwnSubmission
+                    ? 'Approve (acknowledgment only)'
+                    : 'Release'
+              }}
+            </button>
+            <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
           </div>
-        </section>
+          <div class="tb-error mt-2" *ngIf="checkerError">{{ checkerError }}</div>
+        </app-checker-panel>
       </div>
 
       <div class="tb-side">

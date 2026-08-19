@@ -113,7 +113,10 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.catalogPicker.contracts).toEqual([]);
       expect(comp.selectedContract).toBeNull();
       expect(comp.submitResult).toBeNull();
-      expect(comp.checkerLcNumber).toBe('');
+      // BAL-003 pilot #2 (2026-08-19) — checkerLcNumber moved to CheckerPanelComponent, its own initial
+      // state now covered by checker-panel.component.spec.ts.
+      expect(comp.checkerSyncSignal).toBeNull();
+      expect(comp.checkerResetNonce).toBe(0);
     });
 
     it('stores the injected api service (used by every other method)', () => {
@@ -223,12 +226,9 @@ describe('TransactionBuilderComponent', () => {
       comp.acceptanceReimbReceivableMovementId = 'mv3';
       comp.acceptanceMovementId = 'mv4';
       comp.matchedReceivableMovementId = 'mv5';
-      comp.checkerContract = mkContract('ck1', '005');
-      comp.checkerSearchError = 'stale';
-      comp.checkerItems = [mkMovement('m2')];
       comp.selectedCheckerMovement = mkMovement('m2');
       comp.checkerError = 'stale';
-      comp.checkerLcNumber = 'S001'; // deliberately NOT reset
+      const priorResetNonce = comp.checkerResetNonce;
 
       comp.selectFunction(A2);
 
@@ -260,13 +260,13 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.acceptanceReimbReceivableMovementId).toBeNull();
       expect(comp.acceptanceMovementId).toBeNull();
       expect(comp.matchedReceivableMovementId).toBeNull();
-      expect(comp.checkerContract).toBeNull();
-      expect(comp.checkerSearchError).toBeNull();
-      expect(comp.checkerItems).toEqual([]);
       expect(comp.selectedCheckerMovement).toBeNull();
       expect(comp.checkerError).toBeNull();
-      // Deliberately NOT reset.
-      expect(comp.checkerLcNumber).toBe('S001');
+      // BAL-003 pilot #2 (2026-08-19) — checkerContract/checkerSearchError/checkerItems/checkerLcNumber
+      // moved to CheckerPanelComponent; selectFunction() now signals it to reset via checkerResetNonce
+      // instead (checkerLcNumber itself is still deliberately NOT part of that reset — see
+      // CheckerPanelComponent.resetPanel()'s own doc comment, unchanged reasoning).
+      expect(comp.checkerResetNonce).toBe(priorResetNonce + 1);
     });
 
     it('resets naturalKey/searchNaturalKey/searchError and re-syncs lookup.instrumentType per side (B1)', () => {

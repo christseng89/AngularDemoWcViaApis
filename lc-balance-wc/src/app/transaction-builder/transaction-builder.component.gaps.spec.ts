@@ -4,6 +4,7 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './
 import type { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import type { InquiredEvent } from './inquire-events.service';
 import * as functionStrategyModule from './function-strategy';
+import { checkerSecondaryField as policyCheckerSecondaryField } from './function-policy';
 
 /**
  * Closes coverage gaps left after the three method-slice agents finished
@@ -738,44 +739,26 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.searchError).toBe('IB Number IB01 already has a 0 Available Balance — nothing left to settle.');
       expect(c.selectedContract).toBeNull();
 
-      // Final fallback branch: checkerSecondaryField reads selectedFunction.instrumentType (available
-      // immediately on selection), but usesTwoFieldSearch reads model.instrumentType (still unset for
-      // a subChoice function like A7 until onSubChoice() resolves it) — so right after selectFunction(),
-      // before onSubChoice(), neither isCreatingMovement nor usesTwoFieldSearch is true yet, even though
-      // checkerSecondaryField already resolved to 'ibNumber'.
+      // Final fallback branch: checkerSecondaryField (function-policy.ts, called directly here since it
+      // moved off the component to CheckerPanelComponent — BAL-003 pilot #2, 2026-08-19) reads
+      // selectedFunction.instrumentType (available immediately on selection), but usesTwoFieldSearch
+      // reads model.instrumentType (still unset for a subChoice function like A7 until onSubChoice()
+      // resolves it) — so right after selectFunction(), before onSubChoice(), neither isCreatingMovement
+      // nor usesTwoFieldSearch is true yet, even though checkerSecondaryField already resolved to
+      // 'ibNumber'.
       const c5 = new TransactionBuilderComponent(mockApi());
       c5.selectFunction(fn('A7'));
-      expect(c5.checkerSecondaryField).toBe('ibNumber');
+      expect(policyCheckerSecondaryField(c5.selectedFunction)).toBe('ibNumber');
       expect(c5.usesTwoFieldSearch).toBe(false);
       expect(c5.contextSecondaryRef).toBeNull();
       c5.selectedContract = contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB-FALLBACK' } });
       expect(c5.contextSecondaryRef).toBe('IB-FALLBACK');
     });
 
-    it('checkerContractId / checkerSecondaryField / checkerSecondaryLabel', () => {
-      const c = new TransactionBuilderComponent(mockApi());
-      expect(c.checkerContractId).toBeNull();
-      expect(c.checkerSecondaryField).toBeNull();
-
-      c.selectFunction(fn('A8')); // SHGT -> sgNumber
-      expect(c.checkerSecondaryField).toBe('sgNumber');
-      expect(c.checkerSecondaryLabel).toBe('SG Number');
-
-      const c2 = new TransactionBuilderComponent(mockApi());
-      c2.selectFunction(fn('A6')); // IPLC_ACCEPTANCE -> ibNumber, "IB Number"
-      expect(c2.checkerSecondaryField).toBe('ibNumber');
-      expect(c2.checkerSecondaryLabel).toBe('IB Number');
-
-      const c3 = new TransactionBuilderComponent(mockApi());
-      c3.selectFunction(fn('B4')); // EPLC_ACCEPTANCE reachable via B4's own instrumentType? use B5 which is EPLC_ACCEPTANCE
-      const c4 = new TransactionBuilderComponent(mockApi());
-      c4.selectFunction(fn('B5')); // EPLC_ACCEPTANCE -> ibNumber, "EB Number"
-      expect(c4.checkerSecondaryField).toBe('ibNumber');
-      expect(c4.checkerSecondaryLabel).toBe('EB Number');
-
-      (c3 as any).checkerContract = contract({ balanceContractId: 'ctx-1' });
-      expect(c3.checkerContractId).toBe('ctx-1');
-    });
+    // BAL-003 pilot #2 (2026-08-19, desiger-comments.md) — checkerContractId/checkerSecondaryField/
+    // checkerSecondaryLabel moved to CheckerPanelComponent; the pure-function logic they delegate to was
+    // already independently covered by function-policy.spec.ts, and the component-level delegation
+    // itself now has its own coverage in checker-panel.component.spec.ts.
 
     it('isCheckerCompoundOwnSubmission / checkerActionInFlight / isArrivalAcknowledgmentStep / checkerActionButtonLabel', () => {
       const c = new TransactionBuilderComponent(mockApi());

@@ -1,0 +1,225 @@
+// Copied (not promoted to a shared location), same convention `account-entries-dialog.component.scss`'s
+// own doc comment already established: Angular's default Emulated view encapsulation scopes a
+// component's own styles to its own template only, and every class below is still needed by
+// TransactionBuilderComponent's own OTHER template sections too (the projected Release/Reject action
+// block in particular reuses .tb-btn/.tb-error/.tb-hint directly). CSS custom-property TOKENS
+// (--gray-border, --blue, etc.) are global (:root, styles.scss) and need no copying.
+
+.tb-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tb-section--checker {
+  border-top: 3px solid var(--green);
+}
+
+.tb-section__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--blue-bg-soft);
+  border-bottom: 1px solid var(--gray-border);
+}
+
+.tb-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+
+.tb-section__body {
+  padding: 18px;
+}
+
+.tb-role-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+
+  &--checker {
+    background: var(--green-bg);
+    color: var(--green-dark);
+    border: 1px solid var(--green-border);
+  }
+}
+
+.tb-field {
+  margin-bottom: 14px;
+
+  &--inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0;
+
+    .tb-input {
+      width: 120px;
+    }
+  }
+
+  // Checker's own independent LC search (business instruction 2026-08-15) — needs more room than the
+  // 120px Checker-ID field .tb-field--inline was originally sized for.
+  &--search .tb-input {
+    width: 180px;
+  }
+}
+
+.tb-field__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-body);
+  margin-bottom: 4px;
+}
+
+.tb-input {
+  border: 1px solid var(--gray-input-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  background: var(--bg-surface);
+  color: var(--gray-body);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+
+  &:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.12);
+  }
+
+  &:disabled {
+    background: var(--gray-readonly-bg);
+    color: var(--gray-disabled);
+  }
+}
+
+.tb-input--required {
+  border-left: 3px solid var(--blue);
+  background: var(--blue-bg-soft);
+
+  &:focus {
+    background: var(--bg-surface);
+  }
+}
+
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform 80ms ease;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &--outline {
+    background: var(--bg-surface);
+    border-color: var(--blue);
+    color: var(--blue);
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg);
+    }
+  }
+
+  &--success {
+    background: var(--green-solid);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(22, 163, 74, 0.25);
+
+    &:hover:not(:disabled) {
+      background: var(--green-solid-hover);
+    }
+  }
+
+  &--danger-outline {
+    background: var(--bg-surface);
+    border-color: var(--red);
+    color: var(--red);
+
+    &:hover:not(:disabled) {
+      background: var(--red-bg-soft);
+    }
+  }
+}
+
+.tb-hint {
+  font-size: 11px;
+  color: var(--gray-muted);
+  font-style: italic;
+
+  &--ok {
+    color: var(--green-dark);
+    font-style: normal;
+    background: var(--green-bg);
+    border: 1px solid var(--green-border);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+  }
+}
+
+.tb-error {
+  font-size: 12px;
+  color: var(--red-dark);
+  background: var(--red-bg-soft);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.tb-checker-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+// Content-projected `<ng-template let-m>` for `app-index-picker` keeps ITS OWN declaring component's
+// view-encapsulation attribute (this component's, not IndexPickerComponent's) — these rules must live
+// here, not just in transaction-builder.component.scss, or the picker rows render unstyled.
+.tb-row-primary {
+  display: block;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.tb-row-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--gray-muted);
+  margin-top: 2px;
+}

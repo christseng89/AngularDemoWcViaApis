@@ -1059,80 +1059,8 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
   });
 
-  describe('searchCheckerLc', () => {
-    it('is a no-op when no function is selected', () => {
-      const api = makeApi();
-      const comp = makeComponent(getFn('A2'), api);
-      (comp as unknown as { selectedFunction: unknown }).selectedFunction = null;
-
-      expect(() => comp.searchCheckerLc()).not.toThrow();
-      expect(comp.checkerContract).toBeNull();
-      expect(api.resolveContract).not.toHaveBeenCalled();
-    });
-
-    it('requires an LC Number', () => {
-      const api = makeApi();
-      const comp = makeComponent(getFn('A2'), api);
-      comp.checkerLcNumber = '';
-
-      comp.searchCheckerLc();
-
-      expect(comp.checkerSearchError).toBe('Type an LC Number to search.');
-      expect(api.resolveContract).not.toHaveBeenCalled();
-    });
-
-    it("requires the secondary ref (IB/SG Number) when the function's instrumentType has one", () => {
-      const api = makeApi();
-      const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE'); // IPLC_ACCEPTANCE -> ibNumber
-      comp.checkerLcNumber = 'LC1';
-      comp.checkerSecondaryRef = '';
-
-      comp.searchCheckerLc();
-
-      expect(comp.checkerSearchError).toContain('Type a IB Number to search');
-      expect(api.resolveContract).not.toHaveBeenCalled();
-    });
-
-    it('resolves the contract and loads the Checker queue on success (no secondary field needed)', () => {
-      const contract = makeContract({ balanceContractId: 'C1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } });
-      const pendingMovement = { movementId: 'M1', status: 'PENDING', movementType: 'AMEND_INCREASE' };
-      const api = makeApi({
-        resolveContract: jest.fn(() => of(contract)),
-        listMovements: jest.fn(() => of([pendingMovement, { movementId: 'M2', status: 'RELEASED', movementType: 'AMEND_INCREASE' }])),
-      });
-      const comp = makeComponent(getFn('A2'), api);
-      comp.checkerLcNumber = 'LC1';
-
-      comp.searchCheckerLc();
-
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC1', ibNumber: null, sgNumber: null });
-      expect(comp.checkerContract?.balanceContractId).toBe('C1');
-      expect(comp.checkerSearching).toBe(false);
-      expect(comp.checkerItems).toEqual([pendingMovement]); // loadCheckerQueue() side effect
-    });
-
-    it('sends ibNumber (not sgNumber) for an Acceptance-typed function', () => {
-      const api = makeApi();
-      const comp = makeComponent(getFn('A7'), api, 'FULL_SETTLE');
-      comp.checkerLcNumber = 'LC1';
-      comp.checkerSecondaryRef = 'IB01';
-
-      comp.searchCheckerLc();
-
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null });
-    });
-
-    it('sets checkerSearchError from the server message on a resolve failure', () => {
-      const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ error: { message: 'no such SG' } }))) });
-      const comp = makeComponent(getFn('A8'), api); // SHGT -> sgNumber
-      comp.checkerLcNumber = 'LC1';
-      comp.checkerSecondaryRef = 'SG01';
-
-      comp.searchCheckerLc();
-
-      expect(comp.checkerSearchError).toBe('no such SG');
-      expect(comp.checkerSearching).toBe(false);
-      expect(comp.checkerContract).toBeNull();
-    });
-  });
+  // BAL-003 "Feature Components + Facade" pilot #2 (2026-08-19, desiger-comments.md) — searchCheckerLc()/
+  // checkerLcNumber/checkerContract/etc. moved to CheckerPanelComponent; the equivalent coverage
+  // (no-op with no function, missing LC Number, missing secondary ref, success + queue load, ibNumber
+  // vs sgNumber routing, resolve-failure error message) now lives in checker-panel.component.spec.ts.
 });
