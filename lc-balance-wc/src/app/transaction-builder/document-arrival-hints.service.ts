@@ -7,16 +7,19 @@ import { InstrumentType } from './balance-component.model';
  * BAL-003 (9th same-day pass — desiger-comments.md F-03 reassessment 2026-08-19, user-confirmed narrow
  * scope after being shown the current state: "只抽這個 session 新增的 paging/eligibility 狀態", mirroring
  * the earlier "8th pass" precedent of a deliberately narrowed BAL-003 extraction rather than the full
- * selection-flow one). Owns the per-candidate "does this LC/Confirmation have an eligible outstanding
- * A3/A3S Document Arrival (or, for B4, an already-Released child B3 Present Docs record) of its own" hint
- * data A4/A6/B4's own LC Index pickers now depend on for BOTH their own inline hint text (A4's own
- * "— IB00001 — Pending: 25,000") AND their own eligibility filtering (business requirement 2026-08-19,
- * "A4/A6/B4 — LC Index Eligibility Criteria").
+ * selection-flow one). Owns every A1-A9/B1-B5 function's own per-candidate LC Index eligibility data —
+ * originally just A4/A6/B4's own "does this LC/Confirmation have an eligible outstanding A3/A3S Document
+ * Arrival (or, for B4, an already-Released child B3 Present Docs record) of its own" hint maps (used for
+ * BOTH their own inline hint text, e.g. A4's "— IB00001 — Pending: 25,000", AND their own eligibility
+ * filtering — business requirement 2026-08-19, "A4/A6/B4 — LC Index Eligibility Criteria"); extended the
+ * same day to A3S/A9's own genuinely different "does this LC have an outstanding SG Balance" eligibility
+ * (business requirement 2026-08-19, "A3S/A9 — LC Index Criteria") — kept in this same service rather than
+ * a new one, since it's the same underlying concept (per-candidate LC Index eligibility for a paginated
+ * picker), just a different per-candidate check.
  *
  * `catalogPayableIbs`/`catalogPayableMovements` (A4) predate this session (business instruction
- * 2026-08-14, originally hint-display-only); `parentPayableIbs`/`parentPayableMovements` (A6) and
- * `catalogChildPayableIbs` (B4) are new this session. Moved together since all three are genuinely the
- * SAME underlying concept (per-candidate document-arrival hints for a paginated picker), not a strict
+ * 2026-08-14, originally hint-display-only); everything else here is new this session. Moved/added
+ * together since all of it is genuinely the SAME underlying concept, not a strict
  * "only literally-new-this-session lines" cut — matching this file's own precedent elsewhere of moving a
  * cohesive unit rather than half of one.
  *
@@ -36,6 +39,10 @@ export class DocumentArrivalHintsService {
   readonly parentPayableMovements = new Map<string, BalanceMovement[]>();
   /** B4 (Honour / Acceptance) only — its own flat Catalog picker, CROSS-contract (a child EPLC_EXAMINATION contract's own CREATE), RELEASED and not yet consumed. */
   readonly catalogChildPayableIbs = new Map<string, string[]>();
+  /** A3S (Document Arrival w/ Shipping Gtee) only — its own flat Catalog picker. Set of balanceContractId whose LC has at least one child SHGT contract with a non-zero Available Balance — see loadSgBalanceEligibility()'s own doc comment. */
+  readonly catalogSgEligible = new Set<string>();
+  /** A9 (Shipping Gtee Redemption) only — its own Parent LC picker. Same eligibility rule as catalogSgEligible above. */
+  readonly parentSgEligible = new Set<string>();
 
   constructor(private readonly api: BalanceComponentApiService) {}
 
@@ -114,6 +121,51 @@ export class DocumentArrivalHintsService {
     ).subscribe((results) => {
       list.forEach((c, i) => {
         if (results[i].length) this.catalogChildPayableIbs.set(c.balanceContractId, results[i]);
+      });
+      onDone();
+    });
+  }
+
+  /** A3S's own hint fetch — see loadSgBalanceEligibility()'s own doc comment. */
+  loadCatalogSgEligibility(list: BalanceContract[], onDone: () => void): void {
+    this.loadSgBalanceEligibility(list, this.catalogSgEligible, onDone);
+  }
+
+  /** A9's own hint fetch — see loadSgBalanceEligibility()'s own doc comment. */
+  loadParentSgEligibility(list: BalanceContract[], onDone: () => void): void {
+    this.loadSgBalanceEligibility(list, this.parentSgEligible, onDone);
+  }
+
+  /**
+   * Shared by A3S and A9 — business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria — Only LC
+   * Numbers with an outstanding SG Balance should be displayed... once SG Balance = 0, the LC Number
+   * should no longer appear"). For each LC Index candidate, catalog-searches its own child SHGT
+   * contracts by lcNumber, then fetches each child's own live snapshot — mirrors
+   * `loadSgsForArrival()`'s own "outstanding SG" filter (`availableBalance !== '0'`) exactly, run once
+   * per Step-1 candidate instead of for the one already-picked LC. A LC with no SHGT children at all is
+   * correctly not eligible (nothing to redeem), same as one whose every SHGT child is fully redeemed.
+   */
+  private loadSgBalanceEligibility(list: BalanceContract[], eligible: Set<string>, onDone: () => void): void {
+    eligible.clear();
+    if (!list.length) {
+      onDone();
+      return;
+    }
+    forkJoin(
+      list.map((c) =>
+        this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
+          switchMap((result) => {
+            if (!result.items.length) return of(false);
+            return forkJoin(result.items.map((child) => this.api.getSnapshot(child.balanceContractId).pipe(catchError(() => of(null))))).pipe(
+              map((snaps) => snaps.some((snap) => !!snap && snap.availableBalance !== '0')),
+            );
+          }),
+          catchError(() => of(false)),
+        ),
+      ),
+    ).subscribe((results) => {
+      list.forEach((c, i) => {
+        if (results[i]) eligible.add(c.balanceContractId);
       });
       onDone();
     });

@@ -7121,3 +7121,73 @@ introduced by this session's own work, without touching the part that's already 
 correctly left alone.
 
 Not committed (not requested).
+
+## LC Index eligibility extended to A3S/A9 — "outstanding SG Balance" criterion, sharing `DocumentArrivalHintsService` rather than a second service (2026-08-19, user-directed formal requirement, verbatim: "### A3S / A9 — LC Index Criteria — For A3S — Document Arrival w/ Shipping Gtee and A9 — Shipping Gtee (Redemption): Only LC Numbers with an outstanding SG Balance should be displayed in the LC Index. Once the SG Balance = 0, the LC Number should no longer appear in the LC Index for A3S / A9.")
+
+Direct sibling of the A4/A6/B4 "outstanding EARMARKING events" LC Index eligibility pass earlier this same
+day (see that entry above) — same underlying pattern (filter a paginated picker's candidates down to only
+those satisfying a real business-rule eligibility check, not a raw ACTIVE-status/balance heuristic), a
+genuinely different eligibility CRITERION: "has at least one associated SG (Shipping Guarantee) with a
+non-zero Available Balance" rather than "has an outstanding Document Arrival movement." A3S uses the flat
+Catalog picker (like A4); A9 uses the Parent LC picker (like A6) — confirmed by re-reading each function's
+own registry entry before writing anything, not assumed from the naming symmetry with A4/A6 alone.
+
+**Fix, landed inside the just-extracted `DocumentArrivalHintsService`** (the BAL-003/F-03 9th-pass
+extraction immediately above, same day) rather than a new service — same underlying concept (per-candidate
+LC Index eligibility for a paginated picker), just a different per-candidate check, and the class's own
+`catalogPayableIbs`/`parentPayableIbs`/`catalogChildPayableIbs` trio already established the "one service,
+several independent hint maps, one per function" shape this slots into cleanly:
+- New `readonly catalogSgEligible = new Set<string>()` (A3S) / `readonly parentSgEligible = new Set<string>()`
+  (A9) — a plain `Set<balanceContractId>`, not a `Map`, since eligibility here is boolean-only (unlike the
+  A4/A6/B4 hint maps, which also carry inline hint TEXT — SG Balance eligibility has no equivalent inline
+  hint requirement in this request).
+- `loadCatalogSgEligibility(list, onDone)` / `loadParentSgEligibility(list, onDone)`, sharing one private
+  `loadSgBalanceEligibility(list, eligible, onDone)` body — mirrors `loadPayableMovementsAcrossChildContracts()`'s/
+  B4's own `loadChildHints()`'s already-proven two-step shape (catalog-search the child instrumentType by
+  `lcNumber`, then fetch a live status for each match) exactly: `api.catalog('SHGT', 'ACTIVE', ..., c.naturalKey.lcNumber)`
+  then, for each child SHGT found, `api.getSnapshot(child.balanceContractId)` — reusing `loadSgsForArrival()`'s
+  own already-established "outstanding SG" filter (`availableBalance !== '0'`) rather than inventing a new
+  threshold. An LC with no SHGT children at all is correctly NOT eligible (nothing to redeem) — same
+  "genuinely nothing to act on" reasoning A4/A6/B4's own eligibility check already applies elsewhere.
+- Wired into `reloadCatalog()`'s own `onLoaded` hook (A3S branch, alongside the pre-existing A4/B4
+  branches) and `loadParent()`'s own `onLoaded` hook (A9 branch, alongside the pre-existing A6 branch) —
+  `catalogPicker`/`parentPicker`'s own `total`/`filteredXxxCatalog` re-sync a further time inside each
+  hint fetch's own completion callback, same mechanism the Page-by-Page pagination pass's own
+  `onLoaded`/`qualifies` design already established for this exact "eligibility data resolves
+  asynchronously, later than the initial fetch" timing problem.
+- `filteredCatalogContracts` gained a new `documentArrivalWithSg` branch (A3S), inserted after the
+  pre-existing A4/B4 branches, filtering on `documentArrivalHints.catalogSgEligible`; `filteredParentCatalog`
+  gained a new `amountVsAvailableDerivation === 'REDEEM'` branch (A9 — the same Strategy field this
+  session's own F-01 PR-3/PR-4 migration already uses to identify A9 uniquely, since A9 is the only
+  function with this derivation), inserted after the pre-existing A6 branch and before the older
+  `settlesDocumentArrival || catalogTenorFilter === 'USANCE' || usesSettleableBalanceIndex` bypass.
+
+**Tests**: 6 new integration-style tests in `transaction-builder.component.spec.ts` (mirroring the
+existing B4 cross-contract eligibility describe block's own `setup()`/`mockApi.catalog`/`mockApi.getSnapshot`
+pattern exactly) — A3S's own `reloadCatalog()` → `loadCatalogSgEligibility` (kept with a non-zero-balance
+child SG; excluded with a fully-redeemed child SG; excluded with no child SG contracts at all) and A9's own
+`loadParent()`/`onParentInstrumentTypeChange()` → `loadParentSgEligibility` (the same three cases). Plus 2
+direct unit tests in `transaction-builder.component.gaps.spec.ts` exercising `filteredCatalogContracts`/
+`filteredParentCatalog` with hand-populated `catalogSgEligible`/`parentSgEligible` sets, closing the
+coverage gap the integration tests alone left (`document-arrival-hints.service.ts`'s own new
+`loadSgBalanceEligibility` body). Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration
+development` (strict templates)/`npm run lint` (0 errors, 228 warnings — new test-fixture `any` casts, same
+accepted convention as every other test-fixture `any` in this file) all clean, `npx prettier --write` applied
+to the two touched spec files (whitespace-only, re-verified via a clean `tsc --noEmit`/full suite re-run
+afterward). Full Angular suite **849/849 passing** (8 new), coverage **97.8/95.18/96.75/98.11%** (all four
+metrics clear the 95% floor). `backend/` 34/34 and microservice 335/335 both re-run per this file's own
+standing rule, unaffected (Angular-only change — no request/response contract change; every candidate
+resolution still goes through the microservice's own existing `GET /balance-contracts/catalog`/
+`GET .../balance` endpoints, just called more times and filtered differently client-side, same posture the
+A4/A6/B4 eligibility pass immediately above already established).
+
+Live in-browser verification not attempted this pass — static verification is unusually strong here
+(strict-template build, full typecheck, and 6 new dedicated integration tests reproducing the exact
+eligible/ineligible shapes for both A3S's flat-Catalog picker and A9's Parent-LC picker). A human should
+reproduce live: an LC with no child SG contracts, or whose only child SG is fully redeemed (Available
+Balance 0), should no longer appear under A3S's or A9's own LC Index; one with a genuinely outstanding SG
+should — and, since this depends on an async per-candidate fetch completing before the LC Index reflects
+the true eligible set (same caveat the A4/A6/B4 pass above already notes), confirm there's no jarring flash
+of ineligible LCs briefly showing before the real filter lands.
+
+Not committed (not requested).

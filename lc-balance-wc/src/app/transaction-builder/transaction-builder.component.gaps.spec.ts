@@ -399,6 +399,18 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'sight'].sort());
     });
 
+    it('filteredCatalogContracts: documentArrivalWithSg (A3S) is SG-Balance-eligibility-driven (business requirement 2026-08-19, "A3S/A9 — LC Index Criteria") — keeps a candidate WITH an outstanding SG Balance, excludes one without, regardless of the LC\'s own Available Balance', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A3S'));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'sg-eligible' }), contract({ balanceContractId: 'sg-exhausted' })];
+      // The LC's own Available Balance is irrelevant to A3S eligibility now — 'sg-eligible' is 0 here,
+      // proving the OLD 0-balance-on-the-LC-itself heuristic is genuinely gone, not just supplemented.
+      (c as any).catalogPicker.snapshots.set('sg-eligible', snapshot({ availableBalance: '0' }));
+      c.documentArrivalHints.catalogSgEligible.add('sg-eligible');
+      // 'sg-exhausted' has no catalogSgEligible entry at all — every child SG is fully redeemed (or none exist).
+      expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['sg-eligible']);
+    });
+
     it('parentTenorFamily: undefined with no function, USANCE when tenorTypeOptions is set (A6), USANCE when catalogTenorFilter is USANCE (A7)', () => {
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.parentTenorFamily).toBeUndefined();
@@ -442,6 +454,15 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.model.tenorType = 'BUYERS_USANCE';
       c.parentPicker.contracts = [contract({ balanceContractId: 'no-arrival', tenorType: 'BUYERS_USANCE' })];
       expect(c.filteredParentCatalog).toEqual([]);
+    });
+
+    it('filteredParentCatalog: amountVsAvailableDerivation REDEEM (A9) is SG-Balance-eligibility-driven (business requirement 2026-08-19, "A3S/A9 — LC Index Criteria") — keeps a candidate WITH an outstanding SG Balance, excludes one without, regardless of the LC\'s own Available Balance', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.selectFunction(fn('A9'));
+      c.parentPicker.contracts = [contract({ balanceContractId: 'sg-eligible' }), contract({ balanceContractId: 'sg-exhausted' })];
+      (c as any).parentPicker.snapshots.set('sg-eligible', snapshot({ availableBalance: '0' }));
+      c.documentArrivalHints.parentSgEligible.add('sg-eligible');
+      expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['sg-eligible']);
     });
 
     it('filteredParentCatalog: catalogTenorFilter USANCE (A7) excludes only Sight, keeps legacy, and skips the 0-balance filter', () => {

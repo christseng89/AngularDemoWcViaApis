@@ -25,6 +25,8 @@ const A1 = findFn(IMPORT_FUNCTIONS, 'A1'); // LC Issue — fixed movementType IS
 const A2 = findFn(IMPORT_FUNCTIONS, 'A2'); // LC Amendment — subChoice, no fixed movementType
 const A4 = findFn(IMPORT_FUNCTIONS, 'A4'); // Sight Settlement — payExistingUtilize, catalogTenorFilter SIGHT
 const A6 = findFn(IMPORT_FUNCTIONS, 'A6'); // Acceptance (Usance) — defaultParentInstrumentType, tenorTypeOptions, settlesDocumentArrival
+const A3S = findFn(IMPORT_FUNCTIONS, 'A3S'); // Document Arrival w/ Shipping Gtee — flat Catalog picker, documentArrivalWithSg
+const A9 = findFn(IMPORT_FUNCTIONS, 'A9'); // Shipping Gtee (Redemption) — defaultParentInstrumentType, amountVsAvailableDerivation REDEEM
 const B1 = findFn(EXPORT_FUNCTIONS, 'B1'); // Confirm LC — export side, fixed movementType
 const B4 = findFn(EXPORT_FUNCTIONS, 'B4'); // Honour / Acceptance — payableMovementInstrumentType EPLC_EXAMINATION, flat Catalog picker
 
@@ -511,6 +513,115 @@ describe('TransactionBuilderComponent', () => {
       expect(() => comp.reloadCatalog()).not.toThrow();
       expect(comp.documentArrivalHints.catalogChildPayableIbs.size).toBe(0);
       expect(comp.catalogPicker.total).toBe(0);
+    });
+  });
+
+  // Business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria — Only LC Numbers with an outstanding
+  // SG Balance should be displayed... once SG Balance = 0, the LC Number should no longer appear").
+  describe('reloadCatalog — A3S LC Index SG Balance eligibility (loadCatalogSgEligibility)', () => {
+    function setup(mockApi: ReturnType<typeof makeApiMock>, sgSnapshotOverrides: Partial<BalanceSnapshot>) {
+      const c1 = mkContract('c1', 'S01');
+      const sg1 = mkContract('sg1', 'S01', { instrumentType: 'SHGT' });
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'IPLC_LC' ? of(mkCatalogPage([c1], 1)) : of(mkCatalogPage([sg1], 1)),
+      );
+      mockApi.getSnapshot.mockImplementation((id: string) => (id === 'sg1' ? of(mkSnapshot('sg1', sgSnapshotOverrides)) : of(mkSnapshot(id))));
+      return { c1, sg1 };
+    }
+
+    it("keeps an LC with an outstanding (non-zero Available Balance) child SG, regardless of the LC's own balance", () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = A3S;
+      comp.model.instrumentType = 'IPLC_LC';
+      comp.model.movementType = 'UTILIZE';
+      setup(mockApi, { availableBalance: '5000' });
+
+      comp.reloadCatalog();
+
+      expect(comp.documentArrivalHints.catalogSgEligible.has('c1')).toBe(true);
+      expect(comp.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['c1']);
+    });
+
+    it('excludes an LC whose only child SG is fully redeemed (availableBalance 0)', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = A3S;
+      comp.model.instrumentType = 'IPLC_LC';
+      comp.model.movementType = 'UTILIZE';
+      setup(mockApi, { availableBalance: '0' });
+
+      comp.reloadCatalog();
+
+      expect(comp.documentArrivalHints.catalogSgEligible.has('c1')).toBe(false);
+      expect(comp.filteredCatalogContracts).toEqual([]);
+    });
+
+    it('excludes an LC with no child SG contracts at all', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = A3S;
+      comp.model.instrumentType = 'IPLC_LC';
+      comp.model.movementType = 'UTILIZE';
+      const c1 = mkContract('c1', 'S01');
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'IPLC_LC' ? of(mkCatalogPage([c1], 1)) : of(mkCatalogPage([])),
+      );
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
+
+      comp.reloadCatalog();
+
+      expect(comp.documentArrivalHints.catalogSgEligible.has('c1')).toBe(false);
+      expect(comp.filteredCatalogContracts).toEqual([]);
+    });
+  });
+
+  describe('loadParent (via onParentInstrumentTypeChange) — A9 LC Index SG Balance eligibility (loadParentSgEligibility)', () => {
+    function setup(mockApi: ReturnType<typeof makeApiMock>, sgSnapshotOverrides: Partial<BalanceSnapshot>) {
+      const p1 = mkContract('p1', 'S01');
+      const sg1 = mkContract('sg1', 'S01', { instrumentType: 'SHGT' });
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'IPLC_LC' ? of(mkCatalogPage([p1], 1)) : of(mkCatalogPage([sg1], 1)),
+      );
+      mockApi.getSnapshot.mockImplementation((id: string) => (id === 'sg1' ? of(mkSnapshot('sg1', sgSnapshotOverrides)) : of(mkSnapshot(id))));
+      return { p1, sg1 };
+    }
+
+    it("keeps an LC with an outstanding child SG, regardless of the LC's own balance", () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = A9;
+      comp.parentInstrumentType = 'IPLC_LC';
+      setup(mockApi, { availableBalance: '5000' });
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.documentArrivalHints.parentSgEligible.has('p1')).toBe(true);
+      expect(comp.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['p1']);
+    });
+
+    it('excludes an LC whose only child SG is fully redeemed (availableBalance 0)', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = A9;
+      comp.parentInstrumentType = 'IPLC_LC';
+      setup(mockApi, { availableBalance: '0' });
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.documentArrivalHints.parentSgEligible.has('p1')).toBe(false);
+      expect(comp.filteredParentCatalog).toEqual([]);
+    });
+
+    it('excludes an LC with no child SG contracts at all', () => {
+      const { comp, mockApi } = makeComponent();
+      comp.selectedFunction = A9;
+      comp.parentInstrumentType = 'IPLC_LC';
+      const p1 = mkContract('p1', 'S01');
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'IPLC_LC' ? of(mkCatalogPage([p1], 1)) : of(mkCatalogPage([])),
+      );
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('p1')));
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.documentArrivalHints.parentSgEligible.has('p1')).toBe(false);
+      expect(comp.filteredParentCatalog).toEqual([]);
     });
   });
 

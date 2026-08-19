@@ -679,6 +679,12 @@ export class TransactionBuilderComponent {
             },
           );
         }
+        // Business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria") — A3S only.
+        if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+          this.documentArrivalHints.loadCatalogSgEligibility(items, () => {
+            this.catalogPicker.total = this.filteredCatalogContracts.length;
+          });
+        }
       },
     });
   }
@@ -807,6 +813,15 @@ export class TransactionBuilderComponent {
     if (this.selectedFunction?.payableMovementInstrumentType) {
       return list.filter((c) => this.documentArrivalHints.catalogChildPayableIbs.has(c.balanceContractId));
     }
+    // Business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria" — "Only LC Numbers with an
+    // outstanding SG Balance should be displayed... once SG Balance = 0, the LC Number should no
+    // longer appear") — A3S only. Supersedes the generic 0-balance fallback below for this function,
+    // since A3S's own movementType (UTILIZE) would otherwise fall through into it, filtering by the
+    // LC's OWN Available Balance — the wrong signal, same class of gap A4's own exemption above already
+    // fixed for a different reason. See catalogSgEligible's own doc comment (loadSgBalanceEligibility()).
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+      return list.filter((c) => this.documentArrivalHints.catalogSgEligible.has(c.balanceContractId));
+    }
     if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return list;
     return list.filter((c) => {
       const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
@@ -856,6 +871,13 @@ export class TransactionBuilderComponent {
         // requiresEligibleParentDocumentArrival's own doc comment.
         if (this.requiresEligibleParentDocumentArrival) {
           this.documentArrivalHints.loadParentHints(items, () => {
+            this.parentPicker.total = this.filteredParentCatalog.length;
+          });
+        }
+        // Business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria") — A9 only (the one function
+        // whose amountVsAvailableDerivation is REDEEM).
+        if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
+          this.documentArrivalHints.loadParentSgEligibility(items, () => {
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
@@ -935,6 +957,15 @@ export class TransactionBuilderComponent {
     // is genuinely A6-only.
     if (this.requiresEligibleParentDocumentArrival) {
       return list.filter((c) => this.documentArrivalHints.parentPayableIbs.has(c.balanceContractId));
+    }
+    // Business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria" — "Only LC Numbers with an
+    // outstanding SG Balance should be displayed... once SG Balance = 0, the LC Number should no
+    // longer appear") — A9 only (amountVsAvailableDerivation is REDEEM only for A9). Supersedes the
+    // generic 0-balance fallback below, which would otherwise filter by the LC's OWN Available Balance
+    // — the wrong signal, same class of gap A3S's own filteredCatalogContracts fix addresses. See
+    // parentSgEligible's own doc comment (loadSgBalanceEligibility()).
+    if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
+      return list.filter((c) => this.documentArrivalHints.parentSgEligible.has(c.balanceContractId));
     }
     if (
       this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
