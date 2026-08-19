@@ -4,6 +4,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { InstrumentType, TransactionFunction } from './balance-component.model';
 import { describeApiError } from './api-error';
+import { deriveFunctionStrategy } from './function-strategy';
 
 /**
  * BAL-003 (Quality-report-balance.md — 6th same-day OOD/SOLID pass, "Maker Submit service"): the four
@@ -75,16 +76,20 @@ export class MakerSubmitService {
   constructor(private readonly api: BalanceComponentApiService) {}
 
   submit(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable<MakerSubmitOutcome> {
-    if (ctx.selectedFunction?.documentArrivalWithSg && ctx.selectedArrivalSg && ctx.arrivalSgSnapshot) {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — all 4 dispatch conditions below now
+    // read through the Strategy instead of the raw flags (documentArrivalWithSg migrated in PR-3; the
+    // other 3, B-series-exclusive, migrated here); behavior unchanged.
+    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
+    if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && ctx.selectedArrivalSg && ctx.arrivalSgSnapshot) {
       return this.submitDocumentArrivalWithSg(req, ctx);
     }
-    if (ctx.selectedFunction?.createsIssuingBankReceivableOnHonour && ctx.model.movementType === 'HONOUR' && ctx.selectedContract) {
+    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && ctx.model.movementType === 'HONOUR' && ctx.selectedContract) {
       return this.submitConfirmationHonourWithReceivable(req, ctx);
     }
-    if (ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && ctx.selectedContract) {
+    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && ctx.selectedContract) {
       return this.submitConfirmationAcceptWithReceivable(req, ctx);
     }
-    if (ctx.selectedFunction?.settlesAcceptanceOnMature && ctx.model.instrumentType === 'EPLC_ACCEPTANCE' && ctx.selectedContract) {
+    if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && ctx.model.instrumentType === 'EPLC_ACCEPTANCE' && ctx.selectedContract) {
       return this.submitAcceptanceSettleWithReceivable(req, ctx);
     }
     return this.submitPlain(req);

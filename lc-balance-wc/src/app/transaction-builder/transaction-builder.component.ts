@@ -25,6 +25,7 @@ import {
 } from './balance-component.model';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import { SubmitRulesContext, buildSubmitRequest as buildSubmitRequestRules, validateSubmit as validateSubmitRules } from './submit-rules';
+import { deriveFunctionStrategy } from './function-strategy';
 import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
 
@@ -70,6 +71,18 @@ export class TransactionBuilderComponent {
   activeMode: 'PROCESSING' | 'INQUIRE' = 'PROCESSING';
 
   selectedFunction: TransactionFunction | null = null;
+
+  /**
+   * PR-3 of the F-01 Strategy refactoring (`desiger-comments.md`, OOD review finding F-01) —
+   * `selectedFunction`'s own derived `FunctionStrategy`, used by the A-series-exclusive call sites below
+   * instead of reading `payExistingUtilize`/`documentArrivalWithSg`/`autoRedeemType`/`deferSettlement`
+   * directly. `settlesDocumentArrival` (shared with B-series) deliberately still reads the raw flag —
+   * migrating it is PR-4's job, once B-series also has its own strategy wiring in place.
+   */
+  private get selectedFunctionStrategy() {
+    return this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
+  }
+
   /** Value of the function's subChoice (e.g. 'AMEND_INCREASE', or 'CONFIRMED' for B1/B2). */
   subChoiceValue = '';
   /**
@@ -560,12 +573,12 @@ export class TransactionBuilderComponent {
       // Available diverge, and defaulting to Confirmed would set up a Full Settle guaranteed to fail
       // its own server-side check the moment it's typed.
       this.model.amount = this.selectedContractSnapshot.availableBalance;
-    } else if (this.selectedFunction?.autoRedeemType && this.selectedContractSnapshot) {
+    } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && this.selectedContractSnapshot) {
       // Business instruction 2026-08-15 ("Amount default to SG Available Balance") — Confirmed Balance
       // ignores any OTHER redemption already reserved PENDING against this same SG; Available is what's
       // actually still redeemable right now (same distinction as the shgtRedeem.ts commitment-control fix).
       this.model.amount = this.selectedContractSnapshot.availableBalance;
-    } else if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContractSnapshot) {
+    } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && this.model.instrumentType === 'EPLC_ACCEPTANCE' && this.selectedContractSnapshot) {
       // B5 only — kept symmetric with FULL_SETTLE/autoRedeemType above; unreachable in practice since B5
       // has no subChoice to re-trigger this with a contract already selected (refreshSelectedContractSnapshot() does the real work).
       this.model.amount = this.selectedContractSnapshot.availableBalance;
@@ -583,7 +596,7 @@ export class TransactionBuilderComponent {
       page,
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
       onLoaded: (items) => {
-        if (this.selectedFunction?.payExistingUtilize) this.loadPayableIbHints(items);
+        if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) this.loadPayableIbHints(items);
       },
     });
   }
@@ -713,7 +726,7 @@ export class TransactionBuilderComponent {
     if (tenorFilter) {
       list = list.filter((c) => !c.tenorType || (tenorFilter === 'SIGHT' ? c.tenorType === 'SIGHT' : c.tenorType !== 'SIGHT'));
     }
-    if (this.selectedFunction?.payExistingUtilize) return list;
+    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) return list;
     if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return list;
     return list.filter((c) => {
       const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
@@ -807,10 +820,13 @@ export class TransactionBuilderComponent {
     // case). Excluding 0-balance parents made every such LC/Confirmation invisible to A6/B4's own
     // Parent LC picker — the more fully a Document Arrival used up the LC, the more certain this bug
     // was to hide it.
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
+    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) and
+    // settleableBalanceIndex now read through the Strategy too; behavior unchanged.
     if (
-      this.selectedFunction?.settlesDocumentArrival ||
+      this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
       this.selectedFunction?.catalogTenorFilter === 'USANCE' ||
-      this.selectedFunction?.settleableBalanceIndex
+      this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex
     )
       return list;
     return list.filter((c) => {
@@ -856,7 +872,7 @@ export class TransactionBuilderComponent {
    * find the one with a pending Document Arrival.
    */
   catalogPendingHint(c: BalanceContract): string {
-    if (!this.selectedFunction?.payExistingUtilize) return '';
+    if (!this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) return '';
     const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
     if (!snap || snap.pendingEarmarkTotal === '0') return '';
     const ibs = this.catalogPayableIbs.get(c.balanceContractId);
@@ -1017,7 +1033,9 @@ export class TransactionBuilderComponent {
     // Business instruction 2026-08-15 ("B3 不須選 Sight/Usance 因為交易本身已經有此訊息了") — B3 only.
     // Sight/Usance is no longer a manual subChoice; derive it from the picked Confirmation's own
     // tenorType (declared once, at B1) instead of asking the Maker to re-pick it here.
-    if (this.selectedFunction?.movementTypeFromContractTenor && this.selectedContract) {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — movementTypeFromContractTenor now
+    // reads through the Strategy instead of the raw flag; behavior unchanged.
+    if (this.selectedFunctionStrategy?.movementDerivation.derivesMovementTypeFromTenor && this.selectedContract) {
       this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT';
     }
     // Business instruction 2026-08-16 ("A2-A9/B2-B5 Currency = Carry from A1/B1 + Protected") — see
@@ -1033,10 +1051,13 @@ export class TransactionBuilderComponent {
     // Catalog (onSelectContract), unlike A6/old-B4 which picked via a Parent LC. settlesDocumentArrival
     // still means the same thing either way: load the still-PENDING B3 Present Docs records under
     // whichever Confirmation was just picked.
-    if (this.selectedFunction?.payExistingUtilize || this.selectedFunction?.settlesDocumentArrival) {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
+    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) now reads
+    // through the Strategy too; behavior unchanged.
+    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace || this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival) {
       this.loadPayableMovements(this.selectedContract?.balanceContractId);
     }
-    if (this.selectedFunction?.documentArrivalWithSg) this.loadSgsForArrival();
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) this.loadSgsForArrival();
     this.syncCheckerToContext();
   }
 
@@ -1241,7 +1262,9 @@ export class TransactionBuilderComponent {
           // BalanceMovement.presentDocsConsumedAt's own doc comment — set as a side effect of B4's own
           // compound release). This check is a no-op for A6 (its own candidates, plain A3 UTILIZEs,
           // never set presentDocsConsumedAt at all).
-          const requiresRelease = !!this.selectedFunction?.payableMovementRequiresRelease;
+          // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — reads through the Strategy
+          // instead of the raw flag; behavior unchanged.
+          const requiresRelease = !!this.selectedFunctionStrategy?.checkerRelease.sourceAlreadyReleasedBeforePick;
           this.payableMovements = movementLists
             .flat()
             .filter((m: any) => m.movementType === wantedMovementType && m.status === (requiresRelease ? 'RELEASED' : 'PENDING') && !m.presentDocsConsumedAt);
@@ -1261,14 +1284,17 @@ export class TransactionBuilderComponent {
     // number and protected"): auto-fills AND locks the Acceptance's own natural key IB Number and Amount from
     // the Document Arrival being converted — no longer just a default, rebuildFields() below disables the
     // Amount input so it can't drift from what the presentation actually recorded.
-    if (this.selectedFunction?.settlesDocumentArrival && this.selectedPayMovement) {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
+    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) now reads
+    // through the Strategy too; behavior unchanged.
+    if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedPayMovement) {
       this.naturalKey.ibNumber = this.selectedPayMovement.sourceTransactionRef ?? '';
       // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — B4 only. A6 reads
       // naturalKey.ibNumber (its own instrumentType, IPLC_ACCEPTANCE, has ibNumber as a natural key
       // field); B4's instrumentType, EPLC_CONFIRMATION, does not — it carries its EB Number via
       // secondaryRef instead (secondaryRefLabel), same as old-B3 did. Set both so either kind of
       // consumer picks up the right one; harmless no-op for a function that doesn't use secondaryRef.
-      if (this.selectedFunction.secondaryRefLabel) {
+      if (this.selectedFunction?.secondaryRefLabel) {
         this.model.secondaryRef = this.selectedPayMovement.sourceTransactionRef ?? '';
       }
       this.model.amount = this.selectedPayMovement.amount;
@@ -1277,7 +1303,7 @@ export class TransactionBuilderComponent {
     // A4 only (business instruction 2026-08-16, real Maker Submit): picking a NEW Document Arrival
     // clears any PREVIOUS Submit result so the Maker isn't left looking at a stale MAKER RESULT panel
     // for a DIFFERENT movement.
-    if (this.selectedFunction?.payExistingUtilize) {
+    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
       this.submitResult = null;
       this.submitError = null;
     }
@@ -1332,7 +1358,7 @@ export class TransactionBuilderComponent {
         if (this.model.movementType === 'FULL_SETTLE') {
           this.model.amount = snap.availableBalance;
           this.rebuildFields();
-        } else if (this.selectedFunction?.settlesAcceptanceOnMature && this.model.instrumentType === 'EPLC_ACCEPTANCE') {
+        } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && this.model.instrumentType === 'EPLC_ACCEPTANCE') {
           // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance>0的EB交易") — same
           // "default to Available, freely editable down to Partial, capped at it" shape as autoRedeemType
           // below. NOTE: since B5's own registry entry now declares movementType: 'FULL_SETTLE' directly
@@ -1344,7 +1370,7 @@ export class TransactionBuilderComponent {
           // was dead, and merging/removing it needs its own separate verification pass).
           this.model.amount = snap.availableBalance;
           this.rebuildFields();
-        } else if (this.selectedFunction?.autoRedeemType) {
+        } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
           // Business instruction 2026-08-15 ("Amount default to SG Available Balance", refining the
           // earlier same-day "defaulted amount is the SG Balance" instruction) — Available, not
           // Confirmed: Confirmed ignores any OTHER redemption already reserved PENDING against this
@@ -1475,13 +1501,16 @@ export class TransactionBuilderComponent {
     }
     // A6 only (business instruction 2026-08-14 "A6 => Approved LC Balance and Create Acceptance Balance") —
     // Step 2: still-PENDING Document Arrivals under the picked parent LC, ready to be released + converted.
-    if (this.selectedFunction?.settlesDocumentArrival && this.selectedParent) {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
+    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) and
+    // settleableBalanceIndex now read through the Strategy too; behavior unchanged.
+    if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedParent) {
       this.loadPayableMovements(this.selectedParent.balanceContractId);
     }
     // B5 only (business instruction 2026-08-16, "EB Index... those EB records with Acceptance
     // Balance") — Step 2: still-outstanding Due-from-Issuing-Bank/Acceptance records under the picked
     // Confirmation, ready to be settled.
-    if (this.selectedFunction?.settleableBalanceIndex && this.selectedParent) {
+    if (this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex && this.selectedParent) {
       this.loadSettleableBalances(this.selectedParent.naturalKey.lcNumber);
     }
     // A6/B4 (business instruction 2026-08-14 "The Tenor Type and Tenor days should carry from the LC Number
@@ -1695,10 +1724,14 @@ export class TransactionBuilderComponent {
     // disambiguator for A3S specifically: a plain A3's own UTILIZE (no matched SG, submitted via
     // submitPlain()) never has one, so it correctly falls through to the existing deferSettlement/
     // acknowledgment-only path below instead of wrongly attempting (and failing) a compound release.
-    if (this.selectedFunction?.documentArrivalWithSg) {
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       return this.selectedCheckerMovement.movementType === 'UTILIZE' && !!this.selectedCheckerMovement.businessEventId;
     }
-    if (this.selectedFunction?.settlesAcceptanceOnMature) {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 3 flag reads below now read
+    // through the Strategy instead of the raw flags; behavior unchanged, including the ordering (B4's
+    // own settlesDocumentArrival branch below always matches before createsIssuingBankReceivableOnHonour
+    // is reached, per this method's own existing doc comment).
+    if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE') {
       return (
         (this.selectedCheckerMovement.movementType === 'FULL_SETTLE' || this.selectedCheckerMovement.movementType === 'PARTIAL_SETTLE') &&
         !!this.selectedCheckerMovement.businessEventId
@@ -1712,7 +1745,7 @@ export class TransactionBuilderComponent {
     // referencedTransactionId is ONLY ever stamped by A6/B4's own settlesDocumentArrival-gated
     // buildSubmitRequest() path, never by B1/B2's plain ISSUE/AMEND, so a genuine ISSUE/AMEND item
     // picked while on B4's own tab is never mistaken for a compound one.
-    if (this.selectedFunction?.settlesDocumentArrival) {
+    if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival) {
       return !!this.selectedCheckerMovement.referencedTransactionId;
     }
     // B4's own Sight/HONOUR (createsIssuingBankReceivableOnHonour) — UNCHANGED, still requires the
@@ -1726,7 +1759,7 @@ export class TransactionBuilderComponent {
     // Without this movementType check, reviewing a just-submitted ACCEPT record would ALSO match here
     // (createsIssuingBankReceivableOnHonour is set unconditionally on B3) and wrongly route it into
     // release()'s HONOUR-shaped compound instead of the acknowledgment-only path.
-    if (this.selectedFunction?.createsIssuingBankReceivableOnHonour) {
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable')) {
       return this.selectedCheckerMovement.movementType === 'HONOUR';
     }
     return false;
@@ -1760,14 +1793,14 @@ export class TransactionBuilderComponent {
     return (
       !!this.selectedCheckerMovement &&
       this.selectedCheckerMovement.movementType === 'UTILIZE' &&
-      !!(this.selectedFunction?.deferSettlement || this.selectedFunction?.documentArrivalWithSg)
+      !!(this.selectedFunctionStrategy?.checkerRelease.deferSettlement || this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg'))
     );
   }
 
   /** Drives the Checker Release/Approve button's label — kept as one getter so it can never drift from what checkerAct() actually does (see its own doc comment). */
   get checkerActionButtonLabel(): string {
     if (this.checkerBusy) return 'Working…';
-    if (this.selectedFunction?.documentArrivalWithSg && this.isCheckerCompoundOwnSubmission) {
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && this.isCheckerCompoundOwnSubmission) {
       return 'Release (Shipping Guarantee redemption)';
     }
     if (this.isArrivalAcknowledgmentStep) return 'Approve (acknowledgment only)';
@@ -1941,7 +1974,7 @@ export class TransactionBuilderComponent {
     // when unset, so A3 is unchanged).
     if (
       action === 'release' &&
-      this.selectedFunction?.deferSettlement &&
+      this.selectedFunctionStrategy?.checkerRelease.deferSettlement &&
       this.selectedCheckerMovement.movementType === (this.selectedFunction?.deferSettlementMovementType ?? 'UTILIZE')
     ) {
       this.approveArrival();
@@ -1956,7 +1989,7 @@ export class TransactionBuilderComponent {
     // backend-persisted gate that closes that gap — visible to any independent Checker session, not
     // just a same-session flag. Server-side release() deliberately does NOT enforce this itself (see
     // service.submitByMaker()'s own doc comment for why) — this client-side check is the real gate.
-    if (action === 'release' && this.selectedFunction?.payExistingUtilize && !this.selectedCheckerMovement.makerSubmittedAt) {
+    if (action === 'release' && this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace && !this.selectedCheckerMovement.makerSubmittedAt) {
       this.checkerError = 'This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.';
       return;
     }

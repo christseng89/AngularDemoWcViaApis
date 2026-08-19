@@ -2,6 +2,7 @@ import { FormlyFieldConfig } from '@ngx-formly/core';
 import { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import { CURRENCY_OPTIONS, TransactionFunction, decimalPlacesForCurrency } from './balance-component.model';
 import { BuilderModel, carriedCurrency, hasParent, isCreatingMovement, toleranceApplicable } from './function-policy';
+import { deriveFunctionStrategy } from './function-strategy';
 
 /**
  * BAL-003 (God Component) — the Transaction Builder's own Formly field factory, extracted from
@@ -30,6 +31,10 @@ export interface BuilderFieldsContext {
 
 export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const { model, selectedFunction, selectedContractSnapshot } = ctx;
+  // PR-3 of the F-01 Strategy refactoring (desiger-comments.md) — the two A-series-exclusive flag reads
+  // below (autoRedeemType/documentArrivalWithSg) now go through the Strategy instead of the raw flag;
+  // behavior is unchanged (see function-strategy.ts's own equivalence proof), only the read site moved.
+  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
   // Business instruction 2026-08-14: "The amount should carry from the related LC number + IB number and
   // protected. The Tenor Type and Tenor days should carry from the LC Number and protected as well." — A6/B4
   // only, and only once the source has actually been picked (before that, they're normal editable inputs).
@@ -48,8 +53,12 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // a Partial Settle". Confirmed unreachable in practice, not just in theory: nothing between
   // afterResolved() and buildFields() ever changes B5's own model.movementType away from its registry
   // default before Submit, so amountFromFullSettle matched on every single B5 render.
-  const amountFromDocArrival = !!selectedFunction?.settlesDocumentArrival && !!ctx.selectedPayMovement;
-  const amountFromFullSettle = !selectedFunction?.settlesAcceptanceOnMature && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
+  // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
+  // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) and
+  // settlesAcceptanceOnMature (below, and at amountCappedAtAcceptance further down) now read through
+  // the Strategy too; behavior unchanged.
+  const amountFromDocArrival = !!strategy?.checkerRelease.settlesDocumentArrival && !!ctx.selectedPayMovement;
+  const amountFromFullSettle = strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
   // Business instruction 2026-08-15 ("There is no need to select Full or Partial as long as the
   // amount is not greater than the SG Balance. The defaulted amount is the SG Balance and
   // mandatory.", refined same day: "Amount default to SG Available Balance") — A9 only, replacing
@@ -59,13 +68,13 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // is correctly netted out) and capped at it (props.max below) — never disabled. FULL_REDEEM vs
   // PARTIAL_REDEEM is derived at submit() time from whether the typed amount still equals that
   // Available Balance, not picked by the user (autoRedeemType — see its own doc comment).
-  const amountCappedAtSg = !!selectedFunction?.autoRedeemType && !!selectedContractSnapshot;
+  const amountCappedAtSg = strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && !!selectedContractSnapshot;
   // Business instruction 2026-08-16 ("B6改成B5選資料為有Acceptance Balance>0的EB交易") — same
   // default-to-Available/freely-editable-down-to-Partial/capped-at-it shape as amountCappedAtSg above,
   // just for B5's own Usance/CNF_MATURE branch (model.instrumentType === 'EPLC_ACCEPTANCE', B5's own
   // fixed registry type — see settlesAcceptanceOnMature's own doc comment for why this is always true
   // for a real B5 submission, not a conditional fallback resolution).
-  const amountCappedAtAcceptance = !!selectedFunction?.settlesAcceptanceOnMature && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
+  const amountCappedAtAcceptance = strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
   const amountLocked = amountFromDocArrival || amountFromFullSettle;
   const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
   // Business instruction 2026-08-16 ("A1/B1 = Input; every other function = Carry from A1/B1 +
@@ -102,7 +111,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
             ? "Amount (defaults to the Shipping Guarantee's Available Balance — reduce for a Partial Redeem, must not exceed it)"
             : amountCappedAtAcceptance
               ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
-              : selectedFunction?.documentArrivalWithSg
+              : strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')
                 ? // Business instruction 2026-08-15 ("Bill Amount = actual Document Arrival amount... SG
                   // Redemption Amount = system-calculated MIN(Bill Amount, SG Outstanding)") — reverses the
                   // prior full-match-only design (Bill Amount used to be locked to the SG's outstanding).

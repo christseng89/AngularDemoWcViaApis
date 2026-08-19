@@ -4,6 +4,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceMovement } from './balance-component-api.service';
 import { TransactionFunction } from './balance-component.model';
 import { describeApiError } from './api-error';
+import { deriveFunctionStrategy } from './function-strategy';
 
 /**
  * BAL-003 (Quality-report-balance.md — 4th same-day OOD/SOLID pass, "Checker Actions service"):
@@ -78,6 +79,12 @@ export class CheckerActionsService {
 
   release(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
     const checkerId = ctx.createdBy === 'maker1' ? 'checker1' : 'checker2';
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — every flag read in this method now
+    // goes through the Strategy instead of the raw flag, including settlesDocumentArrival (shared with
+    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring); behavior
+    // unchanged, including the A6-vs-B4 asymmetry captured in payableMovementRequiresRelease's own
+    // Strategy field (sourceAlreadyReleasedBeforePick).
+    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
 
     // Business instruction 2026-08-14 (revised): "When Checker approve it, then LC Balance will be approved
     // and Acceptance Balance will be approved too." — A6/B4. Release the picked source record FIRST
@@ -98,8 +105,8 @@ export class CheckerActionsService {
     // so B4 skips straight to that. A6's own source (a Usance Document Arrival, still acknowledgment-only
     // — see balance-component.model.ts's own deferSettlement doc comment) is UNCHANGED — it has no
     // payableMovementRequiresRelease flag, so it still takes the release-the-source-first path below.
-    if (ctx.selectedFunction?.settlesDocumentArrival) {
-      if (ctx.selectedFunction?.payableMovementRequiresRelease) {
+    if (strategy?.checkerRelease.settlesDocumentArrival) {
+      if (strategy?.checkerRelease.sourceAlreadyReleasedBeforePick) {
         return this.resolveSettlesDocumentArrivalIds(ctx).pipe(switchMap((ids) => this.releaseAcceptance(checkerId, ctx, ids)));
       }
       return this.resolveSettlesDocumentArrivalIds(ctx).pipe(
@@ -129,7 +136,9 @@ export class CheckerActionsService {
     // Maker/Checker 4-eyes separation) always had it null, silently skipping this branch entirely and
     // leaving the SG's own redemption PENDING forever. Now resolves it via businessEventId when the
     // in-memory id is missing — see resolveLinkedMovementId's own doc comment.
-    if (ctx.selectedFunction?.documentArrivalWithSg) {
+    // PR-3 of the F-01 Strategy refactoring (desiger-comments.md) — documentArrivalWithSg (A3S-exclusive)
+    // now reads through the Strategy instead of the raw flag; behavior unchanged.
+    if (ctx.selectedFunction && deriveFunctionStrategy(ctx.selectedFunction).compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       return this.resolveLinkedMovementId(ctx, ctx.arrivalSgRedeemMovementId, 'FULL_REDEEM', 'PARTIAL_REDEEM').pipe(
         switchMap((arrivalSgRedeemMovementId) => {
           if (!arrivalSgRedeemMovementId) {
@@ -151,7 +160,7 @@ export class CheckerActionsService {
     // cause and same fix shape as documentArrivalWithSg above — matchedReceivableMovementId resolved via
     // businessEventId when the in-memory id is missing, and the primary release uses
     // selectedCheckerMovement (always real server data) instead of submitResult (session-only).
-    if (ctx.selectedFunction?.settlesAcceptanceOnMature) {
+    if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE') {
       return this.resolveLinkedMovementId(ctx, ctx.matchedReceivableMovementId, 'REIMBURSE').pipe(
         switchMap((matchedReceivableMovementId) => {
           if (!matchedReceivableMovementId) {
@@ -201,13 +210,16 @@ export class CheckerActionsService {
     // nothing and doesn't silently mask a future caller reaching this method with it unset.
     if (!ctx.createdBy) return this.fail('Cannot delete this Maker submission — no Maker (createdBy) is known for it.');
     const cancelledBy = ctx.createdBy;
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 3 B-series-exclusive flag reads
+    // below now go through the Strategy instead of the raw flag; behavior unchanged.
+    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const cancelPrimary = (): Observable<CheckerActionOutcome> =>
       this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res, syncLookup: true })),
         catchError((err) => this.fail(describeApiError(err))),
       );
 
-    if (ctx.selectedFunction?.documentArrivalWithSg && ctx.arrivalSgRedeemMovementId) {
+    if (ctx.selectedFunction && deriveFunctionStrategy(ctx.selectedFunction).compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && ctx.arrivalSgRedeemMovementId) {
       return this.api.cancel(ctx.arrivalSgRedeemMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() => cancelPrimary()),
         catchError((err) => this.fail(`Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${describeApiError(err)}`)),
@@ -216,7 +228,7 @@ export class CheckerActionsService {
 
     // B3 (createsIssuingBankReceivableOnHonour) — cancel the linked Due from Issuing Bank asset FIRST,
     // so an EC on the Confirmation Honour never leaves it orphaned.
-    if (ctx.selectedFunction?.createsIssuingBankReceivableOnHonour && ctx.dueFromIssuingBankMovementId) {
+    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && ctx.dueFromIssuingBankMovementId) {
       return this.api.cancel(ctx.dueFromIssuingBankMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() => cancelPrimary()),
         catchError((err) => this.fail(`Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${describeApiError(err)}`)),
@@ -226,7 +238,7 @@ export class CheckerActionsService {
     // B4's Usance/ACCEPT branch (createsAcceptanceReimbReceivableOnCreate) — reverse creation order:
     // cancel the Reimbursement Receivable asset FIRST, then the Acceptance liability, THEN the primary
     // Confirmation ACCEPT.
-    if (ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && ctx.acceptanceReimbReceivableMovementId && ctx.acceptanceMovementId) {
+    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && ctx.acceptanceReimbReceivableMovementId && ctx.acceptanceMovementId) {
       return this.api.cancel(ctx.acceptanceReimbReceivableMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() =>
           this.api.cancel(ctx.acceptanceMovementId!, cancelledBy, 'MAKER_EC').pipe(
@@ -244,7 +256,7 @@ export class CheckerActionsService {
 
     // B5's Usance/CNF_MATURE branch (settlesAcceptanceOnMature) — cancel the matching Reimbursement
     // Receivable's REIMBURSE FIRST, then the primary Acceptance FULL_SETTLE/PARTIAL_SETTLE.
-    if (ctx.selectedFunction?.settlesAcceptanceOnMature && ctx.matchedReceivableMovementId) {
+    if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && ctx.matchedReceivableMovementId) {
       return this.api.cancel(ctx.matchedReceivableMovementId, cancelledBy, 'MAKER_EC').pipe(
         switchMap(() => cancelPrimary()),
         catchError((err) => this.fail(`Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${describeApiError(err)}`)),
@@ -317,11 +329,14 @@ export class CheckerActionsService {
         acceptanceMovementId: ctx.acceptanceMovementId,
         acceptanceReimbReceivableMovementId: ctx.acceptanceReimbReceivableMovementId,
       });
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 2 flag reads below now go
+    // through the Strategy instead of the raw flag; behavior unchanged.
+    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const isHonour = ctx.selectedCheckerMovement?.movementType === 'HONOUR';
     const isAccept = ctx.selectedCheckerMovement?.movementType === 'ACCEPT';
     const needsDownstreamLookup =
-      (isHonour && !!ctx.selectedFunction?.createsIssuingBankReceivableOnHonour && !ctx.dueFromIssuingBankMovementId) ||
-      (isAccept && !!ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && (!ctx.acceptanceMovementId || !ctx.acceptanceReimbReceivableMovementId));
+      (isHonour && !!strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && !ctx.dueFromIssuingBankMovementId) ||
+      (isAccept && !!strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && (!ctx.acceptanceMovementId || !ctx.acceptanceReimbReceivableMovementId));
     if (!needsDownstreamLookup) return asIs();
     const businessEventId = ctx.selectedCheckerMovement?.businessEventId;
     if (!businessEventId) return asIs();
@@ -355,13 +370,16 @@ export class CheckerActionsService {
     ctx: CheckerActionContext,
     ids: { dueFromIssuingBankMovementId: string | null; acceptanceMovementId: string | null; acceptanceReimbReceivableMovementId: string | null },
   ): Observable<CheckerActionOutcome> {
+    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 2 flag reads below now go
+    // through the Strategy instead of the raw flag; behavior unchanged.
+    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.release(primaryMovementId!, checkerId).pipe(
       switchMap((res) => {
-        if (ctx.selectedFunction?.createsIssuingBankReceivableOnHonour && ids.dueFromIssuingBankMovementId) {
+        if (strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && ids.dueFromIssuingBankMovementId) {
           return this.releaseDueFromIssuingBank(checkerId, res, ids.dueFromIssuingBankMovementId);
         }
-        if (ctx.selectedFunction?.createsAcceptanceReimbReceivableOnCreate && ids.acceptanceMovementId) {
+        if (strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && ids.acceptanceMovementId) {
           return this.releaseAcceptanceLiability(checkerId, res, ids.acceptanceMovementId, ids.acceptanceReimbReceivableMovementId);
         }
         return of<CheckerActionOutcome>({ kind: 'released', result: res });

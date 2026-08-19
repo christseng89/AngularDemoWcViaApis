@@ -1,5 +1,6 @@
 import { BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { TransactionFunction, amountExceedsCurrencyDecimals, decimalPlacesForCurrency } from './balance-component.model';
+import { deriveFunctionStrategy } from './function-strategy';
 import {
   BuilderModel,
   NaturalKeyFields,
@@ -65,6 +66,10 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   const { model, naturalKey, selectedFunction } = ctx;
   const patch: Partial<BuilderModel> = {};
   const fail = (error: string): SubmitValidation => ({ error, patch });
+  // PR-3 of the F-01 Strategy refactoring (desiger-comments.md) — the two A-series-exclusive flag reads
+  // below (documentArrivalWithSg/autoRedeemType) now go through the Strategy instead of the raw flag;
+  // settlesDocumentArrival (shared with B-series) deliberately stays on the old flag path until PR-4.
+  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
 
   if (!model.instrumentType || !model.movementType || !model.amount || !model.currency || !model.createdBy) {
     return fail('Fill in amount, currency, createdBy.');
@@ -108,12 +113,15 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // Business instruction 2026-08-14 ("A6 => Approved LC Balance and Create Acceptance Balance"),
   // generalized 2026-08-15 for B4 ("B4 should index records from B3") — A6/B4 must convert a
   // SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
-  if (selectedFunction?.settlesDocumentArrival && !ctx.selectedPayMovement) {
+  // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
+  // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) now reads through
+  // the Strategy too; behavior unchanged.
+  if (strategy?.checkerRelease.settlesDocumentArrival && !ctx.selectedPayMovement) {
     return fail(`Pick the still-PENDING ${selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`);
   }
   // A3S must be tied to a SPECIFIC Shipping Guarantee — same reasoning as A6 above, just against an
   // outstanding SG record instead of an existing PENDING Document Arrival.
-  if (selectedFunction?.documentArrivalWithSg && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
+  if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
     return fail('Pick the Shipping Guarantee this Document Arrival is against first.');
   }
   // Business instruction 2026-08-15 ("no need to select Full or Partial as long as the amount is not
@@ -125,7 +133,7 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // otherwise this could offer/accept an amount the server's own sufficiency check would reject.
   // movementType is DERIVED here — never picked by the user — FULL_REDEEM when the typed amount still
   // equals the SG's current Available Balance, PARTIAL_REDEEM when it's been reduced below it.
-  if (selectedFunction?.autoRedeemType) {
+  if (strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
     if (!ctx.selectedContractSnapshot) {
       return fail('Search for the Shipping Guarantee to redeem first.');
     }
@@ -144,7 +152,7 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // row): "−CONFIRMED_ACCEPTANCE_DPU_OUTSTANDING | −BENEFICIARY_ACCOUNT; +NOSTRO / −ACCEPTANCE_REIMB_
   // RECEIVABLE_ISSUING_BANK" — ONE event clearing both the Acceptance liability and its matching
   // Reimbursement Receivable together, not two independent ones the way CNF_REIMB (Sight/Nego'd) is.
-  if (selectedFunction?.settlesAcceptanceOnMature && model.instrumentType === 'EPLC_ACCEPTANCE') {
+  if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE') {
     if (!ctx.selectedContractSnapshot) {
       return fail('Search for the Acceptance to settle first.');
     }
@@ -167,6 +175,9 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
  */
 export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
   const { model, selectedFunction } = ctx;
+  // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival below now
+  // reads through the Strategy instead of the raw flag; behavior unchanged.
+  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
   const request: CreateMovementRequest = {
     instrumentType: model.instrumentType!,
     movementType: model.movementType!,
@@ -205,7 +216,7 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
   // independent Checker session can later resolve and release it without needing this Maker's own
   // in-memory selectedPayMovement — see CreateMovementRequest.referencedTransactionId's own doc
   // comment for the full rule.
-  if (selectedFunction?.settlesDocumentArrival && ctx.selectedPayMovement) {
+  if (strategy?.checkerRelease.settlesDocumentArrival && ctx.selectedPayMovement) {
     request.referencedTransactionId = ctx.selectedPayMovement.movementId;
   }
   return { request, error: null };

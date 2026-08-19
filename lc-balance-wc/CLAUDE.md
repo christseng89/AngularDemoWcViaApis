@@ -6348,3 +6348,256 @@ Balance still stack cleanly, full-width, top-to-bottom.
 
 Files changed (uncommitted, not requested): `transaction-builder.component.scss`,
 `transaction-builder.component.html`, this file.
+
+## PR-1 of the F-01 Strategy refactoring — characterization tests only, zero production code changed (2026-08-19, per the user's own Senior Engineer Refactoring & Regression-Safety Requirements: "Before Refactoring = Known Baseline... every搬移一項 Business Rule 都必須有 Characterization / Regression Test 保護")
+
+Establishes the "Known Baseline" the Requirements document itself mandates before any Phase-1 (F-01)
+production code change, and lands the first, smallest, safest increment of that refactor: a dedicated
+characterization-test file locking in the CURRENT behavior of the 5 flags the OOD review
+(`desiger-comments.md`, finding F-01) named as actually implicated in real bugs this session already had
+to chase down by hand — before any of that behavior is migrated into a real per-function Strategy
+structure in a later, separate PR.
+
+**Baseline established first** (`lc-balance-wc/REGRESSION-BASELINE.md`, new file, tied to commit
+`450e6f8`): Angular app 821/821 tests (99.37/96.28/99.35/99.48% coverage), microservice 322/322
+(99.25/97.16/100/99.49%), `backend/` 34/34 (97.32/95.34/96.42/98.03%) — all three clear their own 95%
+floor. All 14 Business Case Registry entries executed live end to end (spaced to respect the
+microservice's own 120 req/min rate limiter, ruling out the known transient `ORCHESTRATION_ERROR`
+artifact explicitly rather than assuming it away) — 14/14 pass, the one intentionally-designed negative
+case (`import-case-5`, `expectError: true`) fails exactly as designed and only as designed. Full
+before/after regression-report table and reproduction commands recorded in that file.
+
+**New file**: `src/app/transaction-builder/transaction-function-flags.characterization.spec.ts` — 26
+tests, four sections:
+1. **Registry inventory** (11 tests) — locks in the exact, current flag-to-function-code mapping for
+   all 11 boolean flags on `TransactionFunction` (`payExistingUtilize`→A4 only,
+   `settlesDocumentArrival`→A6/B4, `payableMovementRequiresRelease`→B4 only,
+   `settlesAcceptanceOnMature`/`settleableBalanceIndex`→B5 only, `deferSettlement`→A3/A3S only — B3 lost
+   this flag entirely in the 2026-08-18 redesign, confirmed still true — `documentArrivalWithSg`→A3S
+   only, `createsIssuingBankReceivableOnHonour`/`createsAcceptanceReimbReceivableOnCreate`→B4 only,
+   `autoRedeemType`→A9 only, `movementTypeFromContractTenor`→B4 only), plus one test confirming B4 alone
+   carries 5 of the 11 flags simultaneously — the exact shape a per-function Strategy object for B4
+   would need to reproduce as one coherent unit, not five independently-read booleans.
+2. **`submit-rules.ts` characterization** (7 tests) — `autoRedeemType`/`settlesAcceptanceOnMature`'s
+   identical amount-vs-Available-Balance FULL/PARTIAL derivation (A9 vs. B5, same shape, different
+   movementType target); `documentArrivalWithSg`'s own pre-Submit guard; `settlesDocumentArrival`'s own
+   guard message (using the function's own `pendingItemLabel`) and its `referencedTransactionId`
+   stamping, proven present for A6 and absent for a function without the flag in the same test.
+3. **`maker-submit.service.ts` dispatch-table characterization** (4 tests) — proves the ACTUAL current
+   `if`-chain order live through the real `MakerSubmitService`, not just read from source: A3S's SG-first
+   compound path; that `createsIssuingBankReceivableOnHonour` requires `model.movementType === 'HONOUR'`
+   specifically (an ACCEPT on the same B4 function falls through to the NEXT flag check instead); B5's
+   settle-then-reimburse 2-call compound; the no-flag-matches fallback to `submitPlain()` (1 call).
+4. **`checker-actions.service.ts` characterization** (2 tests) — the one genuinely asymmetric behavior
+   found while writing this file: A6 (`settlesDocumentArrival` alone) releases its own SOURCE record
+   first, but B4 (`settlesDocumentArrival` **and** `payableMovementRequiresRelease` together) does NOT —
+   B3's own record is already independently RELEASED by the time B4 can even pick it (per the 2026-08-18
+   "B3 redesigned" entry above), so attempting to release it again would 409. This is exactly the kind of
+   cross-flag interaction a naive per-flag Strategy migration could easily get wrong if it assumed
+   `settlesDocumentArrival` alone always means "release the source first" — now pinned down as an explicit
+   test.
+
+**`payExistingUtilize` (A4) deliberately NOT characterized in this file** — its own `checkerAct()`/
+`submitA4()` gating logic lives directly on `TransactionBuilderComponent` with no extracted service to
+call in isolation the way the other 4 flags' owning files allow; constructing the full ~2,300-line
+component here would be disproportionate for a "pure characterization, zero risk" PR. Flagged explicitly
+in the new file's own trailing doc comment as a known gap for a PR-1b follow-up if Phase 2 needs it — the
+existing `transaction-builder.component.actions.spec.ts` describe blocks for `checkerAct()`/`submitA4()`
+already exercise this flag's real behavior and serve as its safety net for now.
+
+**Verification**: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development`
+clean, `npm run lint` 0 errors (225 warnings, up from 221 — 4 new test-fixture `any` casts from the
+`crypto.randomUUID()` jsdom polyfill this file needed, same established pattern
+`maker-submit.service.spec.ts` already carries for the identical reason). Full Angular suite **847/847
+passing** (26 new), coverage **99.37/96.57/99.35/99.48%** — all four metrics clear the 95% floor, branches
+improved slightly (96.28% → 96.57%) since the new tests exercise `maker-submit.service.ts`'s own compound
+paths more than before. `git diff --stat -- lc-balance-wc/src` returns **empty** — confirmed via direct
+command output, not asserted from memory — proving zero existing production `.ts`/`.html`/`.scss` file
+was touched; the only new file under `src/` is the characterization spec itself. `backend/`/
+`microservices/balance-component/` untouched (Angular-only PR).
+
+**No current-behavior inconsistencies found that needed recording** (the Requirements document's own
+"if you find code/design-doc/test-case disagree, don't silently pick one — record it" rule) — every
+behavior characterized matched its own already-documented business rule exactly; the one genuinely
+non-obvious finding (A6 vs. B4's asymmetric source-release behavior under the shared
+`settlesDocumentArrival` flag) is already fully explained by the 2026-08-18 "B3 redesigned" decision-log
+entry above, not a new discovery.
+
+Nothing else changed this pass. PR-2 (introducing a real Strategy interface without changing behavior)
+is the next planned increment, per the Requirements document's own "one refactoring concern per change"
+rule — not started in this pass.
+
+## PR-2 of the F-01 Strategy refactoring — the Strategy interface itself, still zero production wiring (2026-08-19, same Senior Engineer Requirements)
+
+New `function-strategy.ts`/`function-strategy.spec.ts` — a `FunctionStrategy` interface (four small,
+independently-testable sub-interfaces: `MovementDerivationStrategy`, `CompoundSubmissionStrategy`,
+`CheckerReleaseStrategy`, `SelectionFlowStrategy`) plus `deriveFunctionStrategy()`/`FUNCTION_STRATEGIES`,
+one entry per registered function code (A1-A9, B1-B5). **Not imported by, and does not change, any of
+the 5 existing consumers** (`transaction-builder.component.ts`/`checker-actions.service.ts`/
+`maker-submit.service.ts`/`submit-rules.ts`/`builder-fields.ts`) — confirmed by grep, not assumed.
+
+**Grouping** — re-derived by reading the 5 consumer files fresh rather than copying the OOD review's own
+starting hypothesis verbatim; landed close to it but with two corrections found along the way:
+- `hasParent` was explicitly EXCLUDED from the Strategy — it turned out, on rereading, to already be a
+  clean DERIVED function of `model.instrumentType` in `function-policy.ts`, not a stored
+  `TransactionFunction` flag at all, so it was never actually part of F-01's own "flags scattered across
+  5 files" problem.
+- `settlesAcceptanceOnMature` (B5) genuinely spans TWO of the four groups (it drives both the
+  Amount-vs-Available SETTLE derivation AND which `maker-submit.service.ts` method is used) — kept as one
+  flag on the registry but represented in both `movementDerivation` and `compoundSubmission` on the
+  Strategy object, since Interface Segregation groups METHODS a consumer needs together, not source
+  flags one-to-one.
+- `possibleShapes` (not a single `submissionShape`) for `CompoundSubmissionStrategy` — B4 is the one
+  function where `createsIssuingBankReceivableOnHonour`/`createsAcceptanceReimbReceivableOnCreate` are
+  BOTH unconditionally `true` on the same registry entry, with the real choice made at submit time by
+  `model.movementType` (`'HONOUR'` vs `'ACCEPT'`). A single fixed value would have misrepresented B4;
+  a list correctly captures "this function can produce either, chosen at runtime."
+
+**Deliberately built as a pure, derived PROJECTION over the existing registry** (`deriveFunctionStrategy(fn)`
+reads `fn`'s own current flags), not a second, independently-typed data source — avoids introducing, within
+this one app, the exact "kept in sync by hand" drift risk the OOD review's own finding F-06 already flags
+for `BalanceContract`/`BalanceMovement` across the Angular/microservice boundary. Whether PR-3/PR-4 later
+move the SOURCE of this data onto each registry entry directly (making the boolean flags themselves
+redundant) is a decision for those PRs, not this one.
+
+**Equivalence proof**: `function-strategy.spec.ts` — every assertion cross-references a fact PR-1's
+`transaction-function-flags.characterization.spec.ts` already locked in (e.g. `codesWith('autoRedeemType')
+=== ['A9']` from PR-1 → `FUNCTION_STRATEGIES['A9'].movementDerivation.amountVsAvailableDerivation ===
+'REDEEM'` here), including the one genuinely subtle fact PR-1 surfaced — A6 vs. B4's asymmetric
+`sourceAlreadyReleasedBeforePick` behavior under the shared `settlesDocumentArrival` flag — reproduced
+here as its own dedicated assertion, not glossed over.
+
+**Verification**: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development`
+clean (confirms `function-strategy.ts` is correctly excluded from the production bundle entirely — nothing
+imports it outside test files, so it never reaches the compiled `transaction-builder-component` chunk;
+chunk size unchanged from PR-1's own build), `npm run lint` 0 errors (225 warnings, unchanged from PR-1).
+Full Angular suite **862/862 passing** (15 new), coverage **99.37/96.6/99.35/99.48%** — all four metrics
+clear the 95% floor, branches improved again (96.57% → 96.6%); `function-strategy.ts` itself at
+**100/100/100/100**. `git diff --stat -- lc-balance-wc/src/app` returns **empty** for tracked files —
+confirmed via direct command output — the only untracked additions under `src/app` are the three
+characterization/strategy files from PR-1 and PR-2 combined. `backend/`/`microservices/balance-component/`
+untouched.
+
+**No current-behavior inconsistencies found needing separate recording** — every Strategy answer matches
+what PR-1 already characterized exactly; no new discrepancy surfaced while writing the projection.
+
+Nothing else changed this pass. PR-3 (migrate A-series consumers to call `FUNCTION_STRATEGIES` instead of
+reading flags directly, still with zero behavior change) is the next planned increment — not started.
+
+## PR-3 of the F-01 Strategy refactoring — A-series consumers migrated to the Strategy, zero behavior change (2026-08-19, Senior Engineer Refactoring & Regression-Safety Requirements)
+
+First PR in this migration that actually touches production code. Scope: **A-series (A1–A9) only** —
+B-series (B1–B5) untouched, per the initiative's own "one concern per change" rule.
+
+**Flags migrated at their real consumer call sites** (all confirmed A-series-exclusive by re-reading the
+current registry fresh, not assumed from the OOD review's original count): `payExistingUtilize` (A4),
+`documentArrivalWithSg` (A3S), `autoRedeemType` (A9), `deferSettlement` (A3/A3S) — 24 call sites total
+across `transaction-builder.component.ts` (16), `submit-rules.ts` (2), `checker-actions.service.ts` (2),
+`maker-submit.service.ts` (1), `builder-fields.ts` (2), each rewired from the raw `TransactionFunction`
+flag to the equivalent `FunctionStrategy` field (via a new private `selectedFunctionStrategy` getter on
+the component, or a local `deriveFunctionStrategy(...)` call in the pure-function/service files). A new
+`documentArrivalWithSg` bug-free equivalence: `strategy.compoundSubmission.possibleShapes.includes(...)`
+reproduces the old plain flag check exactly, since only that one flag ever pushes that shape.
+
+**`settlesDocumentArrival` (shared A6/B4) deliberately deferred to PR-4**, exactly as planned — every
+call site touching it (including the one mixed `payExistingUtilize || settlesDocumentArrival` OR-condition
+in `transaction-builder.component.ts`, where only the `payExistingUtilize` operand was migrated) still
+reads the raw flag today. This file set now has old-style flag reads (B-series, plus the deferred shared
+branch) and new-style Strategy calls (the 4 migrated A-exclusive flags) genuinely coexisting — the
+intended shape of a mid-migration state, not an inconsistency.
+
+**Stale doc-comment found, not silently fixed, per the initiative's own "record don't pick" rule**: the
+comment above `checkerAct()`'s `deferSettlement` branch still says "deferSettlementMovementType lets B3's
+Usance/ACCEPT branch reuse this same acknowledgment-only path" — but B3's own deferSettlement-era fields
+were removed from its registry entry entirely on 2026-08-18 (the "B3 redesigned to genuinely RELEASE"
+change, already in this file's own decision log). The CODE is correct (deferSettlement is genuinely
+A-exclusive today, confirmed by direct registry read); only this one comment is stale documentation from
+before that redesign. Left as-is — editing prose is out of scope for a mechanical, behavior-preserving
+call-site migration — flagged here for a future doc-cleanup pass instead of silently correcting it
+mid-refactor.
+
+**Regression report**:
+
+| Check | Before (PR-2) | After (PR-3) | Result |
+|---|---|---|---|
+| Build | PASS | PASS | No Regression |
+| Unit Tests | 862/862 | **862/862 — zero test changes needed** | No Regression |
+| Coverage | 99.37/96.6/99.35/99.48% | 99.38/**96.63**/99.35/99.49% | Improved |
+| Lint | 225 warnings, 0 errors | 225 warnings, 0 errors | No Regression |
+| Production code (`src/app`) | — | `git diff --stat` shows exactly the 5 expected consumer files, 55(+)/20(-) | Expected, scoped |
+| Import A-series live scenarios | Baseline (REGRESSION-BASELINE.md) | **7/7 cases pass**, import-case-5's own single intentional 409 fires exactly as designed and only as designed | No Regression |
+| Balance/Event Timeline results | Documented baseline figures | **Byte-identical** — import-case-6 spot-checked directly: LC 46,000 / SG1 0 / SG2 8,000, matching the baseline exactly; this case specifically exercises BOTH migrated flags (A3S `documentArrivalWithSg` + A4 `payExistingUtilize`) | No Regression |
+
+Zero existing test files needed changes — the strongest evidence available that this PR is genuinely
+behavior-preserving, since the pre-existing 862-test suite was written against the old flag-reading
+implementation and passes completely unmodified against the new Strategy-reading one.
+
+**Unrelated data-hygiene finding, discovered and fixed during live verification, NOT a business-logic
+regression**: post-verification cleanup found 2 stray contract rows (`S12`/`IPLC_LC` and `S12`/`SHGT`,
+created earlier today, ~02:52–02:54 UTC) that didn't match the `IMP-C%`/`EXP-C%` scoped-cleanup pattern
+every prior pass has used — left behind by an earlier task this session that manually typed an LC Number
+during live UI verification rather than using the auto-generated pattern. Not caused by this PR (its own
+test runs were all correctly `IMP-C%`-prefixed and cleaned normally) and not a code defect — pure
+incidental test-data hygiene debt, found only because this PR's own before/after row-count check is more
+rigorous than earlier passes'. Removed; reference contract rows confirmed back at the documented baseline
+of **41**.
+
+PR-4 (migrate B-series consumers, including the deferred shared `settlesDocumentArrival` branch — the
+first PR that requires BOTH sides moving together) is the next planned increment, not started.
+
+## PR-4 of the F-01 Strategy refactoring — B-series consumers migrated, shared `settlesDocumentArrival` branch retired (2026-08-19, Senior Engineer Refactoring & Regression-Safety Requirements)
+
+Final consumer-migration PR. Every remaining flag-driven call site across the 5 consumer files
+(`transaction-builder.component.ts`, `checker-actions.service.ts`, `maker-submit.service.ts`,
+`submit-rules.ts`, `builder-fields.ts`) now reads through `function-strategy.ts`'s
+`FUNCTION_STRATEGIES`/`deriveFunctionStrategy()` instead of a raw `TransactionFunction` boolean flag —
+confirmed by grep, not assumed (see verification below).
+
+**Flags migrated this pass**: the 6 believed B-series-exclusive flags (`payableMovementRequiresRelease`,
+`settlesAcceptanceOnMature`, `settleableBalanceIndex`, `createsIssuingBankReceivableOnHonour`,
+`createsAcceptanceReimbReceivableOnCreate`, `movementTypeFromContractTenor`) — all confirmed genuinely
+B-exclusive on fresh re-reading, matching PR-3's own hypothesis exactly, no surprises. `settlesAcceptanceOnMature`
+had no dedicated `CheckerReleaseStrategy` field of its own in PR-2's design — every one of its call sites
+(checker-release routing, cancel-ordering, Amount-field derivation) was already correctly served by
+`MovementDerivationStrategy.amountVsAvailableDerivation === 'SETTLE'` (the same field PR-3 already used
+for `autoRedeemType`'s own `'REDEEM'` case), since B5 is the only function with `settlesAcceptanceOnMature`
+set and never also sets `autoRedeemType` — no PR-2 correction needed, the interface already covered this
+case without a name suggesting it.
+
+**The shared `settlesDocumentArrival` branch (A6 + B4), deliberately left on the old path by PR-3, is now
+retired.** Every call site across all 5 files — `release()`'s own compound-release routing and its
+`payableMovementRequiresRelease`-gated inner branch (A6 vs. B4 asymmetry), `deleteMakerPending()`'s
+cancel-ordering, `resolveSettlesDocumentArrivalIds()`'s downstream-lookup gate, `releaseAcceptance()`'s
+own leg dispatch, `validateSubmit()`/`buildSubmitRequest()`'s own guard/`referencedTransactionId` stamp,
+`buildFields()`'s own Amount-carry-from-Document-Arrival rule, `onSelectContract()`/`onSelectPayMovement()`/
+`onSelectParent()`'s own Step-2 loading, and `isCheckerCompoundOwnSubmission`'s own routing — now reads
+`strategy.checkerRelease.settlesDocumentArrival` uniformly. The A6-vs-B4 asymmetry PR-2 already proved
+(A6's own source is released as the compound's first leg; B4's own source, B3's Present Docs record, is
+already independently Released before B4 can even pick it, so it's skipped) lives entirely inside
+`sourceAlreadyReleasedBeforePick` (from the already-migrated `payableMovementRequiresRelease`) — the
+`settlesDocumentArrival` migration itself is symmetric for both functions, exactly as it should be, since
+the asymmetry was never in THIS flag to begin with.
+
+**One real narrowing bug caught by `tsc`, not by a human**: `onSelectPayMovement()`'s own
+`this.selectedFunction.secondaryRefLabel` (no `?.`) relied on TypeScript narrowing `selectedFunction` as
+non-null from the OLD guard `this.selectedFunction?.settlesDocumentArrival && ...` — a control-flow
+inference TypeScript can make for a property read on the SAME object the optional chain just tested, but
+NOT across two different properties (`selectedFunction` vs. the derived `selectedFunctionStrategy`
+getter), even though the getter is logically derived from `selectedFunction`. `tsc --noEmit` caught this
+immediately as `TS2531: Object is possibly 'null'` — fixed by adding the `?.` (a pure type-safety fix, zero
+runtime behavior change: the code path is only ever reached when `selectedFunction` is genuinely non-null
+at runtime either way). Flagged explicitly since this is exactly the class of subtle regression a
+type-narrowing-blind refactor could otherwise ship silently in a language with a weaker compiler.
+
+**Verification**:
+- `tsc --noEmit`, `ng build --configuration development` — both clean (0 errors) after the one narrowing fix above.
+- `npm run lint` — 0 errors, 225 warnings (unchanged from PR-3's own baseline).
+- `npm run test:coverage` — **862/862 passing, zero test changes needed** (same "behavior-preserving refactor needs no test changes" evidence PR-3 already established), coverage 99.38/96.38/99.35/99.49% (all four clear the 95% floor; a few individual files' own branch coverage — `checker-actions.service.ts` 88.17%, `maker-submit.service.ts` 80.35% — dipped locally since this PR didn't add new characterization coverage of its own, but the GLOBAL threshold this project's own `jest.config.js` actually gates on held comfortably).
+- `git diff --stat -- src/app` (cumulative with PR-3, both still uncommitted): the same 5 consumer files, `128 insertions(+), 52 deletions(-)` — no other file touched.
+- `grep` confirmed **zero raw flag reads remain** in the 5 consumer files for any of the 11 `TransactionFunction` flags — only `function-strategy.ts` itself and `balance-component.model.ts` (the registry/derivation layer, never a "consumer" in F-01's own sense) still read them directly. This makes a future cleanup PR (removing the now-fully-redundant boolean flags from `TransactionFunction`, with `function-strategy.ts`'s own registry becoming the sole source of truth) realistic — explicitly NOT attempted in this PR, per the user's own "one concern per change" rule.
+- **Live end-to-end, all 14 Business Case Registry entries**, spaced to respect the 120 req/min rate limiter (no transient failures this run): 14/14 pass, `import-case-5`'s own intentional negative case fails with `INSUFFICIENT_AVAILABLE_BALANCE` exactly as designed. The two cases exercising the just-retired shared branch confirmed **byte-identical to the documented baseline**: Import Case #6 (A6's own compound release) — LC Confirmed 100,000→46,000/Available 46,000 throughout, SG1 0 (fully redeemed), SG2 8,000 still outstanding; Export Case #6 (B4's own compound release) — CONF LIAB 90,000, Due From Issuing Bank 10,000. Both match `CLAUDE.md`'s own already-documented figures for these cases exactly.
+- DB cleanup: 37 test contract rows (`IMP-C%`/`EXP-C%`) removed after extracting the figures above; reference contract rows confirmed still at the documented **41**.
+
+Not committed (not requested). With all 4 consumer-migration PRs complete, F-01's own scattered-flag problem
+is closed on the consumer side — remaining, explicitly out-of-scope future work: removing the now-redundant
+boolean flags from the registry itself (a "PR-5", not started, not requested).
