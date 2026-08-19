@@ -7422,3 +7422,107 @@ Confirmed Balance — i.e. that the negated amount genuinely reached the microse
 UI's own guard logic looks right in isolation.
 
 Not committed (not requested).
+
+## desiger-comments.md F-04 — all 8 constructor dependencies unified onto one construction style (2026-08-19, user-directed — "Refer to the design-comments.md" → picked F-04 from the review's own remaining-findings list, then, after a deeper investigation surfaced the real technical constraint blocking a naive fix, explicitly chose the higher-risk "unify all 6" option over two narrower alternatives)
+
+**SUPERSEDED same day — see "F-04 fully reverted..." entry below.** This pass shipped a hard,
+page-breaking production regression (`NullInjectorError: No provider for LookUpPanelService!` on every
+Transaction Builder page load) that its own static verification (typecheck/build/unit tests) could not
+catch, and was only caught once the user tested it live in the browser. Left in place below, unedited,
+as an honest record of what was attempted and why it was wrong — see the entry below for the actual root
+cause and the fix (a full revert).
+
+**Investigated before touching anything, per this session's own established "verify the finding against current source, don't just implement what it says" convention.** F-04's own text ("api is real Angular DI; checkerActions/makerSubmit use a default-parameter fallback... five other services are manually new'd in the constructor body with no DI at all") turned out to be directionally correct but to understate a real, already-documented technical constraint: `catalogPicker`/`parentPicker`/`ibIndexPicker` each depend on their own page-size field (`this.catalogPageSize` etc.) at construction time — but constructor PARAMETER DEFAULTS are evaluated before class FIELD INITIALIZERS run, so naively moving these three into parameter defaults (the review's own literal suggested fix) would have silently read `undefined` instead of `100`. This exact reasoning was already recorded on the PRE-fix constructor's own doc comment as the reason those three were kept in the body — not an oversight the review caught, a genuine constraint the codebase had already discovered and correctly worked around, just never documented as a *reason the 3-way split exists* rather than as *3 arbitrary styles*.
+
+Also found, and confirmed via direct source inspection rather than assumed: the 3 existing styles map onto exactly **2 real, different categories**, not one arbitrary inconsistency — `CheckerActionsService`/`MakerSubmitService` are genuinely stateless `@Injectable({providedIn: 'root'})` singletons (Angular's own DI container resolves them for real in production; the constructor default is purely a test-compatibility escape hatch on top of already-real DI); `LookUpPanelService`/`InquireEventsService`/`DocumentArrivalHintsService`/`CatalogPickerService` are deliberately NOT `@Injectable` — each is genuinely per-component-instance mutable state (a picker's own `contracts`/`page`, a lookup's own `lookupResult`), and marking them `providedIn: 'root'` would make Angular hand out ONE SHARED instance app-wide, a real bug source (even if not currently manifesting, since only one Transaction Builder page exists today), not a fix. Presented this finding back to the user via `AskUserQuestion` — three options: (a) only convert the 3 services with no page-size dependency (lookUp/inquireEvents/documentArrivalHints) to parameter defaults, leaving the other 3 in the body with a strengthened doc comment explaining why; (b) make no code change, just document the 2-category finding in this file; (c) unify all 6 by promoting the 3 page-size VALUES to `static readonly` class members (available before any instance exists, closing the ordering gap), accepting the larger diff. User picked (c).
+
+**Fix**: `catalogPageSize`/`parentPageSize`/`ibIndexPageSize` — each split into a `private static readonly CATALOG_PAGE_SIZE`/`PARENT_PAGE_SIZE`/`IB_INDEX_PAGE_SIZE = 100` (a class-level member, available from the moment the class itself is defined — no per-instance ordering issue) plus a same-named public INSTANCE getter delegating to it (`get catalogPageSize(): number { return TransactionBuilderComponent.CATALOG_PAGE_SIZE; }`) — every existing `comp.catalogPageSize`-style test assertion keeps reading the identical public surface unchanged; only the underlying storage moved from an instance field to a static one. All 6 remaining constructor-body-`new`'d services (`lookUp`, `inquireEvents`, `catalogPicker`, `parentPicker`, `ibIndexPicker`, `documentArrivalHints`) are now genuine constructor PARAMETER properties with default values — the exact same shape `checkerActions`/`makerSubmit` already established (`readonly xxx: XxxService = new XxxService(api)`), so `new TransactionBuilderComponent(mockApi)` (the single-arg form 70+ existing tests across 4 spec files already use) keeps working completely unmodified, while every one of the 6 is now independently substitutable at construction time without reaching into `comp.xxx.yyy` afterward. `lookUp`'s own `onBeforeLookup` callback (closing over `this` to null out the Account Entries dialog fields) was confirmed NOT to hit the same field-initializer-ordering landmine — it's a closure invoked lazily, long after construction finishes, by which point every field initializer has already run regardless of where the closure itself was created; only VALUES read *immediately* at construction time (the three page sizes) were ever at risk. The now-empty class-level field declarations for the 6 services were removed (TypeScript's parameter-property syntax auto-generates the same public `readonly` field a manual declaration would have duplicated). Deliberately did **NOT** mark `LookUpPanelService`/`InquireEventsService`/`DocumentArrivalHintsService`/`CatalogPickerService` `@Injectable({providedIn: 'root'})` to "fully match" `checkerActions`'s own shape — that would have traded a real inconsistency finding for a real new bug (shared per-instance state across every future component instance), per the 2-category finding above; this pass's own change is syntactic/testability consistency only, and Angular still never constructs these 6 via its own injector in production, same as before.
+
+**Tests**: one new assertion in the existing `initializes default state` test (`transaction-builder.component.spec.ts`) — `comp.ibIndexPageSize` had no prior direct test read (unlike `catalogPageSize`/`parentPageSize`), and converting it from a plain field to a real getter turned it into its own trackable code path that the coverage gate correctly flagged as newly uncovered; closed with a direct assertion, matching this file's own "the new gate correctly caught a real gap, not a false positive" convention. One genuinely new test, `desiger-comments.md F-04 ... every per-instance service is a genuine constructor parameter, substitutable without touching comp.xxx.yyy after construction` — constructs `TransactionBuilderComponent` with 8 explicit positional arguments (`undefined` for every default except a hand-built `DocumentArrivalHintsService` instance carrying a marker value), and asserts the component picked up that EXACT instance — the concrete, directly-provable benefit F-04 itself named ("none of the five body-constructed services can be substituted in a test without reaching into `comp.xxx.yyy` directly"), not just "nothing broke."
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` (strict templates) clean, `npm run lint` 0 errors (228 warnings, unchanged), `npx prettier --check` clean on both touched files (no reformatting needed this time). Full Angular suite **881/881 passing** (2 net new; **zero existing test files needed any edits beyond the one added assertion** — the strongest evidence available that this refactor is genuinely behavior-preserving, since the pre-existing 70+ single-arg `new TransactionBuilderComponent(mockApi)` construction call sites across 4 spec files, and every `comp.catalogPageSize`/`comp.parentPageSize` read, all still pass completely unmodified), coverage **97.85/95.41/96.81/98.15%** (all four metrics clear the 95% floor). `backend/` 34/34 and microservice 335/335 both re-run per this file's own standing rule, unaffected (Angular-only change — no request/response contract change, no template touched at all).
+
+`transaction-builder.component.ts`: 2,654 → 2,689 lines (a modest net GROWTH, not reduction — expected and consistent with this file's own established BAL-003/F-01 extraction-pass posture: this was never a line-count exercise, the win is 8 dependencies now genuinely substitutable through one consistent construction style, plus ~35 new lines of doc comment recording the 2-category finding and the field-initializer-ordering constraint for the next reader, rather than a shorter file).
+
+Live in-browser verification not attempted this pass — static verification is unusually strong here (strict-template build, full typecheck, and a 881-test suite requiring effectively zero pre-existing-test edits across all 4 spec files touching this component). This is also a pure constructor/dependency-construction change with zero template modifications and zero behavioral/business-logic change of any kind — the lowest-risk category of change this file's own history records, so a human click-through adds little beyond what the build/test evidence already establishes; still worth a single sanity load of the Transaction Builder page to confirm the app boots and every picker/panel renders exactly as before, since a constructor-wiring mistake (unlike a template mistake) would be a hard runtime crash on load, not a subtle rendering difference.
+
+**Remaining desiger-comments.md items**, for reference: F-06 (hand-duplicated `BalanceContract`/`BalanceMovement` types across the Angular/microservice boundary), F-08 (`submitResult: any`), F-09 (`CatalogPickerService` can't be reused for a read-only browse — still hardcodes `'ACTIVE'`/`requireIssueReleased: true`, confirmed still accurate this same session). F-05/F-07 are root-cause-shared with F-01 (closed) and F-04 (this entry) respectively, not independently actionable. F-10–F-13 are Low priority, no action recommended by the review itself.
+
+Not committed (not requested).
+
+## F-04 fully reverted — the "unify all 6" fix broke the real running app; production Angular DI does not consult TypeScript default parameter values (2026-08-19, same day, user-caught live — "用UI測 全部不能用?" / "用BROWSER測 全部不能用?", i.e. "tested with the UI — nothing works at all?")
+
+**Root cause, confirmed directly via the browser's own console, not guessed**: the entry immediately
+above claimed Angular's DI "always resolves every constructor parameter... default parameter values are
+never consulted by Angular's DI" — TRUE for `checkerActions`/`makerSubmit` specifically, because those two
+ARE registered `@Injectable({providedIn: 'root'})` providers Angular's DI can actually satisfy. What that
+claim's own reasoning missed: Angular's Ivy compiler generates each component's DI factory
+(`ɵfac`/`ɵɵdirectiveInject`) at BUILD TIME from the constructor parameters' own declared TYPES — this
+codegen has no concept of "this parameter has a TypeScript default value, skip trying to inject it if no
+provider exists." It unconditionally attempts to inject EVERY constructor parameter by type. The moment
+`lookUp`/`inquireEvents`/`catalogPicker`/`parentPicker`/`ibIndexPicker`/`documentArrivalHints` became real
+constructor parameters (even with defaults) pointing at classes that are deliberately NOT `@Injectable`
+(per the entry above's own correct 2-category finding — they're genuinely per-instance state, not
+singleton-appropriate), Angular's real production DI had no provider to satisfy them and threw
+`NullInjectorError: No provider for LookUpPanelService!` on every single attempt to construct
+`TransactionBuilderComponent` — i.e., the ENTIRE Transaction Builder page, all 14 A1–A9/B1–B5 functions,
+Inquire Events, Look Up Current Balance, everything, failed to render at all. This was **not** visible to
+any of this pass's own verification: `tsc --noEmit` and `ng build` both check TYPES, not runtime DI
+resolution; the 881-test Jest suite constructs the component via a plain `new TransactionBuilderComponent(mockApi)`
+JS call, which is genuine JS default-parameter semantics and bypasses Angular's own Ivy-compiled factory
+entirely — structurally blind to this exact class of bug, the same way this project's own direct-
+instantiation test convention is already documented elsewhere in this file as blind to template-scoping
+and DOM-coercion bugs. Confirmed via `read_console_messages` against the live `ng serve` (already running,
+picked up the change automatically via its own watch mode): the exact `NullInjectorError` stack trace,
+rooted at `NodeInjectorFactory.TransactionBuilderComponent_Factory`.
+
+**This is exactly the risk category the F-04 entry's own closing line named** ("a constructor-wiring
+mistake... would be a hard runtime crash on load, not a subtle rendering difference") — and then, in a
+real lapse, skipped live-verifying anyway, reasoning from unit-test-plus-build evidence that structurally
+cannot exercise Angular's own production DI resolution path at all. The user's own live UI test caught it
+immediately; static verification alone did not and could not.
+
+**Fix**: full revert. `git checkout 75463ba -- src/app/transaction-builder/transaction-builder.component.ts
+src/app/transaction-builder/transaction-builder.component.spec.ts` — restored both files byte-for-byte to
+the last known-good committed state (immediately before this whole F-04 attempt), rather than hand-editing
+a partial undo, to eliminate any risk of the revert itself introducing a second mistake. This restores the
+ORIGINAL 3-way construction split exactly as it stood before this pass: `api` as a genuinely required
+parameter, `checkerActions`/`makerSubmit` as real-DI-with-test-fallback parameter defaults, and the other 6
+services constructed unconditionally in the constructor BODY (never as Angular-visible parameters at all,
+which is precisely what kept them safe from Ivy's own per-parameter injection attempt).
+
+**What this means for F-04 itself, going forward**: the finding's own underlying observation (3
+inconsistent-looking construction styles) is still accurate, but the "fix" needs a fundamentally different
+mechanism than promoting these 6 to constructor parameters — since Angular's real DI will always try to
+satisfy a real constructor parameter by type, the ONLY services that can safely become one are services
+that either (a) are genuinely appropriate as `@Injectable({providedIn:'root'})` singletons (not true for
+these 6, confirmed by the 2-category analysis above — making them singletons would fix the DI error but
+introduce a different bug, shared state across component instances), or (b) are supplied via an Angular
+provider mechanism OTHER than a bare class type token (e.g. a factory provider scoped to this component
+via the `@Component({providers:[...]})` array, or an injection token with a factory) — genuinely more
+machinery than this session's own effort budget or the review's own "doesn't require the F-07 test
+rewrite" framing anticipated. **F-04 is back to fully open**, with this attempt's own failure mode now
+documented as a concrete reason to treat it as harder than it first appears, not just noted-but-untried.
+
+**Verified after the revert**: `npx tsc -p tsconfig.app.json --noEmit` clean, full Angular suite
+**880/880 passing** (back to the exact pre-F-04 baseline, coverage 97.85/95.39/96.79/98.14%). **Live
+re-verified in the browser** (the actual gap the original pass skipped): reloaded the already-running
+`ng serve` twice from fresh tabs, confirmed via `read_console_messages` that the `NullInjectorError` no
+longer fires on page load (a fresh page load after the revert produced zero console errors, versus the
+identical, reproducible error on every load before it), and confirmed the Transaction Builder page renders
+its function-chip picker (A1–A9 visible, tab switching working) with no crash. Chip-click-through to a
+live A1 form render could not be independently re-confirmed this pass due to the Claude in Chrome
+extension's own well-documented click-coordinate/viewport-reflow flakiness (already recorded repeatedly
+elsewhere in this file) — stopped after 2 attempts per this session's own established practice rather than
+looping further; the console-level before/after evidence (the exact same error present, then reproducibly
+absent, across multiple fresh page loads) is strong enough on its own to consider the crash genuinely
+fixed. `backend/`/microservice suites unaffected (no files under either touched by the revert).
+
+**Lesson recorded for this session going forward**: "static verification (typecheck, build, tests) is
+strong" is not, on its own, sufficient justification to skip live browser verification for any change that
+touches Angular's own dependency-injection wiring specifically — this is a distinct, narrower risk category
+from the general "template-only changes are covered by build/lint, not by this project's own tests"
+posture already established elsewhere in this file; DI-wiring changes need the live check even when
+nothing else about the change would normally call for one.
+
+Not committed (not requested).
