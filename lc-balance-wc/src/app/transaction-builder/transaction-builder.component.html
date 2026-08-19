@@ -871,7 +871,14 @@
        toReadOnlyFields()), IMPORT_FUNCTIONS/EXPORT_FUNCTIONS (resolveFunctionForMovement(),
        balance-component.model.ts), and the Account Entries dialog below (openAccountEntryDialog(), no new
        dialog markup). -->
-  <div class="tb-workspace" *ngIf="activeMode === 'INQUIRE'">
+  <!-- Business instruction 2026-08-19 ("Inquire Events...uses only part of the available browser
+       width, leaving a large amount of unused space on the right") — Inquire Events has no .tb-side
+       sibling at all (unlike Transaction Processing, which populates BOTH .tb-main — the Maker/Checker
+       form — AND .tb-side — Look Up Current Balance), so reusing the bare .tb-workspace grid here left
+       CSS Grid reserving a second 50%-width track with nothing in it. .tb-workspace--single overrides
+       to a single full-width track (see transaction-builder.component.scss) — scoped to this wrapper
+       only, Transaction Processing's own genuine 50/50 split is untouched. -->
+  <div class="tb-workspace tb-workspace--single" *ngIf="activeMode === 'INQUIRE'">
     <div class="tb-main">
       <!-- Business instruction 2026-08-17 ("Remove the second 'Inquire Events' heading within the
            Inquire Events screen to avoid duplicate labeling. Keep only the top-level 'Inquire Events'

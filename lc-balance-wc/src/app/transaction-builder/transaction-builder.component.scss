@@ -140,6 +140,17 @@
   }
 }
 
+// Business instruction 2026-08-19 — Inquire Events reuses .tb-workspace's shared properties (gap,
+// align-items) but supplies only ONE child (.tb-main, no .tb-side) — CSS Grid still reserves the
+// second 50%-width track regardless of whether anything occupies it, leaving half the screen unused.
+// A single full-width track lets Inquire Events' own content (especially the Event Timeline table)
+// use the whole available width instead. Deliberately a modifier on .tb-workspace, not a change to
+// its own base rule — Transaction Processing's genuine 50/50 split (Transaction Processing / Look Up
+// Current Balance) must stay exactly as-is.
+.tb-workspace--single {
+  grid-template-columns: 1fr;
+}
+
 // `container-type: inline-size` + a shared `container-name` — lets .tb-grid-3/.tb-grid-2 (below) respond
 // to THIS panel's own rendered width via @container queries, not the viewport's. Necessary now that
 // .tb-main is only ~50% of the workspace width instead of "most of it": a 3-column input grid keyed off

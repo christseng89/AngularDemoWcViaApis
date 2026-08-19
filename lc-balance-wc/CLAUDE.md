@@ -6223,3 +6223,49 @@ immediately before this pass. `ng serve`'s own watch mode picked up every source
 throughout — the same already-running dev stack from the layout-fix pass was reused, no restart needed.
 
 Nothing committed yet this pass (not requested).
+
+## Inquire Events — widened to use the full available page width, not capped at 50% (2026-08-19, same day, user-requested — "Inquire Events...uses only part of the available browser width, leaving a large amount of unused space on the right...especially cramping the Event Timeline table")
+
+Direct fallout of the immediately-prior 50/50 layout-split pass: Inquire Events reuses the SAME
+`.tb-workspace` grid wrapper Transaction Processing uses for its own genuine Transaction Processing /
+Look Up Current Balance 50/50 split (`grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)`), but Inquire
+Events supplies only ONE child (`.tb-main` — the Import LC/Export Confirmed LC Master Index and the
+merged Event Timeline drill-down; there's no `.tb-side` panel in this mode at all). CSS Grid still
+reserves BOTH declared column tracks regardless of how many actual grid items exist, so `.tb-main` alone
+was capped at exactly the first 50%-width track — the second track's width sat empty, unused. This was
+always true even before the layout-fix pass (the second track was previously a fixed 420px rather than
+50%, so it was less visually obvious), but the 50/50 fix made the wasted space impossible to miss.
+
+**Fix**: new modifier class `.tb-workspace--single` (`transaction-builder.component.scss`) —
+`grid-template-columns: 1fr;`, applied alongside `.tb-workspace` on the Inquire Events wrapper only
+(`transaction-builder.component.html`, `*ngIf="activeMode === 'INQUIRE'"`) — a single full-width track
+instead of two. Deliberately a modifier, not a change to `.tb-workspace`'s own base rule, so Transaction
+Processing's own genuine 50/50 split (verified in the immediately-prior pass) is completely unaffected —
+re-confirmed live below. `.tb-table`/`.tb-table-scroll` both already size via `width: 100%`/`max-width:
+100%` relative to their container (no fixed-pixel constraint found), so the Event Timeline table and its
+Master Index sibling both naturally expand to fill the new full-width track with zero additional CSS
+needed.
+
+**Verified**: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run
+lint` (0 errors, 221 warnings — unchanged from the immediately-prior pass's own baseline) all clean, full
+Angular suite 821/821 unaffected (pure CSS/template change, this project's own direct-instantiation Jest
+tests never render the DOM so this was never going to be covered by a test either way, same established
+convention as every other template-only fix in this file).
+
+**Live-verified against the already-running dev stack** (reused, not restarted, same as the immediately-
+prior two passes): `.tb-workspace` on Inquire Events measured **1368.0px wide — genuinely full-width**
+(matching `.tb-page`'s own 1400px max-width minus its padding exactly), with `.tb-workspace--single`
+confirmed present and `computedGridTemplateColumns` resolving to a single `"1368px"` track (not two).
+Drilled into LC S01's own 17-event merged timeline (Page 1/2) — all 8 columns (Function/Ledger/Type/
+Amount/Reference/Secondary Ref./Status/Time) rendered fully visible with generous room, and
+`scrollWidth === clientWidth` (1331px both) on `.tb-table-scroll` confirmed **zero horizontal overflow** —
+the safety-net scroll wrapper stays in place but is genuinely not needed at this width. Switched to Export
+Confirmed LC — same full-width rendering confirmed (3-row index, all columns visible). Switched back to
+Transaction Processing (A1) and re-measured `.tb-workspace` — `tb-workspace--single` correctly ABSENT
+there, `.tb-main`/`.tb-side` both **674.0px** (pixel-identical to the immediately-prior layout-fix pass's
+own measurement), confirming this fix is genuinely scoped to Inquire Events only. Found and cleaned up
+one stray `IMP-C%` test contract left over from an earlier live-verification pass this session (not this
+one) during this check — deleted along with its movements, all 41 reference-LC rows reconfirmed intact
+afterward.
+
+Nothing committed yet this pass (not requested).
