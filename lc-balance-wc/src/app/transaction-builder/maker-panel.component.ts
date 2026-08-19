@@ -9,6 +9,7 @@ import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './ma
 import { CatalogPickerService } from './catalog-picker.service';
 import { DocumentArrivalHintsService } from './document-arrival-hints.service';
 import { PayMovementSelectionOutcome, PickerSelectionService } from './picker-selection.service';
+import { EligibilityRule, applyEligibilityRule } from './eligibility-rule';
 
 /**
  * F-04 pattern (desiger-comments.md, 2026-08-19) reused verbatim here — `CatalogPickerService` has NO
@@ -510,26 +511,32 @@ export class MakerPanelComponent implements OnChanges {
     if (page !== null) this.catalogPicker.page = page;
   }
 
+  /** BAL-003 Phase 3 (2026-08-20) — see `eligibility-rule.ts`'s own doc comment for why this returns a
+   * value for `applyEligibilityRule()` rather than filtering directly: the mechanical "now apply it" tail
+   * is shared with `filteredParentCatalog`/`filteredIbIndexCatalog`, but WHICH rule applies to this
+   * picker/function combination stays local (it reads `payableMovementInstrumentType`, a registry field
+   * deliberately outside the `FunctionStrategy` migration). Branch order/conditions unchanged from before
+   * this unification. */
+  private resolveCatalogEligibilityRule(): EligibilityRule {
+    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.catalogPayableIbs };
+    }
+    if (this.selectedFunction?.payableMovementInstrumentType) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.catalogChildPayableIbs };
+    }
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.catalogSgEligible };
+    }
+    return { kind: 'genericFallback', gatedByMovementType: true };
+  }
+
   get filteredCatalogContracts(): BalanceContract[] {
     let list = this.catalogPicker.contracts;
     const tenorFilter = this.selectedFunction?.catalogTenorFilter;
     if (tenorFilter) {
       list = list.filter((c) => !c.tenorType || (tenorFilter === 'SIGHT' ? c.tenorType === 'SIGHT' : c.tenorType !== 'SIGHT'));
     }
-    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
-      return list.filter((c) => this.documentArrivalHints.catalogPayableIbs.has(c.balanceContractId));
-    }
-    if (this.selectedFunction?.payableMovementInstrumentType) {
-      return list.filter((c) => this.documentArrivalHints.catalogChildPayableIbs.has(c.balanceContractId));
-    }
-    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
-      return list.filter((c) => this.documentArrivalHints.catalogSgEligible.has(c.balanceContractId));
-    }
-    if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return list;
-    return list.filter((c) => {
-      const snap = this.catalogPicker.snapshots.get(c.balanceContractId);
-      return !snap || snap.availableBalance !== '0';
-    });
+    return applyEligibilityRule(list, this.resolveCatalogEligibilityRule(), this.model.movementType, this.catalogPicker.snapshots);
   }
 
   get pagedFilteredCatalogContracts(): BalanceContract[] {
@@ -581,6 +588,29 @@ export class MakerPanelComponent implements OnChanges {
     return policy.parentTenorFamily(this.selectedFunction);
   }
 
+  /** BAL-003 Phase 3 (2026-08-20) — see `resolveCatalogEligibilityRule()`'s own doc comment; same shared
+   * mechanism, this picker's own branch order/conditions unchanged from before this unification.
+   * `gatedByMovementType: false` on the trailing fallback is DELIBERATE, not a copy-paste of the catalog
+   * resolver's own `true` — see `eligibility-rule.ts`'s own doc comment on `EligibilityRule` for the real,
+   * pre-existing asymmetry this preserves (the parent picker's own 0-balance exclusion was never gated by
+   * `DECREASING_MOVEMENT_TYPES` before this unification either). */
+  private resolveParentEligibilityRule(): EligibilityRule {
+    if (this.requiresEligibleParentDocumentArrival) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.parentPayableIbs };
+    }
+    if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.parentSgEligible };
+    }
+    if (
+      this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
+      this.selectedFunction?.catalogTenorFilter === 'USANCE' ||
+      this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex
+    ) {
+      return { kind: 'unconditional' };
+    }
+    return { kind: 'genericFallback', gatedByMovementType: false };
+  }
+
   get filteredParentCatalog(): BalanceContract[] {
     let list = this.parentPicker.contracts;
     if (this.selectedFunction?.tenorTypeOptions?.length) {
@@ -588,22 +618,7 @@ export class MakerPanelComponent implements OnChanges {
     } else if (this.selectedFunction?.catalogTenorFilter === 'USANCE') {
       list = list.filter((c) => !c.tenorType || c.tenorType !== 'SIGHT');
     }
-    if (this.requiresEligibleParentDocumentArrival) {
-      return list.filter((c) => this.documentArrivalHints.parentPayableIbs.has(c.balanceContractId));
-    }
-    if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
-      return list.filter((c) => this.documentArrivalHints.parentSgEligible.has(c.balanceContractId));
-    }
-    if (
-      this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
-      this.selectedFunction?.catalogTenorFilter === 'USANCE' ||
-      this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex
-    )
-      return list;
-    return list.filter((c) => {
-      const snap = this.parentPicker.snapshots.get(c.balanceContractId);
-      return !snap || snap.availableBalance !== '0';
-    });
+    return applyEligibilityRule(list, this.resolveParentEligibilityRule(), this.model.movementType, this.parentPicker.snapshots);
   }
 
   get pagedFilteredParentCatalog(): BalanceContract[] {
@@ -886,12 +901,16 @@ export class MakerPanelComponent implements OnChanges {
     this.emitSync();
   }
 
+  /** BAL-003 Phase 3 (2026-08-20) — no special-case eligibility rule exists for the IB Index picker
+   * today; always resolves to `genericFallback`, matching the pre-unification body exactly. Kept as its
+   * own resolver (not a bare `{kind: 'genericFallback'}` inlined at the call site) purely for symmetry
+   * with the catalog/parent resolvers, in case a future function genuinely needs one here. */
+  private resolveIbIndexEligibilityRule(): EligibilityRule {
+    return { kind: 'genericFallback', gatedByMovementType: true };
+  }
+
   get filteredIbIndexCatalog(): BalanceContract[] {
-    if (!this.model.movementType || !DECREASING_MOVEMENT_TYPES.has(this.model.movementType)) return this.ibIndexPicker.contracts;
-    return this.ibIndexPicker.contracts.filter((c) => {
-      const snap = this.ibIndexPicker.snapshots.get(c.balanceContractId);
-      return !snap || snap.availableBalance !== '0';
-    });
+    return applyEligibilityRule(this.ibIndexPicker.contracts, this.resolveIbIndexEligibilityRule(), this.model.movementType, this.ibIndexPicker.snapshots);
   }
 
   get pagedFilteredIbIndexCatalog(): BalanceContract[] {
