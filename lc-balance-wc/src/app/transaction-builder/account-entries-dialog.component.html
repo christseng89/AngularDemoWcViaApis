@@ -1,0 +1,57 @@
+<!-- ══════ View Voucher pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html;
+     retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement; extracted into this
+     standalone component 2026-08-19, BAL-003 pilot) ══════
+     The parent controls WHEN this exists at all (`*ngIf="accountEntryDialogMovement"` on the
+     `<app-account-entries-dialog>` tag) — `movement` is never actually null while this component is
+     alive in practice, but every binding below still guards on it (`movement as m`) to stay type-safe
+     against its own nullable @Input() rather than `!`-asserting throughout. -->
+<div class="tb-dialog-overlay" *ngIf="movement as m" (click)="closed.emit()">
+  <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="View Voucher" (click)="$event.stopPropagation()">
+    <div class="tb-dialog__header">
+      <h3 class="tb-dialog__title">View Voucher</h3>
+      <button type="button" class="tb-dialog__close" (click)="closed.emit()" aria-label="Close">×</button>
+    </div>
+    <div class="tb-dialog__meta">
+      <span class="tb-type-tag">{{ m.movementType }}</span>
+      <span class="tb-muted">{{ m.sourceTransactionRef || 'eventSeq ' + m.eventSeq }}</span>
+      <span class="tb-status-badge" [ngClass]="statusBadgeClass(m.status)">{{ displayStatus(m.status) }}</span>
+    </div>
+    <table class="tb-table tb-table--static mt-2" *ngIf="m.contingentAccountEntry as entry">
+      <caption class="visually-hidden">
+        Contingent liability account entries for
+        {{
+          m.movementType
+        }}
+      </caption>
+      <thead>
+        <tr>
+          <th>Dr/Cr</th>
+          <th>Account Name</th>
+          <th>Currency</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
+          <td>{{ entry.drAccount }}</td>
+          <td>{{ entry.currency }}</td>
+          <td class="tb-table__amount">{{ entry.amount }}</td>
+        </tr>
+        <tr>
+          <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
+          <td>{{ entry.crAccount }}</td>
+          <td>{{ entry.currency }}</td>
+          <td class="tb-table__amount">{{ entry.amount }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <!-- 2026-08-18 — whole-row click (Look Up Current Balance's own Event Timeline) can open this
+         dialog for an event with no contingentAccountEntry at all (e.g. B3/EPLC_EXAMINATION, or any
+         instrumentType outside the contingent-liability scope contingentAccountEntry.ts enforces) —
+         this hint replaces what used to be a silently-blank "—" for exactly that case. -->
+    <p class="tb-hint mt-2" *ngIf="!m.contingentAccountEntry">No voucher entries recorded for this event.</p>
+    <p class="tb-hint mt-2" *ngIf="m.contingentAccountEntry">Historical entries recorded with this event — never recalculated from the current balance.</p>
+    <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closed.emit()">Close</button>
+  </div>
+</div>

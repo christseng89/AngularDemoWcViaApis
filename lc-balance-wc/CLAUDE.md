@@ -7632,3 +7632,106 @@ parameter-with-default-value shape, and every one that's registered a real provi
 substitutable via Angular's own DI, not just syntactically parameter-shaped.
 
 Not committed (not requested).
+
+## BAL-003 — Account Entries dialog extracted as a genuine standalone Angular child component, the pilot for whether ANY of BAL-003's remaining scope can become a real child component under this project's own no-TestBed test convention (2026-08-19, user-directed — "Account Entries 彈窗做這個 pilot")
+
+Direct follow-up to this same session's own BAL-003 research pass ("BAL-003 是否也可使用ANGULAR 官方文檔 以及
+GOOGLE搜尋 看看如何處理?"), which confirmed via official Angular docs + GitHub-issue research that
+`@ViewChild`/signal `viewChild()` both require Angular's real view-creation pipeline regardless of Angular
+version — an architectural fact, not a knowledge gap — meaning the three paginated pickers' own selection
+handlers genuinely CANNOT become real child components under this project's established
+`new TransactionBuilderComponent(mockApi)`, no-TestBed test convention (their state lives on the parent and
+~40-90+ existing test assertions read/write it directly). That same research identified the Account Entries
+dialog specifically as the one piece of remaining BAL-003 scope that IS genuinely presentational — no
+Maker-flow-entangled state, only displays a passed-in `BalanceMovement` and emits a close event — making it
+a correctly-scoped pilot candidate per the "Container vs. Presentational" component-testing pattern the
+research also surfaced.
+
+**Design — modeled directly on `IndexPickerComponent`'s own already-proven precedent**, not a new pattern:
+classic decorator `@Input()`/`@Output()` (not signal-based `input()`/`output()`, for consistency with the
+one other genuine child component this codebase already has), `standalone: true`, own `styleUrl`, and —
+the pilot's own biggest, better-than-expected finding — **no TestBed needed at all**. `IndexPickerComponent`'s
+own spec file already proves this project's established "no TestBed" convention extends to a REAL
+`@Component`, not just plain classes/services: it constructs the component via plain `new
+IndexPickerComponent()` and tests only class-level logic, leaving the TEMPLATE itself to be verified via
+`ng build`'s own strict-template check plus a live in-browser pass — the same verification split every other
+template in this codebase already relies on. This is a materially better outcome than the pilot was
+originally scoped under (the research pass's own framing anticipated this piece might still need some new
+testing infrastructure) — none was needed.
+
+**New files**: `account-entries-dialog.component.ts` (`@Input() movement: BalanceMovement | null`,
+`@Input() instrumentType: InstrumentType | null`, `@Input() phase: 'primary' | 'create' | 'finalize' | null`,
+`@Output() closed = new EventEmitter<void>()`; `displayStatus()`/`statusBadgeClass()` methods delegate to
+the shared `balance-component.model.ts` functions, with the imports aliased — `displayStatus as
+displayStatusRule`, `statusBadgeClass as statusBadgeClassRule` — matching the established BAL-136-style
+readability-trap precedent already in this codebase, since a same-named method calling a same-named
+imported function would otherwise self-recurse silently); `account-entries-dialog.component.html` (the
+dialog markup, adapted verbatim from the inline block it replaces — header, meta row with the status badge,
+the static Dr/Cr table, the "no voucher entries"/"historical, never recalculated" hints, the Close button);
+`account-entries-dialog.component.scss` (every class the moved markup uses — `.tb-dialog*`, `.tb-table`
+base + the static-table hover-suppression override, `.tb-status-badge` + all 5 modifiers, `.tb-type-tag`,
+`.tb-muted`, `.tb-drcr-tag` + modifiers, `.tb-hint`, `.tb-btn` base + `--outline` — copied, NOT
+moved/promoted to a shared location, since Angular's default Emulated view encapsulation scopes a
+component's own styles to its own template only, and the broadly-shared atoms among them are still needed
+by the parent's own OTHER template sections; disclosed explicitly in the file's own doc comment, citing
+`.tb-pagination`'s own pre-existing "mirrored here, not imported" precedent for the identical tradeoff);
+`account-entries-dialog.component.spec.ts` (direct-instantiation tests, `IndexPickerComponent.spec.ts`'s
+own exact convention: `@Input` defaults, the `closed` `EventEmitter` shape, and `displayStatus()`/
+`statusBadgeClass()`'s own delegation across the earmark/non-earmark/phase-disqualified/no-movement/PENDING
+cases).
+
+**`displayStatus`/`statusBadgeClass` extracted as new shared exported functions** in
+`balance-component.model.ts` (placed right after the existing `isEarmarkFunction()`, which both now call
+internally) — previously private methods on `TransactionBuilderComponent` alone; the parent's own two
+methods are now thin one-line delegations, kept only for backward test-compatibility with the ~existing
+call sites across its own spec files. One line (`statusBadgeClass`'s own trailing `return ''` fallback for
+a status value outside the closed `MovementStatus` enum) is now uncovered post-move — the SAME
+pre-existing, already-accepted "defensive fallback never reached by real data" gap this exact logic already
+carried before the extraction, not a new one introduced by it.
+
+**Parent-side changes**: `transaction-builder.component.html`'s entire ~74-line inline
+`<div class="tb-dialog-overlay" *ngIf="accountEntryDialogMovement" ...>` block replaced with one
+`<app-account-entries-dialog [movement]="accountEntryDialogMovement"
+[instrumentType]="accountEntryDialogInstrumentType" [phase]="accountEntryDialogPhase"
+(closed)="closeAccountEntryDialog()">` tag; `transaction-builder.component.scss` had the now-moved
+dialog-exclusive rule block (`.tb-dialog-overlay` through `.tb-drcr-tag` + modifiers, ~120 lines) deleted,
+replaced with a short comment pointing to the new component's own stylesheet — the shared atom classes
+still needed by the parent's own OTHER sections (`.tb-table`, `.tb-status-badge`, `.tb-type-tag`,
+`.tb-muted`, `.tb-hint`, `.tb-btn`) were deliberately left in place, unchanged.
+`transaction-builder.component.ts`'s `@Component({ imports: [...] })` array gained
+`AccountEntriesDialogComponent`; every OTHER dialog-related field/method
+(`accountEntryDialogMovement`/`accountEntryDialogInstrumentType`/`accountEntryDialogPhase`/
+`openAccountEntryDialog()`/`closeAccountEntryDialog()`) stayed exactly where they already were on the
+parent, unchanged — this pilot is purely a template/presentation extraction, not a state-ownership change.
+
+**Verification**: `npx tsc -p tsconfig.app.json --noEmit` clean; full Jest suite **890/890 passing** with
+**zero existing test files needing any edits** beyond the one new spec file — the same strongest-available
+evidence of exact behavior preservation every prior extraction in this file's own history has used —
+coverage **97.68/95.41/96.13/97.94%** (all four metrics clear the 95% floor; `account-entries-dialog.
+component.ts` itself at **100/100/100/100**); `ng build --configuration development` clean (strict
+templates validated the new `<app-account-entries-dialog>` binding end to end); `npm run lint` 0 errors
+(same pre-existing `any`-typing warning baseline, unaffected); `npx prettier --write` applied to 2
+pre-existing files it flagged as unformatted along the way (`transaction-builder.component.scss`,
+`balance-component.model.ts` — whitespace-only, re-verified clean via a repeat `tsc --noEmit`/full-suite
+run afterward). Full three-suite re-verification per this file's own standing rule: `backend/` **34/34**
+and microservice **335/335**, both unaffected (Angular-only change — no request/response contract, no
+route, no domain logic touched).
+
+**Live in-browser verification, completed** (against the already-running dev stack, per this project's own
+established "don't chase port conflicts" posture): loaded the Transaction Builder — zero console errors on
+page load. Searched LC S01 under Look Up Current Balance and clicked its own ISSUE row's own Event Timeline
+entry — the extracted dialog opened correctly: title "View Voucher", `ISSUE`/`eventSeq
+1787015019357`/`APPROVED` (green) badges, the exact historical Dr/Cr pair (`Dr Customers' Liability under
+DC — Sight` / `Cr Documentary Credits Outstanding — Sight`, both USD 100000), the "historical entries...
+never recalculated" hint text, and a working Close button — clicking Close correctly dismissed the dialog
+and left the underlying Event Timeline table rendering correctly underneath it, with zero console errors
+throughout the whole sequence.
+
+**Net effect on BAL-003**: closes the one remaining piece of BAL-003 scope this session's own prior
+research pass identified as a genuine, correctly-risk-scoped presentational candidate — and, per the "no
+TestBed needed after all" finding above, does so with a materially lower testing-infrastructure cost than
+that research pass itself anticipated going in. BAL-003 stays open at Major — the three paginated pickers'
+own selection-handler state remains confirmed, by the SAME prior research, architecturally unable to become
+real child components under this project's current test convention; extracting THAT would require either
+rewriting ~40-90+ existing test assertions to drive a genuine Angular view-rendering pipeline (TestBed), or
+a broader test-convention change this session has not been asked to make.

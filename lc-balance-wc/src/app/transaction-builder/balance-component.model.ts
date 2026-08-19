@@ -848,6 +848,43 @@ export function isEarmarkFunction(
   return (instrumentType === 'IPLC_LC' && movementType === 'UTILIZE') || (instrumentType === 'EPLC_EXAMINATION' && movementType === 'CREATE');
 }
 
+/**
+ * PENDING/RELEASED/etc. display label (business-mandated Event Status Display Mapping — see
+ * `isEarmarkFunction()`'s own doc comment above for the full EARMARKING/EARMARKED-vs-PENDING/APPROVED
+ * rule this reads). Extracted from `TransactionBuilderComponent`'s own like-named method (2026-08-19,
+ * BAL-003 "Account Entries dialog" pilot — desiger-comments.md, researched against official Angular
+ * docs first) so both the component's own two remaining template call sites (Look Up Current Balance's
+ * Event Timeline, Inquire Events' merged table) AND the new standalone `AccountEntriesDialogComponent`
+ * can share one implementation rather than the child re-deriving the same rule independently — the
+ * component's own `displayStatus()` method is now a thin delegation to this function, kept only because
+ * ~20 existing test assertions and 2 template bindings still read it by that name.
+ */
+export function displayStatus(
+  status: string,
+  instrumentType?: InstrumentType | string | null,
+  movementType?: string | null,
+  phase?: 'primary' | 'create' | 'finalize' | null,
+): string {
+  const earmark = isEarmarkFunction(instrumentType, movementType, phase);
+  if (status === 'PENDING') return earmark ? 'EARMARKING' : 'PENDING';
+  if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
+  return status;
+}
+
+/** Status badge CSS class — see `displayStatus()`'s own doc comment immediately above for why this is now a shared, exported pure function rather than a component-only method. */
+export function statusBadgeClass(
+  status: string,
+  instrumentType?: InstrumentType | string | null,
+  movementType?: string | null,
+  phase?: 'primary' | 'create' | 'finalize' | null,
+): string {
+  if (status === 'PENDING') return 'tb-status-badge--pending';
+  if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
+  if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
+  if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
+  return '';
+}
+
 // payExistingUtilizeFunctionFor() relocated to function-strategy.ts in PR-5, for the same
 // circular-import reason movementTypeMatchesFunction()/resolveFunctionForMovement() were (see that
 // note above resolveFunctionForMovement's own former location) — it reads the (now-removed)

@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.4% </span>
+                <span class="strong">95.45% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>810/849</span>
+                <span class='fraction'>799/837</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.73% </span>
+                <span class="strong">95.58% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>382/399</span>
+                <span class='fraction'>368/385</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.75% </span>
+                <span class="strong">95.85% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>721/753</span>
+                <span class='fraction'>716/747</span>
             </div>
         
             
@@ -2789,15 +2789,7 @@
 <a name='L2724'></a><a href='#L2724'>2724</a>
 <a name='L2725'></a><a href='#L2725'>2725</a>
 <a name='L2726'></a><a href='#L2726'>2726</a>
-<a name='L2727'></a><a href='#L2727'>2727</a>
-<a name='L2728'></a><a href='#L2728'>2728</a>
-<a name='L2729'></a><a href='#L2729'>2729</a>
-<a name='L2730'></a><a href='#L2730'>2730</a>
-<a name='L2731'></a><a href='#L2731'>2731</a>
-<a name='L2732'></a><a href='#L2732'>2732</a>
-<a name='L2733'></a><a href='#L2733'>2733</a>
-<a name='L2734'></a><a href='#L2734'>2734</a>
-<a name='L2735'></a><a href='#L2735'>2735</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
+<a name='L2727'></a><a href='#L2727'>2727</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
@@ -2824,6 +2816,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -3987,22 +3981,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">30x</span>
-<span class="cline-any cline-yes">30x</span>
-<span class="cline-any cline-yes">21x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -4013,10 +4001,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -5555,9 +5539,11 @@ import {
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
+  displayStatus as displayStatusShared,
   groupThousands,
-  isEarmarkFunction,
+  statusBadgeClass as statusBadgeClassShared,
 } from './balance-component.model';
+import { AccountEntriesDialogComponent } from './account-entries-dialog.component';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import {
   SubmitRulesContext,
@@ -5612,7 +5598,7 @@ const IB_INDEX_PICKER = new InjectionToken&lt;CatalogPickerService&gt;('Transact
 @Component({
   selector: 'app-transaction-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, AccountEntriesDialogComponent],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
   /**
@@ -6715,42 +6701,32 @@ export class TransactionBuilderComponent {
    * to correctly exclude A4's own 'finalize' row for a Sight Document Arrival — see
    * `isEarmarkFunction()`'s own doc comment (balance-component.model.ts) for the full bug this closes.
    */
+  /**
+   * BAL-003 "Account Entries dialog" pilot (2026-08-19, desiger-comments.md — researched against
+   * official Angular docs first) — the actual rule moved to a shared, exported pure function
+   * (`displayStatus()`, balance-component.model.ts) so the new standalone
+   * `AccountEntriesDialogComponent` can use the identical logic without re-deriving it; this stays a
+   * thin delegation purely because ~20 existing test assertions and this component's own remaining 2
+   * template call sites (Look Up Current Balance's Event Timeline, Inquire Events' merged table) still
+   * read it by this name.
+   */
   displayStatus(
     status: string,
     instrumentType?: InstrumentType | string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
   ): string {
-    const earmark = isEarmarkFunction(instrumentType, movementType, phase);
-    if (status === 'PENDING') return earmark ? 'EARMARKING' : 'PENDING';
-    if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
-    return status;
+    return displayStatusShared(status, instrumentType, movementType, phase);
   }
 &nbsp;
-  /**
-   * Status badge CSS class (2026-08-18, user-requested — "EARMARK 可否用與APPROVED PENDING不同顏色區分",
-   * i.e. give the released-earmark label its own color distinct from both APPROVED and PENDING). Single
-   * source of truth for the 3 template call sites that render a colored status badge (Look Up Current
-   * Balance's own Event Timeline, Inquire Events' merged Events table, the Account Entries dialog) —
-   * each used to expand the same 4 `[class.tb-status-badge--x]` boolean bindings inline; consolidated
-   * into one method instead, bound via a single `[ngClass]`. Mirrors `displayStatus()`'s own EARMARKING/
-   * EARMARKED-vs-PENDING/APPROVED decision (same `isEarmarkFunction()` call) — the label and its color
-   * stay in sync by construction. EARMARKING deliberately shares PENDING's own amber class (not a new
-   * color) — the color axis this app draws is "not yet released" (amber) vs. "released, and which kind
-   * of released" (green APPROVED / violet EARMARKED); the label text itself, not a 4th color, is what
-   * distinguishes EARMARKING from plain PENDING.
-   */
+  /** Same delegation, same reason — see `displayStatus()`'s own doc comment immediately above. */
   statusBadgeClass(
     status: string,
     instrumentType?: InstrumentType | string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
   ): string {
-    if (status === 'PENDING') return 'tb-status-badge--pending';
-    if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
-    if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
-    if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
-<span class="cstat-no" title="statement not covered" >    return '';</span>
+    return statusBadgeClassShared(status, instrumentType, movementType, phase);
   }
 &nbsp;
   /**
@@ -8272,7 +8248,7 @@ export class TransactionBuilderComponent {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-19T09:31:20.935Z
+                at 2026-08-19T10:02:15.368Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

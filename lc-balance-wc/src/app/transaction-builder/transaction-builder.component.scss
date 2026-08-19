@@ -675,7 +675,9 @@
   cursor: pointer;
   text-align: left;
 
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
 
   // Same &:hover/&--active specificity pitfall as .tb-function-chip above (2026-08-15 fix).
   &:hover:not(.tb-quick-pick__row--active) {
@@ -973,114 +975,12 @@
   color: var(--gray-muted);
 }
 
-// ── Account Entries pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html)
-// ─────────────────────────────────────────────────────────────────────────────────────────────────────
-
-.tb-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 1000;
-  animation: tb-dialog-fade-in 150ms ease;
-}
-
-.tb-dialog {
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  width: 100%;
-  max-width: 460px;
-  padding: 18px 20px;
-  animation: tb-dialog-rise-in 150ms ease;
-}
-
-@keyframes tb-dialog-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes tb-dialog-rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.98);
-  }
-}
-
-.tb-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.tb-dialog__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--navy);
-  margin: 0;
-}
-
-.tb-dialog__close {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--gray-muted);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-
-  &:hover {
-    background: var(--gray-bg);
-    color: var(--gray-body);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--blue);
-    outline-offset: 1px;
-  }
-}
-
-.tb-dialog__meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-
-// A static 2-row Dr/Cr table, not a pickable list — override .tb-table's own clickable-row affordance.
-// Matches .tb-table's own selector specificity exactly (both classes present in the template together)
-// so this wins on source order rather than needing !important.
-.tb-table.tb-table--static tbody tr {
-  cursor: default;
-
-  &:hover:not(.tb-table__row--active) {
-    background: inherit;
-  }
-}
-
-.tb-drcr-tag {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-
-  &--dr {
-    background: var(--blue-bg);
-    color: var(--blue-dark);
-  }
-
-  &--cr {
-    background: var(--green-bg);
-    color: var(--green-dark);
-  }
-}
+// The "Account Entries pop-up" (business-requested 2026-08-16, analysis/contingent-liability-ledger.html)
+// itself was extracted into its own standalone AccountEntriesDialogComponent 2026-08-19 (BAL-003 pilot,
+// desiger-comments.md) — its own dialog-exclusive rules (`.tb-dialog*`, `.tb-drcr-tag*`, and the
+// `.tb-table.tb-table--static` override, none of which any OTHER section of this template ever used)
+// moved with it, into account-entries-dialog.component.scss. The shared "design-system atom" classes it
+// also needs (`.tb-table`/`.tb-status-badge`/`.tb-type-tag`/`.tb-muted`/`.tb-hint`/`.tb-btn`) are still
+// defined here too, since this file's OWN other sections (Look Up Current Balance's Event Timeline,
+// Inquire Events' merged table, the Maker Result panel, etc.) still use them — see that new component's
+// own stylesheet for why they're a disclosed, deliberate COPY rather than a shared/imported source.

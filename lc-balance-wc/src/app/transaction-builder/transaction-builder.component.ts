@@ -22,9 +22,11 @@ import {
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
+  displayStatus as displayStatusShared,
   groupThousands,
-  isEarmarkFunction,
+  statusBadgeClass as statusBadgeClassShared,
 } from './balance-component.model';
+import { AccountEntriesDialogComponent } from './account-entries-dialog.component';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import {
   SubmitRulesContext,
@@ -79,7 +81,7 @@ const IB_INDEX_PICKER = new InjectionToken<CatalogPickerService>('TransactionBui
 @Component({
   selector: 'app-transaction-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, AccountEntriesDialogComponent],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
   /**
@@ -1182,42 +1184,32 @@ export class TransactionBuilderComponent {
    * to correctly exclude A4's own 'finalize' row for a Sight Document Arrival — see
    * `isEarmarkFunction()`'s own doc comment (balance-component.model.ts) for the full bug this closes.
    */
+  /**
+   * BAL-003 "Account Entries dialog" pilot (2026-08-19, desiger-comments.md — researched against
+   * official Angular docs first) — the actual rule moved to a shared, exported pure function
+   * (`displayStatus()`, balance-component.model.ts) so the new standalone
+   * `AccountEntriesDialogComponent` can use the identical logic without re-deriving it; this stays a
+   * thin delegation purely because ~20 existing test assertions and this component's own remaining 2
+   * template call sites (Look Up Current Balance's Event Timeline, Inquire Events' merged table) still
+   * read it by this name.
+   */
   displayStatus(
     status: string,
     instrumentType?: InstrumentType | string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
   ): string {
-    const earmark = isEarmarkFunction(instrumentType, movementType, phase);
-    if (status === 'PENDING') return earmark ? 'EARMARKING' : 'PENDING';
-    if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
-    return status;
+    return displayStatusShared(status, instrumentType, movementType, phase);
   }
 
-  /**
-   * Status badge CSS class (2026-08-18, user-requested — "EARMARK 可否用與APPROVED PENDING不同顏色區分",
-   * i.e. give the released-earmark label its own color distinct from both APPROVED and PENDING). Single
-   * source of truth for the 3 template call sites that render a colored status badge (Look Up Current
-   * Balance's own Event Timeline, Inquire Events' merged Events table, the Account Entries dialog) —
-   * each used to expand the same 4 `[class.tb-status-badge--x]` boolean bindings inline; consolidated
-   * into one method instead, bound via a single `[ngClass]`. Mirrors `displayStatus()`'s own EARMARKING/
-   * EARMARKED-vs-PENDING/APPROVED decision (same `isEarmarkFunction()` call) — the label and its color
-   * stay in sync by construction. EARMARKING deliberately shares PENDING's own amber class (not a new
-   * color) — the color axis this app draws is "not yet released" (amber) vs. "released, and which kind
-   * of released" (green APPROVED / violet EARMARKED); the label text itself, not a 4th color, is what
-   * distinguishes EARMARKING from plain PENDING.
-   */
+  /** Same delegation, same reason — see `displayStatus()`'s own doc comment immediately above. */
   statusBadgeClass(
     status: string,
     instrumentType?: InstrumentType | string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
   ): string {
-    if (status === 'PENDING') return 'tb-status-badge--pending';
-    if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
-    if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
-    if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
-    return '';
+    return statusBadgeClassShared(status, instrumentType, movementType, phase);
   }
 
   /**

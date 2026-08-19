@@ -1555,79 +1555,24 @@
   </div>
 
   <!-- ══════ View Voucher pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html;
-       retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement — same dialog, same
-       accountEntryDialogMovement/openAccountEntryDialog() mechanism, unchanged) ══════
+       retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement) ══════
        Opened from the Maker Result panel (right after Submit), an Inquire Events row's own "Original
-       Transaction Screen" panel, or — 2026-08-18 — a whole Look Up Current Balance Event Timeline row
-       click; all pass in the exact BalanceMovement object already returned by the API, so this dialog
-       only ever displays the historical entries stored WITH that event, never a recalculation against
-       the current balance. -->
-  <div class="tb-dialog-overlay" *ngIf="accountEntryDialogMovement" (click)="closeAccountEntryDialog()">
-    <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="View Voucher" (click)="$event.stopPropagation()">
-      <div class="tb-dialog__header">
-        <h3 class="tb-dialog__title">View Voucher</h3>
-        <button type="button" class="tb-dialog__close" (click)="closeAccountEntryDialog()" aria-label="Close">×</button>
-      </div>
-      <div class="tb-dialog__meta">
-        <span class="tb-type-tag">{{ accountEntryDialogMovement.movementType }}</span>
-        <span class="tb-muted">{{ accountEntryDialogMovement.sourceTransactionRef || 'eventSeq ' + accountEntryDialogMovement.eventSeq }}</span>
-        <span
-          class="tb-status-badge"
-          [ngClass]="
-            statusBadgeClass(
-              accountEntryDialogMovement.status,
-              accountEntryDialogInstrumentType,
-              accountEntryDialogMovement.movementType,
-              accountEntryDialogPhase
-            )
-          "
-          >{{
-            displayStatus(accountEntryDialogMovement.status, accountEntryDialogInstrumentType, accountEntryDialogMovement.movementType, accountEntryDialogPhase)
-          }}</span
-        >
-      </div>
-      <table class="tb-table tb-table--static mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry as entry">
-        <caption class="visually-hidden">
-          Contingent liability account entries for
-          {{
-            accountEntryDialogMovement.movementType
-          }}
-        </caption>
-        <thead>
-          <tr>
-            <th>Dr/Cr</th>
-            <th>Account Name</th>
-            <th>Currency</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
-            <td>{{ entry.drAccount }}</td>
-            <td>{{ entry.currency }}</td>
-            <td class="tb-table__amount">{{ entry.amount }}</td>
-          </tr>
-          <tr>
-            <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
-            <td>{{ entry.crAccount }}</td>
-            <td>{{ entry.currency }}</td>
-            <td class="tb-table__amount">{{ entry.amount }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <!-- 2026-08-18 — whole-row click (Look Up Current Balance's own Event Timeline) can now open this
-           dialog for an event with no contingentAccountEntry at all (e.g. B3/EPLC_EXAMINATION, or any
-           instrumentType outside the contingent-liability scope contingentAccountEntry.ts enforces) —
-           the removed per-row "Entries" button used to silently show a plain "—" for exactly this case;
-           this explicit hint replaces that, rather than leaving the dialog looking broken/empty. -->
-      <p class="tb-hint mt-2" *ngIf="!accountEntryDialogMovement.contingentAccountEntry">No voucher entries recorded for this event.</p>
-      <p class="tb-hint mt-2" *ngIf="accountEntryDialogMovement.contingentAccountEntry">
-        Historical entries recorded with this event — never recalculated from the current balance.
-      </p>
-      <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closeAccountEntryDialog()">Close</button>
-    </div>
-  </div>
+       Transaction Screen" panel, or a whole Look Up Current Balance Event Timeline row click; all pass
+       in the exact BalanceMovement object already returned by the API, so this dialog only ever
+       displays the historical entries stored WITH that event, never a recalculation against the current
+       balance. Extracted into its own standalone AccountEntriesDialogComponent 2026-08-19 (BAL-003
+       pilot, desiger-comments.md — this session's own first genuine child-component extraction, chosen
+       specifically because this dialog is purely presentational, unlike the pickers' own Maker-flow-
+       entangled selection handlers) — this component still decides WHETHER the dialog exists at all
+       (the *ngIf below), exactly as the inline `<div>` version did; the child owns only its own display
+       and emits `closed` when the backdrop/×/Close button fires. -->
+  <app-account-entries-dialog
+    *ngIf="accountEntryDialogMovement"
+    [movement]="accountEntryDialogMovement"
+    [instrumentType]="accountEntryDialogInstrumentType"
+    [phase]="accountEntryDialogPhase"
+    (closed)="closeAccountEntryDialog()"
+  ></app-account-entries-dialog>
 
   <!-- Shared Balance Snapshot box (2026-08-17, extracted from the Look Up panel's own former inline
        "Current Balance" block) — declared at the root of this template so *ngTemplateOutlet can invoke
