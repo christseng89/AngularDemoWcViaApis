@@ -307,6 +307,56 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
+  // isSubmitReady — business requirement 2026-08-19 ("Submit Button Enablement — A1–A9 / B1–B5")
+  // ---------------------------------------------------------------------
+  describe('isSubmitReady', () => {
+    it('A1 (no eligible-target requirement) — false with mandatory fields missing, true once Amount/LC Number are filled in', () => {
+      const { comp } = setup();
+      comp.selectFunction(A1);
+      expect(comp.isSubmitReady).toBe(false); // no Amount, no LC Number yet
+
+      comp.naturalKey.lcNumber = 'LC001';
+      comp.model.amount = '100000';
+      // model.currency/createdBy already default 'USD'/'maker1'; tenorType defaults to SIGHT via selectFunction()
+      expect(comp.isSubmitReady).toBe(true);
+    });
+
+    it('A2 — false before an eligible target is picked (mandatory fields otherwise valid)', () => {
+      const { comp } = setup();
+      comp.selectFunction(A2);
+      comp.subChoiceValue = 'AMEND_DECREASE';
+      comp.onSubChoice();
+      comp.model.amount = '100';
+      comp.model.secondaryRef = 'AMD01';
+      // selectedContract left unset — hasEligibleTargetSelected is false
+      expect(comp.isSubmitReady).toBe(false);
+    });
+
+    it('A2 — still false once an eligible target IS picked but a mandatory field (Amendment No.) is still blank', () => {
+      const { comp } = setup();
+      comp.selectFunction(A2);
+      comp.subChoiceValue = 'AMEND_DECREASE';
+      comp.onSubChoice();
+      comp.model.amount = '100';
+      comp.selectedContract = makeContract();
+      // model.secondaryRef left unset — validateSubmit() would still fail
+      expect(comp.hasEligibleTargetSelected).toBe(true);
+      expect(comp.isSubmitReady).toBe(false);
+    });
+
+    it('A2 — true once BOTH an eligible target is picked AND every mandatory field is valid', () => {
+      const { comp } = setup();
+      comp.selectFunction(A2);
+      comp.subChoiceValue = 'AMEND_DECREASE';
+      comp.onSubChoice();
+      comp.model.amount = '100';
+      comp.model.secondaryRef = 'AMD01';
+      comp.selectedContract = makeContract();
+      expect(comp.isSubmitReady).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------
   // submit() — request-building + happy/error paths
   // ---------------------------------------------------------------------
   describe('submit() — request building', () => {
@@ -1715,7 +1765,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       // STILL A3/A3S's own earmark — now that its own eventStatus correctly shows RELEASED (not a stale
       // PENDING), it correctly displays EARMARKED, not EARMARKING.
       expect(comp.displayStatus(createRow.eventStatus, createRow.contract.instrumentType, createRow.movement.movementType, createRow.phase)).toBe('EARMARKED');
-      expect(comp.displayStatus(finalizeRow.eventStatus, finalizeRow.contract.instrumentType, finalizeRow.movement.movementType, finalizeRow.phase)).toBe('APPROVED');
+      expect(comp.displayStatus(finalizeRow.eventStatus, finalizeRow.contract.instrumentType, finalizeRow.movement.movementType, finalizeRow.phase)).toBe(
+        'APPROVED',
+      );
       // UX enhancement 2026-08-19 ("Look Up Current Balance → Event Timeline" gains a FUNCTION column
       // that "must use the same Function mapping as Inquire Events... Do not implement a separate
       // Function mapping") — lookUp.functionFor() delegates to the exact same functionForEvent() free
@@ -1733,7 +1785,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('a NOT-yet-finalized Sight IPLC_LC/UTILIZE (still genuinely PENDING) stays a single row showing EARMARKING, never splits', () => {
       const { comp, api } = setup();
       const sightLc = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
-      const stillPendingUtilize = makeMovement({ movementId: 'mv-utilize-pending', movementType: 'UTILIZE', status: 'PENDING', eventSeq: 2, createdAt: '2026-08-18T01:00:00.000Z' });
+      const stillPendingUtilize = makeMovement({
+        movementId: 'mv-utilize-pending',
+        movementType: 'UTILIZE',
+        status: 'PENDING',
+        eventSeq: 2,
+        createdAt: '2026-08-18T01:00:00.000Z',
+      });
       api.resolveContract.mockReturnValueOnce(of(sightLc) as any);
       api.listMovements.mockReturnValueOnce(of([stillPendingUtilize]) as any);
       comp.lookUp.lookup = { instrumentType: 'IPLC_LC', lcNumber: 'LC001', ibNumber: '', sgNumber: '' };
@@ -1808,9 +1866,21 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     // invisible here even though Inquire Events' own already-merged timeline showed them correctly.
     it('EPLC_CONFIRMATION contract: merges every B3/EPLC_EXAMINATION Earmark event into the LC tab timeline, sorted by true Event Date/Time across contracts', () => {
       const { comp, api } = setup();
-      const confirmationLc = makeContract({ balanceContractId: 'bc-conf-1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } });
-      const examE01 = makeContract({ balanceContractId: 'bc-exam-e01', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'U01', ibNumber: 'E01', sgNumber: null } });
-      const examE02 = makeContract({ balanceContractId: 'bc-exam-e02', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'U01', ibNumber: 'E02', sgNumber: null } });
+      const confirmationLc = makeContract({
+        balanceContractId: 'bc-conf-1',
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null },
+      });
+      const examE01 = makeContract({
+        balanceContractId: 'bc-exam-e01',
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'U01', ibNumber: 'E01', sgNumber: null },
+      });
+      const examE02 = makeContract({
+        balanceContractId: 'bc-exam-e02',
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'U01', ibNumber: 'E02', sgNumber: null },
+      });
       api.resolveContract.mockReturnValueOnce(of(confirmationLc) as any);
       (api.catalog as any).mockImplementation((instrumentType: string) =>
         instrumentType === 'EPLC_EXAMINATION'
@@ -1818,9 +1888,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
           : of({ items: [], total: 0, page: 1, pageSize: 50 }),
       );
       (api.listMovements as any).mockImplementation((contractId: string) => {
-        if (contractId === 'bc-conf-1') return of([makeMovement({ movementId: 'mv-issue', movementType: 'ISSUE', status: 'RELEASED', createdAt: '2026-08-18T01:00:00.000Z' })]);
-        if (contractId === 'bc-exam-e01') return of([makeMovement({ movementId: 'mv-exam-e01', movementType: 'CREATE', status: 'RELEASED', createdAt: '2026-08-18T02:00:00.000Z' })]);
-        if (contractId === 'bc-exam-e02') return of([makeMovement({ movementId: 'mv-exam-e02', movementType: 'CREATE', status: 'PENDING', createdAt: '2026-08-18T03:00:00.000Z' })]);
+        if (contractId === 'bc-conf-1')
+          return of([makeMovement({ movementId: 'mv-issue', movementType: 'ISSUE', status: 'RELEASED', createdAt: '2026-08-18T01:00:00.000Z' })]);
+        if (contractId === 'bc-exam-e01')
+          return of([makeMovement({ movementId: 'mv-exam-e01', movementType: 'CREATE', status: 'RELEASED', createdAt: '2026-08-18T02:00:00.000Z' })]);
+        if (contractId === 'bc-exam-e02')
+          return of([makeMovement({ movementId: 'mv-exam-e02', movementType: 'CREATE', status: 'PENDING', createdAt: '2026-08-18T03:00:00.000Z' })]);
         return of([]);
       });
       comp.lookUp.lookup = { instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'U01', ibNumber: '', sgNumber: '' };
@@ -1998,7 +2071,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.lookUp.lookupMovementsPaging.total).toBe(1);
     });
 
-    it('switching to an ALREADY-LOADED tab (no re-fetch) resets to page 1 against that tab\'s own array — must not carry over a stale page from a different tab', () => {
+    it("switching to an ALREADY-LOADED tab (no re-fetch) resets to page 1 against that tab's own array — must not carry over a stale page from a different tab", () => {
       const { comp } = setup();
       comp.lookUp.lookupMovements = Array.from({ length: 25 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `lc${i}` }) }));
       comp.lookUp.acceptancesUnderLookup = [makeContract({ balanceContractId: 'bc-acc-1' })];

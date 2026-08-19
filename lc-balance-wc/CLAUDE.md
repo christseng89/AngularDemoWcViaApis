@@ -7300,3 +7300,125 @@ eligible record and confirm both the fields and Submit button immediately unlock
 reload/re-render glitch.
 
 Not committed (not requested).
+
+## Submit Button Enablement — every mandatory field valid, all A1–A9/B1–B5 — plus Amount > 0 and B2's own Direction selector (2026-08-19, two same-day, directly-related user-directed requirements: "### Submit Button Enablement — A1–A9 / B1–B5 — The Submit button should be enabled only when all mandatory fields have been entered and contain valid values.", then "Furthermore A1 - A9, B1 - B5 Amount figure should > 0")
+
+**Scope, unlike the "No Eligible Records" entry immediately above**: this requirement applies to EVERY
+function including A1/B1 — the prior requirement's own `requiresEligibleTarget`/`hasEligibleTargetSelected`
+gate stays scoped to A2–A9/B2–B5 (A1/B1 create a brand-new record with no target to pick), but Submit's
+own overall READINESS now also depends on every mandatory FIELD VALUE being valid, for all 14 functions.
+
+**Design — reuse `validateSubmit()` live, read-only, never its own mutating call path.** New
+`TransactionBuilderComponent.isSubmitReady` getter: `this.hasEligibleTargetSelected &&
+validateSubmitRules(this.submitRulesContext).error === null`. Deliberately calls the exported
+`validateSubmit` (`submit-rules.ts`) directly for its `error` result only, WITHOUT ever applying the
+`patch` it also returns (that stays the click-time `validateSubmit()` **method** wrapper's own job,
+`Object.assign(this.model, patch)`) — since `validateSubmitRules` is a pure function with no side effects
+of its own, calling it repeatedly from a template-bound getter (once per change-detection cycle) is safe
+and byte-consistent with what a real Submit click would do, rather than a second, independently-maintained
+"is the form valid" check that could drift from the real one. `hasEligibleTargetSelected` is ALSO required
+(not merely implied) because `validateSubmit()` alone never checks the generic flat-Catalog/two-field-
+search "a contract must be picked" case — that guard lives in `buildSubmitRequest()` instead, which only
+ever runs AFTER `validateSubmit()` already passed in the real `submit()` flow; `hasEligibleTargetSelected`
+already reproduces that same condition (see its own doc comment, previous entry), so this composition
+covers exactly the same ground the real `submit()` → `buildSubmitRequest()` call chain does.
+
+**Template**: the generic Submit button's `[disabled]` binding changed from the prior entry's own
+`submitting || !!submitResult || (requiresEligibleTarget && !hasEligibleTargetSelected)` to `submitting ||
+!!submitResult || !isSubmitReady` — `isSubmitReady` already subsumes the old condition (its own
+`hasEligibleTargetSelected` half is unconditionally `true` for A1/B1, same exemption as before), so this
+is a strict generalization, not a behavior narrowing for the 12 functions the prior requirement already
+covered. A4's own separate "Submit A4" button was deliberately left untouched — it has no live-typed
+Amount/Currency fields at all (fully auto-filled/read-only from the picked Document Arrival), so its
+existing `!selectedPayMovement` check already fully captures "all mandatory fields entered and valid" for
+its own reduced flow; routing it through `validateSubmitRules` (which checks fields A4 never asks the user
+to type) would be semantically wrong, not merely redundant.
+
+**Follow-up, same day — "Amount figure should > 0" — surfaced a real design conflict with B2's own
+existing signed-Amount convention, resolved via `AskUserQuestion`.** B2 (Export LC Amendment,
+`EPLC_CONFIRMATION`/`AMEND`) is the one function in this whole registry where a NEGATIVE typed Amount was
+already load-bearing, per this file's own pre-existing "Contingent account entries" doc history: Confirmation
+has no separate `AMEND_INCREASE`/`AMEND_DECREASE` movementType the way `IPLC_LC` does (A2's own subChoice),
+so a Decrease was expressed by the SIGN of the typed Amount itself. A blanket "> 0" rule would have made a
+B2 Decrease impossible to submit at all — flagged to the user rather than silently either breaking B2 or
+silently exempting it. User's own answer: keep Amount itself always positive (satisfying the universal rule
+uniformly), and have B2 gain its own explicit Direction picker instead — "Input the Decrease Amount > 0,
+then it turns to negative figure to call the APIs."
+
+**Fix, universal ">0" guard (`submit-rules.ts`, `validateSubmit()`)**: `if (Number(model.amount) <= 0)
+return fail('Amount must be greater than 0.');` — added right after the existing decimal-places guard,
+applying unconditionally to every function's own RAW typed magnitude (checked BEFORE any function-specific
+patch, including B2's own sign-negation below, so it always validates what the Maker actually typed, never
+an already-negated value). `builder-fields.ts`'s Amount field also gained `props.min` (the same
+`Math.pow(10, -decimalPlacesForCurrency(model.currency))` expression `step` already uses — the smallest
+representable positive value for the typed Currency) so the native `type="number"` input itself refuses
+0/negative before the submit-time backstop is ever reached, live client-side feedback matching this app's
+own established convention of surfacing constraints reactively, not only at Submit.
+
+**Fix, B2's own Direction selector**: rather than force-fitting the existing `subChoice` mechanism (which
+hardcodes writing the picked value into `model.movementType` — wrong for B2, whose own `movementType` stays
+the fixed `'AMEND'` regardless of direction, unlike A2's genuinely distinct `AMEND_INCREASE`/
+`AMEND_DECREASE` movementTypes), a small, B2-dedicated mechanism was added instead: new component field
+`amendDirection: 'INCREASE' | 'DECREASE' | null` (pure UI-selection state, NOT part of `BuilderModel`/the
+wire request — reset alongside `subChoiceValue` in `selectFunction()`'s own reset block), a new
+`<select>` bound to it (styled identically to the existing subChoice dropdown, positioned right after it,
+`*ngIf="selectedFunction.code === 'B2'"`, `[disabled]="formLocked"` matching every other field's own
+post-Submit lock), and a new field on `SubmitRulesContext`, `amendDirection`, threaded through the
+component's own `submitRulesContext` getter. New guard in `validateSubmit()`, placed after the existing
+A9/B5 FULL-vs-PARTIAL derivation guards (same "derive the real value via `patch`" shape): for
+`selectedFunction?.code === 'B2'`, fails with `'Pick Increase or Decrease for this Amendment.'` when
+`amendDirection` is unset, otherwise patches `model.amount` to `String(Math.abs(...))` (Increase, a
+sign-wise no-op since the universal `>0` guard already proved it positive) or `String(-Math.abs(...))`
+(Decrease) — the SAME "raw input stays positive/untouched, the real derived value travels via `patch`"
+convention A9/B5's own FULL_REDEEM/PARTIAL_REDEEM derivation already established, reused rather than
+inventing a second pattern. `buildSubmitRequest()` needed zero changes — it already reads `model.amount`
+strictly AFTER the caller applies `validateSubmit()`'s own `patch`, per its own pre-existing doc comment,
+so it automatically sees the correctly-signed value on the wire.
+
+**Tests**: `submit-rules.spec.ts` gained two new describe blocks — "Amount must be > 0" (4 cases: A1
+rejects `'0'`, A2 rejects a negative amount with a selectedContract already picked, a positive amount
+passes, and the `>0` guard is proven to run BEFORE the decimal-places guard would matter) and "B2 Direction
+/ signed Amount patch" (5 cases: no Direction picked fails even with every other field valid; Increase
+patches to the same positive magnitude; Decrease patches to the negated value; a negative TYPED amount is
+still rejected by the universal `>0` guard even for a Decrease, before the Direction guard is ever reached;
+and an end-to-end proof that `buildSubmitRequest()` sees the negated amount once the caller applies the
+patch, mirroring the real component flow exactly). One new `isSubmitReady` describe block in
+`transaction-builder.component.actions.spec.ts` (4 cases, using the file's own existing `A1`/`A2`/
+`makeContract()` fixtures): A1 false-then-true as Amount/LC Number are filled in; A2 false before an
+eligible target is picked; A2 still false once a target IS picked but a mandatory field (Amendment No.) is
+still blank; A2 true once both halves are satisfied — directly proving the two-part composition
+(`hasEligibleTargetSelected && validateSubmitRules(...).error === null`), not just each half in isolation.
+`ctx()`'s own default fixture in `submit-rules.spec.ts` gained `amendDirection: null`, a mechanical
+addition every existing test call site needed to keep compiling (TS caught this immediately as a real
+compile error, not silently — the new required `SubmitRulesContext` field surfaced every construction site
+that needed updating).
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit` clean, `ng build --configuration development` (strict
+templates — validates the new `[(ngModel)]="amendDirection"`/`[ngValue]="null"` select binding) clean,
+`npm run lint` 0 errors (228 warnings, unchanged), `npx prettier --write` applied to the touched files
+(whitespace-only, re-verified via a clean `tsc --noEmit`/full suite re-run afterward). Full Angular suite
+**880/880 passing** (13 net new), coverage **97.85/95.39/96.79/98.14%** (all four metrics clear the 95%
+floor; `submit-rules.ts` and `builder-fields.ts` both back to **100/100/100/100**). `backend/` 34/34 and
+microservice 335/335 both re-run per this file's own standing rule, unaffected (Angular-only change — the
+microservice's own acceptance of a negative `EPLC_CONFIRMATION`/`AMEND` amount is completely unchanged;
+this is purely a client-side UX/validation change on the Transaction Builder, and `backend/data/
+businessCases.js`'s own orchestrator calls the microservice directly, bypassing Angular entirely, so it
+was never in scope to begin with).
+
+**Genuine, previously-undetected coverage gap closed as a side effect**: no existing test anywhere in this
+codebase exercised B2's own real `submit()`/`validateSubmit()`/`buildSubmitRequest()` flow with an actual
+typed Amount before this pass (confirmed via a repo-wide grep) — every pre-existing B2 reference was a
+registry-shape/Strategy assertion only. B2's own signed-Amount design has therefore been genuinely
+untested end-to-end since it first shipped; this pass's new tests are the first to exercise it directly.
+
+Live in-browser verification not attempted this pass — static verification is unusually strong here
+(strict-template build, full typecheck, and 13 new dedicated tests covering both the universal `>0` rule
+and B2's own full Increase/Decrease/no-direction-picked/negative-typed-amount matrix). A human should
+reproduce live: on any function, confirm Submit stays disabled while Amount is blank/zero/negative and
+enables the instant a valid positive Amount (plus every other mandatory field) is filled in; on B2
+specifically, confirm the new Direction dropdown appears, Submit stays disabled until a direction is
+picked, and a Decrease submission correctly reduces (rather than increases) the Confirmation's own
+Confirmed Balance — i.e. that the negated amount genuinely reached the microservice, not just that the
+UI's own guard logic looks right in isolation.
+
+Not committed (not requested).

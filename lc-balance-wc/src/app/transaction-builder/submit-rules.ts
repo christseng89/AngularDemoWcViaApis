@@ -45,6 +45,13 @@ export interface SubmitRulesContext {
   selectedContract: BalanceContract | null;
   selectedParent: BalanceContract | null;
   exposureNature: 'ACTUAL' | 'MEMO';
+  /**
+   * B2 only (business requirement 2026-08-19, "Furthermore A1-A9, B1-B5 Amount figure should > 0" —
+   * clarified via a follow-up: B2's Amount stays a plain positive magnitude like every other function;
+   * a Decrease is now expressed by picking this Direction instead of by typing a negative number).
+   * `null` for every other function, which never reads it.
+   */
+  amendDirection: 'INCREASE' | 'DECREASE' | null;
 }
 
 export interface SubmitValidation {
@@ -76,6 +83,16 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   }
   if (amountExceedsCurrencyDecimals(model.amount, model.currency)) {
     return fail(`Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`);
+  }
+  // Business requirement 2026-08-19 ("Furthermore A1-A9, B1-B5 Amount figure should > 0") — applies
+  // uniformly to every function's own TYPED magnitude, including B2: B2 used to accept a negative
+  // Amount directly (the sign itself expressed Increase vs. Decrease, per this file's own EPLC_
+  // CONFIRMATION AMEND doc history) — clarified via a follow-up business instruction that B2's own
+  // typed Amount should ALSO always be a positive magnitude, with the new Direction guard below
+  // deriving the actual signed value via `patch` instead. Checked here, before that patch runs, so
+  // this always validates the RAW typed value, never an already-negated one.
+  if (Number(model.amount) <= 0) {
+    return fail('Amount must be greater than 0.');
   }
   if (ctx.dynamicSecondaryRefLabel && !model.secondaryRef) {
     return fail(`${ctx.dynamicSecondaryRefLabel} is mandatory for ${selectedFunction?.code}.`);
@@ -161,6 +178,20 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
       return fail(`Amount must not exceed the Acceptance's Available Balance (${available}).`);
     }
     patch.movementType = Number(model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
+  }
+  // Business requirement 2026-08-19, follow-up clarification ("Would it be possible that 1. Input the
+  // Decrease Amount > 0, then it turns to negative figure to call the APIs?") — B2 only
+  // (EPLC_CONFIRMATION/AMEND is the one movementType this whole registry shares between Increase and
+  // Decrease, per the direction-from-sign design this reverses; every other function's own direction
+  // is already carried by a distinct movementType — A2's own AMEND_INCREASE/AMEND_DECREASE subChoice,
+  // for one — so none of them need this). Amount itself was already proven > 0 above; this patch
+  // negates it for the wire request when Decrease is picked, same "raw input stays positive, the real
+  // signed/derived value travels via `patch`" shape as A9/B5's own FULL/PARTIAL derivation above.
+  if (selectedFunction?.code === 'B2') {
+    if (!ctx.amendDirection) {
+      return fail('Pick Increase or Decrease for this Amendment.');
+    }
+    patch.amount = ctx.amendDirection === 'DECREASE' ? String(-Math.abs(Number(model.amount))) : String(Math.abs(Number(model.amount)));
   }
   return { error: null, patch };
 }

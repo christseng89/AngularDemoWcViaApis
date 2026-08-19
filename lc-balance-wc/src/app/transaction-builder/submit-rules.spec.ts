@@ -83,6 +83,7 @@ function ctx(overrides: Partial<SubmitRulesContext> = {}): SubmitRulesContext {
     selectedContract: null,
     selectedParent: null,
     exposureNature: 'ACTUAL',
+    amendDirection: null,
     ...overrides,
     model,
   };
@@ -562,6 +563,72 @@ describe('submit-rules', () => {
       );
       expect(request?.tenorType).toBe('SIGHT');
       expect(request?.tenorDays).toBeUndefined();
+    });
+  });
+
+  describe('validateSubmit — Amount must be > 0 (business requirement 2026-08-19, "A1-A9, B1-B5 Amount figure should > 0")', () => {
+    it('rejects Amount "0" for A1 (creating function)', () => {
+      const result = validateSubmit(ctx({ model: { amount: '0' } }));
+      expect(result.error).toBe('Amount must be greater than 0.');
+    });
+
+    it('rejects a negative Amount for A2 (non-creating, generic target)', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '-500', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBe('Amount must be greater than 0.');
+    });
+
+    it('passes for a genuinely positive Amount', () => {
+      const result = validateSubmit(ctx({ model: { amount: '1' } }));
+      expect(result.error).toBeNull();
+    });
+
+    it('is checked before the decimal-places guard would otherwise be reached — a zero amount fails with the >0 message, not a decimal-places one', () => {
+      // "0" has zero decimal places for any currency, so this test only proves ORDER, not a case the
+      // decimal-places guard would itself have caught — the >0 check runs first regardless.
+      const result = validateSubmit(ctx({ model: { amount: '0', currency: 'JPY' } }));
+      expect(result.error).toBe('Amount must be greater than 0.');
+    });
+  });
+
+  describe('validateSubmit — B2 Direction / signed Amount patch (business requirement 2026-08-19, follow-up: "Input the Decrease Amount > 0, then it turns to negative figure to call the APIs")', () => {
+    const b2Model: Partial<BuilderModel> = { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', amount: '5000', currency: 'USD', createdBy: 'maker1' };
+
+    it('fails when no Direction is picked, even though every other field is valid', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: null }));
+      expect(result.error).toBe('Pick Increase or Decrease for this Amendment.');
+    });
+
+    it('Increase — patches amount to the same positive magnitude (a no-op sign-wise)', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'INCREASE' }));
+      expect(result.error).toBeNull();
+      expect(result.patch.amount).toBe('5000');
+    });
+
+    it('Decrease — patches amount to the negated value', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'DECREASE' }));
+      expect(result.error).toBeNull();
+      expect(result.patch.amount).toBe('-5000');
+    });
+
+    it('the typed Amount itself must still be > 0 even for a Decrease — a negative typed value is rejected before the Direction guard is ever reached', () => {
+      const result = validateSubmit(
+        ctx({ selectedFunction: fn('B2'), model: { ...b2Model, amount: '-5000' }, selectedContract: contract(), amendDirection: 'DECREASE' }),
+      );
+      expect(result.error).toBe('Amount must be greater than 0.');
+    });
+
+    it('buildSubmitRequest() sees the negated amount on the wire once the patch has been applied by the caller (mirroring the real component flow)', () => {
+      const c = ctx({ selectedFunction: fn('B2'), model: { ...b2Model }, selectedContract: contract(), amendDirection: 'DECREASE' });
+      const { patch } = validateSubmit(c);
+      const patched = ctx({ ...c, model: { ...c.model, ...patch } });
+      const { request } = buildSubmitRequest(patched);
+      expect(request?.amount).toBe('-5000');
     });
   });
 

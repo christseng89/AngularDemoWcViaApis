@@ -94,6 +94,14 @@ export class TransactionBuilderComponent {
   /** Value of the function's subChoice (e.g. 'AMEND_INCREASE', or 'CONFIRMED' for B1/B2). */
   subChoiceValue = '';
   /**
+   * B2 only (business requirement 2026-08-19, "Amount figure should > 0", follow-up clarification —
+   * B2's own Amount field stays a plain positive magnitude; this Direction pick is what now carries
+   * Increase-vs-Decrease instead of the amount's own sign). Not part of `model`/`BuilderModel` — it's
+   * pure UI selection state, threaded into `submitRulesContext` for `validateSubmit()`'s own new
+   * B2-only guard (submit-rules.ts) to read and turn into the actual signed wire amount via `patch`.
+   */
+  amendDirection: 'INCREASE' | 'DECREASE' | null = null;
+  /**
    * Business instruction 2026-08-14: usually just selectedFunction's own
    * static secondaryRefLabel, but B1 is special — Advise (Unconfirmed) is a
    * starting transaction like A1/LC Issue (no secondary ref needed), while
@@ -539,6 +547,7 @@ export class TransactionBuilderComponent {
     this.activeFunctionSide = fn.side;
     this.lookUp.resetForSide(fn.side);
     this.subChoiceValue = '';
+    this.amendDirection = null;
     this.dynamicSecondaryRefLabel = fn.secondaryRefLabel ?? null;
     this.model = { currency: 'USD', createdBy: 'maker1', eventSeq: Date.now() };
     // Business instruction 2026-08-15: A1 (LC Issue) and B1 (Confirm LC) Tenor Type should default to
@@ -2352,6 +2361,25 @@ export class TransactionBuilderComponent {
   }
 
   /**
+   * Business requirement 2026-08-19 ("Submit Button Enablement — A1–A9 / B1–B5" — "The Submit button
+   * should be enabled only when all mandatory fields have been entered and contain valid values.").
+   * Unlike `requiresEligibleTarget`/`hasEligibleTargetSelected` above, this applies to EVERY function
+   * including A1/B1 — reuses the exact same `validateSubmit()` guard sequence a real Submit click
+   * already runs, called here purely for its `error` result (never applying the `patch` it also
+   * returns — that stays the click-time `validateSubmit()` wrapper's own job) so this stays
+   * byte-consistent with what a click would actually do rather than a second, independently-maintained
+   * "is the form valid" check. `hasEligibleTargetSelected` is ALSO required — not merely implied —
+   * because `validateSubmit()` alone never checks the generic flat-Catalog/two-field-search "a contract
+   * must be picked" case (that guard lives in `buildSubmitRequest()` instead, which only ever runs
+   * AFTER `validateSubmit()` already passed); `hasEligibleTargetSelected` already reproduces that same
+   * condition (see its own doc comment above), so combining the two here covers exactly the same
+   * ground the real `submit()` → `buildSubmitRequest()` call chain does, with zero side effects.
+   */
+  get isSubmitReady(): boolean {
+    return this.hasEligibleTargetSelected && validateSubmitRules(this.submitRulesContext).error === null;
+  }
+
+  /**
    * Template binds to this instead of `fields` directly, so the live form flips to
    * `toReadOnlyFields()` (BAL-101/Decorator, already built for Inquire Events' own read-only
    * reconstruction — reused here rather than duplicated) the instant `fieldsLocked` goes true, with no
@@ -2401,6 +2429,7 @@ export class TransactionBuilderComponent {
       selectedContract: this.selectedContract,
       selectedParent: this.selectedParent,
       exposureNature: this.exposureNature,
+      amendDirection: this.amendDirection,
     };
   }
 

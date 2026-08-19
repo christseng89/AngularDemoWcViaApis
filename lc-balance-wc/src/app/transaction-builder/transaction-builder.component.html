@@ -80,6 +80,22 @@
               </select>
             </div>
 
+            <!-- Business requirement 2026-08-19 ("Amount figure should > 0", follow-up clarification —
+                 B2's own Amount stays a positive magnitude; this Direction pick, not the amount's sign,
+                 now carries Increase vs. Decrease. B2 only — every other function's own direction is
+                 already carried by a distinct movementType (A2's own AMEND_INCREASE/AMEND_DECREASE
+                 subChoice above, for one), so none of them need this. [disabled] mirrors formLocked
+                 the same way the field-formGroup below already does — no changing Direction after a
+                 successful Submit. -->
+            <div class="tb-field" *ngIf="selectedFunction.code === 'B2'">
+              <label class="tb-field__label">Direction <span class="tb-required-mark">*</span></label>
+              <select class="tb-select tb-select--required" [(ngModel)]="amendDirection" [disabled]="formLocked">
+                <option [ngValue]="null">— select —</option>
+                <option value="INCREASE">Increase</option>
+                <option value="DECREASE">Decrease</option>
+              </select>
+            </div>
+
             <ng-container *ngIf="ready">
               <!-- Parent LC (business instruction 2026-08-14): for A6/B4 (Acceptance) and A8 (Shipping Gtee Issue),
                  the LC Number is NOT freely typed — an Acceptance/SG can only ever be created under an LC that
@@ -729,15 +745,15 @@
                    while submitting is true, so a second click can't fire a duplicate movement for the same
                    entry. selectFunction() resets submitResult to null, which is already how a Maker starts
                    a genuinely new submission — re-picking the function chip (same or different).
-                   Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — also disabled
-                   until an eligible record is selected, for every function this requirement applies to
-                   (requiresEligibleTarget is false for A1/B1, so this added condition is always false —
-                   a no-op — for those two). -->
-                <button
-                  class="tb-btn tb-btn--primary"
-                  (click)="submit()"
-                  [disabled]="submitting || !!submitResult || (requiresEligibleTarget && !hasEligibleTargetSelected)"
-                >
+                   Business requirement 2026-08-19 ("Submit Button Enablement — A1–A9 / B1–B5") — also
+                   disabled until isSubmitReady (an eligible record selected AND every mandatory field
+                   holds a valid value, per the exact same validateSubmit() guards a real click already
+                   runs) — see isSubmitReady's own doc comment. Applies to every function including A1/B1
+                   this time (unlike the earlier "No Eligible Records" requirement's own narrower
+                   requiresEligibleTarget, isSubmitReady's own hasEligibleTargetSelected half is already
+                   unconditionally true for A1/B1, so only the mandatory-field-validity half is new for
+                   them). -->
+                <button class="tb-btn tb-btn--primary" (click)="submit()" [disabled]="submitting || !!submitResult || !isSubmitReady">
                   {{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction.code }}
                 </button>
               </ng-container>

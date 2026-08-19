@@ -58,7 +58,8 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // settlesAcceptanceOnMature (below, and at amountCappedAtAcceptance further down) now read through
   // the Strategy too; behavior unchanged.
   const amountFromDocArrival = !!strategy?.checkerRelease.settlesDocumentArrival && !!ctx.selectedPayMovement;
-  const amountFromFullSettle = strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
+  const amountFromFullSettle =
+    strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
   // Business instruction 2026-08-15 ("There is no need to select Full or Partial as long as the
   // amount is not greater than the SG Balance. The defaulted amount is the SG Balance and
   // mandatory.", refined same day: "Amount default to SG Available Balance") — A9 only, replacing
@@ -74,7 +75,8 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // just for B5's own Usance/CNF_MATURE branch (model.instrumentType === 'EPLC_ACCEPTANCE', B5's own
   // fixed registry type — see settlesAcceptanceOnMature's own doc comment for why this is always true
   // for a real B5 submission, not a conditional fallback resolution).
-  const amountCappedAtAcceptance = strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
+  const amountCappedAtAcceptance =
+    strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
   const amountLocked = amountFromDocArrival || amountFromFullSettle;
   const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
   // Business instruction 2026-08-16 ("A1/B1 = Input; every other function = Carry from A1/B1 +
@@ -123,6 +125,13 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
         type: 'number',
         disabled: amountLocked,
         max: amountCappedAtSg || amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
+        // Business requirement 2026-08-19 ("A1-A9, B1-B5 Amount figure should > 0") — the smallest
+        // representable positive value for the typed Currency (same expression as `step` below), so
+        // the native number input itself refuses 0/negative before the real submit-time backstop
+        // (validateSubmit()'s own `Amount must be greater than 0.` guard, submit-rules.ts) ever runs.
+        // Applies unconditionally, including B2 (EPLC_CONFIRMATION/AMEND): its own Amount is no longer
+        // ever typed negative — Increase/Decrease is now picked via the new Direction selector instead.
+        min: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
         // Keeps the input's own spinner/step granularity in sync with whichever Currency is typed
         // alongside it (e.g. JPY -> step 1, no cents) — see decimalPlacesForCurrency's own doc
         // comment (balance-component.model.ts) for the ISO 4217 minor-unit table this reads.
