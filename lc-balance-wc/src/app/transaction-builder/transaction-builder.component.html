@@ -785,7 +785,10 @@
                  and with no scroll container of its own the overflow had nowhere to go but clipped. This
                  wrapper gives that overflow a dedicated horizontal-scroll surface instead. -->
             <div class="tb-table-scroll" *ngIf="lookUp.activeLookupMovements.length">
-            <table class="tb-table">
+            <!-- 2026-08-19 (60/40 split, requirement #5) — tb-table--lookup-timeline tightens this
+                 specific table's own cell padding/font-size (transaction-builder.component.scss) so its
+                 7 columns fit the now-narrower 40% Look Up Current Balance panel without truncation. -->
+            <table class="tb-table tb-table--lookup-timeline">
               <caption class="visually-hidden">Event Timeline — {{ lookUp.activeLookupLabel }}</caption>
               <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
                    (Design doc §8's idempotency key part, currently just Date.now()) dropped from the

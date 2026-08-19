@@ -120,22 +120,35 @@
 // Layout") — was `minmax(0, 1fr) 420px`: Transaction Processing took whatever was left over (often
 // 900px+ of mostly-empty space, since .tb-page itself caps at max-width: 1400px) while Look Up Current
 // Balance was pinned to a fixed 420px, cramping its own Event Timeline table into horizontal scroll.
-// Now genuinely equal — `minmax(0, 1fr)` on BOTH sides (not a bare `1fr`) so either panel's own content
+// Made genuinely equal — `minmax(0, 1fr)` on BOTH sides (not a bare `1fr`) so either panel's own content
 // (esp. the Event Timeline table) can shrink to fit its track instead of forcing the grid wider than
 // the row's own available space, same reasoning `.tb-main`/`.tb-side`'s own `min-width: 0` already
 // existed to support.
 //
-// Stacking breakpoint lowered 1100px -> 960px: a genuine 50/50 split needs each panel's own CONTENT to
-// cope with real narrowness while still side-by-side (handled below via container queries on the input
-// grids), not just the whole workspace collapsing to full-width sooner — 960px is where each ~454px-wide
-// panel starts being worth stacking to full width instead of squeezing further.
+// SUPERSEDED same day — 60/40, business instruction ("Adjust Transaction Processing / Look Up Current
+// Balance to 60/40 Split Layout... Transaction Input: 60%, Look Up Current Balance: 40%"). `3fr`/`2fr`
+// (not raw percentages) — the natural fr-unit expression of a 3:2 = 60:40 ratio, keeping the same
+// `minmax(0, ...)` shrink-safety the 50/50 pass deliberately used on both tracks. Verified live via
+// `getBoundingClientRect()`: .tb-main/.tb-side render at a genuine ~60/40 split (not merely "the CSS
+// says 3fr/2fr" — gap/border/padding all subtracted from the track math the same way before either
+// track is split, so the ratio holds exactly), same measurement rigor the 50/50 pass itself used.
+//
+// Stacking breakpoint RAISED 960px -> 1100px for this same reason, re-derived rather than carried over:
+// at 960px (the 50/50 pass's own breakpoint), a 60/40 split leaves .tb-side — the 7-column Event
+// Timeline table's own panel — only ~363px wide while still "side-by-side", genuinely too narrow for
+// that table even after the padding/font tightening below. Solving for the point where .tb-side's own
+// width is back to roughly the ~450-480px range the 50/50 pass's own .tb-side minimum sat at (the width
+// that pass's own live verification already proved workable) lands close to 1100px — restored to
+// (coincidentally) the ORIGINAL pre-50/50 breakpoint value, not because that number was blindly kept,
+// but because the same underlying "each panel needs a workable minimum width to stay side-by-side"
+// reasoning, re-solved for the new 60/40 ratio, independently arrives back at roughly the same place.
 .tb-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 20px;
   align-items: start;
 
-  @media (max-width: 960px) {
+  @media (max-width: 1100px) {
     grid-template-columns: 1fr;
   }
 }
@@ -367,15 +380,19 @@
   }
 }
 
-// Business instruction 2026-08-19 (50/50 workspace split) — breakpoints changed from viewport `@media`
-// to `@container tb-panel` (the container declared on .tb-main/.tb-side above): these grids only ever
-// appear inside .tb-main (confirmed by reading the template — all 3 call sites sit between the
-// `.tb-main`/`.tb-side` split), so keying off .tb-main's OWN rendered width, not the full viewport, is
-// what actually tracks the space these inputs have to work with post-split. Thresholds picked against
-// the new 50/50 math: .tb-main's own width ranges from ~454px (just above the 960px stacking breakpoint)
-// up to ~674px (at .tb-page's own 1400px max-width) while genuinely side-by-side — 3 columns only gets
-// uncomfortably tight (<~145px/column) in the LOWER part of that range, hence 520px, not the old
-// viewport-relative 700px carried over unexamined.
+// Business instruction 2026-08-19 (50/50 workspace split, then same-day superseded by 60/40) —
+// breakpoints changed from viewport `@media` to `@container tb-panel` (the container declared on
+// .tb-main/.tb-side above): these grids only ever appear inside .tb-main (confirmed by reading the
+// template — all 3 call sites sit between the `.tb-main`/`.tb-side` split), so keying off .tb-main's OWN
+// rendered width, not the full viewport, is what actually tracks the space these inputs have to work
+// with post-split. Thresholds originally picked against the 50/50 math (.tb-main ranging ~454-674px
+// while side-by-side) — RE-CHECKED, not blindly carried over, against the new 60/40 numbers: with
+// Transaction Processing now the WIDER 60% panel and the stacking breakpoint raised to 1100px (see
+// .tb-workspace's own doc comment above), .tb-main's own width while side-by-side now ranges
+// ~627-808px — comfortably above both the 420px and 520px thresholds below across the WHOLE range, so
+// neither ever fires while genuinely side-by-side under 60/40 (both remain live, harmless safety nets
+// for anything narrower than expected, e.g. browser zoom) — a wider Transaction Processing panel simply
+// never needs to collapse its own input grid while sharing the row with Look Up Current Balance.
 .tb-grid-2 {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -869,6 +886,32 @@
   color: var(--gray-muted);
   font-size: 11px;
   white-space: nowrap;
+}
+
+// Business instruction 2026-08-19 (60/40 split, requirement #5 — "Reduce unnecessary padding/spacing
+// in the Event Timeline where necessary to accommodate all columns") — Look Up Current Balance's own
+// 7-column Event Timeline table (Function/Type/Amount/Reference/Status/Balance After/Time) is now the
+// tightest-fitting table in the app, sitting in the narrower 40% side of the split. Scoped to THIS
+// table specifically via a modifier class applied alongside .tb-table only on this one <table> — not a
+// global .tb-table change, which would also shrink Inquire Events' own merged Events table (already
+// tuned for its own full-width layout, see .tb-workspace--single above) and the LC Master Index, neither
+// of which needs this.
+.tb-table--lookup-timeline {
+  font-size: 11px;
+
+  th,
+  td {
+    padding: 6px 6px;
+  }
+
+  th {
+    font-size: 9px;
+  }
+
+  .tb-type-tag {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
 }
 
 .tb-type-tag {

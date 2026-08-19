@@ -6269,3 +6269,82 @@ one) during this check — deleted along with its movements, all 41 reference-LC
 afterward.
 
 Nothing committed yet this pass (not requested).
+
+## Transaction Processing / Look Up Current Balance re-tuned from 50/50 to 60/40 — same day, same-file follow-up (2026-08-19, user-requested: "Adjust the current layout to a 60/40 split... Transaction Input: 60%, Look Up Current Balance: 40%")
+
+Direct, same-day follow-up to the two immediately-prior passes above (the 50/50 split itself, then the
+separate Inquire Events full-width fix) — this pass touches ONLY `.tb-workspace`'s own two-column grid
+ratio (the Transaction Processing / Look Up Current Balance split), the `.tb-grid-2`/`.tb-grid-3`
+container-query breakpoints inside `.tb-main`, and a new table-specific padding/font tightening for Look
+Up Current Balance's own Event Timeline — `.tb-workspace--single` (Inquire Events' own full-width fix)
+is untouched and reverified unaffected below.
+
+**The ratio itself**: `grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)` → `minmax(0, 3fr) minmax(0,
+2fr)` — `fr`-unit values (3:2 = 60:40), not raw percentages, keeping the same `minmax(0, ...)`
+shrink-safety the 50/50 pass deliberately used on both tracks. Verified live via `getBoundingClientRect()`
+(the same rigor the 50/50 pass itself used, not just "the CSS says 3fr/2fr"): at a real ~1707px viewport,
+`.tb-main` measured **808.8px** and `.tb-side` measured **539.2px** — 808.8 / (808.8 + 539.2) = exactly
+**60.0%** / **40.0%**, matching the hand-derived math (`(1368 workspace width − 20px gap) × 0.6/0.4`)
+precisely.
+
+**Stacking breakpoint raised 960px → 1100px, re-derived rather than left unexamined**: at the 50/50
+pass's own 960px breakpoint, a 60/40 split would leave `.tb-side` — the panel holding the 7-column Event
+Timeline table — only ~363px wide while still nominally "side-by-side," narrower than the ~450-480px
+range the 50/50 pass's own `.tb-side` minimum sat at (a width that pass's own live verification already
+proved workable). Solving for where `.tb-side`'s own width returns to roughly that same workable minimum
+under the NEW 60/40 ratio lands close to 1100px — restoring, coincidentally, the ORIGINAL pre-50/50
+breakpoint value, not because that number was blindly kept, but because the same "each panel needs a
+workable minimum width to stay side-by-side" reasoning, re-solved for 60/40, independently arrives back
+near the same place.
+
+**`.tb-grid-2`/`.tb-grid-3` container-query thresholds (420px/520px) — re-checked, left unchanged.**
+With Transaction Processing now the WIDER 60% panel and the stacking breakpoint at 1100px, `.tb-main`'s
+own width while genuinely side-by-side now ranges ~627–808px (was ~454–674px under 50/50) — comfortably
+above BOTH existing thresholds across the whole range, so neither ever fires while side-by-side under
+60/40 (both remain live as harmless safety nets for anything narrower than expected, e.g. browser zoom).
+A wider Transaction Processing panel simply never needs to collapse its own input grid while sharing the
+row with Look Up Current Balance — confirmed by the arithmetic, not assumed.
+
+**New `.tb-table--lookup-timeline` modifier, requirement #5 ("Reduce unnecessary padding/spacing in the
+Event Timeline where necessary")**: Look Up Current Balance's own 7-column Event Timeline table
+(Function/Type/Amount/Reference/Status/Balance After/Time) is now the tightest-fitting table in the app,
+sitting in the narrower 40% side. Scoped to THIS table specifically via a modifier class applied
+alongside `.tb-table` on this one `<table>` only (`transaction-builder.component.html`'s Look Up Current
+Balance Event Timeline block) — deliberately NOT a global `.tb-table` change, which would also shrink
+Inquire Events' own merged Events table (already tuned for its own full-width layout) and the LC Master
+Index, neither of which needs it. Tightens: table font-size 12px → 11px, cell padding `8px 10px` → `6px
+6px`, header font-size 10px → 9px, and the Function/Type column's own `.tb-type-tag` badges (font-size
+10px → 9px, padding `2px 6px` → `1px 5px`).
+
+**Live-verified end to end, both sides, real data, not just the container math**: searched Import LC S01
+(10 events, paginated) under Look Up Current Balance — the Event Timeline table measured **502px**
+(`scrollWidth === clientWidth`, zero horizontal overflow) inside the 539.2px `.tb-side` panel (the
+remaining ~37px is `.tb-section__body`'s own existing padding), all 7 headers present
+(Function/Type/Amount/Reference/Status/Balance After/Time), and the first row's own full content
+rendered untruncated end to end: `"A1 · LC Issue" | ISSUE | 100000 | — | APPROVED | 100000 | 8/18/26,
+9:03 AM`. Switched to Export Confirmed LC, searched U01 — identical result: 502px table, zero overflow,
+full first-row content (`"B1 · Confirm LC" | ISSUE | 10000 | — | APPROVED | 10000 | 8/18/26, 7:20 PM`),
+confirming requirement #6 (consistent across both sides) without needing two separate fixes, since both
+sides already shared one `look-up-panel.service.ts`/template block before this pass. Re-confirmed Inquire
+Events is genuinely unaffected by this same-file change: `.tb-workspace--single` still present, workspace
+width still **1368.0px** full-width, no `.tb-side` rendered there at all.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`, `ng build --configuration development`, `npm run lint`
+(0 errors, 221 warnings — unchanged from the immediately-prior pass's own baseline) all clean; full
+Angular suite unaffected, **821/821 passing**, coverage 99.37/96.28/99.35/99.48% (unchanged — pure
+CSS/template change, no `.ts` logic touched, matching this file's own repeatedly-established convention
+that such changes aren't covered by this project's direct-instantiation Jest tests). `backend/`/
+`microservices/balance-component/` untouched by this pass. No test data was created during live
+verification (read-only Look Up Current Balance searches only, no Submit/Release actions) — no DB
+cleanup needed this time.
+
+Not yet re-verified at a genuinely narrow desktop width below the new 1100px stacking breakpoint (this
+session's own browser tooling has repeatedly been unable to actually resize the tab viewport — a
+documented tooling limitation, not a code issue, per several earlier entries in this file) — the raised
+breakpoint's own derivation above is grounded in real measured `.tb-side` widths at the WIDE end, but the
+actual stacked-layout rendering at <1100px was not independently re-confirmed visually this pass; a human
+should shrink the browser window below ~1100px once to confirm Transaction Processing/Look Up Current
+Balance still stack cleanly, full-width, top-to-bottom.
+
+Files changed (uncommitted, not requested): `transaction-builder.component.scss`,
+`transaction-builder.component.html`, this file.
