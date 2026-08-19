@@ -7918,3 +7918,62 @@ items: F-06 (hand-duplicated wire types), F-08 (`submitResult: any`), F-10–F-1
 recommended by the review itself) — none flagged as urgent by the review's own "Recommended sequence."
 
 Not committed (not requested).
+
+## desiger-comments.md F-06 — a parity contract test between Angular's `BalanceContract`/`BalanceMovement` and the microservice's own `types.ts` (2026-08-19, user-directed — "先評估 F-06 的工作量" then "做方案 1")
+
+Investigated the finding's own literal framing ("kept in sync by hand... already caused one real gap") by
+reading both sides' actual current interfaces before proposing anything, and found the honest fix is
+narrower than "keep the two types in sync" implies. **The two interfaces are NOT supposed to be identical**
+— Angular's own `BalanceContract`/`BalanceMovement` doc comments already state they're a deliberate SUBSET
+(the microservice's own `legRef`/`accountEntries`/`lmtsReservationId`/`transactionDate`/`sourceModule`/
+`contractVersion`/`openingBalance`/`effectiveFrom`/etc. are never declared client-side, since the UI never
+reads them) — so a full set-equality check would be actively wrong, flagging every intentional omission as
+a false gap. Presented two real options (a one-direction subset parity test vs. OAS-driven codegen) with an
+honest cost/risk comparison — codegen was rejected as disproportionate given root `CLAUDE.md` already
+documents `analysis/balance-component-api.yaml` itself lagging the real implementation, so generating types
+FROM a known-stale spec would encode staleness as a compile-time guarantee rather than removing the risk.
+User confirmed the narrower option.
+
+**Fix**: new `wire-type-contract.spec.ts`, same "read both sibling projects' source files as plain text,
+never import/compile them" convention `instrument-type-contract.spec.ts` (BAL-110) already established for
+this exact "two independently-maintained sources of truth" problem shape — necessary so the test can never
+cross the two projects' separate tsconfigs/Jest configs, per this project's own standing caveat.
+`extractInterfaceFieldNames()` regex-extracts the top-level field names out of an `export interface X {
+...}` block (assumes no field's own type is an inline `{ ... }` object literal — true for both interfaces
+today; if that ever changes, the regex under/over-matching is itself the signal to revisit it, same
+"failure is itself the signal" posture BAL-110's own extraction helpers already established). Two tests —
+one per interface — assert Angular's own declared field NAMES are a subset of the microservice's own
+(`missing = clientFields.filter(f => !serverFields.has(f)); expect(missing).toEqual([])`), deliberately
+never the reverse direction and never a full equality.
+
+**Known, disclosed limitation, stated in the new file's own doc comment rather than glossed over**: this
+test can only catch a field renamed/typo'd on the Angular side without the microservice following (or vice
+versa, for a field Angular already declares). It structurally **cannot** catch the actual historical bug
+this finding cites — `balanceBefore`/`balanceAfter` were, for a time, missing from the Angular interface
+entirely while the microservice already had them and the UI code was already reading `m.balanceAfter`
+through a loose `any` cast — since there is nothing on the Angular side for a "declared fields" scan to
+find in that case. Closing that class of gap for real needs generated types from a genuinely
+kept-current single source of truth (a larger, separately-scoped investment, not this fix) or a code-review
+practice, not a static contract test. This test still earns its keep for the narrower, cheaper risk it DOES
+cover.
+
+**Verified the test isn't a tautology**, same discipline BAL-110's own verification pass established:
+temporarily renamed `balanceAfter` to `balanceAfterXYZ` in the Angular interface via `sed`, confirmed the
+new test failed with a clear, exact message (`Array ["balanceAfterXYZ"]` under "missing"), then reverted via
+`git checkout` and confirmed `git diff --stat` showed zero net change to that file before moving on.
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint` (0
+errors, 222 warnings, unchanged baseline)/`npx prettier --check` all clean. Full Angular suite **909/909
+passing** (2 new) with **zero existing test files touched** — a pure test-only addition, no production code
+changed at all. `backend/` 34/34 and microservice 335/335 both re-run per this file's own standing rule,
+unaffected. No live in-browser verification needed or attempted — a test-only change with no runtime
+behavior of any kind.
+
+**F-06 is now closed at the scope the investigation confirmed was actually worth doing** — the narrower,
+real risk (a silent rename) is now caught; the finding's own more ambitious framing (fully preventing the
+`balanceBefore`/`balanceAfter`-class gap) is explicitly disclosed as still open, not silently claimed as
+solved. Remaining `desiger-comments.md` items: F-08 (`submitResult: any`), F-03/F-05 (God Component/its
+server-side companion, both confirmed to need a larger architectural investment this session hasn't been
+asked to make), F-10–F-13 (Low priority, no action recommended by the review itself).
+
+Not committed (not requested).
