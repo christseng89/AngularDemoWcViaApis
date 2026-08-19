@@ -2,6 +2,7 @@ import { SubmitRulesContext, buildSubmitRequest, validateSubmit } from './submit
 import { BuilderModel } from './function-policy';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import * as functionStrategyModule from './function-strategy';
 
 /**
  * BAL-003 (God Component) — dedicated unit coverage for `submit-rules.ts`'s two pure functions, added
@@ -385,21 +386,38 @@ describe('submit-rules', () => {
 
   describe('validateSubmit — regression: an early guard’s patch survives a later guard’s own failure', () => {
     it('keeps tenorDays: 0 in the returned patch even when a LATER guard in the same call fails', () => {
-      // A6 itself never combines a Sight tenorType with settlesDocumentArrival in the real registry (A6
-      // is Usance-only) — this constructs the combination directly to lock in submit-rules.ts's own
-      // documented contract (SubmitValidation.patch's doc comment): the caller must Object.assign the
-      // patch REGARDLESS of `error`, because in the original inline component code an early mutation
-      // (`this.model.tenorDays = 0`) was a real assignment to `this.model` that survived a later guard's
-      // own `return false` — reproduced here structurally, independent of which real function reaches it.
-      const result = validateSubmit(
-        ctx({
-          selectedFunction: { ...fn('A6'), code: 'A1' },
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', tenorDays: 999 },
-          selectedPayMovement: null,
-        }),
-      );
-      expect(result.error).toBe('Pick the still-PENDING Document Arrival (2ndary Index) to convert first.');
-      expect(result.patch).toEqual({ tenorDays: 0 });
+      // No REAL registry function combines A1's own tenorDays-patching guard (gated strictly on
+      // `code === 'A1'`, submit-rules.ts's own line ~106) with a LATER guard that can still fail for
+      // that same submission — A1 itself has no settlesDocumentArrival/documentArrivalWithSg/REDEEM/
+      // SETTLE behavior of its own, so once its own tenorDays check passes there's nothing left in the
+      // real guard sequence able to fail it. This test's whole point is verifying the GENERIC
+      // patch-survives-failure mechanism (SubmitValidation.patch's own doc comment: the caller must
+      // Object.assign the patch REGARDLESS of `error`, because in the original inline component code an
+      // early mutation — `this.model.tenorDays = 0` — was a real assignment to `this.model` that
+      // survived a later guard's own `return false`) independent of which real function reaches it — so
+      // it deliberately forces a code='A1' object to ALSO report settlesDocumentArrival via a Strategy
+      // stub, since PR-5 of the F-01 Strategy refactoring made Strategy resolution keyed strictly by
+      // `fn.code` (previously — through PR-4 — deriveFunctionStrategy() read raw flags directly off
+      // the object, so spreading `...fn('A6')` onto a code='A1' object worked without a stub; that
+      // spread-based technique stopped working the moment flags left TransactionFunction entirely).
+      const realDeriveFunctionStrategy = functionStrategyModule.deriveFunctionStrategy;
+      const strategySpy = jest.spyOn(functionStrategyModule, 'deriveFunctionStrategy').mockImplementation((f) => {
+        const real = realDeriveFunctionStrategy(f);
+        return f.code === 'A1' ? { ...real, checkerRelease: { ...real.checkerRelease, settlesDocumentArrival: true } } : real;
+      });
+      try {
+        const result = validateSubmit(
+          ctx({
+            selectedFunction: { ...fn('A1'), pendingItemLabel: fn('A6').pendingItemLabel },
+            model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', tenorDays: 999 },
+            selectedPayMovement: null,
+          }),
+        );
+        expect(result.error).toBe('Pick the still-PENDING Document Arrival (2ndary Index) to convert first.');
+        expect(result.patch).toEqual({ tenorDays: 0 });
+      } finally {
+        strategySpy.mockRestore();
+      }
     });
   });
 

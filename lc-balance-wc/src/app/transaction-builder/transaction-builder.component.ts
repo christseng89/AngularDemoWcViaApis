@@ -75,11 +75,12 @@ export class TransactionBuilderComponent {
   /**
    * PR-3 of the F-01 Strategy refactoring (`desiger-comments.md`, OOD review finding F-01) —
    * `selectedFunction`'s own derived `FunctionStrategy`, used by the A-series-exclusive call sites below
-   * instead of reading `payExistingUtilize`/`documentArrivalWithSg`/`autoRedeemType`/`deferSettlement`
-   * directly. `settlesDocumentArrival` (shared with B-series) deliberately still reads the raw flag —
-   * migrating it is PR-4's job, once B-series also has its own strategy wiring in place.
+   * instead of reading the 11 boolean flags directly — those flags were fully removed from
+   * `TransactionFunction`/the registry in PR-5, so this Strategy lookup is now the ONLY way to answer
+   * any of these questions. Public (not `private`) since PR-5 — the template's own Checker-panel
+   * bindings (deferSettlement's acknowledgment-only hint/button label) read this directly too.
    */
-  private get selectedFunctionStrategy() {
+  get selectedFunctionStrategy() {
     return this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
   }
 

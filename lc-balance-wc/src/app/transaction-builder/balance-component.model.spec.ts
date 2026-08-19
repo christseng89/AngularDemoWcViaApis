@@ -19,8 +19,6 @@
   groupThousands,
   defaultLcInstrumentTypeForSide,
   childInstrumentTypesOf,
-  resolveFunctionForMovement,
-  payExistingUtilizeFunctionFor,
   BALANCE_SNAPSHOT_LABEL,
   CURRENCY_OPTIONS,
   isEarmarkFunction,
@@ -302,47 +300,25 @@ describe('balance-component.model data invariants', () => {
       expect(a2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
-    it('A3 defers settlement (Checker acknowledgment only) and does not settle a document arrival itself', () => {
+    // A3/A3S's own deferSettlement/documentArrivalWithSg behavior (F-01 Strategy flags, since PR-5 no
+    // longer stored on TransactionFunction at all) is covered by function-strategy.spec.ts instead —
+    // this file only asserts the registry's own non-flag configuration.
+    it('A3 targets IPLC_LC/UTILIZE', () => {
       const a3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3') as TransactionFunction;
-      expect(a3.deferSettlement).toBe(true);
-      expect(a3.settlesDocumentArrival).toBeFalsy();
       expect(a3.movementType).toBe('UTILIZE');
     });
 
-    it('A3S is the only function with documentArrivalWithSg, and also defers settlement', () => {
-      for (const f of IMPORT_FUNCTIONS) {
-        if (f.code === 'A3S') {
-          expect(f.documentArrivalWithSg).toBe(true);
-          expect(f.deferSettlement).toBe(true);
-        } else {
-          expect(f.documentArrivalWithSg).toBeFalsy();
-        }
-      }
+    it('A4 filters the catalog to SIGHT', () => {
+      const a4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4') as TransactionFunction;
+      expect(a4.catalogTenorFilter).toBe('SIGHT');
     });
 
-    it('A4 is the only function with payExistingUtilize, filters the catalog to SIGHT, and never creates a movement of its own', () => {
-      for (const f of IMPORT_FUNCTIONS) {
-        if (f.code === 'A4') {
-          expect(f.payExistingUtilize).toBe(true);
-          expect(f.catalogTenorFilter).toBe('SIGHT');
-        } else {
-          expect(f.payExistingUtilize).toBeFalsy();
-        }
-      }
-    });
-
-    it("A6 is the only IMPORT function with settlesDocumentArrival, sourced from A3's own UTILIZE", () => {
-      for (const f of IMPORT_FUNCTIONS) {
-        if (f.code === 'A6') {
-          expect(f.settlesDocumentArrival).toBe(true);
-          expect(f.payableMovementType).toBe('UTILIZE');
-          expect(f.pendingItemSourceHint).toContain('A3');
-          expect(f.instrumentType).toBe('IPLC_ACCEPTANCE');
-          expect(f.tenorTypeOptions?.map((o) => o.value)).toEqual(['SELLERS_USANCE', 'BUYERS_USANCE']);
-        } else {
-          expect(f.settlesDocumentArrival).toBeFalsy();
-        }
-      }
+    it("A6 is sourced from A3's own UTILIZE, on IPLC_ACCEPTANCE, Usance-tenor-only", () => {
+      const a6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6') as TransactionFunction;
+      expect(a6.payableMovementType).toBe('UTILIZE');
+      expect(a6.pendingItemSourceHint).toContain('A3');
+      expect(a6.instrumentType).toBe('IPLC_ACCEPTANCE');
+      expect(a6.tenorTypeOptions?.map((o) => o.value)).toEqual(['SELLERS_USANCE', 'BUYERS_USANCE']);
     });
 
     it('A7 offers Full/Partial Settle as a subChoice and filters the catalog to USANCE (an Acceptance never exists under a Sight LC)', () => {
@@ -352,15 +328,9 @@ describe('balance-component.model data invariants', () => {
       expect(a7.instrumentType).toBe('IPLC_ACCEPTANCE');
     });
 
-    it('A9 is the only function with autoRedeemType, on SHGT', () => {
-      for (const f of IMPORT_FUNCTIONS) {
-        if (f.code === 'A9') {
-          expect(f.autoRedeemType).toBe(true);
-          expect(f.instrumentType).toBe('SHGT');
-        } else {
-          expect(f.autoRedeemType).toBeFalsy();
-        }
-      }
+    it('A9 targets SHGT', () => {
+      const a9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9') as TransactionFunction;
+      expect(a9.instrumentType).toBe('SHGT');
     });
 
     it('SHGT/IPLC_ACCEPTANCE functions declare defaultParentInstrumentType: IPLC_LC (A6/A8/A9/A7)', () => {
@@ -370,10 +340,9 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
-    it("every function except A1 carries a secondaryRefLabel OR relies on documentArrivalWithSg/payExistingUtilize/autoRedeemType's own natural-key flow", () => {
-      // A1 (LC Issue) is the sole function creating a brand-new natural key with nothing to
-      // reference yet, per the interface's own doc comment ("every function except LC Issue (A1/B1)
-      // requires ONE generic secondary reference").
+    it('A1 is the sole function with no secondaryRefLabel (it creates a brand-new natural key with nothing to reference yet)', () => {
+      // Per the interface's own doc comment ("every function except LC Issue (A1/B1) requires ONE
+      // generic secondary reference").
       const a1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1') as TransactionFunction;
       expect(a1.secondaryRefLabel).toBeUndefined();
     });
@@ -429,74 +398,43 @@ describe('balance-component.model data invariants', () => {
       expect(b2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
-    // Bug fixed 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易"): B3
-    // no longer defers settlement at all — it uses the standard release()/reject() Checker path
-    // directly, same as every other function that doesn't set deferSettlement.
-    it('B3 (Present Docs) is EPLC_EXAMINATION/CREATE, uses the standard Checker release() path, and has no secondaryRefLabel of its own', () => {
+    // B3/B4/B5's own deferSettlement/settlesDocumentArrival/movementTypeFromContractTenor/
+    // createsIssuingBankReceivableOnHonour/createsAcceptanceReimbReceivableOnCreate/
+    // settlesAcceptanceOnMature/settleableBalanceIndex behavior (F-01 Strategy flags, since PR-5 no
+    // longer stored on TransactionFunction at all) is covered by function-strategy.spec.ts instead —
+    // this file only asserts the registry's own non-flag configuration.
+    it('B3 (Present Docs) is EPLC_EXAMINATION/CREATE and has no secondaryRefLabel of its own', () => {
       const b3 = EXPORT_FUNCTIONS.find((f) => f.code === 'B3') as TransactionFunction;
       expect(b3.instrumentType).toBe('EPLC_EXAMINATION');
       expect(b3.movementType).toBe('CREATE');
       expect(b3.defaultParentInstrumentType).toBe('EPLC_CONFIRMATION');
-      expect(b3.deferSettlement).toBeFalsy();
       expect(b3.deferSettlementMovementType).toBeUndefined();
       expect(b3.secondaryRefLabel).toBeUndefined();
     });
 
-    it('A3 is the only function with deferSettlement (B3 no longer sets it, 2026-08-18)', () => {
-      for (const f of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
-        if (f.code === 'A3' || f.code === 'A3S') {
-          expect(f.deferSettlement).toBe(true);
-        } else {
-          expect(f.deferSettlement).toBeFalsy();
-        }
-      }
-    });
-
-    it("B4 (Honour / Acceptance) is the unified legal-event step: movementTypeFromContractTenor, settlesDocumentArrival against B3's already-RELEASED CREATE, and both compound-creation flags", () => {
+    it('B4 (Honour / Acceptance) targets EPLC_CONFIRMATION/HONOUR, sources still-RELEASED B3 Present Docs records, and has an EB Number secondaryRefLabel', () => {
       const b4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4') as TransactionFunction;
       expect(b4.instrumentType).toBe('EPLC_CONFIRMATION');
       expect(b4.movementType).toBe('HONOUR');
-      expect(b4.movementTypeFromContractTenor).toBe(true);
-      expect(b4.settlesDocumentArrival).toBe(true);
       expect(b4.payableMovementType).toBe('CREATE');
       expect(b4.payableMovementInstrumentType).toBe('EPLC_EXAMINATION');
-      expect(b4.payableMovementRequiresRelease).toBe(true);
       expect(b4.pendingItemSourceCode).toBe('B3');
-      expect(b4.createsIssuingBankReceivableOnHonour).toBe(true);
-      expect(b4.createsAcceptanceReimbReceivableOnCreate).toBe(true);
       expect(b4.secondaryRefLabel).toBe('EB Number');
     });
 
-    it('B4 is the only function with movementTypeFromContractTenor / payableMovementInstrumentType / payableMovementRequiresRelease', () => {
+    it('B4 is the only function with payableMovementInstrumentType', () => {
       for (const f of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
         if (f.code === 'B4') continue;
-        expect(f.movementTypeFromContractTenor).toBeFalsy();
         expect(f.payableMovementInstrumentType).toBeUndefined();
-        expect(f.payableMovementRequiresRelease).toBeFalsy();
       }
     });
 
-    it('B4 and A6 are the only functions with settlesDocumentArrival', () => {
-      const withFlag = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].filter((f) => f.settlesDocumentArrival).map((f) => f.code);
-      expect(new Set(withFlag)).toEqual(new Set(['A6', 'B4']));
-    });
-
-    it('B5 (Settlement — Reimbursement / Maturity) settles the Acceptance on Maturity, USANCE-only, and drives a settleable-balance two-step index', () => {
+    it('B5 (Settlement — Reimbursement / Maturity) settles the Acceptance on Maturity, USANCE-only', () => {
       const b5 = EXPORT_FUNCTIONS.find((f) => f.code === 'B5') as TransactionFunction;
       expect(b5.instrumentType).toBe('EPLC_ACCEPTANCE');
       expect(b5.movementType).toBe('FULL_SETTLE');
-      expect(b5.settlesAcceptanceOnMature).toBe(true);
       expect(b5.catalogTenorFilter).toBe('USANCE');
-      expect(b5.settleableBalanceIndex).toBe(true);
       expect(b5.defaultParentInstrumentType).toBe('EPLC_CONFIRMATION');
-    });
-
-    it('B5 is the only function with settlesAcceptanceOnMature / settleableBalanceIndex', () => {
-      for (const f of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
-        if (f.code === 'B5') continue;
-        expect(f.settlesAcceptanceOnMature).toBeFalsy();
-        expect(f.settleableBalanceIndex).toBeFalsy();
-      }
     });
 
     it('no EXPORT function ever creates a plain EPLC_LC movement (EBL is out of Balance Component scope, business instruction 2026-08-15)', () => {
@@ -696,53 +634,8 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  describe('resolveFunctionForMovement', () => {
-    it('resolves a literal fn.movementType match (A1 — IPLC_LC/ISSUE)', () => {
-      expect(resolveFunctionForMovement('IPLC_LC', 'ISSUE')?.code).toBe('A1');
-    });
-
-    it('resolves via subChoice.options (A2 — IPLC_LC/AMEND_INCREASE and AMEND_DECREASE, both from the same A2 subChoice)', () => {
-      expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_INCREASE')?.code).toBe('A2');
-      expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_DECREASE')?.code).toBe('A2');
-    });
-
-    it('resolves via movementTypeFromContractTenor for BOTH derived movementTypes (B4 — EPLC_CONFIRMATION/HONOUR and ACCEPT)', () => {
-      expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'HONOUR')?.code).toBe('B4');
-      expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'ACCEPT')?.code).toBe('B4');
-    });
-
-    it("resolves the derived PARTIAL_REDEEM via autoRedeemType (A9), not only the registry's own literal FULL_REDEEM default", () => {
-      expect(resolveFunctionForMovement('SHGT', 'FULL_REDEEM')?.code).toBe('A9');
-      expect(resolveFunctionForMovement('SHGT', 'PARTIAL_REDEEM')?.code).toBe('A9');
-    });
-
-    it("resolves the derived PARTIAL_SETTLE via settlesAcceptanceOnMature (B5), not only the registry's own literal FULL_SETTLE default", () => {
-      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
-      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'PARTIAL_SETTLE')?.code).toBe('B5');
-    });
-
-    it('returns undefined for a movementType/instrumentType combination no current function produces', () => {
-      expect(resolveFunctionForMovement('EPLC_EXAMINATION', 'AMEND')).toBeUndefined();
-    });
-
-    // Bug fixed 2026-08-18, reviewer-reported live (Inquire Events on LC U01 — the EPLC_ACCEPTANCE/
-    // CREATE row, B4's own Usance compound secondary leg, showed a blank "–" Function column). No
-    // EXPORT_FUNCTIONS entry has instrumentType EPLC_ACCEPTANCE + movementType CREATE — B4's own
-    // registry entry is instrumentType EPLC_CONFIRMATION, so the direct find() could never match this
-    // leg's own instrumentType (unlike A6 on the Import side, whose registry entry IS instrumentType
-    // IPLC_ACCEPTANCE/CREATE directly).
-    it("resolves EPLC_ACCEPTANCE/CREATE (B4's own Usance Acceptance-liability compound leg) to B4, via createsAcceptanceReimbReceivableOnCreate, not a direct instrumentType match", () => {
-      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'CREATE')?.code).toBe('B4');
-    });
-
-    it('the fallback above is scoped to EPLC_ACCEPTANCE/CREATE only — a different movementType on the same instrumentType still resolves normally (B5) rather than also falling back to B4', () => {
-      expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
-    });
-
-    it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
-      expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
-    });
-  });
+  // resolveFunctionForMovement's own test coverage moved to function-strategy.spec.ts in PR-5 (the
+  // function itself relocated there — see balance-component.model.ts's own note at its former location).
 
   // 2026-08-18, business instruction — "APPROVED still required. EARMARK only applied for RELEASED
   // event in Import LC Document Arrival and Export Present Docs" (narrowing an earlier same-day
@@ -793,19 +686,7 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // 2026-08-18, "A4 Sight Payment" ordering bug fix — InquireEventsService uses this instead of
-  // resolveFunctionForMovement() specifically for the LATER (Release) half of a finalized Sight
-  // Document Arrival, since the generic resolver above always returns A3 for that same pair.
-  describe('payExistingUtilizeFunctionFor', () => {
-    it('resolves IPLC_LC to A4 — the one function in the registry with payExistingUtilize set', () => {
-      expect(payExistingUtilizeFunctionFor('IPLC_LC')?.code).toBe('A4');
-    });
-
-    it('returns undefined for any instrumentType with no payExistingUtilize function of its own (e.g. SHGT, EPLC_CONFIRMATION — no Export equivalent exists)', () => {
-      expect(payExistingUtilizeFunctionFor('SHGT')).toBeUndefined();
-      expect(payExistingUtilizeFunctionFor('EPLC_CONFIRMATION')).toBeUndefined();
-    });
-  });
+  // payExistingUtilizeFunctionFor's own test coverage moved to function-strategy.spec.ts in PR-5.
 
   describe('BALANCE_SNAPSHOT_LABEL', () => {
     it('covers exactly the 5 instrumentTypes the user named as real Balance Components, no more, no fewer', () => {

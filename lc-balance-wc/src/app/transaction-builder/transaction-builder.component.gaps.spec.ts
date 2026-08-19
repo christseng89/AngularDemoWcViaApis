@@ -3,6 +3,7 @@ import { TransactionBuilderComponent } from './transaction-builder.component';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import type { InquiredEvent } from './inquire-events.service';
+import * as functionStrategyModule from './function-strategy';
 
 /**
  * Closes coverage gaps left after the three method-slice agents finished
@@ -711,16 +712,27 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // settlesDocumentArrival/documentArrivalWithSg check above, which always wins first. In the real
       // registry every function carrying createsIssuingBankReceivableOnHonour (only B4) also carries
       // settlesDocumentArrival, so that branch is unreachable via any real function object — exercise it
-      // directly via a synthetic variant with the earlier flags stripped, same pattern used elsewhere in
-      // this file for other doc-comment-confirmed "unreachable in practice" branches.
-      const syntheticB4: TransactionFunction = { ...fn('B4'), settlesDocumentArrival: false, documentArrivalWithSg: false };
-      const c2 = new TransactionBuilderComponent(mockApi());
-      c2.selectFunction(syntheticB4);
-      c2.selectedCheckerMovement = movement({ movementId: 'm-2', movementType: 'ACCEPT' });
-      (c2 as any).submitResult = { movementId: 'm-2' };
-      expect(c2.isCheckerCompoundOwnSubmission).toBe(false);
-      c2.selectedCheckerMovement = movement({ movementId: 'm-2', movementType: 'HONOUR' });
-      expect(c2.isCheckerCompoundOwnSubmission).toBe(true);
+      // directly via a synthetic Strategy variant with the earlier flag stripped, same pattern used
+      // elsewhere in this file for other doc-comment-confirmed "unreachable in practice" branches.
+      // Since PR-5 of the F-01 Strategy refactoring removed the raw flags from TransactionFunction
+      // entirely, this now stubs deriveFunctionStrategy() itself (real B4 in every other respect) rather
+      // than spreading a flag override onto a plain object literal.
+      const realDeriveFunctionStrategy = functionStrategyModule.deriveFunctionStrategy;
+      const strategySpy = jest.spyOn(functionStrategyModule, 'deriveFunctionStrategy').mockImplementation((f) => {
+        const real = realDeriveFunctionStrategy(f);
+        return f.code === 'B4' ? { ...real, checkerRelease: { ...real.checkerRelease, settlesDocumentArrival: false } } : real;
+      });
+      try {
+        const c2 = new TransactionBuilderComponent(mockApi());
+        c2.selectFunction(fn('B4'));
+        c2.selectedCheckerMovement = movement({ movementId: 'm-2', movementType: 'ACCEPT' });
+        (c2 as any).submitResult = { movementId: 'm-2' };
+        expect(c2.isCheckerCompoundOwnSubmission).toBe(false);
+        c2.selectedCheckerMovement = movement({ movementId: 'm-2', movementType: 'HONOUR' });
+        expect(c2.isCheckerCompoundOwnSubmission).toBe(true);
+      } finally {
+        strategySpy.mockRestore();
+      }
 
       // plain, non-compound function -> false
       const c3 = new TransactionBuilderComponent(mockApi());

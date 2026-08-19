@@ -1,5 +1,5 @@
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
-import { FUNCTION_STRATEGIES, deriveFunctionStrategy } from './function-strategy';
+import { FUNCTION_STRATEGIES, deriveFunctionStrategy, resolveFunctionForMovement, payExistingUtilizeFunctionFor } from './function-strategy';
 
 /**
  * PR-2 of the F-01 Strategy refactoring — equivalence proof only. Every assertion here cross-references
@@ -104,5 +104,72 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
     const second = deriveFunctionStrategy(b4);
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
+  });
+});
+
+/**
+ * Relocated from `balance-component.model.spec.ts` in PR-5, alongside `resolveFunctionForMovement()`/
+ * `payExistingUtilizeFunctionFor()` themselves (see `function-strategy.ts`'s own top-of-file doc comment
+ * for why — a sixth real consumer of the 11 now-removed flags, discovered while removing them).
+ */
+describe('resolveFunctionForMovement', () => {
+  it('resolves a literal fn.movementType match (A1 — IPLC_LC/ISSUE)', () => {
+    expect(resolveFunctionForMovement('IPLC_LC', 'ISSUE')?.code).toBe('A1');
+  });
+
+  it('resolves via subChoice.options (A2 — IPLC_LC/AMEND_INCREASE and AMEND_DECREASE, both from the same A2 subChoice)', () => {
+    expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_INCREASE')?.code).toBe('A2');
+    expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_DECREASE')?.code).toBe('A2');
+  });
+
+  it('resolves via derivesMovementTypeFromTenor for BOTH derived movementTypes (B4 — EPLC_CONFIRMATION/HONOUR and ACCEPT)', () => {
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'HONOUR')?.code).toBe('B4');
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'ACCEPT')?.code).toBe('B4');
+  });
+
+  it("resolves the derived PARTIAL_REDEEM via amountVsAvailableDerivation 'REDEEM' (A9), not only the registry's own literal FULL_REDEEM default", () => {
+    expect(resolveFunctionForMovement('SHGT', 'FULL_REDEEM')?.code).toBe('A9');
+    expect(resolveFunctionForMovement('SHGT', 'PARTIAL_REDEEM')?.code).toBe('A9');
+  });
+
+  it("resolves the derived PARTIAL_SETTLE via amountVsAvailableDerivation 'SETTLE' (B5), not only the registry's own literal FULL_SETTLE default", () => {
+    expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
+    expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'PARTIAL_SETTLE')?.code).toBe('B5');
+  });
+
+  it('returns undefined for a movementType/instrumentType combination no current function produces', () => {
+    expect(resolveFunctionForMovement('EPLC_EXAMINATION', 'AMEND')).toBeUndefined();
+  });
+
+  // Bug fixed 2026-08-18, reviewer-reported live (Inquire Events on LC U01 — the EPLC_ACCEPTANCE/
+  // CREATE row, B4's own Usance compound secondary leg, showed a blank "–" Function column). No
+  // EXPORT_FUNCTIONS entry has instrumentType EPLC_ACCEPTANCE + movementType CREATE — B4's own
+  // registry entry is instrumentType EPLC_CONFIRMATION, so the direct find() could never match this
+  // leg's own instrumentType (unlike A6 on the Import side, whose registry entry IS instrumentType
+  // IPLC_ACCEPTANCE/CREATE directly).
+  it("resolves EPLC_ACCEPTANCE/CREATE (B4's own Usance Acceptance-liability compound leg) to B4, via compoundSubmission.possibleShapes including confirmationAcceptWithReceivable, not a direct instrumentType match", () => {
+    expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'CREATE')?.code).toBe('B4');
+  });
+
+  it('the fallback above is scoped to EPLC_ACCEPTANCE/CREATE only — a different movementType on the same instrumentType still resolves normally (B5) rather than also falling back to B4', () => {
+    expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
+  });
+
+  it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
+    expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
+  });
+});
+
+// 2026-08-18, "A4 Sight Payment" ordering bug fix — InquireEventsService uses this instead of
+// resolveFunctionForMovement() specifically for the LATER (Release) half of a finalized Sight
+// Document Arrival, since the generic resolver above always returns A3 for that same pair.
+describe('payExistingUtilizeFunctionFor', () => {
+  it('resolves IPLC_LC to A4 — the one function in the registry with releasesExistingMovementInPlace set', () => {
+    expect(payExistingUtilizeFunctionFor('IPLC_LC')?.code).toBe('A4');
+  });
+
+  it('returns undefined for any instrumentType with no matching function of its own (e.g. SHGT, EPLC_CONFIRMATION — no Export equivalent exists)', () => {
+    expect(payExistingUtilizeFunctionFor('SHGT')).toBeUndefined();
+    expect(payExistingUtilizeFunctionFor('EPLC_CONFIRMATION')).toBeUndefined();
   });
 });

@@ -6601,3 +6601,143 @@ type-narrowing-blind refactor could otherwise ship silently in a language with a
 Not committed (not requested). With all 4 consumer-migration PRs complete, F-01's own scattered-flag problem
 is closed on the consumer side — remaining, explicitly out-of-scope future work: removing the now-redundant
 boolean flags from the registry itself (a "PR-5", not started, not requested).
+
+## PR-5 of the F-01 Strategy refactoring — the 11 flags removed from `TransactionFunction`/the registry entirely; `function-strategy.ts` is now the sole source of truth (2026-08-19, user-requested — "PR-5", Senior Engineer Refactoring & Regression-Safety Requirements)
+
+The final, highest-risk step in this migration — it changes `TransactionFunction`'s own shape, not just how a
+consumer reads it. Confirmed the full current flag list fresh (`hasParent` excluded, per PR-2's own finding it
+was never part of this problem): `payExistingUtilize`/`settlesDocumentArrival`/`payableMovementRequiresRelease`/
+`settlesAcceptanceOnMature`/`settleableBalanceIndex`/`deferSettlement`/`documentArrivalWithSg`/
+`createsIssuingBankReceivableOnHonour`/`createsAcceptanceReimbReceivableOnCreate`/`autoRedeemType`/
+`movementTypeFromContractTenor` — 11, matching PR-1 through PR-4's own count throughout.
+
+**A genuine sixth consumer found, never in PR-3/PR-4's own "5 consumer files" scope**: `balance-component.model.ts`
+itself contained three flag-reading functions — `movementTypeMatchesFunction()` (private), `resolveFunctionForMovement()`,
+`payExistingUtilizeFunctionFor()` (both exported, imported by `inquire-events.service.ts` to resolve which named
+function produced a historical movement, for Inquire Events' own "Function" column and read-only screen
+reconstruction). All three relocated to `function-strategy.ts` (which already imports the registry, avoiding a
+circular import the reverse direction would have created) and rewritten to read `FUNCTION_STRATEGIES` instead of
+raw flags — byte-identical resolution logic, confirmed via their own moved test coverage (`function-strategy.spec.ts`
+gained the `resolveFunctionForMovement`/`payExistingUtilizeFunctionFor` describe blocks verbatim from
+`balance-component.model.spec.ts`). `inquire-events.service.ts`'s own import updated accordingly.
+
+**`function-strategy.ts`'s `deriveFunctionStrategy(fn)` — same public signature, now a lookup instead of a
+derivation.** A new hand-authored `FUNCTION_STRATEGY_DEFINITIONS` (keyed by function code, one entry per A1-A9/
+B1-B5) reproduces exactly what the old flag-derivation produced for each code — verified by hand against the real
+registry entries immediately before their flags were removed, and independently proven by the full test suite
+passing unchanged. `deriveFunctionStrategy()` still takes the full `TransactionFunction` (not just its code) and
+still returns a FRESH object each call (never the literal `FUNCTION_STRATEGY_DEFINITIONS[fn.code]` reference) —
+preserves the exact "independent objects, not shared mutable state" guarantee PR-2's own
+"calling it twice yields deep-equal, independent objects" test already locked in, unchanged since PR-2. This
+means **zero of the 5 consumer files' own call sites needed touching** — every `deriveFunctionStrategy(ctx.selectedFunction)`
+call from PR-3/PR-4 kept working exactly as before, only the function's own internal implementation changed.
+
+**A real architectural consequence, not a bug**: because Strategy resolution is now keyed strictly by `fn.code`,
+it is no longer possible to construct a synthetic "frankenstein" object (spreading one function's own shape onto
+a DIFFERENT function's `code`) and have it inherit the spread-from function's own behavior — PRE-PR-5, `deriveFunctionStrategy`
+read raw flags directly off whatever object was passed, independent of `code`, so a few existing WHITE-BOX unit
+tests exploited this to construct otherwise-impossible two-guard-collision scenarios. Two such tests broke at
+compile/run time and were fixed, not silently worked around:
+- `submit-rules.spec.ts`'s own "an early guard's patch survives a later guard's own failure" regression test —
+  its own comment already stated its synthetic construction (`{ ...fn('A6'), code: 'A1' }`) was testing the
+  GENERIC patch-accumulator mechanism "independent of which real function reaches it," since no real registry
+  function combines A1's own tenorDays-patching guard with any later-failing guard (confirmed by walking
+  `validateSubmit()`'s own full guard sequence — A1 has no `settlesDocumentArrival`/`documentArrivalWithSg`/
+  `amountVsAvailableDerivation` behavior of its own, so once its own tenorDays check passes, nothing later in the
+  real guard chain can still fail it). Fixed by `jest.spyOn`-stubbing `deriveFunctionStrategy` for this one test
+  (forcing a code='A1' object to also report `checkerRelease.settlesDocumentArrival: true`, restored via
+  `mockRestore()` in a `finally` block) — same intent, a technique compatible with code-keyed resolution.
+- `transaction-builder.component.gaps.spec.ts`'s own test for `isCheckerCompoundOwnSubmission`'s
+  `createsIssuingBankReceivableOnHonour` branch — already documented, even before PR-5, as "unreachable via any
+  real function object" (every function carrying that flag, only B4, also carries `settlesDocumentArrival`, which
+  always wins first) — same `jest.spyOn` fix, forcing B4's own `checkerRelease.settlesDocumentArrival` to `false`
+  for this one test so the fall-through branch is actually reached.
+
+**A genuinely new gap found by this PR itself, not by either agent that did PR-3/PR-4**: the strict-template
+`ng build` (which `tsc --noEmit` alone never runs, since it doesn't type-check `.html` templates) surfaced **8
+direct flag reads still live in `transaction-builder.component.html`** — `payExistingUtilize` (5 sites: the LC
+Index label/hint, the flattened-payable-rows guard, the A4 subcard guard, the "not payExistingUtilize" guard, the
+Delete-Pending-button guard), `settlesDocumentArrival` (3 sites, alongside the already-migrated
+`deferSettlement` at the same locations — the Checker-panel hint/button-disabled/button-label bindings),
+`settleableBalanceIndex` (2 sites), `documentArrivalWithSg` (2 sites), `movementTypeFromContractTenor` (1 site).
+**Neither PR-3 nor PR-4 ever migrated these** — both only touched the 5 files' own `.ts` logic, and a plain
+`tsc --noEmit` run (this project's own standing verification step) is structurally blind to template-only bindings,
+so this had been silently accumulating debt across two prior "done" PRs without ever failing a single build check
+— until removing the flags from the TYPE itself finally made the gap impossible to miss. Fixed identically to the
+`.ts` pattern: every site now reads `selectedFunctionStrategy?.checkerRelease?.xxx` /
+`selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('xxx')` /
+`selectedFunctionStrategy?.movementDerivation?.xxx` /`selectedFunctionStrategy?.selectionFlow?.xxx` instead of the
+raw flag — required making the previously-`private get selectedFunctionStrategy()` **public**, since Angular
+templates can only bind to public members (a compile-time-only visibility change, zero runtime behavior
+difference). Angular's own strict-template null-checking required a SECOND `?.` at each step beyond what plain
+TS strict-null-checks would demand for the equivalent `.ts` expression (`a?.b.c` compiles fine in a `.ts` file but
+`ng build`'s own template type-checker flags `.c` as "possibly undefined" unless written `a?.b?.c`) — noted here
+so a future template edit isn't surprised by needing the extra guard.
+
+**Constraints honored**: zero registry-STRUCTURE change beyond the flag removal itself (no field renamed, no
+non-flag config field touched — `payableMovementType`/`payableMovementInstrumentType`/`pendingItemLabel`/
+`pendingItemSourceHint`/`pendingItemSourceCode`/`deferSettlementMovementType`/`deferSettlementLabel`/
+`deferSettlementNextStepHint`/`catalogTenorFilter`/`secondaryRefLabel`/`tenorTypeOptions` all remain exactly as
+they were — these were never part of F-01's own "flags scattered across 5 files" finding). PR-1's own
+characterization spec (`transaction-function-flags.characterization.spec.ts`) was **retired** (deleted), not
+converted — its own fixtures constructed raw flag-bearing `TransactionFunction` object literals that can no
+longer compile once the flags are gone, and its bridging purpose (proving PR-2's Strategy matched PR-1's own
+characterized behavior) was already fully served once PR-2's own `function-strategy.spec.ts` locked in the
+equivalence; keeping a copy that could only test something that no longer exists would be pure duplication, not
+genuine coverage, per this codebase's own established BAL-101-style "don't keep dead/duplicate code just in case"
+convention. `balance-component.model.spec.ts`'s own registry-shape tests were trimmed to their non-flag
+assertions only (still real, still valuable — `instrumentType`/`movementType`/`tenorTypeOptions`/
+`catalogTenorFilter`/`secondaryRefLabel`/etc.); the purely-flag-based tests it used to carry are superseded by
+`function-strategy.spec.ts`'s own already-existing "exactly these codes have this behavior" assertions, not
+silently dropped.
+
+**Verification**:
+- `npx tsc -p tsconfig.app.json --noEmit` — clean, 0 errors (this alone did NOT catch the 8 template gaps above —
+  see that finding's own note on why).
+- `ng build --configuration development` — clean, 0 errors, after the fixes above (iteratively found and fixed
+  the `deferSettlement` → `payExistingUtilize` → `settlesDocumentArrival`/`settleableBalanceIndex`/
+  `documentArrivalWithSg`/`movementTypeFromContractTenor` → the `possibleShapes` extra-`?.` layers, in that
+  order, as each successive `ng build` run surfaced the next).
+- `npm run lint` — 0 errors, 221 warnings (same baseline as PR-4, unchanged).
+- `npm run test:coverage` — **832/832 passing** (862 PR-4 baseline − 26 retired characterization tests − 4 retired
+  purely-flag registry tests = 832, confirmed arithmetically, not just observed), coverage
+  **99.38/95.98/99.35/99.49%** — all four metrics clear the 95% floor, branches actually held higher than PR-4's
+  own 96.38% baseline once the two `jest.spyOn`-based test fixes landed real coverage of their own target branches.
+- Whole-codebase `grep` across `src/app/**/*.ts` **and** `.html`, re-run AFTER all fixes: **zero references to any
+  of the 11 flag names remain anywhere** except inside `function-strategy.ts` itself (the sole owner now) and
+  historical/explanatory comments in `balance-component.model.ts` pointing readers there.
+- `git diff --stat -- src/app`: `balance-component.model.ts` (interface + registry + 3 functions removed, net
+  -253 lines from the original un-migrated state), `function-strategy.ts` (hardcoded definitions + 3 relocated
+  functions, grew substantially), `inquire-events.service.ts` (1-line import change),
+  `transaction-builder.component.ts` (1 getter visibility change), `transaction-builder.component.html` (8 binding
+  fixes), `balance-component.model.spec.ts` (flag-assertion tests trimmed/retired, imports cleaned up),
+  `function-strategy.spec.ts` (gained the two relocated describe blocks), `submit-rules.spec.ts` +
+  `transaction-builder.component.gaps.spec.ts` (the two `jest.spyOn`-based test fixes);
+  `transaction-function-flags.characterization.spec.ts` deleted outright.
+- **Live end-to-end, all 14 Business Case Registry entries**, one pass each, spaced to respect the 120 req/min
+  rate limiter: **14/14 clean on the first invocation of each** (`import-case-5`'s own intentional negative case
+  fails exactly as designed, the only "failure"). A follow-up solo retry of `export-case-5` (to double-check an
+  earlier-session-style transient) reproduced the ALREADY-DIAGNOSED "re-running the same fixed-natural-key case
+  twice within one backend process lifetime collides" limitation (`lcNumberFor()` computes the LC number ONCE at
+  module load, not per-run) — confirmed via the backend log's own identical `Cannot read properties of null
+  (reading 'balanceContractId')` signature already on record from earlier this session, NOT a new regression;
+  the single, valid, one-run-per-case pass is the real evidence and it was fully clean.
+- DB cleanup: 24 test contract rows (`IMP-C%`/`EXP-C%`) removed after this run.
+
+**Open discrepancy, disclosed rather than silently resolved either way**: after cleanup, **48** non-`IMP-C%`/
+`EXP-C%` contract rows remain, not the previously-documented **41**. Investigated, not ignored: grouping by
+`lc_number` shows the familiar S01-S05/S07-S11/U01/U02 set (with S01's and U01's own row counts having grown
+across this session's own many live-verification passes that legitimately touched those same LCs — expected,
+not a defect) **plus two base LC numbers never previously documented anywhere in this session's own history:
+`U03` and `U04`** (one `IPLC_LC/ACTIVE` row each). Confirmed these were NOT created by this PR's own live
+verification (which only ever creates `IMP-C%`/`EXP-C%`-prefixed contracts via `lcNumberFor()`) — their origin is
+unknown from this PR's own vantage point. Deliberately NOT deleted, per this file's own standing rule ("如發現現有
+Code、Design Document 與 Test Case 三者存在不一致，不要自行選擇其中一個改掉" — don't silently pick a side when
+facing an inconsistency) — flagged here for a human or a future pass to triage (confirm whether U03/U04 are
+legitimate manually-created test data from an earlier live-browser-verification pass this session, or something
+else) rather than unilaterally removed.
+
+**F-01 is now genuinely closed, not just closed "on the consumer side"** — the registry itself no longer carries
+the 11 flags at all; `function-strategy.ts`'s own hardcoded `FUNCTION_STRATEGY_DEFINITIONS` is the sole surviving
+source of truth for this behavior, exactly the inversion PR-2's own original doc comment anticipated as a future
+possibility. Not committed (not requested).

@@ -156,7 +156,7 @@
                    Contract (from B3)") — label matches Step 1's "LC Index — Existing Contract" naming
                    pattern; ibNumberLabel already reads "IB Number"/"EB Number" per instrumentType, so its
                    first word gives "IB"/"EB" here. -->
-              <div class="tb-field mt-2" *ngIf="selectedFunction.settlesDocumentArrival && selectedParent">
+              <div class="tb-field mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && selectedParent">
                 <app-index-picker
                   label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
                   [items]="filteredPayableMovements"
@@ -271,7 +271,7 @@
                        fields above (+ Search) remain as a manual fallback. B5 excluded — single-instrumentType
                        (model.instrumentType only), would silently miss the Usance/EPLC_ACCEPTANCE half; B5 gets
                        its own cross-instrumentType "EB Index" below instead. -->
-                  <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunction.settleableBalanceIndex">
+                  <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
                     <app-index-picker
                       label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{ searchNaturalKey.lcNumber }}"
                       [items]="filteredIbIndexCatalog"
@@ -291,7 +291,7 @@
                        only. Same Step 1/Step 2 shape as above, but merges candidates across BOTH of B5's own
                        possible instrumentTypes (Sight EPLC_DUE_FROM_ISSUING_BANK, Usance EPLC_ACCEPTANCE) since
                        the Maker doesn't know in advance which tenor a given EB Number was. -->
-                  <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunction.settleableBalanceIndex">
+                  <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
                     <app-index-picker
                       label="EB Index — Existing Contract (from B3)"
                       [items]="settleableBalances"
@@ -309,7 +309,7 @@
               </ng-template>
               <ng-template #flatCatalogPicker>
                 <app-index-picker
-                  label="{{ selectedFunction.payExistingUtilize ? 'LC Index — pick the LC to pay against' : 'LC Index — Existing Contract' }}"
+                  label="{{ selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace ? 'LC Index — pick the LC to pay against' : 'LC Index — Existing Contract' }}"
                   [items]="filteredCatalogContracts"
                   [selectedId]="selectedContract?.balanceContractId ?? null"
                   [searchable]="true"
@@ -328,7 +328,7 @@
                 <!-- Business-reported gap 2026-08-14 ("user would like to select S001 IB03 or S001 IB04 for A4
                      separately... buyer may settle IB04 today then IB03 by tomorrow") — one click per (LC, IB)
                      pair, no need to pick the LC first and then drill into a second dropdown. -->
-                <div class="mt-2" *ngIf="selectedFunction.payExistingUtilize && flattenedPayableRows.length">
+                <div class="mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && flattenedPayableRows.length">
                   <label class="tb-field__label">Quick Pick — every still-PENDING presentation on this page</label>
                   <div class="tb-quick-pick">
                     <button type="button" class="tb-quick-pick__row"
@@ -350,7 +350,7 @@
                    picked Confirmation's own Tenor Type (declared at B1) via onSelectContract()
                    (component.ts). This just surfaces that derived decision so the Maker can see it before
                    Submit, since it's no longer something they explicitly picked themselves. -->
-              <div class="tb-hint tb-hint--ok mt-2" *ngIf="selectedFunction.movementTypeFromContractTenor && selectedContract">
+              <div class="tb-hint tb-hint--ok mt-2" *ngIf="selectedFunctionStrategy?.movementDerivation?.derivesMovementTypeFromTenor && selectedContract">
                 Confirmation Tenor Type: <strong>{{ selectedContract.tenorType || '(none recorded)' }}</strong> → this will <strong>{{ model.movementType === 'HONOUR' ? 'Honour (Sight)' : 'Accept (Usance)' }}</strong>.
               </div>
 
@@ -414,7 +414,7 @@
                     "
                   >
                     ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ selectedContractSnapshot.tightAvailableBalance }}) — this will be rejected (Design doc §6.1: Available Balance minus outstanding off-balance-sheet (SHGT) exposure {{ selectedContractSnapshot.offBalanceExposure }}).
-                    <ng-container *ngIf="!selectedFunction?.documentArrivalWithSg"
+                    <ng-container *ngIf="!selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
                       >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.</ng-container
                     >
                   </div>
@@ -429,7 +429,7 @@
                  Shipping Guarantees this arrival is matched against; the Formly form below still shows normally
                  (unlike A4's payExistingUtilize, A3S DOES create new movements via Submit) — Amount there is now
                  the real Bill Amount, freely typed; this box shows the derived SG-side numbers alongside it. -->
-            <div class="tb-subcard" *ngIf="selectedFunction.documentArrivalWithSg && selectedContract">
+            <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract">
               <app-index-picker
                 label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
                 [items]="sgsForArrival"
@@ -462,7 +462,7 @@
                  resolves its LC via the flat Catalog picker just above, into selectedContract — not a Parent
                  LC into selectedParent). Mirrors A4's own payExistingUtilize subcard immediately below, just
                  for the cross-contract (B4 -> B3's EPLC_EXAMINATION) case instead of same-contract (A4 -> A3). -->
-            <div class="tb-subcard" *ngIf="selectedFunction.settlesDocumentArrival && !hasParent && selectedContract">
+            <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
               <app-index-picker
                 label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
                 [items]="filteredPayableMovements"
@@ -486,7 +486,7 @@
             <!-- Business instruction 2026-08-14 ("pickup LC then pickup IB Number... Amount will be captured...
                  without further input") — A4 (Sight Settlement) only. Amount is never typed here: it's
                  whatever A3 (Document Arrival (Sight)) already recorded on the picked PENDING movement. -->
-            <div class="tb-subcard" *ngIf="selectedFunction.payExistingUtilize && selectedContract">
+            <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract">
               <app-index-picker
                 label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
                 [items]="payableMovements"
@@ -519,7 +519,7 @@
               </button>
             </div>
 
-            <ng-container *ngIf="!selectedFunction.payExistingUtilize">
+            <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
               <form [formGroup]="form">
                 <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
               </form>
@@ -581,7 +581,7 @@
              for every OTHER function, means "withdraw only my own just-created record". A4 offers no
              correct "delete my own pending thing" action at all (there is no such record), so hiding it
              is the fix, not relabeling it. -->
-        <button type="button" class="tb-btn tb-btn--danger-outline mt-2" *ngIf="submitResult?.status === 'PENDING' && !selectedFunction?.payExistingUtilize" (click)="deleteMakerPending()" [disabled]="actionBusy">
+        <button type="button" class="tb-btn tb-btn--danger-outline mt-2" *ngIf="submitResult?.status === 'PENDING' && !selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace" (click)="deleteMakerPending()" [disabled]="actionBusy">
           {{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
         </button>
       </div>
@@ -655,7 +655,7 @@
                  correctly shows it as already approved instead of offering a second attempt that would
                  409. Shows who/when when that persisted field is the reason (this session's own click
                  already says so via the ✓ wording alone). -->
-            <div class="tb-hint tb-hint--ok" *ngIf="selectedCheckerMovement && selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved">
+            <div class="tb-hint tb-hint--ok" *ngIf="selectedCheckerMovement && selectedFunctionStrategy?.checkerRelease?.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved">
               ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"> — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date:'short' }}</span>. Balance stays <strong>Pending</strong> — go to {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
             </div>
 
@@ -668,8 +668,8 @@
                    ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
                    so clicking either immediately disables both, for every function including the
                    compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
-              <button class="tb-btn tb-btn--success" (click)="checkerAct('release')" [disabled]="checkerActionInFlight || (selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved)">
-                {{ checkerActionInFlight ? 'Working…' : (selectedFunction.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission ? 'Approve (acknowledgment only)' : 'Release') }}
+              <button class="tb-btn tb-btn--success" (click)="checkerAct('release')" [disabled]="checkerActionInFlight || (selectedFunctionStrategy?.checkerRelease?.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission && arrivalAlreadyApproved)">
+                {{ checkerActionInFlight ? 'Working…' : (selectedFunctionStrategy?.checkerRelease?.deferSettlement && selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') && !isCheckerCompoundOwnSubmission ? 'Approve (acknowledgment only)' : 'Release') }}
               </button>
               <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
             </div>
