@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for app/transaction-builder/look-up-panel.service.ts</title>
+    <title>Code coverage report for app/transaction-builder/picker-selection.service.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> look-up-panel.service.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> picker-selection.service.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">99.33% </span>
+                <span class="strong">99.44% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>150/151</span>
+                <span class='fraction'>178/179</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">94.91% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>56/59</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">98.07% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>51/52</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>63/63</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">97.77% </span>
-                <span class="quiet">Functions</span>
-                <span class='fraction'>44/45</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">99.24% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>132/133</span>
+                <span class='fraction'>158/158</span>
             </div>
         
             
@@ -529,52 +529,332 @@
 <a name='L464'></a><a href='#L464'>464</a>
 <a name='L465'></a><a href='#L465'>465</a>
 <a name='L466'></a><a href='#L466'>466</a>
-<a name='L467'></a><a href='#L467'>467</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a>
+<a name='L510'></a><a href='#L510'>510</a>
+<a name='L511'></a><a href='#L511'>511</a>
+<a name='L512'></a><a href='#L512'>512</a>
+<a name='L513'></a><a href='#L513'>513</a>
+<a name='L514'></a><a href='#L514'>514</a>
+<a name='L515'></a><a href='#L515'>515</a>
+<a name='L516'></a><a href='#L516'>516</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -582,11 +862,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">386x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -602,83 +880,206 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">386x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-yes">386x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -686,779 +1087,525 @@
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">247x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">247x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-yes">57x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">54x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">53x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">53x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">51x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">51x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">65x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">65x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">65x</span>
-<span class="cline-any cline-yes">65x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">104x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">100x</span>
-<span class="cline-any cline-yes">100x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">34x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">29x</span>
-<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Injectable } from '@angular/core';
-import { Observable, forkJoin } from 'rxjs';
-import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
-import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
-import { describeApiError } from './api-error';
-import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$ } from './inquire-events.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
+import { InstrumentType, TransactionFunction } from './balance-component.model';
 import { PagedListState } from './paged-list-state';
+import { FunctionStrategy } from './function-strategy';
 &nbsp;
 /**
- * BAL-003 (7th same-day OOD/SOLID pass, "Look Up panel"): the "Look Up Current Balance" panel's own
- * search criteria, results (LC/Acceptance/SG tabs), and orchestration logic — previously ~200 lines of
- * `TransactionBuilderComponent`'s own state fields and methods (`lookup`/`lookupResult`/`lookupTab`/
- * `runLookup()`/`selectLookupTab()`/`selectLookupAcceptance()`/`selectLookupSg()`/
- * `loadSnapshotAndMovements()`/`loadUnderLookupCandidates()`) — now owns exactly that: a read-only
- * balance/movement viewer, genuinely independent of the Maker/Checker submit-release lifecycle it sits
- * alongside on the same screen.
+ * Outcome of picking a still-PENDING/RELEASED "payable movement" (A4/A6/B4's own Step-2 "2ndary Index" —
+ * `selectPayMovement()`/`onPayableMovementSearchChange()` below) — the service owns `selectedPayMovement`
+ * itself directly (assigned before this is even built), but the FOUR further consequences
+ * (`naturalKey.ibNumber`/`model.secondaryRef`/`model.amount`/`rebuildFields()`/clearing `submitResult` —
+ * A6/B4's own "carry and protect" rule and A4's own "picking a new item clears the stale MAKER RESULT
+ * panel" rule) all read/write component-owned state this service deliberately does not hold, per
+ * `PickerSelectionService`'s own class doc comment. Every field but `selectedPayMovement` is optional —
+ * `undefined` means "this call site never touches it", never "clear it" — matching the same convention
+ * `MakerSubmitOutcome.secondary` already established.
+ */
+export interface PayMovementSelectionOutcome {
+  readonly selectedPayMovement: BalanceMovement | null;
+  readonly naturalKeyIbNumber?: string;
+  readonly modelSecondaryRef?: string;
+  readonly modelAmount?: string;
+  readonly needsRebuildFields: boolean;
+  readonly clearsSubmitResult: boolean;
+}
+&nbsp;
+/** Outcome of picking a row from B5's own "EB Index" (`selectSettleableBalance()` below) — a synthetic `BalanceContract` shape the caller sets as its own `selectedContract`, plus the `ibNumber` it carries into `searchNaturalKey`. */
+export interface SettleableBalanceSelectionOutcome {
+  readonly instrumentType: InstrumentType;
+  readonly contract: BalanceContract;
+  readonly ibNumber: string;
+}
+&nbsp;
+/**
+ * BAL-003 (desiger-comments.md, 2026-08-19 — researched against official Angular docs first, see
+ * `TransactionBuilderComponent`'s own F-04 doc comment for the citation) — the three "2ndary Index"
+ * cascading-picker subsystems A3S/B5/A4-A6-B4 each drive once their own Step-1 LC/Parent is picked:
+ * A3S's own SG picker (`sgsForArrival`), B5's own EB Index (`settleableBalances`), and A4/A6/B4's shared
+ * "still-PENDING/RELEASED payable movement" picker (`payableMovements`). Previously ~300 lines of
+ * `TransactionBuilderComponent`'s own state + `loadXxx()`/`onSelectXxx()` methods.
  *
- * Deliberately a PLAIN class with no template, not a `@Component` — a genuine child component would
- * need `@ViewChild`/`@Input`-`@Output()` wiring to talk to the parent, but this file's own test suite
- * (`transaction-builder.component.spec.ts`/`.actions.spec.ts`) constructs `TransactionBuilderComponent`
- * via plain `new TransactionBuilderComponent(mockApi)` — no TestBed, no Angular view rendering — so
- * `@ViewChild` would never resolve in ~90 existing test assertions that read/write this state directly.
- * A plain-class-with-a-template-less-view avoids that entirely: the component exposes it as a public
- * `readonly lookUp` field, the template binds straight to `lookUp.xxx`, and existing tests only need a
- * mechanical `comp.xxx` → `comp.lookUp.xxx` rename, not a TestBed migration.
+ * **Deliberately does NOT own `onSelectContract()`/`onSelectParent()`/`onSelectIbIndex()` themselves** —
+ * an earlier same-session investigation (see the "BAL-003 — the three paginated pickers' load-and-page
+ * bookkeeping" decision-log entry) found those three Step-1 handlers read/write `model`/`naturalKey`/
+ * `selectedContract`/`selectedParent` far too pervasively to extract without moving those fields too — a
+ * much larger blast radius than this pass's own approved scope. This service instead owns exactly the
+ * state and load/select logic that is genuinely exclusive to the THREE Step-2 pickers, called by the
+ * component's own (unchanged, still-on-component) `onSelectContract()`/`onSelectParent()` at the points
+ * they already used to call the plain methods this service now provides.
  *
- * `@Injectable()` (desiger-comments.md F-04, 2026-08-19 — the ORIGINAL fix attempt tried to make this
- * class a genuine constructor PARAMETER on `TransactionBuilderComponent` while still relying on a plain
- * `new LookUpPanelService(api, callback)` constructor-default for test compatibility, without ANY real
- * Angular provider registered anywhere — production's own Ivy-compiled DI factory unconditionally tries
- * to inject every constructor parameter by TYPE regardless of TS default values, found no provider, and
- * threw `NullInjectorError` on every single page load, confirmed live in the browser. Deliberately no
- * `providedIn: 'root'` here — this class is genuinely PER-COMPONENT-INSTANCE mutable state (the whole
- * point of this extraction), and a root-scoped singleton would silently share `lookupResult`/etc. across
- * every `TransactionBuilderComponent` instance app-wide, a different real bug. Instead,
- * `TransactionBuilderComponent`'s own `@Component({ providers: [LookUpPanelService, ...] })` registers a
- * genuine, COMPONENT-SCOPED provider — Angular constructs exactly one instance per component instance,
- * destroyed when the component is, and its own DI factory can now actually resolve this type. The
- * constructor's own `new LookUpPanelService(api)` default value is UNCHANGED in purpose — it's what
- * fires for the ~90 existing tests' own plain `new TransactionBuilderComponent(mockApi)` calls, which
- * never go through Angular's compiled factory at all and so never see the `providers` array either; both
- * paths coexist without conflict.
+ * **Dependency Inversion, same shape as `CheckerActionsService`/`MakerSubmitService`**: every method that
+ * would otherwise need to write back to `model`/`naturalKey`/`submitResult`/call `rebuildFields()` (all
+ * component-owned) instead either (a) takes the read-only values it needs as plain parameters — this
+ * service has only 3 narrow "what do I need to know" surfaces, not one large shared Context interface,
+ * since each of the 3 pickers is independent of the other two — or (b) returns/passes-forward an Outcome
+ * object (`PayMovementSelectionOutcome`/`SettleableBalanceSelectionOutcome`) the CALLER applies to its own
+ * state, exactly mirroring `CheckerActionOutcome`/`MakerSubmitOutcome`. An async chain that needs to
+ * trigger a component-owned side effect it doesn't otherwise return a value for (`rebuildFields()` after
+ * an SG snapshot loads) takes an explicit `onUpdated: () =&gt; void` callback instead — the same pattern
+ * `LookUpPanelService.runLookup()`'s own `onBeforeLookup` callback already established for an identical
+ * "service needs to trigger a side effect it doesn't own" situation.
  *
- * `onBeforeLookup` moved from a CONSTRUCTOR callback to a CALL-TIME parameter on `runLookup()`/
- * `syncFrom()` below, as part of this same F-04 fix — a constructor-time callback closing over the
- * component's own `this` would need the component to inject itself into this service's own factory
- * provider, which is a documented Angular DI trap (`NG0200: Circular dependency in DI`,
- * https://github.com/angular/angular/issues/51639) rather than a safe pattern. A call-time parameter
- * needs no such self-injection — `this` is already fully available at the component's own call site,
- * exactly like every other method call in this codebase.
+ * **`arrivalSgRedeemAmount`/`arrivalSgRedeemType`/`arrivalSgRemaining` deliberately stayed ON THE
+ * COMPONENT**, not moved here — all three are genuinely derived from BOTH this service's own
+ * `arrivalSgSnapshot` AND the component-owned `model.amount` (the typed Bill Amount), so moving them here
+ * would only relocate the coupling, not remove it, and would additionally force every template call site
+ * to pass `model.amount` through as an argument for no real benefit. The component's own three getters
+ * read `this.pickerSelection.arrivalSgSnapshot` directly — a legitimate cross-cutting combinator, the same
+ * class as `carriedCurrency`/`arrivalAlreadyApproved` already staying on the component for the identical
+ * reason.
+ *
+ * **Action methods (`onSelectArrivalSg`/`onSelectSettleableBalance`/`onSelectPayMovement`/
+ * `onPayableMovementSearchChange`/every `xxxPrevPage()`/`xxxNextPage()`) stay as one-line wrapper methods
+ * on the component**, delegating into this service's own like-named methods — matching
+ * `catalogPrevPage()`/`catalogNextPage()`'s own already-established precedent (`CatalogPickerService`,
+ * BAL-003 8th pass) of keeping the template's own action bindings unchanged even once the underlying state
+ * moves to a service; only the STATE bindings (`[items]`/`[loading]`/`[selectedId]`/`[page]`/`{{ }}`
+ * interpolations) needed a `pickerSelection.` prefix added in the template.
+ *
+ * `@Injectable()`, no `providedIn` (desiger-comments.md F-04, 2026-08-19) — genuinely per-component-
+ * instance mutable state (three pickers' own results), same reasoning `LookUpPanelService`/
+ * `DocumentArrivalHintsService`/`InquireEventsService` already carry; `providedIn: 'root'` would wrongly
+ * make Angular hand out ONE shared instance app-wide. Registered as a component-scoped provider in
+ * `TransactionBuilderComponent`'s own `@Component({ providers: [...] })` array.
  */
 @Injectable()
-export class LookUpPanelService {
+export class PickerSelectionService {
   constructor(private readonly api: BalanceComponentApiService) {}
 &nbsp;
-  lookup = { instrumentType: 'IPLC_LC' as InstrumentType, lcNumber: '', ibNumber: '', sgNumber: '' };
-  lookupResult: { contract: BalanceContract; snapshot: BalanceSnapshot } | null = null;
-  lookupError: string | null = null;
+  // ---------------------------------------------------------------------------------------------------
+  // A3S (Document Arrival w/ Shipping Gtee) — Step 2: the picked LC's own outstanding SHGT records.
+  // ---------------------------------------------------------------------------------------------------
 &nbsp;
-  /**
-   * Event timeline (business instruction 2026-08-14) — populated alongside lookupResult, in true Event
-   * Date/Time order (`eventTime`, not `eventSeq` — see `loadSnapshotAndMovements()`'s own doc comment on
-   * why, once B3/EPLC_EXAMINATION events can be merged in from a different contract entirely).
-   * `InquiredEvent[]` (2026-08-18, "should use the SAME status/display logic as Inquire Events"), not a
-   * raw `BalanceMovement[]` — a finalized Sight IPLC_LC/UTILIZE (A3/A3S earmarked, later A4-finalized)
-   * splits into its own 'create' + 'finalize' rows via the SAME `toEventRows()` Inquire Events itself
-   * uses (both rows show the movement's own real, current status — see `toEventRows()`'s own doc
-   * comment), so the two screens can never disagree on what status the same underlying movement shows.
-   * For an Export Confirmed LC specifically, this ALSO includes every B3/EPLC_EXAMINATION Earmark event
-   * under this LC Number, merged in from their own separate per-E01/E02/E03 contracts (2026-08-18, bug
-   * fix — see `loadSnapshotAndMovements()`'s own `mergeChildTypes` doc comment) — B3 has no dedicated
-   * Balance Tab of its own to show them in otherwise, unlike Import LC's own SG/Acceptance children.
-   */
-  lookupMovements: InquiredEvent[] = [];
+  sgsForArrival: BalanceContract[] = [];
+  sgsForArrivalLoading = false;
+  readonly arrivalSgPaging = new PagedListState(10);
+  selectedArrivalSg: BalanceContract | null = null;
+  arrivalSgSnapshot: BalanceSnapshot | null = null;
 &nbsp;
-  /**
-   * Business instruction 2026-08-14 ("`Look Up Current Balance` should be two tabs for Usance LC, one
-   * for LC Balance and one for Acceptance Balance"): when the looked-up contract is an IPLC_LC/
-   * EPLC_CONFIRMATION declared Usance, a second tab lists every IPLC_ACCEPTANCE/EPLC_ACCEPTANCE carved
-   * out under it (one per IB Number, per A6) and lets the user pick which one's own balance/timeline to
-   * view — a Usance LC's own Balance and its Acceptance's Balance are genuinely separate ledgers (Design
-   * doc §7), so "the balance" is ambiguous without picking which one.
-   */
-  lookupTab: 'LC' | 'ACCEPTANCE' | 'SG' = 'LC';
-  acceptancesUnderLookup: BalanceContract[] = [];
-  selectedLookupAcceptance: BalanceContract | null = null;
-  acceptanceSnapshot: BalanceSnapshot | null = null;
-  acceptanceMovements: InquiredEvent[] = [];
-&nbsp;
-  /**
-   * Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC...
-   * three tabs, LC Balance, Acceptance Balance, and SG Balance") — SG applies to a Sight OR Usance
-   * IPLC_LC alike (unlike Acceptance, which is Usance-only, Design doc §7), so this tab shows for any
-   * IPLC_LC lookup regardless of tenor. EPLC_LC has no SHGT equivalent, so this stays Import-only.
-   */
-  sgsUnderLookup: BalanceContract[] = [];
-  selectedLookupSg: BalanceContract | null = null;
-  sgSnapshot: BalanceSnapshot | null = null;
-  sgMovements: InquiredEvent[] = [];
-&nbsp;
-  /**
-   * Business instruction 2026-08-14 ("two/three tabs...") — whichever tab is active supplies the Event
-   * Timeline table.
-   *
-   * UX enhancement (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN") — this getter ALSO keeps
-   * `lookupMovementsPaging` (below) in sync via reference-identity tracking, deliberately placed HERE
-   * rather than only inside `pagedLookupMovements`. `activeLookupMovements` is read unconditionally by the
-   * template on every change-detection cycle (the `*ngIf="lookUp.activeLookupMovements.length"` table
-   * wrapper AND the `.tb-hint`/"No movements yet" fallback both read it directly), while
-   * `pagedLookupMovements` is read only from INSIDE that same `*ngIf` — i.e. only when the active array is
-   * non-empty. A first implementation put the sync logic in `pagedLookupMovements` alone and shipped a
-   * real bug, caught live: switching to a tab whose own array is currently EMPTY (e.g. the SG tab when an
-   * LC has 2+ candidate SGs, so nothing auto-selects and `sgMovements` stays `[]`) meant
-   * `pagedLookupMovements` was never called, so `lookupMovementsPaging` kept showing the PREVIOUS tab's
-   * stale total/page ("Page 2/2 (12 total)") underneath a table that had already gone empty. Syncing here
-   * instead guarantees the check runs every time the active array could possibly have changed, table
-   * rendered or not.
-   *
-   * Deliberately NOT the same "the mutating method sets `.total`/resets `.page`" convention
-   * `InquireEventsService.eventsPaging` itself uses — `InquireEventsService.events` is a single flat array
-   * with exactly one mutation point (`loadEvents()`); this getter switches between THREE independent
-   * arrays (`lookupMovements`/`acceptanceMovements`/`sgMovements`) across FOUR different call sites that
-   * can each replace one of them (`runLookup()`'s own LC-tab fetch, `selectLookupAcceptance()`/
-   * `selectLookupSg()`'s own fetches — including when auto-selected from `runLookup()` itself while the LC
-   * tab is still active — and a plain `selectLookupTab()` switch with no new fetch at all, when the target
-   * tab's data was already loaded earlier). Instrumenting all four by hand risks missing one (exactly the
-   * class of bug this doc comment's own earlier drafting caught: `selectLookupSg()`'s auto-select path can
-   * fire while `lookupTab` is still `'LC'`, so a naive "reset whenever SG movements are set" would wrongly
-   * clobber the LC tab's own still-current paging). Reference-identity tracking sidesteps the whole
-   * problem instead: every fetch assigns a BRAND NEW array to `lookupMovements`/`acceptanceMovements`/
-   * `sgMovements` (via `groups.flat().sort(...)` in `loadSnapshotAndMovements()`), and switching tabs
-   * changes which of those three references this getter returns — so simply noticing "the array reference
-   * I'm windowing has changed since last read" and resetting exactly then is correct for every one of the
-   * four cases at once, with no per-call-site bookkeeping to keep in sync. (A plain length comparison
-   * would NOT be safe here — two different tabs' own timelines coincidentally having the same row count
-   * would then wrongly look "unchanged" and carry over a stale page; an empty array is exactly this same
-   * risk in miniature — length 0 both before and after a tab switch to another currently-empty tab — but
-   * reference identity still correctly distinguishes them since each fetch/reset assigns its own new `[]`.)
-   */
-  private lastLookupMovementsRef: InquiredEvent[] | null = null;
-  readonly lookupMovementsPaging = new PagedListState(10);
-&nbsp;
-  get activeLookupMovements(): InquiredEvent[] {
-    const events = this.lookupTab === 'ACCEPTANCE' ? this.acceptanceMovements : this.lookupTab === 'SG' ? this.sgMovements : this.lookupMovements;
-    if (events !== this.lastLookupMovementsRef) {
-      this.lastLookupMovementsRef = events;
-      this.lookupMovementsPaging.total = events.length;
-      this.lookupMovementsPaging.page = 1;
-    }
-    return events;
+  /** The current page's own slice of `sgsForArrival` — the template iterates this instead of `sgsForArrival` directly. */
+  get pagedSgsForArrival(): BalanceContract[] {
+    const start = (this.arrivalSgPaging.page - 1) * this.arrivalSgPaging.pageSize;
+    return this.sgsForArrival.slice(start, start + this.arrivalSgPaging.pageSize);
   }
 &nbsp;
-  get pagedLookupMovements(): InquiredEvent[] {
-    const events = this.activeLookupMovements;
-    const start = (this.lookupMovementsPaging.page - 1) * this.lookupMovementsPaging.pageSize;
-    return events.slice(start, start + this.lookupMovementsPaging.pageSize);
+  arrivalSgPrevPage(): void {
+    const target = this.arrivalSgPaging.prevTarget();
+    if (target) this.arrivalSgPaging.page = target;
   }
 &nbsp;
-  prevLookupMovementsPage(): void {
-    const target = this.lookupMovementsPaging.prevTarget();
-    if (target) this.lookupMovementsPaging.page = target;
-  }
-&nbsp;
-  nextLookupMovementsPage(): void {
-    const target = this.lookupMovementsPaging.nextTarget();
-    if (target) this.lookupMovementsPaging.page = target;
-  }
-&nbsp;
-  /** Business instruction 2026-08-14 ("don't show the JSON, start with Event Timeline") — whichever tab is active supplies the live Current Balance summary shown after the Event Timeline. */
-  get activeLookupSnapshot(): BalanceSnapshot | null {
-    if (this.lookupTab === 'ACCEPTANCE') return this.acceptanceSnapshot;
-    if (this.lookupTab === 'SG') return this.sgSnapshot;
-    return this.lookupResult?.snapshot ?? null;
-  }
-&nbsp;
-  get activeLookupContract(): BalanceContract | null {
-    if (this.lookupTab === 'ACCEPTANCE') return this.selectedLookupAcceptance;
-    if (this.lookupTab === 'SG') return this.selectedLookupSg;
-    return this.lookupResult?.contract ?? null;
+  arrivalSgNextPage(): void {
+    const target = this.arrivalSgPaging.nextTarget();
+    if (target) this.arrivalSgPaging.page = target;
   }
 &nbsp;
   /**
-   * Business instruction 2026-08-19 ("Look Up Current Balance → Event Timeline" gains a FUNCTION
-   * column that "must use the same Function mapping as Inquire Events... Do not implement a separate
-   * Function mapping") — delegates to the SAME `functionForEvent()` free function
-   * `InquireEventsService.functionFor()` itself now delegates to (see that method's own doc comment),
-   * so both screens resolve every event's own Function badge identically by construction, not by
-   * convention.
+   * Business instruction 2026-08-14 ("When SG Full_redemp then it should no longer available from
+   * Document Arrival w/ Shipping Gtee") — a fully redeemed SG's own `BalanceContract.status` stays ACTIVE
+   * (nothing in this design ever transitions a contract to CLOSED just because its balance hit 0), so the
+   * only reliable signal that it has nothing left is its own live snapshot showing 0 Available — same
+   * "0-balance exclusion" principle every other picker in this app already applies. `requireIssueReleased:
+   * true` — business-reported gap 2026-08-18 ("There are function dependency, if pending in previous
+   * event, then next event cannot be accessed") — an SG whose own A8 Issue hasn't been Checker-Released
+   * yet shouldn't be redeemable via A3S. `onUpdated` fires once, at the point the auto-picked SG's own
+   * snapshot finishes loading (or immediately, if nothing was auto-picked) — the caller's own
+   * `rebuildFields()`, since Formly's field config depends on `arrivalSgSnapshot`.
    */
-  functionFor(event: InquiredEvent): TransactionFunction | undefined {
-    return functionForEvent(event);
-  }
-&nbsp;
-  /**
-   * Business instruction 2026-08-14 ("always use the LC Number if exists") — the LC Number is the one
-   * natural-key field every instrumentType always carries (Design doc §3.1's natural key table), so
-   * it's always the primary label, never a UUID. Suffixed with IB#/SG# only when the active tab is
-   * drilled into that specific Acceptance/SG.
-   */
-  get activeLookupLabel(): string {
-    const lcNumber = this.lookupResult?.contract.naturalKey.lcNumber ?? this.lookup.lcNumber;
-    if (this.lookupTab === 'ACCEPTANCE') {
-      const ibNumber = this.selectedLookupAcceptance?.naturalKey.ibNumber;
-      return ibNumber ? `LC ${lcNumber} / IB ${ibNumber}` : `LC ${lcNumber}`;
-    }
-    if (this.lookupTab === 'SG') {
-      const sgNumber = this.selectedLookupSg?.naturalKey.sgNumber;
-      return sgNumber ? `LC ${lcNumber} / SG ${sgNumber}` : `LC ${lcNumber}`;
-    }
-    return `LC ${lcNumber}`;
-  }
-&nbsp;
-  /** A Sight LC never has an Acceptance (Design doc §7 Tenor Type Routing) — that tab is only meaningful for Usance. */
-  get lookupIsUsanceLc(): boolean {
-    const contract = this.lookupResult?.contract;
-    if (!contract || (contract.instrumentType !== 'IPLC_LC' &amp;&amp; contract.instrumentType !== 'EPLC_CONFIRMATION')) return false;
-    return !!contract.tenorType &amp;&amp; contract.tenorType !== 'SIGHT';
-  }
-&nbsp;
-  /** SG applies to any IPLC_LC regardless of tenor (unlike Acceptance) — Import only. */
-  get lookupHasSg(): boolean {
-    return this.lookupResult?.contract.instrumentType === 'IPLC_LC';
-  }
-&nbsp;
-  /**
-   * UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design") — the Acceptance picker's own
-   * catalog rows need a side-aware balance-type label (Import "Acceptance Balance" vs. Export "Confirmed
-   * LC Acceptance Balance"), same rule InquireEventsService.selectEvent() already applies for its own
-   * identically-named Balance Tab — reused via the resolved contract's own instrumentType (this service
-   * has no separate `side` field of its own, unlike InquireEventsService) rather than duplicated.
-   */
-  get acceptanceBalanceLabel(): string {
-    return this.lookupResult?.contract.instrumentType === 'EPLC_CONFIRMATION' ? 'Confirmed LC Acceptance Balance' : 'Acceptance Balance';
-  }
-&nbsp;
-  /**
-   * Business instruction 2026-08-15 ("Look Up Current Balance... 如果選 Import LC Tab, 不用選 直接
-   * Default Import LC 輸入LC Number... 如果選 Export Confirmed Tab, 不用選 直接Default Export
-   * Confirmed") — switching the Import/Export tab also defaults this panel's own instrumentType to
-   * that side's root LC type. Was duplicated identically in `selectFunctionSide()`/`selectFunction()`
-   * before this extraction — now one shared method.
-   */
-  resetForSide(side: 'IMPORT' | 'EXPORT'): void {
-    this.lookup.instrumentType = defaultLcInstrumentTypeForSide(side);
-    // Business instruction 2026-08-15 ("Export LC LC No, EB No 沒有 SG No") — SG# is Import-only.
-    if (side === 'EXPORT') this.lookup.sgNumber = '';
-  }
-&nbsp;
-  /**
-   * Business instruction 2026-08-15 ("Look Up Current Balance should use the existing LC Number on
-   * Screen... Once Maker Submit or Checker display, it will just use the LC Number instead of keyin")
-   * — syncs this panel's own fields from whatever LC the Maker/Checker side currently has in context and
-   * re-runs the lookup. The component calls this after a Submit and whenever the Checker queue is
-   * (re)displayed — not on every intermediate contract pick while still browsing, to avoid firing
-   * lookups mid-search; that guard (`contextLcNumber`/`model.instrumentType` presence) stays on the
-   * component's own caller, since both concepts belong to the Maker-side selection state this panel
-   * deliberately doesn't own.
-   */
-  syncFrom(lcNumber: string, instrumentType: InstrumentType, onBeforeLookup?: () =&gt; void): void {
-    this.lookup.lcNumber = lcNumber;
-    this.lookup.instrumentType = this.lcInstrumentTypeFor(instrumentType);
-    this.lookup.ibNumber = '';
-    this.lookup.sgNumber = '';
-    this.runLookup(onBeforeLookup);
-  }
-&nbsp;
-  /**
-   * `onBeforeLookup` (call-time parameter, F-04 2026-08-19 — see this class's own doc comment for why
-   * this moved off the constructor) — the one piece of state a fresh lookup needs to reach OUTSIDE
-   * itself: closing any open Account Entries dialog before it replaces the Event Timeline underneath it.
-   * The component passes `() =&gt; this.closeAccountEntryDialog()` at each of its own call sites.
-   */
-  runLookup(onBeforeLookup?: () =&gt; void): void {
-    onBeforeLookup?.();
-    this.lookupError = null;
-    this.lookupResult = null;
-    this.lookupMovements = [];
-    this.lastLookupMovementsRef = null;
-    this.lookupTab = 'LC';
-    this.acceptancesUnderLookup = [];
-    this.selectedLookupAcceptance = null;
-    this.acceptanceSnapshot = null;
-    this.acceptanceMovements = [];
-    this.sgsUnderLookup = [];
-    this.selectedLookupSg = null;
-    this.sgSnapshot = null;
-    this.sgMovements = [];
-    this.api
-      .resolveContract(this.lookup.instrumentType, {
-        lcNumber: this.lookup.lcNumber,
-        ibNumber: this.lookup.ibNumber || null,
-        sgNumber: this.lookup.sgNumber || null,
-      })
-      .subscribe({
-        next: (contract) =&gt; {
-          // Bug fix 2026-08-18 (see loadSnapshotAndMovements()'s own doc comment) — Export Confirmed
-          // LC's own B3/EPLC_EXAMINATION Earmark events have no dedicated Balance Tab of their own, so
-          // they're merged directly into the Confirmed LC's own Tab 1 Event Timeline here; Import LC's
-          // own SG/Acceptance children already have dedicated tabs further below and need no such merge.
-          this.loadSnapshotAndMovements(
-            contract.balanceContractId,
-            contract,
-            (snapshot) =&gt; (this.lookupResult = { contract, snapshot }),
-            (movements) =&gt; (this.lookupMovements = movements),
-            (err) =&gt; (this.lookupError = describeApiError(err)),
-            contract.instrumentType === 'EPLC_CONFIRMATION' ? ['EPLC_EXAMINATION'] : [],
-          );
-          // Business instruction 2026-08-14 ("two tabs for Usance LC, one for LC Balance and one for
-          // Acceptance Balance") — fetch every Acceptance carved out under this LC so the second tab has
-          // something to pick from as soon as it's a Usance-tenor LC.
-          const acceptanceType = this.acceptanceInstrumentTypeFor(contract.instrumentType);
-          if (acceptanceType) {
-            this.loadUnderLookupCandidates(
-              acceptanceType,
-              contract.naturalKey.lcNumber,
-              (items) =&gt; (this.acceptancesUnderLookup = items),
-              (contractId) =&gt; this.selectLookupAcceptance(contractId),
-            );
-          }
-          // Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for
-          // Usance LC... three tabs...") — every SHGT under this LC, any tenor.
-          if (contract.instrumentType === 'IPLC_LC') {
-            this.loadUnderLookupCandidates(
-              'SHGT',
-              contract.naturalKey.lcNumber,
-              (items) =&gt; (this.sgsUnderLookup = items),
-              (contractId) =&gt; this.selectLookupSg(contractId),
-            );
-          }
-        },
-        error: (err) =&gt; (this.lookupError = describeApiError(err)),
-      });
-  }
-&nbsp;
-  /** Business instruction 2026-08-14 ("two/three tabs...") — switching tabs with only one candidate under it jumps straight to it. */
-  selectLookupTab(tab: 'LC' | 'ACCEPTANCE' | 'SG'): void {
-    this.lookupTab = tab;
-    if (tab === 'ACCEPTANCE' &amp;&amp; !this.selectedLookupAcceptance &amp;&amp; this.acceptancesUnderLookup.length === 1) {
-      this.selectLookupAcceptance(this.acceptancesUnderLookup[0].balanceContractId);
-    }
-    if (tab === 'SG' &amp;&amp; !this.selectedLookupSg &amp;&amp; this.sgsUnderLookup.length === 1) {
-      this.selectLookupSg(this.sgsUnderLookup[0].balanceContractId);
-    }
-  }
-&nbsp;
-  /** SG tab — business instruction 2026-08-14 ("SG Balance"): loads the picked SHGT's own snapshot + Event Timeline, independent of the LC's own and any Acceptance's. */
-  selectLookupSg(contractId: string): void {
-    this.selectedLookupSg = this.sgsUnderLookup.find((c) =&gt; c.balanceContractId === contractId) ?? null;
-    if (!this.selectedLookupSg) {
-      this.sgSnapshot = null;
-      this.sgMovements = [];
-      return;
-    }
-    this.loadSnapshotAndMovements(
-      this.selectedLookupSg.balanceContractId,
-      this.selectedLookupSg,
-      (snapshot) =&gt; (this.sgSnapshot = snapshot),
-      (movements) =&gt; (this.sgMovements = movements),
-      () =&gt; (this.sgSnapshot = null),
-    );
-  }
-&nbsp;
-  /** Acceptance tab — business instruction 2026-08-14 ("one for Acceptance Balance"): loads the picked Acceptance's own snapshot + Event Timeline, independent of the LC's own (Tab 1's lookupResult/lookupMovements are untouched). */
-  selectLookupAcceptance(contractId: string): void {
-    this.selectedLookupAcceptance = this.acceptancesUnderLookup.find((c) =&gt; c.balanceContractId === contractId) ?? null;
-    if (!this.selectedLookupAcceptance) {
-      this.acceptanceSnapshot = null;
-      this.acceptanceMovements = [];
-      return;
-    }
-    this.loadSnapshotAndMovements(
-      this.selectedLookupAcceptance.balanceContractId,
-      this.selectedLookupAcceptance,
-      (snapshot) =&gt; (this.acceptanceSnapshot = snapshot),
-      (movements) =&gt; (this.acceptanceMovements = movements),
-      () =&gt; (this.acceptanceSnapshot = null),
-    );
-  }
-&nbsp;
-  /**
-   * Shared body behind this panel's three near-identical "fetch snapshot + fetch/sort movements" pairs
-   * (Tab 1 LC, Tab 2 Acceptance, Tab 3 SG). `contract` is required by `movementsOf$()`/`toEventRows()`
-   * (a finalized Sight IPLC_LC/UTILIZE splits into two rows — see that function's own doc comment) —
-   * each of the 3 call sites already has the relevant contract on hand.
-   *
-   * `mergeChildTypes` (2026-08-18, bug fix, reviewer-reported live — "Look Up Current Balance →
-   * Event Timeline 明顯有漏資料...主要漏掉的是 B3 Present Docs / EPLC_EXAMINATION 的 Earmark Events"):
-   * optional extra child instrumentTypes whose OWN movements (across every one of their own contracts
-   * under this LC Number) get merged directly into this tab's own Event Timeline, exactly the way
-   * InquireEventsService's own loadEvents() already merges every child ledger into its one timeline —
-   * see childMovementsOf$()'s own doc comment for the full root cause. Only the LC tab's own call site
-   * passes this (`['EPLC_EXAMINATION']`, Export Confirmed LC only) — B3/EPLC_EXAMINATION is MEMO_ONLY
-   * with no dedicated Balance Tab of its own (unlike Import LC's own SG/Acceptance children, which
-   * already have one each further below), so merging its events directly into the Confirmed LC's own
-   * Tab 1 timeline is the only place they can ever be seen in this panel. The sort key switches from
-   * plain `eventSeq` to `eventTime` (a real timestamp) once more than one contract can contribute rows —
-   * eventSeq is only meaningful WITHIN a single contract (Design doc §8), so merging Confirmed LC events
-   * with B3's own, separately-eventSeq'd Examination events by eventSeq alone would interleave them
-   * incorrectly; `eventTime` is the same "true Event Date/Time" sort key InquireEventsService's own
-   * merged timeline already uses, and it degrades to the exact same chronological order eventSeq gave
-   * for the single-contract case (SG/Acceptance tabs, and the LC tab whenever nothing is merged in).
-   */
-  private loadSnapshotAndMovements(
-    contractId: string,
-    contract: BalanceContract,
-    setSnapshot: (snapshot: BalanceSnapshot) =&gt; void,
-    setMovements: (events: InquiredEvent[]) =&gt; void,
-    onSnapshotError: (err: unknown) =&gt; void,
-    mergeChildTypes: InstrumentType[] = [],
-  ): void {
-    this.api.getSnapshot(contractId).subscribe({
-      next: setSnapshot,
-      error: onSnapshotError,
-    });
-    const sources: Observable&lt;InquiredEvent[]&gt;[] = [
-      movementsOf$(this.api, contract),
-      ...mergeChildTypes.map((childType) =&gt; childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber)),
-    ];
-    forkJoin(sources).subscribe({
-      next: (groups) =&gt; setMovements(groups.flat().sort((a, b) =&gt; new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime())),
-      error: <span class="fstat-no" title="function not covered" >() =</span>&gt; <span class="cstat-no" title="statement not covered" >setMovements([]),</span>
-    });
-  }
-&nbsp;
-  /** Shared body behind runLookup()'s two near-identical "fetch candidates under this LC, auto-pick if exactly one" catalog calls (Acceptance tab / SG tab). */
-  private loadUnderLookupCandidates(
-    instrumentType: InstrumentType,
-    lcNumber: string,
-    setCandidates: (items: BalanceContract[]) =&gt; void,
-    autoSelect: (contractId: string) =&gt; void,
-  ): void {
-    this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).subscribe({
+  loadSgsForArrival(lcNumber: string | undefined, onUpdated: () =&gt; void): void {
+    this.selectedArrivalSg = null;
+    this.arrivalSgSnapshot = null;
+    this.sgsForArrival = [];
+    this.arrivalSgPaging.reset();
+    if (!lcNumber) return;
+    this.sgsForArrivalLoading = true;
+    this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).subscribe({
       next: (result) =&gt; {
-        setCandidates(result.items);
-        if (result.items.length === 1) autoSelect(result.items[0].balanceContractId);
+        if (!result.items.length) {
+          this.sgsForArrivalLoading = false;
+          this.sgsForArrival = [];
+          this.arrivalSgPaging.total = 0;
+          return;
+        }
+        forkJoin(result.items.map((c) =&gt; this.api.getSnapshot(c.balanceContractId).pipe(catchError(<span class="fstat-no" title="function not covered" >() =</span>&gt; <span class="cstat-no" title="statement not covered" >of(null))</span>))).subscribe((snapshots) =&gt; {
+          this.sgsForArrivalLoading = false;
+          this.sgsForArrival = result.items.filter((_, i) =&gt; {
+            const snap = snapshots[i];
+            return !!snap &amp;&amp; snap.availableBalance !== '0';
+          });
+          this.arrivalSgPaging.total = this.sgsForArrival.length;
+          this.arrivalSgPaging.page = 1;
+          // UX 2026-08-14 "UX要做好 方便操作" — same "only one thing to pick, don't make the user pick
+          // it" pattern as `loadPayableMovements()` below. Reads the FULL (unwindowed) `sgsForArrival`,
+          // not `pagedSgsForArrival` — "if this LC has only one outstanding SG, automatic selection can
+          // remain" applies to the true total across all pages, not just page 1's own count.
+          if (this.sgsForArrival.length === 1) this.selectArrivalSg(this.sgsForArrival[0].balanceContractId, onUpdated);
+        });
       },
-      error: () =&gt; setCandidates([]),
+      error: () =&gt; {
+        this.sgsForArrivalLoading = false;
+        this.sgsForArrival = [];
+        this.arrivalSgPaging.total = 0;
+      },
     });
   }
 &nbsp;
-  private acceptanceInstrumentTypeFor(lcInstrumentType: InstrumentType): InstrumentType | null {
-    if (lcInstrumentType === 'IPLC_LC') return 'IPLC_ACCEPTANCE';
-    // Business instruction 2026-08-15: EPLC_ACCEPTANCE's parent is now EPLC_CONFIRMATION, not EPLC_LC.
-    if (lcInstrumentType === 'EPLC_CONFIRMATION') return 'EPLC_ACCEPTANCE';
+  /**
+   * Business instruction 2026-08-15 ("SG redemption should support partial redemption... Bill Amount =
+   * actual Document Arrival amount, freely typed") — only fetches the picked SG's CURRENT snapshot (not
+   * the stale Catalog row) so the component's own `arrivalSgRedeemAmount`/`arrivalSgRedeemType` compute
+   * against a live outstanding figure; Bill Amount itself (component-owned `model.amount`) is untouched.
+   */
+  selectArrivalSg(contractId: string, onUpdated: () =&gt; void): void {
+    this.selectedArrivalSg = this.sgsForArrival.find((c) =&gt; c.balanceContractId === contractId) ?? null;
+    this.arrivalSgSnapshot = null;
+    if (!this.selectedArrivalSg) {
+      onUpdated();
+      return;
+    }
+    this.api.getSnapshot(this.selectedArrivalSg.balanceContractId).subscribe({
+      next: (snapshot) =&gt; {
+        this.arrivalSgSnapshot = snapshot;
+        onUpdated();
+      },
+      error: () =&gt; {
+        this.arrivalSgSnapshot = null;
+        onUpdated();
+      },
+    });
+  }
+&nbsp;
+  // ---------------------------------------------------------------------------------------------------
+  // B5 (Settlement — Reimbursement / Maturity) — Step 2: the picked Confirmation's own "EB Index"
+  // (still-outstanding Due-from-Issuing-Bank/Acceptance records).
+  // ---------------------------------------------------------------------------------------------------
+&nbsp;
+  settleableBalances: Array&lt;{
+    balanceContractId: string;
+    instrumentType: InstrumentType;
+    ibNumber: string | null;
+    availableBalance: string;
+    currency: string;
+  }&gt; = [];
+  settleableBalancesLoading = false;
+  readonly settleableBalancesPaging = new PagedListState(10);
+&nbsp;
+  /** The current page's own slice of `settleableBalances`. */
+  get pagedSettleableBalances(): Array&lt;{
+    balanceContractId: string;
+    instrumentType: InstrumentType;
+    ibNumber: string | null;
+    availableBalance: string;
+    currency: string;
+  }&gt; {
+    const start = (this.settleableBalancesPaging.page - 1) * this.settleableBalancesPaging.pageSize;
+    return this.settleableBalances.slice(start, start + this.settleableBalancesPaging.pageSize);
+  }
+&nbsp;
+  settleableBalancesPrevPage(): void {
+    const target = this.settleableBalancesPaging.prevTarget();
+    if (target) this.settleableBalancesPaging.page = target;
+  }
+&nbsp;
+  settleableBalancesNextPage(): void {
+    const target = this.settleableBalancesPaging.nextTarget();
+    if (target) this.settleableBalancesPaging.page = target;
+  }
+&nbsp;
+  /**
+   * B5's own "EB Index" Step 2 (business instruction 2026-08-16) — still-outstanding candidates of the
+   * given `instrumentType` (B5's own fixed `EPLC_ACCEPTANCE`) under the given Confirmation's own LC
+   * Number, filtered to Available &gt; 0. `requireIssueReleased: true` — business-reported gap 2026-08-18 —
+   * safe here since an Acceptance/receivable's own CREATE is released as part of B4's own compound
+   * Release, so any genuinely-settleable candidate already clears this by the time B5 looks.
+   */
+  loadSettleableBalances(lcNumber: string, instrumentType: InstrumentType | undefined): void {
+    this.settleableBalancesPaging.reset();
+    if (!instrumentType) {
+      this.settleableBalances = [];
+      return;
+    }
+    this.settleableBalancesLoading = true;
+    forkJoin([
+      this.api.catalog(instrumentType, 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).pipe(
+        map((result) =&gt; result.items.map((c) =&gt; ({ contract: c, instrumentType }))),
+        catchError(() =&gt; of([] as { contract: BalanceContract; instrumentType: InstrumentType }[])),
+      ),
+    ]).subscribe((lists) =&gt; {
+      const candidates = lists.flat();
+      if (!candidates.length) {
+        this.settleableBalancesLoading = false;
+        this.settleableBalances = [];
+        return;
+      }
+      forkJoin(
+        candidates.map((cand) =&gt;
+          this.api.getSnapshot(cand.contract.balanceContractId).pipe(
+            map((snap) =&gt; ({ cand, snap })),
+            catchError(() =&gt; of(null)),
+          ),
+        ),
+      ).subscribe((results) =&gt; {
+        this.settleableBalancesLoading = false;
+        this.settleableBalances = results
+          .filter(
+            (r): r is { cand: { contract: BalanceContract; instrumentType: InstrumentType }; snap: BalanceSnapshot } =&gt;
+              !!r &amp;&amp; Number(r.snap.availableBalance) &gt; 0,
+          )
+          .map((r) =&gt; ({
+            balanceContractId: r.cand.contract.balanceContractId,
+            instrumentType: r.cand.instrumentType,
+            ibNumber: r.cand.contract.naturalKey.ibNumber ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span>
+            availableBalance: r.snap.availableBalance,
+            currency: r.cand.contract.currency,
+          }));
+        this.settleableBalancesPaging.total = this.settleableBalances.length;
+      });
+    });
+  }
+&nbsp;
+  /** Pick handler for the "EB Index" picker above — resolves to whichever real instrumentType that specific candidate actually is (currently always `EPLC_ACCEPTANCE`, B5's own fixed type). Returns `null` for an id that no longer matches (defensive — the caller's own template only ever offers ids from this exact list). */
+  selectSettleableBalance(balanceContractId: string, parentLcNumber: string | undefined): SettleableBalanceSelectionOutcome | null {
+    const picked = this.settleableBalances.find((s) =&gt; s.balanceContractId === balanceContractId);
+    if (!picked) return null;
+    return {
+      instrumentType: picked.instrumentType,
+      contract: {
+        balanceContractId: picked.balanceContractId,
+        instrumentType: picked.instrumentType,
+        naturalKey: { lcNumber: parentLcNumber ?? '', ibNumber: picked.ibNumber },
+        status: 'ACTIVE',
+        currency: picked.currency,
+      } as BalanceContract,
+      ibNumber: picked.ibNumber ?? '',
+    };
+  }
+&nbsp;
+  // ---------------------------------------------------------------------------------------------------
+  // A4 (Sight Settlement) / A6 (Acceptance, Usance) / B4 (Honour / Acceptance) — Step 2: the picked
+  // LC/Confirmation's own still-PENDING (or, for B4, still-RELEASED-but-not-yet-consumed) presentation.
+  // ---------------------------------------------------------------------------------------------------
+&nbsp;
+  payableMovements: BalanceMovement[] = [];
+  payableMovementsLoading = false;
+  selectedPayMovement: BalanceMovement | null = null;
+  payableMovementSearch = '';
+  readonly payableMovementsPaging = new PagedListState(10);
+&nbsp;
+  /** Business instruction 2026-08-15 ("Index Search") — client-side filter, since `payableMovements` is a fully-loaded, unpaginated array (one `listMovements()` call per contract, not server-paginated). */
+  get filteredPayableMovements(): BalanceMovement[] {
+    const q = this.payableMovementSearch.trim().toLowerCase();
+    if (!q) return this.payableMovements;
+    return this.payableMovements.filter((m) =&gt; (m.sourceTransactionRef ?? '').toLowerCase().includes(q));
+  }
+&nbsp;
+  /** The current page's own slice of `filteredPayableMovements` — shared by all three template call sites (A4/A6's own unfiltered picker and B4's two search-filtered ones), same "exactly one is ever visible for a given selectedFunction" safety this app's own `CatalogPickerService`-backed pickers already rely on. */
+  get pagedFilteredPayableMovements(): BalanceMovement[] {
+    const start = (this.payableMovementsPaging.page - 1) * this.payableMovementsPaging.pageSize;
+    return this.filteredPayableMovements.slice(start, start + this.payableMovementsPaging.pageSize);
+  }
+&nbsp;
+  payableMovementsPrevPage(): void {
+    const target = this.payableMovementsPaging.prevTarget();
+    if (target) this.payableMovementsPaging.page = target;
+  }
+&nbsp;
+  payableMovementsNextPage(): void {
+    const target = this.payableMovementsPaging.nextTarget();
+    if (target) this.payableMovementsPaging.page = target;
+  }
+&nbsp;
+  /**
+   * Business instruction 2026-08-14 ("pickup LC then pickup IB Number... Amount will be captured...
+   * without further input") — A4/A6's own plain `listMovements(contractId)` path; routes to
+   * `loadPayableMovementsAcrossChildContracts()` instead for B4 (`selectedFunction.
+   * payableMovementInstrumentType` set — B3's own CREATE lives on a SEPARATE child `EPLC_EXAMINATION`
+   * contract, not on the Confirmation contract itself, so `listMovements(contractId)` would never find
+   * it). `onAutoPicked` fires the same `PayMovementSelectionOutcome` `selectPayMovement()` itself would
+   * return, for the "only one candidate, don't make the user pick it" auto-select case (UX 2026-08-14) —
+   * the caller applies it exactly like a real pick.
+   */
+  loadPayableMovements(opts: {
+    contractId: string | undefined;
+    lcNumber: string | undefined;
+    selectedFunction: TransactionFunction | null;
+    selectedFunctionStrategy: FunctionStrategy | null;
+    onAutoPicked: (outcome: PayMovementSelectionOutcome) =&gt; void;
+  }): void {
+    const { contractId, lcNumber, selectedFunction, selectedFunctionStrategy, onAutoPicked } = opts;
+    this.selectedPayMovement = null;
+    this.payableMovementSearch = '';
+    this.payableMovementsPaging.reset();
+    if (!contractId) {
+      this.payableMovements = [];
+      return;
+    }
+    if (selectedFunction?.payableMovementInstrumentType) {
+      this.loadPayableMovementsAcrossChildContracts(
+        selectedFunction.payableMovementInstrumentType,
+        lcNumber,
+        selectedFunction,
+        selectedFunctionStrategy,
+        onAutoPicked,
+      );
+      return;
+    }
+    this.payableMovementsLoading = true;
+    // Business instruction 2026-08-15 ("B4 should index records from B3") — payableMovementType lets B4
+    // filter for still-PENDING ACCEPT records instead of A4/A6's own UTILIZE; defaults to 'UTILIZE' when
+    // unset so A4/A6 are unchanged.
+    const wantedMovementType = selectedFunction?.payableMovementType ?? 'UTILIZE';
+    this.api.listMovements(contractId).subscribe({
+      next: (list) =&gt; {
+        this.payableMovementsLoading = false;
+        this.payableMovements = list.filter((m) =&gt; m.status === 'PENDING' &amp;&amp; m.movementType === wantedMovementType);
+        this.payableMovementsPaging.total = this.payableMovements.length;
+        if (this.payableMovements.length === 1) {
+          onAutoPicked(this.selectPayMovement(this.payableMovements[0].movementId, selectedFunctionStrategy, selectedFunction?.secondaryRefLabel));
+        }
+      },
+      error: () =&gt; {
+        this.payableMovementsLoading = false;
+        this.payableMovements = [];
+      },
+    });
+  }
+&nbsp;
+  /**
+   * B4 (`payableMovementInstrumentType`) only — the cross-contract half of `loadPayableMovements()`
+   * above: catalog-search still-ACTIVE child contracts of the given `childInstrumentType` under the
+   * given LC Number (same "search by lcNumber" mechanism as `loadSgsForArrival()`), then fetch EACH
+   * one's own movements to find its still-PENDING/RELEASED record. One `EPLC_EXAMINATION` contract only
+   * ever carries one `CREATE` movement, so this is always at most one movement per candidate contract.
+   *
+   * Bug fixed 2026-08-18, reviewer-reported live ("Export Confirmed LC Sight B4 Submit後 不應該再出現 S01
+   * E01 E02" — after B4 has already consumed a presentation, it must stop appearing as a pickable
+   * candidate): a status filter alone isn't enough once a presentation can be RELEASED (EARMARKED) YET
+   * ALSO already fully consumed by an earlier B4 — excludes anything with `presentDocsConsumedAt`
+   * already set. A no-op for A6's own candidates (plain A3 UTILIZEs never set it).
+   */
+  private loadPayableMovementsAcrossChildContracts(
+    childInstrumentType: InstrumentType,
+    lcNumber: string | undefined,
+    selectedFunction: TransactionFunction | null,
+    selectedFunctionStrategy: FunctionStrategy | null,
+    onAutoPicked: (outcome: PayMovementSelectionOutcome) =&gt; void,
+  ): void {
+    if (!lcNumber) {
+      this.payableMovements = [];
+      return;
+    }
+    const wantedMovementType = selectedFunction?.payableMovementType ?? <span class="branch-1 cbranch-no" title="branch not covered" >'UTILIZE';</span>
+    this.payableMovementsLoading = true;
+    this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, lcNumber).subscribe({
+      next: (result) =&gt; {
+        if (!result.items.length) {
+          this.payableMovementsLoading = false;
+          this.payableMovements = [];
+          return;
+        }
+        forkJoin(
+          result.items.map((c) =&gt;
+            this.api.listMovements(c.balanceContractId).pipe(
+              // EPLC_EXAMINATION's own EB Number lives on the CONTRACT's naturalKey.ibNumber — merge it
+              // onto each movement here as a synthetic sourceTransactionRef, so selectPayMovement()/the
+              // row template can keep reading `.sourceTransactionRef` generically without knowing which
+              // case this is.
+              map((list) =&gt; list.map((m) =&gt; ({ ...m, sourceTransactionRef: m.sourceTransactionRef ?? c.naturalKey.ibNumber }))),
+              catchError(() =&gt; of([] as BalanceMovement[])),
+            ),
+          ),
+        ).subscribe((movementLists) =&gt; {
+          this.payableMovementsLoading = false;
+          // Basis changed 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易"): B3 now genuinely
+          // RELEASEs on its own, so B4's own candidate filter looks for status === 'RELEASED' instead of
+          // 'PENDING' when this flag is set; A6's own equivalent (still-PENDING A3 Document Arrivals) is
+          // unaffected, still filters on 'PENDING'.
+          const requiresRelease = !!selectedFunctionStrategy?.checkerRelease.sourceAlreadyReleasedBeforePick;
+          this.payableMovements = movementLists
+            .flat()
+            .filter((m) =&gt; m.movementType === wantedMovementType &amp;&amp; m.status === (requiresRelease ? 'RELEASED' : <span class="branch-1 cbranch-no" title="branch not covered" >'PENDING')</span> &amp;&amp; !m.presentDocsConsumedAt);
+          this.payableMovementsPaging.total = this.payableMovements.length;
+          if (this.payableMovements.length === 1) {
+            onAutoPicked(this.selectPayMovement(this.payableMovements[0].movementId, selectedFunctionStrategy, selectedFunction?.secondaryRefLabel));
+          }
+        });
+      },
+      error: () =&gt; {
+        this.payableMovementsLoading = false;
+        this.payableMovements = [];
+      },
+    });
+  }
+&nbsp;
+  /**
+   * Business instruction 2026-08-15 ("Index Search") — the `IndexPicker`'s own `autoPickedHint` text
+   * fires purely off `items.length === 1`, but the actual auto-pick behavior only ever ran once, against
+   * the ORIGINAL unfiltered list at load time — so narrowing to one match via search would show the hint
+   * without it being true. This re-runs that same auto-pick whenever typing narrows `filteredPayableMovements`
+   * down to exactly one, keeping the hint and the actual behavior in sync — returns the resulting
+   * `PayMovementSelectionOutcome` for the caller to apply, or `null` when no auto-pick happened.
+   */
+  onPayableMovementSearchChange(
+    value: string,
+    selectedFunctionStrategy: FunctionStrategy | null,
+    secondaryRefLabel: string | undefined,
+  ): PayMovementSelectionOutcome | null {
+    this.payableMovementSearch = value;
+    this.payableMovementsPaging.total = this.filteredPayableMovements.length;
+    this.payableMovementsPaging.page = 1;
+    if (this.filteredPayableMovements.length === 1) {
+      return this.selectPayMovement(this.filteredPayableMovements[0].movementId, selectedFunctionStrategy, secondaryRefLabel);
+    }
     return null;
   }
 &nbsp;
-  /** This panel is an LC-level view (with Acceptance/SG as sub-tabs) — a function whose own instrumentType IS a child (Acceptance/SG) still looks up its PARENT LC's own contract, not itself. */
-  private lcInstrumentTypeFor(instrumentType: InstrumentType): InstrumentType {
-    if (instrumentType === 'IPLC_ACCEPTANCE' || instrumentType === 'SHGT') return 'IPLC_LC';
-    // Business instruction 2026-08-15: EPLC_ACCEPTANCE's parent is always EPLC_CONFIRMATION now.
-    if (instrumentType === 'EPLC_ACCEPTANCE') return 'EPLC_CONFIRMATION';
-    // Bug fixed 2026-08-18, reviewer-reported ("B3 Present Docs -&gt; Submit -&gt; Release -&gt; Look Up Current
-    // Balance" showed "No Logical Contract exists yet for this natural key"): EPLC_EXAMINATION (B3) was
-    // missing from this map, so it fell through to the `return instrumentType` default below and
-    // syncFrom() left lookup.instrumentType as EPLC_EXAMINATION itself — but EPLC_EXAMINATION's own
-    // natural key requires ibNumber (the EB Number) too, which syncFrom() always clears to '' before
-    // calling runLookup(), so resolveContract('EPLC_EXAMINATION', {lcNumber, ibNumber: null, ...}) could
-    // never match anything. EPLC_EXAMINATION is MEMO_ONLY and never itself a real Balance Component
-    // ledger worth looking up (same boundary contingentAccountEntry/BALANCE_SNAPSHOT_LABEL already
-    // enforce) — Look Up Current Balance should show its PARENT Confirmation instead, same as every
-    // other child instrumentType above.
-    if (instrumentType === 'EPLC_EXAMINATION') return 'EPLC_CONFIRMATION';
-    return instrumentType;
+  /**
+   * A6 only (business instruction 2026-08-14 "The amount should carry from the related LC number + IB
+   * number and protected"): auto-fills AND locks the Acceptance's own natural key IB Number and Amount
+   * from the Document Arrival being converted — `needsRebuildFields: true` so the caller disables the
+   * Amount input, matching every other "carried and protected" field's own convention. A4 only
+   * (`releasesExistingMovementInPlace`): `clearsSubmitResult: true` — picking a NEW Document Arrival
+   * clears any PREVIOUS Submit result so the Maker isn't left looking at a stale MAKER RESULT panel for a
+   * DIFFERENT movement.
+   */
+  selectPayMovement(movementId: string, selectedFunctionStrategy: FunctionStrategy | null, secondaryRefLabel: string | undefined): PayMovementSelectionOutcome {
+    this.selectedPayMovement = this.payableMovements.find((m) =&gt; m.movementId === movementId) ?? null;
+    const outcome: {
+      selectedPayMovement: BalanceMovement | null;
+      naturalKeyIbNumber?: string;
+      modelSecondaryRef?: string;
+      modelAmount?: string;
+      needsRebuildFields: boolean;
+      clearsSubmitResult: boolean;
+    } = {
+      selectedPayMovement: this.selectedPayMovement,
+      needsRebuildFields: false,
+      clearsSubmitResult: false,
+    };
+    if (selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival &amp;&amp; this.selectedPayMovement) {
+      outcome.naturalKeyIbNumber = this.selectedPayMovement.sourceTransactionRef ?? '';
+      // B4's instrumentType (EPLC_CONFIRMATION) has no ibNumber natural-key field of its own — it carries
+      // its EB Number via secondaryRef instead. Set both so either kind of consumer picks up the right
+      // one; harmless no-op for a function that doesn't use secondaryRef.
+      if (secondaryRefLabel) outcome.modelSecondaryRef = this.selectedPayMovement.sourceTransactionRef ?? '';
+      outcome.modelAmount = this.selectedPayMovement.amount;
+      outcome.needsRebuildFields = true;
+    }
+    if (selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+      outcome.clearsSubmitResult = true;
+    }
+    return outcome;
   }
 }
 &nbsp;</pre></td></tr></table></pre>

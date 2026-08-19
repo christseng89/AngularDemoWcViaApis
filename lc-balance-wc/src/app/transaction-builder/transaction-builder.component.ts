@@ -2,8 +2,6 @@ import { Component, HostListener, Inject, InjectionToken, inject } from '@angula
 import { CommonModule } from '@angular/common';
 import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
@@ -12,7 +10,7 @@ import { LookUpPanelService } from './look-up-panel.service';
 import { CatalogPickerService } from './catalog-picker.service';
 import { InquireEventsService } from './inquire-events.service';
 import { DocumentArrivalHintsService } from './document-arrival-hints.service';
-import { PagedListState } from './paged-list-state';
+import { PayMovementSelectionOutcome, PickerSelectionService } from './picker-selection.service';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   DECREASING_MOVEMENT_TYPES,
@@ -102,6 +100,7 @@ const IB_INDEX_PICKER = new InjectionToken<CatalogPickerService>('TransactionBui
     LookUpPanelService,
     InquireEventsService,
     DocumentArrivalHintsService,
+    PickerSelectionService,
     { provide: CATALOG_PICKER, useFactory: () => new CatalogPickerService(CATALOG_PAGE_SIZE, inject(BalanceComponentApiService)) },
     { provide: PARENT_PICKER, useFactory: () => new CatalogPickerService(PARENT_PAGE_SIZE, inject(BalanceComponentApiService)) },
     { provide: IB_INDEX_PICKER, useFactory: () => new CatalogPickerService(IB_INDEX_PAGE_SIZE, inject(BalanceComponentApiService)) },
@@ -219,64 +218,6 @@ export class TransactionBuilderComponent {
   // constructor's own doc comment (F-04) and its own `ibIndexPicker` parameter.
 
   /**
-   * Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB Index —
-   * Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5's own "EB Index"
-   * Step 2, once its Parent LC (Step 1) is picked. Unlike ibIndexPicker.contracts above (single instrumentType,
-   * model.instrumentType's own catalog), this is populated from selectedFunction.instrumentType
-   * (EPLC_ACCEPTANCE, B5's own fixed type) under the same picked Confirmation. Each entry carries its
-   * own real balanceContractId/instrumentType/availableBalance so onSelectSettleableBalance() can route
-   * correctly.
-   */
-  settleableBalances: Array<{
-    balanceContractId: string;
-    instrumentType: InstrumentType;
-    ibNumber: string | null;
-    availableBalance: string;
-    currency: string;
-  }> = [];
-  settleableBalancesLoading = false;
-  /**
-   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
-   * 2ndary Key Index, A3S's SG Index used as the worked example) — settleableBalances is a fully-loaded,
-   * unpaginated in-memory array (same shape as sgsForArrival/payableMovements below), so this windows it
-   * client-side rather than re-fetching per page — same "no per-page API call makes sense once everything
-   * is already in memory" reasoning InquireEventsService.eventsPaging already established for the merged
-   * Events table.
-   */
-  readonly settleableBalancesPaging = new PagedListState(10);
-
-  /**
-   * Business instruction 2026-08-14 ("pickup LC then pickup IB Number...
-   * Amount will be captured... without further input") — A4 (Sight
-   * Settlement) only: still-PENDING UTILIZE movements under the picked LC,
-   * one per prior A3 (Document Arrival (Sight)) awaiting payment. No
-   * createMovement request is ever built for this function — Pay releases
-   * the picked movement directly (the Checker half of the Maker(A3)/
-   * Checker(A4) split — "All those functions will be processed via Maker,
-   * Checker").
-   */
-  payableMovements: BalanceMovement[] = [];
-  payableMovementsLoading = false;
-  selectedPayMovement: BalanceMovement | null = null;
-  /**
-   * Business instruction 2026-08-15 ("Index Search") — the 2ndary Index (A4/A6's still-PENDING
-   * Document Arrival picker, B4's still-PENDING Present Docs picker) can have several entries under
-   * one LC once a bank has multiple presentations against it, so it needed the same search box every
-   * other picker on this screen already has. payableMovements is a fully-loaded, unpaginated array
-   * (one listMovements() call per contract, not server-paginated), so this filters client-side via
-   * filteredPayableMovements below rather than round-tripping to the server.
-   */
-  payableMovementSearch = '';
-  /**
-   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
-   * 2ndary Key Index) — windows filteredPayableMovements (below) client-side, same reasoning as
-   * settleableBalancesPaging/arrivalSgPaging. Shared by all three template call sites (A4/A6's own
-   * unfiltered picker and B4's two search-filtered ones) — safe, since exactly one is ever visible for a
-   * given selectedFunction, and when payableMovementSearch is '' (A4/A6's own case, which never wires a
-   * search box) filteredPayableMovements already just returns payableMovements unfiltered.
-   */
-  readonly payableMovementsPaging = new PagedListState(10);
-  /**
    * Live Confirmed/Available Balance for selectedContract — fetched the
    * instant a contract is picked (and refreshed after every submit) so the
    * Amount field is never filled in blind. Reviewer-reported gap
@@ -290,29 +231,6 @@ export class TransactionBuilderComponent {
   selectedContractSnapshot: BalanceSnapshot | null = null;
   snapshotLoading = false;
 
-  /**
-   * A3S (Document Arrival w/ Shipping Gtee) only — Step 2 under the picked
-   * LC (onSelectContract() below), listing that LC's own outstanding SHGT
-   * records. See documentArrivalWithSg's doc comment in
-   * balance-component.model.ts for the full two-movement, redeem-then-
-   * arrive mechanism this drives.
-   */
-  sgsForArrival: BalanceContract[] = [];
-  sgsForArrivalLoading = false;
-  /**
-   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern... A3S — Document Arrival
-   * w/ Shipping Gtee used as the worked example: Primary Key = LC Number [already Page-by-Page via
-   * parentPicker/catalogPicker], 2ndary Key = SG Number — this 2ndary Index should ALSO provide the same
-   * Page-by-Page design when multiple Shipping Guarantees exist under one LC"). sgsForArrival is a
-   * fully-loaded, unpaginated in-memory array (loadSgsForArrival() below), so this windows it client-side
-   * — same reasoning as InquireEventsService.eventsPaging. If exactly ONE SG exists under the LC,
-   * loadSgsForArrival()'s own pre-existing auto-pick (unaffected by this change — it reads the full,
-   * unwindowed sgsForArrival) still selects it automatically; pagination only ever matters once more than
-   * one SG exists, matching the business's own stated rule exactly.
-   */
-  readonly arrivalSgPaging = new PagedListState(10);
-  selectedArrivalSg: BalanceContract | null = null;
-  arrivalSgSnapshot: BalanceSnapshot | null = null;
   /** Set once Submit's first call (the SG's own FULL_REDEEM) succeeds — Release then needs it for the compound Checker action. */
   arrivalSgRedeemMovementId: string | null = null;
   /**
@@ -521,6 +439,7 @@ export class TransactionBuilderComponent {
     @Inject(PARENT_PICKER) readonly parentPicker: CatalogPickerService = new CatalogPickerService(PARENT_PAGE_SIZE, api),
     @Inject(IB_INDEX_PICKER) readonly ibIndexPicker: CatalogPickerService = new CatalogPickerService(IB_INDEX_PAGE_SIZE, api),
     readonly documentArrivalHints: DocumentArrivalHintsService = new DocumentArrivalHintsService(api),
+    readonly pickerSelection: PickerSelectionService = new PickerSelectionService(api),
   ) {}
 
   /**
@@ -634,13 +553,13 @@ export class TransactionBuilderComponent {
     this.catalogPicker.search = '';
     this.ibIndexPicker.contracts = [];
     this.ibIndexPicker.resetPaging();
-    this.settleableBalances = [];
-    this.settleableBalancesLoading = false;
-    this.settleableBalancesPaging.reset();
-    this.payableMovements = [];
-    this.payableMovementSearch = '';
-    this.payableMovementsPaging.reset();
-    this.selectedPayMovement = null;
+    this.pickerSelection.settleableBalances = [];
+    this.pickerSelection.settleableBalancesLoading = false;
+    this.pickerSelection.settleableBalancesPaging.reset();
+    this.pickerSelection.payableMovements = [];
+    this.pickerSelection.payableMovementSearch = '';
+    this.pickerSelection.payableMovementsPaging.reset();
+    this.pickerSelection.selectedPayMovement = null;
     this.arrivalApproved = false;
     this.submitResult = null;
     this.submitError = null;
@@ -648,10 +567,10 @@ export class TransactionBuilderComponent {
     this.accountEntryDialogMovement = null;
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
-    this.sgsForArrival = [];
-    this.arrivalSgPaging.reset();
-    this.selectedArrivalSg = null;
-    this.arrivalSgSnapshot = null;
+    this.pickerSelection.sgsForArrival = [];
+    this.pickerSelection.arrivalSgPaging.reset();
+    this.pickerSelection.selectedArrivalSg = null;
+    this.pickerSelection.arrivalSgSnapshot = null;
     this.arrivalSgRedeemMovementId = null;
     this.arrivalSgRedeemMovement = null;
     this.dueFromIssuingBankMovementId = null;
@@ -819,10 +738,10 @@ export class TransactionBuilderComponent {
   onSelectFlattenedPayable(contractId: string, movementId: string): void {
     this.selectedContract = this.catalogPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     this.refreshSelectedContractSnapshot();
-    this.payableMovements = this.documentArrivalHints.catalogPayableMovements.get(contractId) ?? [];
-    this.payableMovementsLoading = false;
-    this.payableMovementsPaging.total = this.payableMovements.length;
-    this.payableMovementsPaging.page = 1;
+    this.pickerSelection.payableMovements = this.documentArrivalHints.catalogPayableMovements.get(contractId) ?? [];
+    this.pickerSelection.payableMovementsLoading = false;
+    this.pickerSelection.payableMovementsPaging.total = this.pickerSelection.payableMovements.length;
+    this.pickerSelection.payableMovementsPaging.page = 1;
     this.onSelectPayMovement(movementId);
     // 4-eyes redesign 2026-08-16: unlike onSelectContract() above (which this deliberately doesn't
     // call, see doc comment), this one-click path never pre-fills the Checker panel's own search box
@@ -1066,57 +985,19 @@ export class TransactionBuilderComponent {
     return this.filteredParentCatalog.slice(start, start + this.parentPicker.pageSize);
   }
 
-  /**
-   * Business instruction 2026-08-15 ("Index Search") — client-side filter for the 2ndary Index
-   * (A4/A6's still-PENDING Document Arrival picker, B4's still-PENDING Present Docs picker), by
-   * sourceTransactionRef (IB/EB Number). payableMovements is already fully loaded/unpaginated
-   * (loadPayableMovements()), so this filters in place rather than round-tripping to the server —
-   * unlike the LC Index/flat Catalog pickers, which page server-side and need a real (search) event.
-   */
-  get filteredPayableMovements(): any[] {
-    const q = this.payableMovementSearch.trim().toLowerCase();
-    if (!q) return this.payableMovements;
-    return this.payableMovements.filter((m) => (m.sourceTransactionRef ?? '').toLowerCase().includes(q));
-  }
-
-  /**
-   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
-   * 2ndary Key Index) — the current page's own slice of filteredPayableMovements, shared by all three
-   * template call sites (A4/A6's own unpaginated picker, B4's two search-filtered ones — see
-   * payableMovementsPaging's own doc comment for why one shared paging state is safe here).
-   */
-  get pagedFilteredPayableMovements(): any[] {
-    const start = (this.payableMovementsPaging.page - 1) * this.payableMovementsPaging.pageSize;
-    return this.filteredPayableMovements.slice(start, start + this.payableMovementsPaging.pageSize);
-  }
-
+  /** BAL-003 (PickerSelectionService extraction, 2026-08-19) — thin wrapper; state/logic now live on `pickerSelection`, see its own doc comment. */
   payableMovementsPrevPage(): void {
-    const target = this.payableMovementsPaging.prevTarget();
-    if (target) this.payableMovementsPaging.page = target;
+    this.pickerSelection.payableMovementsPrevPage();
   }
 
   payableMovementsNextPage(): void {
-    const target = this.payableMovementsPaging.nextTarget();
-    if (target) this.payableMovementsPaging.page = target;
+    this.pickerSelection.payableMovementsNextPage();
   }
 
-  /**
-   * Business instruction 2026-08-15 ("Index Search") — the IndexPicker's own autoPickedHint text
-   * ("picked automatically") fires purely off items.length === 1, but the actual auto-pick behavior
-   * (loadPayableMovements()) only ever runs once, against the ORIGINAL unfiltered list at load time —
-   * so narrowing to one match via search would show the hint without it being true. This re-runs that
-   * same auto-pick whenever typing narrows filteredPayableMovements down to exactly one, keeping the
-   * hint and the actual behavior in sync. Also resets the paging window to page 1 and recomputes its own
-   * total against the NEW filtered length (business requirement 2026-08-19) — a stale page 2 from before
-   * the search would otherwise show an empty window against a narrower filtered result set.
-   */
+  /** BAL-003 (PickerSelectionService extraction, 2026-08-19) — thin wrapper over `pickerSelection.onPayableMovementSearchChange()`; applies the resulting outcome (if any) exactly like a real pick. */
   onPayableMovementSearchChange(value: string): void {
-    this.payableMovementSearch = value;
-    this.payableMovementsPaging.total = this.filteredPayableMovements.length;
-    this.payableMovementsPaging.page = 1;
-    if (this.filteredPayableMovements.length === 1) {
-      this.onSelectPayMovement(this.filteredPayableMovements[0].movementId);
-    }
+    const outcome = this.pickerSelection.onPayableMovementSearchChange(value, this.selectedFunctionStrategy, this.selectedFunction?.secondaryRefLabel);
+    if (outcome) this.applyPayMovementOutcome(outcome);
   }
 
   /**
@@ -1313,114 +1194,31 @@ export class TransactionBuilderComponent {
     // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) now reads
     // through the Strategy too; behavior unchanged.
     if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace || this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival) {
-      this.loadPayableMovements(this.selectedContract?.balanceContractId);
+      this.pickerSelection.loadPayableMovements({
+        contractId: this.selectedContract?.balanceContractId,
+        lcNumber: this.selectedContract?.naturalKey.lcNumber,
+        selectedFunction: this.selectedFunction,
+        selectedFunctionStrategy: this.selectedFunctionStrategy,
+        onAutoPicked: (outcome) => this.applyPayMovementOutcome(outcome),
+      });
     }
-    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) this.loadSgsForArrival();
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+      this.pickerSelection.loadSgsForArrival(this.selectedContract?.naturalKey.lcNumber, () => this.rebuildFields());
+    }
     this.syncCheckerToContext();
   }
 
-  /**
-   * A3S Step 2 (business instruction 2026-08-14) — every SHGT record under
-   * the LC picked in Step 1, so the Maker can pick which one this Document
-   * Arrival is matched against. Mirrors the "Look Up Current Balance"
-   * panel's own sgsUnderLookup fetch, restricted to the picked LC's own
-   * lcNumber via the Catalog's lcNumber filter.
-   *
-   * Business instruction 2026-08-14 ("When SG Full_redemp then it should no
-   * longer available from Document Arrival w/ Shipping Gtee") — a fully
-   * redeemed SG's own BalanceContract.status stays ACTIVE (nothing in this
-   * design ever transitions a contract to CLOSED just because its balance
-   * hit 0, see Design doc §3.1's status machine); the only reliable signal
-   * that it has nothing left is its own live snapshot showing 0 Available.
-   * Same "0-balance exclusion" principle already applied to every other
-   * picker (filteredCatalogContracts()/filteredIbIndexCatalog()/
-   * filteredParentCatalog()), just resolved eagerly here — via forkJoin,
-   * not the fire-and-forget loadSnapshotsInto() helper — so the exclusion
-   * is already applied by the time "only one left, auto-pick it" runs.
-   */
-  private loadSgsForArrival(): void {
-    this.selectedArrivalSg = null;
-    this.arrivalSgSnapshot = null;
-    this.sgsForArrival = [];
-    this.arrivalSgPaging.reset();
-    const lcNumber = this.selectedContract?.naturalKey.lcNumber;
-    if (!lcNumber) return;
-    this.sgsForArrivalLoading = true;
-    // requireIssueReleased: true — business-reported gap 2026-08-18 ("There are function dependency, if
-    // pending in previous event, then next event cannot be accessed") — an SG whose own A8 Issue hasn't
-    // been Checker-Released yet shouldn't be redeemable via A3S.
-    this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).subscribe({
-      next: (result) => {
-        if (!result.items.length) {
-          this.sgsForArrivalLoading = false;
-          this.sgsForArrival = [];
-          this.arrivalSgPaging.total = 0;
-          return;
-        }
-        forkJoin(result.items.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null))))).subscribe((snapshots) => {
-          this.sgsForArrivalLoading = false;
-          this.sgsForArrival = result.items.filter((_, i) => {
-            const snap = snapshots[i];
-            return !!snap && snap.availableBalance !== '0';
-          });
-          this.arrivalSgPaging.total = this.sgsForArrival.length;
-          this.arrivalSgPaging.page = 1;
-          // UX 2026-08-14 "UX要做好 方便操作" — same "only one thing to pick, don't make the user pick it" pattern as loadPayableMovements().
-          // Business requirement 2026-08-19: this auto-pick deliberately still reads the FULL (unwindowed)
-          // sgsForArrival, not pagedSgsForArrival — "if LC S09 has only one outstanding SG, automatic
-          // selection can remain" applies to the true total across all pages, not just page 1's own count.
-          if (this.sgsForArrival.length === 1) this.onSelectArrivalSg(this.sgsForArrival[0].balanceContractId);
-        });
-      },
-      error: () => {
-        this.sgsForArrivalLoading = false;
-        this.sgsForArrival = [];
-        this.arrivalSgPaging.total = 0;
-      },
-    });
-  }
-
-  /** The current page's own slice of sgsForArrival — the template iterates this instead of sgsForArrival directly. */
-  get pagedSgsForArrival(): BalanceContract[] {
-    const start = (this.arrivalSgPaging.page - 1) * this.arrivalSgPaging.pageSize;
-    return this.sgsForArrival.slice(start, start + this.arrivalSgPaging.pageSize);
-  }
-
+  /** BAL-003 (PickerSelectionService extraction, 2026-08-19) — thin wrappers; state/logic now live on `pickerSelection`, see its own doc comment. */
   arrivalSgPrevPage(): void {
-    const target = this.arrivalSgPaging.prevTarget();
-    if (target) this.arrivalSgPaging.page = target;
+    this.pickerSelection.arrivalSgPrevPage();
   }
 
   arrivalSgNextPage(): void {
-    const target = this.arrivalSgPaging.nextTarget();
-    if (target) this.arrivalSgPaging.page = target;
+    this.pickerSelection.arrivalSgNextPage();
   }
 
-  /**
-   * Business instruction 2026-08-15 ("SG redemption should support partial redemption... Bill Amount
-   * = actual Document Arrival amount, freely typed") — reverses the prior full-match-only design: this
-   * used to force model.amount = snapshot.confirmedBalance (locking Bill Amount to the SG's full
-   * outstanding). Now it only fetches the picked SG's CURRENT snapshot (not the stale Catalog row) so
-   * arrivalSgRedeemAmount/arrivalSgRedeemType below compute against a live outstanding figure — Bill
-   * Amount itself stays whatever the Maker already typed (or blank).
-   */
   onSelectArrivalSg(contractId: string): void {
-    this.selectedArrivalSg = this.sgsForArrival.find((c) => c.balanceContractId === contractId) ?? null;
-    this.arrivalSgSnapshot = null;
-    if (!this.selectedArrivalSg) {
-      this.rebuildFields();
-      return;
-    }
-    this.api.getSnapshot(this.selectedArrivalSg.balanceContractId).subscribe({
-      next: (snapshot) => {
-        this.arrivalSgSnapshot = snapshot;
-        this.rebuildFields();
-      },
-      error: () => {
-        this.arrivalSgSnapshot = null;
-        this.rebuildFields();
-      },
-    });
+    this.pickerSelection.selectArrivalSg(contractId, () => this.rebuildFields());
   }
 
   /**
@@ -1429,168 +1227,35 @@ export class TransactionBuilderComponent {
    * SHGT redemption call. Null until both a specific SG is picked and a positive Bill Amount is typed.
    */
   get arrivalSgRedeemAmount(): string | null {
-    if (!this.arrivalSgSnapshot) return null;
+    if (!this.pickerSelection.arrivalSgSnapshot) return null;
     const billAmount = Number(this.model.amount);
     if (!this.model.amount || !isFinite(billAmount) || billAmount <= 0) return null;
-    return String(Math.min(billAmount, Number(this.arrivalSgSnapshot.confirmedBalance)));
+    return String(Math.min(billAmount, Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance)));
   }
 
   /** FULL_REDEEM when Bill Amount fully covers the SG's outstanding, PARTIAL_REDEEM otherwise (business instruction 2026-08-15). */
   get arrivalSgRedeemType(): 'FULL_REDEEM' | 'PARTIAL_REDEEM' | null {
-    if (!this.arrivalSgSnapshot || !this.arrivalSgRedeemAmount) return null;
-    return Number(this.arrivalSgRedeemAmount) >= Number(this.arrivalSgSnapshot.confirmedBalance) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM';
+    if (!this.pickerSelection.arrivalSgSnapshot || !this.arrivalSgRedeemAmount) return null;
+    return Number(this.arrivalSgRedeemAmount) >= Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM';
   }
 
   /** Informational only (not submitted) — what the SG's own outstanding balance will be after this redemption. */
   get arrivalSgRemaining(): string | null {
-    if (!this.arrivalSgSnapshot || !this.arrivalSgRedeemAmount) return null;
-    return String(Math.max(0, Number(this.arrivalSgSnapshot.confirmedBalance) - Number(this.arrivalSgRedeemAmount)));
+    if (!this.pickerSelection.arrivalSgSnapshot || !this.arrivalSgRedeemAmount) return null;
+    return String(Math.max(0, Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance) - Number(this.arrivalSgRedeemAmount)));
   }
 
-  /**
-   * IB Index of still-PENDING Document Arrivals under a picked LC — A4
-   * (Sight Settlement, triggered from onSelectContract) and A6 (Acceptance,
-   * business instruction 2026-08-14 "A6 => Approved LC Balance and Create
-   * Acceptance Balance", triggered from onSelectParent). Takes an explicit
-   * contractId since the two callers source it from different selections
-   * (selectedContract vs selectedParent).
-   */
-  private loadPayableMovements(contractId: string | undefined): void {
-    this.selectedPayMovement = null;
-    this.payableMovementSearch = '';
-    this.payableMovementsPaging.reset();
-    if (!contractId) {
-      this.payableMovements = [];
-      return;
-    }
-    // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — B4 only. B3's own
-    // CREATE lives on a SEPARATE child EPLC_EXAMINATION contract (parentLogicalContractId -> the
-    // Confirmation), not on the Confirmation contract itself — listMovements(contractId) below would
-    // never find it. See payableMovementInstrumentType's own doc comment.
-    if (this.selectedFunction?.payableMovementInstrumentType) {
-      this.loadPayableMovementsAcrossChildContracts(this.selectedFunction.payableMovementInstrumentType);
-      return;
-    }
-    this.payableMovementsLoading = true;
-    // Business instruction 2026-08-15 ("B4 should index records from B3") — payableMovementType lets
-    // B4 filter for still-PENDING ACCEPT records (B3, EPLC_CONFIRMATION) instead of A4/A6's own
-    // UTILIZE (A3, IPLC_LC); defaults to 'UTILIZE' when unset so A4/A6 are unchanged.
-    const wantedMovementType = this.selectedFunction?.payableMovementType ?? 'UTILIZE';
-    this.api.listMovements(contractId).subscribe({
-      next: (list) => {
-        this.payableMovementsLoading = false;
-        this.payableMovements = list.filter((m) => m.status === 'PENDING' && m.movementType === wantedMovementType);
-        this.payableMovementsPaging.total = this.payableMovements.length;
-        // UX 2026-08-14 "UX要做好 方便操作" — when there's only one thing to pick, don't make the user pick it.
-        // Business requirement 2026-08-19: reads the FULL (unwindowed) payableMovements — "only one
-        // candidate in total" auto-selects regardless of page size, same rule as arrivalSgPaging above.
-        if (this.payableMovements.length === 1) this.onSelectPayMovement(this.payableMovements[0].movementId);
-      },
-      error: () => {
-        this.payableMovementsLoading = false;
-        this.payableMovements = [];
-      },
-    });
-  }
-
-  /**
-   * B4 (payableMovementInstrumentType) only — the cross-contract half of loadPayableMovements() above:
-   * catalog-search still-ACTIVE child contracts of the given instrumentType under the picked
-   * Confirmation's own LC Number (same "search by lcNumber" mechanism as A3S's loadSgsForArrival()),
-   * then fetch EACH one's own movements to find its still-PENDING record (payableMovementType). One
-   * EPLC_EXAMINATION contract only ever carries one CREATE movement (B3 never revisits a contract it
-   * already created), so this is always at most one movement per candidate contract.
-   */
-  private loadPayableMovementsAcrossChildContracts(childInstrumentType: InstrumentType): void {
-    const lcNumber = this.selectedContract?.naturalKey.lcNumber ?? this.selectedParent?.naturalKey.lcNumber;
-    if (!lcNumber) {
-      this.payableMovements = [];
-      return;
-    }
-    const wantedMovementType = this.selectedFunction?.payableMovementType ?? 'UTILIZE';
-    this.payableMovementsLoading = true;
-    this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, lcNumber).subscribe({
-      next: (result) => {
-        if (!result.items.length) {
-          this.payableMovementsLoading = false;
-          this.payableMovements = [];
-          return;
-        }
-        forkJoin(
-          result.items.map((c) =>
-            this.api.listMovements(c.balanceContractId).pipe(
-              // EPLC_EXAMINATION's own EB Number lives on the CONTRACT's naturalKey.ibNumber (it's a
-              // genuine natural key field, unlike A3's UTILIZE which has none of its own and carries
-              // IB Number purely via sourceTransactionRef) — merge it onto each movement here as a
-              // synthetic sourceTransactionRef, so onSelectPayMovement()/the row template can keep
-              // reading `.sourceTransactionRef` generically without knowing which case this is.
-              map((list) => list.map((m) => ({ ...m, sourceTransactionRef: m.sourceTransactionRef ?? c.naturalKey.ibNumber }))),
-              catchError(() => of([] as any[])),
-            ),
-          ),
-        ).subscribe((movementLists) => {
-          this.payableMovementsLoading = false;
-          // Business instruction 2026-08-15 ("B4 只能挑 Approved 的記錄") — B4 only: a B3 Present Docs
-          // record must have passed its OWN, genuine Checker Release before it can be picked here for
-          // Honour/Accept, enforcing the 4-eyes check on the presentation itself as a real gate, not
-          // just a courtesy. Basis changed 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易"):
-          // B3 now genuinely RELEASEs on its own (status RELEASED), superseding the prior
-          // acknowledgedAt-while-still-PENDING design — so B4's own candidate filter looks for
-          // status === 'RELEASED' instead of 'PENDING' when this flag is set; A6's own equivalent
-          // (still-PENDING A3 Document Arrivals) is unaffected, still filters on 'PENDING'.
-          //
-          // Bug fixed 2026-08-18, reviewer-reported live ("Export Confirmed LC Sight B4 Submit後 不應該
-          //再出現 S01 E01 E02" — after B4 has already consumed a presentation, it must stop appearing
-          // as a pickable candidate): status alone isn't enough once a presentation can be RELEASED
-          // (EARMARKED) YET ALSO already fully consumed by an earlier B4 — an already-consumed record
-          // never leaves PENDING or transitions again, so `status === 'RELEASED'` alone kept matching it
-          // forever. Also exclude anything with `presentDocsConsumedAt` already set (see
-          // BalanceMovement.presentDocsConsumedAt's own doc comment — set as a side effect of B4's own
-          // compound release). This check is a no-op for A6 (its own candidates, plain A3 UTILIZEs,
-          // never set presentDocsConsumedAt at all).
-          // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — reads through the Strategy
-          // instead of the raw flag; behavior unchanged.
-          const requiresRelease = !!this.selectedFunctionStrategy?.checkerRelease.sourceAlreadyReleasedBeforePick;
-          this.payableMovements = movementLists
-            .flat()
-            .filter((m: any) => m.movementType === wantedMovementType && m.status === (requiresRelease ? 'RELEASED' : 'PENDING') && !m.presentDocsConsumedAt);
-          this.payableMovementsPaging.total = this.payableMovements.length;
-          if (this.payableMovements.length === 1) this.onSelectPayMovement(this.payableMovements[0].movementId);
-        });
-      },
-      error: () => {
-        this.payableMovementsLoading = false;
-        this.payableMovements = [];
-      },
-    });
-  }
-
+  /** BAL-003 (PickerSelectionService extraction, 2026-08-19) — thin wrapper over `pickerSelection.selectPayMovement()`; applies the returned outcome to the component-owned state the service deliberately doesn't hold (`naturalKey`/`model`/`submitResult` — see `PayMovementSelectionOutcome`'s own doc comment). */
   onSelectPayMovement(movementId: string): void {
-    this.selectedPayMovement = this.payableMovements.find((m) => m.movementId === movementId) ?? null;
-    // A6 only (business instruction 2026-08-14 "The amount should carry from the related LC number + IB
-    // number and protected"): auto-fills AND locks the Acceptance's own natural key IB Number and Amount from
-    // the Document Arrival being converted — no longer just a default, rebuildFields() below disables the
-    // Amount input so it can't drift from what the presentation actually recorded.
-    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival (shared with
-    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) now reads
-    // through the Strategy too; behavior unchanged.
-    if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedPayMovement) {
-      this.naturalKey.ibNumber = this.selectedPayMovement.sourceTransactionRef ?? '';
-      // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — B4 only. A6 reads
-      // naturalKey.ibNumber (its own instrumentType, IPLC_ACCEPTANCE, has ibNumber as a natural key
-      // field); B4's instrumentType, EPLC_CONFIRMATION, does not — it carries its EB Number via
-      // secondaryRef instead (secondaryRefLabel), same as old-B3 did. Set both so either kind of
-      // consumer picks up the right one; harmless no-op for a function that doesn't use secondaryRef.
-      if (this.selectedFunction?.secondaryRefLabel) {
-        this.model.secondaryRef = this.selectedPayMovement.sourceTransactionRef ?? '';
-      }
-      this.model.amount = this.selectedPayMovement.amount;
-      this.rebuildFields();
-    }
-    // A4 only (business instruction 2026-08-16, real Maker Submit): picking a NEW Document Arrival
-    // clears any PREVIOUS Submit result so the Maker isn't left looking at a stale MAKER RESULT panel
-    // for a DIFFERENT movement.
-    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+    this.applyPayMovementOutcome(this.pickerSelection.selectPayMovement(movementId, this.selectedFunctionStrategy, this.selectedFunction?.secondaryRefLabel));
+  }
+
+  private applyPayMovementOutcome(outcome: PayMovementSelectionOutcome): void {
+    if (outcome.naturalKeyIbNumber !== undefined) this.naturalKey.ibNumber = outcome.naturalKeyIbNumber;
+    if (outcome.modelSecondaryRef !== undefined) this.model.secondaryRef = outcome.modelSecondaryRef;
+    if (outcome.modelAmount !== undefined) this.model.amount = outcome.modelAmount;
+    if (outcome.needsRebuildFields) this.rebuildFields();
+    if (outcome.clearsSubmitResult) {
       this.submitResult = null;
       this.submitError = null;
     }
@@ -1607,11 +1272,11 @@ export class TransactionBuilderComponent {
    * function — checkerAct()'s own doc comment covers the matching Checker-side gate.
    */
   submitA4(): void {
-    if (!this.selectedPayMovement) return;
+    if (!this.pickerSelection.selectedPayMovement) return;
     this.submitting = true;
     this.submitResult = null;
     this.submitError = null;
-    this.api.submitByMaker(this.selectedPayMovement.movementId, this.model.createdBy || 'maker1').subscribe({
+    this.api.submitByMaker(this.pickerSelection.selectedPayMovement.movementId, this.model.createdBy || 'maker1').subscribe({
       next: (res) => {
         this.submitting = false;
         this.submitResult = res;
@@ -1795,13 +1460,19 @@ export class TransactionBuilderComponent {
     // A6, deliberately left on the old path by PR-3 until B-series had its own wiring) and
     // settleableBalanceIndex now read through the Strategy too; behavior unchanged.
     if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedParent) {
-      this.loadPayableMovements(this.selectedParent.balanceContractId);
+      this.pickerSelection.loadPayableMovements({
+        contractId: this.selectedParent.balanceContractId,
+        lcNumber: this.selectedParent.naturalKey.lcNumber,
+        selectedFunction: this.selectedFunction,
+        selectedFunctionStrategy: this.selectedFunctionStrategy,
+        onAutoPicked: (outcome) => this.applyPayMovementOutcome(outcome),
+      });
     }
     // B5 only (business instruction 2026-08-16, "EB Index... those EB records with Acceptance
     // Balance") — Step 2: still-outstanding Due-from-Issuing-Bank/Acceptance records under the picked
     // Confirmation, ready to be settled.
     if (this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex && this.selectedParent) {
-      this.loadSettleableBalances(this.selectedParent.naturalKey.lcNumber);
+      this.pickerSelection.loadSettleableBalances(this.selectedParent.naturalKey.lcNumber, this.selectedFunction?.instrumentType);
     }
     // A6/B4 (business instruction 2026-08-14 "The Tenor Type and Tenor days should carry from the LC Number
     // and protected as well") — copied from the parent LC's own declared values, not freely typed, since the
@@ -1841,110 +1512,21 @@ export class TransactionBuilderComponent {
     if (page !== null) this.ibIndexPicker.page = page;
   }
 
-  /**
-   * B5's own "EB Index" Step 2 (business instruction 2026-08-16) — still-outstanding candidates of
-   * selectedFunction.instrumentType (EPLC_ACCEPTANCE, B5's own fixed type) under the given
-   * Confirmation's own LC Number. Unlike loadIbIndex() above (which now also just does a single-shot
-   * capped fetch, see CatalogPickerService's own 2026-08-19 module doc comment), this
-   * loads its one catalog unpaginated (up to 50, same cap as loadPayableMovementsAcrossChildContracts())
-   * and filters to Available > 0 — nothing left to settle isn't worth offering as a target. `types`
-   * stays an array (rather than a single instrumentType) purely so the forkJoin below can stay written
-   * generically — earlier in B5's history (when it briefly also covered the Sight case) this merged in
-   * a second instrumentType via a `dualInstrumentFallback` field; removed as dead code
-   * (Quality-report-balance.md BAL-101) once B5 reverted to Usance-only and the field was left
-   * permanently unset.
-   */
-  private loadSettleableBalances(lcNumber: string): void {
-    this.settleableBalancesPaging.reset();
-    const fn = this.selectedFunction;
-    if (!fn?.instrumentType) {
-      this.settleableBalances = [];
-      return;
-    }
-    const types: InstrumentType[] = [fn.instrumentType];
-    this.settleableBalancesLoading = true;
-    // requireIssueReleased: true — business-reported gap 2026-08-18 ("There are function dependency, if
-    // pending in previous event, then next event cannot be accessed"). Safe here (unlike B4's own
-    // loadPayableMovementsAcrossChildContracts() search below, which deliberately wants a still-PENDING
-    // EPLC_EXAMINATION CREATE): an Acceptance/receivable's own CREATE is released as part of B4's own
-    // compound Release, so any genuinely-settleable candidate already clears this by the time B5 looks.
-    forkJoin(
-      types.map((instrumentType) =>
-        this.api.catalog(instrumentType, 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).pipe(
-          map((result) => result.items.map((c) => ({ contract: c, instrumentType }))),
-          catchError(() => of([] as { contract: BalanceContract; instrumentType: InstrumentType }[])),
-        ),
-      ),
-    ).subscribe((lists) => {
-      const candidates = lists.flat();
-      if (!candidates.length) {
-        this.settleableBalancesLoading = false;
-        this.settleableBalances = [];
-        return;
-      }
-      forkJoin(
-        candidates.map((cand) =>
-          this.api.getSnapshot(cand.contract.balanceContractId).pipe(
-            map((snap) => ({ cand, snap })),
-            catchError(() => of(null)),
-          ),
-        ),
-      ).subscribe((results) => {
-        this.settleableBalancesLoading = false;
-        this.settleableBalances = results
-          .filter(
-            (r): r is { cand: { contract: BalanceContract; instrumentType: InstrumentType }; snap: BalanceSnapshot } =>
-              !!r && Number(r.snap.availableBalance) > 0,
-          )
-          .map((r) => ({
-            balanceContractId: r.cand.contract.balanceContractId,
-            instrumentType: r.cand.instrumentType,
-            ibNumber: r.cand.contract.naturalKey.ibNumber ?? null,
-            availableBalance: r.snap.availableBalance,
-            currency: r.cand.contract.currency,
-          }));
-        this.settleableBalancesPaging.total = this.settleableBalances.length;
-      });
-    });
-  }
-
-  /**
-   * Business requirement 2026-08-19 ("Page-by-Page Pagination Design Pattern" for every Primary AND
-   * 2ndary Key Index) — the current page's own slice of settleableBalances (B5's own EB Index).
-   */
-  get pagedSettleableBalances(): Array<{
-    balanceContractId: string;
-    instrumentType: InstrumentType;
-    ibNumber: string | null;
-    availableBalance: string;
-    currency: string;
-  }> {
-    const start = (this.settleableBalancesPaging.page - 1) * this.settleableBalancesPaging.pageSize;
-    return this.settleableBalances.slice(start, start + this.settleableBalancesPaging.pageSize);
-  }
-
+  /** BAL-003 (PickerSelectionService extraction, 2026-08-19) — thin wrappers; state/logic now live on `pickerSelection`, see its own doc comment. */
   settleableBalancesPrevPage(): void {
-    const target = this.settleableBalancesPaging.prevTarget();
-    if (target) this.settleableBalancesPaging.page = target;
+    this.pickerSelection.settleableBalancesPrevPage();
   }
 
   settleableBalancesNextPage(): void {
-    const target = this.settleableBalancesPaging.nextTarget();
-    if (target) this.settleableBalancesPaging.page = target;
+    this.pickerSelection.settleableBalancesNextPage();
   }
 
-  /** Pick handler for the "EB Index" picker above — routes to whichever real instrumentType that specific candidate actually is (currently always EPLC_ACCEPTANCE, B5's own fixed type — see loadSettleableBalances' own doc comment). */
+  /** Pick handler for the "EB Index" picker above — thin wrapper over `pickerSelection.selectSettleableBalance()`, applying its outcome to the component-owned `model.instrumentType`/`selectedContract`/`searchNaturalKey` the service deliberately doesn't hold. */
   onSelectSettleableBalance(balanceContractId: string): void {
-    const picked = this.settleableBalances.find((s) => s.balanceContractId === balanceContractId);
-    if (!picked) return;
-    this.model.instrumentType = picked.instrumentType;
-    this.selectedContract = {
-      balanceContractId: picked.balanceContractId,
-      instrumentType: picked.instrumentType,
-      naturalKey: { lcNumber: this.selectedParent?.naturalKey.lcNumber ?? '', ibNumber: picked.ibNumber },
-      status: 'ACTIVE',
-      currency: picked.currency,
-    } as BalanceContract;
+    const outcome = this.pickerSelection.selectSettleableBalance(balanceContractId, this.selectedParent?.naturalKey.lcNumber);
+    if (!outcome) return;
+    this.model.instrumentType = outcome.instrumentType;
+    this.selectedContract = outcome.contract;
     // Business instruction 2026-08-16 ("B2-B5 Currency = Carry from B1 + Protected") — already carried
     // from Step 1's selectedParent (onSelectParent()) in the normal flow; re-asserted here too so it's
     // correct even if Step 2 is reached some other way. See carriedCurrency's own doc comment.
@@ -1952,7 +1534,7 @@ export class TransactionBuilderComponent {
       this.model.currency = this.carriedCurrency;
       this.rebuildFields();
     }
-    this.searchNaturalKey.ibNumber = picked.ibNumber ?? '';
+    this.searchNaturalKey.ibNumber = outcome.ibNumber;
     this.refreshSelectedContractSnapshot();
     this.syncCheckerToContext();
   }
@@ -2359,7 +1941,7 @@ export class TransactionBuilderComponent {
     this.fields = buildFields({
       model: this.model,
       selectedFunction: this.selectedFunction,
-      selectedPayMovement: this.selectedPayMovement,
+      selectedPayMovement: this.pickerSelection.selectedPayMovement,
       selectedContract: this.selectedContract,
       selectedContractSnapshot: this.selectedContractSnapshot,
       selectedParent: this.selectedParent,
@@ -2494,9 +2076,9 @@ export class TransactionBuilderComponent {
       selectedFunction: this.selectedFunction,
       dynamicSecondaryRefLabel: this.dynamicSecondaryRefLabel,
       activeFunctionSide: this.activeFunctionSide,
-      selectedPayMovement: this.selectedPayMovement,
-      selectedArrivalSg: this.selectedArrivalSg,
-      arrivalSgSnapshot: this.arrivalSgSnapshot,
+      selectedPayMovement: this.pickerSelection.selectedPayMovement,
+      selectedArrivalSg: this.pickerSelection.selectedArrivalSg,
+      arrivalSgSnapshot: this.pickerSelection.arrivalSgSnapshot,
       selectedContractSnapshot: this.selectedContractSnapshot,
       selectedContract: this.selectedContract,
       selectedParent: this.selectedParent,
@@ -2524,8 +2106,8 @@ export class TransactionBuilderComponent {
       naturalKey: this.naturalKey,
       selectedFunction: this.selectedFunction,
       selectedContract: this.selectedContract,
-      selectedArrivalSg: this.selectedArrivalSg,
-      arrivalSgSnapshot: this.arrivalSgSnapshot,
+      selectedArrivalSg: this.pickerSelection.selectedArrivalSg,
+      arrivalSgSnapshot: this.pickerSelection.arrivalSgSnapshot,
     };
   }
 
@@ -2668,7 +2250,7 @@ export class TransactionBuilderComponent {
     return {
       submitResult: this.submitResult,
       selectedFunction: this.selectedFunction,
-      selectedPayMovement: this.selectedPayMovement,
+      selectedPayMovement: this.pickerSelection.selectedPayMovement,
       matchedReceivableMovementId: this.matchedReceivableMovementId,
       dueFromIssuingBankMovementId: this.dueFromIssuingBankMovementId,
       acceptanceMovementId: this.acceptanceMovementId,
@@ -2695,7 +2277,7 @@ export class TransactionBuilderComponent {
       this.refreshSelectedContractSnapshot();
       this.syncCheckerToContext();
       // The picked SG's own snapshot is stale otherwise until the user navigates away and back.
-      this.loadSgsForArrival();
+      this.pickerSelection.loadSgsForArrival(this.selectedContract?.naturalKey.lcNumber, () => this.rebuildFields());
       return;
     }
     this.finishCheckerAction(outcome.result, { syncLookup: outcome.syncLookup });

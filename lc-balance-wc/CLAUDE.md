@@ -7735,3 +7735,124 @@ own selection-handler state remains confirmed, by the SAME prior research, archi
 real child components under this project's current test convention; extracting THAT would require either
 rewriting ~40-90+ existing test assertions to drive a genuine Angular view-rendering pipeline (TestBed), or
 a broader test-convention change this session has not been asked to make.
+
+## BAL-003 — `PickerSelectionService` extracted: A3S's SG picker, B5's EB Index, and A4/A6/B4's shared "payable movement" picker (2026-08-19, user-directed — asked whether `@ViewChild`/`@Input`-`@Output` could instead become an "Angular Service"; confirmed yes for the parts that are genuinely picker-owned state, scoped via three successive `AskUserQuestion` rounds as the true blast radius came into focus during investigation)
+
+Direct continuation of the same-day F-04 fix and the earlier BAL-003 research pass (confirming a genuine
+child component is blocked by this project's own no-TestBed convention). The user's own follow-up question
+— "can `@ViewChild`/`@Input`-`@Output` instead become a Service?" — is answered **yes**, and is in fact the
+exact mechanism this session had already used 5 times (`CheckerActionsService`, `MakerSubmitService`,
+`LookUpPanelService`, `CatalogPickerService`, `DocumentArrivalHintsService`): a plain service class, not a
+`@Component`, held as a public field the template reads directly — no `@ViewChild` wiring exists to be
+blocked, and `new PickerSelectionService(api)` needs no TestBed either. Confirmed against angular.dev's own
+[Component testing scenarios](https://angular.dev/guide/testing/components-scenarios) guide (which uses
+`TestBed.createComponent()` throughout but does affirm delegating to an injected service as a testability
+pattern) before committing to the design.
+
+**Scope, arrived at incrementally as investigation surfaced the true entanglement, not decided up front**:
+`onSelectContract()`/`onSelectParent()`/`onSelectIbIndex()` (Step 1 — LC/Parent/IB Index picks) themselves
+stayed on the component, unchanged in shape — they read/write `model`/`naturalKey`/`selectedContract`/
+`selectedParent` too pervasively to move without relocating those fields too (the exact "core Maker-flow
+orchestration, not picker bookkeeping" finding an earlier same-session pass already reached for this same
+question). What DID move: the three Step-2 "2ndary Index" subsystems that are genuinely exclusive to their
+own picker — A3S's SG picker (`sgsForArrival`/`selectedArrivalSg`/`arrivalSgSnapshot` +
+`loadSgsForArrival()`/`selectArrivalSg()`), B5's EB Index (`settleableBalances` +
+`loadSettleableBalances()`/`selectSettleableBalance()`), and A4/A6/B4's shared payable-movement picker
+(`payableMovements`/`selectedPayMovement` + `loadPayableMovements()`/
+`loadPayableMovementsAcrossChildContracts()`/`selectPayMovement()`/`onPayableMovementSearchChange()`) —
+including, per the user's own explicit follow-up confirmation once the investigation surfaced it,
+`onSelectPayMovement()` itself (originally not named in the first approval, but structurally inseparable
+from `loadPayableMovements()`'s own auto-pick chain).
+
+**Dependency Inversion, same shape as `CheckerActionsService`/`MakerSubmitService`**: every method that
+would otherwise need to write back to component-owned `model`/`naturalKey`/`submitResult`/call
+`rebuildFields()` instead returns (or passes forward, via an `onAutoPicked`/`onUpdated` callback for the
+async auto-pick cases) a small `PayMovementSelectionOutcome`/`SettleableBalanceSelectionOutcome` object the
+component's own thin wrapper applies — `applyPayMovementOutcome()` is the one new place these turn into
+`naturalKey.ibNumber`/`model.secondaryRef`/`model.amount`/`rebuildFields()`/`submitResult` writes, mirroring
+`applyCheckerActionOutcome()`/`applyMakerSubmitOutcome()` exactly. **Action methods
+(`onSelectArrivalSg`/`onSelectSettleableBalance`/`onSelectPayMovement`/`onPayableMovementSearchChange`/
+every `xxxPrevPage()`/`xxxNextPage()`) stay as one-line wrapper methods on the component** — matching
+`catalogPrevPage()`/`catalogNextPage()`'s own already-established precedent of keeping template action
+bindings unchanged even once the underlying state moves to a service; only the STATE bindings (`[items]`/
+`[loading]`/`[selectedId]`/`[page]`/`{{ }}` interpolations) needed a `pickerSelection.` prefix added in the
+template. `arrivalSgRedeemAmount`/`arrivalSgRedeemType`/`arrivalSgRemaining` deliberately stayed on the
+component too — genuinely derived from BOTH the service's own `arrivalSgSnapshot` AND the component-owned
+`model.amount`, the same class of cross-cutting combinator `carriedCurrency`/`arrivalAlreadyApproved`
+already are.
+
+`@Injectable()`, no `providedIn` (matching `LookUpPanelService`/`DocumentArrivalHintsService`/
+`InquireEventsService`'s own F-04-fixed pattern — genuinely per-component-instance state, never an app-wide
+singleton), registered in `TransactionBuilderComponent`'s own `@Component({ providers: [...] })` array and
+as a constructor parameter with a TS default value, same construction style as the other 6.
+
+**Mechanical migration**: ~97 raw call sites across the four spec files renamed from bare `comp.X`/`c.X` to
+`comp.pickerSelection.X`/`c.pickerSelection.X` via the same scripted word-boundary regex pass this session's
+prior LookUpPanelService/CatalogPickerService extractions already established — pure rename, no logic
+touched. Two pre-existing tests that called the now-service-owned, now-private
+`loadPayableMovementsAcrossChildContracts()` DIRECTLY (bypassing the public dispatcher) needed redirecting
+to `pickerSelection.loadPayableMovements({...})` instead — the same "the new boundary correctly caught a
+test reaching past the public API" pattern this file's own history already uses repeatedly, not a behavior
+regression.
+
+**Coverage, closed deliberately rather than left at the aggregate floor** (user-directed follow-up:
+"Ensure test coverage is well covered for Balance Component refactoring"): a new
+`picker-selection.service.spec.ts` (direct unit tests, no TestBed, same convention as
+`checker-actions.service.spec.ts`) took the new file from 83.24/76.27/80.76/85.44 to
+99.44/94.91/98.07/100 — closing the paging-getter/prevPage/nextPage branches, the
+`loadSettleableBalances`/`loadPayableMovements` "guard fires before any HTTP call" branches, and, most
+significantly, a full B4 cross-contract candidate-filtering test (3 candidates: wrong movementType, an
+already-`presentDocsConsumedAt`-consumed RELEASED one, and one genuine match) proving the reviewer-reported
+2026-08-18 "already consumed" bug-fix line still works correctly post-extraction, not just that the code
+moved. A second gap, found only once the FULL suite's own coverage report was checked (not assumed from the
+new file alone): the six new one-line wrapper methods
+(`arrivalSgPrevPage`/`NextPage`/`settleableBalancesPrevPage`/`NextPage`/`payableMovementsPrevPage`/
+`NextPage`) had no direct test at all — closed with a new describe block in
+`transaction-builder.component.selection.spec.ts`, mirroring `ibIndexPrevPage`/`ibIndexNextPage`'s own
+already-established "thin delegation" test shape exactly. Remaining uncovered branches (3 lines in the new
+service — an `?? null` fallback never hit by a truthy-`ibNumber` fixture, and a `?? 'UTILIZE'` fallback
+confirmed genuinely unreachable via any real function object since B4, the only caller of that code path,
+always sets `payableMovementType` on its own registry entry; 4 lines in the component — the `providers`
+array's own `useFactory` closures, never invoked by this project's own direct-instantiation tests, and two
+pre-existing, unrelated getter bodies) are the same class of defensive/unreachable gap this file already
+accepts elsewhere, not new debt from this extraction.
+
+**Verification**: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates)/`npm run lint` (0 errors, 222 warnings, unchanged baseline) all clean. Full Angular suite
+**903/903 passing** (13 net new — 1 in `picker-selection.service.spec.ts`'s own coverage-closing pass plus
+its own earlier tests, 3 in the new prevPage/nextPage delegation block; **zero pre-existing test files
+needed any logic changes beyond the mechanical rename and the two redirected private-method calls** — the
+strongest evidence available that this extraction is genuinely behavior-preserving). Coverage
+**99.11/96.31/97.67/99.27%** (up from 97.38/95.43/95/97.64% before the dedicated coverage-closing pass —
+every metric improved, not just held at the floor). `backend/` 34/34 and microservice 335/335 both re-run
+per this file's own standing rule, unaffected (Angular-only change — no request/response contract change).
+
+**Live-verified end to end against the real running stack**: built a fresh test LC (`PICKVERIFY01`) via A1
+→ Release → A8 (SG `GVERIFY01`, 40,000) → Release, confirming Off-Balance Exposure 40,000/Tight Available
+60,000 along the way (the pre-existing eligibility/hint services working correctly alongside the new one).
+Switched to A3S — `PICKVERIFY01` correctly appeared in the eligibility-filtered LC Index only once its own
+SG existed (confirming `DocumentArrivalHintsService`'s own eligibility check is unaffected); picking it
+correctly loaded the "2ndary Index — Outstanding Shipping Guarantees" panel via the NEW
+`pickerSelection.loadSgsForArrival()`, auto-picked the sole candidate `GVERIFY01` via
+`pickerSelection.selectArrivalSg()` ("Only one Shipping Guarantee under this LC — picked automatically."),
+and — typing Bill Amount 25,000 — the component's own `arrivalSgRedeemAmount`/`Type`/`Remaining` getters
+(reading `pickerSelection.arrivalSgSnapshot` + `model.amount`) correctly computed "SG Redemption Amount
+(MIN of Bill Amount, SG Outstanding) — PARTIAL_REDEEM: 25000 USD" and "SG Remaining After This Redemption:
+15000 USD" — an exact, independently-verifiable arithmetic proof (MIN(25000, 40000) = 25000; 40000 − 25000
+= 15000) that the extracted service's own state and the component's own cross-cutting derived getters are
+wired correctly end to end through the real microservice. Zero console errors observed throughout (checked
+directly via `read_console_messages`, not just the absence of a visible error banner). Test data
+(`PICKVERIFY01`/`GVERIFY01`) cleaned up afterward via a direct SQLite delete, scoped to that one LC number;
+confirmed the pre-existing 47 reference contracts were left untouched.
+
+**Net effect on BAL-003**: `transaction-builder.component.ts` net line count is roughly flat (state/methods
+removed roughly offset by new thin-wrapper bodies and doc comments — never a line-count exercise, same
+posture every prior BAL-003 pass in this file has taken), but this closes the second-to-last genuinely
+picker-exclusive subsystem this session's own investigation history has identified — what remains on the
+component (function/side selection, the three Step-1 picker SELECTION handlers themselves) is confirmed,
+by two independent same-session investigations now, to be core Maker-flow orchestration rather than picker
+bookkeeping, and not further extractable without either moving `model`/`naturalKey`/`selectedContract`/
+`selectedParent` off the component (a much larger, differently-shaped refactor) or a TestBed-based
+child-component migration this session has not been asked to make.
+
+Not committed (not requested).

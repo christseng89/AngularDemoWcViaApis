@@ -143,9 +143,9 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.onSelectContract('C1');
 
       expect(api.listMovements).toHaveBeenCalledWith('C1');
-      expect(comp.payableMovements).toEqual([pendingUtilize]);
+      expect(comp.pickerSelection.payableMovements).toEqual([pendingUtilize]);
       // Only one PENDING match -> auto-picked (onSelectPayMovement side effect).
-      expect(comp.selectedPayMovement?.movementId).toBe('M1');
+      expect(comp.pickerSelection.selectedPayMovement?.movementId).toBe('M1');
     });
 
     it('B4 (movementTypeFromContractTenor + payableMovementInstrumentType): derives HONOUR for a Sight Confirmation and loads already-RELEASED B3 CREATEs across child EPLC_EXAMINATION contracts', () => {
@@ -176,8 +176,8 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.onSelectContract('CNF1');
 
       expect(comp.model.movementType).toBe('HONOUR');
-      expect(comp.payableMovements).toHaveLength(1);
-      expect(comp.payableMovements[0].movementId).toBe('MX1');
+      expect(comp.pickerSelection.payableMovements).toHaveLength(1);
+      expect(comp.pickerSelection.payableMovements[0].movementId).toBe('MX1');
       // Only one match -> auto-picked; B4 has secondaryRefLabel ('EB Number') so both naturalKey.ibNumber and model.secondaryRef get carried, from the EPLC_EXAMINATION contract's own naturalKey.ibNumber (merged in as a synthetic sourceTransactionRef).
       expect(comp.naturalKey.ibNumber).toBe('EB01');
       expect(comp.model.secondaryRef).toBe('EB01');
@@ -218,7 +218,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.onSelectContract('CNF2');
 
       expect(comp.model.movementType).toBe('ACCEPT');
-      expect(comp.payableMovements).toHaveLength(0); // filtered out — still PENDING, not yet Released
+      expect(comp.pickerSelection.payableMovements).toHaveLength(0); // filtered out — still PENDING, not yet Released
     });
 
     // Bug fixed 2026-08-18, reviewer-reported live ("Export Confirmed LC Sight B4 Submit後 不應該再出現
@@ -259,7 +259,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.onSelectContract('CNF3');
 
       expect(comp.model.movementType).toBe('HONOUR');
-      expect(comp.payableMovements).toHaveLength(0); // filtered out — already consumed by an earlier B4
+      expect(comp.pickerSelection.payableMovements).toHaveLength(0); // filtered out — already consumed by an earlier B4
     });
 
     it("A3S (documentArrivalWithSg): loads the LC's outstanding SHGT records and auto-picks/fetches the sole one's snapshot", () => {
@@ -273,9 +273,9 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       comp.onSelectContract('C1');
 
-      expect(comp.sgsForArrival).toHaveLength(1);
-      expect(comp.selectedArrivalSg?.balanceContractId).toBe('SG1');
-      expect(comp.arrivalSgSnapshot?.availableBalance).toBe('3000');
+      expect(comp.pickerSelection.sgsForArrival).toHaveLength(1);
+      expect(comp.pickerSelection.selectedArrivalSg?.balanceContractId).toBe('SG1');
+      expect(comp.pickerSelection.arrivalSgSnapshot?.availableBalance).toBe('3000');
       // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
       // event cannot be accessed") — an SG whose own A8 Issue isn't Released yet shouldn't be offered
       // as a redemption target.
@@ -287,7 +287,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     function setup() {
       const api = makeApi();
       const comp = makeComponent(getFn('A3S'), api);
-      comp.sgsForArrival = [
+      comp.pickerSelection.sgsForArrival = [
         makeContract({ balanceContractId: 'SG1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'SG01' } }),
       ];
       return { api, comp };
@@ -299,8 +299,8 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       comp.onSelectArrivalSg('SG1');
 
-      expect(comp.selectedArrivalSg?.balanceContractId).toBe('SG1');
-      expect(comp.arrivalSgSnapshot?.confirmedBalance).toBe('7000');
+      expect(comp.pickerSelection.selectedArrivalSg?.balanceContractId).toBe('SG1');
+      expect(comp.pickerSelection.arrivalSgSnapshot?.confirmedBalance).toBe('7000');
     });
 
     it('sets arrivalSgSnapshot to null on a snapshot-fetch error', () => {
@@ -309,7 +309,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       comp.onSelectArrivalSg('SG1');
 
-      expect(comp.arrivalSgSnapshot).toBeNull();
+      expect(comp.pickerSelection.arrivalSgSnapshot).toBeNull();
     });
 
     it('clears selectedArrivalSg/arrivalSgSnapshot and skips the API call when the id is not in sgsForArrival', () => {
@@ -317,8 +317,8 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       comp.onSelectArrivalSg('missing');
 
-      expect(comp.selectedArrivalSg).toBeNull();
-      expect(comp.arrivalSgSnapshot).toBeNull();
+      expect(comp.pickerSelection.selectedArrivalSg).toBeNull();
+      expect(comp.pickerSelection.arrivalSgSnapshot).toBeNull();
       expect(api.getSnapshot).not.toHaveBeenCalled();
     });
   });
@@ -327,11 +327,11 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('A6 (settlesDocumentArrival, no secondaryRefLabel): carries and locks IB Number + Amount from the picked Document Arrival', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
-      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
+      comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
 
       comp.onSelectPayMovement('M1');
 
-      expect(comp.selectedPayMovement?.movementId).toBe('M1');
+      expect(comp.pickerSelection.selectedPayMovement?.movementId).toBe('M1');
       expect(comp.naturalKey.ibNumber).toBe('IB01');
       expect(comp.model.amount).toBe('5000');
       expect(comp.model.secondaryRef).toBeUndefined(); // A6 has no secondaryRefLabel
@@ -340,7 +340,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('B4 (settlesDocumentArrival + secondaryRefLabel "EB Number"): also carries the reference into model.secondaryRef', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('B4'), api);
-      comp.payableMovements = [makeMovement({ movementId: 'MX1', sourceTransactionRef: 'EB01', amount: '2000', movementType: 'CREATE' })];
+      comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'MX1', sourceTransactionRef: 'EB01', amount: '2000', movementType: 'CREATE' })];
 
       comp.onSelectPayMovement('MX1');
 
@@ -352,23 +352,23 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('A4 (no settlesDocumentArrival): sets selectedPayMovement but leaves naturalKey/model untouched', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '999' })];
+      comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '999' })];
       comp.naturalKey.ibNumber = '';
 
       comp.onSelectPayMovement('M1');
 
-      expect(comp.selectedPayMovement?.movementId).toBe('M1');
+      expect(comp.pickerSelection.selectedPayMovement?.movementId).toBe('M1');
       expect(comp.naturalKey.ibNumber).toBe('');
     });
 
     it('sets selectedPayMovement to null when the movementId is not found', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
-      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
+      comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
 
       comp.onSelectPayMovement('missing');
 
-      expect(comp.selectedPayMovement).toBeNull();
+      expect(comp.pickerSelection.selectedPayMovement).toBeNull();
     });
   });
 
@@ -386,7 +386,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('does nothing when no movement is selected', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = null;
+      comp.pickerSelection.selectedPayMovement = null;
 
       comp.submitA4();
 
@@ -396,7 +396,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('calls api.submitByMaker() with the picked movement and model.createdBy, sets submitResult exactly like the generic submit() does', () => {
       const api = makeApi({ submitByMaker: jest.fn(() => of({ movementId: 'M1', status: 'PENDING', makerSubmittedBy: 'maker1' })) });
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'M1' });
       comp.model.createdBy = 'maker1';
 
       comp.submitA4();
@@ -410,7 +410,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('falls back to maker1 when model.createdBy is falsy', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'M1' });
       comp.model.createdBy = '';
 
       comp.submitA4();
@@ -421,7 +421,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('sets submitError and clears submitting on a submitByMaker() failure', () => {
       const api = makeApi({ submitByMaker: jest.fn(() => throwError(() => ({ error: { message: 'submit boom' } }))) });
       const comp = makeComponent(getFn('A4'), api);
-      comp.selectedPayMovement = makeMovement({ movementId: 'M1' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'M1' });
 
       comp.submitA4();
 
@@ -435,7 +435,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('resets submitResult/submitError when a NEW Document Arrival is picked for A4', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A4'), api);
-      comp.payableMovements = [makeMovement({ movementId: 'M1' }), makeMovement({ movementId: 'M2' })];
+      comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1' }), makeMovement({ movementId: 'M2' })];
       comp.submitResult = { movementId: 'M1', status: 'PENDING' };
       comp.submitError = 'stale error';
 
@@ -448,7 +448,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('does NOT reset submitResult for a non-A4 function (A6) — settlesDocumentArrival keeps its own existing behavior', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('A6'), api);
-      comp.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
+      comp.pickerSelection.payableMovements = [makeMovement({ movementId: 'M1', sourceTransactionRef: 'IB01', amount: '5000' })];
       comp.submitResult = { movementId: 'OLD', status: 'PENDING' };
 
       comp.onSelectPayMovement('M1');
@@ -678,7 +678,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       comp.onSelectParent('P1');
 
       expect(api.listMovements).toHaveBeenCalledWith('P1');
-      expect(comp.payableMovements).toEqual([pendingArrival]);
+      expect(comp.pickerSelection.payableMovements).toEqual([pendingArrival]);
       expect(comp.model.tenorType).toBe('SELLERS_USANCE');
       expect(comp.model.tenorDays).toBe(90);
     });
@@ -702,7 +702,7 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       comp.onSelectParent('CNF1');
 
-      expect(comp.settleableBalances).toEqual([
+      expect(comp.pickerSelection.settleableBalances).toEqual([
         { balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' },
       ]);
       // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
@@ -722,8 +722,8 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       expect(() => comp.onSelectParent('CNF1')).not.toThrow();
 
-      expect(comp.settleableBalances).toEqual([]);
-      expect(comp.settleableBalancesLoading).toBe(false);
+      expect(comp.pickerSelection.settleableBalances).toEqual([]);
+      expect(comp.pickerSelection.settleableBalancesLoading).toBe(false);
     });
 
     it('B5 (settleableBalanceIndex): a getSnapshot error for one candidate is swallowed (catchError) and that candidate is excluded', () => {
@@ -743,8 +743,8 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
 
       comp.onSelectParent('CNF1');
 
-      expect(comp.settleableBalances).toEqual([]);
-      expect(comp.settleableBalancesLoading).toBe(false);
+      expect(comp.pickerSelection.settleableBalances).toEqual([]);
+      expect(comp.pickerSelection.settleableBalancesLoading).toBe(false);
     });
 
     it('does nothing (leaves selectedParent null, no side loads) when the contractId is not in parentPicker.contracts', () => {
@@ -919,6 +919,60 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     });
   });
 
+  /**
+   * BAL-003 (PickerSelectionService extraction, 2026-08-19) — the component's own arrivalSg/
+   * settleableBalances/payableMovements prevPage()/nextPage() methods are now one-line delegations to
+   * `pickerSelection`'s like-named methods (mirroring `ibIndexPrevPage`/`ibIndexNextPage`'s own
+   * already-established "thin wrapper, no reload" shape above) — direct tests proving the delegation
+   * itself works, since the underlying paging math is already covered by `picker-selection.service.spec.ts`.
+   */
+  describe('arrivalSgPrevPage / arrivalSgNextPage / settleableBalancesPrevPage / settleableBalancesNextPage / payableMovementsPrevPage / payableMovementsNextPage — thin delegation to pickerSelection', () => {
+    it('arrivalSgPrevPage/arrivalSgNextPage move pickerSelection.arrivalSgPaging.page within bounds', () => {
+      const comp = makeComponent(getFn('A3S'), makeApi());
+      comp.pickerSelection.arrivalSgPaging.page = 1;
+      comp.pickerSelection.arrivalSgPaging.total = 12; // display pageSize 5 -> 3 pages
+
+      comp.arrivalSgPrevPage();
+      expect(comp.pickerSelection.arrivalSgPaging.page).toBe(1); // no-op on page 1
+
+      comp.arrivalSgNextPage();
+      expect(comp.pickerSelection.arrivalSgPaging.page).toBe(2);
+
+      comp.arrivalSgPrevPage();
+      expect(comp.pickerSelection.arrivalSgPaging.page).toBe(1);
+    });
+
+    it('settleableBalancesPrevPage/settleableBalancesNextPage move pickerSelection.settleableBalancesPaging.page within bounds', () => {
+      const comp = makeComponent(getFn('B5'), makeApi());
+      comp.pickerSelection.settleableBalancesPaging.page = 1;
+      comp.pickerSelection.settleableBalancesPaging.total = 12;
+
+      comp.settleableBalancesPrevPage();
+      expect(comp.pickerSelection.settleableBalancesPaging.page).toBe(1);
+
+      comp.settleableBalancesNextPage();
+      expect(comp.pickerSelection.settleableBalancesPaging.page).toBe(2);
+
+      comp.settleableBalancesPrevPage();
+      expect(comp.pickerSelection.settleableBalancesPaging.page).toBe(1);
+    });
+
+    it('payableMovementsPrevPage/payableMovementsNextPage move pickerSelection.payableMovementsPaging.page within bounds', () => {
+      const comp = makeComponent(getFn('A4'), makeApi());
+      comp.pickerSelection.payableMovementsPaging.page = 1;
+      comp.pickerSelection.payableMovementsPaging.total = 12;
+
+      comp.payableMovementsPrevPage();
+      expect(comp.pickerSelection.payableMovementsPaging.page).toBe(1);
+
+      comp.payableMovementsNextPage();
+      expect(comp.pickerSelection.payableMovementsPaging.page).toBe(2);
+
+      comp.payableMovementsPrevPage();
+      expect(comp.pickerSelection.payableMovementsPaging.page).toBe(1);
+    });
+  });
+
   describe('loadIbIndex() guard (via onSelectParent) — clears the index when the guard fails', () => {
     it('clears ibIndexPicker.contracts/total without calling the api when the picked Parent has no LC Number of its own', () => {
       const api = makeApi();
@@ -947,7 +1001,9 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '4000' }))) });
       const comp = makeComponent(getFn('B5'), api);
       comp.selectedParent = makeContract({ balanceContractId: 'CNF1', naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null } });
-      comp.settleableBalances = [{ balanceContractId: 'SB1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' }];
+      comp.pickerSelection.settleableBalances = [
+        { balanceContractId: 'SB1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' },
+      ];
 
       comp.onSelectSettleableBalance('SB1');
 
@@ -960,7 +1016,9 @@ describe('TransactionBuilderComponent — selection/picker methods', () => {
     it('does nothing when the balanceContractId is not in settleableBalances', () => {
       const api = makeApi();
       const comp = makeComponent(getFn('B5'), api);
-      comp.settleableBalances = [{ balanceContractId: 'SB1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' }];
+      comp.pickerSelection.settleableBalances = [
+        { balanceContractId: 'SB1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' },
+      ];
       comp.selectedContract = null;
 
       comp.onSelectSettleableBalance('missing');

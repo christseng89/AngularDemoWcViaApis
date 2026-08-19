@@ -206,16 +206,18 @@ describe('TransactionBuilderComponent', () => {
       comp.ibIndexPicker.contracts = [mkContract('ib1', '003')];
       comp.ibIndexPicker.page = 2;
       comp.ibIndexPicker.total = 20;
-      comp.settleableBalances = [{ balanceContractId: 'x', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: null, availableBalance: '1', currency: 'USD' }];
-      comp.payableMovements = [mkMovement('m1')];
-      comp.payableMovementSearch = 'stale';
-      comp.selectedPayMovement = mkMovement('m1');
+      comp.pickerSelection.settleableBalances = [
+        { balanceContractId: 'x', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: null, availableBalance: '1', currency: 'USD' },
+      ];
+      comp.pickerSelection.payableMovements = [mkMovement('m1')];
+      comp.pickerSelection.payableMovementSearch = 'stale';
+      comp.pickerSelection.selectedPayMovement = mkMovement('m1');
       comp.arrivalApproved = true;
       comp.submitResult = { ok: true };
       comp.submitError = 'boom';
-      comp.sgsForArrival = [mkContract('sg1', '004')];
-      comp.selectedArrivalSg = mkContract('sg1', '004');
-      comp.arrivalSgSnapshot = mkSnapshot('sg1');
+      comp.pickerSelection.sgsForArrival = [mkContract('sg1', '004')];
+      comp.pickerSelection.selectedArrivalSg = mkContract('sg1', '004');
+      comp.pickerSelection.arrivalSgSnapshot = mkSnapshot('sg1');
       comp.arrivalSgRedeemMovementId = 'mv1';
       comp.dueFromIssuingBankMovementId = 'mv2';
       comp.acceptanceReimbReceivableMovementId = 'mv3';
@@ -243,16 +245,16 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.ibIndexPicker.contracts).toEqual([]);
       expect(comp.ibIndexPicker.page).toBe(1);
       expect(comp.ibIndexPicker.total).toBe(0);
-      expect(comp.settleableBalances).toEqual([]);
-      expect(comp.payableMovements).toEqual([]);
-      expect(comp.payableMovementSearch).toBe('');
-      expect(comp.selectedPayMovement).toBeNull();
+      expect(comp.pickerSelection.settleableBalances).toEqual([]);
+      expect(comp.pickerSelection.payableMovements).toEqual([]);
+      expect(comp.pickerSelection.payableMovementSearch).toBe('');
+      expect(comp.pickerSelection.selectedPayMovement).toBeNull();
       expect(comp.arrivalApproved).toBe(false);
       expect(comp.submitResult).toBeNull();
       expect(comp.submitError).toBeNull();
-      expect(comp.sgsForArrival).toEqual([]);
-      expect(comp.selectedArrivalSg).toBeNull();
-      expect(comp.arrivalSgSnapshot).toBeNull();
+      expect(comp.pickerSelection.sgsForArrival).toEqual([]);
+      expect(comp.pickerSelection.selectedArrivalSg).toBeNull();
+      expect(comp.pickerSelection.arrivalSgSnapshot).toBeNull();
       expect(comp.arrivalSgRedeemMovementId).toBeNull();
       expect(comp.dueFromIssuingBankMovementId).toBeNull();
       expect(comp.acceptanceReimbReceivableMovementId).toBeNull();
@@ -655,9 +657,9 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.selectedContract).toBe(c1);
       expect(mockApi.getSnapshot).toHaveBeenCalledWith('c1');
       expect(comp.selectedContractSnapshot).toEqual(mkSnapshot('c1'));
-      expect(comp.payableMovements).toEqual([movement]);
-      expect(comp.payableMovementsLoading).toBe(false);
-      expect(comp.selectedPayMovement).toBe(movement);
+      expect(comp.pickerSelection.payableMovements).toEqual([movement]);
+      expect(comp.pickerSelection.payableMovementsLoading).toBe(false);
+      expect(comp.pickerSelection.selectedPayMovement).toBe(movement);
     });
 
     it('auto-fills and locks the Acceptance amount/IB Number for a settlesDocumentArrival function (A6)', () => {
@@ -903,31 +905,31 @@ describe('TransactionBuilderComponent', () => {
     it('sets payableMovementSearch and auto-picks when narrowed to exactly one match', () => {
       const { comp } = makeComponent();
       const m1 = mkMovement('m1', { sourceTransactionRef: 'IB00001' });
-      comp.payableMovements = [m1, mkMovement('m2', { sourceTransactionRef: 'IB00002' })];
+      comp.pickerSelection.payableMovements = [m1, mkMovement('m2', { sourceTransactionRef: 'IB00002' })];
 
       comp.onPayableMovementSearchChange('IB00001');
 
-      expect(comp.payableMovementSearch).toBe('IB00001');
-      expect(comp.selectedPayMovement).toEqual(m1);
+      expect(comp.pickerSelection.payableMovementSearch).toBe('IB00001');
+      expect(comp.pickerSelection.selectedPayMovement).toEqual(m1);
     });
 
     it('does not auto-pick when the search still matches more than one movement', () => {
       const { comp } = makeComponent();
-      comp.payableMovements = [mkMovement('m1', { sourceTransactionRef: 'IB00001' }), mkMovement('m2', { sourceTransactionRef: 'IB00002' })];
+      comp.pickerSelection.payableMovements = [mkMovement('m1', { sourceTransactionRef: 'IB00001' }), mkMovement('m2', { sourceTransactionRef: 'IB00002' })];
 
       comp.onPayableMovementSearchChange('IB000');
 
-      expect(comp.selectedPayMovement).toBeNull();
+      expect(comp.pickerSelection.selectedPayMovement).toBeNull();
     });
 
     it('does not auto-pick when the search matches nothing', () => {
       const { comp } = makeComponent();
-      comp.payableMovements = [mkMovement('m1', { sourceTransactionRef: 'IB00001' })];
+      comp.pickerSelection.payableMovements = [mkMovement('m1', { sourceTransactionRef: 'IB00001' })];
 
       comp.onPayableMovementSearchChange('zzz');
 
-      expect(comp.payableMovementSearch).toBe('zzz');
-      expect(comp.selectedPayMovement).toBeNull();
+      expect(comp.pickerSelection.payableMovementSearch).toBe('zzz');
+      expect(comp.pickerSelection.selectedPayMovement).toBeNull();
     });
   });
 

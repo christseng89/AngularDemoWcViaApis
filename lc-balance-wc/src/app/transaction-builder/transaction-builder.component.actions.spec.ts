@@ -497,7 +497,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.amount = '1000';
       comp.model.tenorType = 'SELLERS_USANCE';
       comp.model.tenorDays = 60;
-      comp.selectedPayMovement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1000' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1000' });
 
       comp.submit();
 
@@ -518,12 +518,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.amount = '1000';
       comp.model.secondaryRef = 'IB01';
       comp.selectedContract = makeContract({ balanceContractId: 'bc-lc' });
-      comp.selectedArrivalSg = makeContract({
+      comp.pickerSelection.selectedArrivalSg = makeContract({
         balanceContractId: 'bc-sg',
         instrumentType: 'SHGT',
         naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null },
       });
-      comp.arrivalSgSnapshot = makeSnapshot({ confirmedBalance: '1000' });
+      comp.pickerSelection.arrivalSgSnapshot = makeSnapshot({ confirmedBalance: '1000' });
     }
 
     it('creates the SG redemption THEN the Document Arrival, in that order, on full success', () => {
@@ -606,7 +606,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.model.amount = '2000';
       comp.model.secondaryRef = 'EB01';
       comp.selectedContract = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', logicalContractId: 'lgl-cnf' });
-      comp.selectedPayMovement = makeMovement({ movementType: 'CREATE', sourceTransactionRef: 'EB01', amount: '2000' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementType: 'CREATE', sourceTransactionRef: 'EB01', amount: '2000' });
     }
 
     it('creates the Confirmation HONOUR then the Due from Issuing Bank asset', () => {
@@ -665,7 +665,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
         tenorType: 'SELLERS_USANCE',
         tenorDays: 90,
       });
-      comp.selectedPayMovement = makeMovement({ movementType: 'ACCEPT', sourceTransactionRef: 'EB02', amount: '3000' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementType: 'ACCEPT', sourceTransactionRef: 'EB02', amount: '3000' });
     }
 
     it('creates ACCEPT, then the Acceptance liability, then the Reimbursement Receivable asset', () => {
@@ -995,7 +995,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       comp.model.createdBy = 'maker1';
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
       comp.selectedParent = makeContract({ balanceContractId: 'bc-parent-lc' });
       comp.submitResult = { movementId: 'mv-acceptance', status: 'PENDING' };
       api.release
@@ -1017,7 +1017,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('A6: a failed source release NEVER attempts to release the Acceptance', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
       comp.submitResult = { movementId: 'mv-acceptance', status: 'PENDING' };
       api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
 
@@ -1031,7 +1031,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('A6: source release succeeds but the Acceptance release fails', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' });
       comp.submitResult = { movementId: 'mv-acceptance', status: 'PENDING' };
       api.release
         .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
@@ -1128,7 +1128,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'HONOUR';
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE', sourceTransactionRef: 'EB01' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'CREATE', sourceTransactionRef: 'EB01' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
@@ -1152,7 +1152,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'HONOUR';
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.dueFromIssuingBankMovementId = 'mv-receivable';
       comp.submitResult = { movementId: 'mv-honour', status: 'PENDING' };
@@ -1169,7 +1169,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'ACCEPT';
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'ACCEPT' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3', movementType: 'ACCEPT' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
@@ -1195,7 +1195,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'ACCEPT';
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';
@@ -1214,7 +1214,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       comp.model.movementType = 'ACCEPT';
-      comp.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'mv-b3' });
       comp.selectedContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION' });
       comp.acceptanceMovementId = 'mv-acceptance';
       comp.acceptanceReimbReceivableMovementId = 'mv-receivable';

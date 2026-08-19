@@ -194,20 +194,20 @@
                 <div class="tb-field mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && selectedParent">
                   <app-index-picker
                     label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
-                    [items]="pagedFilteredPayableMovements"
-                    [loading]="payableMovementsLoading"
-                    [selectedId]="selectedPayMovement?.movementId ?? null"
+                    [items]="pickerSelection.pagedFilteredPayableMovements"
+                    [loading]="pickerSelection.payableMovementsLoading"
+                    [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
                     [searchable]="true"
-                    [searchValue]="payableMovementSearch"
+                    [searchValue]="pickerSelection.payableMovementSearch"
                     (searchValueChange)="onPayableMovementSearchChange($event)"
                     searchPlaceholder="Search {{ ibNumberLabel }}…"
                     emptyText="No PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{
                       selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first'
                     }}."
                     autoPickedHint="Only one PENDING {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                    [page]="payableMovementsPaging.page"
-                    [totalPages]="payableMovementsPaging.totalPages"
-                    [total]="payableMovementsPaging.total"
+                    [page]="pickerSelection.payableMovementsPaging.page"
+                    [totalPages]="pickerSelection.payableMovementsPaging.totalPages"
+                    [total]="pickerSelection.payableMovementsPaging.total"
                     (pick)="!formLocked && onSelectPayMovement($event)"
                     (prevPage)="payableMovementsPrevPage()"
                     (nextPage)="payableMovementsNextPage()"
@@ -217,7 +217,7 @@
                       <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date: 'short' }}</span>
                     </ng-template>
                   </app-index-picker>
-                  <div class="tb-hint tb-hint--ok" *ngIf="selectedPayMovement">
+                  <div class="tb-hint tb-hint--ok" *ngIf="pickerSelection.selectedPayMovement">
                     {{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.
                   </div>
                 </div>
@@ -403,13 +403,13 @@
                     <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
                       <app-index-picker
                         label="EB Index — Existing Contract (from B3)"
-                        [items]="pagedSettleableBalances"
-                        [loading]="settleableBalancesLoading"
+                        [items]="pickerSelection.pagedSettleableBalances"
+                        [loading]="pickerSelection.settleableBalancesLoading"
                         [selectedId]="selectedContract?.balanceContractId ?? null"
                         emptyText="No outstanding balance under this LC — nothing left to settle."
-                        [page]="settleableBalancesPaging.page"
-                        [totalPages]="settleableBalancesPaging.totalPages"
-                        [total]="settleableBalancesPaging.total"
+                        [page]="pickerSelection.settleableBalancesPaging.page"
+                        [totalPages]="pickerSelection.settleableBalancesPaging.totalPages"
+                        [total]="pickerSelection.settleableBalancesPaging.total"
                         (pick)="!formLocked && onSelectSettleableBalance($event)"
                         (prevPage)="settleableBalancesPrevPage()"
                         (nextPage)="settleableBalancesNextPage()"
@@ -466,7 +466,7 @@
                         type="button"
                         class="tb-quick-pick__row"
                         *ngFor="let row of flattenedPayableRows"
-                        [class.tb-quick-pick__row--active]="selectedPayMovement?.movementId === row.movement.movementId"
+                        [class.tb-quick-pick__row--active]="pickerSelection.selectedPayMovement?.movementId === row.movement.movementId"
                         [disabled]="formLocked"
                         (click)="onSelectFlattenedPayable(row.contract.balanceContractId, row.movement.movementId)"
                       >
@@ -596,14 +596,14 @@
               >
                 <app-index-picker
                   label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
-                  [items]="pagedSgsForArrival"
-                  [loading]="sgsForArrivalLoading"
-                  [selectedId]="selectedArrivalSg?.balanceContractId ?? null"
+                  [items]="pickerSelection.pagedSgsForArrival"
+                  [loading]="pickerSelection.sgsForArrivalLoading"
+                  [selectedId]="pickerSelection.selectedArrivalSg?.balanceContractId ?? null"
                   emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
                   autoPickedHint="Only one Shipping Guarantee under this LC — picked automatically."
-                  [page]="arrivalSgPaging.page"
-                  [totalPages]="arrivalSgPaging.totalPages"
-                  [total]="arrivalSgPaging.total"
+                  [page]="pickerSelection.arrivalSgPaging.page"
+                  [totalPages]="pickerSelection.arrivalSgPaging.totalPages"
+                  [total]="pickerSelection.arrivalSgPaging.total"
                   (pick)="!formLocked && onSelectArrivalSg($event)"
                   (prevPage)="arrivalSgPrevPage()"
                   (nextPage)="arrivalSgNextPage()"
@@ -613,27 +613,31 @@
                     <span class="tb-row-badge">{{ sg.status }}</span>
                   </ng-template>
                 </app-index-picker>
-                <div class="tb-balance-box mt-2" *ngIf="selectedArrivalSg && arrivalSgSnapshot">
+                <div class="tb-balance-box mt-2" *ngIf="pickerSelection.selectedArrivalSg && pickerSelection.arrivalSgSnapshot">
                   <div class="tb-balance-row">
-                    <span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ selectedArrivalSg.naturalKey.sgNumber }}</span>
+                    <span class="tb-balance-row__label">SG Number</span
+                    ><span class="tb-balance-row__value">{{ pickerSelection.selectedArrivalSg.naturalKey.sgNumber }}</span>
                   </div>
                   <div class="tb-balance-row">
                     <span class="tb-balance-row__label">SG Outstanding</span
-                    ><span class="tb-balance-row__value">{{ arrivalSgSnapshot.confirmedBalance }} {{ selectedArrivalSg.currency }}</span>
+                    ><span class="tb-balance-row__value"
+                      >{{ pickerSelection.arrivalSgSnapshot.confirmedBalance }} {{ pickerSelection.selectedArrivalSg.currency }}</span
+                    >
                   </div>
                   <ng-container *ngIf="arrivalSgRedeemAmount">
                     <div class="tb-balance-row">
                       <span class="tb-balance-row__label">SG Redemption Amount (MIN of Bill Amount, SG Outstanding) — {{ arrivalSgRedeemType }}</span
-                      ><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount }} {{ selectedArrivalSg.currency }}</span>
+                      ><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
                     </div>
                     <div class="tb-balance-row">
                       <span class="tb-balance-row__label">SG Remaining After This Redemption</span
-                      ><span class="tb-balance-row__value">{{ arrivalSgRemaining }} {{ selectedArrivalSg.currency }}</span>
+                      ><span class="tb-balance-row__value">{{ arrivalSgRemaining }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
                     </div>
                   </ng-container>
-                  <div class="tb-hint mt-2" *ngIf="model.amount && +model.amount > +arrivalSgSnapshot.confirmedBalance">
-                    Bill Amount exceeds this SG's Outstanding — the excess ({{ +model.amount - +arrivalSgSnapshot.confirmedBalance }}
-                    {{ selectedArrivalSg.currency }}) is ordinary incremental LC exposure, checked against Tight Available Balance as usual (Design doc §6.1).
+                  <div class="tb-hint mt-2" *ngIf="model.amount && +model.amount > +pickerSelection.arrivalSgSnapshot.confirmedBalance">
+                    Bill Amount exceeds this SG's Outstanding — the excess ({{ +model.amount - +pickerSelection.arrivalSgSnapshot.confirmedBalance }}
+                    {{ pickerSelection.selectedArrivalSg.currency }}) is ordinary incremental LC exposure, checked against Tight Available Balance as usual
+                    (Design doc §6.1).
                   </div>
                 </div>
               </div>
@@ -647,20 +651,20 @@
               <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
                 <app-index-picker
                   label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction.pendingItemSourceCode || 'A3' }})"
-                  [items]="pagedFilteredPayableMovements"
-                  [loading]="payableMovementsLoading"
-                  [selectedId]="selectedPayMovement?.movementId ?? null"
+                  [items]="pickerSelection.pagedFilteredPayableMovements"
+                  [loading]="pickerSelection.payableMovementsLoading"
+                  [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
                   [searchable]="true"
-                  [searchValue]="payableMovementSearch"
+                  [searchValue]="pickerSelection.payableMovementSearch"
                   (searchValueChange)="onPayableMovementSearchChange($event)"
                   searchPlaceholder="Search {{ ibNumberLabel }}…"
                   emptyText="No Approved (Checker-acknowledged) {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — {{
                     selectedFunction.pendingItemSourceHint || 'use A3 (Document Arrival) first'
                   }}, then Release it in B3's own Checker panel."
                   autoPickedHint="Only one Approved {{ selectedFunction.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
-                  [page]="payableMovementsPaging.page"
-                  [totalPages]="payableMovementsPaging.totalPages"
-                  [total]="payableMovementsPaging.total"
+                  [page]="pickerSelection.payableMovementsPaging.page"
+                  [totalPages]="pickerSelection.payableMovementsPaging.totalPages"
+                  [total]="pickerSelection.payableMovementsPaging.total"
                   (pick)="!formLocked && onSelectPayMovement($event)"
                   (prevPage)="payableMovementsPrevPage()"
                   (nextPage)="payableMovementsNextPage()"
@@ -670,7 +674,7 @@
                     <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date: 'short' }}</span>
                   </ng-template>
                 </app-index-picker>
-                <div class="tb-hint tb-hint--ok" *ngIf="selectedPayMovement">
+                <div class="tb-hint tb-hint--ok" *ngIf="pickerSelection.selectedPayMovement">
                   {{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.
                 </div>
               </div>
@@ -681,14 +685,14 @@
               <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract">
                 <app-index-picker
                   label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
-                  [items]="pagedFilteredPayableMovements"
-                  [loading]="payableMovementsLoading"
-                  [selectedId]="selectedPayMovement?.movementId ?? null"
+                  [items]="pickerSelection.pagedFilteredPayableMovements"
+                  [loading]="pickerSelection.payableMovementsLoading"
+                  [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
                   emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."
                   autoPickedHint="Only one PENDING Document Arrival under this LC — picked automatically."
-                  [page]="payableMovementsPaging.page"
-                  [totalPages]="payableMovementsPaging.totalPages"
-                  [total]="payableMovementsPaging.total"
+                  [page]="pickerSelection.payableMovementsPaging.page"
+                  [totalPages]="pickerSelection.payableMovementsPaging.totalPages"
+                  [total]="pickerSelection.payableMovementsPaging.total"
                   (pick)="!formLocked && onSelectPayMovement($event)"
                   (prevPage)="payableMovementsPrevPage()"
                   (nextPage)="payableMovementsNextPage()"
@@ -698,14 +702,16 @@
                     <span class="tb-row-sub">{{ m.amount }} {{ m.currency }} — earmarked {{ m.createdAt | date: 'short' }}</span>
                   </ng-template>
                 </app-index-picker>
-                <div class="tb-balance-box mt-2" *ngIf="selectedPayMovement">
+                <div class="tb-balance-box mt-2" *ngIf="pickerSelection.selectedPayMovement">
                   <div class="tb-balance-row">
                     <span class="tb-balance-row__label">IB Number</span
-                    ><span class="tb-balance-row__value">{{ selectedPayMovement.sourceTransactionRef || '(none)' }}</span>
+                    ><span class="tb-balance-row__value">{{ pickerSelection.selectedPayMovement.sourceTransactionRef || '(none)' }}</span>
                   </div>
                   <div class="tb-balance-row">
                     <span class="tb-balance-row__label">Amount (captured at Document Arrival, read-only)</span
-                    ><span class="tb-balance-row__value">{{ selectedPayMovement.amount }} {{ selectedPayMovement.currency }}</span>
+                    ><span class="tb-balance-row__value"
+                      >{{ pickerSelection.selectedPayMovement.amount }} {{ pickerSelection.selectedPayMovement.currency }}</span
+                    >
                   </div>
                 </div>
                 <!-- Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release
@@ -718,7 +724,11 @@
                    function has (A1-A9/B1-B5) applies here too, not just a "go release it yourself"
                    hint. Disabled-once-submitResult-set convention matches the generic Submit button
                    below exactly (business instruction 2026-08-15, "按Submit...後 Button 直接灰掉"). -->
-                <button class="tb-btn tb-btn--primary mt-2" (click)="submitA4()" [disabled]="!selectedPayMovement || submitting || !!submitResult">
+                <button
+                  class="tb-btn tb-btn--primary mt-2"
+                  (click)="submitA4()"
+                  [disabled]="!pickerSelection.selectedPayMovement || submitting || !!submitResult"
+                >
                   {{ submitting ? 'Submitting…' : 'Submit A4' }}
                 </button>
               </div>

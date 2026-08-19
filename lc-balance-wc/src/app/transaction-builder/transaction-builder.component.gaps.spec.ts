@@ -564,18 +564,18 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(mockApi());
       const m1 = movement({ movementId: '1', sourceTransactionRef: 'IB01' });
       const m2 = movement({ movementId: '2', sourceTransactionRef: 'IB02' });
-      c.payableMovements = [m1, m2];
-      expect(c.filteredPayableMovements.length).toBe(2);
-      c.payableMovementSearch = 'ib01';
-      expect(c.filteredPayableMovements).toEqual([m1]);
+      c.pickerSelection.payableMovements = [m1, m2];
+      expect(c.pickerSelection.filteredPayableMovements.length).toBe(2);
+      c.pickerSelection.payableMovementSearch = 'ib01';
+      expect(c.pickerSelection.filteredPayableMovements).toEqual([m1]);
     });
 
     it('filteredPayableMovements: a movement missing sourceTransactionRef falls back to "" for the search comparison instead of crashing', () => {
       const c = new TransactionBuilderComponent(mockApi());
       const m2 = movement({ movementId: '2', sourceTransactionRef: 'IB02' });
-      c.payableMovements = [movement({ movementId: '1', sourceTransactionRef: null }), m2];
-      c.payableMovementSearch = 'ib';
-      expect(c.filteredPayableMovements).toEqual([m2]);
+      c.pickerSelection.payableMovements = [movement({ movementId: '1', sourceTransactionRef: null }), m2];
+      c.pickerSelection.payableMovementSearch = 'ib';
+      expect(c.pickerSelection.filteredPayableMovements).toEqual([m2]);
     });
 
     it('catalogPendingHint returns "" outside payExistingUtilize, or with no/zero pending, and formats single vs multiple pending with thousands separators', () => {
@@ -624,7 +624,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
 
     it('are null when a snapshot is loaded but Bill Amount is blank, zero, negative, or non-numeric', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      (c as any).arrivalSgSnapshot = snapshot({ confirmedBalance: '1000' });
+      (c as any).pickerSelection.arrivalSgSnapshot = snapshot({ confirmedBalance: '1000' });
       for (const bad of ['', '0', '-5', 'abc']) {
         c.model.amount = bad;
         expect(c.arrivalSgRedeemAmount).toBeNull();
@@ -633,7 +633,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
 
     it('computes MIN(Bill Amount, SG outstanding), FULL_REDEEM when it fully covers, and the correct remaining balance', () => {
       const c = new TransactionBuilderComponent(mockApi());
-      (c as any).arrivalSgSnapshot = snapshot({ confirmedBalance: '1000' });
+      (c as any).pickerSelection.arrivalSgSnapshot = snapshot({ confirmedBalance: '1000' });
 
       c.model.amount = '400';
       expect(c.arrivalSgRedeemAmount).toBe('400');
@@ -913,7 +913,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     it('onSelectPayMovement (B4): a picked movement missing sourceTransactionRef falls back to empty-string IB Number / secondaryRef', () => {
       const c = new TransactionBuilderComponent(mockApi());
       c.selectFunction(fn('B4')); // settlesDocumentArrival + secondaryRefLabel: 'EB Number'
-      c.payableMovements = [movement({ movementId: 'm-1', amount: '5000', sourceTransactionRef: null })];
+      c.pickerSelection.payableMovements = [movement({ movementId: 'm-1', amount: '5000', sourceTransactionRef: null })];
       c.onSelectPayMovement('m-1');
       expect(c.naturalKey.ibNumber).toBe('');
       expect(c.model.secondaryRef).toBe('');
@@ -988,8 +988,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // its own `if (!lcNumber) return;` guard before ever reaching the catalog() call under test.
       c.catalogPicker.contracts = [contract({ balanceContractId: 'bc-1', naturalKey: { lcNumber: 'S001' } })];
       c.onSelectContract('bc-1');
-      expect(c.sgsForArrivalLoading).toBe(false);
-      expect(c.sgsForArrival).toEqual([]);
+      expect(c.pickerSelection.sgsForArrivalLoading).toBe(false);
+      expect(c.pickerSelection.sgsForArrival).toEqual([]);
     });
 
     it('loadSgsForArrival: no lcNumber to search on (selectedContract never resolved) -> early return, no catalog() call at all', () => {
@@ -1000,8 +1000,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       catalogSpy.mockClear(); // selectFunction()'s own reloadCatalog() already called it once, unrelated to this guard
       c.catalogPicker.contracts = []; // picking an id that matches nothing leaves selectedContract null
       c.onSelectContract('does-not-exist');
-      expect(c.sgsForArrivalLoading).toBe(false);
-      expect(c.sgsForArrival).toEqual([]);
+      expect(c.pickerSelection.sgsForArrivalLoading).toBe(false);
+      expect(c.pickerSelection.sgsForArrival).toEqual([]);
       expect(catalogSpy).not.toHaveBeenCalled();
     });
 
@@ -1014,8 +1014,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectFunction(fn('A4'));
       c.catalogPicker.contracts = [contract({ balanceContractId: 'bc-1' })];
       c.onSelectContract('bc-1');
-      expect(c.payableMovementsLoading).toBe(false);
-      expect(c.payableMovements).toEqual([]);
+      expect(c.pickerSelection.payableMovementsLoading).toBe(false);
+      expect(c.pickerSelection.payableMovements).toEqual([]);
     });
 
     it('loadPayableMovements: no contractId at all (unresolved pick) -> clears payableMovements without calling listMovements (A4)', () => {
@@ -1024,9 +1024,9 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('A4'));
       c.catalogPicker.contracts = []; // picking an id that matches nothing leaves selectedContract null
-      c.payableMovements = [movement({ movementId: 'stale' })]; // must be cleared, not left stale
+      c.pickerSelection.payableMovements = [movement({ movementId: 'stale' })]; // must be cleared, not left stale
       c.onSelectContract('does-not-exist');
-      expect(c.payableMovements).toEqual([]);
+      expect(c.pickerSelection.payableMovements).toEqual([]);
       expect(listMovementsSpy).not.toHaveBeenCalled();
     });
 
@@ -1040,8 +1040,19 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       // ordinary LC Index — that's unrelated to the guard under test, so only the call SHAPE, not
       // the call count, distinguishes this method's own would-be pageSize-50 child-contract lookup.)
       catalogSpy.mockClear();
-      (c as any).loadPayableMovementsAcrossChildContracts(fn('B4').payableMovementInstrumentType!);
-      expect(c.payableMovements).toEqual([]);
+      // PickerSelectionService extraction (2026-08-19) — the private cross-contract method now lives on
+      // the service, reachable only through the public loadPayableMovements() dispatcher; a truthy
+      // contractId (any string) is enough to clear the dispatcher's own top-level guard and reach the
+      // B4 cross-contract branch (payableMovementInstrumentType set), which is what actually reads
+      // lcNumber (deliberately left undefined here, the guard under test).
+      c.pickerSelection.loadPayableMovements({
+        contractId: 'confirmation-id',
+        lcNumber: undefined,
+        selectedFunction: fn('B4'),
+        selectedFunctionStrategy: functionStrategyModule.deriveFunctionStrategy(fn('B4')),
+        onAutoPicked: () => {},
+      });
+      expect(c.pickerSelection.payableMovements).toEqual([]);
       expect(catalogSpy).not.toHaveBeenCalled();
     });
 
@@ -1054,17 +1065,29 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       const c = new TransactionBuilderComponent(api);
       c.selectFunction(fn('B4'));
       c.selectedContract = contract({ naturalKey: { lcNumber: 'S001' } });
-      (c as any).loadPayableMovementsAcrossChildContracts(fn('B4').payableMovementInstrumentType!);
-      expect(c.payableMovementsLoading).toBe(false);
-      expect(c.payableMovements).toEqual([]);
+      c.pickerSelection.loadPayableMovements({
+        contractId: c.selectedContract.balanceContractId,
+        lcNumber: 'S001',
+        selectedFunction: fn('B4'),
+        selectedFunctionStrategy: functionStrategyModule.deriveFunctionStrategy(fn('B4')),
+        onAutoPicked: () => {},
+      });
+      expect(c.pickerSelection.payableMovementsLoading).toBe(false);
+      expect(c.pickerSelection.payableMovements).toEqual([]);
 
       const apiErr = mockApi({ catalog: jest.fn(() => throwError(() => new Error('boom'))) as any });
       const c2 = new TransactionBuilderComponent(apiErr);
       c2.selectFunction(fn('B4'));
       c2.selectedContract = contract({ naturalKey: { lcNumber: 'S001' } });
-      (c2 as any).loadPayableMovementsAcrossChildContracts(fn('B4').payableMovementInstrumentType!);
-      expect(c2.payableMovementsLoading).toBe(false);
-      expect(c2.payableMovements).toEqual([]);
+      c2.pickerSelection.loadPayableMovements({
+        contractId: c2.selectedContract.balanceContractId,
+        lcNumber: 'S001',
+        selectedFunction: fn('B4'),
+        selectedFunctionStrategy: functionStrategyModule.deriveFunctionStrategy(fn('B4')),
+        onAutoPicked: () => {},
+      });
+      expect(c2.pickerSelection.payableMovementsLoading).toBe(false);
+      expect(c2.pickerSelection.payableMovements).toEqual([]);
     });
   });
 
