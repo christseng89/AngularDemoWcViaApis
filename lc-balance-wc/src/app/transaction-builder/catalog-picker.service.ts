@@ -50,6 +50,26 @@ const DISPLAY_PAGE_SIZE = 5;
  * once `loadSnapshotsInto()` finishes — since several callers' own filters (the 0-balance exclusion)
  * depend on `snapshots`, which fills in asynchronously; a caller whose filter doesn't touch `snapshots`
  * at all just gets the same correct number both times.
+ *
+ * `status`/`requireIssueReleased` made overridable (desiger-comments.md F-09, 2026-08-19 — OCP): both
+ * were previously hardcoded literals in `load()` itself (`'ACTIVE'`/`true`), correct for the three
+ * existing Maker-ACTION pickers this class backs but wrong for a read-only INQUIRY browse — confirmed
+ * first-hand when `InquireEventsService`'s own LC Master Records Index needed neither and had to
+ * hand-roll a parallel fetch implementation rather than reuse this class. Both default to the original
+ * hardcoded values, so all 3 existing callers (`reloadCatalog()`/`loadParent()`/`loadIbIndex()` on
+ * `TransactionBuilderComponent`) are completely unaffected without any change on their own end.
+ *
+ * **Deliberately does NOT make `InquireEventsService.loadIndex()` itself switch to this class** — investigated
+ * first and found the actual gap is deeper than the missing parameter alone: `loadIndex()` uses genuine
+ * SERVER-side pagination (`page`/`pageSize` passed straight to `api.catalog()`, `result.total` trusted
+ * directly), which is the *correct* strategy for it precisely because it has no client-side qualifying
+ * filter to reconcile against — the opposite of why THIS class fetches one big batch and paginates
+ * client-side (see the "Redesigned 2026-08-19" paragraph above). `loadIndex()` also enriches each row with
+ * a full merged Event Timeline fetch (`lcAmount`/`tenorType`/`lastEventAt`) that `loadSnapshotsInto()`
+ * below has no equivalent for. Forcing the two together would mean this class owning two incompatible
+ * pagination models for its one real caller — a worse outcome than the current, disclosed duplication.
+ * This fix closes the OCP gap the finding actually named (the two hardcoded literals) without attempting
+ * the deeper, not-worth-it unification.
  */
 export class CatalogPickerService {
   contracts: BalanceContract[] = [];
@@ -103,31 +123,42 @@ export class CatalogPickerService {
     onLoaded?: (items: BalanceContract[]) => void;
     /** Business requirement 2026-08-19 — computes the TRUE qualified/total count (the caller's own filteredXxxCatalog getter's own length), called once right after `contracts` is set and again once `snapshots` finishes loading. Omit for a picker with no separate qualifying filter (total then just tracks the raw fetched count). */
     qualifies?: () => number;
+    /** desiger-comments.md F-09 — override for a non-Maker-action caller. Omitted (`undefined`) defaults to `'ACTIVE'`, the value every existing Maker-action picker already relies on; pass `null` explicitly to request NO status filter at all (every status is a legitimate candidate — e.g. a read-only inquiry browse), since `api.catalog()`'s own `status` param already treats an omitted value that way and there would otherwise be no way to ask for it through this override. */
+    status?: string | null;
+    /** desiger-comments.md F-09 — override for a non-Maker-action caller; defaults to `true`, the value every existing Maker-action picker already relies on (see this method's own inline comment below for why). */
+    requireIssueReleased?: boolean;
   }): void {
     this.resetPaging();
     if (args.guardFails) {
       this.contracts = [];
       return;
     }
-    // requireIssueReleased: true — business-reported gap 2026-08-18 ("S10 still shown in A4 function
-    // which is wrong"; "There are function dependency, if pending in previous event, then next event
-    // cannot be accessed") — every A1-A9/B1-B5 Maker-side ACTION picker (flat Catalog, Parent LC, IB/SG
-    // Index — this ONE service backs all three) should only ever offer a contract whose own creating
-    // movement has already cleared Checker approval. See BalanceComponentApiService.catalog()'s own
-    // doc comment for why this is opt-in rather than the catalog endpoint's default behavior.
-    this.api.catalog(args.instrumentType, 'ACTIVE', this.search || undefined, 1, this.fetchSize, args.lcNumber, args.tenorFamily, true).subscribe({
-      next: (result) => {
-        this.contracts = result.items;
-        this.total = args.qualifies ? args.qualifies() : result.items.length;
-        this.loadSnapshotsInto(result.items, () => {
-          this.total = args.qualifies ? args.qualifies() : this.contracts.length;
-        });
-        args.onLoaded?.(result.items);
-      },
-      error: () => {
-        this.contracts = [];
-      },
-    });
+    // requireIssueReleased: true (default) — business-reported gap 2026-08-18 ("S10 still shown in A4
+    // function which is wrong"; "There are function dependency, if pending in previous event, then next
+    // event cannot be accessed") — every A1-A9/B1-B5 Maker-side ACTION picker (flat Catalog, Parent LC,
+    // IB/SG Index — this ONE service backs all three) should only ever offer a contract whose own
+    // creating movement has already cleared Checker approval. See BalanceComponentApiService.catalog()'s
+    // own doc comment for why this is opt-in rather than the catalog endpoint's default behavior. Both
+    // defaults preserve this class's own original hardcoded behavior for these 3 callers unchanged;
+    // `status`/`requireIssueReleased` above exist purely so a genuinely different caller (a read-only
+    // inquiry, which needs neither) can override them without a second, parallel implementation.
+    const status = args.status === undefined ? 'ACTIVE' : (args.status ?? undefined);
+    const requireIssueReleased = args.requireIssueReleased ?? true;
+    this.api
+      .catalog(args.instrumentType, status, this.search || undefined, 1, this.fetchSize, args.lcNumber, args.tenorFamily, requireIssueReleased)
+      .subscribe({
+        next: (result) => {
+          this.contracts = result.items;
+          this.total = args.qualifies ? args.qualifies() : result.items.length;
+          this.loadSnapshotsInto(result.items, () => {
+            this.total = args.qualifies ? args.qualifies() : this.contracts.length;
+          });
+          args.onLoaded?.(result.items);
+        },
+        error: () => {
+          this.contracts = [];
+        },
+      });
   }
 
   /** Business instruction 2026-08-14: fetch each candidate's live balance so the component's own filteredXxxCatalog getters can exclude 0-balance ones — never lets a picker offer a target an action would immediately fail against. `onDone` (2026-08-19) lets the caller recompute its own qualified total once snapshots are actually in place — see `load()`'s own doc comment. */

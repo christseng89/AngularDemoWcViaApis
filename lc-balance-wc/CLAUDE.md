@@ -7856,3 +7856,65 @@ bookkeeping, and not further extractable without either moving `model`/`naturalK
 child-component migration this session has not been asked to make.
 
 Not committed (not requested).
+
+## desiger-comments.md F-09 — `CatalogPickerService.load()`'s `status`/`requireIssueReleased` made overridable (2026-08-19, user-directed — "先評估 F-09（CatalogPickerService 唯讀瀏覽重用）的工作量", scope narrowed after investigation, then "YES" to the narrowed scope)
+
+Investigated the finding's own literal suggestion ("a single filter-override parameter would let it extend
+cleanly") against current code before implementing anything, and found it undersells the real gap: since
+this finding was written, `InquireEventsService.loadIndex()` (the LC Master Records Index, this same
+session's own earlier work) grew two further, genuinely structural differences from `CatalogPickerService`
+— (1) **opposite pagination strategies**: `loadIndex()` uses real SERVER-side pagination (`page`/`pageSize`
+passed straight to `api.catalog()`, `result.total` trusted directly) because it has no client-side
+qualifying filter to reconcile against, while `CatalogPickerService` deliberately fetches one big batch and
+paginates CLIENT-side specifically BECAUSE its own 3 Maker-action callers DO have one (0-balance exclusion,
+tenor match) — these are mutually exclusive designs, not a missing parameter; (2) **row enrichment**:
+`loadIndexRow()` fetches a full merged Event Timeline per row (`lcAmount`/`tenorType`/`lastEventAt`) that
+`CatalogPickerService`'s own `loadSnapshotsInto()` has no equivalent for. Reported this back rather than
+attempting the full reuse the finding's own title implies — forcing the two together would mean
+`CatalogPickerService` owning two incompatible pagination models for its one real non-Maker-action caller,
+a worse outcome than the current, disclosed duplication. User confirmed the narrowed scope: fix the two
+literal hardcoded values only, do NOT attempt to make `loadIndex()` itself switch to this class.
+
+**Fix**: `load()` gained two new optional args, both defaulting to the exact literals every existing caller
+already relies on — `requireIssueReleased?: boolean` (defaults `true`) and `status?: string | null`
+(defaults `'ACTIVE'` when OMITTED). `status` specifically needed a `null` sentinel, not a plain optional
+string: `api.catalog()`'s own `status` param already treats an omitted/`undefined` value as "no filter",
+which is exactly what a read-only inquiry caller would want — but with a bare `args.status ?? 'ACTIVE'`
+default, `undefined` could never be DISTINGUISHED from "not supplied," making it impossible to ever
+actually request "no filter" through the override (a real design bug caught and fixed before shipping, not
+after: `const status = args.status === undefined ? 'ACTIVE' : (args.status ?? undefined);` — `undefined`
+(omitted) → `'ACTIVE'`; `null` (explicit) → `undefined` (no filter, passed through to `api.catalog()`); a
+real string → used as-is). `requireIssueReleased` needed no such trick — `false` is already distinguishable
+from `undefined` via a plain `??`. All 3 existing callers (`reloadCatalog()`/`loadParent()`/`loadIbIndex()`
+on `TransactionBuilderComponent`) pass neither new arg, so their own behavior is byte-for-byte unchanged.
+
+**Tests**: this class has no dedicated spec file by established convention (tested only indirectly through
+the component's own 3 real callers, same as `LookUpPanelService`) — but since NONE of those 3 callers
+exercises a non-default value, the new override itself would otherwise be completely unverified. New
+`catalog-picker.service.spec.ts` (4 direct tests, no TestBed): the unchanged default-value case, an
+explicit `status` string passed through, `status: null` correctly resolving to `undefined` on the wire (the
+literal read-only-inquiry case this finding was about) paired with `requireIssueReleased: false`, and
+`requireIssueReleased: false` alone proven not silently coerced back to `true`. `catalog-picker.service.ts`
+itself reaches **100/100/100/100** coverage (was 100/80/100/100 immediately after the code change, before
+this file existed — the new ternary's own `null`/explicit-string branches were genuinely unexercised until
+this pass).
+
+Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development`/`npm run lint` (0
+errors, 222 warnings, unchanged baseline)/`npx prettier --write` (whitespace-only) all clean. Full Angular
+suite **907/907 passing** (4 new) with **zero existing test files needing any change** — the strongest
+evidence available that the 3 existing callers are genuinely unaffected. Coverage
+**99.11/96.33/97.67/99.27%** (all four clear the 95% floor). `backend/` 34/34 and microservice 335/335 both
+re-run per this file's own standing rule, unaffected (Angular-only change — no request/response contract
+change, no template touched at all). Live in-browser verification not attempted this pass — a pure,
+backward-compatible parameter addition with no template/DI-wiring change, the class of change this
+session's own risk calibration (established across the F-04 incident and its aftermath) does not require it
+for; the 907-test suite passing with zero existing-test edits is itself strong behavior-preservation
+evidence for the 3 real callers.
+
+**F-09 is now closed at the scope the investigation confirmed was actually worth doing.** `InquireEventsService.loadIndex()`
+remains its own, separately-justified implementation — the disclosed duplication this finding originally
+flagged stays, on the reasoned basis above, rather than being forced together. Remaining `desiger-comments.md`
+items: F-06 (hand-duplicated wire types), F-08 (`submitResult: any`), F-10–F-13 (Low priority, no action
+recommended by the review itself) — none flagged as urgent by the review's own "Recommended sequence."
+
+Not committed (not requested).
