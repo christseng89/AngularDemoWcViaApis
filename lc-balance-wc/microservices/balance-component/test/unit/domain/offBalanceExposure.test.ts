@@ -1,5 +1,7 @@
 import Decimal from 'decimal.js';
 import {
+  checkPresentDocsIssueSufficiency,
+  checkShgtIssueSufficiency,
   checkUtilizeSufficiency,
   computeOffBalanceExposure,
   computePresentDocsEarmark,
@@ -126,5 +128,85 @@ describe('checkUtilizeSufficiency (Design doc §6.1, hardened v0.12: two-way ERR
       offBalanceExposure: new Decimal('0'), // the matched SG's 100,000 already netted out by the caller
     });
     expect(result.ok).toBe(true);
+  });
+});
+
+// desiger-comments.md F-02 — extracted from BalanceService.createMovement()'s own inline "creating a
+// new contract" branch (2026-08-19), pure code motion. Direct unit coverage added here since the
+// pre-existing indirect coverage (balanceService.test.ts / app.test.ts's own "SG Issue amount..."
+// HTTP-integration assertions) already proves the extraction preserved behavior, but never isolated
+// this function's own math the way this file's siblings above already do.
+describe('checkShgtIssueSufficiency (business instruction 2026-08-14, v0.11 nets existing SG exposure first)', () => {
+  test('OK: within the Tight Available Balance', () => {
+    const result = checkShgtIssueSufficiency({
+      requestedAmount: new Decimal('3000'),
+      parentAvailableBalance: new Decimal('3000'),
+      existingShgtExposure: new Decimal('0'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  test('boundary: exact match on the Tight Available Balance is OK', () => {
+    const result = checkShgtIssueSufficiency({
+      requestedAmount: new Decimal('3000'),
+      parentAvailableBalance: new Decimal('5000'),
+      existingShgtExposure: new Decimal('2000'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  test('ERROR: exceeds the Tight Available Balance once existing SG exposure is netted out (v0.11, "two overlapping SG issuances... could each individually pass")', () => {
+    const result = checkShgtIssueSufficiency({
+      requestedAmount: new Decimal('3001'),
+      parentAvailableBalance: new Decimal('3000'),
+      existingShgtExposure: new Decimal('0'),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/SG Issue amount 3001 exceeds parent LC's Tight Available Balance 3000/);
+    expect(result.error).toMatch(/Available Balance 3000 minus 0 already-outstanding/);
+  });
+
+  test('ERROR: two overlapping SG issuances against the same LC — the second one is rejected once the first is netted in as existingShgtExposure', () => {
+    const result = checkShgtIssueSufficiency({
+      requestedAmount: new Decimal('90000'),
+      parentAvailableBalance: new Decimal('100000'),
+      existingShgtExposure: new Decimal('90000'), // the first SG, already outstanding
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/exceeds parent LC's Tight Available Balance 10000/);
+  });
+});
+
+describe('checkPresentDocsIssueSufficiency (business-reported gap 2026-08-15, "B3 沒檢查到單金額超過 Balance餘額", hardened same day to a running Present Earmark check)', () => {
+  test('OK: within the Present-Earmark-adjusted Available Balance', () => {
+    const result = checkPresentDocsIssueSufficiency({
+      requestedAmount: new Decimal('50000'),
+      parentAvailableBalance: new Decimal('100000'),
+      presentDocsEarmark: new Decimal('0'),
+      parentConfirmationBalanceContractId: 'bc-1',
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  test('boundary: exact match on the earmark-adjusted threshold is OK', () => {
+    const result = checkPresentDocsIssueSufficiency({
+      requestedAmount: new Decimal('30000'),
+      parentAvailableBalance: new Decimal('100000'),
+      presentDocsEarmark: new Decimal('70000'),
+      parentConfirmationBalanceContractId: 'bc-1',
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  test('ERROR: exceeds the earmark-adjusted Available Balance — reproduces the reported E01(50k)+E02(70k)+E03(100k) SUM-never-checked gap', () => {
+    const result = checkPresentDocsIssueSufficiency({
+      requestedAmount: new Decimal('100000'),
+      parentAvailableBalance: new Decimal('100000'),
+      presentDocsEarmark: new Decimal('120000'), // E01 + E02 already outstanding
+      parentConfirmationBalanceContractId: 'bc-conf-1',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Present Docs amount 100000 exceeds the parent Confirmation's Present Earmark-adjusted Available Balance -20000/);
+    expect(result.error).toMatch(/balanceContractId bc-conf-1/);
   });
 });

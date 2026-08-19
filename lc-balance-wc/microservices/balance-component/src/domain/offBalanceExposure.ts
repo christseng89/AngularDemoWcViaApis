@@ -25,6 +25,39 @@ export function computeOffBalanceExposure(shgtMovements: readonly Pick<BalanceMo
     }, ZERO);
 }
 
+export interface ShgtIssueSufficiencyResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
+ * example S001 has 3000 LC Available Balance, the SG Issue should be not greater than 3000... It should
+ * be a validation for the Maker Input."), business-confirmed fix 2026-08-14 (v0.11, nets out other
+ * already-outstanding SG exposure on the same LC first — see `computeOffBalanceExposure` above, which is
+ * how the caller derives `existingShgtExposure`). Extracted from `BalanceService.createMovement()`'s own
+ * inline "creating a new contract" branch (desiger-comments.md finding F-02) — pure code motion, same
+ * error message/condition as before.
+ */
+export function checkShgtIssueSufficiency(params: {
+  requestedAmount: Decimal;
+  parentAvailableBalance: Decimal;
+  existingShgtExposure: Decimal;
+}): ShgtIssueSufficiencyResult {
+  const { requestedAmount, parentAvailableBalance, existingShgtExposure } = params;
+  const tightAvailable = parentAvailableBalance.minus(existingShgtExposure);
+  if (requestedAmount.greaterThan(tightAvailable)) {
+    return {
+      ok: false,
+      error:
+        `SG Issue amount ${requestedAmount.toFixed()} exceeds parent LC's Tight Available Balance ${tightAvailable.toFixed()} ` +
+        `(Available Balance ${parentAvailableBalance.toFixed()} minus ${existingShgtExposure.toFixed()} already-outstanding ` +
+        `Shipping Guarantee exposure on this same LC).`,
+    };
+  }
+  return { ok: true };
+}
+
 /**
  * Business-reported gap 2026-08-15 ("Export S001 都超 Present Docs. E01-E04 應該有一個 Present
  * Earmark Amount 控制 B3＋，B4－") — B3's own single-presentation-vs-Available check (Gap Analysis
@@ -64,6 +97,38 @@ function sumExaminationCreates(examinationMovements: readonly ExaminationMovemen
  */
 export function computePresentDocsEarmark(examinationMovements: readonly ExaminationMovement[]): Decimal {
   return sumExaminationCreates(examinationMovements.filter((m) => !m.presentDocsConsumedAt && (m.status === 'PENDING' || m.status === 'RELEASED')));
+}
+
+export interface PresentDocsIssueSufficiencyResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * B3's own sufficiency check at CREATE time (business-reported gap 2026-08-15, "B3 沒檢查到單金額超過
+ * Balance餘額", hardened the same day per `computePresentDocsEarmark`'s own doc comment). Extracted from
+ * `BalanceService.createMovement()`'s own inline "creating a new contract" branch (desiger-comments.md
+ * finding F-02) — pure code motion, same error message/condition as before.
+ */
+export function checkPresentDocsIssueSufficiency(params: {
+  requestedAmount: Decimal;
+  parentAvailableBalance: Decimal;
+  presentDocsEarmark: Decimal;
+  parentConfirmationBalanceContractId: string;
+}): PresentDocsIssueSufficiencyResult {
+  const { requestedAmount, parentAvailableBalance, presentDocsEarmark, parentConfirmationBalanceContractId } = params;
+  const tightAvailable = parentAvailableBalance.minus(presentDocsEarmark);
+  if (requestedAmount.greaterThan(tightAvailable)) {
+    return {
+      ok: false,
+      error:
+        `Present Docs amount ${requestedAmount.toFixed()} exceeds the parent Confirmation's Present Earmark-adjusted Available Balance ` +
+        `${tightAvailable.toFixed()} (Available Balance ${parentAvailableBalance.toFixed()} minus ${presentDocsEarmark.toFixed()} already-outstanding ` +
+        `Present Docs earmark on this same Confirmation, balanceContractId ${parentConfirmationBalanceContractId}) — this presentation could ` +
+        `never be Honoured/Accepted in full alongside the other still-open presentations on this LC.`,
+    };
+  }
+  return { ok: true };
 }
 
 /**

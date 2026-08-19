@@ -23,6 +23,8 @@ import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
 import { computeAvailableBalance, computeConfirmedBalance } from '../domain/balanceDerivation';
 import {
+  checkPresentDocsIssueSufficiency,
+  checkShgtIssueSufficiency,
   checkUtilizeSufficiency,
   computeOffBalanceExposure,
   computePresentDocsEarmark,
@@ -31,6 +33,7 @@ import {
 } from '../domain/offBalanceExposure';
 import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
+import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
@@ -291,7 +294,9 @@ export class BalanceService {
       if (childInstrumentType === 'SHGT') shgtMovements = [...shgtMovements, childMovement];
     }
     if (parent.instrumentType === 'EPLC_CONFIRMATION') {
-      examinationMovements = this.movements.listExaminationMovementsForParent(parent.logicalContractId).filter((m) => m.movementId !== childMovement.movementId);
+      examinationMovements = this.movements
+        .listExaminationMovementsForParent(parent.logicalContractId)
+        .filter((m) => m.movementId !== childMovement.movementId);
       if (childInstrumentType === 'EPLC_EXAMINATION') examinationMovements = [...examinationMovements, childMovement];
     }
     return this.assembleSnapshot(parent, parentMovements, shgtMovements, examinationMovements);
@@ -437,24 +442,21 @@ export class BalanceService {
       // must carry the SAME Tenor Type their parent LC declared at ISSUE. This
       // is enforced here, not left as an unchecked convention, precisely to
       // stop a maker from creating a flow-inconsistent Acceptance by mistake.
+      // desiger-comments.md F-02: the actual check now lives in
+      // domain/tenorRouting.ts's own checkAcceptanceTenorConsistency() — pure
+      // code motion, same condition/messages as before this extraction.
       if (
         (req.instrumentType === 'IPLC_ACCEPTANCE' || req.instrumentType === 'EPLC_ACCEPTANCE') &&
         req.movementType === 'CREATE' &&
         req.parentLogicalContractId
       ) {
         const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-        if (parent?.tenorType === 'SIGHT') {
-          throw new RequestValidationError(
-            `Cannot Create Acceptance under a Sight LC (parent ${parent.balanceContractId} was Issued with tenorType=SIGHT) — ` +
-              `a Sight presentation settles via UTILIZE alone (Design doc §7 Tenor Type Routing: Sight -> A4, never A5).`,
-          );
-        }
-        if (parent?.tenorType && req.tenorType && parent.tenorType !== req.tenorType) {
-          throw new RequestValidationError(
-            `Acceptance tenorType (${req.tenorType}) does not match its parent LC's own declared tenorType ` +
-              `(${parent.tenorType}, set at Issue) — the two must agree.`,
-          );
-        }
+        const tenorCheck = checkAcceptanceTenorConsistency({
+          parentTenorType: parent?.tenorType,
+          parentBalanceContractId: parent?.balanceContractId,
+          requestedTenorType: req.tenorType,
+        });
+        if (!tenorCheck.ok) throw new RequestValidationError(tenorCheck.error!);
       }
 
       // Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
@@ -477,6 +479,9 @@ export class BalanceService {
       // against what's actually still uncommitted, not just what the LC itself shows. This SG doesn't exist yet
       // (we're still inside the "creating a new contract" branch), so listShgtMovementsForParent here can only
       // ever return OTHER SGs' movements — no need to exclude "self".
+      // desiger-comments.md F-02: the actual sufficiency comparison now lives in
+      // domain/offBalanceExposure.ts's own checkShgtIssueSufficiency() — pure code motion, same
+      // condition/message as before this extraction.
       if (req.instrumentType === 'SHGT' && req.movementType === 'ISSUE') {
         if (!req.parentLogicalContractId) {
           throw new RequestValidationError("parentLogicalContractId is required to check SG Issue against the parent LC's Available Balance.");
@@ -490,7 +495,6 @@ export class BalanceService {
         const parentAvailable = computeAvailableBalance(parentConfirmed, parentMovements);
         const existingShgtMovements = this.movements.listShgtMovementsForParent(parentLc.logicalContractId);
         const existingShgtExposure = computeOffBalanceExposure(existingShgtMovements);
-        const tightAvailable = parentAvailable.minus(existingShgtExposure);
         // Quality-report-balance.md BAL-115: was `new Decimal(req.amount)`, bypassing money.ts's own
         // "only module allowed to construct a Decimal from a wire string" invariant — parseMonetaryAmount()
         // both enforces MONETARY_AMOUNT_PATTERN and constructs the Decimal in one step. The HTTP route
@@ -498,13 +502,8 @@ export class BalanceService {
         // service method is also called directly from tests/other callers that bypass the route, so the
         // invariant is worth enforcing here too, not just at the HTTP boundary.
         const requestedAmount = parseMonetaryAmount(req.amount);
-        if (requestedAmount.greaterThan(tightAvailable)) {
-          throw new InsufficientBalanceError(
-            `SG Issue amount ${requestedAmount.toFixed()} exceeds parent LC's Tight Available Balance ${tightAvailable.toFixed()} ` +
-              `(Available Balance ${parentAvailable.toFixed()} minus ${existingShgtExposure.toFixed()} already-outstanding ` +
-              `Shipping Guarantee exposure on this same LC).`,
-          );
-        }
+        const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentAvailableBalance: parentAvailable, existingShgtExposure });
+        if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error!);
       }
 
       // Business-reported gap 2026-08-15 ("B3 沒檢查到單金額超過 Balance餘額", repro'd with LC CU02 / EB E04 —
@@ -523,6 +522,9 @@ export class BalanceService {
       // = a new PENDING presentation adds to this earmark (this check); "B4－" = once B4 actually releases a
       // specific presentation (Honour/Accept), it drops out of the PENDING filter and so out of the earmark —
       // no separate bookkeeping needed, it falls out of computePresentDocsEarmark's own PENDING-only filter.
+      // desiger-comments.md F-02: the actual sufficiency comparison now lives in
+      // domain/offBalanceExposure.ts's own checkPresentDocsIssueSufficiency() — pure code motion, same
+      // condition/message as before this extraction.
       if (req.instrumentType === 'EPLC_EXAMINATION' && req.movementType === 'CREATE') {
         if (!req.parentLogicalContractId) {
           throw new RequestValidationError(
@@ -538,17 +540,15 @@ export class BalanceService {
         const parentAvailable = computeAvailableBalance(parentConfirmed, parentMovements);
         const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
         const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
-        const tightAvailable = parentAvailable.minus(presentDocsEarmark);
         // Quality-report-balance.md BAL-115 — see the identical SG Issue check's own comment above.
         const requestedAmount = parseMonetaryAmount(req.amount);
-        if (requestedAmount.greaterThan(tightAvailable)) {
-          throw new InsufficientBalanceError(
-            `Present Docs amount ${requestedAmount.toFixed()} exceeds the parent Confirmation's Present Earmark-adjusted Available Balance ` +
-              `${tightAvailable.toFixed()} (Available Balance ${parentAvailable.toFixed()} minus ${presentDocsEarmark.toFixed()} already-outstanding ` +
-              `Present Docs earmark on this same Confirmation, balanceContractId ${parentConfirmation.balanceContractId}) — this presentation could ` +
-              `never be Honoured/Accepted in full alongside the other still-open presentations on this LC.`,
-          );
-        }
+        const presentDocsCheck = checkPresentDocsIssueSufficiency({
+          requestedAmount,
+          parentAvailableBalance: parentAvailable,
+          presentDocsEarmark,
+          parentConfirmationBalanceContractId: parentConfirmation.balanceContractId,
+        });
+        if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error!);
       }
 
       contract = this.createContract(req);
@@ -662,7 +662,9 @@ export class BalanceService {
     // sufficiency checks; `movement` isn't inserted yet — no extra DB read, same "simulate rather than
     // round-trip" posture release() below uses).
     const ownShgtMovements =
-      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
+      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC'
+        ? this.movements.listShgtMovementsForParent(contract.logicalContractId)
+        : [];
     const ownExaminationMovements =
       contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
     movement.eventSnapshot = this.assembleSnapshot(contract, [...existingMovements, movement], ownShgtMovements, ownExaminationMovements);
@@ -753,7 +755,9 @@ export class BalanceService {
     const releasedSelf = { ...movement, status: 'RELEASED' as const };
     const ownMovements = this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movementId ? releasedSelf : m));
     const ownShgtMovements =
-      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
+      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC'
+        ? this.movements.listShgtMovementsForParent(contract.logicalContractId)
+        : [];
     const ownExaminationMovements =
       contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
     const releaseTimeSnapshot = this.assembleSnapshot(contract, ownMovements, ownShgtMovements, ownExaminationMovements);

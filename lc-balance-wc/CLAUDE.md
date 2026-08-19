@@ -6957,3 +6957,94 @@ async per-candidate fetch completing before the LC Index reflects the true eligi
 no jarring flash of ineligible LCs briefly showing before the real filter lands.
 
 Not committed (not requested).
+
+## desiger-comments.md F-02 — three per-instrument sufficiency/validation checks extracted out of `BalanceService.createMovement()`'s own inline "creating a new contract" branch (2026-08-19, user-directed — picked F-02 from the OOD/SOLID review's own recommended sequence after F-01 was confirmed already closed)
+
+`desiger-comments.md` (the independent OOD/SOLID review this session's own F-01 Strategy refactoring —
+see the "F-01 is now genuinely closed" entry above — was driven by) names `createMovement()` as
+"arguably the most consequential single function in the whole system... a distinct per-instrument
+sufficiency check (SHGT vs. parent Tight Available, Acceptance tenor consistency, Present-Docs earmark)
+all as sequential inline `if` blocks," and recommends "extract each per-instrument sufficiency check
+into its own named function under `domain/`, matching the pattern already proven in
+`shgtRedeem.ts`/`amendDecrease.ts`." The function had grown to ~300 lines when that review was written;
+confirmed via direct re-reading before touching anything that it's genuinely ~537 lines now (the review
+document's own cited line counts are a snapshot, not necessarily current — same posture this session's
+own history already applies to every other cited artifact).
+
+**Scope, precisely matched to the finding's own three named checks** — no broader restructuring of
+`createMovement()` attempted this pass (the idempotency check, ceilingAmount computation, duplicate
+`sourceTransactionRef` guard, movement-object construction, and snapshot capture all stay exactly where
+they are; several of THOSE already delegate to existing domain/private-method calls, so they weren't
+part of the finding's own complaint in the first place):
+
+1. **`checkAcceptanceTenorConsistency`** (new `domain/tenorRouting.ts`) — Design doc §7 Tenor Type
+   Routing: a Sight LC never produces an Acceptance, and an Acceptance's own tenorType must match its
+   parent LC's own declared tenorType. A NEW file, since no existing domain module owned tenor-routing
+   validation (`tolerance.ts` is Tolerance conversion, not routing) — this is a pure VALIDATION check
+   (always `RequestValidationError`), not a balance/sufficiency comparison, so it doesn't belong beside
+   the other two.
+2. **`checkShgtIssueSufficiency`** (added to the existing `domain/offBalanceExposure.ts`, right after
+   `computeOffBalanceExposure`) — business instruction 2026-08-14 ("SG issue amount should be less than
+   the LC Current Balance"), v0.11 nets existing SG exposure first. Co-located with
+   `computeOffBalanceExposure` (which the caller already uses to derive `existingShgtExposure`) rather
+   than a new file — the two are already tightly coupled by data flow.
+3. **`checkPresentDocsIssueSufficiency`** (added to the same file, right after `computePresentDocsEarmark`)
+   — business-reported gap 2026-08-15 ("B3 沒檢查到單金額超過 Balance餘額"), hardened the same day to a
+   running Present Earmark check. Same co-location reasoning as #2.
+
+**Deliberately did NOT reuse the existing `checkUtilizeSufficiency`** for either #2 or #3, even though
+all three share the identical underlying shape (`requestedAmount > (availableBalance − exposure)`):
+`checkUtilizeSufficiency` is a genuine TWO-TIER check (first against plain Available Balance, with its
+own distinct error message, THEN against the tight/exposure-adjusted threshold) — reusing it would have
+silently added an extra tier neither SG Issue nor Present Docs ever had, and swapped in
+`checkUtilizeSufficiency`'s own generic wording for both's own specific, already-live error messages
+(e.g. "SG Issue amount ... exceeds parent LC's Tight Available Balance ..." → the generic "Requested
+amount ... exceeds Available Balance"). That would have been an observable behavior change disguised as
+a refactor — exactly the kind of drift this session's own "pure code motion, zero behavior change"
+convention (established across every prior BAL-003/F-01 extraction) exists to prevent. Each new function
+instead replicates its own original single-tier check and message verbatim.
+
+**Every condition and error message is byte-for-byte identical to what `createMovement()` threw
+directly before this extraction** — the service layer still owns resolving the parent contract via the
+store and deciding which `Error` class to throw (`RequestValidationError`/`InsufficientBalanceError`);
+the three new functions stay pure/anemic (no store access, no Error-class coupling), matching this
+review's own "Anemic — and correctly so" Strength finding for the rest of `domain/`.
+
+**Tests**: full microservice suite **335/335 passing (13 new) with ZERO pre-existing test file needing
+any change** — the same strongest-possible evidence of exact behavior preservation this session's every
+prior extraction has used, since the pre-existing suite (`balanceService.test.ts`'s own BAL-115 test,
+`app.test.ts`'s own "exceeds parent LC's Tight Available Balance"/"Sight LC" HTTP-integration
+assertions) was written against the OLD inline implementation and still passes unmodified. 13 new direct
+unit tests added: `test/unit/domain/offBalanceExposure.test.ts` gained `checkShgtIssueSufficiency` (4
+cases, including the v0.11 "two overlapping SG issuances" scenario) and `checkPresentDocsIssueSufficiency`
+(3 cases, including a direct reproduction of the reported E01+E02+E03 SUM-never-checked gap) describe
+blocks; new `test/unit/domain/tenorRouting.test.ts` (6 cases) — the tenor-MISMATCH branch specifically
+had NO prior test coverage at all (only the Sight-LC branch was ever asserted, via `app.test.ts`), so this
+extraction closes a genuine pre-existing gap, not just relocates already-covered logic. Verified: `npm run
+typecheck`/`npm run build` clean, `npm test` → 335/335 (14 suites, +1 new file), coverage
+**99.27/97.19/100/99.5%** (all four metrics clear the 95% floor; `offBalanceExposure.ts` and the new
+`tenorRouting.ts` both **100/100/100/100**), `npm run lint` 0 errors (11 pre-existing warnings, unchanged
+— none in any touched/new file), `npm run format:check` clean on every touched/new file (3 pre-existing
+unformatted files — `db/migrations.ts`, `test/unit/app.test.ts`, `test/unit/service/balanceService.test.ts`
+— left alone, out of this pass's own scope). Full three-suite re-verification per this file's own standing
+rule: Angular app 841/841 and `backend/` 34/34, both unaffected (microservice-only change — no
+request/response contract change, no route/schema touched).
+
+Live in-browser/live-API verification not attempted this pass — static verification is unusually strong
+here (full typecheck, a clean build, and a 335-test suite requiring zero pre-existing-test edits across
+14 suites). A human should still exercise the three checks live at least once (an SG Issue exceeding
+Tight Available Balance, a Present Docs presentation exceeding the running earmark, and an Acceptance
+CREATE attempted under a Sight LC or with a mismatched tenorType) to confirm the HTTP-level error
+responses are byte-identical to before this extraction.
+
+**Remaining desiger-comments.md items, for reference** (not started this pass): F-02's OWN `release()`
+God-Method half ("repeats the shape at smaller scale," not attempted here — this pass scoped strictly to
+`createMovement()`'s three named checks per the finding's own primary complaint), F-03 (Angular
+component still owns 6 load/select/paginate subsystems — largely superseded in scope by this session's
+own separate F-01 PR-1–PR-5 and LC-Index-eligibility passes, worth a fresh line-count/finding re-read
+before picking up), F-04 (three incompatible DI styles in the Angular constructor), F-06/F-07/F-08
+(Medium, each cheap at a natural touch-point per the review's own text), F-09 (CatalogPickerService
+reusability for a read-only browse — discussed and explicitly deferred this session, see the
+`AskUserQuestion` exchange immediately preceding this entry for why it's now a bigger design question
+than the finding's own text implies, given this session's own separate CatalogPickerService pagination
+redesign), F-10–F-13 (Low, no action recommended by the review itself).
