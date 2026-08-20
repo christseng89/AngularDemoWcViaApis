@@ -421,7 +421,37 @@ info:
     'RELEASED'`) as three independent facts with no status-based inference required. `/reject` is
     unaffected — a REJECTED movement still reuses `releasedBy`/`releasedAt`, no dedicated
     `rejectedBy`/`rejectedAt` pair was requested.
-  version: "1.14.0"
+
+
+    v1.15.0 (2026-08-20, same day, two business-reported premature-release gaps, both closed by the
+    same "increases counted late, decreases counted early" ("增加從嚴，占用從寬") principle already
+    established for other checks in v1.13.0): (1) `BalanceSnapshot.offBalanceExposure`
+    (`GET .../balance`, `BalanceMovement.eventSnapshot`, etc.) previously netted a
+    `PARTIAL_REDEEM`/`FULL_REDEEM` the moment it was Maker-submitted (`PENDING`), the same as once
+    genuinely `RELEASED` — a standalone SHGT redemption submitted but not yet Checker-approved could let
+    a SECOND, unrelated submission (a new SG Issue, or a new Document Arrival) pass against capacity that
+    was never really freed; if the Checker later rejected that redemption, the bank ended up over its
+    real LC capacity. Now only nets a redemption once genuinely `RELEASED`, **except** a redemption
+    sharing a still-PENDING `UTILIZE`'s own `businessEventId` on the SAME LC (Document Arrival w/
+    Shipping Gtee's own matched compound pair — both legs are always released, or both auto-rolled-back,
+    together, so there is no cross-transaction leakage risk in netting that ONE case from Submit). (2)
+    The Export-side analog: `BalanceSnapshot.presentDocsEarmarkApproved` previously kept counting an
+    already-`RELEASED` `EPLC_EXAMINATION`/`CREATE` in full even while a Confirmation's own `HONOUR`/
+    `ACCEPT` that *references it* (`referencedTransactionId`) was already Maker-submitted, `PENDING` —
+    that consumption is a foregone, self-balancing conclusion once Submitted (unlike a genuinely separate
+    later Checker decision), so it now nets provisionally from that Submit onward too, purely for display
+    (`presentDocsConsumedAt` itself is still only genuinely written at the referencing movement's own
+    `/release`, unchanged). Both exceptions are scoped identically: they apply ONLY to the persisted/live
+    balance display, never to a genuinely separate, independent transaction's own sufficiency check — a
+    NEW SG Issue, a NEW Document Arrival, a NEW Present Docs presentation, or an AMEND_DECREASE (A2/B2's
+    own Decrease direction) are all still checked against the un-netted, strict figure. Also corrects two
+    property descriptions this document itself had left stale since v1.13.0: `tightAvailableBalance`
+    (both the IPLC_LC/EPLC_LC and EPLC_CONFIRMATION cases) is derived from `confirmedBalance`, not
+    `availableBalance`, as v1.13.0's own changelog entry above already stated but this schema's own field
+    description never caught up to reflect; and `POST /balance-movements`' own AMEND_DECREASE sufficiency
+    check (and the parallel `EPLC_CONFIRMATION` `AMEND`-Decrease check) compares against Tight Available
+    Balance, not plain Available Balance, same correction.
+  version: "1.15.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -658,8 +688,11 @@ paths:
         For IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE, `amount`
         is the caller-typed face-level delta; the server derives
         `ceilingAmount = amount × (1+tolerancePct/100)` and — for
-        AMEND_DECREASE specifically — checks *that* derived figure against
-        Available Balance, not the raw `amount` (Design doc §6.2, v0.3.0).
+        AMEND_DECREASE specifically (and, symmetrically, `EPLC_CONFIRMATION`'s
+        own `AMEND` in its Decrease direction) — checks *that* derived figure
+        against **Tight** Available Balance, not plain Available Balance and
+        not the raw `amount` (Design doc §6.2, v0.3.0; basis corrected to
+        Tight in v1.13.0/v1.15.0 — see the top-level changelog).
       requestBody:
         required: true
         content:
@@ -1208,8 +1241,9 @@ components:
             Design doc §6.2 (v0.3.0) — amount × (1 + tolerancePct/100) for
             IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE; equal to
             amount for every other case. AMEND_DECREASE sufficiency
-            (compared against Available Balance) always uses this field,
-            never the raw amount.
+            (compared against Tight Available Balance since v1.13.0 — see
+            the top-level changelog) always uses this field, never the raw
+            amount.
         currency:
           type: string
           description: Always equal to the resolved/derived contract's own currency at the time this movement was created — see CURRENCY DERIVATION.
@@ -1465,10 +1499,10 @@ components:
         directly. offBalanceExposure (Design doc §6.1) applies only to
         IPLC_LC/EPLC_LC contracts that may have an SHGT issued against
         them — null for any other instrumentType. tightAvailableBalance
-        (v1.11.0) is populated for IPLC_LC/EPLC_LC (availableBalance minus
-        offBalanceExposure) AND for EPLC_CONFIRMATION (availableBalance
-        minus the combined Present Docs earmark — see its own field
-        description below); null for every other instrumentType.
+        (v1.11.0; basis corrected to confirmedBalance-based in v1.13.0 — see
+        its own field description below) is populated for IPLC_LC/EPLC_LC
+        AND for EPLC_CONFIRMATION (a genuinely different deduction — see its
+        own field description); null for every other instrumentType.
         presentDocsEarmarkPending/presentDocsEarmarkApproved (v0.8.0,
         EPLC_CONFIRMATION only) are null for any other instrumentType.
       properties:
@@ -1481,28 +1515,40 @@ components:
         offBalanceExposure:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
           nullable: true
-          description: Design doc §6.1 — sum of PENDING+RELEASED SHGT ISSUE net of PARTIAL_REDEEM/FULL_REDEEM, for SHGT contracts whose parentLogicalContractId matches this LC. Null for instrumentTypes other than IPLC_LC/EPLC_LC.
+          description: >
+            Design doc §6.1 — sum of PENDING+RELEASED SHGT `ISSUE` net of SHGT `PARTIAL_REDEEM`/
+            `FULL_REDEEM`, for SHGT contracts whose parentLogicalContractId matches this LC. A
+            redemption only counts once genuinely RELEASED (v1.15.0 — a still-PENDING one no longer
+            nets), **except** one sharing a still-PENDING `UTILIZE`'s own `businessEventId` on the SAME
+            LC (Document Arrival w/ Shipping Gtee's own matched compound pair, which nets from Submit —
+            see the top-level v1.15.0 changelog entry). An `ISSUE` always counts from PENDING, both
+            before and after v1.15.0 — only the REDEEM side's timing changed. Null for instrumentTypes
+            other than IPLC_LC/EPLC_LC.
         tightAvailableBalance:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
           nullable: true
           description: >
-            IPLC_LC/EPLC_LC: availableBalance minus offBalanceExposure —
-            the threshold a UTILIZE amount (and, at creation time, an SHGT
-            ISSUE against this LC as parent) is checked against. v1.0.0 —
-            this check is now a hard 409 on both sides, not a soft warning
-            (see the removed MovementWarning schema note below).
-
-            v1.11.0 (2026-08-18, user-requested — "the same field for the
-            Export Confirmed LC"): also populated for EPLC_CONFIRMATION —
-            availableBalance minus the COMBINED presentDocsEarmarkPending +
-            presentDocsEarmarkApproved (the same figure B3's own Present
-            Docs sufficiency check already nets internally at creation
-            time — see presentDocsEarmarkApproved's own description). This
-            is a genuinely different deduction from the Import case, not
-            the same SHGT computation reused — EPLC_CONFIRMATION has no
-            sibling SHGT exposure to net out (SHGT is always a child of
-            IPLC_LC). Both share the same PURPOSE (true remaining capacity
-            before the next event), via a different source figure.
+            CURRENT formula (since v1.13.0 — this field description was not updated at the time; v1.15.0
+            corrects it here): `confirmedBalance` minus **Pending Decrease Total** (the sum of
+            still-PENDING movements' own `ceilingAmount` on THIS contract whose signed direction is a
+            decrease — e.g. AMEND_DECREASE/UTILIZE/the Export Confirmation's own AMEND-Decrease — never
+            netted against a PENDING increase on the same contract; not a separately-exposed
+            `BalanceSnapshot` field) minus, for IPLC_LC/EPLC_LC, `offBalanceExposure`, or for
+            EPLC_CONFIRMATION, the COMBINED `presentDocsEarmarkPending` + `presentDocsEarmarkApproved`. A
+            still-PENDING **increase** (ISSUE/AMEND_INCREASE/the Confirmation's own AMEND-Increase) is
+            invisible to this figure until genuinely Released ("增加從嚴") — a still-PENDING **decrease**
+            occupies it immediately at Submit ("占用從寬"), same as before. This is the threshold a
+            UTILIZE amount, an SHGT ISSUE against this LC as parent, a Present Docs (EPLC_EXAMINATION
+            CREATE) submission, and an AMEND_DECREASE/Confirmation-AMEND-Decrease are all checked
+            against. v1.0.0 — hard 409 on both sides, not a soft warning (see the removed
+            MovementWarning schema note below). v1.11.0 (2026-08-18) — also populated for
+            EPLC_CONFIRMATION (previously IPLC_LC/EPLC_LC only), a genuinely different deduction from
+            the Import case (no sibling SHGT exposure to net — SHGT is always a child of IPLC_LC), same
+            PURPOSE (true remaining capacity before the next event) via a different source figure. Both
+            deductions (`offBalanceExposure` and the combined Present Docs earmark) can themselves read
+            provisionally lower than their own strict definitions from v1.15.0 onward for a still-PENDING
+            matched/referencing transaction — see their own field descriptions and the top-level v1.15.0
+            changelog entry.
 
             Null for every other instrumentType.
         presentDocsEarmarkPending:
@@ -1514,6 +1560,12 @@ components:
             under this Confirmation. Basis changed v1.12.0: previously
             "not-yet-Checker-acknowledged"; B3's own acknowledge()-only
             path was removed, so this is now simply status === PENDING.
+            v1.15.0 — also excludes any record a still-PENDING HONOUR/ACCEPT already provisionally
+            references via referencedTransactionId (see presentDocsEarmarkApproved's own v1.15.0 note
+            below); in practice this exclusion never actually changes this particular field's own value,
+            since a still-PENDING EPLC_EXAMINATION record can never itself be referenced yet (HONOUR/
+            ACCEPT only ever picks an already-RELEASED one) — the exclusion is applied here purely for
+            implementation symmetry with presentDocsEarmarkApproved.
             Null for every other instrumentType.
         presentDocsEarmarkApproved:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
@@ -1528,8 +1580,20 @@ components:
             and stays counted here until B4 actually consumes it (see
             BalanceMovement.presentDocsConsumedAt) — preserving the original
             commitment-control intent across that now-real PENDING->RELEASED
-            transition. A Present Docs submission's own sufficiency check
-            nets Pending and Approved together against availableBalance.
+            transition. v1.15.0 (business-reported live gap, "B4 U02 也有類似問題") — a record this
+            Confirmation's own still-PENDING (Maker-submitted, not yet Checker-Released) HONOUR/ACCEPT
+            already references via `referencedTransactionId` is now ALSO excluded here, purely for
+            display, from that HONOUR/ACCEPT's own Submit onward — its eventual consumption is a
+            foregone, self-balancing conclusion once Submitted, unlike a genuinely separate later Checker
+            decision (`presentDocsConsumedAt` itself is still only genuinely written at that HONOUR/
+            ACCEPT's own `/release`; reversed automatically, with no write, if that movement is instead
+            rejected/cancelled). This exception applies ONLY at the persisted/live balance display — a
+            genuinely NEW, independent Present Docs (B3) submission's own sufficiency check, and an
+            AMEND_DECREASE/Confirmation-AMEND-Decrease's own sufficiency check, both still compare against
+            the un-netted, strict figure (see the top-level v1.15.0 changelog entry). A Present Docs
+            submission's own sufficiency check nets Pending and Approved together against **Tight**
+            Available Balance (confirmedBalance-based since v1.13.0 — see tightAvailableBalance's own
+            description), not plain availableBalance.
             Null for every other instrumentType.
         asOf: { type: string, format: date, nullable: true, description: Echoes the request's asOf parameter (GET .../balance only); null means this is the live balance or a balance-as-of-movement query. }
 

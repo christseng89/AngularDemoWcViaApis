@@ -805,4 +805,19 @@ Earmark Total = +8,000 (SG) − 2,000 (LC)" figure — combined effect is always
 leg is MIN-capped at the SG's own Available Balance, never exceeds the UTILIZE's own ceilingAmount), never
 a pure increase. No source code was wrong — the sufficiency-check/display code already nets correctly
 (confirmed by the passing test suite); only this row's prose was stale.
+
+## `balance-component-api.yaml` bumped to v1.15.0 — schema descriptions never caught up to v1.13.0's own changelog, and this session's two netting fixes were undocumented
+
+Two kinds of drift, no code changed: (1) v1.13.0's own changelog entry said `tightAvailableBalance`
+became confirmedBalance-based and AMEND_DECREASE's own check became Tight-based, but the actual
+`tightAvailableBalance`/`ceilingAmount` schema field descriptions and the `POST /balance-movements`
+endpoint prose still described the old availableBalance-based formula — fixed to match. (2) This
+session's SG redemption (`offBalanceExposure`, matched-`businessEventId` exception) and B4 Present Docs
+(`presentDocsEarmarkApproved`, provisionally-referenced exception) fixes were never reflected in the
+spec at all — added as a new v1.15.0 changelog entry plus corrected the two affected field descriptions,
+mirroring `Balance-Figures-Calculation-Logic.md`'s own wording. Checked `BalanceMovement.warnings`/
+`MovementWarning` (kept in `types.ts`/DB schema but deliberately excluded from this OAS since v1.0.0) —
+`checkUtilizeSufficiency()` never actually returns a `warning` in current code, only `ok`/`error`, so the
+field genuinely never populates a live response; the OAS omission is still correct, just vestigial
+dead code left behind in the TypeScript side, not a spec bug.
 </content>
