@@ -227,6 +227,31 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.releaseSuccessHint).toBe('Release completed (movement mv-amend) — screen reset for a new A2 (LC Amendment) transaction.');
     });
 
+    it("Common Requirement: a genuine 'released' outcome refreshes Look Up Current Balance too, using the Maker's last-known LC (selectFunction()'s own reset wipes the Maker screen first)", () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A2);
+      comp.onMakerSyncRequested({ lcNumber: 'LC-RELEASED', secondaryRef: null, alsoSyncLookup: false, instrumentType: 'IPLC_LC' });
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-amend', status: 'PENDING' }) });
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-amend', status: 'RELEASED' }) as any);
+      const syncFromSpy = jest.spyOn(comp.lookUp, 'syncFrom');
+
+      comp.release();
+
+      expect(syncFromSpy).toHaveBeenCalledWith('LC-RELEASED', 'IPLC_LC', expect.any(Function));
+    });
+
+    it("Common Requirement: no lookup refresh is attempted when the Maker never synced (nothing to refresh)", () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A2);
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-amend', status: 'PENDING' }) });
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-amend', status: 'RELEASED' }) as any);
+      const syncFromSpy = jest.spyOn(comp.lookUp, 'syncFrom');
+
+      comp.release();
+
+      expect(syncFromSpy).not.toHaveBeenCalled();
+    });
+
     it('plain path: derives checker2 when createdBy is not maker1', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
@@ -566,7 +591,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.cancel).toHaveBeenCalledWith('mv-1', 'maker1', 'MAKER_EC');
       expect(api.reject).not.toHaveBeenCalled();
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'CANCELLED' }, syncLookup: true });
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'CANCELLED' } });
       expect(comp.actionBusy).toBe(false);
     });
 
@@ -597,7 +622,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.cancel).toHaveBeenNthCalledWith(1, 'mv-sg-redeem', 'maker1', 'MAKER_EC');
       expect(api.cancel).toHaveBeenNthCalledWith(2, 'mv-doc-arrival', 'maker1', 'MAKER_EC');
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-doc-arrival', status: 'CANCELLED' }, syncLookup: true });
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-doc-arrival', status: 'CANCELLED' } });
     });
 
     it('A3S: a failed SG cancel leaves the primary un-cancelled', () => {

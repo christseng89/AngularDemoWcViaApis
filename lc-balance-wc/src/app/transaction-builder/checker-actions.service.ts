@@ -32,7 +32,7 @@ export interface CheckerActionContext {
 }
 
 export type CheckerActionOutcome =
-  | { kind: 'released'; result: BalanceMovement; syncLookup?: boolean }
+  | { kind: 'released'; result: BalanceMovement }
   /** A3S's own acknowledgment-only path (releaseArrivalDocument's old shape) — no API call, no `result`. */
   | { kind: 'documentArrivalAcknowledged' }
   | { kind: 'failed'; message: string };
@@ -148,7 +148,7 @@ export class CheckerActionsService {
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const cancelPrimary = (): Observable<CheckerActionOutcome> =>
       this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
-        switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res, syncLookup: true })),
+        switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
         catchError((err) => this.fail(describeApiError(err))),
       );
 
@@ -202,7 +202,7 @@ export class CheckerActionsService {
   /** B5's Usance/CNF_MATURE branch only — second leg, releasing the matching Reimbursement Receivable's REIMBURSE after the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE was already released above. */
   private releaseMatchedReceivable(checkerId: string, settleRes: BalanceMovement, matchedReceivableMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(matchedReceivableMovementId, checkerId).pipe(
-      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: settleRes, syncLookup: true })),
+      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: settleRes })),
       catchError((err) => this.fail(`Acceptance settled, but the matching Reimbursement Receivable failed to release: ${describeApiError(err)}`)),
     );
   }
@@ -306,7 +306,7 @@ export class CheckerActionsService {
   /** B4's Sight/HONOUR branch only — final leg, releasing the new Due from Issuing Bank asset after the Confirmation's own Honour (and, before that, the B3 Present Docs record) were already released above. */
   private releaseDueFromIssuingBank(checkerId: string, honourRes: BalanceMovement, dueFromIssuingBankMovementId: string): Observable<CheckerActionOutcome> {
     return this.api.release(dueFromIssuingBankMovementId, checkerId).pipe(
-      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: honourRes, syncLookup: true })),
+      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: honourRes })),
       catchError((err) => this.fail(`Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ${describeApiError(err)}`)),
     );
   }
@@ -336,7 +336,7 @@ export class CheckerActionsService {
       );
     }
     return this.api.release(acceptanceReimbReceivableMovementId, checkerId).pipe(
-      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: acceptRes, syncLookup: true })),
+      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: acceptRes })),
       catchError((err) => this.fail(`Acceptance released, but the Reimbursement Receivable asset failed to release: ${describeApiError(err)}`)),
     );
   }

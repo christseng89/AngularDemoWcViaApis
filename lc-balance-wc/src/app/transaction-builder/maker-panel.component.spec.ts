@@ -1417,6 +1417,95 @@ describe('MakerPanelComponent', () => {
     });
   });
 
+  // Common Requirement: every successful Maker Submit or Checker Release must refresh Look Up Current
+  // Balance too, not just the Checker queue — regression coverage for a real gap this requirement's own
+  // fix closed (several success paths previously called emitSync() with alsoSyncLookup left false).
+  describe('Common Requirement — Refresh Look Up Current Balance (syncRequested.alsoSyncLookup)', () => {
+    function captureSync(comp: MakerPanelComponent): { lcNumber: string; alsoSyncLookup: boolean }[] {
+      const captured: { lcNumber: string; alsoSyncLookup: boolean }[] = [];
+      comp.syncRequested.subscribe((e) => captured.push({ lcNumber: e.lcNumber, alsoSyncLookup: e.alsoSyncLookup }));
+      return captured;
+    }
+
+    it("submitA4()'s Maker Submit success syncs Look Up Current Balance too", () => {
+      const api = makeApi({ submitByMaker: jest.fn(() => of({ movementId: 'M1', status: 'PENDING' })) });
+      const comp = makeComponentB(getFn('A4'), api);
+      comp.selectedContract = makeContract();
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'M1' });
+      const captured = captureSync(comp);
+
+      comp.submitA4();
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
+    });
+
+    it('a plain Checker Release/Reject (the refreshRequested signal) syncs Look Up Current Balance too', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.naturalKey.lcNumber = 'LC001';
+      const captured = captureSync(comp);
+
+      comp.refreshRequested = 1;
+      comp.ngOnChanges({ refreshRequested: makeChange(null, 1) } as any);
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
+    });
+
+    it('the FIRST refreshRequested change (initial binding, not a real Checker action) is a no-op', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.naturalKey.lcNumber = 'LC001';
+      const captured = captureSync(comp);
+
+      comp.ngOnChanges({ refreshRequested: { previousValue: null, currentValue: 0, firstChange: true, isFirstChange: () => true } } as any);
+
+      expect(captured).toHaveLength(0);
+    });
+
+    it("A3S's own Checker acknowledgment outcome (documentArrivalAcknowledged) syncs Look Up Current Balance too", () => {
+      const comp = makeComponentB(getFn('A3S'), makeApi());
+      comp.selectedContract = makeContract();
+      const captured = captureSync(comp);
+
+      comp.externalCheckerOutcome = { kind: 'documentArrivalAcknowledged' };
+      comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
+    });
+
+    it('any other successful Checker outcome (release/reject/EC delete, carrying a real result) syncs Look Up Current Balance too', () => {
+      const comp = makeComponentB(getFn('A2'), makeApi());
+      comp.selectedContract = makeContract();
+      const captured = captureSync(comp);
+
+      comp.externalCheckerOutcome = { kind: 'released', result: makeMovement({ movementId: 'mv-2', status: 'RELEASED' }) };
+      comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
+    });
+
+    it('a FAILED Checker outcome never syncs anything — nothing succeeded server-side', () => {
+      const comp = makeComponentB(getFn('A2'), makeApi());
+      comp.selectedContract = makeContract();
+      const captured = captureSync(comp);
+
+      comp.externalCheckerOutcome = { kind: 'failed', message: 'boom' };
+      comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
+
+      expect(captured).toHaveLength(0);
+    });
+
+    it('a mere selection pick (onSelectContract) still syncs the Checker queue only, never Look Up Current Balance', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A2'), api);
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1' })];
+      const captured = captureSync(comp);
+
+      comp.onSelectContract('C1');
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: false });
+      expect(captured.some((e) => e.alsoSyncLookup)).toBe(false);
+    });
+  });
+
   describe('onSelectPayMovement clears a stale submitResult (A4 only)', () => {
     it('resets submitResult/submitError when a NEW Document Arrival is picked for A4', () => {
       const api = makeApi();

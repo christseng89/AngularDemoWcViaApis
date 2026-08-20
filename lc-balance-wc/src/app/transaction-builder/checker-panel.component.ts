@@ -58,7 +58,7 @@ export class CheckerPanelComponent implements OnChanges {
   @Output() movementPicked = new EventEmitter<BalanceMovement | null>();
   /** Fires at the top of every `loadCheckerQueue()` run — parent clears its own stale Release/Reject error. */
   @Output() queueReloaded = new EventEmitter<void>();
-  /** Fires once `listMovements` succeeds — parent calls its own `syncLookupToContext()`. */
+  /** Fires once `listMovements` succeeds — parent calls its own `onCheckerQueueLoadSucceeded()`. */
   @Output() queueLoadSucceeded = new EventEmitter<void>();
 
   checkerLcNumber = '';

@@ -139,7 +139,7 @@ export class TransactionBuilderComponent {
     this.makerContext = ctx;
   }
 
-  /** Caches the Maker's last-known lcNumber/instrumentType for `onCheckerQueueLoadSucceeded()` — needs the Maker's value, not the Checker's. */
+  /** Caches the Maker's last-known lcNumber/instrumentType — needed once the Maker screen has already been reset (see `refreshLookUpForLastMakerContext()`), not just for `onCheckerQueueLoadSucceeded()`. */
   private lastMakerSync: { lcNumber: string; instrumentType: InstrumentType | undefined } | null = null;
 
   onMakerSyncRequested(e: MakerSyncRequest): void {
@@ -147,6 +147,19 @@ export class TransactionBuilderComponent {
     this.lastMakerSync = { lcNumber: e.lcNumber, instrumentType: e.instrumentType };
     if (e.alsoSyncLookup && e.instrumentType) {
       this.lookUp.syncFrom(e.lcNumber, e.instrumentType, () => this.closeAccountEntryDialog());
+    }
+  }
+
+  /**
+   * Common Requirement: every successful Maker Submit or Checker Release refreshes Look Up Current
+   * Balance. `MakerPanelComponent`'s own `emitCheckerAndLookupSync()` already covers every success path
+   * that leaves the Maker screen populated (it reads the still-live `contextLcNumber`) — this helper
+   * covers the one case where the screen was ALREADY reset first (a compound Checker Release's
+   * `selectFunction()` call), using the cached `lastMakerSync` since the Maker's own state is gone by then.
+   */
+  private refreshLookUpForLastMakerContext(): void {
+    if (this.lastMakerSync?.instrumentType) {
+      this.lookUp.syncFrom(this.lastMakerSync.lcNumber, this.lastMakerSync.instrumentType, () => this.closeAccountEntryDialog());
     }
   }
 
@@ -274,11 +287,9 @@ export class TransactionBuilderComponent {
     this.checkerError = null;
   }
 
-  /** See `lastMakerSync` — reads the Maker's last-known context, not the Checker's. */
+  /** See `lastMakerSync`/`refreshLookUpForLastMakerContext()` — reads the Maker's last-known context, not the Checker's. */
   onCheckerQueueLoadSucceeded(): void {
-    if (this.lastMakerSync?.instrumentType) {
-      this.lookUp.syncFrom(this.lastMakerSync.lcNumber, this.lastMakerSync.instrumentType, () => this.closeAccountEntryDialog());
-    }
+    this.refreshLookUpForLastMakerContext();
   }
 
   approveArrival(): void {
@@ -300,6 +311,7 @@ export class TransactionBuilderComponent {
       this.actionBusy = false;
       if (fn && outcome.kind === 'released') {
         this.selectFunction(fn);
+        this.refreshLookUpForLastMakerContext();
         this.releaseSuccessHint = `Release completed (movement ${outcome.result.movementId}) — screen reset for a new ${fn.code} (${fn.label}) transaction.`;
         return;
       }

@@ -87,7 +87,13 @@ const EMPTY_COMPOUND_LEGS: CompoundLegState = {
   matchedReceivableMovementId: null,
 };
 
-/** A pending sync request for the Checker's own search and (only when `alsoSyncLookup` is set) the Look Up Current Balance panel. `instrumentType` is only read when `alsoSyncLookup` is true. */
+/**
+ * A pending sync request for the Checker's own search and, when `alsoSyncLookup` is set, the Look Up
+ * Current Balance panel. Emitted through exactly two named private methods — `emitCheckerSync()` (a mere
+ * selection pick, Checker search only) and `emitCheckerAndLookupSync()` (a genuine Submit/Release
+ * success, both) — never a bare boolean literal at a call site, so a future success path can't silently
+ * skip the Look Up refresh the way several already did before this fix.
+ */
 export interface MakerSyncRequest {
   lcNumber: string;
   secondaryRef: string | null;
@@ -219,7 +225,7 @@ export class MakerPanelComponent implements OnChanges {
     if (changes['externalCheckerOutcome'] && this.externalCheckerOutcome) this.applyCheckerOutcome(this.externalCheckerOutcome);
     if (changes['refreshRequested'] && !changes['refreshRequested'].firstChange) {
       this.refreshSelectedContractSnapshot();
-      this.emitSync();
+      this.emitCheckerAndLookupSync();
     }
   }
 
@@ -240,8 +246,7 @@ export class MakerPanelComponent implements OnChanges {
     });
   }
 
-  /** See `MakerSyncRequest`'s own doc comment for why `alsoSyncLookup` exists — only a 'submitted' outcome also syncs the Look Up panel; every other call site syncs the Checker alone. */
-  private emitSync(alsoSyncLookup = false): void {
+  private emitSync(alsoSyncLookup: boolean): void {
     const lcNumber = this.contextLcNumber;
     if (!lcNumber) return;
     this.syncRequested.emit({
@@ -250,6 +255,14 @@ export class MakerPanelComponent implements OnChanges {
       alsoSyncLookup,
       instrumentType: this.model.instrumentType,
     });
+  }
+  /** A mere selection pick — re-syncs the Checker's own search box only, never Look Up Current Balance. */
+  private emitCheckerSync(): void {
+    this.emitSync(false);
+  }
+  /** Common Requirement: every successful Maker Submit or Checker Release refreshes Look Up Current Balance too. */
+  private emitCheckerAndLookupSync(): void {
+    this.emitSync(true);
   }
 
   /*
@@ -474,7 +487,7 @@ export class MakerPanelComponent implements OnChanges {
     this.pickerSelection.payableMovementsPaging.total = this.pickerSelection.payableMovements.length;
     this.pickerSelection.payableMovementsPaging.page = 1;
     this.onSelectPayMovement(movementId);
-    this.emitSync();
+    this.emitCheckerSync();
   }
 
   catalogIbHint(c: BalanceContract): string {
@@ -644,7 +657,7 @@ export class MakerPanelComponent implements OnChanges {
     if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       this.pickerSelection.loadSgsForArrival(this.selectedContract?.naturalKey.lcNumber, () => this.rebuildFields());
     }
-    this.emitSync();
+    this.emitCheckerSync();
   }
 
   arrivalSgPrevPage(): void {
@@ -702,7 +715,7 @@ export class MakerPanelComponent implements OnChanges {
         this.submitting = false;
         this.submitResult = res;
         this.emitContext();
-        this.emitSync();
+        this.emitCheckerAndLookupSync();
       },
       error: (err) => {
         this.submitting = false;
@@ -780,7 +793,7 @@ export class MakerPanelComponent implements OnChanges {
                 this.rebuildFields();
               }
               this.refreshSelectedContractSnapshot();
-              this.emitSync();
+              this.emitCheckerSync();
             });
             return;
           }
@@ -790,7 +803,7 @@ export class MakerPanelComponent implements OnChanges {
             this.rebuildFields();
           }
           this.refreshSelectedContractSnapshot();
-          this.emitSync();
+          this.emitCheckerSync();
         },
         error: (err) => {
           this.selectedContract = null;
@@ -873,7 +886,7 @@ export class MakerPanelComponent implements OnChanges {
     }
     this.searchNaturalKey.ibNumber = outcome.ibNumber;
     this.refreshSelectedContractSnapshot();
-    this.emitSync();
+    this.emitCheckerSync();
   }
 
   /** No special-case rule exists for the IB Index picker; always resolves to `genericFallback`. Kept as
@@ -903,7 +916,7 @@ export class MakerPanelComponent implements OnChanges {
       this.rebuildFields();
     }
     this.refreshSelectedContractSnapshot();
-    this.emitSync();
+    this.emitCheckerSync();
   }
 
   private rebuildFields(): void {
@@ -1007,7 +1020,7 @@ export class MakerPanelComponent implements OnChanges {
     if (outcome.kind === 'submitted') {
       this.submitResult = outcome.result;
       this.emitContext();
-      this.emitSync(true);
+      this.emitCheckerAndLookupSync();
       return;
     }
     this.submitError = outcome.message;
@@ -1044,14 +1057,14 @@ export class MakerPanelComponent implements OnChanges {
     if (outcome.kind === 'documentArrivalAcknowledged') {
       this.arrivalApproved = true;
       this.refreshSelectedContractSnapshot();
-      this.emitSync();
+      this.emitCheckerAndLookupSync();
       this.pickerSelection.loadSgsForArrival(this.selectedContract?.naturalKey.lcNumber, () => this.rebuildFields());
       this.emitContext();
       return;
     }
     this.submitResult = outcome.result;
     this.refreshSelectedContractSnapshot();
-    this.emitSync(!!outcome.syncLookup);
+    this.emitCheckerAndLookupSync();
     this.emitContext();
   }
 }

@@ -586,4 +586,12 @@ selected (`hasEligibleTargetSelected(ctx)`, re-deriving each function's own targ
 fields). Separately, ALL functions including A1/B1: Submit also requires every mandatory field to hold a
 valid value (`isSubmitReady = hasEligibleTargetSelected && validateSubmitRules(ctx).error === null`), plus
 a universal `Amount > 0` guard in `validateSubmit()`.
+
+## Common Requirement — every successful Maker Submit or Checker Release refreshes Look Up Current Balance
+
+All A1–A9/B1–B5. Consolidated into two named `MakerPanelComponent` methods (`emitCheckerSync()` vs.
+`emitCheckerAndLookupSync()`, never a bare boolean at a call site) plus one parent-side
+`refreshLookUpForLastMakerContext()` for the compound-release screen-reset case — fixed 4 real gaps
+(A4's `submitA4()`, the plain Checker Release/Reject path, A3S's acknowledgment leg, the compound
+`'released'` outcome after `selectFunction()` resets the Maker screen).
 </content>

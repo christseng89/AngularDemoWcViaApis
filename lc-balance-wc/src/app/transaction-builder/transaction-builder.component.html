@@ -176,10 +176,9 @@
             <h2 class="tb-section__title">Look Up Current Balance</h2>
           </div>
           <div class="tb-section__body">
-            <!-- Business instruction 2026-08-15 ("Look Up Current Balance should use the existing LC Number on
-               Screen... instead of keyin") — these fields are kept as a manual override/fallback (e.g. to look
-               up an unrelated LC), but syncLookupToContext() (component.ts) already keeps them in sync with
-               whatever LC is in context after a Submit or a Checker action, so re-typing is rarely needed. -->
+            <!-- Manual override/fallback (e.g. to look up an unrelated LC) — MakerPanelComponent's own
+               emitCheckerAndLookupSync()/TransactionBuilderComponent.refreshLookUpForLastMakerContext()
+               already keep these in sync with whatever LC is in context, so re-typing is rarely needed. -->
             <div class="tb-grid-lookup">
               <!-- Business instruction 2026-08-15: EPLC_LC (Unconfirmed Export LC) removed from this
                  list — Export Confirmed-only scope, no function creates one anymore (see the
