@@ -1,4 +1,5 @@
 import { checkAcceptanceTenorConsistency } from '../../../src/domain/tenorRouting';
+import { assertFailed } from '../helpers/assertFailed';
 
 // desiger-comments.md F-02 — extracted from BalanceService.createMovement()'s own inline "creating a
 // new contract" branch (2026-08-19), pure code motion. Direct unit coverage added here since the
@@ -39,6 +40,7 @@ describe('checkAcceptanceTenorConsistency (Design doc §7 Tenor Type Routing, bu
       requestedTenorType: undefined,
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/Cannot Create Acceptance under a Sight LC \(parent bc-sight-1 was Issued with tenorType=SIGHT\)/);
     expect(result.error).toMatch(/Design doc §7 Tenor Type Routing/);
   });
@@ -50,6 +52,7 @@ describe('checkAcceptanceTenorConsistency (Design doc §7 Tenor Type Routing, bu
       requestedTenorType: 'BUYERS_USANCE',
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/Cannot Create Acceptance under a Sight LC/);
   });
 
@@ -60,6 +63,7 @@ describe('checkAcceptanceTenorConsistency (Design doc §7 Tenor Type Routing, bu
       requestedTenorType: 'SELLERS_USANCE',
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(
       /Acceptance tenorType \(SELLERS_USANCE\) does not match its parent LC's own declared tenorType \(BUYERS_USANCE, set at Issue\)/,
     );

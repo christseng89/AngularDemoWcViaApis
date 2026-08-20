@@ -33,10 +33,8 @@
  */
 import Decimal from 'decimal.js';
 
-export interface AmendDecreaseCheckResult {
-  ok: boolean;
-  error?: string;
-}
+/** Discriminated union (2026-08-20, reviewer-directed) — see tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
+export type AmendDecreaseCheckResult = { ok: true } | { ok: false; error: string };
 
 export function checkAmendDecreaseSufficiency(params: {
   /** The caller's raw, face-level decrease amount (never itself compared against tightAvailableBalance — shown in the error purely for disambiguation). */

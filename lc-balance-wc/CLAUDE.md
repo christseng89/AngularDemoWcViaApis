@@ -864,4 +864,25 @@ the typed amount happened to exceed plain Available too — reproduced live: LC 
 10000, Tight 0), B3 amount 20000, zero warning shown even though the server would reject it. New
 `checksAgainstPlainAvailable` getter identifies the functions that genuinely have both tiers; the `<=
 availableBalance` guard now only applies for them — B3/A8 always fall through to the Tight-tier check.
+
+## BAL-142 — `createMovement()`'s own worst Cognitive Complexity finding (71 vs. 15 allowed) decomposed; sufficiency-check result types converted to discriminated unions
+
+Reviewer-directed, following SonarQube-report2.md's own specific findings. `createMovement()`'s own
+contract-resolution/creation preamble (re-ISSUE guard, Root-Issue-Released guard, Acceptance Tenor
+consistency, SHGT ISSUE / EPLC_EXAMINATION CREATE creation-time sufficiency) extracted into
+`resolveOrCreateContract()`; the latter two checks — structurally identical (resolve parent → confirmed/
+pendingDecreaseTotal → gather siblings → earmark/exposure → check → throw) — collapsed into a
+`newContractSufficiencyRegistry` keyed by `${instrumentType}:${movementType}`, same "table over
+conditional chain" convention as BAL-141's own `movementTypeRegistry`. `captureSiblingSnapshots()` (its
+own 21-complexity finding) split into `resolveAcceptanceSibling()`/`resolveSgSibling()`, with a nested
+ternary replaced by an `ACCEPTANCE_TYPE_BY_ROOT` lookup table. Separately: `AcceptanceTenorCheckResult`/
+`ShgtIssueSufficiencyResult`/`PresentDocsIssueSufficiencyResult`/`UtilizeSufficiencyResult`/
+`AmendDecreaseCheckResult`/`RedeemCheckResult` (all of `domain/`'s sufficiency-check result types) and
+the local `MovementSufficiencyOutcome` converted from `{ok: boolean; error?: string}` to a discriminated
+union `{ok: true} | {ok: false; error: string}` — removes all 4 `.error!` non-null assertions in this
+file with a compiler-enforced guarantee instead of a suppressed warning. Pure code motion — zero
+condition/message changed, all 361 microservice + 34 backend + 996 Angular tests green with no spec
+edits, and independently re-verified live against the running dev stack (A1 re-ISSUE guard, A8 SG Issue
+both the InsufficientBalanceError and success paths, B3 Present Docs earmark rejection, SG sibling
+snapshot rendering) — every error message byte-for-byte identical to before.
 </content>

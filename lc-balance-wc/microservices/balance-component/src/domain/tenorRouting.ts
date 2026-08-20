@@ -14,10 +14,12 @@
  */
 import type { TenorType } from '../types';
 
-export interface AcceptanceTenorCheckResult {
-  ok: boolean;
-  error?: string;
-}
+/**
+ * Discriminated union (2026-08-20, reviewer-directed) — `error` is only ever meaningful when `ok` is
+ * `false`; this lets every caller narrow on `.ok` and read `.error` with no non-null assertion, and lets
+ * `tsc` itself catch a future check that forgets to set `error` on its own failure branch.
+ */
+export type AcceptanceTenorCheckResult = { ok: true } | { ok: false; error: string };
 
 export function checkAcceptanceTenorConsistency(params: {
   /** The parent LC's own declared tenorType (set at ISSUE) — undefined/null when the parent wasn't found or never declared one (legacy). */

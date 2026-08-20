@@ -9,6 +9,7 @@ import {
   computePresentDocsEarmarkPending,
 } from '../../../src/domain/offBalanceExposure';
 import type { BalanceMovement } from '../../../src/types';
+import { assertFailed } from '../helpers/assertFailed';
 
 type M = Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>;
 type Exam = Pick<BalanceMovement, 'movementId' | 'movementType' | 'ceilingAmount' | 'status' | 'presentDocsConsumedAt'>;
@@ -99,6 +100,7 @@ describe('checkUtilizeSufficiency (Design doc §6.1, hardened v0.12: two-way ERR
       offBalanceExposure: new Decimal('100000'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds Tight Available Balance 21000/);
     expect(result.error).toMatch(/Document Arrival w\/ Shipping Gtee/);
   });
@@ -112,6 +114,7 @@ describe('checkUtilizeSufficiency (Design doc §6.1, hardened v0.12: two-way ERR
       offBalanceExposure: new Decimal('0'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds Available Balance/);
   });
 
@@ -149,6 +152,7 @@ describe('checkUtilizeSufficiency (Design doc §6.1, hardened v0.12: two-way ERR
       offBalanceExposure: new Decimal('0'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds Tight Available Balance 0/);
   });
 
@@ -161,6 +165,7 @@ describe('checkUtilizeSufficiency (Design doc §6.1, hardened v0.12: two-way ERR
       offBalanceExposure: new Decimal('0'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds Tight Available Balance 80000/);
     expect(result.error).toMatch(/Confirmed Balance 100000 minus 20000 still-PENDING decrease/);
   });
@@ -200,6 +205,7 @@ describe('checkShgtIssueSufficiency (business instruction 2026-08-14, v0.11 nets
       existingShgtExposure: new Decimal('0'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/SG Issue amount 3001 exceeds parent LC's Tight Available Balance 3000/);
     expect(result.error).toMatch(/Confirmed Balance 3000 minus 0 still-PENDING decrease/);
   });
@@ -212,6 +218,7 @@ describe('checkShgtIssueSufficiency (business instruction 2026-08-14, v0.11 nets
       existingShgtExposure: new Decimal('90000'), // the first SG, already outstanding
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds parent LC's Tight Available Balance 10000/);
   });
 
@@ -223,6 +230,7 @@ describe('checkShgtIssueSufficiency (business instruction 2026-08-14, v0.11 nets
       existingShgtExposure: new Decimal('0'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
   });
 
   test('ERROR: a still-PENDING parent LC AMEND_DECREASE occupies the Tight threshold immediately ("占用從寬")', () => {
@@ -233,6 +241,7 @@ describe('checkShgtIssueSufficiency (business instruction 2026-08-14, v0.11 nets
       existingShgtExposure: new Decimal('0'),
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds parent LC's Tight Available Balance 2000/);
   });
 });
@@ -269,6 +278,7 @@ describe('checkPresentDocsIssueSufficiency (business-reported gap 2026-08-15, "B
       parentConfirmationBalanceContractId: 'bc-conf-1',
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/Present Docs amount 100000 exceeds the parent Confirmation's Present Earmark-adjusted Tight Available Balance -20000/);
     expect(result.error).toMatch(/balanceContractId bc-conf-1/);
   });
@@ -282,6 +292,7 @@ describe('checkPresentDocsIssueSufficiency (business-reported gap 2026-08-15, "B
       parentConfirmationBalanceContractId: 'bc-1',
     });
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds the parent Confirmation's Present Earmark-adjusted Tight Available Balance 80000/);
   });
 });

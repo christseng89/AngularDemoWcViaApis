@@ -25,10 +25,8 @@
  */
 import Decimal from 'decimal.js';
 
-export interface RedeemCheckResult {
-  ok: boolean;
-  error?: string;
-}
+/** Discriminated union (2026-08-20, reviewer-directed) — see tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
+export type RedeemCheckResult = { ok: true } | { ok: false; error: string };
 
 export function checkRedeemSufficiency(params: { redeemAmount: Decimal; sgAvailableBalance: Decimal }): RedeemCheckResult {
   const { redeemAmount, sgAvailableBalance } = params;

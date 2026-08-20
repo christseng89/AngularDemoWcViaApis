@@ -73,10 +73,8 @@ export function computeOffBalanceExposure(
     }, ZERO);
 }
 
-export interface ShgtIssueSufficiencyResult {
-  ok: boolean;
-  error?: string;
-}
+/** Discriminated union (2026-08-20, reviewer-directed) — see AcceptanceTenorCheckResult's own doc comment for why. */
+export type ShgtIssueSufficiencyResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
@@ -187,10 +185,8 @@ export function computePresentDocsEarmark(
   );
 }
 
-export interface PresentDocsIssueSufficiencyResult {
-  ok: boolean;
-  error?: string;
-}
+/** Discriminated union (2026-08-20, reviewer-directed) — see AcceptanceTenorCheckResult's own doc comment for why. */
+export type PresentDocsIssueSufficiencyResult = { ok: true } | { ok: false; error: string };
 
 /**
  * B3's own sufficiency check at CREATE time (business-reported gap 2026-08-15, "B3 沒檢查到單金額超過
@@ -254,13 +250,13 @@ export function computePresentDocsEarmarkApproved(
   );
 }
 
-export interface UtilizeSufficiencyResult {
-  ok: boolean;
-  /** Set when ok is false — the caller should reject with a 409 InsufficientBalanceError. */
-  error?: string;
-  /** Set when ok is true but the tighter, off-balance-adjusted threshold was still exceeded — non-blocking. */
-  warning?: MovementWarning;
-}
+/**
+ * Discriminated union (2026-08-20, reviewer-directed) — see AcceptanceTenorCheckResult's own doc comment
+ * for why. `warning` is only ever meaningful on the `ok: true` arm (set when the tighter, off-balance-
+ * adjusted threshold was still exceeded — non-blocking); current code never actually populates it (see
+ * `checkUtilizeSufficiency`'s own body below), kept only because the OAS/DB schema still carry the field.
+ */
+export type UtilizeSufficiencyResult = { ok: true; warning?: MovementWarning } | { ok: false; error: string };
 
 /**
  * Design doc §6.1, hardened v0.12 (business-confirmed 2026-08-14, off a live

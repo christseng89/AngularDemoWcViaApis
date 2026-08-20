@@ -15,6 +15,7 @@ import Decimal from 'decimal.js';
 import { ScenarioLedger } from './helpers/scenarioLedger';
 import { checkAmendDecreaseSufficiency } from '../../src/domain/amendDecrease';
 import { computeCeilingAmount } from '../../src/domain/tolerance';
+import { assertFailed, assertSucceeded } from './helpers/assertFailed';
 
 const TOLERANCE_10PCT = '10';
 
@@ -36,6 +37,7 @@ describe('Case 1 — USD Sight, no SHGT', () => {
   test('3. Document Arrival 50,000 -> OK, no warning (no SHGT)', () => {
     const result = lc.utilize('50000');
     expect(result.ok).toBe(true);
+    assertSucceeded(result);
     expect(result.warning).toBeUndefined();
     expect(lc.available().toFixed()).toBe('71000'); // 121000 earmarked down to 71000
   });
@@ -60,6 +62,7 @@ describe('Case 2 — USD Usance 120 days after sight, no SHGT', () => {
   test('3. Document Arrival 50,000 -> OK, PENDING earmark', () => {
     const result = lc.utilize('50000');
     expect(result.ok).toBe(true);
+    assertSucceeded(result);
     expect(result.warning).toBeUndefined();
   });
 
@@ -97,6 +100,7 @@ describe('Case 3 — USD Sight + Shipping Guarantee 50,000 (matches document arr
   test('4. Document Arrival 50,000 -> OK, NO warning: Tight Available (71,000) still >= 50,000', () => {
     const result = lc.utilize('50000', shgt.offBalanceExposure());
     expect(result.ok).toBe(true);
+    assertSucceeded(result);
     expect(result.warning).toBeUndefined();
   });
 
@@ -134,6 +138,7 @@ describe('Case 4 — USD Sight + Shipping Guarantee 100,000 (covers full LC) + I
   test('4. Document Arrival 50,000 (unmatched) -> REJECTED: exceeds Tight Available 21,000 (v0.12 — was a non-blocking WARNING through v0.10/v0.11, see offBalanceExposure.ts)', () => {
     const result = lc.utilize('50000', shgt.offBalanceExposure());
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds Tight Available Balance 21000/);
     expect(result.error).toMatch(/Document Arrival w\/ Shipping Gtee/);
   });
@@ -157,6 +162,7 @@ describe('Case 4 — USD Sight + Shipping Guarantee 100,000 (covers full LC) + I
   test('5c. Attempting to redeem more than what remains outstanding is rejected', () => {
     const result = shgt.redeem('FULL_REDEEM', '60000'); // only 50,000 left
     expect(result.ok).toBe(false);
+    assertFailed(result);
     expect(result.error).toMatch(/exceeds this record's Available Balance/);
     expect(shgt.confirmed().toFixed()).toBe('50000'); // unchanged
   });

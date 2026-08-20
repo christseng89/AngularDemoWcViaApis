@@ -72,11 +72,8 @@ interface MovementSufficiencyContext {
   req: CreateMovementRequest;
 }
 
-interface MovementSufficiencyOutcome {
-  ok: boolean;
-  error?: string;
-  warning?: MovementWarning;
-}
+/** Discriminated union (2026-08-20, reviewer-directed) — see domain/tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
+type MovementSufficiencyOutcome = { ok: true; warning?: MovementWarning } | { ok: false; error: string };
 
 type MovementSufficiencyCheck = (ctx: MovementSufficiencyContext) => MovementSufficiencyOutcome | null;
 
@@ -99,6 +96,18 @@ type UpdateMovementStatusParams = Parameters<BalanceMovementStore['updateStatus'
  * child could never have been created in the first place if the root wasn't already Released.
  */
 const ROOT_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set(['IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION']);
+
+/**
+ * 2026-08-20 (reviewer-directed, closing a Cognitive Complexity finding on captureSiblingSnapshots()) —
+ * the Acceptance instrumentType a given root instrumentType produces, or `undefined` when it has none
+ * (SHGT/EPLC_EXAMINATION's own root, IPLC_CONFIRMATION doesn't exist). Replaces a nested ternary with a
+ * lookup table, same "table over conditional chain" convention BAL-141's own movementTypeRegistry
+ * already established in this file.
+ */
+const ACCEPTANCE_TYPE_BY_ROOT: Readonly<Partial<Record<InstrumentType, InstrumentType>>> = {
+  IPLC_LC: 'IPLC_ACCEPTANCE',
+  EPLC_CONFIRMATION: 'EPLC_ACCEPTANCE',
+};
 
 export interface CreateMovementRequest {
   instrumentType: InstrumentType;
@@ -144,6 +153,7 @@ export class BalanceService {
   private readonly contracts: BalanceContractStore;
   private readonly movements: BalanceMovementStore;
   private readonly movementTypeRegistry: Readonly<Record<string, MovementTypeDescriptor>>;
+  private readonly newContractSufficiencyRegistry: Readonly<Record<string, (req: CreateMovementRequest) => void>>;
 
   constructor(
     db: Db,
@@ -152,6 +162,7 @@ export class BalanceService {
     this.contracts = new BalanceContractStore(db);
     this.movements = new BalanceMovementStore(db);
     this.movementTypeRegistry = this.buildMovementTypeRegistry();
+    this.newContractSufficiencyRegistry = this.buildNewContractSufficiencyRegistry();
   }
 
   /**
@@ -259,6 +270,95 @@ export class BalanceService {
       pendingDecreaseTotal,
       offBalanceExposure,
     });
+  }
+
+  /**
+   * BAL-142 (2026-08-20, reviewer-directed decomposition of createMovement()'s own worst Cognitive
+   * Complexity finding — 71 vs. an allowed 15) — SHGT ISSUE and EPLC_EXAMINATION CREATE's own
+   * creation-time sufficiency checks share one shape (resolve parent → confirmed/pendingDecreaseTotal →
+   * gather existing siblings → compute earmark/exposure → call the domain check → throw on failure) and
+   * used to live as two structurally-identical inline if-blocks inside createMovement()'s own "creating a
+   * new contract" branch. Collapsed into a registry keyed by `${instrumentType}:${movementType}` — the
+   * SAME "table over conditional chain" convention buildMovementTypeRegistry() already established in
+   * this file, extended to this earlier, contract-creation-time dispatch point. Keyed by the FULL
+   * instrumentType+movementType pair, not instrumentType alone, deliberately preserving the exact
+   * original guard (`req.instrumentType === 'SHGT' && req.movementType === 'ISSUE'` etc.) — SHGT/
+   * EPLC_EXAMINATION only ever use one creating movementType each in practice, but keying on instrumentType
+   * alone would silently run this check against a hypothetical malformed SHGT+CREATE request the original
+   * code never did (a genuine, if inconsequential, behavior change this extraction must not introduce).
+   */
+  private buildNewContractSufficiencyRegistry(): Readonly<Record<string, (req: CreateMovementRequest) => void>> {
+    return {
+      'SHGT:ISSUE': (req) => this.checkNewShgtSufficiency(req),
+      'EPLC_EXAMINATION:CREATE': (req) => this.checkNewPresentDocsSufficiency(req),
+    };
+  }
+
+  /**
+   * Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance"),
+   * business-confirmed fix 2026-08-14 (v0.11, nets out other already-outstanding SG exposure on the same
+   * LC first — see design doc v0.10 changelog for the reversal record this overrides). Checked BEFORE
+   * `createContract()` — a rejected request must never leave an orphaned, empty BalanceContract row
+   * behind. Throws on failure; a plain return means the request may proceed. desiger-comments.md F-02:
+   * the actual sufficiency comparison lives in domain/offBalanceExposure.ts's own
+   * checkShgtIssueSufficiency() — this method is pure code motion, same condition/messages as before.
+   */
+  private checkNewShgtSufficiency(req: CreateMovementRequest): void {
+    if (!req.parentLogicalContractId) {
+      throw new RequestValidationError("parentLogicalContractId is required to check SG Issue against the parent LC's Available Balance.");
+    }
+    const parentLc = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+    if (!parentLc) {
+      throw new RequestValidationError(`Parent LC (logicalContractId ${req.parentLogicalContractId}) not found or not ACTIVE.`);
+    }
+    const parentMovements = this.movements.listByContract(parentLc.balanceContractId);
+    const parentConfirmed = computeConfirmedBalance(parentMovements);
+    const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
+    const existingShgtMovements = this.movements.listShgtMovementsForParent(parentLc.logicalContractId);
+    const existingShgtExposure = computeOffBalanceExposure(existingShgtMovements);
+    // Quality-report-balance.md BAL-115 — parseMonetaryAmount() is the only module allowed to construct a
+    // Decimal from a wire string; the HTTP route already validates this, but this service method is also
+    // called directly from tests/other callers that bypass the route.
+    const requestedAmount = parseMonetaryAmount(req.amount);
+    const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentConfirmedBalance: parentConfirmed, parentPendingDecreaseTotal, existingShgtExposure });
+    if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error);
+  }
+
+  /**
+   * Business-reported gap 2026-08-15 ("B3 沒檢查到單金額超過 Balance餘額"), hardened the same day into a
+   * running "Present Earmark Amount" that nets Σ other still-PENDING presentations, not just the one
+   * submitted (see computePresentDocsEarmark's own doc comment). Deliberately STRICT (no
+   * provisionally-consumed derivation) — this is a NEW, genuinely independent presentation's own
+   * sufficiency check, same posture as checkNewShgtSufficiency()'s own new-SG-Issue check: it must never
+   * rely on capacity a DIFFERENT, still-unapproved B4 Accept has only provisionally freed — see
+   * derivePresentDocsProvisionallyConsumedIds()'s own doc comment. desiger-comments.md F-02: the actual
+   * sufficiency comparison lives in domain/offBalanceExposure.ts's own checkPresentDocsIssueSufficiency().
+   */
+  private checkNewPresentDocsSufficiency(req: CreateMovementRequest): void {
+    if (!req.parentLogicalContractId) {
+      throw new RequestValidationError(
+        "parentLogicalContractId is required to check a Present Docs amount against the parent Confirmation's Available Balance.",
+      );
+    }
+    const parentConfirmation = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+    if (!parentConfirmation) {
+      throw new RequestValidationError(`Parent Confirmation (logicalContractId ${req.parentLogicalContractId}) not found or not ACTIVE.`);
+    }
+    const parentMovements = this.movements.listByContract(parentConfirmation.balanceContractId);
+    const parentConfirmed = computeConfirmedBalance(parentMovements);
+    const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
+    const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
+    const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
+    // Quality-report-balance.md BAL-115 — see checkNewShgtSufficiency()'s own comment above.
+    const requestedAmount = parseMonetaryAmount(req.amount);
+    const presentDocsCheck = checkPresentDocsIssueSufficiency({
+      requestedAmount,
+      parentConfirmedBalance: parentConfirmed,
+      parentPendingDecreaseTotal,
+      presentDocsEarmark,
+      parentConfirmationBalanceContractId: parentConfirmation.balanceContractId,
+    });
+    if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error);
   }
 
   resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
@@ -473,26 +573,28 @@ export class BalanceService {
     contract: BalanceContract,
     rootInstrumentType: InstrumentType,
   ): { acceptanceEventSnapshot: BalanceSnapshot | null; sgEventSnapshot: BalanceSnapshot | null } {
-    const lcNumber = contract.naturalKey.lcNumber;
+    return {
+      acceptanceEventSnapshot: this.resolveAcceptanceSibling(contract, rootInstrumentType),
+      sgEventSnapshot: this.resolveSgSibling(contract, rootInstrumentType),
+    };
+  }
 
-    let acceptanceEventSnapshot: BalanceSnapshot | null = null;
-    if (contract.instrumentType !== 'IPLC_ACCEPTANCE' && contract.instrumentType !== 'EPLC_ACCEPTANCE') {
-      const acceptanceType = rootInstrumentType === 'IPLC_LC' ? 'IPLC_ACCEPTANCE' : rootInstrumentType === 'EPLC_CONFIRMATION' ? 'EPLC_ACCEPTANCE' : null;
-      if (acceptanceType) {
-        const candidates = this.contracts.listCatalog({ instrumentType: acceptanceType, lcNumber }).items;
-        const only = candidates.length === 1 ? candidates[0] : undefined;
-        if (only) acceptanceEventSnapshot = this.getBalanceSnapshot(only.balanceContractId);
-      }
-    }
+  /** See captureSiblingSnapshots()'s own doc comment for the full "why" — this half resolves the ONE unambiguous Acceptance sibling. Pure code motion, 2026-08-20, no condition changed. */
+  private resolveAcceptanceSibling(contract: BalanceContract, rootInstrumentType: InstrumentType): BalanceSnapshot | null {
+    if (contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE') return null;
+    const acceptanceType = ACCEPTANCE_TYPE_BY_ROOT[rootInstrumentType];
+    if (!acceptanceType) return null;
+    const candidates = this.contracts.listCatalog({ instrumentType: acceptanceType, lcNumber: contract.naturalKey.lcNumber }).items;
+    const only = candidates.length === 1 ? candidates[0] : undefined;
+    return only ? this.getBalanceSnapshot(only.balanceContractId) : null;
+  }
 
-    let sgEventSnapshot: BalanceSnapshot | null = null;
-    if (contract.instrumentType !== 'SHGT' && rootInstrumentType === 'IPLC_LC') {
-      const candidates = this.contracts.listCatalog({ instrumentType: 'SHGT', lcNumber }).items;
-      const only = candidates.length === 1 ? candidates[0] : undefined;
-      if (only) sgEventSnapshot = this.getBalanceSnapshot(only.balanceContractId);
-    }
-
-    return { acceptanceEventSnapshot, sgEventSnapshot };
+  /** See captureSiblingSnapshots()'s own doc comment for the full "why" — this half resolves the ONE unambiguous SG sibling (IPLC_LC only, SHGT is Import-only). Pure code motion, 2026-08-20, no condition changed. */
+  private resolveSgSibling(contract: BalanceContract, rootInstrumentType: InstrumentType): BalanceSnapshot | null {
+    if (contract.instrumentType === 'SHGT' || rootInstrumentType !== 'IPLC_LC') return null;
+    const candidates = this.contracts.listCatalog({ instrumentType: 'SHGT', lcNumber: contract.naturalKey.lcNumber }).items;
+    const only = candidates.length === 1 ? candidates[0] : undefined;
+    return only ? this.getBalanceSnapshot(only.balanceContractId) : null;
   }
 
   /**
@@ -612,12 +714,21 @@ export class BalanceService {
     }
   }
 
-  createMovement(req: CreateMovementRequest): CreateMovementResult {
-    let contract = req.balanceContractId
-      ? this.contracts.findById(req.balanceContractId)
-      : req.naturalKey
-        ? this.contracts.findActiveByNaturalKey(req.instrumentType, req.naturalKey)
-        : undefined;
+  /**
+   * BAL-142 (2026-08-20, reviewer-directed decomposition of createMovement()'s own worst Cognitive
+   * Complexity finding — 71 vs. an allowed 15) — pure code motion: resolves an existing contract by
+   * balanceContractId/naturalKey, or creates a brand-new one (re-ISSUE guard, Root-Issue-Released guard,
+   * Acceptance Tenor consistency, and the SHGT/EPLC_EXAMINATION creation-time sufficiency checks via
+   * newContractSufficiencyRegistry above), exactly as createMovement() used to do inline before this
+   * extraction. Every condition/error message is byte-for-byte identical to before.
+   */
+  private resolveOrCreateContract(req: CreateMovementRequest): BalanceContract {
+    let contract: BalanceContract | undefined;
+    if (req.balanceContractId) {
+      contract = this.contracts.findById(req.balanceContractId);
+    } else if (req.naturalKey) {
+      contract = this.contracts.findActiveByNaturalKey(req.instrumentType, req.naturalKey);
+    }
 
     // Business-reported gap 2026-08-14: "Issue LC Number 後不能再 Issue 同一筆 LC
     // Number" — a creating movementType (ISSUE/CREATE) against a natural key
@@ -642,144 +753,58 @@ export class BalanceService {
       this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
     }
 
-    if (!contract) {
-      if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
-      if (!this.movementTypeRegistry[req.movementType]?.isCreating) {
-        throw new NotFoundError(`No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`);
-      }
+    if (contract) return contract;
 
-      // See assertRootIssueReleased's own doc comment — creating a NEW CHILD contract (A6/A7 Acceptance,
-      // A8 SG Issue, B3 Present Docs) under a parent LC/Confirmation requires that parent's own ISSUE to
-      // already be Checker-Released. Resolved defensively here (each instrument-specific block below
-      // re-resolves the same parent for its own sufficiency check) — a not-found/inactive parent falls
-      // through to that block's own, more specific error instead of a generic one here.
-      if (req.parentLogicalContractId) {
-        const parentForIssueCheck = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-        if (parentForIssueCheck) this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
-      }
-
-      // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
-      // COMPONENT範圍之一" — Design doc §7 Tenor Type Routing says a Sight LC
-      // never produces an Acceptance, and Seller's/Buyer's Usance Acceptances
-      // must carry the SAME Tenor Type their parent LC declared at ISSUE. This
-      // is enforced here, not left as an unchecked convention, precisely to
-      // stop a maker from creating a flow-inconsistent Acceptance by mistake.
-      // desiger-comments.md F-02: the actual check now lives in
-      // domain/tenorRouting.ts's own checkAcceptanceTenorConsistency() — pure
-      // code motion, same condition/messages as before this extraction.
-      if (
-        (req.instrumentType === 'IPLC_ACCEPTANCE' || req.instrumentType === 'EPLC_ACCEPTANCE') &&
-        req.movementType === 'CREATE' &&
-        req.parentLogicalContractId
-      ) {
-        const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-        const tenorCheck = checkAcceptanceTenorConsistency({
-          parentTenorType: parent?.tenorType,
-          parentBalanceContractId: parent?.balanceContractId,
-          requestedTenorType: req.tenorType,
-        });
-        if (!tenorCheck.ok) throw new RequestValidationError(tenorCheck.error!);
-      }
-
-      // Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
-      // example S001 has 3000 LC Available Balance, the SG Issue should be not greater than 3000... It should
-      // be a validation for the Maker Input."): explicit override of Design doc §5/§11's earlier decision that
-      // SHGT's sufficiency target is the customer's LMTS Available Limit, not the LC Balance (see design doc
-      // v0.10 changelog for the reversal record). Checked HERE — inside the "creating a new contract" branch,
-      // before createContract() — same positioning as the Acceptance tenor check above it: a rejected request
-      // must never leave an orphaned, empty BalanceContract row behind (found live: a first attempt at 3,001
-      // against a 3,000-available LC left exactly that behind before this was moved here). Uses req.amount
-      // directly rather than a computed ceilingAmount — SHGT is never in TOLERANCE_APPLICABLE_INSTRUMENT_TYPES
-      // (tolerance.ts), so the two are always numerically identical for this instrumentType regardless.
-      //
-      // Business-confirmed fix 2026-08-14 (v0.11): the v0.10 version of this check compared the requested SG
-      // amount against the parent LC's plain Available Balance only, oblivious to any OTHER Shipping Guarantee
-      // already outstanding on the same LC — so two overlapping SG issuances (e.g. 90,000 + 90,000 against a
-      // 100,000-available LC) could each individually pass. Now nets out the LC's existing §6.1 off-balance SG
-      // exposure first (reusing computeOffBalanceExposure — the same "Tight Available Balance" already computed
-      // for the UTILIZE-side WARNING check, see domain/offBalanceExposure.ts), so a new SG Issue is checked
-      // against what's actually still uncommitted, not just what the LC itself shows. This SG doesn't exist yet
-      // (we're still inside the "creating a new contract" branch), so listShgtMovementsForParent here can only
-      // ever return OTHER SGs' movements — no need to exclude "self".
-      // desiger-comments.md F-02: the actual sufficiency comparison now lives in
-      // domain/offBalanceExposure.ts's own checkShgtIssueSufficiency() — pure code motion, same
-      // condition/message as before this extraction.
-      if (req.instrumentType === 'SHGT' && req.movementType === 'ISSUE') {
-        if (!req.parentLogicalContractId) {
-          throw new RequestValidationError("parentLogicalContractId is required to check SG Issue against the parent LC's Available Balance.");
-        }
-        const parentLc = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-        if (!parentLc) {
-          throw new RequestValidationError(`Parent LC (logicalContractId ${req.parentLogicalContractId}) not found or not ACTIVE.`);
-        }
-        const parentMovements = this.movements.listByContract(parentLc.balanceContractId);
-        const parentConfirmed = computeConfirmedBalance(parentMovements);
-        const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
-        const existingShgtMovements = this.movements.listShgtMovementsForParent(parentLc.logicalContractId);
-        const existingShgtExposure = computeOffBalanceExposure(existingShgtMovements);
-        // Quality-report-balance.md BAL-115: was `new Decimal(req.amount)`, bypassing money.ts's own
-        // "only module allowed to construct a Decimal from a wire string" invariant — parseMonetaryAmount()
-        // both enforces MONETARY_AMOUNT_PATTERN and constructs the Decimal in one step. The HTTP route
-        // (routes/balanceMovements.ts) already validates this before calling createMovement(), but this
-        // service method is also called directly from tests/other callers that bypass the route, so the
-        // invariant is worth enforcing here too, not just at the HTTP boundary.
-        const requestedAmount = parseMonetaryAmount(req.amount);
-        const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentConfirmedBalance: parentConfirmed, parentPendingDecreaseTotal, existingShgtExposure });
-        if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error!);
-      }
-
-      // Business-reported gap 2026-08-15 ("B3 沒檢查到單金額超過 Balance餘額", repro'd with LC CU02 / EB E04 —
-      // a 70,000 presentation against a Confirmation whose own Available Balance was only 60,000 was accepted
-      // with zero check), HARDENED the same day ("Export S001 都超 Present Docs. E01-E04 應該有一個 Present
-      // Earmark Amount 控制 B3＋，B4－" — E01 50,000 / E02 70,000 / E03 100,000 were each individually checked
-      // in isolation against the SAME still-100,000 Available Balance and each passed, but their SUM (220,000)
-      // was never checked, since none of them had actually moved the Confirmation's own balance yet). Reverses
-      // this check's original 2026-08-15 same-day design ("does NOT net out other still-PENDING EPLC_EXAMINATION
-      // presentations... two presentations can legitimately co-exist even if their sum nominally exceeds
-      // Available") — that reasoning is wrong: a running "Present Earmark Amount" IS wanted, same shape as
-      // SHGT's own Tight Available Balance netting just above (Σ other still-PENDING presentations on the same
-      // Confirmation, via computePresentDocsEarmark/listExaminationMovementsForParent) — EPLC_EXAMINATION's own
-      // CREATE is still MEMO_ONLY and still does NOT itself move the Confirmation's real balance (cs-tf-balance-
-      // knowhow D3 stands), this is purely a soft commitment-control check, same species as the SHGT one. "B3＋"
-      // = a new PENDING presentation adds to this earmark (this check); "B4－" = once B4 actually releases a
-      // specific presentation (Honour/Accept), it drops out of the PENDING filter and so out of the earmark —
-      // no separate bookkeeping needed, it falls out of computePresentDocsEarmark's own PENDING-only filter.
-      // desiger-comments.md F-02: the actual sufficiency comparison now lives in
-      // domain/offBalanceExposure.ts's own checkPresentDocsIssueSufficiency() — pure code motion, same
-      // condition/message as before this extraction.
-      if (req.instrumentType === 'EPLC_EXAMINATION' && req.movementType === 'CREATE') {
-        if (!req.parentLogicalContractId) {
-          throw new RequestValidationError(
-            "parentLogicalContractId is required to check a Present Docs amount against the parent Confirmation's Available Balance.",
-          );
-        }
-        const parentConfirmation = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-        if (!parentConfirmation) {
-          throw new RequestValidationError(`Parent Confirmation (logicalContractId ${req.parentLogicalContractId}) not found or not ACTIVE.`);
-        }
-        const parentMovements = this.movements.listByContract(parentConfirmation.balanceContractId);
-        const parentConfirmed = computeConfirmedBalance(parentMovements);
-        const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
-        const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
-        // Deliberately STRICT (no provisionally-consumed derivation) — this is a NEW, genuinely
-        // independent presentation's own sufficiency check, same posture as A8's own new-SG-Issue check
-        // above: it must never rely on capacity a DIFFERENT, still-unapproved B4 Accept has only
-        // provisionally freed — see derivePresentDocsProvisionallyConsumedIds()'s own doc comment.
-        const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
-        // Quality-report-balance.md BAL-115 — see the identical SG Issue check's own comment above.
-        const requestedAmount = parseMonetaryAmount(req.amount);
-        const presentDocsCheck = checkPresentDocsIssueSufficiency({
-          requestedAmount,
-          parentConfirmedBalance: parentConfirmed,
-          parentPendingDecreaseTotal,
-          presentDocsEarmark,
-          parentConfirmationBalanceContractId: parentConfirmation.balanceContractId,
-        });
-        if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error!);
-      }
-
-      contract = this.createContract(req);
+    if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
+    if (!this.movementTypeRegistry[req.movementType]?.isCreating) {
+      throw new NotFoundError(`No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`);
     }
+
+    // See assertRootIssueReleased's own doc comment — creating a NEW CHILD contract (A6/A7 Acceptance,
+    // A8 SG Issue, B3 Present Docs) under a parent LC/Confirmation requires that parent's own ISSUE to
+    // already be Checker-Released. Resolved defensively here (each instrument-specific block below
+    // re-resolves the same parent for its own sufficiency check) — a not-found/inactive parent falls
+    // through to that block's own, more specific error instead of a generic one here.
+    if (req.parentLogicalContractId) {
+      const parentForIssueCheck = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+      if (parentForIssueCheck) this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
+    }
+
+    // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
+    // COMPONENT範圍之一" — Design doc §7 Tenor Type Routing says a Sight LC
+    // never produces an Acceptance, and Seller's/Buyer's Usance Acceptances
+    // must carry the SAME Tenor Type their parent LC declared at ISSUE. This
+    // is enforced here, not left as an unchecked convention, precisely to
+    // stop a maker from creating a flow-inconsistent Acceptance by mistake.
+    // desiger-comments.md F-02: the actual check now lives in
+    // domain/tenorRouting.ts's own checkAcceptanceTenorConsistency() — pure
+    // code motion, same condition/messages as before this extraction.
+    if (
+      (req.instrumentType === 'IPLC_ACCEPTANCE' || req.instrumentType === 'EPLC_ACCEPTANCE') &&
+      req.movementType === 'CREATE' &&
+      req.parentLogicalContractId
+    ) {
+      const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
+      const tenorCheck = checkAcceptanceTenorConsistency({
+        parentTenorType: parent?.tenorType,
+        parentBalanceContractId: parent?.balanceContractId,
+        requestedTenorType: req.tenorType,
+      });
+      if (!tenorCheck.ok) throw new RequestValidationError(tenorCheck.error);
+    }
+
+    // BAL-142 — SHGT ISSUE / EPLC_EXAMINATION CREATE's own creation-time sufficiency checks; see
+    // buildNewContractSufficiencyRegistry()'s own doc comment for why this is a registry dispatch rather
+    // than two inline if-blocks. Checked BEFORE createContract() — a rejected request must never leave an
+    // orphaned, empty BalanceContract row behind.
+    const newContractCheck = this.newContractSufficiencyRegistry[`${req.instrumentType}:${req.movementType}`];
+    if (newContractCheck) newContractCheck(req);
+
+    return this.createContract(req);
+  }
+
+  createMovement(req: CreateMovementRequest): CreateMovementResult {
+    const contract = this.resolveOrCreateContract(req);
 
     const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
     if (existing) return { created: false, existing };
@@ -829,7 +854,7 @@ export class BalanceService {
       ceilingAmount,
       req,
     });
-    if (sufficiency && !sufficiency.ok) throw new InsufficientBalanceError(sufficiency.error!);
+    if (sufficiency && !sufficiency.ok) throw new InsufficientBalanceError(sufficiency.error);
     const warnings: MovementWarning[] | null = sufficiency?.warning ? [sufficiency.warning] : null;
 
     // analysis/contingent-liability-ledger.html — server-derived once, here, at creation time; never
