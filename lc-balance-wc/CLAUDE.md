@@ -8374,3 +8374,91 @@ the 2026-08-19 "No Eligible Records" requirement, not a defect. Test data (`A2VE
 cleaned up afterward; the pre-existing 47 reference contracts confirmed untouched.
 
 Not committed (not requested).
+
+## BAL-003 Phase 8, narrowly scoped — MakerPanelComponent's 7 flat compound-leg movement fields grouped into one `compoundLegs: CompoundLegState` (2026-08-20, user-directed — asked to evaluate Phase 8 (ViewModel consolidation) after Phase 5/7 were confirmed already achieved; full ViewModel judged low marginal value for the same reason as Phase 4/6 (Facade) — Phase 1/2's own ownership split already solved the "too many scattered fields on one component" problem the proposal was written against — but the 7 compound-leg fields specifically were named as a genuine, narrower candidate (real mechanical duplication across 3 read/write sites, minimal template exposure); user asked for a concrete example, then "go ahead and browser testing")
+
+`arrivalSgRedeemMovementId`/`arrivalSgRedeemMovement`/`dueFromIssuingBankMovementId`/
+`acceptanceReimbReceivableMovementId`/`acceptanceMovementId`/`acceptanceMovement`/
+`matchedReceivableMovementId` — the 7 fields A3S/A6/B4/B5's own multi-leg submissions populate — grouped
+into a new `CompoundLegState` interface + `EMPTY_COMPOUND_LEGS` constant, with the class gaining one
+`compoundLegs: CompoundLegState` field in place of the 7 flat ones.
+
+**Deliberately did NOT change `MakerCheckerContext`'s own shape** (still flat, 5 bare movementId fields,
+no `arrivalSgRedeemMovement`/`acceptanceMovement`) — only this component's own INTERNAL representation
+changed; `emitContext()` destructures the 5 wanted fields back out of `compoundLegs` when building the
+emitted DTO, so `TransactionBuilderComponent`'s own `makerContext` mirror and `buildCheckerActionContext()`
+are completely unaffected (zero changes needed on the parent).
+
+**One real subtlety found and preserved exactly, not glossed over**: `submit()` has its own PARTIAL reset
+(`arrivalSgRedeemMovementId`/`arrivalSgRedeemMovement`/`acceptanceMovement` only — 3 of the 7, NOT
+`dueFromIssuingBankMovementId`/`acceptanceReimbReceivableMovementId`/`acceptanceMovementId`/
+`matchedReceivableMovementId`) that is genuinely different from `resetForFunction()`'s own FULL reset (all
+7, on a function switch). Confirmed by reading every read/write site (`emitContext()`, `resetForFunction()`,
+`submit()`, `applyMakerSubmitOutcome()`) before writing anything, rather than assuming a uniform "reset
+everything to null" pattern — the grouped version reproduces this asymmetry exactly via
+`{ ...this.compoundLegs, arrivalSgRedeemMovementId: null, arrivalSgRedeemMovement: null, acceptanceMovement:
+null }` (a partial spread-merge) rather than `{ ...EMPTY_COMPOUND_LEGS }` (which would have wrongly cleared
+all 7).
+
+**`applyMakerSubmitOutcome()`'s own 7 individual `if (outcome.secondary.xxx !== undefined) this.xxx =
+outcome.secondary.xxx` guards collapsed to one merge-spread** (`this.compoundLegs = { ...this.compoundLegs,
+...outcome.secondary }`) — verified safe, not assumed: read every `secondary:` object literal
+`maker-submit.service.ts` ever constructs (11 call sites) and confirmed each includes ONLY the keys it has
+an actual value for, never an explicit `key: undefined` — so a key genuinely absent from `outcome.secondary`
+is also absent from the spread and cannot overwrite `compoundLegs`' own existing value for it, reproducing
+the old guards' "only overwrite when a value is actually present" behavior exactly.
+
+**Template**: the 2 call sites reading the 2 full-`BalanceMovement` fields (the "Account Entries — SG
+Redemption"/"Account Entries — Acceptance" buttons, gated on `arrivalSgRedeemMovement?.contingentAccountEntry`/
+`acceptanceMovement?.contingentAccountEntry`) updated to `compoundLegs.arrivalSgRedeemMovement`/
+`compoundLegs.acceptanceMovement` — the only 2 of the 7 fields ever referenced in this component's own
+template; the other 5 (bare movementId strings) are read only internally (`emitContext()`) or by the
+Checker via the unchanged `MakerCheckerContext`/`CheckerActionContext` DTOs.
+
+**Tests**: 18 mechanical renames across `maker-panel.component.spec.ts` (`comp.xxx` → `comp.compoundLegs.xxx`
+for all 7 fields), zero test LOGIC changes. Verified: `npx tsc -p tsconfig.app.json --noEmit`/`ng build
+--configuration development` (strict templates)/`npm run lint` (0 errors, 228 warnings, unchanged)/`npx
+prettier --check` all clean (no reformatting needed). Full Angular suite **940/940 passing** (unchanged
+count — pure structural regrouping), coverage 97.8/95.95/97.07/97.9% (all four clear the 95% floor).
+`backend/` 34/34 and microservice 335/335 both re-run per this file's own standing rule, unaffected
+(Angular-only change, no request/response contract touched).
+
+**Live-verified end to end against the real running stack**, specifically exercising the ONE compound
+shape that touches both grouped full-`BalanceMovement` fields at once (A3S — the SG-redemption leg
+populates `compoundLegs.arrivalSgRedeemMovement`): built `COMPOUNDVERIFY1` (A1 Issue 50,000 → Released →
+A8 SG Issue `GCOMPOUND1` 15,000 → Released → A3S Document Arrival, Bill Amount 15,000 — an exact match
+against the SG's own Outstanding, producing a `FULL_REDEEM`). Confirmed the "Account Entries — SG
+Redemption" button correctly appears (proving the new `compoundLegs.arrivalSgRedeemMovement?.
+contingentAccountEntry` template binding works) and opens to show the exact expected pair (`Dr Shipping
+Guarantees Outstanding` / `Cr Customers' Liability under Shipping Guarantees`, both USD 15000, tagged
+`FULL_REDEEM`/`IBCOMP1`/`PENDING`) — matching this file's own already-documented expected values for this
+exact scenario shape. Released the compound submission via the Checker (SG's own Off-Balance Exposure
+correctly dropped 15,000 → 0, confirming the SG leg's own release succeeded); the LC's own UTILIZE
+correctly stayed EARMARKING/PENDING throughout (by design — A3S's own Release "moves the Document Arrival
+to Pending LC Balance, still not finalized," per this file's own long-established A3S semantics — NOT a
+regression). Zero console errors throughout.
+
+**One pre-existing behavior confirmed, not a regression from this pass**: re-opening "Account Entries — SG
+Redemption" after the Checker's own Release still showed the SG leg's own status as `PENDING` (its
+originally-captured, at-Submit-time snapshot), not the now-genuinely-RELEASED status — traced directly to
+`applyCheckerOutcome()` (the method handling `externalCheckerOutcome`, i.e. Checker-initiated outcomes),
+which was NOT touched by this pass at all and has never, in any of its 3 branches, written back into
+`compoundLegs`/the old flat fields — confirmed by reading its current body line-by-line. This is
+byte-for-byte the same staleness the pre-grouping code already had; this pass only changed WHERE the field
+lives, not WHEN it gets refreshed, and is consistent with this app's own "View Voucher shows historical,
+immutable entries" design principle stated elsewhere in this file. Flagged here for completeness, not
+treated as an in-scope defect to fix.
+
+Test data (`COMPOUNDVERIFY1`) cleaned up afterward. Reference-contract row count is now 54 (up from the
+47 last recorded in this file) — investigated, not assumed: all 54 rows resolve to the same 13
+pre-existing reference LC numbers (S01–S11, U01, U02), reflecting legitimate growth from this session's
+own extensive live-verification activity across many earlier passes (including the user's own manual
+testing) — no orphaned/stray test contract found; this pass's own `COMPOUNDVERIFY1` was confirmed fully
+removed before this count was taken.
+
+**Net effect on the 8-phase proposal**: Phase 8 is now closed at the narrow scope the investigation
+confirmed was actually worth doing — the one genuine candidate (compound-leg fields) grouped; the broader
+ViewModel consolidation the original proposal envisioned remains explicitly not done, same "low marginal
+value post-Phase-1/2" reasoning as Phase 4/6.
+
+Not committed (not requested).

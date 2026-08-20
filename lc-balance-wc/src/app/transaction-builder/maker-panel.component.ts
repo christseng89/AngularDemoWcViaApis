@@ -67,6 +67,37 @@ export interface MakerCheckerContext {
   createdBy: string;
 }
 
+/**
+ * 2026-08-20 (desiger-comments.md Phase 8, narrowed scope — the 7 flat compound-leg movement fields
+ * A3S/A6/B4/B5's own multi-leg submissions produce, grouped into ONE object rather than left scattered
+ * across the class). Deliberately does NOT change `MakerCheckerContext`'s own shape above (still flat) —
+ * only this component's own INTERNAL representation changes; `emitContext()` destructures the 5 ID
+ * fields back out when building the emitted DTO, so the parent (`TransactionBuilderComponent`) and
+ * `CheckerActionContext` are completely unaffected. `arrivalSgRedeemMovement`/`acceptanceMovement` (the
+ * 2 full-`BalanceMovement` fields, vs. the other 5 which are bare `movementId` strings) are read only by
+ * this panel's own template (the "Account Entries — SG Redemption"/"Account Entries — Acceptance"
+ * buttons) — the Checker never needs the full object, only the id, for its own release/reject calls.
+ */
+export interface CompoundLegState {
+  arrivalSgRedeemMovementId: string | null;
+  arrivalSgRedeemMovement: BalanceMovement | null;
+  dueFromIssuingBankMovementId: string | null;
+  acceptanceReimbReceivableMovementId: string | null;
+  acceptanceMovementId: string | null;
+  acceptanceMovement: BalanceMovement | null;
+  matchedReceivableMovementId: string | null;
+}
+
+const EMPTY_COMPOUND_LEGS: CompoundLegState = {
+  arrivalSgRedeemMovementId: null,
+  arrivalSgRedeemMovement: null,
+  dueFromIssuingBankMovementId: null,
+  acceptanceReimbReceivableMovementId: null,
+  acceptanceMovementId: null,
+  acceptanceMovement: null,
+  matchedReceivableMovementId: null,
+};
+
 /** A pending sync request for the Checker's own independent search AND (only when `alsoSyncLookup` is set) the Look Up Current Balance panel — see `TransactionBuilderComponent.syncCheckerToContext()`'s pre-extraction body for the original, single-component version of this. `instrumentType` is only read when `alsoSyncLookup` is true (Look Up's own `syncFrom()` needs it; the Checker's own search resolves its own instrumentType from `selectedFunction` already). */
 export interface MakerSyncRequest {
   lcNumber: string;
@@ -197,13 +228,8 @@ export class MakerPanelComponent implements OnChanges {
   /** A3 (Document Arrival (Sight)) only — set by `approveArrival()` (parent, Checker acknowledgment) via `externalCheckerOutcome`'s `documentArrivalAcknowledged` outcome kind. Displayed nowhere in THIS panel's own template — kept here purely because it's part of the same outcome-application state machine as `submitResult`. */
   arrivalApproved = false;
 
-  arrivalSgRedeemMovementId: string | null = null;
-  arrivalSgRedeemMovement: BalanceMovement | null = null;
-  dueFromIssuingBankMovementId: string | null = null;
-  acceptanceReimbReceivableMovementId: string | null = null;
-  acceptanceMovementId: string | null = null;
-  acceptanceMovement: BalanceMovement | null = null;
-  matchedReceivableMovementId: string | null = null;
+  /** See `CompoundLegState`'s own doc comment for why these 7 fields (A3S/A6/B4/B5's own multi-leg submissions) are grouped here rather than left flat. */
+  compoundLegs: CompoundLegState = { ...EMPTY_COMPOUND_LEGS };
 
   constructor(
     private readonly api: BalanceComponentApiService,
@@ -245,14 +271,18 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   private emitContext(): void {
+    // MakerCheckerContext only wants the 5 bare movementId fields, never the 2 full-BalanceMovement
+    // ones (arrivalSgRedeemMovement/acceptanceMovement) — see CompoundLegState's own doc comment.
+    const { matchedReceivableMovementId, dueFromIssuingBankMovementId, acceptanceMovementId, acceptanceReimbReceivableMovementId, arrivalSgRedeemMovementId } =
+      this.compoundLegs;
     this.contextChanged.emit({
       submitResult: this.submitResult,
       selectedPayMovement: this.pickerSelection.selectedPayMovement,
-      matchedReceivableMovementId: this.matchedReceivableMovementId,
-      dueFromIssuingBankMovementId: this.dueFromIssuingBankMovementId,
-      acceptanceMovementId: this.acceptanceMovementId,
-      acceptanceReimbReceivableMovementId: this.acceptanceReimbReceivableMovementId,
-      arrivalSgRedeemMovementId: this.arrivalSgRedeemMovementId,
+      matchedReceivableMovementId,
+      dueFromIssuingBankMovementId,
+      acceptanceMovementId,
+      acceptanceReimbReceivableMovementId,
+      arrivalSgRedeemMovementId,
       createdBy: this.model.createdBy ?? 'maker1',
     });
   }
@@ -390,13 +420,7 @@ export class MakerPanelComponent implements OnChanges {
     this.pickerSelection.arrivalSgPaging.reset();
     this.pickerSelection.selectedArrivalSg = null;
     this.pickerSelection.arrivalSgSnapshot = null;
-    this.arrivalSgRedeemMovementId = null;
-    this.arrivalSgRedeemMovement = null;
-    this.dueFromIssuingBankMovementId = null;
-    this.acceptanceReimbReceivableMovementId = null;
-    this.acceptanceMovementId = null;
-    this.acceptanceMovement = null;
-    this.matchedReceivableMovementId = null;
+    this.compoundLegs = { ...EMPTY_COMPOUND_LEGS };
 
     if (fn?.movementType) {
       this.model.instrumentType = fn.instrumentType;
@@ -1039,14 +1063,13 @@ export class MakerPanelComponent implements OnChanges {
 
   private applyMakerSubmitOutcome(outcome: MakerSubmitOutcome): void {
     this.submitting = false;
-    if (outcome.secondary.arrivalSgRedeemMovementId !== undefined) this.arrivalSgRedeemMovementId = outcome.secondary.arrivalSgRedeemMovementId;
-    if (outcome.secondary.arrivalSgRedeemMovement !== undefined) this.arrivalSgRedeemMovement = outcome.secondary.arrivalSgRedeemMovement;
-    if (outcome.secondary.dueFromIssuingBankMovementId !== undefined) this.dueFromIssuingBankMovementId = outcome.secondary.dueFromIssuingBankMovementId;
-    if (outcome.secondary.acceptanceMovementId !== undefined) this.acceptanceMovementId = outcome.secondary.acceptanceMovementId;
-    if (outcome.secondary.acceptanceMovement !== undefined) this.acceptanceMovement = outcome.secondary.acceptanceMovement;
-    if (outcome.secondary.acceptanceReimbReceivableMovementId !== undefined)
-      this.acceptanceReimbReceivableMovementId = outcome.secondary.acceptanceReimbReceivableMovementId;
-    if (outcome.secondary.matchedReceivableMovementId !== undefined) this.matchedReceivableMovementId = outcome.secondary.matchedReceivableMovementId;
+    // Safe as a plain merge-spread, not 7 individual `!== undefined` guards: every MakerSubmitSecondary
+    // object maker-submit.service.ts ever constructs (confirmed by reading all of its own `secondary:`
+    // literals) includes ONLY the keys it actually has a value for — never an explicit `key: undefined`
+    // — so a key genuinely absent from `outcome.secondary` is also absent from the spread and cannot
+    // overwrite the existing `compoundLegs` value for it, matching the old guards' own "only overwrite
+    // when a value is actually present" behavior exactly.
+    this.compoundLegs = { ...this.compoundLegs, ...outcome.secondary };
 
     if (outcome.kind === 'submitted') {
       this.submitResult = outcome.result;
@@ -1068,9 +1091,10 @@ export class MakerPanelComponent implements OnChanges {
     this.submitResult = null;
     this.submitError = null;
     this.arrivalApproved = false;
-    this.arrivalSgRedeemMovementId = null;
-    this.arrivalSgRedeemMovement = null;
-    this.acceptanceMovement = null;
+    // Deliberately a PARTIAL reset — only these 3 of the 7 compoundLegs fields, byte-for-byte matching
+    // the pre-grouping behavior (dueFromIssuingBankMovementId/acceptanceReimbReceivableMovementId/
+    // acceptanceMovementId/matchedReceivableMovementId are NOT cleared here, only by resetForFunction()).
+    this.compoundLegs = { ...this.compoundLegs, arrivalSgRedeemMovementId: null, arrivalSgRedeemMovement: null, acceptanceMovement: null };
 
     this.makerSubmit.submit(req, this.buildMakerSubmitContext()).subscribe((outcome) => this.applyMakerSubmitOutcome(outcome));
   }

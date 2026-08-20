@@ -252,11 +252,11 @@ describe('MakerPanelComponent', () => {
       comp.pickerSelection.sgsForArrival = [mkContract('sg1', '004')];
       comp.pickerSelection.selectedArrivalSg = mkContract('sg1', '004');
       comp.pickerSelection.arrivalSgSnapshot = mkSnapshot('sg1');
-      comp.arrivalSgRedeemMovementId = 'mv1';
-      comp.dueFromIssuingBankMovementId = 'mv2';
-      comp.acceptanceReimbReceivableMovementId = 'mv3';
-      comp.acceptanceMovementId = 'mv4';
-      comp.matchedReceivableMovementId = 'mv5';
+      comp.compoundLegs.arrivalSgRedeemMovementId = 'mv1';
+      comp.compoundLegs.dueFromIssuingBankMovementId = 'mv2';
+      comp.compoundLegs.acceptanceReimbReceivableMovementId = 'mv3';
+      comp.compoundLegs.acceptanceMovementId = 'mv4';
+      comp.compoundLegs.matchedReceivableMovementId = 'mv5';
 
       triggerSelectFunction(comp, A2);
 
@@ -283,11 +283,11 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.sgsForArrival).toEqual([]);
       expect(comp.pickerSelection.selectedArrivalSg).toBeNull();
       expect(comp.pickerSelection.arrivalSgSnapshot).toBeNull();
-      expect(comp.arrivalSgRedeemMovementId).toBeNull();
-      expect(comp.dueFromIssuingBankMovementId).toBeNull();
-      expect(comp.acceptanceReimbReceivableMovementId).toBeNull();
-      expect(comp.acceptanceMovementId).toBeNull();
-      expect(comp.matchedReceivableMovementId).toBeNull();
+      expect(comp.compoundLegs.arrivalSgRedeemMovementId).toBeNull();
+      expect(comp.compoundLegs.dueFromIssuingBankMovementId).toBeNull();
+      expect(comp.compoundLegs.acceptanceReimbReceivableMovementId).toBeNull();
+      expect(comp.compoundLegs.acceptanceMovementId).toBeNull();
+      expect(comp.compoundLegs.matchedReceivableMovementId).toBeNull();
     });
 
     it('resets naturalKey/searchNaturalKey/searchError on every pick, and applies the Sight tenorType default (B1)', () => {
@@ -2583,7 +2583,7 @@ describe('MakerPanelComponent', () => {
       expect(lastReqC(api, 1)).toMatchObject({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc' });
       // Both legs share one businessEventId.
       expect(lastReqC(api, 0).businessEventId).toBe(lastReqC(api, 1).businessEventId);
-      expect(comp.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
+      expect(comp.compoundLegs.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
       expect(comp.submitResult).toEqual({ movementId: 'utilize-1', status: 'PENDING' });
       expect(comp.submitting).toBe(false);
     });
@@ -2608,7 +2608,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.arrivalSgRedeemMovement).toEqual({ movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry });
+      expect(comp.compoundLegs.arrivalSgRedeemMovement).toEqual({ movementId: 'sg-redeem-1', status: 'PENDING', contingentAccountEntry: sgEntry });
       expect(comp.submitResult!.contingentAccountEntry).toBeNull();
     });
 
@@ -2633,7 +2633,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
+      expect(comp.compoundLegs.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
       expect(comp.submitError).toBe('Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: LEGS_UNBALANCED');
       expect(comp.submitting).toBe(false);
     });
@@ -2665,7 +2665,7 @@ describe('MakerPanelComponent', () => {
       expect(lastReqC(api, 0)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR' });
       expect(lastReqC(api, 1)).toMatchObject({ instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK', movementType: 'CREATE', parentLogicalContractId: 'lgl-cnf' });
       expect(comp.submitResult).toEqual({ movementId: 'honour-1', status: 'PENDING' });
-      expect(comp.dueFromIssuingBankMovementId).toBe('receivable-1');
+      expect(comp.compoundLegs.dueFromIssuingBankMovementId).toBe('receivable-1');
     });
 
     it('a failed HONOUR never creates the asset', () => {
@@ -2732,8 +2732,8 @@ describe('MakerPanelComponent', () => {
       });
       expect(lastReqC(api, 2)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', movementType: 'CREATE' });
       expect(comp.submitResult).toEqual({ movementId: 'accept-1', status: 'PENDING' });
-      expect(comp.acceptanceMovementId).toBe('acceptance-1');
-      expect(comp.acceptanceReimbReceivableMovementId).toBe('receivable-1');
+      expect(comp.compoundLegs.acceptanceMovementId).toBe('acceptance-1');
+      expect(comp.compoundLegs.acceptanceReimbReceivableMovementId).toBe('receivable-1');
     });
 
     // Same fix and reasoning as the A3S SG-redemption test above, applied to this compound's own
@@ -2755,7 +2755,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.acceptanceMovement).toEqual({ movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry });
+      expect(comp.compoundLegs.acceptanceMovement).toEqual({ movementId: 'acceptance-1', status: 'PENDING', contingentAccountEntry: acceptanceEntry });
       expect(comp.submitResult!.contingentAccountEntry).toBeNull();
     });
 
@@ -2834,7 +2834,7 @@ describe('MakerPanelComponent', () => {
         movementType: 'REIMBURSE',
       });
       expect(comp.submitResult).toEqual({ movementId: 'settle-1', status: 'PENDING' });
-      expect(comp.matchedReceivableMovementId).toBe('reimb-1');
+      expect(comp.compoundLegs.matchedReceivableMovementId).toBe('reimb-1');
     });
 
     it('a failed Acceptance settle never resolves the Receivable', () => {

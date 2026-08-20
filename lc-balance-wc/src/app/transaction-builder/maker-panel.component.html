@@ -717,16 +717,16 @@
   <button
     type="button"
     class="tb-btn tb-btn--outline mt-2"
-    *ngIf="arrivalSgRedeemMovement?.contingentAccountEntry"
-    (click)="openAccountEntries.emit({ movement: arrivalSgRedeemMovement!, instrumentType: 'SHGT' })"
+    *ngIf="compoundLegs.arrivalSgRedeemMovement?.contingentAccountEntry"
+    (click)="openAccountEntries.emit({ movement: compoundLegs.arrivalSgRedeemMovement!, instrumentType: 'SHGT' })"
   >
     Account Entries — SG Redemption
   </button>
   <button
     type="button"
     class="tb-btn tb-btn--outline mt-2"
-    *ngIf="acceptanceMovement?.contingentAccountEntry"
-    (click)="openAccountEntries.emit({ movement: acceptanceMovement!, instrumentType: 'EPLC_ACCEPTANCE' })"
+    *ngIf="compoundLegs.acceptanceMovement?.contingentAccountEntry"
+    (click)="openAccountEntries.emit({ movement: compoundLegs.acceptanceMovement!, instrumentType: 'EPLC_ACCEPTANCE' })"
   >
     Account Entries — Acceptance
   </button>
