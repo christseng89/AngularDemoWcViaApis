@@ -1241,7 +1241,7 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
         createdBy: 'maker1',
       })
       .expect(409);
-    expect(res.body.message).toMatch(/exceeds the parent Confirmation's Present Earmark-adjusted Available Balance 100000/);
+    expect(res.body.message).toMatch(/exceeds the parent Confirmation's Present Earmark-adjusted Tight Available Balance 100000/);
   });
 
   test('EX_DOC_RCV proxy: Present Docs amount within parent Confirmation Available Balance -> 201, MEMO_ONLY (Confirmation balance untouched)', async () => {
@@ -1265,7 +1265,7 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     expect(cnfSnapshot.body.availableBalance).toBe('100000');
     // 2026-08-18, user-requested — EPLC_CONFIRMATION now also gets a tightAvailableBalance, same
     // purpose as IPLC_LC/EPLC_LC's own SHGT-based figure but netting the Present Docs earmark instead:
-    // Available 100000 minus the 90000 still-PENDING EB03 earmark.
+    // Confirmed 100000 (no still-PENDING decreases here) minus the 90000 still-PENDING EB03 earmark.
     expect(cnfSnapshot.body.tightAvailableBalance).toBe('10000');
     expect(exam.body.status).toBe('PENDING');
     examEb03MovementId = exam.body.movementId;
@@ -1293,7 +1293,7 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
       })
       .expect(409);
     expect(res.body.message).toMatch(
-      /Present Earmark-adjusted Available Balance 10000 \(Available Balance 100000 minus 90000 already-outstanding Present Docs earmark/,
+      /Present Earmark-adjusted Tight Available Balance 10000 \(Confirmed Balance 100000 minus 0 still-PENDING decrease\(s\) minus 90000 already-outstanding Present Docs earmark/,
     );
   });
 
@@ -2116,6 +2116,123 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({}).expect(400);
     expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
     expect(res.body.message).toMatch(/makerSubmittedBy is required/);
+  });
+
+  // Restored 2026-08-20 ("A3 A3S 交易 Approve 過後 不要再顯示") — A3/A3S's own Checker acknowledgment on
+  // the LC's own UTILIZE, mirroring submitByMaker() above but on the Checker side. See
+  // service.acknowledgeArrival()'s own doc comment.
+  test('POST /balance-movements/:id/acknowledge: sets acknowledgedBy/acknowledgedAt, status stays PENDING (A3 Checker acknowledgment)', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-ACK' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const acknowledged = await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+    expect(acknowledged.body.status).toBe('PENDING');
+    expect(acknowledged.body.acknowledgedBy).toBe('checker1');
+    expect(acknowledged.body.acknowledgedAt).toBeTruthy();
+  });
+
+  test('POST /balance-movements/:id/acknowledge: acknowledging the same movement twice -> 409, rejected', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-ACK2' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+
+    const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(409);
+    expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    expect(res.body.message).toMatch(/already acknowledged by checker1/);
+  });
+
+  test('POST /balance-movements/:id/acknowledge: rejects a non-IPLC_LC/UTILIZE movement -> 400', async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'CNF-ACK' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '50000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${cnf.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(400);
+    expect(res.body.message).toMatch(/acknowledgeArrival\(\) only applies to an IPLC_LC UTILIZE movement/);
+  });
+
+  test('POST /balance-movements/:movementId/acknowledge without acknowledgedBy -> 400', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-NOACKBY' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '500',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({}).expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/acknowledgedBy is required/);
   });
 
   // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found): A4's own Maker/Checker 4-eyes gate

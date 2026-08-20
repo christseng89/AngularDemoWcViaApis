@@ -73,6 +73,28 @@ export function computeAvailableBalance(
 }
 
 /**
+ * Business instruction 2026-08-20 ("Tight Available Balance 應該用 Confirmed LC Balance 減其他金額,
+ * 因為 APPROVED 才可以動用" / "A2 B2 Decrease Submit 後，對 Tight LC Balance 也是減項") — Tight Available
+ * Balance is now based on Confirmed Balance (RELEASED-only), not Available Balance, since a still-PENDING
+ * INCREASE isn't genuinely usable capacity yet. But a still-PENDING DECREASE (AMEND_DECREASE/UTILIZE/
+ * HONOUR/ACCEPT/etc.) is a commitment already reducing what's really left, so it must still count
+ * immediately, not only once Released — otherwise two overlapping pending decreases (or a decrease and a
+ * fresh draw) could each pass sufficiency in isolation. Σ the NEGATIVE-signed contribution only (never
+ * netted against any PENDING increase on the same contract) of every currently-PENDING movement, as a
+ * positive magnitude ready to subtract. See `service/balanceService.ts`'s own assembleSnapshot() and
+ * `domain/offBalanceExposure.ts`'s three sufficiency checks for where this feeds into Tight Available
+ * Balance.
+ */
+export function computePendingDecreaseTotal(movements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[]): Decimal {
+  return movements
+    .filter((m) => m.status === 'PENDING')
+    .reduce((acc, m) => {
+      const signed = signedAmount(m);
+      return signed.isNegative() ? acc.plus(signed.abs()) : acc;
+    }, ZERO);
+}
+
+/**
  * Design doc §3.3/§6.2 — LC 面額 faceAmount, tracked independently of
  * Confirmed Balance because UTILIZE reduces Confirmed Balance without ever
  * touching the face amount. Sums RELEASED ISSUE/AMEND_INCREASE/AMEND_DECREASE

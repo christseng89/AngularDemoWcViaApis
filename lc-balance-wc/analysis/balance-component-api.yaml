@@ -391,7 +391,25 @@ info:
     first" leg — the B3 record is already `RELEASED` by the time B4 acts, and re-releasing it would now
     be a `409 ILLEGAL_STATE_TRANSITION` — B4 releases only its own linked `HONOUR`/`ACCEPT` and any
     secondary leg(s); the consume side effect above happens automatically as part of that same call.
-  version: "1.12.0"
+
+
+    v1.13.0 (2026-08-20, business instructions — "Tight Available Balance 應該用 Confirmed LC Balance 減
+    其他金額, 因為 APPROVED 才可以動用" / "A3 A3S 交易 Approve 過後 不要再顯示"): TWO changes. (1)
+    `BalanceSnapshot.tightAvailableBalance` now derives from `confirmedBalance`, not `availableBalance` —
+    a still-PENDING increase (ISSUE/AMEND_INCREASE/`EPLC_CONFIRMATION` `AMEND` with a positive amount) no
+    longer raises it until genuinely Released, while a still-PENDING decrease still occupies it
+    immediately (unchanged from before) — same rule now applied consistently inside the SG Issue and
+    Present Docs sufficiency checks at `POST /balance-movements` too, not just the persisted snapshot
+    field. Also closes a related gap: `EPLC_CONFIRMATION`'s own `AMEND` movementType (B2, direction riding
+    the sign of `amount`) previously ran NO sufficiency check at all in its Decrease direction, unlike
+    `IPLC_LC`'s own `AMEND_DECREASE` — now shares that same floor check. (2) RESTORES
+    `POST /balance-movements/{movementId}/acknowledge` (removed v1.12.0 for B3) — re-purposed for A3/A3S's
+    own `IPLC_LC`/`UTILIZE` instead: the Checker's "Approve (acknowledgment only)" step on a Document
+    Arrival still deliberately never transitions `status` (A4/A6 remains the sole real finalization), but
+    is now genuinely persisted again (`acknowledgedBy`/`acknowledgedAt`, no longer historical-only) so a
+    Checker Queue listing can filter an already-approved item out instead of it reappearing as PENDING
+    forever.
+  version: "1.13.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -855,6 +873,64 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: Movement is not PENDING, or was already submitted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/acknowledge:
+    post:
+      tags: [BalanceMovements]
+      summary: A3/A3S (Document Arrival)'s own Checker acknowledgment-only step
+      description: >
+        REMOVED v1.12.0 for B3 (superseded by a genuine `/release`); RESTORED
+        v1.13.0, re-purposed for A3/A3S's own `IPLC_LC`/`UTILIZE` instead —
+        the Checker's own confirmation that a Document Arrival is accepted,
+        WITHOUT genuinely finalizing it (A4/A6 remains the sole real
+        `PENDING` -> `RELEASED` transition for this same movement, later).
+        Deliberately does NOT transition status — the movement stays PENDING
+        throughout (same posture as `/maker-submit` above, on the Checker
+        side instead of the Maker side). Sets
+        `acknowledgedBy`/`acknowledgedAt`, read by the Checker Queue to filter
+        an already-acknowledged item out (see
+        `BalanceMovement.acknowledgedBy`'s own schema description).
+
+
+        400 if the movement's instrumentType is not IPLC_LC or its
+        movementType is not UTILIZE. 409 if the movement is not currently
+        PENDING, or if it was already acknowledged (acknowledgedAt already
+        set).
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledgedBy]
+              properties:
+                acknowledgedBy: { type: string }
+      responses:
+        '200':
+          description: Movement acknowledged by Checker; status unchanged (still PENDING).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Not an IPLC_LC UTILIZE movement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING, or was already acknowledged.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

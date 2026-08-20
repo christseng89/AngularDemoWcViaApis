@@ -41,18 +41,20 @@ export interface ShgtIssueSufficiencyResult {
  */
 export function checkShgtIssueSufficiency(params: {
   requestedAmount: Decimal;
-  parentAvailableBalance: Decimal;
+  parentConfirmedBalance: Decimal;
+  parentPendingDecreaseTotal: Decimal;
   existingShgtExposure: Decimal;
 }): ShgtIssueSufficiencyResult {
-  const { requestedAmount, parentAvailableBalance, existingShgtExposure } = params;
-  const tightAvailable = parentAvailableBalance.minus(existingShgtExposure);
+  const { requestedAmount, parentConfirmedBalance, parentPendingDecreaseTotal, existingShgtExposure } = params;
+  const tightAvailable = parentConfirmedBalance.minus(parentPendingDecreaseTotal).minus(existingShgtExposure);
   if (requestedAmount.greaterThan(tightAvailable)) {
     return {
       ok: false,
       error:
         `SG Issue amount ${requestedAmount.toFixed()} exceeds parent LC's Tight Available Balance ${tightAvailable.toFixed()} ` +
-        `(Available Balance ${parentAvailableBalance.toFixed()} minus ${existingShgtExposure.toFixed()} already-outstanding ` +
-        `Shipping Guarantee exposure on this same LC).`,
+        `(Confirmed Balance ${parentConfirmedBalance.toFixed()} minus ${parentPendingDecreaseTotal.toFixed()} still-PENDING decrease(s) ` +
+        `minus ${existingShgtExposure.toFixed()} already-outstanding Shipping Guarantee exposure on this same LC — only APPROVED amounts ` +
+        `count as usable capacity).`,
     };
   }
   return { ok: true };
@@ -112,20 +114,22 @@ export interface PresentDocsIssueSufficiencyResult {
  */
 export function checkPresentDocsIssueSufficiency(params: {
   requestedAmount: Decimal;
-  parentAvailableBalance: Decimal;
+  parentConfirmedBalance: Decimal;
+  parentPendingDecreaseTotal: Decimal;
   presentDocsEarmark: Decimal;
   parentConfirmationBalanceContractId: string;
 }): PresentDocsIssueSufficiencyResult {
-  const { requestedAmount, parentAvailableBalance, presentDocsEarmark, parentConfirmationBalanceContractId } = params;
-  const tightAvailable = parentAvailableBalance.minus(presentDocsEarmark);
+  const { requestedAmount, parentConfirmedBalance, parentPendingDecreaseTotal, presentDocsEarmark, parentConfirmationBalanceContractId } = params;
+  const tightAvailable = parentConfirmedBalance.minus(parentPendingDecreaseTotal).minus(presentDocsEarmark);
   if (requestedAmount.greaterThan(tightAvailable)) {
     return {
       ok: false,
       error:
-        `Present Docs amount ${requestedAmount.toFixed()} exceeds the parent Confirmation's Present Earmark-adjusted Available Balance ` +
-        `${tightAvailable.toFixed()} (Available Balance ${parentAvailableBalance.toFixed()} minus ${presentDocsEarmark.toFixed()} already-outstanding ` +
-        `Present Docs earmark on this same Confirmation, balanceContractId ${parentConfirmationBalanceContractId}) — this presentation could ` +
-        `never be Honoured/Accepted in full alongside the other still-open presentations on this LC.`,
+        `Present Docs amount ${requestedAmount.toFixed()} exceeds the parent Confirmation's Present Earmark-adjusted Tight Available Balance ` +
+        `${tightAvailable.toFixed()} (Confirmed Balance ${parentConfirmedBalance.toFixed()} minus ${parentPendingDecreaseTotal.toFixed()} ` +
+        `still-PENDING decrease(s) minus ${presentDocsEarmark.toFixed()} already-outstanding Present Docs earmark on this same Confirmation, ` +
+        `balanceContractId ${parentConfirmationBalanceContractId}) — this presentation could never be Honoured/Accepted in full alongside the ` +
+        `other still-open presentations on this LC.`,
     };
   }
   return { ok: true };
@@ -186,9 +190,11 @@ export interface UtilizeSufficiencyResult {
 export function checkUtilizeSufficiency(params: {
   requestedAmount: Decimal;
   availableBalance: Decimal;
+  confirmedBalance: Decimal;
+  pendingDecreaseTotal: Decimal;
   offBalanceExposure: Decimal;
 }): UtilizeSufficiencyResult {
-  const { requestedAmount, availableBalance, offBalanceExposure } = params;
+  const { requestedAmount, availableBalance, confirmedBalance, pendingDecreaseTotal, offBalanceExposure } = params;
 
   if (requestedAmount.greaterThan(availableBalance)) {
     return {
@@ -197,13 +203,14 @@ export function checkUtilizeSufficiency(params: {
     };
   }
 
-  const tightAvailableBalance = availableBalance.minus(offBalanceExposure);
+  const tightAvailableBalance = confirmedBalance.minus(pendingDecreaseTotal).minus(offBalanceExposure);
   if (requestedAmount.greaterThan(tightAvailableBalance)) {
     return {
       ok: false,
       error:
         `Requested amount ${requestedAmount.toFixed()} exceeds Tight Available Balance ${tightAvailableBalance.toFixed()} ` +
-        `(Available Balance ${availableBalance.toFixed()} minus outstanding off-balance-sheet (SHGT) exposure ${offBalanceExposure.toFixed()}). ` +
+        `(Confirmed Balance ${confirmedBalance.toFixed()} minus ${pendingDecreaseTotal.toFixed()} still-PENDING decrease(s) minus outstanding ` +
+        `off-balance-sheet (SHGT) exposure ${offBalanceExposure.toFixed()} — only APPROVED amounts count as usable capacity). ` +
         `If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use ` +
         `"Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.`,
     };

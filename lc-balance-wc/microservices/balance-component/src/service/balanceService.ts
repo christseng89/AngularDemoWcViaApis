@@ -21,7 +21,7 @@ import { BalanceMovementStore } from '../store/balanceMovementStore';
 import { applyStatusTransition } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
-import { computeAvailableBalance, computeConfirmedBalance } from '../domain/balanceDerivation';
+import { computeAvailableBalance, computeConfirmedBalance, computePendingDecreaseTotal } from '../domain/balanceDerivation';
 import {
   checkPresentDocsIssueSufficiency,
   checkShgtIssueSufficiency,
@@ -50,8 +50,14 @@ import type {
 /** Design doc §5 — movementTypes that create a new Logical Contract when the natural key doesn't yet resolve. */
 const CREATING_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'CREATE']);
 
-/** Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on Acceptance; ISSUE on SHGT). */
-const NO_CHECK_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'CREATE', 'AMEND']);
+/**
+ * Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on Acceptance; ISSUE on
+ * SHGT). 'AMEND' (B2) is deliberately NOT listed unconditionally — B2 has no separate AMEND_INCREASE/
+ * AMEND_DECREASE movementType (direction rides the sign of `amount`), so whether it needs a check at all
+ * depends on that sign; see the AMEND branch below (business instruction 2026-08-20, BA balance-check
+ * review — B2's own Decrease direction was previously ungated entirely, unlike A2's).
+ */
+const NO_CHECK_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'CREATE']);
 
 /** Design doc §6/§6.1 — UTILIZE-shaped checks: sufficiency against Available Balance, plus the §6.1 off-balance WARNING (0 exposure for non-LC instrumentTypes). */
 const UTILIZE_SHAPED_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['UTILIZE', 'HONOUR', 'ACCEPT']);
@@ -207,13 +213,17 @@ export class BalanceService {
   ): BalanceSnapshot {
     const confirmed = computeConfirmedBalance(movements);
     const available = computeAvailableBalance(confirmed, movements);
+    // Business instruction 2026-08-20 ("Tight Available Balance 應該用 Confirmed LC Balance 減其他金額,
+    // 因為 APPROVED 才可以動用" / "A2 B2 Decrease Submit 後，對 Tight LC Balance 也是減項") — see
+    // computePendingDecreaseTotal()'s own doc comment for the full asymmetric-netting rationale.
+    const pendingDecreaseTotal = computePendingDecreaseTotal(movements);
 
     let offBalanceExposure: string | null = null;
     let tightAvailableBalance: string | null = null;
     if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
       const exposure = computeOffBalanceExposure(shgtMovements);
       offBalanceExposure = exposure.toFixed();
-      tightAvailableBalance = available.minus(exposure).toFixed();
+      tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(exposure).toFixed();
     }
 
     // Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only.
@@ -231,7 +241,7 @@ export class BalanceService {
       // presentDocsEarmarkApproved, see offBalanceExposure.ts's own doc comments on all three
       // functions) — this just surfaces that same figure as a persisted/queryable BalanceSnapshot field
       // instead of a value computed only inline at submission time.
-      tightAvailableBalance = available.minus(computePresentDocsEarmark(examinationMovements)).toFixed();
+      tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements)).toFixed();
     }
 
     return {
@@ -492,7 +502,7 @@ export class BalanceService {
         }
         const parentMovements = this.movements.listByContract(parentLc.balanceContractId);
         const parentConfirmed = computeConfirmedBalance(parentMovements);
-        const parentAvailable = computeAvailableBalance(parentConfirmed, parentMovements);
+        const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
         const existingShgtMovements = this.movements.listShgtMovementsForParent(parentLc.logicalContractId);
         const existingShgtExposure = computeOffBalanceExposure(existingShgtMovements);
         // Quality-report-balance.md BAL-115: was `new Decimal(req.amount)`, bypassing money.ts's own
@@ -502,7 +512,7 @@ export class BalanceService {
         // service method is also called directly from tests/other callers that bypass the route, so the
         // invariant is worth enforcing here too, not just at the HTTP boundary.
         const requestedAmount = parseMonetaryAmount(req.amount);
-        const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentAvailableBalance: parentAvailable, existingShgtExposure });
+        const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentConfirmedBalance: parentConfirmed, parentPendingDecreaseTotal, existingShgtExposure });
         if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error!);
       }
 
@@ -537,14 +547,15 @@ export class BalanceService {
         }
         const parentMovements = this.movements.listByContract(parentConfirmation.balanceContractId);
         const parentConfirmed = computeConfirmedBalance(parentMovements);
-        const parentAvailable = computeAvailableBalance(parentConfirmed, parentMovements);
+        const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
         const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
         const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
         // Quality-report-balance.md BAL-115 — see the identical SG Issue check's own comment above.
         const requestedAmount = parseMonetaryAmount(req.amount);
         const presentDocsCheck = checkPresentDocsIssueSufficiency({
           requestedAmount,
-          parentAvailableBalance: parentAvailable,
+          parentConfirmedBalance: parentConfirmed,
+          parentPendingDecreaseTotal,
           presentDocsEarmark,
           parentConfirmationBalanceContractId: parentConfirmation.balanceContractId,
         });
@@ -583,13 +594,22 @@ export class BalanceService {
 
     let warnings: MovementWarning[] | null = null;
 
-    if (NO_CHECK_MOVEMENT_TYPES.has(req.movementType)) {
-      // no sufficiency check — ISSUE (LC)/AMEND_INCREASE/CREATE/AMEND. SHGT's own ISSUE is checked earlier,
-      // inside the "creating a new contract" branch above (before createContract()), not here — see that
-      // comment for why: a rejected check must never leave an orphaned, empty BalanceContract row behind.
-    } else if (req.movementType === 'AMEND_DECREASE') {
-      // Quality-report-balance.md BAL-115 — see the SG Issue check's own comment above.
-      const check = checkAmendDecreaseSufficiency({ amount: parseMonetaryAmount(req.amount), ceilingAmount, availableBalance: available });
+    if (NO_CHECK_MOVEMENT_TYPES.has(req.movementType) || (req.movementType === 'AMEND' && !ceilingAmount.isNegative())) {
+      // no sufficiency check — ISSUE (LC)/AMEND_INCREASE/CREATE, or B2's own AMEND when its signed
+      // ceilingAmount is an Increase (or zero). SHGT's own ISSUE is checked earlier, inside the
+      // "creating a new contract" branch above (before createContract()), not here — see that comment
+      // for why: a rejected check must never leave an orphaned, empty BalanceContract row behind.
+    } else if (req.movementType === 'AMEND_DECREASE' || req.movementType === 'AMEND') {
+      // Quality-report-balance.md BAL-115 — see the SG Issue check's own comment above. B2's own AMEND
+      // (business instruction 2026-08-20, BA balance-check review, "占用從寬" — a Decrease occupies
+      // capacity as strictly as A2's own AMEND_DECREASE) reaches here only when ceilingAmount is
+      // negative (the `else if` above already absorbed the Increase/zero case) — compared by magnitude,
+      // same floor check as A2, since checkAmendDecreaseSufficiency expects a positive "decrease by" amount.
+      const check = checkAmendDecreaseSufficiency({
+        amount: parseMonetaryAmount(req.amount).abs(),
+        ceilingAmount: ceilingAmount.abs(),
+        availableBalance: available,
+      });
       if (!check.ok) throw new InsufficientBalanceError(check.error!);
     } else if (UTILIZE_SHAPED_MOVEMENT_TYPES.has(req.movementType)) {
       let offBalanceExposure = new Decimal(0);
@@ -597,7 +617,8 @@ export class BalanceService {
         const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
         offBalanceExposure = computeOffBalanceExposure(shgtMovements);
       }
-      const check = checkUtilizeSufficiency({ requestedAmount: ceilingAmount, availableBalance: available, offBalanceExposure });
+      const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
+      const check = checkUtilizeSufficiency({ requestedAmount: ceilingAmount, availableBalance: available, confirmedBalance: confirmed, pendingDecreaseTotal, offBalanceExposure });
       if (!check.ok) throw new InsufficientBalanceError(check.error!);
       if (check.warning) warnings = [check.warning];
     } else if (OUTSTANDING_CAPPED_MOVEMENT_TYPES.has(req.movementType)) {
@@ -872,17 +893,38 @@ export class BalanceService {
   }
 
   /**
-   * REMOVED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" —
-   * superseding the 2026-08-15 "Present Docs Earmark" design this method implemented). B3's own Checker
-   * Release used to be a genuine backend acknowledgment that deliberately never touched status — the
-   * movement stayed PENDING forever, and only B4's own compound release ever finalized it for real. Now
-   * B3 uses the standard `release()` above directly, same as every other function's own Checker
-   * Release — a real PENDING -> RELEASED transition, on B3's own record, independent of B4. See
-   * `release()`'s own `markPresentDocsConsumed` side effect for what tracks "consumed by B4" now, and
-   * `domain/offBalanceExposure.ts`'s own doc comment for the accounting reasoning behind the split.
-   * `acknowledgedBy`/`acknowledgedAt` remain on `BalanceMovement`/the DB schema for historical rows only
-   * (see types.ts's own doc comment) — nothing writes them any more.
+   * B3's OWN former acknowledge()-only design was REMOVED 2026-08-18 (business instruction, "所有交易要
+   * RELEASE過後 才能根據流程走下一個交易") — B3 now uses the standard `release()` above directly, a real
+   * PENDING -> RELEASED transition on B3's own record. See `release()`'s own `markPresentDocsConsumed`
+   * side effect for what tracks "consumed by B4" now, and `domain/offBalanceExposure.ts`'s own doc
+   * comment for the accounting reasoning behind the split.
+   *
+   * Restored 2026-08-20, RE-PURPOSED for A3/A3S instead (business instruction, "A3 A3S 交易 Approve 過後
+   * 不要再顯示") — A3/A3S's own Checker step is still deliberately acknowledgment-only (the LC's own
+   * UTILIZE genuinely stays PENDING; A4/A6 finalizes it for real later, see design doc §5.x), but until
+   * now that acknowledgment was purely client-side (never persisted), so the Checker Queue kept
+   * re-offering an already-approved item forever. Mirrors `submitByMaker()` below exactly — same
+   * `guardSecondaryAction()` helper, same "record a second actor's action without touching status" shape
+   * — sets `acknowledgedBy`/`acknowledgedAt` only. IPLC_LC/UTILIZE only, the same target shape A4's own
+   * `submitByMaker()` uses (A3/A3S's own UTILIZE, before A4 ever touches it).
    */
+  acknowledgeArrival(movementId: string, acknowledgedBy: string): BalanceMovement {
+    return this.guardSecondaryAction(movementId, {
+      presentTense: 'acknowledge',
+      pastTense: 'acknowledged',
+      validate: (contract, movement) => {
+        if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+          throw new RequestValidationError(
+            `acknowledgeArrival() only applies to an IPLC_LC UTILIZE movement (A3/A3S Document Arrival) — ` +
+              `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+          );
+        }
+      },
+      alreadyDoneAt: (movement) => movement.acknowledgedAt,
+      alreadyDoneBy: (movement) => movement.acknowledgedBy,
+      persist: (id, now) => this.movements.acknowledge({ movementId: id, acknowledgedBy, acknowledgedAt: now }),
+    });
+  }
 
   /**
    * Business instruction 2026-08-16 ("Add real Maker Submit, then have Checker to Release it.
@@ -922,10 +964,9 @@ export class BalanceService {
   /**
    * Quality-report-balance.md BAL-130 (2026-08-17) — a shared find-movement -> validate-shape ->
    * guard-PENDING -> guard-not-already-done -> persist-and-refetch shape, originally factored out
-   * because `acknowledge()` and `submitByMaker()` both needed it. `acknowledge()` was removed 2026-08-18
-   * (see its own former section above) — `submitByMaker()` is this helper's only caller now, kept as-is
-   * rather than inlined back, since the shape is still a real, independently-tested unit a future
-   * second-actor action (should one appear) can reuse without re-deriving it.
+   * because B3's own former `acknowledge()` and `submitByMaker()` both needed it. That B3 `acknowledge()`
+   * was removed 2026-08-18; `acknowledgeArrival()` above (restored 2026-08-20, re-purposed for A3/A3S)
+   * and `submitByMaker()` are this helper's two callers now.
    */
   private guardSecondaryAction(
     movementId: string,

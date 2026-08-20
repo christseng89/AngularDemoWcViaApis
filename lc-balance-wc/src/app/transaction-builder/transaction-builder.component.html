@@ -100,22 +100,24 @@
           [selectedFunction]="selectedFunction"
           [syncSignal]="checkerSyncSignal"
           [resetTrigger]="checkerResetNonce"
+          [queueRefreshTrigger]="checkerQueueRefreshNonce"
           (movementPicked)="onCheckerMovementPicked($event)"
           (queueReloaded)="onCheckerQueueReloaded()"
           (queueLoadSucceeded)="onCheckerQueueLoadSucceeded()"
         >
-          <!-- A3/B3 (deferSettlement), matching whichever movementType deferSettlementMovementType
-             names (default UTILIZE), and NOT this Maker session's own A3S/A6/B3-HONOUR compound
-             submission (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
+          <!-- A3/A3S (deferSettlement), matching whichever movementType deferSettlementMovementType
+             names (default UTILIZE), and NOT this Maker session's own A3S/A6 compound submission
+             (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
              "S001 B04 was settled, but the SG B04 still in Pending", A3S's compound release() was
              unreachable before this check was added) — Release here is acknowledgment-only
-             (checkerAct()), never the real release API, so A4/A6/B4 still find it PENDING.
-             Bug fixed 2026-08-18 (see arrivalAlreadyApproved's own doc comment) — this hint (and the
-             button below) now also fires off the item's own PERSISTED acknowledgedAt, not only this
-             session's own arrivalApproved click, so re-searching an already-acknowledged B3 item
-             correctly shows it as already approved instead of offering a second attempt that would
-             409. Shows who/when when that persisted field is the reason (this session's own click
-             already says so via the ✓ wording alone). -->
+             (checkerAct() -> acknowledgeArrival()), never the real release API, so A4/A6 still find it
+             PENDING. acknowledgedAt is genuinely persisted again since 2026-08-20 ("A3 A3S 交易 Approve
+             過後 不要再顯示") — this hint (and the button below) fires off it, so re-searching an
+             already-acknowledged A3/A3S item correctly shows it as already approved instead of offering
+             a second attempt that would 409; in normal flow the item is gone from the queue entirely by
+             then (see checkerQueueRefreshNonce), this is defense-in-depth for a stale/unrefreshed list.
+             Shows who/when when that persisted field is the reason (this session's own click already
+             says so via the ✓ wording alone). -->
           <div
             class="tb-hint tb-hint--ok"
             *ngIf="

@@ -499,7 +499,9 @@
               "
             >
               ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ selectedContractSnapshot.tightAvailableBalance }}) — this will be rejected
-              (Design doc §6.1: Available Balance minus outstanding off-balance-sheet (SHGT) exposure {{ selectedContractSnapshot.offBalanceExposure }}).
+              (Design doc §6.1: Confirmed Balance minus still-PENDING decreases minus outstanding off-balance-sheet (SHGT) exposure {{
+                selectedContractSnapshot.offBalanceExposure
+              }} — only APPROVED amounts count as usable capacity).
               <ng-container *ngIf="!selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
                 >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping
                 Gtee" instead — it nets that SG's own exposure out of this check.</ng-container

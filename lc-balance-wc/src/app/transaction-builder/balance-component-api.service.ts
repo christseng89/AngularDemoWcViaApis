@@ -126,7 +126,7 @@ export interface BalanceMovement {
   /** release() on the microservice side always computes and persists both fields (see the microservice's own `src/types.ts`). */
   balanceBefore?: string | null;
   balanceAfter?: string | null;
-  /** HISTORICAL — superseded by the standard release()/status transition; nothing writes these any more. Kept only so pre-existing rows still round-trip. */
+  /** A3/A3S only. Restored 2026-08-20 (see acknowledge() below) — set once the Checker approves the Document Arrival; status stays PENDING (A4/A6 finalizes it for real later). */
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
   /**
@@ -208,7 +208,10 @@ export class BalanceComponentApiService {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
   }
 
-  /** REMOVED — acknowledge()/`/acknowledge` no longer exist. B3's own Checker Release is now the standard release() above, same as every other function. */
+  /** A3/A3S only. Restored 2026-08-20 — the Checker's own acknowledgment on the LC's own UTILIZE (status stays PENDING; A4/A6 finalizes for real later). B3's own Checker Release is still the standard release() above. */
+  acknowledge(movementId: string, acknowledgedBy: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
+  }
 
   /** A4's own real Maker action; a genuine backend acknowledgment (status stays PENDING — the Checker's release() below is still the real finalizing transition), not a new movement. */
   submitByMaker(movementId: string, makerSubmittedBy: string): Observable<BalanceMovement> {

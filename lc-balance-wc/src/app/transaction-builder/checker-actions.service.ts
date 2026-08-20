@@ -78,10 +78,11 @@ export class CheckerActionsService {
       );
     }
 
-    // A3S only: one Release click releases the SG's own redemption for real; the Document Arrival stays
-    // PENDING (acknowledgment only) for A4/A6 to finalize later. arrivalSgRedeemMovementId is only
-    // populated in the same session that Submitted A3S, so a cross-session Checker resolves it via
-    // businessEventId instead — see resolveLinkedMovementId.
+    // A3S only: one Release click releases the SG's own redemption for real, THEN persists the Checker's
+    // own acknowledgment on the LC's own UTILIZE (restored 2026-08-20, "A3 A3S 交易 Approve 過後 不要再顯示")
+    // — the Document Arrival itself stays PENDING (acknowledgment only) for A4/A6 to finalize later.
+    // arrivalSgRedeemMovementId is only populated in the same session that Submitted A3S, so a
+    // cross-session Checker resolves it via businessEventId instead — see resolveLinkedMovementId.
     if (ctx.selectedFunction && deriveFunctionStrategy(ctx.selectedFunction).compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       return this.resolveLinkedMovementId(ctx, ctx.arrivalSgRedeemMovementId, 'FULL_REDEEM', 'PARTIAL_REDEEM').pipe(
         switchMap((arrivalSgRedeemMovementId) => {
@@ -91,6 +92,7 @@ export class CheckerActionsService {
             );
           }
           return this.api.release(arrivalSgRedeemMovementId, checkerId).pipe(
+            switchMap(() => this.acknowledgeUtilize(ctx, checkerId)),
             switchMap(() => of<CheckerActionOutcome>({ kind: 'documentArrivalAcknowledged' })),
             catchError((err) => this.fail(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`)),
           );
@@ -123,6 +125,27 @@ export class CheckerActionsService {
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
       catchError((err) => this.fail(describeApiError(err))),
     );
+  }
+
+  /**
+   * A3 only (plain, deferSettlement without an SG match) — restored 2026-08-20 ("A3 A3S 交易 Approve
+   * 過後 不要再顯示"): persists the Checker's own acknowledgment on the LC's own UTILIZE instead of the
+   * former purely client-side `approveArrival()` flag, so the Checker Queue can filter it out once
+   * approved (see checker-panel.component.ts's own loadCheckerQueue()). Never releases the movement —
+   * A4 (Sight) / A6 (Usance) still does that, later, for real.
+   */
+  acknowledgeArrival(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
+    const checkerId = ctx.createdBy === 'maker1' ? 'checker1' : 'checker2';
+    return this.acknowledgeUtilize(ctx, checkerId).pipe(
+      switchMap(() => of<CheckerActionOutcome>({ kind: 'documentArrivalAcknowledged' })),
+      catchError((err) => this.fail(describeApiError(err))),
+    );
+  }
+
+  /** Shared by acknowledgeArrival() (plain A3) and release()'s own documentArrivalWithSg branch (A3S) above. */
+  private acknowledgeUtilize(ctx: CheckerActionContext, checkerId: string): Observable<BalanceMovement> {
+    const movementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
+    return this.api.acknowledge(movementId!, checkerId);
   }
 
   reject(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {

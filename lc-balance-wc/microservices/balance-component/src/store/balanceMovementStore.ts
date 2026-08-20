@@ -5,7 +5,9 @@
  * ones and updates `status`/`released_by`/`released_at`/`reason_code`/
  * `present_docs_consumed_by`/`present_docs_consumed_at` (2026-08-18, B3's own
  * Present Docs Earmark consumption by B4 — see markPresentDocsConsumed()
- * below; supersedes the historical `acknowledged_by`/`acknowledged_at`).
+ * below) and `acknowledged_by`/`acknowledged_at` (2026-08-20, restored for
+ * A3/A3S's own Checker acknowledgment — see acknowledge() below; B3 itself
+ * still uses the standard release path, not this field, since 2026-08-18).
  */
 import type { Db } from '../db';
 import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
@@ -385,6 +387,20 @@ export class BalanceMovementStore {
   submitByMaker(params: { movementId: string; makerSubmittedBy: string; makerSubmittedAt: string }): void {
     this.db
       .prepare('UPDATE balance_movements SET maker_submitted_by = @makerSubmittedBy, maker_submitted_at = @makerSubmittedAt WHERE movement_id = @movementId')
+      .run(params);
+  }
+
+  /**
+   * Restored 2026-08-20 (business instruction, "A3 A3S 交易 Approve 過後 不要再顯示") — A3/A3S's own
+   * Checker acknowledgment on the LC's own UTILIZE (deferSettlement, status stays PENDING; A4/A6 finalizes
+   * for real later) now persists again, so the Checker Queue can filter an already-approved item out
+   * instead of it reappearing forever. Distinct from B3's own former acknowledge() (removed 2026-08-18) —
+   * that one was superseded by a genuine release; this one covers a movement that genuinely never releases
+   * at this step.
+   */
+  acknowledge(params: { movementId: string; acknowledgedBy: string; acknowledgedAt: string }): void {
+    this.db
+      .prepare('UPDATE balance_movements SET acknowledged_by = @acknowledgedBy, acknowledged_at = @acknowledgedAt WHERE movement_id = @movementId')
       .run(params);
   }
 }

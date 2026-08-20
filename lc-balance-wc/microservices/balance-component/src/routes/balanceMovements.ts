@@ -60,10 +60,16 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     res.json(service.cancel(req.params.movementId, cancelledBy, reasonCode, remarks));
   });
 
-  // REMOVED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
-  // POST /balance-movements/:movementId/acknowledge, B3's own former Checker acknowledgment-only path.
-  // B3 now uses the standard /release route above directly — see service.ts's own removed acknowledge()
-  // section for the full rationale.
+  // POST /balance-movements/:movementId/acknowledge — B3's own former Checker acknowledgment-only path
+  // was removed 2026-08-18 (B3 now uses the standard /release route above). Restored 2026-08-20,
+  // re-purposed for A3/A3S instead (business instruction, "A3 A3S 交易 Approve 過後 不要再顯示") — sets
+  // acknowledgedBy/acknowledgedAt on the LC's own UTILIZE without touching status, so the Checker Queue
+  // can filter it out once approved (see service.acknowledgeArrival()'s own doc comment).
+  router.post('/balance-movements/:movementId/acknowledge', (req, res) => {
+    const { acknowledgedBy } = req.body as { acknowledgedBy?: string };
+    if (!acknowledgedBy) throw new RequestValidationError('acknowledgedBy is required.');
+    res.json(service.acknowledgeArrival(req.params.movementId, acknowledgedBy));
+  });
 
   // POST /balance-movements/:movementId/maker-submit — A4's own real Maker Submit (business
   // instruction 2026-08-16, "Add real Maker Submit, then have Checker to Release it. Exactly the

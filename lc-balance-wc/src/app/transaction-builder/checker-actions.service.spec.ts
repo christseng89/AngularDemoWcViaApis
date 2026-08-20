@@ -37,6 +37,7 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
     release: jest.fn(() => of({ movementId: 'released', status: 'RELEASED' })),
     reject: jest.fn(() => of({ movementId: 'rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'cancelled', status: 'CANCELLED' })),
+    acknowledge: jest.fn(() => of({ movementId: 'acknowledged', status: 'PENDING' })),
     findByBusinessEventId: jest.fn(() => of([] as BalanceMovement[])),
     ...overrides,
   } as unknown as BalanceComponentApiService;

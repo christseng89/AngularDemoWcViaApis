@@ -594,4 +594,40 @@ All A1–A9/B1–B5. Consolidated into two named `MakerPanelComponent` methods (
 `refreshLookUpForLastMakerContext()` for the compound-release screen-reset case — fixed 4 real gaps
 (A4's `submitA4()`, the plain Checker Release/Reject path, A3S's acknowledgment leg, the compound
 `'released'` outcome after `selectFunction()` resets the Maker screen).
+
+## Tight Available Balance now derives from Confirmed Balance, not Available Balance
+
+Business instruction: "只有 APPROVED 才可以動用" — a still-PENDING increase (ISSUE/AMEND_INCREASE/B1/
+B2-Increase) no longer raises Tight until Released. A still-PENDING decrease still occupies it immediately
+via the new `computePendingDecreaseTotal()` ("增加從嚴，占用從寬") — applies to the persisted snapshot
+field and all three sufficiency checks (`checkUtilizeSufficiency`/`checkShgtIssueSufficiency`/
+`checkPresentDocsIssueSufficiency`) uniformly. See `analysis/Balance-Figures-Calculation-Logic.md` §1/§5.
+
+## B2's own AMEND Decrease direction gained a real sufficiency check — was previously ungated entirely
+
+`NO_CHECK_MOVEMENT_TYPES` used to include `'AMEND'` unconditionally; B2 has no separate `AMEND_INCREASE`/
+`AMEND_DECREASE` movementType (direction rides the sign of `amount`), so its Decrease direction silently
+skipped the floor check A2's own `AMEND_DECREASE` already had. Now runs `checkAmendDecreaseSufficiency`
+(by magnitude) whenever `ceilingAmount` is negative.
+
+## A3/A3S Checker acknowledgment restored as a real persisted action — Checker Queue now hides it once Approved
+
+Business instruction: "A3 A3S 交易 Approve 過後 不要再顯示". The former client-only `approveArrival()` flag
+never survived a page reload/second session, so an approved-but-still-PENDING Document Arrival kept
+reappearing in the Checker Queue. `acknowledgedBy`/`acknowledgedAt` (historical since B3's 2026-08-18
+redesign) are genuinely written again via a restored `POST .../acknowledge` route — re-purposed for A3/A3S's
+own `UTILIZE` instead of B3 — and `CheckerPanelComponent.loadCheckerQueue()` now filters out any
+already-`acknowledgedAt` PENDING movement. Status still never changes here (A4/A6 remains the only real
+finalization); `checkerQueueRefreshNonce` reloads the queue in place (keeps the current search) after a
+successful acknowledgment.
+
+## Unified: EVERY successful Checker action reloads the Checker Queue in place, not just A3/A3S's own acknowledge
+
+Business instruction: "統一規則, 純粹 APPROVE PENDING 交易, APPROVED 後該筆交易應該消失, 不能重複
+APPROVED" (repro'd live via S101/A2's own plain Release leaving the just-Approved item still listed).
+`checkerAct()`'s plain release/reject path and `forwardOutcomeToMaker()` (covers `reject()`/
+`deleteMakerPending()`'s own non-`selectFunction()`-resetting success path) now both bump
+`checkerQueueRefreshNonce` on any non-`'failed'` outcome — a real Release/Reject's own status change was
+always correctly excluded by `loadCheckerQueue()`'s `status === 'PENDING'` filter, but the stale
+already-fetched `checkerItems` array was never re-fetched to pick that up until this fix.
 </content>

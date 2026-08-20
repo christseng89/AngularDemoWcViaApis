@@ -82,6 +82,7 @@ function makeApi() {
     release: jest.fn(() => of({ movementId: 'mv-released', status: 'RELEASED' })),
     reject: jest.fn(() => of({ movementId: 'mv-rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'mv-cancelled', status: 'CANCELLED' })),
+    acknowledge: jest.fn(() => of({ movementId: 'mv-acknowledged', status: 'PENDING' })),
     resolveContract: jest.fn(() => of(makeContract())),
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(() => of(makeSnapshot())),
@@ -565,6 +566,24 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'NOT_FOUND' });
       expect(comp.actionBusy).toBe(false);
     });
+
+    // Business instruction 2026-08-20 — forwardOutcomeToMaker() now reloads the Checker Queue for any
+    // non-'failed' outcome, not just 'documentArrivalAcknowledged'; reject() previously left the
+    // just-rejected item stale in the queue since it never resets the whole screen the way a successful
+    // release() does via selectFunction().
+    it('success bumps checkerQueueRefreshNonce; a failed reject does not', () => {
+      const { comp, api } = setup();
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
+      api.reject.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'REJECTED' }) as any);
+      const before = comp.checkerQueueRefreshNonce;
+
+      comp.reject();
+      expect(comp.checkerQueueRefreshNonce).toBe(before + 1);
+
+      api.reject.mockReturnValueOnce(apiErr('NOT_FOUND') as any);
+      comp.reject();
+      expect(comp.checkerQueueRefreshNonce).toBe(before + 1); // unchanged — the second call failed
+    });
   });
 
   // ---------------------------------------------------------------------
@@ -813,17 +832,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(releaseSpy).not.toHaveBeenCalled();
     });
 
-    it('deferSettlement + release + matching movementType (A3): routes through approveArrival(), never api.release', () => {
+    it('deferSettlement + release + matching movementType (A3): routes through acknowledgeArrival() (persisted, restored 2026-08-20), never api.release', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-2', movementType: 'UTILIZE' });
       // not the same submission -> isCheckerCompoundOwnSubmission false
-      const approveSpy = jest.spyOn(comp, 'approveArrival').mockImplementation(() => undefined);
+      const acknowledgeSpy = jest.spyOn(comp, 'acknowledgeArrival').mockImplementation(() => undefined);
 
       comp.checkerAct('release');
 
-      expect(approveSpy).toHaveBeenCalledTimes(1);
+      expect(acknowledgeSpy).toHaveBeenCalledTimes(1);
       expect(api.release).not.toHaveBeenCalled();
+    });
+
+    it('acknowledgeArrival() persists via CheckerActionsService, then sets arrivalApproved through the shared documentArrivalAcknowledged outcome', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A3);
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-2', movementType: 'UTILIZE' });
+
+      comp.acknowledgeArrival();
+
+      expect(api.acknowledge).toHaveBeenCalledWith('mv-2', comp.checkerId);
+      expect(comp.arrivalApproved).toBe(true);
+      expect(comp.actionBusy).toBe(false);
     });
 
     it('deferSettlement + reject (A3): does NOT call approveArrival, calls api.reject directly', () => {
@@ -862,6 +893,21 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenCalledWith('mv-4', 'checker7');
       expect(comp.checkerBusy).toBe(false);
+    });
+
+    // Business instruction 2026-08-20 ("純粹 APPROVE PENDING 交易, APPROVED 後該筆交易應該消失, 不能重複
+    // APPROVED" — repro'd live via S101/A2's own plain Release leaving the just-Approved item still
+    // listed in the Checker Queue): unified so EVERY successful Checker action reloads the queue, not
+    // just A3/A3S's own acknowledgment path.
+    it('plain path (A2) release bumps checkerQueueRefreshNonce so CheckerPanelComponent reloads its queue in place', () => {
+      const { comp } = setup();
+      comp.selectFunction(A2);
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
+      const before = comp.checkerQueueRefreshNonce;
+
+      comp.checkerAct('release');
+
+      expect(comp.checkerQueueRefreshNonce).toBe(before + 1);
     });
 
     // A4's UTILIZE uses the same plain fallback path as A2; gated on makerSubmittedAt (a real A4 Submit

@@ -49,6 +49,12 @@ export class CheckerPanelComponent implements OnChanges {
    * must each independently fire `resetPanel()`, which a toggling boolean could miss.
    */
   @Input() resetTrigger: number | null = null;
+  /**
+   * Restored 2026-08-20 ("A3 A3S 交易 Approve 過後 不要再顯示") — reloads the queue IN PLACE (keeps the
+   * current search/contract, unlike resetTrigger) after a successful Checker acknowledgment, so an
+   * already-approved A3/A3S item stops reappearing. A counter, same reasoning as resetTrigger above.
+   */
+  @Input() queueRefreshTrigger: number | null = null;
 
   /**
    * Fires whenever the picked PENDING movement changes — a real click, or an implicit clear at the top
@@ -77,6 +83,7 @@ export class CheckerPanelComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['resetTrigger'] && !changes['resetTrigger'].firstChange) this.resetPanel();
     if (changes['syncSignal'] && this.syncSignal) this.syncFromContext(this.syncSignal.lcNumber, this.syncSignal.secondaryRef);
+    if (changes['queueRefreshTrigger'] && !changes['queueRefreshTrigger'].firstChange && this.checkerContractId) this.loadCheckerQueue();
   }
 
   get checkerContractId(): string | null {
@@ -157,7 +164,13 @@ export class CheckerPanelComponent implements OnChanges {
     });
   }
 
-  /** Every PENDING movement on `checkerContractId`. Re-run after anything that could change what's PENDING on this contract (a Maker Submit, or a Checker Release/Reject from this same queue). */
+  /**
+   * Every still-actionable PENDING movement on `checkerContractId`. Re-run after anything that could
+   * change what's PENDING on this contract (a Maker Submit, or a Checker Release/Reject/acknowledge from
+   * this same queue). Excludes an already-`acknowledgedAt` A3/A3S UTILIZE (business instruction
+   * 2026-08-20, "A3 A3S 交易 Approve 過後 不要再顯示") — it's still genuinely PENDING server-side (A4/A6
+   * finalizes it for real later), but the Checker has nothing further to do with it here.
+   */
   loadCheckerQueue(): void {
     this.selectedCheckerMovement = null;
     this.checkerItems = [];
@@ -169,7 +182,7 @@ export class CheckerPanelComponent implements OnChanges {
     this.api.listMovements(contractId).subscribe({
       next: (list: BalanceMovement[]) => {
         this.checkerLoading = false;
-        this.checkerItems = list.filter((m) => m.status === 'PENDING');
+        this.checkerItems = list.filter((m) => m.status === 'PENDING' && !m.acknowledgedAt);
         this.queueLoadSucceeded.emit();
       },
       error: () => {

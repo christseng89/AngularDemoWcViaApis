@@ -1,0 +1,492 @@
+# Balance Component — Balance Figure Calculation & Update Logic
+
+**Scope:** every balance/earmark figure shown on a Current Balance snapshot (Look Up Current Balance,
+Inquire Events' Balance Tabs, and every persisted Event Snapshot) — the five core figures **Confirmed
+Balance**, **Available Balance**, **Pending Earmark Total**, **Off-Balance Exposure**, and **Tight
+Available Balance**, plus three earmark/sub-ledger breakdowns — **Present Docs Earmark (Pending /
+Approved)**, **SG (Pending / Approved)**, and **Document Arrival (Pending / Approved)** — and exactly
+how each one updates at **Submit** (Maker, movement status `PENDING`) versus **Approved** (Checker
+Release, movement status `RELEASED`), across all fourteen named business functions, A1–A9 (Import LC)
+and B1–B5 (Export Confirmed LC). A2 and B2 are each split into their own **Increase** and **Decrease**
+sub-tables, since the two directions move every figure the opposite way.
+
+**Source of truth:** `microservices/balance-component/src/domain/balanceDerivation.ts`,
+`domain/offBalanceExposure.ts`, `domain/tolerance.ts`, and `service/balanceService.ts`'s own
+`assembleSnapshot()` — the single function every snapshot surface (live `GET .../balance`, the
+in-memory snapshot captured at `createMovement()`, and the one captured at `release()`) funnels through.
+Every formula below is quoted from that code, not re-derived.
+
+**Real API fields vs. derived breakdowns — read this before the tables.** Of the eight figures covered
+here, **six are genuine, persisted `BalanceSnapshot` fields** (`confirmedBalance`, `availableBalance`,
+`pendingEarmarkTotal`, `offBalanceExposure`, `tightAvailableBalance`, and — `EPLC_CONFIRMATION` only —
+`presentDocsEarmarkPending`/`presentDocsEarmarkApproved`). **"SG (Pending / Approved)" and "Document
+Arrival (Pending / Approved)" are NOT separate API fields** — no such fields exist anywhere in
+`types.ts`. They are this document's own **derived decomposition** of the real `offBalanceExposure`
+figure and the real `pendingEarmarkTotal`/`confirmedBalance` figures respectively, split by movement
+status, computed with the exact same formulas the real fields already use (just not summed together).
+They are included because they answer "how much of this real figure came from a Document Arrival /
+Shipping Guarantee specifically, and is it still Pending or already Approved" — a question the combined
+system fields alone can't answer, but every A1–A9/B1–B5 Maker/Checker screen visibly needs (e.g. the
+Event Timeline's own EARMARKING/EARMARKED status labels are exactly this Document Arrival Pending/
+Approved split, applied to one specific movement).
+
+---
+
+> **Formula change, 2026-08-20 (business instruction).** Figure #5 (**Tight Available Balance**) now
+> derives from **Confirmed Balance**, not Available Balance — "Tight Available Balance 應該用 Confirmed
+> LC Balance 減其他金額, 因為 APPROVED 才可以動用" (only APPROVED/RELEASED amounts are genuinely usable
+> capacity). A still-PENDING **increase** (ISSUE/AMEND_INCREASE/B1/B2-Increase) therefore no longer
+> raises Tight Available Balance until it is Approved — but a still-PENDING **decrease**
+> (AMEND_DECREASE/UTILIZE/B2-Decrease/etc.) still reduces it immediately at Submit, same as before
+> ("A2 B2 Decrease Submit 後，對 Tight LC Balance 也是減項" — "占用從寬", occupancy is counted early;
+> "增加從嚴", increases are counted late). See the new **Pending Decrease Total** row (#5a) and the
+> rewritten §5 general pattern below. A previously-missing sufficiency check on B2's own Decrease
+> direction (`AMEND` with a negative signed amount) was closed in the same pass — see §4's own note.
+> Every per-function table in §6/§7 below follows this updated rule; only the pure-increase,
+> single-movement tables (A1, A2-Increase, B1, B2-Increase) were individually re-verified against it in
+> this revision — read every other table's own "Tight Available Balance" row through §5's general rule
+> rather than assuming it was re-audited line by line.
+
+## 1. The Five Core Figures — Exact Formulas
+
+All five are **derived at query time from the full movement history of one `BalanceContract`** — none is
+stored directly on the contract row itself. `ceilingAmount` (never the raw `amount`) is what every
+formula sums; see §3 for how `ceilingAmount` itself is computed.
+
+| # | Figure | Formula | Populated for |
+|---|---|---|---|
+| 1 | **Confirmed Balance** | Σ **RELEASED** movements' `ceilingAmount` × direction (`MOVEMENT_DIRECTION` table, §2) | every instrumentType |
+| 2 | **Available Balance** | Confirmed Balance + Σ **PENDING** movements' `ceilingAmount` × direction | every instrumentType |
+| 3 | **Pending Earmark Total** | Available Balance − Confirmed Balance (i.e. just the net PENDING delta, signed) | every instrumentType |
+| 4 | **Off-Balance Exposure** | Σ (**PENDING**+**RELEASED**) child SHGT `ISSUE` − Σ (**PENDING**+**RELEASED**) child SHGT `PARTIAL_REDEEM`/`FULL_REDEEM` | `IPLC_LC` / `EPLC_LC` **only** — `null` for every other instrumentType |
+| 5a | **Pending Decrease Total** *(new, not a persisted field)* | Σ **PENDING** movements' `ceilingAmount` on this SAME contract, counting only the ones whose signed `MOVEMENT_DIRECTION` contribution is negative (never netted against a PENDING increase on the same contract) | every instrumentType, but only consumed by #5 |
+| 5 | **Tight Available Balance** | `IPLC_LC`/`EPLC_LC`: Confirmed − Pending Decrease Total − Off-Balance Exposure. `EPLC_CONFIRMATION`: Confirmed − Pending Decrease Total − (Present Docs Earmark Pending + Approved combined). | `IPLC_LC` / `EPLC_LC` / `EPLC_CONFIRMATION` **only** — `null` for every other instrumentType |
+
+## 2. The Three Earmark / Sub-Ledger Breakdowns
+
+| # | Figure | Formula | Real field? | Populated for |
+|---|---|---|---|---|
+| 6 | **Present Docs Earmark (Pending)** | Σ **PENDING**, not-yet-`presentDocsConsumedAt` `EPLC_EXAMINATION` `CREATE` `ceilingAmount` | **Yes** — `presentDocsEarmarkPending` | `EPLC_CONFIRMATION` only |
+| 7 | **Present Docs Earmark (Approved)** | Σ **RELEASED**, not-yet-`presentDocsConsumedAt` `EPLC_EXAMINATION` `CREATE` `ceilingAmount` | **Yes** — `presentDocsEarmarkApproved` | `EPLC_CONFIRMATION` only |
+| 8 | **SG (Pending)** *(derived)* | Σ **PENDING** child SHGT `ISSUE` `ceilingAmount` − Σ **PENDING** child SHGT `PARTIAL_REDEEM`/`FULL_REDEEM` `ceilingAmount` | No — the PENDING-only half of `offBalanceExposure` | `IPLC_LC`/`EPLC_LC` (shown on the parent LC) |
+| 9 | **SG (Approved)** *(derived)* | Σ **RELEASED** child SHGT `ISSUE` `ceilingAmount` − Σ **RELEASED** child SHGT `PARTIAL_REDEEM`/`FULL_REDEEM` `ceilingAmount` | No — the RELEASED-only half of `offBalanceExposure` | `IPLC_LC`/`EPLC_LC` (shown on the parent LC) |
+| 10 | **Document Arrival (Pending)** *(derived)* | The specific Document Arrival `UTILIZE` movement's own `ceilingAmount`, while its own status is **PENDING** (UI label: **EARMARKING**) | No — the PENDING half of that one movement's own contribution to `pendingEarmarkTotal` | `IPLC_LC` only (Import side; the Export analog is Present Docs Earmark above) |
+| 11 | **Document Arrival (Approved)** *(derived)* | The same movement's own `ceilingAmount` once genuinely **RELEASED** via A4/A6 (UI label: **EARMARKED**) | No — at that point it's already merged into `confirmedBalance`; this row tracks *that specific movement's* own state, not a separate ledger | `IPLC_LC` only |
+
+**#8 + #9 always sum to `offBalanceExposure` (#4).** **#6 + #7 always sum to the combined figure
+`tightAvailableBalance` (#5) subtracts for `EPLC_CONFIRMATION`.** Neither #10 nor #11 is additive with
+anything else — they describe one specific movement's own lifecycle, not a running total.
+
+## 3. Movement Direction Table (`MOVEMENT_DIRECTION`)
+
+Every movement's contribution to Confirmed/Available Balance is its `ceilingAmount` multiplied by a
+fixed **+1** (increases the balance) or **−1** (decreases it), keyed by `movementType`:
+
+| Instrument family | movementType | Direction |
+|---|---|---|
+| `IPLC_LC` / `EPLC_LC` | `ISSUE` | **+1** |
+| | `AMEND_INCREASE` | **+1** |
+| | `AMEND_DECREASE` | **−1** |
+| | `UTILIZE` | **−1** |
+| `IPLC_ACCEPTANCE` / `EPLC_ACCEPTANCE` | `CREATE` | **+1** |
+| | `PARTIAL_SETTLE` / `FULL_SETTLE` | **−1** |
+| `SHGT` | `ISSUE` | **+1** |
+| | `PARTIAL_REDEEM` / `FULL_REDEEM` | **−1** |
+| `EPLC_CONFIRMATION` | `AMEND` (direction rides the sign of `amount`, not this table alone) | **+1** |
+| | `HONOUR` / `ACCEPT` | **−1** |
+| `EPLC_DUE_FROM_ISSUING_BANK` / `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` | `CREATE` | **+1** |
+| | `REIMBURSE` / `RECLASSIFY_OUT` | **−1** |
+| `EPLC_EXAMINATION` (B3) | `CREATE` | — never contributes to Confirmed/Available at all; see B3's own section |
+
+## 4. Tolerance / `ceilingAmount` Conversion
+
+`ceilingAmount = amount × (1 + tolerancePct / 100)` — applied **only** when both of the following hold:
+
+- **instrumentType** is `IPLC_LC`, `EPLC_LC`, or `EPLC_CONFIRMATION` (never SHGT/Acceptance — their
+  amounts are always their own face value, business-confirmed), and
+- **movementType** is `ISSUE`, `AMEND_INCREASE`, `AMEND_DECREASE`, or `AMEND`.
+
+Every other instrumentType/movementType combination uses `ceilingAmount = amount` unchanged. This
+affects A1/A2 (`IPLC_LC`), B1/B2 (`EPLC_CONFIRMATION`) directly — A3/A3S/A4/A6/A7/A8/A9/B3/B4/B5 never
+apply Tolerance, even where their own contract happens to carry a `tolerancePct` value.
+
+**Gap closed 2026-08-20 (BA balance-check review).** B2 has no separate `AMEND_INCREASE`/
+`AMEND_DECREASE` movementType — one `AMEND`, direction riding the sign of `amount` (§2) — and its
+Decrease direction had **no sufficiency check at all** (grouped with the genuinely-unchecked
+ISSUE/AMEND_INCREASE/CREATE movementTypes), unlike A2's own `AMEND_DECREASE` (checked by
+`checkAmendDecreaseSufficiency`, §6.2 — can never decrease below what's already utilized). B2's own
+Decrease (`AMEND` with a negative signed `ceilingAmount`) now runs the same floor check, by magnitude.
+
+## 5. Submit vs. Approved — the General Pattern (read this before the per-function tables)
+
+For **any single, non-compound movement** (one contract, one row, no linked legs), moving that SAME
+movement from `PENDING` → `RELEASED` has a highly specific, non-obvious effect:
+
+- **Confirmed Balance** — unaffected at Submit (only RELEASED counts); moves by the full signed
+  `ceilingAmount` at Approval.
+- **Available Balance** — moves by the full signed `ceilingAmount` **at Submit already** (PENDING
+  already contributes to Available); **stays at that same total value at Approval** — the movement's
+  own contribution simply migrates from the "Σ PENDING" term to the "Confirmed Balance" term, netting
+  to an unchanged sum. **Available Balance genuinely does not change when a simple movement is
+  Released** — only its internal composition does.
+- **Pending Earmark Total** (= Available − Confirmed) — moves by the signed `ceilingAmount` at Submit;
+  returns to its pre-Submit value at Approval.
+- **Tight Available Balance** (2026-08-20 formula, #5/#5a above) — an **increase**-shaped movement
+  (ISSUE/AMEND_INCREASE/B1/B2-Increase) is invisible to Tight at Submit (Confirmed hasn't moved yet) and
+  only raises it **at Approval**, mirroring Confirmed Balance's own row exactly ("增加從嚴"). A
+  **decrease**-shaped movement (AMEND_DECREASE/UTILIZE/B2-Decrease/etc.) instead lowers Tight
+  **immediately at Submit** via Pending Decrease Total, then stays at that same lowered value through
+  Approval — the movement's own contribution migrates from "Pending Decrease Total" to "Confirmed", net
+  unchanged, same shape Available Balance's own row already has ("占用從寬"). Off-Balance
+  Exposure/Present Docs Earmark already fold their own PENDING contribution in from Submit (next two
+  bullets) — Tight's Confirmed-based swap doesn't change how those two behave, only how the LC/
+  Confirmation's *own* pending items are treated.
+- **Off-Balance Exposure / SG (Pending) / SG (Approved)** — for A8/A9, the COMBINED figure (#4) reacts
+  **at Submit** and never again at Approval — but the two SPLIT halves (#8/#9) still move BETWEEN each
+  other at Approval (Pending decreases, Approved increases by the same amount), even though their sum
+  stays fixed. See A8/A9's own tables.
+- **Present Docs Earmark (Pending) / (Approved)** — same "moves between buckets, combined total fixed"
+  shape as SG above, but on B3's own Release specifically (not Submit) — see B3's own table.
+- **Document Arrival (Pending) / (Approved)** — a SINGLE movement's own Pending amount fully migrates to
+  Approved only once A4/A6 genuinely finalizes it — never at A3/A3S's own Submit, and never at A3's own
+  Checker "Approve" (acknowledgment-only, not a real Release — see A3's own table). That acknowledgment
+  is itself genuinely persisted again as of 2026-08-20 ("A3 A3S 交易 Approve 過後 不要再顯示" —
+  `acknowledgedBy`/`acknowledgedAt`, restored on the same `POST .../acknowledge` route B3 used before its
+  own 2026-08-18 redesign, now scoped to A3/A3S's `UTILIZE` instead): the Checker Queue (every PENDING
+  movement on the resolved contract) now excludes an already-`acknowledgedAt` item, so an approved A3/A3S
+  Document Arrival stops reappearing there instead of showing PENDING forever until A4/A6 finalizes it.
+  Unified the same day across every other function too ("純粹 APPROVE PENDING 交易, APPROVED 後該筆交易
+  應該消失, 不能重複 APPROVED"): a plain Release/Reject (A2, etc.) already correctly moved the movement's
+  own `status` off `PENDING`, but the Checker Queue's already-fetched list was never re-fetched to notice
+  — every successful Checker action now reloads it in place.
+
+**Compound functions** (A3S, A6, B4, B5) touch **more than one contract's row** at once — called out
+explicitly, leg by leg, in their own tables below.
+
+---
+
+## 6. Import LC Functions (A1–A9)
+
+### A1 — LC Issue (`IPLC_LC` / `ISSUE`)
+
+Creates a brand-new Logical Contract. No parent, no linked legs. Tolerance applies (§4).
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **+= ceilingAmount** |
+| Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **+= ceilingAmount** | reverts to 0 for this movement |
+| Off-Balance Exposure | unaffected (no SHGT children yet) | unaffected |
+| Tight Available Balance | unchanged (2026-08-20: tracks Confirmed now, not Available — an unApproved ISSUE isn't usable capacity yet) | **+= ceilingAmount** |
+| Present Docs Earmark (P/A) | N/A — Import side | N/A |
+| SG (Pending / Approved) | N/A — no SG issued against this LC yet | N/A |
+| Document Arrival (Pending / Approved) | N/A — not a `UTILIZE` | N/A |
+
+### A2 — LC Amendment (`IPLC_LC` / `AMEND_INCREASE` or `AMEND_DECREASE`)
+
+Direction is picked explicitly (a `subChoice` dropdown) and drives which `movementType` is submitted —
+**not** a sign on `amount`. Tolerance applies. A Decrease is additionally checked at Submit: its own
+`ceilingAmount` must not exceed the current Available Balance.
+
+#### A2 — Increase (`AMEND_INCREASE`)
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **+= ceilingAmount** |
+| Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **+= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | unaffected | unaffected |
+| Tight Available Balance | unchanged (2026-08-20: tracks Confirmed now, not Available) | **+= ceilingAmount** |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| SG (Pending / Approved) | unaffected by this movement | unaffected |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+#### A2 — Decrease (`AMEND_DECREASE`)
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **−= ceilingAmount** |
+| Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **−= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | unaffected | unaffected |
+| Tight Available Balance | **−= ceilingAmount** | unchanged |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| SG (Pending / Approved) | unaffected by this movement | unaffected |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+### A3 — Document Arrival (`IPLC_LC` / `UTILIZE`, plain — no matching Shipping Guarantee)
+
+**No Tolerance.** Sufficiency at Submit is the two-tier `checkUtilizeSufficiency()` check (compares
+against Available Balance, then against Tight Available Balance).
+
+| Figure | At Submit (PENDING) | At the Checker's "Approve" (acknowledgment only — status stays PENDING) |
+|---|---|---|
+| Confirmed Balance | unchanged | **unchanged — A3's own Checker action never calls the real release endpoint** |
+| Available Balance | **−= ceilingAmount** | unchanged (Approve is not a real Release) |
+| Pending Earmark Total | **−= ceilingAmount** | unchanged |
+| Off-Balance Exposure | unaffected (plain A3, no SG match) | unaffected |
+| Tight Available Balance | **−= ceilingAmount** | unchanged |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| SG (Pending / Approved) | unaffected | unaffected |
+| **Document Arrival (Pending)** | **+= ceilingAmount** (EARMARKING) | **stays at that same value — still EARMARKING** |
+| **Document Arrival (Approved)** | 0 | **stays 0 — genuine finalization is A4/A6's own job, not A3's Approve** |
+
+### A3S — Document Arrival w/ Shipping Gtee (`IPLC_LC` / `UTILIZE`, matched against an outstanding SG)
+
+**Two movements created together** (one `businessEventId`): the LC's own `UTILIZE` (`req`) **and** the
+matched SG's own `FULL_REDEEM`/`PARTIAL_REDEEM` (amount = MIN(Bill Amount, SG's own Available Balance)),
+submitted SG-first. Checker Release releases the SG leg for real; the LC's own `UTILIZE` stays PENDING.
+
+| Figure | At Submit (both legs PENDING) | At Checker Release (SG leg genuinely released; LC leg stays PENDING) |
+|---|---|---|
+| LC's Confirmed Balance | unchanged | **unchanged — same A3 exception, the LC leg is never released here** |
+| LC's Available Balance | **−= UTILIZE's ceilingAmount** | unchanged |
+| SG's Confirmed Balance | unchanged | **−= redemption ceilingAmount** |
+| SG's Available Balance | **−= redemption ceilingAmount** | unchanged (already reflected) |
+| LC's Off-Balance Exposure (combined) | **−= redemption ceilingAmount already at Submit** (PENDING redemptions count immediately) | unchanged — combined total already netted |
+| **LC's SG (Pending)** | **−= redemption ceilingAmount** | **reverts (+= back)** — moves out of Pending |
+| **LC's SG (Approved)** | unaffected | **−= redemption ceilingAmount** — moves into the Approved (RELEASED) bucket |
+| LC's Tight Available Balance | **increases** (the SG's own reserved capacity is released back) | unchanged |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| **LC's Document Arrival (Pending)** | **+= UTILIZE's ceilingAmount** (EARMARKING) | **unchanged — still EARMARKING**, A4/A6 finalizes it later |
+| LC's Document Arrival (Approved) | 0 | 0 |
+
+### A4 — Sight Settlement (no new movement — finalizes an existing A3/A3S `UTILIZE`)
+
+**Maker Submit (`submitA4()`) writes only `makerSubmittedBy`/`makerSubmittedAt`** on the already-PENDING
+movement — no new movement, no balance change of any kind. The Checker Release that follows is the
+**real** finalization of that same `UTILIZE` (gated on `makerSubmittedAt` being set first).
+
+| Figure | At Maker Submit (metadata-only, status stays PENDING) | At Checker Release (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **−= UTILIZE's ceilingAmount** |
+| Available Balance | unchanged | unchanged (already reflected since the original A3 Submit) |
+| Pending Earmark Total | unchanged | reverts to 0 for this movement |
+| Off-Balance Exposure | unaffected (Sight-only, never touches SHGT) | unaffected |
+| Tight Available Balance | unchanged | unchanged |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| SG (Pending / Approved) | unaffected | unaffected |
+| **Document Arrival (Pending)** | unchanged, still EARMARKING | **−= ceilingAmount — drops to 0** |
+| **Document Arrival (Approved)** | 0 | **+= ceilingAmount — this is where EARMARKING becomes EARMARKED** |
+
+### A6 — Acceptance, Usance (`IPLC_ACCEPTANCE` / `CREATE` — compound Checker Release)
+
+Maker Submit creates **only** the new Acceptance contract's own `CREATE` (PENDING) — the source LC's own
+`UTILIZE` (from A3) is picked, not re-submitted. Checker Release is compound: releases the source
+Document Arrival first, then the new Acceptance `CREATE`.
+
+| Figure | At Submit | At Checker Release |
+|---|---|---|
+| LC's Confirmed Balance | unchanged | **−= source UTILIZE's ceilingAmount** |
+| LC's Available Balance | unchanged (already reflected since A3's own Submit) | unchanged |
+| Acceptance's Confirmed Balance | unchanged | **+= ceilingAmount** |
+| Acceptance's Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| Off-Balance Exposure (either contract) | unaffected — Acceptance already reduced LC Balance at UTILIZE time, SHGT-style double-counting is out of scope | unaffected |
+| Tight Available Balance (LC) | unaffected by this function directly | unaffected |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| SG (Pending / Approved) | unaffected | unaffected |
+| **LC's Document Arrival (Pending)** | unchanged, still EARMARKING (set by the earlier A3/A3S) | **−= ceilingAmount — drops to 0** |
+| **LC's Document Arrival (Approved)** | 0 | **+= ceilingAmount — EARMARKING becomes EARMARKED** |
+
+### A7 — Acceptance Settlement (`IPLC_ACCEPTANCE` / `FULL_SETTLE` or `PARTIAL_SETTLE`)
+
+Settles an existing Acceptance at/before maturity. **Never touches the parent LC's own Balance.** No
+Tolerance.
+
+| Figure | At Submit | At Approved |
+|---|---|---|
+| Acceptance's Confirmed Balance | unchanged | **−= ceilingAmount** |
+| Acceptance's Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **−= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure / Tight Available | `null` (not `IPLC_LC`/`EPLC_LC`) | `null` |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| SG (Pending / Approved) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A — this is Acceptance-side, not the LC's own UTILIZE | N/A |
+
+### A8 — Shipping Gtee Issue (`SHGT` / `ISSUE`)
+
+Amount is capped at the parent LC's own current Available Balance at Submit (nets any already-outstanding
+SG exposure first). No Tolerance.
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| SG's Confirmed Balance | unchanged | **+= ceilingAmount** |
+| SG's Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| **Parent LC's Off-Balance Exposure (combined)** | **+= ceilingAmount — reacts immediately** | **unchanged — no further reaction to the combined total** |
+| **Parent LC's SG (Pending)** | **+= ceilingAmount** | **reverts to 0 for this movement** — moves out of Pending |
+| **Parent LC's SG (Approved)** | 0 | **+= ceilingAmount** — moves into the Approved (RELEASED) bucket |
+| Parent LC's Tight Available Balance | **−= ceilingAmount** | unchanged |
+| Parent LC's Confirmed/Available Balance itself | unaffected — A8 never touches the LC's own contract row | unaffected |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+This is the one figure whose COMBINED total reacts **at Submit and never again at Release** — but the
+Pending/Approved SPLIT still genuinely migrates between the two buckets at Release, same shape as B3's
+own Present Docs Earmark.
+
+### A9 — Shipping Gtee Redemption (`SHGT` / `FULL_REDEEM` or `PARTIAL_REDEEM`, auto-derived from amount vs. outstanding)
+
+Amount defaults to (and is capped at) the SG's own current Available Balance; `FULL_REDEEM` vs.
+`PARTIAL_REDEEM` is derived automatically, not picked separately.
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| SG's Confirmed Balance | unchanged | **−= ceilingAmount** |
+| SG's Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| **Parent LC's Off-Balance Exposure (combined)** | **−= ceilingAmount — reacts immediately** | **unchanged** |
+| **Parent LC's SG (Pending)** | **−= ceilingAmount** | **reverts (+= back)** — moves out of Pending |
+| **Parent LC's SG (Approved)** | unaffected | **−= ceilingAmount** — moves into the Approved (RELEASED) bucket |
+| Parent LC's Tight Available Balance | **+= ceilingAmount** (reserved capacity released back) | unchanged |
+| Present Docs Earmark (P/A) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+---
+
+## 7. Export Confirmed LC Functions (B1–B5)
+
+### B1 — Confirm LC (`EPLC_CONFIRMATION` / `ISSUE`)
+
+Establishes the confirming bank's own contingent (CONF LIAB). Tolerance applies — identical mechanics
+to A1, on a different instrumentType.
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **+= ceilingAmount** |
+| Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **+= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | `null` (Import-only figure) | `null` |
+| Tight Available Balance | unchanged (2026-08-20: tracks Confirmed now, not Available) | **+= ceilingAmount** |
+| Present Docs Earmark (Pending) | unaffected (no B3 presentation yet) | unaffected |
+| Present Docs Earmark (Approved) | unaffected | unaffected |
+| SG (Pending / Approved) | N/A — Export side | N/A |
+| Document Arrival (Pending / Approved) | N/A — Import-only concept | N/A |
+
+### B2 — Confirm LC Amendment (`EPLC_CONFIRMATION` / `AMEND`)
+
+**No separate `AMEND_INCREASE`/`AMEND_DECREASE` movementType** — the UI's own Direction picker sets the
+**sign** of the submitted `amount` (positive = Increase, negative = Decrease); the wire request always
+carries `movementType: 'AMEND'`. Tolerance applies to the (signed) amount either way.
+
+#### B2 — Increase
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **+= ceilingAmount** |
+| Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **+= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | `null` | `null` |
+| Tight Available Balance | unchanged (2026-08-20: tracks Confirmed now, not Available) | **+= ceilingAmount** |
+| Present Docs Earmark (P/A) | unaffected by this movement | unaffected |
+| SG (Pending / Approved) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+#### B2 — Decrease
+
+Sufficiency gap closed 2026-08-20 — see §4's own note: this direction now runs the same floor check as
+A2's own `AMEND_DECREASE` (`checkAmendDecreaseSufficiency`, by magnitude), previously ungated entirely.
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **−= ceilingAmount** |
+| Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **−= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | `null` | `null` |
+| Tight Available Balance | **−= ceilingAmount** (unaffected by the 2026-08-20 formula change — a decrease still occupies Tight from Submit, via Pending Decrease Total) | unchanged |
+| Present Docs Earmark (P/A) | unaffected by this movement | unaffected |
+| SG (Pending / Approved) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+### B3 — Present Docs (`EPLC_EXAMINATION` / `CREATE`, `MEMO_ONLY`)
+
+**Never contributes to the parent Confirmation's own Confirmed/Available Balance at all** — D3 ("only
+legal events move balances"). What actually matters is the **Present Docs Earmark Pending/Approved**
+pair on the **parent Confirmation**. Unlike every other function, B3 has a genuine **third lifecycle
+state** — "Consumed" (`presentDocsConsumedAt` set, by B4) — beyond Submit/Approved.
+
+| Figure (on the **parent Confirmation**) | At Submit (this presentation is PENDING) | At Checker Release (this presentation is RELEASED — genuinely finalizes B3 itself since the 2026-08-18 redesign) | Later, once B4 consumes it |
+|---|---|---|---|
+| Confirmed / Available Balance | unaffected — MEMO_ONLY | unaffected | unaffected |
+| **Present Docs Earmark (Pending)** | **+= ceilingAmount** | **−= ceilingAmount** (moves out of Pending) | — |
+| **Present Docs Earmark (Approved)** | unaffected | **+= ceilingAmount** (moves into Approved) | **−= ceilingAmount** (finally drops out) |
+| Tight Available Balance | **−= ceilingAmount** (Pending already subtracts) | **unchanged** — the combined total is invariant across B3's own Release | **+= ceilingAmount** (capacity genuinely freed) |
+| Off-Balance Exposure | `null` | `null` | `null` |
+| SG (Pending / Approved) | N/A | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A — Import-only concept; B3 is the Export analog, already covered above | N/A | N/A |
+
+The combined Pending+Approved figure (what actually gates a NEW presentation's own sufficiency check)
+only ever changes at genuine Submit or genuine B4-consumption — never at B3's own Release.
+
+### B4 — Honour / Acceptance (`EPLC_CONFIRMATION` / `HONOUR` or `ACCEPT` — compound, tenor-routed)
+
+Picks an already-RELEASED B3 record. **Sight (`HONOUR`)**: Submit creates 2 linked movements (PENDING) —
+the Confirmation's own `HONOUR` **and** a new `EPLC_DUE_FROM_ISSUING_BANK` contract's own `CREATE`.
+**Usance (`ACCEPT`)**: Submit creates 3 linked movements (PENDING) — the Confirmation's own `ACCEPT`, a
+new `EPLC_ACCEPTANCE` contract's own `CREATE`, **and** a new `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`
+contract's own `CREATE`. Checker Release is compound: releases the primary first, then whichever
+secondary leg(s) that tenor needs, and **marks the picked B3 record `presentDocsConsumedAt` as a side
+effect** — no separate release call against B3 itself (it was already Released beforehand).
+
+| Figure | At Submit (all legs PENDING) | At Checker Release |
+|---|---|---|
+| Confirmation's Confirmed Balance | unchanged | **−= ceilingAmount** (HONOUR/ACCEPT, −1 direction) |
+| Confirmation's Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| `EPLC_DUE_FROM_ISSUING_BANK` (Sight) / `EPLC_ACCEPTANCE` (Usance) Confirmed Balance | unchanged | **+= ceilingAmount** |
+| `EPLC_DUE_FROM_ISSUING_BANK` / `EPLC_ACCEPTANCE` Available Balance | **+= ceilingAmount** | unchanged (already reflected) |
+| `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` Confirmed Balance (Usance only) | unchanged | **+= ceilingAmount** |
+| `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` Available Balance (Usance only) | **+= ceilingAmount** | unchanged (already reflected) |
+| **Confirmation's Present Docs Earmark (Approved)** | unaffected | **−= B3's own ceilingAmount** (the picked presentation is finally consumed) |
+| Confirmation's Present Docs Earmark (Pending) | unaffected — B3's own presentation was already RELEASED before B4 picked it | unaffected |
+| Confirmation's Tight Available Balance | unaffected at Submit by this function | **+= B3's own ceilingAmount** (capacity freed as the earmark clears) |
+| Off-Balance Exposure | `null` | `null` |
+| SG (Pending / Approved) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A — Import-only concept | N/A |
+
+### B5 — Settlement — Reimbursement / Maturity (`EPLC_ACCEPTANCE` / `FULL_SETTLE` or `PARTIAL_SETTLE` — compound, Usance-held-to-maturity only)
+
+Maker Submit creates **2 linked movements together** (PENDING): the Acceptance's own `FULL_SETTLE`/
+`PARTIAL_SETTLE` (`req`) **first**, then resolves the matching (already-existing, B4-created)
+`EPLC_ACCEPTANCE_REIMB_RECEIVABLE` contract and creates its own `REIMBURSE` against it. Checker Release
+releases both in the same order.
+
+| Figure | At Submit (both legs PENDING) | At Checker Release |
+|---|---|---|
+| Acceptance's Confirmed Balance | unchanged | **−= ceilingAmount** |
+| Acceptance's Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Reimbursement Receivable's Confirmed Balance | unchanged | **−= ceilingAmount** |
+| Reimbursement Receivable's Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Off-Balance Exposure / Tight Available (either contract) | `null` — neither instrumentType is `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` | `null` |
+| Present Docs Earmark (P/A) | unaffected — B5 never touches `EPLC_EXAMINATION` | unaffected |
+| SG (Pending / Approved) | N/A | N/A |
+| Document Arrival (Pending / Approved) | N/A | N/A |
+
+Sight settlement (collecting `EPLC_DUE_FROM_ISSUING_BANK`) is explicitly out of Balance Component's own
+scope — B4 books that asset, but nothing in this registry ever settles it.
+
+---
+
+## 8. Quick-Reference — Which Function Touches Which Figure
+
+| Function | Confirmed / Available / Pending Earmark | Off-Balance Exposure | Tight Available Balance | Present Docs Earmark P/A | SG P/A | Document Arrival P/A |
+|---|---|---|---|---|---|---|
+| A1 | own contract | — | own contract | — | — | — |
+| A2 (Inc/Dec) | own contract | — | own contract | — | — | — |
+| A3 | own contract | — | own contract | — | — | **own movement** |
+| A3S | LC + SG contracts | LC (reacts at Submit) | LC | — | **LC (splits at Release)** | **LC's own UTILIZE** |
+| A4 | LC (at Release only) | — | — | — | — | **LC's own UTILIZE (finalizes)** |
+| A6 | LC (at Release) + Acceptance | — | — | — | — | **LC's own UTILIZE (finalizes)** |
+| A7 | own contract | `null` | `null` | — | — | — |
+| A8 | SG's own contract | **LC (reacts at Submit)** | LC | — | **LC (splits at Release)** | — |
+| A9 | SG's own contract | **LC (reacts at Submit)** | LC | — | **LC (splits at Release)** | — |
+| B1 | own contract | `null` | own contract | unaffected | — | — |
+| B2 (Inc/Dec) | own contract | `null` | own contract | unaffected | — | — |
+| B3 | `null` effect on Confirmed/Available (MEMO_ONLY) | `null` | Confirmation (via Earmark) | **own contract, splits at Release** | — | — |
+| B4 | Confirmation + new asset/liability contract(s) | `null` | Confirmation (Approved bucket consumed) | **Confirmation (Approved drops)** | — | — |
+| B5 | Acceptance + Receivable | `null` | `null` | unaffected | — | — |
+
+---
+
+*Generated from `microservices/balance-component/src/domain/balanceDerivation.ts`,
+`domain/offBalanceExposure.ts`, `domain/tolerance.ts`, `service/balanceService.ts`, and
+`src/app/transaction-builder/balance-component.model.ts`'s own `IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS`
+registry. See `lc-balance-wc/CLAUDE.md`'s own decision log for the business rationale/history behind
+each rule.*

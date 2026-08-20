@@ -145,6 +145,31 @@ describe('CheckerPanelComponent', () => {
       expect(c.checkerLcNumber).toBe('S001');
     });
 
+    it('queueRefreshTrigger: does nothing on the first change, reloads the queue in place on a later change when a contract is already resolved', () => {
+      const api = mockApi({ listMovements: jest.fn(() => of([movement({ movementId: 'm1' })])) });
+      const c = new CheckerPanelComponent(api);
+      c.checkerContract = contract({ balanceContractId: 'bc-9' });
+      c.checkerLcNumber = 'S001';
+
+      c.ngOnChanges({ queueRefreshTrigger: { previousValue: undefined, currentValue: 0, firstChange: true, isFirstChange: () => true } });
+      expect(api.listMovements).not.toHaveBeenCalled();
+
+      c.ngOnChanges({ queueRefreshTrigger: { previousValue: 0, currentValue: 1, firstChange: false, isFirstChange: () => false } });
+      expect(api.listMovements).toHaveBeenCalledWith('bc-9');
+      // reloads IN PLACE — the search itself (checkerLcNumber) survives, unlike resetTrigger.
+      expect(c.checkerLcNumber).toBe('S001');
+    });
+
+    it('queueRefreshTrigger: a no-op when no contract is resolved yet — nothing to reload', () => {
+      const api = mockApi();
+      const c = new CheckerPanelComponent(api);
+      c.checkerContract = null;
+
+      c.ngOnChanges({ queueRefreshTrigger: { previousValue: 0, currentValue: 1, firstChange: false, isFirstChange: () => false } });
+
+      expect(api.listMovements).not.toHaveBeenCalled();
+    });
+
     it('syncSignal: a non-null change calls syncFromContext() with the signal payload', () => {
       const api = mockApi();
       const c = new CheckerPanelComponent(api);
@@ -343,6 +368,23 @@ describe('CheckerPanelComponent', () => {
       expect(c.checkerItems.map((m) => m.movementId)).toEqual(['m1', 'm3']);
       expect(c.checkerLoading).toBe(false);
       expect(succeeded).toHaveBeenCalled();
+    });
+
+    it('excludes an already-acknowledgedAt PENDING movement (A3/A3S, restored 2026-08-20 — "A3 A3S 交易 Approve 過後 不要再顯示")', () => {
+      const api = mockApi({
+        listMovements: jest.fn(() =>
+          of([
+            movement({ movementId: 'm1', status: 'PENDING', acknowledgedAt: null }),
+            movement({ movementId: 'm2', status: 'PENDING', acknowledgedAt: '2026-08-20T00:00:00.000Z', acknowledgedBy: 'checker1' }),
+          ]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.checkerContract = contract({ balanceContractId: 'bc-9' });
+
+      c.loadCheckerQueue();
+
+      expect(c.checkerItems.map((m) => m.movementId)).toEqual(['m1']);
     });
 
     it('error: resets checkerItems to empty and checkerLoading to false, without emitting queueLoadSucceeded', () => {

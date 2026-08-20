@@ -56,6 +56,8 @@ export class TransactionBuilderComponent {
   checkerSyncSignal: CheckerSyncSignal | null = null;
   /** Public for template binding — shared reset trigger for both CheckerPanelComponent and MakerPanelComponent. */
   checkerResetNonce = 0;
+  /** Public for template binding — reloads CheckerPanelComponent's own queue in place (keeps its search) after a successful acknowledgeArrival(), so an already-approved A3/A3S item stops reappearing (business instruction 2026-08-20, "A3 A3S 交易 Approve 過後 不要再顯示"). */
+  checkerQueueRefreshNonce = 0;
 
   actionBusy = false;
   releaseSuccessHint: string | null = null;
@@ -296,10 +298,31 @@ export class TransactionBuilderComponent {
     this.arrivalApproved = true;
   }
 
-  /** Forwards a non-special outcome to `MakerPanelComponent` via `makerOutcomeSignal`. */
+  /**
+   * A3 only (plain, deferSettlement without an SG match) — restored 2026-08-20 ("A3 A3S 交易 Approve
+   * 過後 不要再顯示"): persists the Checker's own acknowledgment via CheckerActionsService instead of the
+   * former purely client-side approveArrival(), then reloads the Checker Queue in place so the
+   * now-approved item stops reappearing (see checkerQueueRefreshNonce's own doc comment).
+   */
+  acknowledgeArrival(): void {
+    this.actionBusy = true;
+    this.checkerActions.acknowledgeArrival(this.buildCheckerActionContext()).subscribe((outcome) => {
+      this.actionBusy = false;
+      this.forwardOutcomeToMaker(outcome);
+    });
+  }
+
+  /**
+   * Forwards a non-special outcome to `MakerPanelComponent` via `makerOutcomeSignal`. Also reloads the
+   * Checker Queue in place for any outcome that genuinely changed a movement's state — 'released' (e.g.
+   * reject()/deleteMakerPending()'s own success, which never resets the whole screen the way release()'s
+   * own selectFunction() call does) and 'documentArrivalAcknowledged' (A3S) — never for 'failed'. Same
+   * unification as checkerAct()'s own plain path (see checkerQueueRefreshNonce's own doc comment).
+   */
   private forwardOutcomeToMaker(outcome: CheckerActionOutcome): void {
     this.makerOutcomeSignal = { ...outcome };
     if (outcome.kind === 'documentArrivalAcknowledged') this.arrivalApproved = true;
+    if (outcome.kind !== 'failed') this.checkerQueueRefreshNonce++;
   }
 
   /** A successful Release resets the screen for a new transaction via `selectFunction()`. */
@@ -350,7 +373,7 @@ export class TransactionBuilderComponent {
       this.selectedFunctionStrategy?.checkerRelease.deferSettlement &&
       this.selectedCheckerMovement.movementType === (this.selectedFunction?.deferSettlementMovementType ?? 'UTILIZE')
     ) {
-      this.approveArrival();
+      this.acknowledgeArrival();
       return;
     }
 
@@ -370,8 +393,13 @@ export class TransactionBuilderComponent {
       next: () => {
         this.checkerBusy = false;
         // Plain path never touches submitResult; refreshRequested tells MakerPanelComponent to
-        // refresh its own snapshot + re-sync instead.
+        // refresh its own snapshot + re-sync instead. checkerQueueRefreshNonce reloads the Checker's
+        // own queue in place — business instruction 2026-08-20 ("純粹 APPROVE PENDING 交易, APPROVED
+        // 後該筆交易應該消失, 不能重複 APPROVED" — unified across every function, not just A3/A3S's own
+        // acknowledgment path; repro'd live via S101/A2's plain Release leaving the just-Approved item
+        // still listed).
         this.refreshNonce++;
+        this.checkerQueueRefreshNonce++;
       },
       error: (err) => {
         this.checkerBusy = false;

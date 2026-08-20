@@ -7,7 +7,7 @@
  */
 import Decimal from 'decimal.js';
 import { computeCeilingAmount } from '../../../src/domain/tolerance';
-import { computeAvailableBalance, computeConfirmedBalance, computeFaceAmount } from '../../../src/domain/balanceDerivation';
+import { computeAvailableBalance, computeConfirmedBalance, computeFaceAmount, computePendingDecreaseTotal } from '../../../src/domain/balanceDerivation';
 import { checkUtilizeSufficiency, computeOffBalanceExposure, UtilizeSufficiencyResult } from '../../../src/domain/offBalanceExposure';
 import { checkAmendDecreaseSufficiency } from '../../../src/domain/amendDecrease';
 import { checkRedeemSufficiency, RedeemCheckResult } from '../../../src/domain/shgtRedeem';
@@ -88,7 +88,13 @@ export class ScenarioLedger {
   /** Design doc §6/§6.1 — UTILIZE (到單), creates a PENDING earmark if the ERROR check passes. */
   utilize(amount: string, offBalanceExposure: Decimal = new Decimal(0)): UtilizeSufficiencyResult {
     const requestedAmount = new Decimal(amount);
-    const result = checkUtilizeSufficiency({ requestedAmount, availableBalance: this.available(), offBalanceExposure });
+    const result = checkUtilizeSufficiency({
+      requestedAmount,
+      availableBalance: this.available(),
+      confirmedBalance: this.confirmed(),
+      pendingDecreaseTotal: computePendingDecreaseTotal(this.movements),
+      offBalanceExposure,
+    });
     if (result.ok) {
       this.movements.push({ movementType: 'UTILIZE', amount, ceilingAmount: amount, status: 'PENDING' });
     }
