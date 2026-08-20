@@ -14,27 +14,16 @@
                (switching functions, a fresh Submit, etc.) touches state again. -->
     <div class="tb-hint tb-hint--ok mb-2" *ngIf="releaseSuccessHint">{{ releaseSuccessHint }}</div>
 
+    <!-- 2026-08-20: unified — B2 now shares this exact block via subChoice.key === 'amendDirection'
+                 (see SubChoice's own doc comment) instead of a bespoke, separately-hand-rolled Direction
+                 <select>. [disabled] on formLocked, matching every other field's own "no changes after a
+                 successful Submit" rule, previously only applied to B2's own bespoke block — A2/A7 were
+                 missing it until this unification, a real gap this pass also closes. -->
     <div class="tb-field" *ngIf="selectedFunction?.subChoice">
-      <label class="tb-field__label">{{ selectedFunction?.subChoice?.label }}</label>
-      <select class="tb-select tb-select--required" [(ngModel)]="subChoiceValue" (change)="onSubChoice()">
+      <label class="tb-field__label">{{ selectedFunction?.subChoice?.label }} <span class="tb-required-mark">*</span></label>
+      <select class="tb-select tb-select--required" [(ngModel)]="subChoiceValue" (change)="onSubChoice()" [disabled]="formLocked">
         <option value="">— select —</option>
         <option *ngFor="let o of selectedFunction?.subChoice?.options" [value]="o.value">{{ o.label }}</option>
-      </select>
-    </div>
-
-    <!-- Business requirement 2026-08-19 ("Amount figure should > 0", follow-up clarification —
-                 B2's own Amount stays a positive magnitude; this Direction pick, not the amount's sign,
-                 now carries Increase vs. Decrease. B2 only — every other function's own direction is
-                 already carried by a distinct movementType (A2's own AMEND_INCREASE/AMEND_DECREASE
-                 subChoice above, for one), so none of them need this. [disabled] mirrors formLocked
-                 the same way the field-formGroup below already does — no changing Direction after a
-                 successful Submit. -->
-    <div class="tb-field" *ngIf="selectedFunction?.code === 'B2'">
-      <label class="tb-field__label">Direction <span class="tb-required-mark">*</span></label>
-      <select class="tb-select tb-select--required" [(ngModel)]="amendDirection" [disabled]="formLocked">
-        <option [ngValue]="null">— select —</option>
-        <option value="INCREASE">Increase</option>
-        <option value="DECREASE">Decrease</option>
       </select>
     </div>
 

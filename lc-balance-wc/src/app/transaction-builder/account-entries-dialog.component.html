@@ -12,7 +12,7 @@
       <button type="button" class="tb-dialog__close" (click)="closed.emit()" aria-label="Close">×</button>
     </div>
     <div class="tb-dialog__meta">
-      <span class="tb-type-tag">{{ m.movementType }}</span>
+      <span class="tb-type-tag">{{ displayMovementType() }}</span>
       <span class="tb-muted">{{ m.sourceTransactionRef || 'eventSeq ' + m.eventSeq }}</span>
       <span class="tb-status-badge" [ngClass]="statusBadgeClass(m.status)">{{ displayStatus(m.status) }}</span>
     </div>
@@ -20,7 +20,7 @@
       <caption class="visually-hidden">
         Contingent liability account entries for
         {{
-          m.movementType
+          displayMovementType()
         }}
       </caption>
       <thead>

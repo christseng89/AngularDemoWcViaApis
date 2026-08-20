@@ -3,7 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
-import { TransactionFunction } from './balance-component.model';
+import {
+  TransactionFunction,
+  displayMovementType as displayMovementTypeRule,
+  displayMovementAmount as displayMovementAmountRule,
+} from './balance-component.model';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import * as policy from './function-policy';
 
@@ -118,6 +122,21 @@ export class CheckerPanelComponent implements OnChanges {
 
   get checkerContractId(): string | null {
     return this.checkerContract?.balanceContractId ?? null;
+  }
+
+  /**
+   * 2026-08-20 — same "B2's own AMEND reads as AMEND_INCREASE/AMEND_DECREASE everywhere a movement's
+   * Type/Amount is shown" unification as `displayMovementType()`'s own doc comment
+   * (`balance-component.model.ts`) describes. `checkerContract` (this panel's own single resolved
+   * contract for the whole queue) supplies `instrumentType` — every row in `checkerItems` belongs to
+   * this same contract, so there's no per-row instrumentType to thread through.
+   */
+  displayMovementType(movementType: string | null | undefined, amount: string | null | undefined): string {
+    return displayMovementTypeRule(this.checkerContract?.instrumentType, movementType, amount);
+  }
+
+  displayMovementAmount(movementType: string | null | undefined, amount: string | null | undefined): string {
+    return displayMovementAmountRule(this.checkerContract?.instrumentType, movementType, amount);
   }
 
   get checkerSecondaryField(): 'ibNumber' | 'sgNumber' | null {

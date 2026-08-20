@@ -23,6 +23,8 @@
   CURRENCY_OPTIONS,
   isEarmarkFunction,
   tenorTypeLabel,
+  displayMovementType,
+  displayMovementAmount,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -688,6 +690,43 @@ describe('balance-component.model data invariants', () => {
 
   // payExistingUtilizeFunctionFor's own test coverage moved to function-strategy.spec.ts in PR-5.
 
+  describe('displayMovementType / displayMovementAmount', () => {
+    it('B2 (EPLC_CONFIRMATION/AMEND): a positive amount reads as AMEND_INCREASE', () => {
+      expect(displayMovementType('EPLC_CONFIRMATION', 'AMEND', '5000')).toBe('AMEND_INCREASE');
+      expect(displayMovementType('EPLC_CONFIRMATION', 'AMEND', 5000)).toBe('AMEND_INCREASE');
+    });
+
+    it('B2: a negative amount reads as AMEND_DECREASE, and the displayed amount is de-signed to its own magnitude', () => {
+      expect(displayMovementType('EPLC_CONFIRMATION', 'AMEND', '-7000')).toBe('AMEND_DECREASE');
+      expect(displayMovementAmount('EPLC_CONFIRMATION', 'AMEND', '-7000')).toBe('7000');
+    });
+
+    it('B2: a positive amount is returned unchanged by displayMovementAmount (already the correct magnitude)', () => {
+      expect(displayMovementAmount('EPLC_CONFIRMATION', 'AMEND', '5000')).toBe('5000');
+    });
+
+    it("B2: zero reads as AMEND_INCREASE (not < 0), matching submit-rules.ts's own Amount > 0 guard already ruling out a genuine zero from ever reaching here", () => {
+      expect(displayMovementType('EPLC_CONFIRMATION', 'AMEND', '0')).toBe('AMEND_INCREASE');
+    });
+
+    it("every other (instrumentType, movementType) pair passes through completely unchanged — including A2's own genuinely distinct AMEND_INCREASE/AMEND_DECREASE, which already read correctly with no transformation needed", () => {
+      expect(displayMovementType('IPLC_LC', 'AMEND_INCREASE', '5000')).toBe('AMEND_INCREASE');
+      expect(displayMovementType('IPLC_LC', 'AMEND_DECREASE', '5000')).toBe('AMEND_DECREASE');
+      expect(displayMovementType('IPLC_LC', 'UTILIZE', '5000')).toBe('UTILIZE');
+      expect(displayMovementType('EPLC_CONFIRMATION', 'ISSUE', '5000')).toBe('ISSUE');
+      expect(displayMovementAmount('IPLC_LC', 'AMEND_DECREASE', '5000')).toBe('5000');
+      expect(displayMovementAmount('EPLC_CONFIRMATION', 'ISSUE', '-5000')).toBe('-5000');
+    });
+
+    it('handles missing/undefined/null instrumentType, movementType, and amount gracefully', () => {
+      expect(displayMovementType(undefined, undefined, undefined)).toBe('');
+      expect(displayMovementType(null, null, null)).toBe('');
+      expect(displayMovementAmount(undefined, undefined, undefined)).toBe('');
+      expect(displayMovementAmount(null, null, null)).toBe('');
+      expect(displayMovementAmount('EPLC_CONFIRMATION', 'AMEND', null)).toBe('');
+    });
+  });
+
   describe('BALANCE_SNAPSHOT_LABEL', () => {
     it('covers exactly the 5 instrumentTypes the user named as real Balance Components, no more, no fewer', () => {
       expect(new Set(Object.keys(BALANCE_SNAPSHOT_LABEL))).toEqual(new Set(['IPLC_LC', 'IPLC_ACCEPTANCE', 'SHGT', 'EPLC_CONFIRMATION', 'EPLC_ACCEPTANCE']));
@@ -735,13 +774,13 @@ describe('balance-component.model data invariants', () => {
   // right after LC Number, both Import LC and Export Confirmed LC). Reuses A1's/B1's own tenorType
   // Formly select option labels rather than a third copy of the same three strings.
   describe('tenorTypeLabel', () => {
-    it('Import side spells out Seller\'s/Buyer\'s Usance (matches A1\'s own tenorTypeOptions exactly)', () => {
+    it("Import side spells out Seller's/Buyer's Usance (matches A1's own tenorTypeOptions exactly)", () => {
       expect(tenorTypeLabel('SIGHT', 'IMPORT')).toBe('Sight');
       expect(tenorTypeLabel('SELLERS_USANCE', 'IMPORT')).toBe("Seller's Usance");
       expect(tenorTypeLabel('BUYERS_USANCE', 'IMPORT')).toBe("Buyer's Usance");
     });
 
-    it('Export side labels SELLERS_USANCE as plain "Usance" (matches B1\'s own tenorTypeOptions exactly — Buyer\'s/Seller\'s is Import-only)', () => {
+    it("Export side labels SELLERS_USANCE as plain \"Usance\" (matches B1's own tenorTypeOptions exactly — Buyer's/Seller's is Import-only)", () => {
       expect(tenorTypeLabel('SIGHT', 'EXPORT')).toBe('Sight');
       expect(tenorTypeLabel('SELLERS_USANCE', 'EXPORT')).toBe('Usance');
     });

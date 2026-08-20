@@ -596,7 +596,7 @@ describe('submit-rules', () => {
     });
   });
 
-  describe('validateSubmit — B2 Direction / signed Amount patch (business requirement 2026-08-19, follow-up: "Input the Decrease Amount > 0, then it turns to negative figure to call the APIs")', () => {
+  describe('validateSubmit/buildSubmitRequest — B2 Direction / signed Amount (business requirement 2026-08-19, follow-up: "Input the Decrease Amount > 0, then it turns to negative figure to call the APIs"; bug fixed 2026-08-20 — model.amount must NEVER be mutated, only the wire request)', () => {
     const b2Model: Partial<BuilderModel> = { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', amount: '5000', currency: 'USD', createdBy: 'maker1' };
 
     it('fails when no Direction is picked, even though every other field is valid', () => {
@@ -604,16 +604,13 @@ describe('submit-rules', () => {
       expect(result.error).toBe('Pick Increase or Decrease for this Amendment.');
     });
 
-    it('Increase — patches amount to the same positive magnitude (a no-op sign-wise)', () => {
-      const result = validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'INCREASE' }));
-      expect(result.error).toBeNull();
-      expect(result.patch.amount).toBe('5000');
-    });
-
-    it('Decrease — patches amount to the negated value', () => {
-      const result = validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'DECREASE' }));
-      expect(result.error).toBeNull();
-      expect(result.patch.amount).toBe('-5000');
+    it('Increase or Decrease — validateSubmit() never patches amount at all (patch is empty), regardless of Direction', () => {
+      expect(
+        validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'INCREASE' })).patch.amount,
+      ).toBeUndefined();
+      expect(
+        validateSubmit(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'DECREASE' })).patch.amount,
+      ).toBeUndefined();
     });
 
     it('the typed Amount itself must still be > 0 even for a Decrease — a negative typed value is rejected before the Direction guard is ever reached', () => {
@@ -623,12 +620,23 @@ describe('submit-rules', () => {
       expect(result.error).toBe('Amount must be greater than 0.');
     });
 
-    it('buildSubmitRequest() sees the negated amount on the wire once the patch has been applied by the caller (mirroring the real component flow)', () => {
+    it('buildSubmitRequest() computes the signed wire amount directly from ctx.amendDirection, WITHOUT ctx.model.amount ever being mutated — the actual bug fix, reproduced end to end', () => {
       const c = ctx({ selectedFunction: fn('B2'), model: { ...b2Model }, selectedContract: contract(), amendDirection: 'DECREASE' });
-      const { patch } = validateSubmit(c);
-      const patched = ctx({ ...c, model: { ...c.model, ...patch } });
-      const { request } = buildSubmitRequest(patched);
+      const { request } = buildSubmitRequest(c);
       expect(request?.amount).toBe('-5000');
+      expect(c.model.amount).toBe('5000'); // untouched — this is the field the Maker's own Amount input reads
+    });
+
+    it('buildSubmitRequest() — Increase produces the same positive magnitude (a no-op sign-wise)', () => {
+      const { request } = buildSubmitRequest(ctx({ selectedFunction: fn('B2'), model: b2Model, selectedContract: contract(), amendDirection: 'INCREASE' }));
+      expect(request?.amount).toBe('5000');
+    });
+
+    it('buildSubmitRequest() — every other function (no amendDirection subChoice) passes model.amount through unchanged', () => {
+      const { request } = buildSubmitRequest(
+        ctx({ selectedFunction: fn('A2'), model: { ...b2Model, instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' }, selectedContract: contract() }),
+      );
+      expect(request?.amount).toBe('5000');
     });
   });
 

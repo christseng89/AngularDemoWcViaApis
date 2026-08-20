@@ -1,7 +1,12 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BalanceMovement } from './balance-component-api.service';
-import { InstrumentType, displayStatus as displayStatusRule, statusBadgeClass as statusBadgeClassRule } from './balance-component.model';
+import {
+  InstrumentType,
+  displayStatus as displayStatusRule,
+  statusBadgeClass as statusBadgeClassRule,
+  displayMovementType as displayMovementTypeRule,
+} from './balance-component.model';
 
 /**
  * BAL-003 (God Component, desiger-comments.md F-03) — the "View Voucher" pop-up
@@ -83,5 +88,16 @@ export class AccountEntriesDialogComponent {
   /** Same aliasing reasoning as `displayStatus()` immediately above. */
   statusBadgeClass(status: string): string {
     return statusBadgeClassRule(status, this.instrumentType, this.movement?.movementType, this.phase);
+  }
+
+  /**
+   * 2026-08-20 — same "B2's own AMEND reads as AMEND_INCREASE/AMEND_DECREASE everywhere a movement's
+   * Type is shown" unification as `displayMovementType()`'s own doc comment (`balance-component.model.ts`)
+   * describes; this dialog's own meta line was found as a 4th call site while implementing the two the
+   * user explicitly named (Look Up Current Balance, Inquire Events) plus the Checker queue the user
+   * confirmed adding — included here too for the same consistency reason, not independently requested.
+   */
+  displayMovementType(): string {
+    return displayMovementTypeRule(this.instrumentType, this.movement?.movementType, this.movement?.amount);
   }
 }

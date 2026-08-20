@@ -90,4 +90,23 @@ describe('AccountEntriesDialogComponent', () => {
       expect(c.statusBadgeClass('PENDING')).toBe('tb-status-badge--pending');
     });
   });
+
+  // 2026-08-20, user-directed ("B2 Decrease...View Voucher 一併統一") — this dialog's own meta line was
+  // found as a 4th call site while implementing the two the user explicitly named (Look Up Current
+  // Balance, Inquire Events) plus the Checker queue the user confirmed adding.
+  describe('displayMovementType()', () => {
+    it('delegates to the shared rule, relabeling a negative B2 (EPLC_CONFIRMATION/AMEND) amount as AMEND_DECREASE', () => {
+      const c = new AccountEntriesDialogComponent();
+      c.instrumentType = 'EPLC_CONFIRMATION';
+      c.movement = movement({ movementType: 'AMEND', amount: '-7000' });
+      expect(c.displayMovementType()).toBe('AMEND_DECREASE');
+    });
+
+    it('passes every other (instrumentType, movementType) pair through unchanged', () => {
+      const c = new AccountEntriesDialogComponent();
+      c.instrumentType = 'IPLC_LC';
+      c.movement = movement({ movementType: 'ISSUE' });
+      expect(c.displayMovementType()).toBe('ISSUE');
+    });
+  });
 });

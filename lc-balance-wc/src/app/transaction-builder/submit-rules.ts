@@ -46,10 +46,11 @@ export interface SubmitRulesContext {
   selectedParent: BalanceContract | null;
   exposureNature: 'ACTUAL' | 'MEMO';
   /**
-   * B2 only (business requirement 2026-08-19, "Furthermore A1-A9, B1-B5 Amount figure should > 0" —
-   * clarified via a follow-up: B2's Amount stays a plain positive magnitude like every other function;
-   * a Decrease is now expressed by picking this Direction instead of by typing a negative number).
-   * `null` for every other function, which never reads it.
+   * Set (via the shared `subChoice` mechanism, `key: 'amendDirection'` — see `SubChoice`'s own doc
+   * comment) for a function whose Amount stays a plain positive magnitude and expresses Increase/
+   * Decrease via this Direction pick instead of a distinct movementType or a typed negative number
+   * (business requirement 2026-08-19, "Furthermore A1-A9, B1-B5 Amount figure should > 0"). Today only
+   * B2's own registry entry declares that key; `null` for every other function, which never reads it.
    */
   amendDirection: 'INCREASE' | 'DECREASE' | null;
 }
@@ -180,18 +181,33 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
     patch.movementType = Number(model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
   }
   // Business requirement 2026-08-19, follow-up clarification ("Would it be possible that 1. Input the
-  // Decrease Amount > 0, then it turns to negative figure to call the APIs?") — B2 only
-  // (EPLC_CONFIRMATION/AMEND is the one movementType this whole registry shares between Increase and
-  // Decrease, per the direction-from-sign design this reverses; every other function's own direction
-  // is already carried by a distinct movementType — A2's own AMEND_INCREASE/AMEND_DECREASE subChoice,
-  // for one — so none of them need this). Amount itself was already proven > 0 above; this patch
-  // negates it for the wire request when Decrease is picked, same "raw input stays positive, the real
-  // signed/derived value travels via `patch`" shape as A9/B5's own FULL/PARTIAL derivation above.
-  if (selectedFunction?.code === 'B2') {
-    if (!ctx.amendDirection) {
-      return fail('Pick Increase or Decrease for this Amendment.');
-    }
-    patch.amount = ctx.amendDirection === 'DECREASE' ? String(-Math.abs(Number(model.amount))) : String(Math.abs(Number(model.amount)));
+  // Decrease Amount > 0, then it turns to negative figure to call the APIs?"), generalized 2026-08-20
+  // (desiger-comments.md F-01/Phase 7 — "don't let the component/rules judge A1, A2, A3S...") from a
+  // hardcoded `code === 'B2'` check to this declarative one: driven by SubChoice.key, not a function
+  // code, so this rule applies to WHATEVER function's registry entry declares
+  // `subChoice.key: 'amendDirection'` (today, only B2 — EPLC_CONFIRMATION/AMEND is the one movementType
+  // this whole registry shares between Increase and Decrease, per the direction-from-sign design this
+  // reverses; every other function's own direction is already carried by a distinct movementType —
+  // A2's own AMEND_INCREASE/AMEND_DECREASE subChoice, for one).
+  //
+  // Bug fixed 2026-08-20, reviewer-caught live ("B2 Decrease Submit後 => Amount ... 顯示 -1000?"): this
+  // guard used to ALSO `patch.amount = ...` the negated value here, on the same "raw input stays
+  // positive, the real signed/derived value travels via `patch`" reasoning A9/B5's own FULL/PARTIAL
+  // movementType derivation above uses. That reasoning holds for `patch.movementType`/`patch.tenorDays`
+  // (neither is ever re-displayed to the Maker after Submit — `model.movementType`/`model.tenorDays`
+  // aren't rendered back into an editable-looking field the way Amount is), but NOT for `patch.amount`
+  // specifically: `MakerPanelComponent.validateSubmit()` applies every patch via `Object.assign(this.model,
+  // patch)`, and `this.model` is the SAME object the Formly form's own `[model]` binding renders — so the
+  // "real signed value" this comment used to describe as merely "traveling via patch" was, in practice,
+  // overwriting the user-visible Amount field itself with a negative number the instant Submit ran, even
+  // though the field goes read-only (`formLocked`) at the same moment, making it look like the Maker's own
+  // typed value had silently changed sign. Fixed by NOT patching `amount` here at all — only the guard
+  // condition (Direction must be picked) stays; the actual sign transformation moved to
+  // `buildSubmitRequest()` below, which computes the WIRE request's own `amount` field directly from
+  // `ctx.model.amount` (still positive, untouched) + `ctx.amendDirection`, without ever writing back into
+  // `model`. `model.amount` now stays exactly what the Maker typed, for the lifetime of the form.
+  if (selectedFunction?.subChoice?.key === 'amendDirection' && !ctx.amendDirection) {
+    return fail('Pick Increase or Decrease for this Amendment.');
   }
   return { error: null, patch };
 }
@@ -203,17 +219,29 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
  *
  * MUST be called only after `validateSubmit()`'s own `patch` has been applied to `ctx.model`: the
  * A9/B5 movementType derivation and A1's tenorDays normalization both feed fields read here.
+ *
+ * The `amount` field is the one exception to "read straight off `ctx.model`" — see the 2026-08-20 bug-fix
+ * doc comment on `validateSubmit()`'s own `amendDirection` guard above for why: `model.amount` itself
+ * stays whatever the Maker typed (always positive, never mutated), and the sign transformation for a
+ * `subChoice.key === 'amendDirection'` function (B2) is computed HERE, purely for the outgoing wire
+ * request, reading `ctx.amendDirection` directly rather than an already-negated `model.amount`.
  */
 export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
   const { model, selectedFunction } = ctx;
   // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — settlesDocumentArrival below now
   // reads through the Strategy instead of the raw flag; behavior unchanged.
   const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  const wireAmount =
+    selectedFunction?.subChoice?.key === 'amendDirection'
+      ? ctx.amendDirection === 'DECREASE'
+        ? String(-Math.abs(Number(model.amount)))
+        : String(Math.abs(Number(model.amount)))
+      : String(model.amount);
   const request: CreateMovementRequest = {
     instrumentType: model.instrumentType!,
     movementType: model.movementType!,
     eventSeq: model.eventSeq ?? Date.now(),
-    amount: String(model.amount),
+    amount: wireAmount,
     currency: model.currency!,
     createdBy: model.createdBy!,
   };

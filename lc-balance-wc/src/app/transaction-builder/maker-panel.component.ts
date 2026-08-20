@@ -406,9 +406,21 @@ export class MakerPanelComponent implements OnChanges {
     this.emitContext();
   }
 
+  /**
+   * 2026-08-20 — generalized to dispatch on `subChoice.key` (see that field's own doc comment) so B2
+   * can share this exact mechanism instead of a bespoke Direction `<select>`: `'amendDirection'` (B2)
+   * writes the picked value into `amendDirection` and returns, deliberately WITHOUT touching
+   * `model.movementType` (fixed at 'AMEND' from the registry) or calling `afterResolved()` (whose
+   * FULL_SETTLE/REDEEM/SETTLE derivations don't apply to B2). Every other function's own
+   * `key: 'movementType'` case (A2/A7) is byte-for-byte unchanged.
+   */
   onSubChoice(): void {
     if (!this.selectedFunction || !this.subChoiceValue) return;
     const fn = this.selectedFunction;
+    if (fn.subChoice?.key === 'amendDirection') {
+      this.amendDirection = this.subChoiceValue as 'INCREASE' | 'DECREASE';
+      return;
+    }
     this.model.instrumentType = fn.instrumentType;
     this.model.movementType = this.subChoiceValue;
     this.afterResolved();

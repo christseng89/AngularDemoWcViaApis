@@ -265,4 +265,23 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.statusBadgeClass('SUPERSEDED')).toBe('tb-status-badge--neutral');
     });
   });
+
+  // 2026-08-20, user-directed ("B2 Decrease...Look Up Current Balance and Inquire Events B2 Type與Amount
+  // 處理應該跟A2一樣 AMEND_INCREASE AMEND_DECREASE") — thin delegation to the shared
+  // displayMovementType()/displayMovementAmount() pure functions, same convention as displayStatus()/
+  // statusBadgeClass() above. Full branch coverage of the underlying rule itself lives in
+  // balance-component.model.spec.ts; these just prove the delegation wiring.
+  describe('displayMovementType / displayMovementAmount', () => {
+    it('relabels a negative B2 (EPLC_CONFIRMATION/AMEND) amount as AMEND_DECREASE with the de-signed magnitude', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayMovementType('EPLC_CONFIRMATION', 'AMEND', '-7000')).toBe('AMEND_DECREASE');
+      expect(comp.displayMovementAmount('EPLC_CONFIRMATION', 'AMEND', '-7000')).toBe('7000');
+    });
+
+    it('passes every other (instrumentType, movementType) pair through unchanged, e.g. IPLC_LC/ISSUE', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayMovementType('IPLC_LC', 'ISSUE', '5000')).toBe('ISSUE');
+      expect(comp.displayMovementAmount('IPLC_LC', 'ISSUE', '5000')).toBe('5000');
+    });
+  });
 });

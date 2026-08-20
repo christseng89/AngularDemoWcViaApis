@@ -300,7 +300,17 @@ export const DECREASING_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
  * src/app/web-components/import/ vs export/ screens.
  */
 export interface SubChoice {
-  key: string;
+  /**
+   * Which field the picked `option.value` is written into — `onSubChoice()` (maker-panel.component.ts)
+   * dispatches on this. `'movementType'` (A2/A7) writes straight into `model.movementType`, matching
+   * this function's own `movementType` being otherwise unset in the registry. `'amendDirection'` (B2)
+   * writes into the component's own `amendDirection` field instead, leaving `model.movementType`
+   * untouched at its registry-fixed value — for a function whose wire `movementType` never varies by
+   * direction (EPLC_CONFIRMATION/AMEND is the one movementType this whole registry shares between
+   * Increase and Decrease; direction instead travels via the signed Amount, see `submit-rules.ts`'s
+   * own `subChoice?.key === 'amendDirection'` guard).
+   */
+  key: 'movementType' | 'amendDirection';
   label: string;
   options: { value: string; label: string }[];
 }
@@ -664,8 +674,20 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     side: 'EXPORT',
     instrumentType: 'EPLC_CONFIRMATION',
     movementType: 'AMEND',
+    // 2026-08-20 — reuses the SAME generic subChoice mechanism A2/A7 already use (was a bespoke,
+    // hand-rolled Direction <select> outside this mechanism, since EPLC_CONFIRMATION has no distinct
+    // AMEND_INCREASE/AMEND_DECREASE movementType the way IPLC_LC does) — see SubChoice.key's own doc
+    // comment for why 'amendDirection', not 'movementType', is the write target here.
+    subChoice: {
+      key: 'amendDirection',
+      label: 'Direction',
+      options: [
+        { value: 'INCREASE', label: 'Increase' },
+        { value: 'DECREASE', label: 'Decrease' },
+      ],
+    },
     secondaryRefLabel: 'Amendment No./Times',
-    help: "Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC's own face amount. This function only ever moves the Confirmation's own contingent.",
+    help: "Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC's own face amount. This function only ever moves the Confirmation's own contingent. Amount stays a positive magnitude — Direction (above), not the amount's own sign, carries Increase vs. Decrease.",
   },
   // Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review, cs-tf-balance-knowhow
   // business-expert check) — B3 REBUILT as a genuinely separate physical event (D3: "documents
@@ -883,6 +905,54 @@ export function statusBadgeClass(
   if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
   if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
   return '';
+}
+
+/**
+ * 2026-08-20 (user-directed — "B2 Decrease...Look Up Current Balance and Inquire Events B2 Type與Amount
+ * 處理應該跟A2一樣 AMEND_INCREASE AMEND_DECREASE") — a display-only pair (`displayMovementType()`/
+ * `displayMovementAmount()` below) for EPLC_CONFIRMATION's own single shared `AMEND` movementType,
+ * whose Increase-vs-Decrease direction rides the SIGN of the wire `amount` (see the 2026-08-19 "Submit
+ * Button Enablement" / 2026-08-20 "B2's Direction dropdown unified" entries above for why that wire shape
+ * is correct and NOT changing here — `balanceDerivation.ts`'s own `MOVEMENT_DIRECTION['AMEND'] = 1` and
+ * every downstream balance/snapshot computation depends on the raw signed value staying exactly as
+ * stored). This pair exists purely so every LIST/TABLE view that shows a movement's own Type/Amount side
+ * by side (Look Up Current Balance's Event Timeline, Inquire Events' merged table, the Checker Pending
+ * Approvals queue) can present B2's own AMEND movements the same way A2's own genuinely-distinct
+ * AMEND_INCREASE/AMEND_DECREASE movementTypes already read — a synthetic, VIEW-ONLY label/magnitude,
+ * never written back to `model`/the wire request (submit-time validation/negation in `submit-rules.ts`
+ * is completely unrelated and untouched by this pair). Every other instrumentType/movementType combination
+ * (including B2's own sibling B1/B4/B5, and A2's real AMEND_INCREASE/AMEND_DECREASE, which already read
+ * correctly with no transformation needed) passes through unchanged — the `instrumentType === 'EPLC_
+ * CONFIRMATION' && movementType === 'AMEND'` guard is deliberately narrow, matching `isEarmarkFunction()`'s
+ * own "one specific pair, not a broad heuristic" shape immediately above.
+ */
+export function displayMovementType(
+  instrumentType: InstrumentType | string | null | undefined,
+  movementType: string | null | undefined,
+  amount: string | number | null | undefined,
+): string {
+  if (instrumentType === 'EPLC_CONFIRMATION' && movementType === 'AMEND') {
+    return Number(amount) < 0 ? 'AMEND_DECREASE' : 'AMEND_INCREASE';
+  }
+  return movementType ?? '';
+}
+
+/**
+ * The magnitude half of `displayMovementType()`'s own pair — same guard, same doc comment above applies.
+ * Callable on EITHER `amount` or `ceilingAmount` (both carry the identical sign for a B2 AMEND — Tolerance
+ * conversion, per §6.2, scales but never flips sign — so the SAME function correctly de-signs both,
+ * keeping the Event Timeline's own "(ceiling X)" hint numerically consistent with the de-signed Amount
+ * column next to it rather than showing a mismatched raw negative ceiling beside a positive Amount).
+ */
+export function displayMovementAmount(
+  instrumentType: InstrumentType | string | null | undefined,
+  movementType: string | null | undefined,
+  amount: string | null | undefined,
+): string {
+  if (instrumentType === 'EPLC_CONFIRMATION' && movementType === 'AMEND' && amount != null) {
+    return String(Math.abs(Number(amount)));
+  }
+  return amount ?? '';
 }
 
 // payExistingUtilizeFunctionFor() relocated to function-strategy.ts in PR-5, for the same

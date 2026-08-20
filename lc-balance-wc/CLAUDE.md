@@ -8148,3 +8148,229 @@ Zero console errors observed across the entire session. Test data (`BROWSERELIG1
 **Net effect on the 8-phase proposal**: Phase 3 is now genuinely closed at BOTH halves — the presentational/pagination unification (already done pre-existing via `IndexPickerComponent`/`CatalogPickerService`/`PagedListState`) and this pass's own eligibility-rule unification. Phases 4-8 remain not started.
 
 Not committed (not requested).
+
+## B2's Direction dropdown unified onto the same `subChoice` mechanism A2/A7 already use — closes a real gap where A2/A7's own Direction stayed editable after Submit (2026-08-20, user-directed: "B2 Decrease Amount處理跟A2 相同", clarified into 3 confirmed points via a follow-up question about what `formLocked` actually does — "1. A2 Submit後 direction 不得修改 (as B2) 2. B2 Decrease Amount 輸入為正數 處理方式與A2相同 (Call API轉為負數) OK? Phase 7（Strategy 接管行為） B2的特殊就不存在了 OK?")
+
+Investigated before writing anything: A2/A7 render their own Direction/Settlement-type pick via the
+generic `subChoice` block (`maker-panel.component.html`'s own `*ngIf="selectedFunction?.subChoice"`),
+which `onSubChoice()` (`maker-panel.component.ts`) always resolved by writing straight into
+`model.movementType` — the ONLY behavior that block's own dispatch logic ever supported.
+B2 (`EPLC_CONFIRMATION`/`AMEND` — the one movementType this whole registry shares between Increase and
+Decrease, direction instead carried by the signed Amount, per the 2026-08-19 "Submit Button Enablement"
+entry above) couldn't use it for exactly that reason, so that earlier pass built a second, bespoke,
+hand-rolled `<select>` bound to a separate `amendDirection` field — outside the `subChoice` mechanism
+entirely, with its own `[disabled]="formLocked"` and required-mark styling. Comparing the two blocks
+directly surfaced the real, previously-unnoticed gap: A2/A7's own generic `subChoice` block had **neither**
+`[disabled]="formLocked"` **nor** a required-mark `*` — meaning a Maker could still change A2's own
+Direction after a successful Submit, violating the 2026-08-17 "Submit locks all input fields" rule that
+every OTHER field on this form already respects. B2's own bespoke block, ironically, already had both
+correctly.
+
+**Fix — generalized `subChoice`'s own dispatch, rather than duplicating B2's bespoke block onto A2 or vice
+versa.** `SubChoice.key` (`balance-component.model.ts`) narrowed from a bare `string` to
+`'movementType' | 'amendDirection'`, with a new doc comment on the interface itself explaining what each
+value routes to. `onSubChoice()` now branches on `fn.subChoice?.key`: `'amendDirection'` (B2's own new
+registry declaration) writes the picked value into `this.amendDirection` and returns — deliberately
+WITHOUT touching `model.movementType` (stays fixed at `'AMEND'` from the registry) or calling
+`afterResolved()` (whose FULL_SETTLE/REDEEM/SETTLE derivations don't apply to B2) — while the default
+(`'movementType'`, A2/A7, unchanged) keeps its exact prior behavior byte-for-byte. B2's own bespoke
+`<div *ngIf="selectedFunction?.code === 'B2'">` block removed outright from the template; the ONE shared
+`subChoice` block now carries `[disabled]="formLocked"` and the required-mark `*` unconditionally — which
+both fixes A2/A7's own newly-found gap AND preserves B2's own already-correct behavior, for free, from the
+same edit. Field ordering is unaffected (the shared block already rendered first, before
+`ng-container *ngIf="ready"`'s own `buildFields()` array, matching B2's own prior position exactly).
+
+**Phase 7 (Strategy takes over function-specific behavior) — confirmed, per the user's own explicit
+question**: `submit-rules.ts`'s own Decrease-amount-negation guard, previously `if (selectedFunction?.code
+=== 'B2')`, now reads `if (selectedFunction?.subChoice?.key === 'amendDirection')` — a declarative check
+on the registry's own `subChoice` config, not a hardcoded function-code branch. This is the LAST
+`.code === 'B2'` conditional anywhere in the 5 consumer files (confirmed via a repo-wide grep both before
+and after this fix) — B2 no longer has any special-cased branch of its own anywhere in the codebase; any
+future function sharing this exact shape (a single movementType whose direction rides the Amount's own
+sign) gets this behavior for free simply by declaring the same `subChoice.key: 'amendDirection'`, with zero
+new code.
+
+**Tests**: two pre-existing `maker-panel.component.spec.ts` fixtures (`A9`/`B5`-shaped synthetic
+`TransactionFunction` objects used to force-exercise `afterResolved()`'s own hard-to-reach branches via
+`onSubChoice()`) had used a placeholder `subChoice.key: 'x'` — never actually read before this change,
+now a real compile error once the type narrowed. Fixed by changing the placeholder to the real
+`'movementType'` value, a purely mechanical fix with zero behavior change (both tests already exercised
+the `'movementType'`-dispatch branch, they just hadn't named it accurately). No new test added — this is
+the same "template-only + declarative-condition changes aren't independently unit-tested, verified via
+strict-template build + full suite + live browser instead" convention this file's own history already
+establishes repeatedly for this class of change.
+
+**Verified**: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates)/`npm run lint` (0 errors, 228 warnings, unchanged) all clean, `npx prettier --write` applied to
+the one touched spec file. Full Angular suite **927/927 passing** (unchanged count, 2 fixtures corrected
+in place), coverage 97.82/95.92/97.03/97.91% (all four clear the 95% floor). `backend/` 34/34 and
+microservice 335/335 both re-run per this file's own standing rule, unaffected (Angular-only change, no
+request/response contract touched).
+
+**Live-verified end to end against the real running stack, both directions, both functions** (after
+discovering and fixing an unrelated, pre-existing issue along the way — see below): built `SUBCHOICE1`
+(A1 Issue 30,000, Released) and `SUBCHOICEB1` (B1 Confirm 20,000, Released). A2 with Increase against
+`SUBCHOICE1` (Amendment No. A01, Amount 5,000) — confirmed via direct DOM inspection that the shared
+`subChoice` `<select>`'s own `<label>` now renders the `tb-required-mark` span before Submit, and
+`disabled === true` with the picked value (`AMEND_INCREASE`) still correctly retained AFTER Submit
+succeeds — the exact gap this pass closes. B2 with Decrease against `SUBCHOICEB1` (Amendment No. A01,
+typed a plain positive `7000`) — confirmed the Checker queue itself displays the movement as
+`"AMEND — -7000 USD"` (the negation happening correctly, visible even before Release), then Released it
+and confirmed Confirmed Balance dropped from `20000` to exactly `13000` (`20000 − 7000`) — an
+independently-verifiable arithmetic proof the signed value reached the microservice correctly. Zero
+console errors throughout both flows.
+
+**Unrelated issue found and fixed along the way, not a regression from this change**: the `ng serve`
+process backing this session's live-verification checks had been running continuously since the previous
+evening (~9+ hours, since before Phase 1 of this same day's BAL-003 work) and was serving a stale bundle —
+the freshly-added required-mark span and `formLocked` binding were correctly present in the source on disk
+but absent from what the browser actually rendered, even after a full page reload. Confirmed via direct
+`git`/file inspection that the SOURCE was correct throughout; restarting the `ng serve` process (a normal,
+reversible dev-server lifecycle action, same posture this file's own "don't chase port conflicts, but
+restart a genuinely stale process when found" precedent already establishes) resolved it immediately, and
+every check above was re-run cleanly against the fresh process. Not a code defect — flagged here since it
+cost real verification time and is the kind of thing worth remembering for a future very-long-running
+session.
+
+Not committed (not requested).
+
+## B2's own AMEND movements display as AMEND_INCREASE/AMEND_DECREASE with a de-signed magnitude everywhere a Type/Amount is shown — 4 call sites, display-layer only (2026-08-20, user-directed: "B2 Decrease Event Submit後Amount 出現負值 處理應該與A2 處理方式一樣為正值 Look Up Current Balance and Inquire Events B2 Type與Amount處理 應該跟A2一樣 AMEND_INCREASE AMEND_DECREASE", confirmed via a follow-up question that the Checker Pending Approvals queue — where the raw "-7000" was actually first observed live, in the immediately-preceding entry's own verification pass — should be unified too, "一併統一（避免不一致）")
+
+Directly follows the entry immediately above ("B2's Direction dropdown unified onto the same `subChoice`
+mechanism") — that pass correctly kept the WIRE contract signed (`amount: '-7000'` for a Decrease, since
+`balanceDerivation.ts`'s own `MOVEMENT_DIRECTION['AMEND'] = 1` and every downstream balance/snapshot
+computation depends on it), but never addressed how that same raw signed value gets DISPLAYED back to a
+user in a list/table view once it's already stored — this pass closes that specific, narrower gap.
+
+**Scope, confirmed precisely before writing anything**: `instrumentType === 'EPLC_CONFIRMATION' &&
+movementType === 'AMEND'` is the ONLY combination this applies to (EPLC_CONFIRMATION is the one
+instrumentType in this whole registry whose Increase/Decrease direction rides the sign of `amount` rather
+than a distinct movementType) — every other instrumentType/movementType, including A2's own genuinely
+distinct `AMEND_INCREASE`/`AMEND_DECREASE` movementTypes, passes through completely unchanged.
+
+**Design — two new shared pure functions, `displayMovementType()`/`displayMovementAmount()`**
+(`balance-component.model.ts`, placed right after `statusBadgeClass()` — same "shared, exported pure
+function multiple components delegate to" convention `displayStatus()`/`statusBadgeClass()`/
+`isEarmarkFunction()` already established for this exact class of cross-component display rule):
+`displayMovementType()` returns `'AMEND_DECREASE'` when `Number(amount) < 0`, else `'AMEND_INCREASE'`
+(for the one matching instrumentType/movementType pair) or the raw `movementType` unchanged otherwise.
+`displayMovementAmount()` returns `String(Math.abs(Number(amount)))` for the same matching pair, else the
+raw `amount` unchanged — deliberately callable on EITHER `amount` or `ceilingAmount` (both carry the
+identical sign for a B2 AMEND, since Tolerance conversion per §6.2 scales but never flips sign), so Look
+Up Current Balance's own "(ceiling X)" hint stays numerically consistent with the de-signed Amount column
+right next to it rather than showing a mismatched raw negative ceiling beside a positive Amount.
+
+**4 call sites found and unified, not the 2 originally named** — investigated the full scope via a
+repo-wide grep for `.movementType }}`/`.amount }}` template bindings before touching anything, rather than
+assuming the two named locations were exhaustive:
+1. **Look Up Current Balance's own Event Timeline** (`transaction-builder.component.html`, `row.movement.*`) — one of the two the user explicitly named.
+2. **Inquire Events' own merged table** (`transaction-builder.component.html`, `e.movement.*`) — the other explicitly-named one.
+3. **The Checker Pending Approvals queue** (`checker-panel.component.html`, `m.movementType`/`m.amount`) — found independently while investigating; this is the EXACT location the immediately-preceding entry's own live verification pass had observed `"AMEND — -7000 USD"` in, confirmed via `AskUserQuestion` to unify rather than leave inconsistent with the other two.
+4. **The "View Voucher" / Account Entries dialog's own meta line** (`account-entries-dialog.component.ts`/`.html`) — found while implementing the other three; disclosed explicitly as an addition beyond what was asked, for the same consistency reason, not independently requested. Its own screen-reader-only `<caption>` text was updated too, for the identical reason.
+
+Each of the 3 host components gained its own thin delegation method(s) (`displayMovementType()`, plus
+`displayMovementAmount()` where the host also renders Amount, not just Type), mirroring the exact
+`displayStatus()`/`statusBadgeClass()` delegation shape each of these 3 files already carries:
+`TransactionBuilderComponent` takes `(instrumentType, movementType, amount)` explicitly (multiple
+contracts flow through its own templates); `CheckerPanelComponent` takes only `(movementType, amount)`,
+reading `instrumentType` off its own single resolved `checkerContract` (every row in `checkerItems`
+belongs to the one contract this panel searched); `AccountEntriesDialogComponent.displayMovementType()`
+takes no parameters at all, reading `this.instrumentType`/`this.movement` entirely from its own
+`@Input()`s, matching `displayStatus()`'s own identical no-extra-params shape on that same component.
+
+**Tests**: new `displayMovementType`/`displayMovementAmount` describe block in
+`balance-component.model.spec.ts` (the core pure-function logic — B2 positive→AMEND_INCREASE, B2
+negative→AMEND_DECREASE with the de-signed amount, B2 zero→AMEND_INCREASE per the `< 0` check matching
+`submit-rules.ts`'s own pre-existing "Amount must be > 0" guard already ruling out a genuine zero from
+ever reaching here, every other instrumentType/movementType pair including A2's own real
+AMEND_INCREASE/AMEND_DECREASE passing through unchanged, and null/undefined handled gracefully); thin
+delegation tests added to `transaction-builder.component.spec.ts`, `checker-panel.component.spec.ts`
+(including the null-`checkerContract` case), and `account-entries-dialog.component.spec.ts` — same
+"delegation wiring only, full branch coverage lives with the shared function" split this file's own
+`displayStatus()`/`statusBadgeClass()` tests already use throughout.
+
+**Verified**: `npx tsc -p tsconfig.app.json --noEmit`/`ng build --configuration development` (strict
+templates)/`npm run lint` (0 errors, 228 warnings, unchanged) all clean, `npx prettier --write` applied to
+6 touched files (whitespace-only, re-verified via a clean `tsc --noEmit`/full-suite re-run afterward). Full
+Angular suite **939/939 passing** (12 new), coverage 97.83/95.96/97.07/97.93% (all four clear the 95%
+floor — branches dipped below the floor to 94.84% immediately after the production-code change, before the
+new tests were added, closed back above by the 12 new tests above). `backend/` 34/34 and microservice
+335/335 both re-run per this file's own standing rule, unaffected (Angular-only change, no wire-contract
+touched — `amount` itself is never transformed, only how it's rendered).
+
+**Live-verified end to end against the real running stack (a genuinely fresh `npm run dev:all` this time,
+not the long-running stale process the immediately-preceding entry had to restart)**: built `DISPLAYFIX1`
+(B1 Confirm 15,000, Released), submitted B2 with Decrease (Amendment No. A01, typed a plain positive
+`6000`), and confirmed all 4 locations read consistently: the Checker Pending Approvals queue showed
+`"AMEND_DECREASE — 6000 USD"` (previously `"AMEND — -6000 USD"`); after Release, Look Up Current Balance's
+own Event Timeline row read `"B2 · Confirm LC Amendment | AMEND_DECREASE | 6000 | A01 | APPROVED | 9000"`
+(Confirmed Balance correctly `15000 − 6000 = 9000`); Inquire Events' own merged table showed the identical
+`TYPE: AMEND_DECREASE` / `AMOUNT: 6000` row; and the "View Voucher" dialog opened from that same row showed
+`AMEND_DECREASE` in its own meta line. A plain ISSUE movement (B1's own) was confirmed to pass through
+completely unchanged throughout (`"ISSUE — 15000 USD"`, never transformed) — proving the narrow guard
+doesn't over-fire on other movement types. Zero console errors throughout. Test data (`DISPLAYFIX1`)
+cleaned up afterward; the pre-existing 47 reference contracts confirmed untouched.
+
+Not committed (not requested).
+
+## Bug fixed — B2's own Amount input field visibly turned negative after a Decrease Submit, because the sign-negation patch mutated `model.amount` itself, not just the wire request (2026-08-20, reviewer-caught live — "B2 Decrease Submit後=> Amount (face-level, per Design doc §6.2) * 顯示 -1000?")
+
+Root cause, found by reading `validateSubmit()`'s own patch-application call site directly:
+`MakerPanelComponent`'s `validateSubmit()` wrapper applies `SubmitValidation.patch` via `Object.assign(this.model,
+patch)` — and `submit-rules.ts`'s own `amendDirection` guard (added the same day, see the "B2's Direction
+dropdown unified" entry above) set `patch.amount = ctx.amendDirection === 'DECREASE' ? String(-Math.abs(...))
+: ...`. Since `this.model` is the SAME object the Formly form's own `[model]` binding renders, this
+`Object.assign` overwrote the user-visible Amount field's own value with the negative number the instant
+Submit ran — the field then goes read-only (`formLocked`) at that same moment, so it LOOKED like the Maker's
+own typed `1000` had silently flipped to `-1000` right in front of them. The original doc comment's own
+"raw input stays positive, the real signed/derived value travels via patch" framing was simply wrong in
+practice: the patch mechanism (correctly used elsewhere for `patch.movementType`/`patch.tenorDays`, neither
+of which is ever re-displayed to the Maker as an editable-looking field) was never a safe vehicle for a
+field the Formly form renders directly back to the user.
+
+**Fix**: the `amendDirection` guard in `validateSubmit()` no longer patches `amount` at all — it only keeps
+the validation check (`!ctx.amendDirection` → fail). The sign transformation moved into
+`buildSubmitRequest()` itself, which now computes the wire request's own `amount` field directly from
+`ctx.model.amount` (still positive, genuinely untouched) + `ctx.amendDirection`, entirely locally — never
+writing back into `model`. `model.amount` therefore now stays exactly what the Maker typed for the entire
+lifetime of the form, matching every other field's own behavior. The actual wire value sent to the
+microservice, and every display-layer consumer (`displayMovementType()`/`displayMovementAmount()` from the
+entry immediately above — the Checker queue, Look Up Current Balance, Inquire Events, the View Voucher
+dialog), are completely unaffected by this fix — they already read the movement's own stored value (which
+was, and remains, correctly signed), never `model.amount` directly.
+
+**Tests**: `submit-rules.spec.ts`'s own B2 describe block rewritten — the two old "patches amount to X"
+assertions replaced with a single test proving `validateSubmit()`'s own `patch.amount` is `undefined`
+regardless of Direction; a new test proves `buildSubmitRequest()` alone computes the signed wire amount
+while `ctx.model.amount` stays provably untouched (`toBe('5000')`, not `'-5000'`) — this is the actual
+regression test for the bug itself, not just a rename of the old assertion; two more new tests cover
+Increase's own no-op-sign-wise case and confirm every OTHER function (no `amendDirection` subChoice) passes
+`model.amount` through `buildSubmitRequest()` unchanged. Verified: `npx tsc -p tsconfig.app.json --noEmit`/
+`ng build --configuration development` (strict templates)/`npm run lint` (0 errors, 228 warnings, unchanged)
+all clean, `npx prettier --write` applied to the one touched spec file. Full Angular suite **940/940
+passing** (1 net new — 2 old assertions consolidated into 1, 3 new added), coverage
+97.83/95.97/97.07/97.93% (all four clear the 95% floor; `submit-rules.ts` itself stays **100/100/100/100**).
+`backend/`/microservice unaffected (no files under either touched — pure Angular-side fix, no wire-contract
+change).
+
+**Live-verified end to end against the real running stack, reproducing the exact reported repro
+(B2VERIFY01, Decrease, typed `2000`)**: before this fix, the Amount field read `-2000` immediately after
+Submit; after the fix, the SAME sequence leaves it reading `2000` — confirmed by inspecting the actual
+`<input>` element's own `.value` directly (not just page text), ruling out a display-only artifact.
+Independently re-confirmed the wire/display side is still completely correct post-fix: the Checker queue
+showed `"AMEND_DECREASE — 2000 USD"` (proving the microservice still received `-2000`, de-signed for
+display same as before), and after Release, Confirmed Balance correctly dropped `24000 → 22000`. Zero
+console errors throughout. While investigating this, also independently confirmed (per the same-day
+reviewer question "A2/B2 Increase/Decrease 都測一下") that A2 Increase, A2 Decrease, and B2 Increase all
+already worked correctly with no analogous issue — A2's own Amount field was never mutated by ANY patch
+(its own Direction is carried entirely by `model.movementType`, a field never rendered as user-editable
+text), and B2 Increase's own patch was a same-magnitude no-op that happened to mask the exact same
+underlying mutation. Also separately confirmed, per the same investigation, that a user-reported "B2 選U2
+Decrease 1000無法 Submit" was NOT a bug: LC "U02" genuinely has no `EPLC_CONFIRMATION` (Export Confirmed)
+contract at all — only `IPLC_LC`/`IPLC_ACCEPTANCE` (Import-side) — so it correctly never appears in B2's
+own LC Index, and the picker correctly shows "No ACTIVE EPLC_CONFIRMATION contracts yet — use A1/B1 (Issue)
+first." / "⚠ No eligible records available for this transaction." once searched — expected behavior per
+the 2026-08-19 "No Eligible Records" requirement, not a defect. Test data (`A2VERIFY01`/`B2VERIFY01`)
+cleaned up afterward; the pre-existing 47 reference contracts confirmed untouched.
+
+Not committed (not requested).

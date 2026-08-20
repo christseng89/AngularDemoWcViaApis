@@ -361,11 +361,13 @@
                         <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
                       </td>
                       <td>
-                        <span class="tb-type-tag">{{ row.movement.movementType }}</span>
+                        <span class="tb-type-tag">{{ displayMovementType(row.contract.instrumentType, row.movement.movementType, row.movement.amount) }}</span>
                       </td>
                       <td class="tb-table__amount">
-                        {{ row.movement.amount }}
-                        <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount">(ceiling {{ row.movement.ceilingAmount }})</span>
+                        {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) }}
+                        <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount"
+                          >(ceiling {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount) }})</span
+                        >
                       </td>
                       <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
                       <td>
@@ -628,9 +630,9 @@
                         <span class="tb-type-tag">{{ e.contract.instrumentType }}</span>
                       </td>
                       <td>
-                        <span class="tb-type-tag">{{ e.movement.movementType }}</span>
+                        <span class="tb-type-tag">{{ displayMovementType(e.contract.instrumentType, e.movement.movementType, e.movement.amount) }}</span>
                       </td>
-                      <td class="tb-table__amount">{{ e.movement.amount }}</td>
+                      <td class="tb-table__amount">{{ displayMovementAmount(e.contract.instrumentType, e.movement.movementType, e.movement.amount) }}</td>
                       <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
                       <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
                       <td>

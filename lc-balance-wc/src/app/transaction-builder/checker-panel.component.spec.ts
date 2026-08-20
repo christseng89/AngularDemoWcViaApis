@@ -115,6 +115,27 @@ describe('CheckerPanelComponent', () => {
     });
   });
 
+  // 2026-08-20, user-directed ("B2 Decrease...Checker 佇列一併統一") — thin delegation to the shared
+  // displayMovementType()/displayMovementAmount() pure functions, reading instrumentType off this
+  // panel's own single resolved checkerContract (every row in checkerItems belongs to it).
+  describe('displayMovementType / displayMovementAmount', () => {
+    it('reads instrumentType off checkerContract, relabeling a negative B2 (EPLC_CONFIRMATION/AMEND) amount as AMEND_DECREASE with the de-signed magnitude', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerContract = contract({ instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.displayMovementType('AMEND', '-7000')).toBe('AMEND_DECREASE');
+      expect(c.displayMovementAmount('AMEND', '-7000')).toBe('7000');
+    });
+
+    it('passes every other (instrumentType, movementType) pair through unchanged, and handles a null checkerContract gracefully', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerContract = contract({ instrumentType: 'IPLC_LC' });
+      expect(c.displayMovementType('ISSUE', '5000')).toBe('ISSUE');
+      expect(c.displayMovementAmount('ISSUE', '5000')).toBe('5000');
+      c.checkerContract = null;
+      expect(c.displayMovementType('ISSUE', '5000')).toBe('ISSUE');
+    });
+  });
+
   describe('ngOnChanges()', () => {
     it('resetTrigger: does nothing on the first change (initial binding), calls resetPanel() on a later change', () => {
       const c = new CheckerPanelComponent(mockApi());

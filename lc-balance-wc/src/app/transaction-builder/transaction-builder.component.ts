@@ -15,6 +15,8 @@ import {
   TransactionFunction,
   displayStatus as displayStatusShared,
   statusBadgeClass as statusBadgeClassShared,
+  displayMovementType as displayMovementTypeShared,
+  displayMovementAmount as displayMovementAmountShared,
 } from './balance-component.model';
 import { AccountEntriesDialogComponent } from './account-entries-dialog.component';
 import { CheckerPanelComponent, CheckerSyncSignal } from './checker-panel.component';
@@ -220,6 +222,23 @@ export class TransactionBuilderComponent {
     phase?: 'primary' | 'create' | 'finalize' | null,
   ): string {
     return statusBadgeClassShared(status, instrumentType, movementType, phase);
+  }
+
+  /** See `displayMovementType()`'s own doc comment (`balance-component.model.ts`) — thin template-binding delegation, same convention as `displayStatus()`/`statusBadgeClass()` above. */
+  displayMovementType(
+    instrumentType: InstrumentType | string | null | undefined,
+    movementType: string | null | undefined,
+    amount: string | number | null | undefined,
+  ): string {
+    return displayMovementTypeShared(instrumentType, movementType, amount);
+  }
+
+  displayMovementAmount(
+    instrumentType: InstrumentType | string | null | undefined,
+    movementType: string | null | undefined,
+    amount: string | null | undefined,
+  ): string {
+    return displayMovementAmountShared(instrumentType, movementType, amount);
   }
 
   openAccountEntryDialog(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined, phase?: 'primary' | 'create' | 'finalize'): void {

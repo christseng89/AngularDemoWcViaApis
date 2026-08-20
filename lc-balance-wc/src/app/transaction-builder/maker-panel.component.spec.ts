@@ -3699,7 +3699,10 @@ describe('MakerPanelComponent', () => {
       // autoRedeemType branch is normally reached via refreshSelectedContractSnapshot() instead.
       // Exercise it directly through the same private path with a synthetic subChoice variant,
       // matching the pattern already used elsewhere in this suite for hard-to-reach symmetry branches.
-      const synthetic: TransactionFunction = { ...fn('A9'), subChoice: { key: 'x', label: 'X', options: [{ value: 'FULL_REDEEM', label: 'Full' }] } };
+      const synthetic: TransactionFunction = {
+        ...fn('A9'),
+        subChoice: { key: 'movementType', label: 'X', options: [{ value: 'FULL_REDEEM', label: 'Full' }] },
+      };
       triggerSelectFunction(c, synthetic);
       c.selectedContractSnapshot = snapshot({ confirmedBalance: '1000', availableBalance: '600' });
       c.subChoiceValue = 'FULL_REDEEM';
@@ -3709,7 +3712,10 @@ describe('MakerPanelComponent', () => {
 
     it('settlesAcceptanceOnMature branch defaults model.amount to the snapshot\'s Available Balance (B5-shaped synthetic, per the field\'s own "unreachable in practice without a subChoice" doc comment)', () => {
       const c = new MakerPanelComponent(mockApiD());
-      const synthetic: TransactionFunction = { ...fn('B5'), subChoice: { key: 'x', label: 'X', options: [{ value: 'FULL_SETTLE', label: 'Full' }] } };
+      const synthetic: TransactionFunction = {
+        ...fn('B5'),
+        subChoice: { key: 'movementType', label: 'X', options: [{ value: 'FULL_SETTLE', label: 'Full' }] },
+      };
       triggerSelectFunction(c, synthetic);
       c.model.instrumentType = 'EPLC_ACCEPTANCE';
       c.selectedContractSnapshot = snapshot({ confirmedBalance: '1000', availableBalance: '300' });
