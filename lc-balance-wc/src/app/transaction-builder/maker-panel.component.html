@@ -463,15 +463,17 @@
                        Balance Warning") — this warning used to fire for ANY movementType, including
                        ISSUE/AMEND_INCREASE/CREATE/AMEND, none of which the microservice ever checks against
                        Available Balance (Design doc §6.2: "Increase always succeeds; Decrease is checked").
-                       Now gated on movementTypeChecksAvailableBalance() (DECREASING_MOVEMENT_TYPES), the same
-                       set already used elsewhere in this file to filter 0-balance contracts out of the
-                       pickers — see that method's own doc comment for the full root cause. -->
+                       Now gated on movementTypeChecksAvailableBalance() (DECREASING_MOVEMENT_TYPES) OR
+                       isAmendDecreaseDirection (B2's own Decrease — `model.movementType` is always 'AMEND'
+                       for B2, so DECREASING_MOVEMENT_TYPES alone can never see it; business instruction
+                       2026-08-20, "A2 Decrease 輸入金額控制規則 B2 Decrease... 都適用" — B2 previously got NO
+                       client-side warning at all for a Decrease the server would reject). -->
             <div
               class="tb-error mt-2"
               *ngIf="
                 !formLocked &&
                 model.amount &&
-                movementTypeChecksAvailableBalance(model.movementType) &&
+                (movementTypeChecksAvailableBalance(model.movementType) || isAmendDecreaseDirection) &&
                 +model.amount > +selectedContractSnapshot.availableBalance
               "
             >
@@ -481,28 +483,41 @@
                        LC balance. Right?" — confirmed correct, then "fix it" for the OTHER direction): the
                        warning above only ever compares against plain Available Balance, so an amount between
                        Tight Available and plain Available (Design doc §6.1's own second, Tight-Available-based
-                       check — checkUtilizeSufficiency in offBalanceExposure.ts) was never warned about
-                       client-side even though the server will reject it. Scoped to movementType === 'UTILIZE'
-                       (A3/A3S) — the only movementType this server-side check actually applies to; A2's own
-                       AMEND_DECREASE check compares ceilingAmount against plain Available, never Tight, so
-                       showing this warning there would be misleading, not helpful. -->
+                       check) was never warned about client-side even though the server will reject it.
+                       Bug fixed 2026-08-20 ("A35 可以使用SG交易的金額 所以應該是 Tight Available + 選中SG的金額")
+                       — this used to compare against the plain tightAvailableBalance even for A35, a false
+                       positive (see tightAvailableBalanceForWarning's own doc comment). Now compares against
+                       that getter instead, which widens by the selected SG's own Outstanding for A35 only.
+                       Extended 2026-08-20 ("A2 Decrease 輸入金額控制規則 B2 Decrease, A3 & B3 都適用" — A2/B2's
+                       own AMEND_DECREASE/AMEND-Decrease sufficiency check, checkAmendDecreaseSufficiency, now
+                       also compares against Tight Available Balance server-side, same as A3/A3S's
+                       checkUtilizeSufficiency) and again ("B3金額輸入檢查與B2 Decrease相同" — B3/A8 previously
+                       showed NO balance box or warning at all, since selectedContract was never populated for
+                       their own "create a new child directly under the picked parent" shape; see
+                       onSelectParent()'s own doc comment for the alias fix, and checksAgainstTightAvailable's
+                       own doc comment for the full movementType/instrumentType matrix this now covers. -->
             <div
               class="tb-error mt-2"
               *ngIf="
                 !formLocked &&
                 model.amount &&
                 +model.amount <= +selectedContractSnapshot.availableBalance &&
-                model.movementType === 'UTILIZE' &&
-                selectedContractSnapshot.tightAvailableBalance !== null &&
-                selectedContractSnapshot.tightAvailableBalance !== undefined &&
-                +model.amount > +selectedContractSnapshot.tightAvailableBalance
+                checksAgainstTightAvailable &&
+                tightAvailableBalanceForWarning !== null &&
+                +model.amount > +tightAvailableBalanceForWarning
               "
             >
-              ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ selectedContractSnapshot.tightAvailableBalance }}) — this will be rejected
-              (Design doc §6.1: Confirmed Balance minus still-PENDING decreases minus outstanding off-balance-sheet (SHGT) exposure {{
-                selectedContractSnapshot.offBalanceExposure
+              ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ tightAvailableBalanceForWarning }}) — this will be rejected
+              (Design doc §6.1/§6.2: Confirmed Balance minus still-PENDING decreases minus outstanding
+              <ng-container *ngIf="selectedContract?.instrumentType === 'EPLC_CONFIRMATION'">Present Docs Earmark</ng-container>
+              <ng-container *ngIf="selectedContract?.instrumentType !== 'EPLC_CONFIRMATION'"
+                >off-balance-sheet (SHGT) exposure {{ selectedContractSnapshot.offBalanceExposure }}</ng-container
+              >{{
+                selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && pickerSelection.arrivalSgSnapshot
+                  ? ', netted against the selected SG\'s own Outstanding (' + pickerSelection.arrivalSgSnapshot.confirmedBalance + ')'
+                  : ''
               }} — only APPROVED amounts count as usable capacity).
-              <ng-container *ngIf="!selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
+              <ng-container *ngIf="model.movementType === 'UTILIZE' && !selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
                 >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping
                 Gtee" instead — it nets that SG's own exposure out of this check.</ng-container
               >
@@ -695,7 +710,7 @@
   <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
   <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
   <p class="tb-result__status" *ngIf="submitResult?.status">
-    <strong>Status:</strong> {{ displayStatus(submitResult!.status, model.instrumentType, submitResult!.movementType) }}
+    <strong>Status:</strong> {{ displayStatus(submitResult!.status, model.instrumentType, submitResult!.movementType, submitResult!.acknowledgedAt) }}
   </p>
   <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
              this event actually has a contingent-scope entry (null for an on-balance-sheet instrumentType,

@@ -5,9 +5,11 @@
  * ones and updates `status`/`released_by`/`released_at`/`reason_code`/
  * `present_docs_consumed_by`/`present_docs_consumed_at` (2026-08-18, B3's own
  * Present Docs Earmark consumption by B4 — see markPresentDocsConsumed()
- * below) and `acknowledged_by`/`acknowledged_at` (2026-08-20, restored for
+ * below), `acknowledged_by`/`acknowledged_at` (2026-08-20, restored for
  * A3/A3S's own Checker acknowledgment — see acknowledge() below; B3 itself
- * still uses the standard release path, not this field, since 2026-08-18).
+ * still uses the standard release path, not this field, since 2026-08-18),
+ * and `cancelled_by`/`cancelled_at` (2026-08-20, `cancel()`'s own dedicated
+ * audit pair — see updateStatus() below).
  */
 import type { Db } from '../db';
 import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
@@ -58,6 +60,8 @@ interface MovementRow {
   finalize_sg_event_snapshot: string | null;
   present_docs_consumed_at: string | null;
   present_docs_consumed_by: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -107,6 +111,8 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     finalizeSgEventSnapshot: row.finalize_sg_event_snapshot ? (JSON.parse(row.finalize_sg_event_snapshot) as BalanceSnapshot) : null,
     presentDocsConsumedAt: row.present_docs_consumed_at,
     presentDocsConsumedBy: row.present_docs_consumed_by,
+    cancelledBy: row.cancelled_by,
+    cancelledAt: row.cancelled_at,
   };
 }
 
@@ -326,6 +332,14 @@ export class BalanceMovementStore {
      */
     finalizeAcceptanceEventSnapshot?: string | null;
     finalizeSgEventSnapshot?: string | null;
+    /**
+     * 2026-08-20 ("SUBMIT/EC/APPROVE DATETIME/USER") — passed by `cancel()` only; every other caller
+     * (`release()`/`reject()`) omits both, so they stay null for a RELEASED/REJECTED movement (a
+     * movement is only ever transitioned once — status is terminal — so a plain write here, not a
+     * COALESCE, is safe: there's no second call on the same row that could clobber a real value).
+     */
+    cancelledBy?: string | null;
+    cancelledAt?: string | null;
   }): void {
     this.db
       .prepare(
@@ -339,7 +353,8 @@ export class BalanceMovementStore {
              sg_event_snapshot = CASE WHEN @hasSgEventSnapshot = 1 THEN @sgEventSnapshot ELSE sg_event_snapshot END,
              finalize_event_snapshot = COALESCE(@finalizeEventSnapshot, finalize_event_snapshot),
              finalize_acceptance_event_snapshot = COALESCE(@finalizeAcceptanceEventSnapshot, finalize_acceptance_event_snapshot),
-             finalize_sg_event_snapshot = COALESCE(@finalizeSgEventSnapshot, finalize_sg_event_snapshot)
+             finalize_sg_event_snapshot = COALESCE(@finalizeSgEventSnapshot, finalize_sg_event_snapshot),
+             cancelled_by = @cancelledBy, cancelled_at = @cancelledAt
          WHERE movement_id = @movementId`,
       )
       .run({
@@ -360,6 +375,8 @@ export class BalanceMovementStore {
         finalizeEventSnapshot: params.finalizeEventSnapshot ?? null,
         finalizeAcceptanceEventSnapshot: params.finalizeAcceptanceEventSnapshot ?? null,
         finalizeSgEventSnapshot: params.finalizeSgEventSnapshot ?? null,
+        cancelledBy: params.cancelledBy ?? null,
+        cancelledAt: params.cancelledAt ?? null,
       });
   }
 

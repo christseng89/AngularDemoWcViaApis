@@ -179,8 +179,9 @@ export class TransactionBuilderComponent {
     instrumentType?: InstrumentType | string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
+    acknowledgedAt?: string | null,
   ): string {
-    return displayStatusShared(status, instrumentType, movementType, phase);
+    return displayStatusShared(status, instrumentType, movementType, phase, acknowledgedAt);
   }
 
   statusBadgeClass(
@@ -188,8 +189,9 @@ export class TransactionBuilderComponent {
     instrumentType?: InstrumentType | string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
+    acknowledgedAt?: string | null,
   ): string {
-    return statusBadgeClassShared(status, instrumentType, movementType, phase);
+    return statusBadgeClassShared(status, instrumentType, movementType, phase, acknowledgedAt);
   }
 
   /** Thin delegation, same convention as `displayStatus()`/`statusBadgeClass()`. */
@@ -318,11 +320,17 @@ export class TransactionBuilderComponent {
    * reject()/deleteMakerPending()'s own success, which never resets the whole screen the way release()'s
    * own selectFunction() call does) and 'documentArrivalAcknowledged' (A3S) — never for 'failed'. Same
    * unification as checkerAct()'s own plain path (see checkerQueueRefreshNonce's own doc comment).
+   * Also refreshes Look Up Current Balance (Common Requirement — every successful Maker Submit or
+   * Checker Release/Acknowledge refreshes it), so the Event Timeline's own EARMARKING -> EARMARKED flip
+   * (business instruction 2026-08-20, "狀態必須是 EARMARKED") shows without a manual re-search.
    */
   private forwardOutcomeToMaker(outcome: CheckerActionOutcome): void {
     this.makerOutcomeSignal = { ...outcome };
     if (outcome.kind === 'documentArrivalAcknowledged') this.arrivalApproved = true;
-    if (outcome.kind !== 'failed') this.checkerQueueRefreshNonce++;
+    if (outcome.kind !== 'failed') {
+      this.checkerQueueRefreshNonce++;
+      this.refreshLookUpForLastMakerContext();
+    }
   }
 
   /** A successful Release resets the screen for a new transaction via `selectFunction()`. */

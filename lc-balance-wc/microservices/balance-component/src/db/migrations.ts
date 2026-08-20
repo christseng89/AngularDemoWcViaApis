@@ -117,6 +117,16 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('present_docs_consumed_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_by TEXT');
     },
   },
+  {
+    id: 11,
+    description:
+      'Add cancelled_by/cancelled_at to balance_movements (2026-08-20, "SUBMIT/EC/APPROVE DATETIME/USER" — cancel() no longer reuses released_by/released_at — see types.ts BalanceMovement.cancelledAt)',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('cancelled_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_by TEXT');
+      if (!columns.includes('cancelled_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_at TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

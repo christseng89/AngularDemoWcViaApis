@@ -282,7 +282,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
       ],
     },
     secondaryRefLabel: 'Amendment No./Times',
-    help: 'Increase always succeeds; Decrease is checked against Available Balance (Design doc §6.2).',
+    help: 'Increase always succeeds; Decrease is checked against Tight Available Balance (Design doc §6.2) — only APPROVED amounts count, and outstanding off-balance-sheet exposure is netted out.',
   },
   // Merged into one card, showing all ACTIVE IPLC_LC contracts regardless of tenor — no catalogTenorFilter.
   {
@@ -470,18 +470,28 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
 // both read the flags this file no longer carries; moving them here would create a circular import.
 
 /**
- * Status display mapping — settled requirement (see this file's own nested `CLAUDE.md` decision log):
+ * Status display mapping — see this file's own nested `CLAUDE.md` decision log (originally "settled",
+ * extended 2026-08-20 for the `acknowledgedAt` case below — business instruction, "A4 選取 EARMARKED
+ * 的交易" / "狀態必須是 EARMARKED"):
  *
- * | Function                     | Not Released | Released    |
- * |-------------------------------|--------------|-------------|
- * | Import LC — A3 / A3S          | EARMARKING   | EARMARKED   |
- * | Export Confirmed LC — B3      | EARMARKING   | EARMARKED   |
- * | All other functions           | PENDING      | APPROVED    |
+ * | Function                     | Not Submitted-Approved | Checker-Approved (still PENDING) | Released    |
+ * |-------------------------------|------------------------|-----------------------------------|-------------|
+ * | Import LC — A3 / A3S          | EARMARKING             | EARMARKED                          | EARMARKED   |
+ * | Export Confirmed LC — B3      | EARMARKING             | EARMARKED                          | EARMARKED   |
+ * | All other functions           | PENDING                 | n/a                                | APPROVED    |
  *
  * A3/A3S/B3 are D3 "physical event, not a legal event" earmarks (cs-tf-balance-knowhow) — the reserved
  * amount isn't the bank's definitive contingent position until a later legal event (A4/A6 for Import,
  * B4 for Export) posts it. Matching instrumentType/movementType:
  *   - Import: `IPLC_LC`/`UTILIZE`. Export: `EPLC_EXAMINATION`/`CREATE`.
+ *
+ * A3/A3S's own Checker "Approve" is deliberately acknowledgment-only (never a real Release — status
+ * stays PENDING) — but once genuinely acknowledged (`acknowledgedAt` set, restored 2026-08-20), the
+ * display already reads EARMARKED rather than waiting for A4/A6's own later Release, since a Checker has
+ * already confirmed it. A4/A6's own picker eligibility (`document-arrival-hints.service.ts`) requires
+ * this same EARMARKED state — a Document Arrival that's only Maker-Submitted (EARMARKING, not yet
+ * acknowledged) is not yet selectable there, for genuine 4-eyes separation between A3's own Maker and
+ * the Checker who must confirm it before A4/A6 ever touches it.
  *
  * The `phase` param exists because Inquire Events' `toEventRows()` split represents a finalized Sight
  * Document Arrival as TWO rows sharing the identical `(IPLC_LC, UTILIZE)` pair — 'create' (A3's own
@@ -503,9 +513,10 @@ export function displayStatus(
   instrumentType?: InstrumentType | string | null,
   movementType?: string | null,
   phase?: 'primary' | 'create' | 'finalize' | null,
+  acknowledgedAt?: string | null,
 ): string {
   const earmark = isEarmarkFunction(instrumentType, movementType, phase);
-  if (status === 'PENDING') return earmark ? 'EARMARKING' : 'PENDING';
+  if (status === 'PENDING') return earmark ? (acknowledgedAt ? 'EARMARKED' : 'EARMARKING') : 'PENDING';
   if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
   return status;
 }
@@ -516,8 +527,9 @@ export function statusBadgeClass(
   instrumentType?: InstrumentType | string | null,
   movementType?: string | null,
   phase?: 'primary' | 'create' | 'finalize' | null,
+  acknowledgedAt?: string | null,
 ): string {
-  if (status === 'PENDING') return 'tb-status-badge--pending';
+  if (status === 'PENDING') return isEarmarkFunction(instrumentType, movementType, phase) && acknowledgedAt ? 'tb-status-badge--earmark' : 'tb-status-badge--pending';
   if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
   if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
   if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';

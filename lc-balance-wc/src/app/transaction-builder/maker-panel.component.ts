@@ -89,10 +89,11 @@ const EMPTY_COMPOUND_LEGS: CompoundLegState = {
 
 /**
  * A pending sync request for the Checker's own search and, when `alsoSyncLookup` is set, the Look Up
- * Current Balance panel. Emitted through exactly two named private methods — `emitCheckerSync()` (a mere
- * selection pick, Checker search only) and `emitCheckerAndLookupSync()` (a genuine Submit/Release
- * success, both) — never a bare boolean literal at a call site, so a future success path can't silently
- * skip the Look Up refresh the way several already did before this fix.
+ * Current Balance panel too. `alsoSyncLookup` is now always `true` — business instruction 2026-08-20
+ * ("除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current Balance 自動輸入選取到的LC NUMBER 做
+ * LOOKUP處理") extended the Look Up refresh from "only a genuine Submit/Release success" to "any
+ * selection pick too" — every emitting call site now goes through the one `emitCheckerAndLookupSync()`
+ * method (never a bare boolean literal at a call site), so a future success path can't silently skip it.
  */
 export interface MakerSyncRequest {
   lcNumber: string;
@@ -256,11 +257,18 @@ export class MakerPanelComponent implements OnChanges {
       instrumentType: this.model.instrumentType,
     });
   }
-  /** A mere selection pick — re-syncs the Checker's own search box only, never Look Up Current Balance. */
-  private emitCheckerSync(): void {
-    this.emitSync(false);
-  }
-  /** Common Requirement: every successful Maker Submit or Checker Release refreshes Look Up Current Balance too. */
+  /**
+   * Common Requirement: every successful Maker Submit or Checker Release refreshes Look Up Current
+   * Balance too. Business instruction 2026-08-20 ("除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current
+   * Balance 自動輸入選取到的LC NUMBER 做 LOOKUP處理") — extended to a mere selection pick too, not just a
+   * Submit/Release success: every function that PICKS an existing LC (A2-A9/B2-B5) now syncs Look Up the
+   * moment that pick resolves, not only after the first successful action against it. A1/B1 create a
+   * brand-new LC with no pick step at all, so they only ever reach this via their own Submit/Release
+   * success paths — already correct, unaffected by this change. Previously split into two methods
+   * (`emitCheckerSync()`, selection-only; this one, Submit/Release-only) — collapsed into one now that
+   * every call site wants the same behavior; kept as a named method (not inlined at each call site) so a
+   * future genuinely-selection-only need has one obvious place to reintroduce the split.
+   */
   private emitCheckerAndLookupSync(): void {
     this.emitSync(true);
   }
@@ -323,12 +331,48 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   /** `displayStatus()` thin delegation — duplicated on this component the same way `AccountEntriesDialogComponent` carries its own copy, since Emulated view encapsulation scopes a template's binding surface to its own component. */
-  displayStatus(status: string, instrumentType?: InstrumentType | string | null, movementType?: string | null): string {
-    return displayStatusShared(status, instrumentType, movementType);
+  displayStatus(status: string, instrumentType?: InstrumentType | string | null, movementType?: string | null, acknowledgedAt?: string | null): string {
+    return displayStatusShared(status, instrumentType, movementType, undefined, acknowledgedAt);
   }
 
   movementTypeChecksAvailableBalance(movementType?: string | null): boolean {
     return !!movementType && DECREASING_MOVEMENT_TYPES.has(movementType);
+  }
+
+  /**
+   * True for B2's own Decrease direction — `model.movementType` is always `'AMEND'` for B2
+   * (EPLC_CONFIRMATION has no distinct Increase/Decrease movementType; direction rides `amendDirection`
+   * instead, see `SubChoice.key`'s own doc comment), so `DECREASING_MOVEMENT_TYPES`/
+   * `movementTypeChecksAvailableBalance()` alone can never see it. Business instruction 2026-08-20 ("A2
+   * Decrease 輸入金額控制規則 B2 Decrease... 都適用") — the Available/Tight Available Balance warnings
+   * below need this so B2 gets the same live feedback A2 already has (previously B2 got NO client-side
+   * warning at all for a Decrease that the server would reject). A2's own genuine `AMEND_DECREASE` is
+   * ALSO covered here (redundantly with `movementTypeChecksAvailableBalance`) purely so callers can use
+   * this one getter alone for the Tight-tier warning's own movementType scoping.
+   */
+  get isAmendDecreaseDirection(): boolean {
+    return this.model.movementType === 'AMEND_DECREASE' || (this.model.movementType === 'AMEND' && this.amendDirection === 'DECREASE');
+  }
+
+  /**
+   * True when the CURRENT submission's own server-side sufficiency check is Tight-Available-Balance-based,
+   * so the "exceeds Tight Available Balance" warning below should apply. Business instruction 2026-08-20
+   * ("B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance"): covers A3/A3S (`UTILIZE`,
+   * `checkUtilizeSufficiency`), A2/B2 Decrease (`isAmendDecreaseDirection`, `checkAmendDecreaseSufficiency`),
+   * B3 (`CREATE` against the aliased parent `EPLC_CONFIRMATION` — see `onSelectParent()`'s own doc comment
+   * for why `selectedContract` is aliased to the parent for this shape, `checkPresentDocsIssueSufficiency`),
+   * and A8 (`ISSUE` against the aliased parent `IPLC_LC` — same alias mechanism,
+   * `checkShgtIssueSufficiency`). Deliberately does NOT also cover them under the plain "exceeds Available
+   * Balance" tier-1 warning above: A8/B3 have no separate, looser plain-Available check server-side (unlike
+   * UTILIZE/AMEND_DECREASE, which genuinely have both tiers) — Tight Available Balance is their only real
+   * ceiling.
+   */
+  get checksAgainstTightAvailable(): boolean {
+    if (this.model.movementType === 'UTILIZE') return true;
+    if (this.isAmendDecreaseDirection) return true;
+    if (this.model.movementType === 'CREATE' && this.selectedContract?.instrumentType === 'EPLC_CONFIRMATION') return true;
+    if (this.model.movementType === 'ISSUE' && this.hasParent) return true;
+    return false;
   }
 
   private describeApiError(err: any): string {
@@ -487,7 +531,7 @@ export class MakerPanelComponent implements OnChanges {
     this.pickerSelection.payableMovementsPaging.total = this.pickerSelection.payableMovements.length;
     this.pickerSelection.payableMovementsPaging.page = 1;
     this.onSelectPayMovement(movementId);
-    this.emitCheckerSync();
+    this.emitCheckerAndLookupSync();
   }
 
   catalogIbHint(c: BalanceContract): string {
@@ -657,7 +701,7 @@ export class MakerPanelComponent implements OnChanges {
     if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       this.pickerSelection.loadSgsForArrival(this.selectedContract?.naturalKey.lcNumber, () => this.rebuildFields());
     }
-    this.emitCheckerSync();
+    this.emitCheckerAndLookupSync();
   }
 
   arrivalSgPrevPage(): void {
@@ -686,6 +730,25 @@ export class MakerPanelComponent implements OnChanges {
   get arrivalSgRemaining(): string | null {
     if (!this.pickerSelection.arrivalSgSnapshot || !this.arrivalSgRedeemAmount) return null;
     return String(Math.max(0, Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance) - Number(this.arrivalSgRedeemAmount)));
+  }
+
+  /**
+   * Business instruction 2026-08-20 ("A35 可以使用SG交易的金額 所以應該是 Tight Available + 選中SG的金額") —
+   * the "Typed amount exceeds Tight Available Balance" warning below used to compare `model.amount`
+   * against the plain `tightAvailableBalance` even while A35 (documentArrivalWithSg) is selected, a false
+   * positive: `checkUtilizeSufficiency()` (offBalanceExposure.ts) never actually applies that raw
+   * threshold here — the caller submits the matched SG's own redemption FIRST, netting that SG's
+   * `confirmedBalance` (Outstanding) out of `offBalanceExposure` before the LC UTILIZE's own tier-2 check
+   * runs, so the REAL ceiling this movement can reach is `tightAvailableBalance + SG Outstanding`. Falls
+   * back to the plain `tightAvailableBalance` for every other function (plain A3, or A35 before an SG is
+   * picked) — same value as before this fix, this getter only widens the A35 case.
+   */
+  get tightAvailableBalanceForWarning(): string | null {
+    const plain = this.selectedContractSnapshot?.tightAvailableBalance ?? null;
+    if (plain === null || plain === undefined) return null;
+    if (!this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) return plain;
+    if (!this.pickerSelection.arrivalSgSnapshot) return plain;
+    return String(Number(plain) + Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance));
   }
 
   onSelectPayMovement(movementId: string): void {
@@ -793,7 +856,7 @@ export class MakerPanelComponent implements OnChanges {
                 this.rebuildFields();
               }
               this.refreshSelectedContractSnapshot();
-              this.emitCheckerSync();
+              this.emitCheckerAndLookupSync();
             });
             return;
           }
@@ -803,7 +866,7 @@ export class MakerPanelComponent implements OnChanges {
             this.rebuildFields();
           }
           this.refreshSelectedContractSnapshot();
-          this.emitCheckerSync();
+          this.emitCheckerAndLookupSync();
         },
         error: (err) => {
           this.selectedContract = null;
@@ -843,11 +906,38 @@ export class MakerPanelComponent implements OnChanges {
     if (this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex && this.selectedParent) {
       this.pickerSelection.loadSettleableBalances(this.selectedParent.naturalKey.lcNumber, this.selectedFunction?.instrumentType);
     }
+    // Business instruction 2026-08-20 ("B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance") — B3
+    // (and A8, the same shape) creates a brand-new child contract directly under the picked parent, with
+    // no further Step-2 picker of its own (unlike A6/B4's settlesDocumentArrival or B5's
+    // usesSettleableBalanceIndex, both excluded below) — so `selectedContract`/`selectedContractSnapshot`
+    // were NEVER populated after onSelectParent() alone, meaning the balance box AND both Available/Tight
+    // Available Balance warnings below (both gated on `selectedContract`) never rendered at all for B3/A8:
+    // the Maker got zero live feedback before a Submit that the server would then 409 on. Aliasing
+    // `selectedContract` to the parent here is safe for this specific shape only — B3/A8 read `selectedParent`
+    // (never `selectedContract`) for their own submission/natural-key logic, so this alias exists purely to
+    // drive the shared balance-box/warning template block, which already reads `selectedContract.instrumentType`
+    // to pick Present Docs Earmark vs. SHGT-exposure wording (see the Tight Available Balance warning's own
+    // EPLC_CONFIRMATION branch) — exactly correct for B3, which needs that same branch.
+    if (
+      this.isCreatingMovement &&
+      !this.usesTwoFieldSearch &&
+      !this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival &&
+      !this.selectedFunctionStrategy?.selectionFlow.usesSettleableBalanceIndex &&
+      this.selectedParent
+    ) {
+      this.selectedContract = this.selectedParent;
+      this.refreshSelectedContractSnapshot();
+    }
     if (this.selectedFunction?.tenorTypeOptions?.length && this.isCreatingMovement && this.hasParent && this.selectedParent) {
       this.model.tenorType = this.selectedParent.tenorType ?? undefined;
       this.model.tenorDays = this.selectedParent.tenorDays ?? undefined;
       this.rebuildFields();
     }
+    // Business instruction 2026-08-20 ("除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current Balance
+    // 自動輸入選取到的LC NUMBER 做 LOOKUP處理") — onSelectParent() (A6/A7/A8/B3/B4/B5's own Parent LC pick)
+    // never synced anything at all before this fix, a real gap even the prior selection-only
+    // emitCheckerSync() design missed for this specific picker.
+    this.emitCheckerAndLookupSync();
   }
 
   private loadIbIndex(): void {
@@ -886,7 +976,7 @@ export class MakerPanelComponent implements OnChanges {
     }
     this.searchNaturalKey.ibNumber = outcome.ibNumber;
     this.refreshSelectedContractSnapshot();
-    this.emitCheckerSync();
+    this.emitCheckerAndLookupSync();
   }
 
   /** No special-case rule exists for the IB Index picker; always resolves to `genericFallback`. Kept as
@@ -916,7 +1006,7 @@ export class MakerPanelComponent implements OnChanges {
       this.rebuildFields();
     }
     this.refreshSelectedContractSnapshot();
-    this.emitCheckerSync();
+    this.emitCheckerAndLookupSync();
   }
 
   private rebuildFields(): void {

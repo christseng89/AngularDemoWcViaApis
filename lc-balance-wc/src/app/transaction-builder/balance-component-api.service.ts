@@ -123,6 +123,9 @@ export interface BalanceMovement {
   releasedBy?: string | null;
   createdAt: string;
   releasedAt?: string | null;
+  /** 2026-08-20 — cancel()'s own dedicated audit pair, split out from releasedBy/releasedAt. Null unless status === 'CANCELLED'. See the microservice's own `src/types.ts` BalanceMovement.cancelledAt doc comment. */
+  cancelledBy?: string | null;
+  cancelledAt?: string | null;
   /** release() on the microservice side always computes and persists both fields (see the microservice's own `src/types.ts`). */
   balanceBefore?: string | null;
   balanceAfter?: string | null;

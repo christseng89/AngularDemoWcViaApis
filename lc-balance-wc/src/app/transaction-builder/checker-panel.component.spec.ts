@@ -370,21 +370,142 @@ describe('CheckerPanelComponent', () => {
       expect(succeeded).toHaveBeenCalled();
     });
 
-    it('excludes an already-acknowledgedAt PENDING movement (A3/A3S, restored 2026-08-20 — "A3 A3S 交易 Approve 過後 不要再顯示")', () => {
+    it('excludes an already-acknowledgedAt UTILIZE while A3 (deferSettlement) is the selected function (restored 2026-08-20 — "A3 A3S 交易 Approve 過後 不要再顯示")', () => {
       const api = mockApi({
         listMovements: jest.fn(() =>
           of([
-            movement({ movementId: 'm1', status: 'PENDING', acknowledgedAt: null }),
-            movement({ movementId: 'm2', status: 'PENDING', acknowledgedAt: '2026-08-20T00:00:00.000Z', acknowledgedBy: 'checker1' }),
+            movement({ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', acknowledgedAt: null }),
+            movement({ movementId: 'm2', status: 'PENDING', movementType: 'UTILIZE', acknowledgedAt: '2026-08-20T00:00:00.000Z', acknowledgedBy: 'checker1' }),
           ]),
         ),
       });
       const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A3');
       c.checkerContract = contract({ balanceContractId: 'bc-9' });
 
       c.loadCheckerQueue();
 
       expect(c.checkerItems.map((m) => m.movementId)).toEqual(['m1']);
+    });
+
+    // Bug fixed 2026-08-20 (reviewer-reported live, "A4 SUBMIT後無法APPROVED" — S101 repro): the exact
+    // same acknowledged (EARMARKED) UTILIZE A3's own screen hides above is exactly what A4's own Checker
+    // search must still find — this shared queue component must NOT apply the exclusion while A4 (or any
+    // non-deferSettlement function) is selected.
+    it('does NOT exclude an already-acknowledgedAt, already-Maker-Submitted UTILIZE while A4 (not deferSettlement) is the selected function — A4 needs to find it to Release it', () => {
+      const api = mockApi({
+        listMovements: jest.fn(() =>
+          of([
+            movement({
+              movementId: 'm2',
+              status: 'PENDING',
+              movementType: 'UTILIZE',
+              acknowledgedAt: '2026-08-20T00:00:00.000Z',
+              acknowledgedBy: 'checker1',
+              makerSubmittedAt: '2026-08-20T01:00:00.000Z',
+              makerSubmittedBy: 'maker1',
+            }),
+          ]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A4');
+      c.checkerContract = contract({ balanceContractId: 'bc-9' });
+
+      c.loadCheckerQueue();
+
+      expect(c.checkerItems.map((m) => m.movementId)).toEqual(['m2']);
+    });
+
+    // Business instruction 2026-08-20 ("A4 需要 SUBMIT 後 才能 APPROVE") — an EARMARKED UTILIZE (A3/A3S's
+    // own Checker already acknowledged it) must still not appear in A4's own Checker Queue until A4's own
+    // Maker has Submitted it — release() already 409s server-side for this (BAL-123), but the item must
+    // not even look selectable/approvable before then.
+    it('excludes an already-acknowledgedAt UTILIZE that has NOT yet been Maker-Submitted while A4 is the selected function', () => {
+      const api = mockApi({
+        listMovements: jest.fn(() =>
+          of([
+            movement({
+              movementId: 'earmarked-not-submitted',
+              status: 'PENDING',
+              movementType: 'UTILIZE',
+              acknowledgedAt: '2026-08-20T00:00:00.000Z',
+              acknowledgedBy: 'checker1',
+              makerSubmittedAt: null,
+            }),
+          ]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A4');
+      c.checkerContract = contract({ balanceContractId: 'bc-9' });
+
+      c.loadCheckerQueue();
+
+      expect(c.checkerItems).toEqual([]);
+    });
+
+    // Business instruction 2026-08-20 ("Import A4 Checker Search 也要濾掉EARMARKING的交易") — the opposite
+    // direction of the same split: A4's own Checker Search must exclude a still-EARMARKING (no
+    // acknowledgedAt) UTILIZE — genuine 4-eyes, nothing for A4's Checker to Release until A3's own
+    // Checker has confirmed it first.
+    it('excludes a still-EARMARKING UTILIZE (no acknowledgedAt) while A4 is the selected function', () => {
+      const api = mockApi({
+        listMovements: jest.fn(() =>
+          of([
+            movement({ movementId: 'not-yet-acknowledged', status: 'PENDING', movementType: 'UTILIZE', acknowledgedAt: null, makerSubmittedAt: '2026-08-20T01:00:00.000Z' }),
+            movement({
+              movementId: 'acknowledged',
+              status: 'PENDING',
+              movementType: 'UTILIZE',
+              acknowledgedAt: '2026-08-20T00:00:00.000Z',
+              makerSubmittedAt: '2026-08-20T01:00:00.000Z',
+            }),
+          ]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A4');
+      c.checkerContract = contract({ balanceContractId: 'bc-9' });
+
+      c.loadCheckerQueue();
+
+      expect(c.checkerItems.map((m) => m.movementId)).toEqual(['acknowledged']);
+    });
+
+    // Business instruction 2026-08-20 ("各功能 RELEASE 自己產生的 PENDING 或 EARMARKING 交易" — "A2 不該
+    // 看到 UTILIZED 交易", the user's own literal example): IPLC_LC is shared by A1/A2/A3/A3S/A4 — without
+    // this filter, A2's own Checker Queue would also show an unrelated A3 UTILIZE sitting PENDING on the
+    // same LC.
+    it("excludes a movementType the selected function couldn't have produced (A2's own queue must not show an A3 UTILIZE on the same LC)", () => {
+      const api = mockApi({
+        listMovements: jest.fn(() =>
+          of([
+            movement({ movementId: 'amend-1', status: 'PENDING', movementType: 'AMEND_INCREASE' }),
+            movement({ movementId: 'utilize-1', status: 'PENDING', movementType: 'UTILIZE' }),
+          ]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A2');
+      c.checkerContract = contract({ balanceContractId: 'bc-9' });
+
+      c.loadCheckerQueue();
+
+      expect(c.checkerItems.map((m) => m.movementId)).toEqual(['amend-1']);
+    });
+
+    it('A9 (movementType placeholder FULL_REDEEM, real value derived) still sees a PARTIAL_REDEEM sitting PENDING on the same SG', () => {
+      const api = mockApi({
+        listMovements: jest.fn(() => of([movement({ movementId: 'redeem-1', status: 'PENDING', movementType: 'PARTIAL_REDEEM' })])),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9');
+      c.checkerContract = contract({ balanceContractId: 'bc-9', instrumentType: 'SHGT' });
+
+      c.loadCheckerQueue();
+
+      expect(c.checkerItems.map((m) => m.movementId)).toEqual(['redeem-1']);
     });
 
     it('error: resets checkerItems to empty and checkerLoading to false, without emitting queueLoadSucceeded', () => {

@@ -326,7 +326,20 @@ export class PickerSelectionService {
     this.api.listMovements(contractId).subscribe({
       next: (list) => {
         this.payableMovementsLoading = false;
-        this.payableMovements = list.filter((m) => m.status === 'PENDING' && m.movementType === wantedMovementType);
+        // Business instruction 2026-08-20 ("A4 選取 EARMARKED 的交易") — A4/A6's own UTILIZE candidates
+        // must be genuinely EARMARKED (Checker-acknowledged, acknowledgedAt set), not merely
+        // Maker-Submitted (EARMARKING) — mirrors DocumentArrivalHintsService's own Step-1 LC-level gate,
+        // needed again here since one LC can have MULTIPLE outstanding Document Arrivals and Step-1 only
+        // requires at least one to be eligible. B4's own ACCEPT-shaped payableMovementType is unrelated
+        // to A3/A3S's earmark concept, so it's excluded from this gate. Also excludes one A4 has already
+        // Maker-Submitted itself (makerSubmittedAt set — bug fixed same day, reviewer-reported live,
+        // "已經Submit 為何可以A4重複出現再選取"); A6 never sets this field, so it's a no-op there.
+        this.payableMovements = list.filter(
+          (m) =>
+            m.status === 'PENDING' &&
+            m.movementType === wantedMovementType &&
+            (wantedMovementType !== 'UTILIZE' || (!!m.acknowledgedAt && !m.makerSubmittedAt)),
+        );
         this.payableMovementsPaging.total = this.payableMovements.length;
         if (this.payableMovements.length === 1) {
           onAutoPicked(this.selectPayMovement(this.payableMovements[0].movementId, selectedFunctionStrategy, selectedFunction?.secondaryRefLabel));

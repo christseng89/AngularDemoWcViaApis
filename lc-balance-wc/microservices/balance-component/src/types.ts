@@ -170,6 +170,17 @@ export interface BalanceMovement {
   createdAt: string;
   releasedAt?: string | null;
   /**
+   * 2026-08-20 (business instruction, "交易要有 SUBMIT DATETIME/USER, EC DATETIME/USER (optional) AND
+   * APPROVE DATETIME/USER") — the Maker's own EC/`cancel()` actor and time, split out from
+   * `releasedBy`/`releasedAt` (which `cancel()` used to reuse, disambiguated only by `status ===
+   * 'CANCELLED'`) so the UI can show Submit/EC/Approve as three genuinely independent facts rather than
+   * inferring EC from an overloaded "released" field. Null unless `status === 'CANCELLED'`. `reject()`
+   * still writes into `releasedBy`/`releasedAt` for a REJECTED movement — no dedicated `rejectedBy`/
+   * `rejectedAt` pair was requested, out of scope for this change.
+   */
+  cancelledBy?: string | null;
+  cancelledAt?: string | null;
+  /**
    * EPLC_EXAMINATION only (2026-08-15, "Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
    * 來控制"). HISTORICAL FIELD, no longer written — superseded 2026-08-18 (business instruction, "所有
    * 交易要RELEASE過後 才能根據流程走下一個交易"): B3's own Checker action is now a genuine

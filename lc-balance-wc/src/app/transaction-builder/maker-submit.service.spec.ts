@@ -79,6 +79,7 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
   return {
     createMovement: jest.fn(() => of({ body: makeMovement() })),
     resolveContract: jest.fn(() => of(makeContract({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', balanceContractId: 'receivable-bc' }))),
+    cancel: jest.fn(() => of(makeMovement({ status: 'CANCELLED' }))),
     ...overrides,
   } as unknown as BalanceComponentApiService;
 }
@@ -232,21 +233,53 @@ describe('MakerSubmitService — submitDocumentArrivalWithSg (A3S)', () => {
     });
   });
 
-  it('SG succeeds but the Document Arrival fails: secondary still carries the SG redeem, result stays absent (desiger-comments.md F-08 — the primary call itself failed, so no BalanceMovement was ever created for this leg)', (done) => {
+  // Bug fixed 2026-08-20 (reviewer-reported live, "After the A3S transaction fails with an error, the
+  // selected SG becomes unavailable and cannot be selected or reused" — S001/G01+G02 repro): the SG's
+  // own redemption leg already succeeded and was left orphaned PENDING with no way to cancel it. Now
+  // auto-cancelled as a compensating action — secondary stays empty (nothing left PENDING to act on),
+  // result stays absent (desiger-comments.md F-08 — the primary call itself failed).
+  it('SG succeeds but the Document Arrival fails: the SG redeem is auto-cancelled (rollback), secondary stays empty, result stays absent', (done) => {
+    const cancel = jest.fn(() => of(makeMovement({ movementId: 'sg-redeem-2', status: 'CANCELLED' })));
     const api = makeApi({
       createMovement: jest
         .fn()
         .mockReturnValueOnce(of({ body: makeMovement({ movementId: 'sg-redeem-2', movementType: 'FULL_REDEEM' }) }))
         .mockReturnValueOnce(throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
+      cancel,
     });
     const service = new MakerSubmitService(api);
 
     service.submit(makeReq(), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Document Arrival itself failed');
+        expect(outcome.message).toContain('Document Arrival failed: ILLEGAL_STATE_TRANSITION');
+        expect(outcome.message).toContain('automatically cancelled');
         expect(outcome.result).toBeUndefined();
-        expect(outcome.secondary.arrivalSgRedeemMovementId).toBe('sg-redeem-2');
+        expect(outcome.secondary).toEqual({});
+      }
+      expect(cancel).toHaveBeenCalledWith('sg-redeem-2', 'maker1', 'AUTO_ROLLBACK_LC_LEG_FAILED');
+      done();
+    });
+  });
+
+  it('SG succeeds, Document Arrival fails, AND the auto-cancel rollback itself also fails: both errors surface, secondary stays empty', (done) => {
+    const api = makeApi({
+      createMovement: jest
+        .fn()
+        .mockReturnValueOnce(of({ body: makeMovement({ movementId: 'sg-redeem-3', movementType: 'FULL_REDEEM' }) }))
+        .mockReturnValueOnce(throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
+      cancel: jest.fn(() => throwError(() => ({ error: { message: 'NOT_FOUND' } }))),
+    });
+    const service = new MakerSubmitService(api);
+
+    service.submit(makeReq(), ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') {
+        expect(outcome.message).toContain('Document Arrival failed: ILLEGAL_STATE_TRANSITION');
+        expect(outcome.message).toContain('automatically cancelling');
+        expect(outcome.message).toContain('NOT_FOUND');
+        expect(outcome.message).toContain('sg-redeem-3');
+        expect(outcome.secondary).toEqual({});
       }
       done();
     });

@@ -30,6 +30,7 @@ import {
   computePresentDocsEarmark,
   computePresentDocsEarmarkApproved,
   computePresentDocsEarmarkPending,
+  derivePresentDocsProvisionallyConsumedIds,
 } from '../domain/offBalanceExposure';
 import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
@@ -221,7 +222,21 @@ export class BalanceService {
     let offBalanceExposure: string | null = null;
     let tightAvailableBalance: string | null = null;
     if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
-      const exposure = computeOffBalanceExposure(shgtMovements);
+      // Business-reported scenario 2026-08-20 ("A35 Refer to S02 G02 Tight Available Balance -8000???",
+      // live-reproduced: A1 Issue 10,000 → A8 SG Issue 8,000 → A35 Bill Amount 10,000 Submit) — derives
+      // WHICH still-PENDING SG redemptions computeOffBalanceExposure() should ALSO net (its own
+      // RELEASED-only default is otherwise correct — see that function's own doc comment) by scanning
+      // THIS SAME `movements` list (the LC's own contract) for a still-PENDING `UTILIZE` sharing that
+      // redemption's own `businessEventId` — i.e. A3S's own matched second leg. This one derivation feeds
+      // every caller of assembleSnapshot() uniformly (the live `GET .../balance` query, the movement's own
+      // persisted `eventSnapshot`, and `release()`'s own re-capture) — no separate override needed at any
+      // call site: `movements` already includes the just-built (not-yet-inserted) movement object when
+      // called from createMovement()'s own eventSnapshot capture, so its own `businessEventId` is picked
+      // up automatically the same way an already-persisted one is for a later live query.
+      const matchedPendingUtilizeBusinessEventIds = new Set(
+        movements.filter((m) => m.status === 'PENDING' && m.movementType === 'UTILIZE' && m.businessEventId).map((m) => m.businessEventId as string),
+      );
+      const exposure = computeOffBalanceExposure(shgtMovements, matchedPendingUtilizeBusinessEventIds);
       offBalanceExposure = exposure.toFixed();
       tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(exposure).toFixed();
     }
@@ -230,8 +245,15 @@ export class BalanceService {
     let presentDocsEarmarkPending: string | null = null;
     let presentDocsEarmarkApproved: string | null = null;
     if (contract.instrumentType === 'EPLC_CONFIRMATION') {
+      // Business-reported scenario 2026-08-20 ("B4 U02 也有類似問題 Tight Available Balance -10000",
+      // Export-side twin of the SG one above) — derives which B3 records B4's own still-PENDING
+      // HONOUR/ACCEPT already references (via referencedTransactionId, not businessEventId — B3/B4 never
+      // share one, B3 was created in an earlier, separate submission) from THIS SAME `movements` list, the
+      // same "automatic from movements, no per-call-site override" pattern the SG exposure block above
+      // uses — see derivePresentDocsProvisionallyConsumedIds()'s own doc comment.
+      const provisionallyConsumedIds = derivePresentDocsProvisionallyConsumedIds(movements);
       presentDocsEarmarkPending = computePresentDocsEarmarkPending(examinationMovements).toFixed();
-      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements).toFixed();
+      presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements, provisionallyConsumedIds).toFixed();
       // 2026-08-18, user-requested ("Would it be possible to have the same [Tight Available Balance]
       // field for the Export Confirmed LC?") — EPLC_CONFIRMATION has no sibling SHGT exposure to net
       // out (SHGT is Import-only, always a child of IPLC_LC), so this is NOT the same offBalanceExposure
@@ -241,7 +263,7 @@ export class BalanceService {
       // presentDocsEarmarkApproved, see offBalanceExposure.ts's own doc comments on all three
       // functions) — this just surfaces that same figure as a persisted/queryable BalanceSnapshot field
       // instead of a value computed only inline at submission time.
-      tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements)).toFixed();
+      tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements, provisionallyConsumedIds)).toFixed();
     }
 
     return {
@@ -549,6 +571,10 @@ export class BalanceService {
         const parentConfirmed = computeConfirmedBalance(parentMovements);
         const parentPendingDecreaseTotal = computePendingDecreaseTotal(parentMovements);
         const existingExaminationMovements = this.movements.listExaminationMovementsForParent(parentConfirmation.logicalContractId);
+        // Deliberately STRICT (no provisionally-consumed derivation) — this is a NEW, genuinely
+        // independent presentation's own sufficiency check, same posture as A8's own new-SG-Issue check
+        // above: it must never rely on capacity a DIFFERENT, still-unapproved B4 Accept has only
+        // provisionally freed — see derivePresentDocsProvisionallyConsumedIds()'s own doc comment.
         const presentDocsEarmark = computePresentDocsEarmark(existingExaminationMovements);
         // Quality-report-balance.md BAL-115 — see the identical SG Issue check's own comment above.
         const requestedAmount = parseMonetaryAmount(req.amount);
@@ -605,17 +631,41 @@ export class BalanceService {
       // capacity as strictly as A2's own AMEND_DECREASE) reaches here only when ceilingAmount is
       // negative (the `else if` above already absorbed the Increase/zero case) — compared by magnitude,
       // same floor check as A2, since checkAmendDecreaseSufficiency expects a positive "decrease by" amount.
+      //
+      // Business instruction 2026-08-20 ("A2 Decrease 輸入金額控制規則 B2, A3 & B3 都適用") — checked
+      // against Tight Available Balance, not plain `available`, computed the exact same way
+      // assembleSnapshot() computes the persisted BalanceSnapshot.tightAvailableBalance field for this
+      // contract's own instrumentType (SHGT exposure for IPLC_LC/EPLC_LC — A2's own case; Present Docs
+      // Earmark for EPLC_CONFIRMATION — B2's own case) — see amendDecrease.ts's own doc comment for why.
+      const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
+      let tightAvailableForDecrease = available;
+      if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
+        const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
+        tightAvailableForDecrease = confirmed.minus(pendingDecreaseTotal).minus(computeOffBalanceExposure(shgtMovements));
+      } else if (contract.instrumentType === 'EPLC_CONFIRMATION') {
+        // Deliberately STRICT (no provisionally-consumed override) — an AMEND_DECREASE is a genuinely
+        // independent transaction against the LC's own balance, same posture as B3's own new-presentation
+        // check above; it must never benefit from another PENDING B4's own provisional netting.
+        const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
+        tightAvailableForDecrease = confirmed.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements));
+      }
       const check = checkAmendDecreaseSufficiency({
         amount: parseMonetaryAmount(req.amount).abs(),
         ceilingAmount: ceilingAmount.abs(),
-        availableBalance: available,
+        tightAvailableBalance: tightAvailableForDecrease,
       });
       if (!check.ok) throw new InsufficientBalanceError(check.error!);
     } else if (UTILIZE_SHAPED_MOVEMENT_TYPES.has(req.movementType)) {
       let offBalanceExposure = new Decimal(0);
       if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
         const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
-        offBalanceExposure = computeOffBalanceExposure(shgtMovements);
+        // THIS movement (the LC's own UTILIZE) isn't inserted yet, so it can't appear in `existingMovements`
+        // for assembleSnapshot()'s own automatic businessEventId derivation to pick up — req.businessEventId
+        // matches ONLY A3S's own matched-SG redemption leg it just created in THIS same compound submission
+        // (see computeOffBalanceExposure()'s own doc comment for why this is the one deliberate exception to
+        // "a PENDING redemption never counts as netted").
+        const matchedPendingUtilizeBusinessEventIds = req.businessEventId ? new Set([req.businessEventId]) : undefined;
+        offBalanceExposure = computeOffBalanceExposure(shgtMovements, matchedPendingUtilizeBusinessEventIds);
       }
       const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
       const check = checkUtilizeSufficiency({ requestedAmount: ceilingAmount, availableBalance: available, confirmedBalance: confirmed, pendingDecreaseTotal, offBalanceExposure });
@@ -876,6 +926,11 @@ export class BalanceService {
    * it. Same "Maker/Checker identity not enforced here" posture as release()/reject() (statusTransition.ts's
    * own top comment) — cancelledBy is audit metadata, not an ownership check; a system-authorization
    * layer would enforce "only the original Maker" separately if required.
+   *
+   * 2026-08-20 ("SUBMIT/EC/APPROVE DATETIME/USER") — writes `cancelledBy`/`cancelledAt` instead of
+   * reusing `releasedBy`/`releasedAt` (the original design, disambiguated only by `status ===
+   * 'CANCELLED'`) so the UI can show Submit/EC/Approve as three independently-populated facts — see
+   * types.ts's own `cancelledAt` doc comment.
    */
   cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): BalanceMovement {
     const movement = this.movements.findById(movementId);
@@ -884,8 +939,8 @@ export class BalanceService {
     this.movements.updateStatus({
       movementId,
       status: 'CANCELLED',
-      releasedBy: cancelledBy,
-      releasedAt: this.now(),
+      cancelledBy,
+      cancelledAt: this.now(),
       reasonCode: reasonCode ?? 'MAKER_EC',
       remarks,
     });

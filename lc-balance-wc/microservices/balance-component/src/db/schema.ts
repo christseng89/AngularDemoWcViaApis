@@ -156,7 +156,11 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- BalanceMovement.presentDocsConsumedAt doc comment and domain/offBalanceExposure.ts's own basis-change
   -- note for why this, not status alone, now gates Present Docs Earmark occupancy.
   present_docs_consumed_at TEXT,
-  present_docs_consumed_by TEXT
+  present_docs_consumed_by TEXT,
+  -- 2026-08-20 ("SUBMIT/EC/APPROVE DATETIME/USER") — cancel()'s own actor/time, split out from
+  -- released_by/released_at (see types.ts BalanceMovement.cancelledAt for why).
+  cancelled_by             TEXT,
+  cancelled_at             TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

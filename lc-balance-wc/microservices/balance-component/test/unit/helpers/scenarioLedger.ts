@@ -71,13 +71,17 @@ export class ScenarioLedger {
     return ceiling;
   }
 
-  /** Design doc §6.2 — returns the check result; only pushes a RELEASED movement when ok. */
-  amendDecrease(amount: string): { ok: boolean; error?: string; ceilingAmount: Decimal } {
+  /**
+   * Design doc §6.2 — returns the check result; only pushes a RELEASED movement when ok. Checked
+   * against Tight Available Balance (2026-08-20, "A2 Decrease 輸入金額控制規則 B2, A3 & B3 都適用"),
+   * same as utilize() below — offBalanceExposure defaults to 0 for a ledger with no sibling exposure.
+   */
+  amendDecrease(amount: string, offBalanceExposure: Decimal = new Decimal(0)): { ok: boolean; error?: string; ceilingAmount: Decimal } {
     const ceiling = this.ceilingFor('AMEND_DECREASE', amount);
     const result = checkAmendDecreaseSufficiency({
       amount: new Decimal(amount),
       ceilingAmount: ceiling,
-      availableBalance: this.available(),
+      tightAvailableBalance: this.confirmed().minus(computePendingDecreaseTotal(this.movements)).minus(offBalanceExposure),
     });
     if (result.ok) {
       this.movements.push({ movementType: 'AMEND_DECREASE', amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });

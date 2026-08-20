@@ -409,7 +409,19 @@ info:
     is now genuinely persisted again (`acknowledgedBy`/`acknowledgedAt`, no longer historical-only) so a
     Checker Queue listing can filter an already-approved item out instead of it reappearing as PENDING
     forever.
-  version: "1.13.0"
+
+
+    v1.14.0 (2026-08-20, same day, business instruction "交易要有 SUBMIT DATETIME/USER, EC DATETIME/USER
+    (optional) AND APPROVE DATETIME/USER"): new `BalanceMovement.cancelledBy`/`cancelledAt`. `POST
+    /balance-movements/{movementId}/cancel` (Maker EC) previously wrote its actor/time into
+    `releasedBy`/`releasedAt` — the same fields `/release` (Approve) writes — disambiguated only by
+    `status === 'CANCELLED'` vs `'RELEASED'`. Now writes this dedicated pair instead, so a caller can
+    read Submit (`createdBy`/`createdAt`), EC (`cancelledBy`/`cancelledAt`, populated only once
+    `status === 'CANCELLED'`), and Approve (`releasedBy`/`releasedAt`, populated only once `status ===
+    'RELEASED'`) as three independent facts with no status-based inference required. `/reject` is
+    unaffected — a REJECTED movement still reuses `releasedBy`/`releasedAt`, no dedicated
+    `rejectedBy`/`rejectedAt` pair was requested.
+  version: "1.14.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1252,6 +1264,15 @@ components:
         releasedBy: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         releasedAt: { type: string, format: date-time, nullable: true }
+        cancelledBy:
+          type: string
+          nullable: true
+          description: >
+            v1.14.0 (2026-08-20) — the Maker's own POST /balance-movements/{id}/cancel (EC) actor, split
+            out from releasedBy (which cancel() used to reuse, disambiguated only by status ===
+            'CANCELLED'). Null unless status === 'CANCELLED'. /reject still reuses releasedBy/releasedAt
+            for a REJECTED movement — no dedicated rejectedBy/rejectedAt pair exists.
+        cancelledAt: { type: string, format: date-time, nullable: true, description: "Paired with cancelledBy above." }
         acknowledgedBy:
           type: string
           nullable: true

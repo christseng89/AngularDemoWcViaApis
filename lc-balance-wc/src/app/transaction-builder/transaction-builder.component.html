@@ -326,6 +326,7 @@
                       <th>Status</th>
                       <th>Balance After</th>
                       <th>Time</th>
+                      <th>Audit Trail</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -374,12 +375,29 @@
                       <td>
                         <span
                           class="tb-status-badge"
-                          [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase)"
-                          >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase) }}</span
+                          [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)"
+                          >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt) }}</span
                         >
                       </td>
                       <td class="tb-table__amount">{{ row.movement.balanceAfter ?? '—' }}</td>
                       <td class="tb-table__time">{{ row.eventTime | date: 'short' }}</td>
+                      <!-- Submit/EC/Approve audit trail (business instruction 2026-08-20). EC/Approve are
+                       mutually exclusive per row, gated on the movement's own real status — see the
+                       Original Transaction Screen panel below for the same rule, and the microservice's
+                       own types.ts BalanceMovement.cancelledAt doc comment for why EC no longer reuses
+                       releasedBy/releasedAt. -->
+                      <td class="tb-table__audit-trail">
+                        <div>S: {{ row.movement.createdBy }} · {{ row.movement.createdAt | date: 'short' }}</div>
+                        <div *ngIf="row.eventStatus === 'RELEASED' && row.movement.releasedBy">
+                          A: {{ row.movement.releasedBy }} · {{ row.movement.releasedAt | date: 'short' }}
+                        </div>
+                        <div *ngIf="row.eventStatus === 'REJECTED' && row.movement.releasedBy">
+                          Rej: {{ row.movement.releasedBy }} · {{ row.movement.releasedAt | date: 'short' }}
+                        </div>
+                        <div *ngIf="row.eventStatus === 'CANCELLED' && row.movement.cancelledBy">
+                          EC: {{ row.movement.cancelledBy }} · {{ row.movement.cancelledAt | date: 'short' }}
+                        </div>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -639,8 +657,8 @@
                       <td>
                         <span
                           class="tb-status-badge"
-                          [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase)"
-                          >{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase) }}</span
+                          [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt)"
+                          >{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt) }}</span
                         >
                       </td>
                       <td class="tb-table__time">{{ e.eventTime | date: 'short' }}</td>
@@ -702,20 +720,34 @@
               <div class="tb-balance-row">
                 <span class="tb-balance-row__label">Status</span
                 ><span class="tb-balance-row__value">{{
-                  displayStatus(sel.eventStatus, sel.contract.instrumentType, sel.movement.movementType, sel.phase)
+                  displayStatus(sel.eventStatus, sel.contract.instrumentType, sel.movement.movementType, sel.phase, sel.movement.acknowledgedAt)
                 }}</span>
               </div>
+              <!-- Submit/EC/Approve audit trail (business instruction 2026-08-20, "交易要有SUBMIT
+               DATETIME/USER, EC DATETIME/USER (optional) AND APPROVE DATATIME/USER"). Submit
+               (createdBy/createdAt) always shown; EC/Approve are mutually exclusive, gated on the
+               movement's own real status — never inferred, since cancel() now writes its own
+               cancelledBy/cancelledAt pair instead of reusing releasedBy/releasedAt (see the
+               microservice's own types.ts BalanceMovement.cancelledAt doc comment). -->
               <div class="tb-balance-row">
-                <span class="tb-balance-row__label">Created</span
+                <span class="tb-balance-row__label">Submitted</span
                 ><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date: 'short' }}</span>
               </div>
               <!-- sel.eventStatus (not sel.movement.status directly, though as of 2026-08-18 they're always
                the same value — see toEventRows()'s own doc comment) gates this. A 'create'-phase row for
-               an already-finalized movement now correctly shows "Released by/at" here too, same as its
+               an already-finalized movement now correctly shows "Approved by/at" here too, same as its
                sibling 'finalize' row — both are showing the SAME real fact about the SAME movement. -->
-              <div class="tb-balance-row" *ngIf="sel.eventStatus !== 'PENDING' && sel.movement.releasedBy">
-                <span class="tb-balance-row__label">Released</span
+              <div class="tb-balance-row" *ngIf="sel.eventStatus === 'RELEASED' && sel.movement.releasedBy">
+                <span class="tb-balance-row__label">Approved</span
                 ><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date: 'short' }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.eventStatus === 'REJECTED' && sel.movement.releasedBy">
+                <span class="tb-balance-row__label">Rejected</span
+                ><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date: 'short' }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.eventStatus === 'CANCELLED' && sel.movement.cancelledBy">
+                <span class="tb-balance-row__label">EC (Cancelled)</span
+                ><span class="tb-balance-row__value">{{ sel.movement.cancelledBy }} — {{ sel.movement.cancelledAt | date: 'short' }}</span>
               </div>
               <button
                 type="button"

@@ -10,6 +10,7 @@ import {
 } from './balance-component.model';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import * as policy from './function-policy';
+import { deriveFunctionStrategy, movementTypeMatchesFunction } from './function-strategy';
 
 /**
  * A pending sync request for the Checker's own independent search — see `ngOnChanges()`'s own doc
@@ -167,9 +168,34 @@ export class CheckerPanelComponent implements OnChanges {
   /**
    * Every still-actionable PENDING movement on `checkerContractId`. Re-run after anything that could
    * change what's PENDING on this contract (a Maker Submit, or a Checker Release/Reject/acknowledge from
-   * this same queue). Excludes an already-`acknowledgedAt` A3/A3S UTILIZE (business instruction
-   * 2026-08-20, "A3 A3S 交易 Approve 過後 不要再顯示") — it's still genuinely PENDING server-side (A4/A6
-   * finalizes it for real later), but the Checker has nothing further to do with it here.
+   * this same queue). Two opposite, function-scoped filters share the same EARMARKING(PENDING+no
+   * acknowledgedAt)/EARMARKED(PENDING+acknowledgedAt) split (business instruction 2026-08-20):
+   *
+   * - A3/A3S (deferSettlement) — excludes an already-`acknowledgedAt` UTILIZE ("A3 A3S 交易 Approve 過後
+   *   不要再顯示"): once A3's own Checker has acknowledged it, re-offering it on the A3/A3S screen is
+   *   pointless (A4/A6 finalizes it for real later, on THEIR OWN screen).
+   * - A4 (`releasesExistingMovementInPlace`) — the OPPOSITE: excludes a still-EARMARKING UTILIZE with no
+   *   `acknowledgedAt` yet ("Import A4 Checker Search 也要濾掉EARMARKING的交易") — A4's own Checker has
+   *   nothing legitimate to Release until A3's own Checker has confirmed it first (genuine 4-eyes: a
+   *   still-EARMARKING item must not appear as actionable in the NEXT transaction). ALSO excludes an
+   *   EARMARKED UTILIZE that A4's own Maker hasn't Submitted yet (`!m.makerSubmittedAt` — business
+   *   instruction "A4 需要 SUBMIT 後 才能 APPROVE"): `release()` already 409s server-side for this case
+   *   (BAL-123), but the item must not even be selectable/approvable in the Checker Queue before then —
+   *   same reasoning as the picker-side `!m.makerSubmittedAt` exclusion in `document-arrival-hints.
+   *   service.ts`/`picker-selection.service.ts` (that one stops the SAME item being re-Submitted twice;
+   *   this one stops it being Approved before being Submitted even once).
+   *
+   * Every other function is unaffected by the EARMARKING/EARMARKED split (plain `status === 'PENDING'`)
+   * — A6/B4 etc. search a different instrumentType/movementType entirely (the new Acceptance/asset
+   * record, not the source UTILIZE).
+   *
+   * Business instruction 2026-08-20 ("各功能 RELEASE 自己產生的 PENDING 或 EARMARKING 交易" — "A2 不該看到
+   * UTILIZED 交易"): several instrumentTypes are shared by more than one function (IPLC_LC: A1/A2/A3/
+   * A3S/A4; IPLC_ACCEPTANCE: A6/A7; SHGT: A8/A9; EPLC_CONFIRMATION: B1/B2/B4) — without a per-function
+   * movementType filter, e.g. A2's own Checker Queue would also show an unrelated A3 UTILIZE sitting
+   * PENDING on the same LC. `movementTypeMatchesFunction()` (`function-strategy.ts`, already used by
+   * Inquire Events to answer the same "could this function have produced this movement" question) scopes
+   * every function's own queue to movements it could genuinely have produced.
    */
   loadCheckerQueue(): void {
     this.selectedCheckerMovement = null;
@@ -179,10 +205,20 @@ export class CheckerPanelComponent implements OnChanges {
     const contractId = this.checkerContractId;
     if (!contractId) return;
     this.checkerLoading = true;
+    const strategy = this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
+    const deferMovementType = strategy?.checkerRelease.deferSettlement ? (this.selectedFunction?.deferSettlementMovementType ?? 'UTILIZE') : null;
+    const requiresEarmarked = !!strategy?.checkerRelease.releasesExistingMovementInPlace;
+    const selectedFunction = this.selectedFunction;
     this.api.listMovements(contractId).subscribe({
       next: (list: BalanceMovement[]) => {
         this.checkerLoading = false;
-        this.checkerItems = list.filter((m) => m.status === 'PENDING' && !m.acknowledgedAt);
+        this.checkerItems = list.filter((m) => {
+          if (m.status !== 'PENDING') return false;
+          if (selectedFunction && !movementTypeMatchesFunction(selectedFunction, m.movementType)) return false;
+          if (deferMovementType && m.movementType === deferMovementType && m.acknowledgedAt) return false;
+          if (requiresEarmarked && m.movementType === 'UTILIZE' && (!m.acknowledgedAt || !m.makerSubmittedAt)) return false;
+          return true;
+        });
         this.queueLoadSucceeded.emit();
       },
       error: () => {

@@ -181,6 +181,21 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.displayStatus('PENDING', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKING');
     });
 
+    // Business instruction 2026-08-20 ("A4 選取 EARMARKED 的交易" / "狀態必須是 EARMARKED") — once the
+    // Checker genuinely acknowledges (A3/A3S's own "Approve"), the display already reads EARMARKED even
+    // though status stays PENDING (A4/A6 hasn't finalized it yet) — A4/A6's own picker eligibility relies
+    // on this same signal (see document-arrival-hints.service.ts / picker-selection.service.ts).
+    it('relabels PENDING as EARMARKED (not EARMARKING) once acknowledgedAt is set', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE', null, '2026-08-20T00:00:00.000Z')).toBe('EARMARKED');
+      expect(comp.displayStatus('PENDING', 'EPLC_EXAMINATION', 'CREATE', null, '2026-08-20T00:00:00.000Z')).toBe('EARMARKED');
+    });
+
+    it('does NOT relabel PENDING as EARMARKED for a non-earmark function even when acknowledgedAt is set', () => {
+      const { comp } = makeComponent();
+      expect(comp.displayStatus('PENDING', 'IPLC_LC', 'ISSUE', null, '2026-08-20T00:00:00.000Z')).toBe('PENDING');
+    });
+
     it('leaves PENDING as plain PENDING for every other function', () => {
       const { comp } = makeComponent();
       expect(comp.displayStatus('PENDING', 'IPLC_LC', 'ISSUE')).toBe('PENDING');
@@ -230,6 +245,12 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.statusBadgeClass('RELEASED', 'EPLC_EXAMINATION', 'CREATE')).toBe('tb-status-badge--earmark');
       expect(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'UTILIZE')).not.toBe(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'ISSUE'));
       expect(comp.statusBadgeClass('RELEASED', 'IPLC_LC', 'UTILIZE')).not.toBe(comp.statusBadgeClass('PENDING'));
+    });
+
+    it('returns the earmark class for a PENDING Document Arrival/Present Docs once acknowledgedAt is set, but plain pending class without it', () => {
+      const { comp } = makeComponent();
+      expect(comp.statusBadgeClass('PENDING', 'IPLC_LC', 'UTILIZE', null, '2026-08-20T00:00:00.000Z')).toBe('tb-status-badge--earmark');
+      expect(comp.statusBadgeClass('PENDING', 'IPLC_LC', 'UTILIZE')).toBe('tb-status-badge--pending');
     });
 
     it('returns the negative class for REJECTED/CANCELLED and the neutral class for SUPERSEDED', () => {

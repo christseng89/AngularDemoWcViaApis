@@ -371,9 +371,11 @@ describe('MakerPanelComponent', () => {
       const c2 = mkContract('c2', '002');
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([c1, c2], 2)));
       mockApi.getSnapshot.mockImplementation((id: string) => of(mkSnapshot(id)));
-      // A4's LC Index requires each candidate to have a real outstanding Document Arrival — both c1/c2
-      // need one to still show up in catalogPicker.total/contracts below.
-      mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01' }]));
+      // A4's LC Index requires each candidate to have a real outstanding, Checker-acknowledged (EARMARKED)
+      // Document Arrival — both c1/c2 need one to still show up in catalogPicker.total/contracts below.
+      mockApi.listMovements.mockReturnValue(
+        of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01', acknowledgedAt: '2026-08-20T00:00:00.000Z' }]),
+      );
 
       comp.reloadCatalog();
 
@@ -407,7 +409,7 @@ describe('MakerPanelComponent', () => {
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
       mockApi.listMovements.mockReturnValue(
         of([
-          { movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB00001' },
+          { movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB00001', acknowledgedAt: '2026-08-20T00:00:00.000Z' },
           { movementId: 'm2', status: 'RELEASED', movementType: 'UTILIZE', sourceTransactionRef: 'IB00002' },
         ]),
       );
@@ -416,6 +418,55 @@ describe('MakerPanelComponent', () => {
 
       expect(comp.documentArrivalHints.catalogPayableIbs.get('c1')).toEqual(['IB00001']);
       expect(comp.documentArrivalHints.catalogPayableMovements.get('c1')?.map((m: any) => m.movementId)).toEqual(['m1']);
+    });
+
+    // Business instruction 2026-08-20 ("A4 選取 EARMARKED 的交易") — a Document Arrival that's only
+    // Maker-Submitted (PENDING, acknowledgedAt still null) must NOT populate catalogPayableIbs, even
+    // though it's genuinely PENDING/UTILIZE — the LC has nothing eligible for A4 to pick yet.
+    it('does NOT populate catalogPayableIbs for a still-PENDING UTILIZE that has not yet been Checker-acknowledged', () => {
+      const { comp, mockApi } = makeComponentA();
+      comp.model.instrumentType = 'IPLC_LC';
+      comp.model.movementType = 'UTILIZE';
+      comp.selectedFunction = A4;
+      const c1 = mkContract('c1', '811');
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([c1], 1)));
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
+      mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB00003' }]));
+
+      comp.reloadCatalog();
+
+      expect(comp.documentArrivalHints.catalogPayableIbs.get('c1')).toBeUndefined();
+      expect(comp.documentArrivalHints.catalogPayableMovements.get('c1')).toBeUndefined();
+    });
+
+    // Bug fixed 2026-08-20 (reviewer-reported live, "已經Submit 為何可以A4重複出現再選取" — S101 repro):
+    // once A4's own Maker Submit has already happened, the item has nothing left for A4's Maker step to
+    // do and must drop out of this same list too, not keep re-offering itself for a second 409-doomed Submit.
+    it('does NOT populate catalogPayableIbs for an acknowledged UTILIZE that A4 has already Maker-Submitted (makerSubmittedAt set)', () => {
+      const { comp, mockApi } = makeComponentA();
+      comp.model.instrumentType = 'IPLC_LC';
+      comp.model.movementType = 'UTILIZE';
+      comp.selectedFunction = A4;
+      const c1 = mkContract('c1', '812');
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([c1], 1)));
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
+      mockApi.listMovements.mockReturnValue(
+        of([
+          {
+            movementId: 'm1',
+            status: 'PENDING',
+            movementType: 'UTILIZE',
+            sourceTransactionRef: 'IB00004',
+            acknowledgedAt: '2026-08-20T00:00:00.000Z',
+            makerSubmittedAt: '2026-08-20T01:00:00.000Z',
+          },
+        ]),
+      );
+
+      comp.reloadCatalog();
+
+      expect(comp.documentArrivalHints.catalogPayableIbs.get('c1')).toBeUndefined();
+      expect(comp.documentArrivalHints.catalogPayableMovements.get('c1')).toBeUndefined();
     });
 
     it('handles an error response by clearing catalogPicker.contracts/catalogPicker.total instead of throwing', () => {
@@ -796,8 +847,11 @@ describe('MakerPanelComponent', () => {
       const p1 = mkContract('p1', '001', { tenorType: 'BUYERS_USANCE' });
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([p1], 1)));
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('p1')));
-      // p1 also needs a real outstanding Document Arrival of its own to pass A6's eligibility filter.
-      mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01' }]));
+      // p1 also needs a real outstanding, Checker-acknowledged (EARMARKED) Document Arrival of its own to
+      // pass A6's eligibility filter.
+      mockApi.listMovements.mockReturnValue(
+        of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01', acknowledgedAt: '2026-08-20T00:00:00.000Z' }]),
+      );
 
       comp.onParentInstrumentTypeChange();
 
@@ -1131,8 +1185,15 @@ describe('MakerPanelComponent', () => {
       expect(comp.snapshotLoading).toBe(false);
     });
 
-    it('A4 (payExistingUtilize): loads still-PENDING UTILIZE movements under the picked contract and auto-picks the sole one', () => {
-      const pendingUtilize = { movementId: 'M1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1000' };
+    it('A4 (payExistingUtilize): loads still-PENDING, Checker-acknowledged (EARMARKED) UTILIZE movements under the picked contract and auto-picks the sole one', () => {
+      const pendingUtilize = {
+        movementId: 'M1',
+        status: 'PENDING',
+        movementType: 'UTILIZE',
+        sourceTransactionRef: 'IB01',
+        amount: '1000',
+        acknowledgedAt: '2026-08-20T00:00:00.000Z',
+      };
       const releasedUtilize = { movementId: 'M2', status: 'RELEASED', movementType: 'UTILIZE' };
       const api = makeApi({ listMovements: jest.fn(() => of([pendingUtilize, releasedUtilize])) });
       const comp = makeComponentB(getFn('A4'), api);
@@ -1493,7 +1554,13 @@ describe('MakerPanelComponent', () => {
       expect(captured).toHaveLength(0);
     });
 
-    it('a mere selection pick (onSelectContract) still syncs the Checker queue only, never Look Up Current Balance', () => {
+    // Business instruction 2026-08-20 ("除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current Balance
+    // 自動輸入選取到的LC NUMBER 做 LOOKUP處理") — reverses the prior design this same describe block used
+    // to document ("a mere selection pick... never Look Up Current Balance"): every function that PICKS
+    // an existing LC (A2-A9/B2-B5) now syncs Look Up the moment that pick resolves, not only after a
+    // Submit/Release success. A1/B1 have no pick step (they create a brand-new LC) so are unaffected —
+    // covered separately below.
+    it('a mere selection pick (onSelectContract) now ALSO syncs Look Up Current Balance', () => {
       const api = makeApi();
       const comp = makeComponentB(getFn('A2'), api);
       comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1' })];
@@ -1501,8 +1568,31 @@ describe('MakerPanelComponent', () => {
 
       comp.onSelectContract('C1');
 
-      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: false });
-      expect(captured.some((e) => e.alsoSyncLookup)).toBe(false);
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
+    });
+
+    it('onSelectParent (A8) also syncs Look Up Current Balance on a mere pick', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A8'), api);
+      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: null } })];
+      const captured = captureSync(comp);
+
+      comp.onSelectParent('P1');
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
+    });
+
+    it('onSelectIbIndex (A7 Step 2) also syncs Look Up Current Balance on a mere pick', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A7'), api);
+      comp.ibIndexPicker.contracts = [
+        makeContract({ balanceContractId: 'IB1', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC001', ibNumber: 'IB01', sgNumber: null } }),
+      ];
+      const captured = captureSync(comp);
+
+      comp.onSelectIbIndex('IB1');
+
+      expect(captured).toContainEqual({ lcNumber: 'LC001', alsoSyncLookup: true });
     });
   });
 
@@ -1717,6 +1807,40 @@ describe('MakerPanelComponent', () => {
       expect(comp.naturalKey.lcNumber).toBe('LC1');
     });
 
+    // Business instruction 2026-08-20 ("B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance") — A8/B3
+    // previously never populated selectedContract/selectedContractSnapshot after picking the Parent, so
+    // the balance box + Available/Tight Available Balance warnings (both gated on selectedContract in the
+    // template) never rendered at all for either. onSelectParent() now aliases selectedContract to the
+    // parent for this specific "create a new child directly under the parent, no further picker" shape.
+    it('A8 (creating movement, no further picker): aliases selectedContract to the picked Parent and loads its snapshot', () => {
+      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '100', tightAvailableBalance: '90' }))) });
+      const comp = makeComponentB(getFn('A8'), api);
+      const parent = makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } });
+      comp.parentPicker.contracts = [parent];
+
+      comp.onSelectParent('P1');
+
+      expect(comp.selectedContract).toBe(parent);
+      expect(api.getSnapshot).toHaveBeenCalledWith('P1');
+      expect(comp.selectedContractSnapshot?.tightAvailableBalance).toBe('90');
+    });
+
+    it('B3 (creating movement, no further picker): same alias — selectedContract becomes the picked parent EPLC_CONFIRMATION', () => {
+      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '100', tightAvailableBalance: '90' }))) });
+      const comp = makeComponentB(getFn('B3'), api);
+      const parent = makeContract({
+        balanceContractId: 'CNF1',
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'EXP1', ibNumber: null, sgNumber: null },
+      });
+      comp.parentPicker.contracts = [parent];
+
+      comp.onSelectParent('CNF1');
+
+      expect(comp.selectedContract).toBe(parent);
+      expect(comp.selectedContractSnapshot?.tightAvailableBalance).toBe('90');
+    });
+
     it("A7 (usesTwoFieldSearch): drives Step 2 IB Index off the picked Parent's own LC Number", () => {
       const ibContract = makeContract({
         balanceContractId: 'IB1',
@@ -1742,8 +1866,15 @@ describe('MakerPanelComponent', () => {
       expect(comp.ibIndexPicker.contracts).toEqual([ibContract]);
     });
 
-    it('A6 (settlesDocumentArrival + tenorTypeOptions): loads still-PENDING Document Arrivals and carries Tenor Type/Days from the Parent', () => {
-      const pendingArrival = { movementId: 'M1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01', amount: '1500' };
+    it('A6 (settlesDocumentArrival + tenorTypeOptions): loads still-PENDING, Checker-acknowledged (EARMARKED) Document Arrivals and carries Tenor Type/Days from the Parent', () => {
+      const pendingArrival = {
+        movementId: 'M1',
+        status: 'PENDING',
+        movementType: 'UTILIZE',
+        sourceTransactionRef: 'IB01',
+        amount: '1500',
+        acknowledgedAt: '2026-08-20T00:00:00.000Z',
+      };
       const api = makeApi({ listMovements: jest.fn(() => of([pendingArrival])) });
       const comp = makeComponentB(getFn('A6'), api);
       comp.parentPicker.contracts = [
@@ -1756,6 +1887,9 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.payableMovements).toEqual([pendingArrival]);
       expect(comp.model.tenorType).toBe('SELLERS_USANCE');
       expect(comp.model.tenorDays).toBe(90);
+      // A6 is settlesDocumentArrival — excluded from the A8/B3-only selectedContract alias above (A6 has
+      // its own Step-2 payable-movement picker, a different meaning for "the target of this submission").
+      expect(comp.selectedContract).toBeNull();
     });
 
     it("B5 (settleableBalanceIndex): merges settleable candidates for the picked Confirmation's own LC Number", () => {
@@ -2670,7 +2804,11 @@ describe('MakerPanelComponent', () => {
       expect(comp.submitting).toBe(false);
     });
 
-    it('SG reservation succeeds but the Document Arrival fails — surfaces the compound error, keeps the SG movementId', () => {
+    // Bug fixed 2026-08-20 (reviewer-reported live, "After the A3S transaction fails with an error, the
+    // selected SG becomes unavailable and cannot be selected or reused" — S001/G01+G02 repro): the SG's
+    // own reservation is now auto-cancelled (compensating rollback) rather than left orphaned PENDING —
+    // compoundLegs.arrivalSgRedeemMovementId stays unset, nothing left for the Checker to act on.
+    it('SG reservation succeeds but the Document Arrival fails — auto-cancels the SG reservation (rollback), does NOT keep the SG movementId', () => {
       const { comp, api } = setupC();
       api.createMovement
         .mockReturnValueOnce(of({ body: { movementId: 'sg-redeem-1', status: 'PENDING' } }) as any)
@@ -2679,8 +2817,11 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.compoundLegs.arrivalSgRedeemMovementId).toBe('sg-redeem-1');
-      expect(comp.submitError).toBe('Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: LEGS_UNBALANCED');
+      expect(api.cancel).toHaveBeenCalledWith('sg-redeem-1', expect.any(String), 'AUTO_ROLLBACK_LC_LEG_FAILED');
+      expect(comp.compoundLegs.arrivalSgRedeemMovementId).toBeNull();
+      expect(comp.submitError).toBe(
+        'Document Arrival failed: LEGS_UNBALANCED. The reserved Shipping Guarantee redemption was automatically cancelled, so its capacity is available again.',
+      );
       expect(comp.submitting).toBe(false);
     });
   });
@@ -3438,6 +3579,123 @@ describe('MakerPanelComponent', () => {
     });
   });
 
+  describe('tightAvailableBalanceForWarning (business instruction 2026-08-20, "A35 可以使用SG交易的金額")', () => {
+    it('is null when the contract has no tightAvailableBalance at all', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: null });
+      expect(c.tightAvailableBalanceForWarning).toBeNull();
+    });
+
+    it('returns the plain tightAvailableBalance for a plain A3 (not documentArrivalWithSg)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A3'));
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '24' });
+      (c as any).pickerSelection.arrivalSgSnapshot = snapshot({ confirmedBalance: '10' });
+      expect(c.tightAvailableBalanceForWarning).toBe('24');
+    });
+
+    it('returns the plain tightAvailableBalance for A35 before an SG is picked (no arrivalSgSnapshot yet)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A3S'));
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '24' });
+      expect(c.tightAvailableBalanceForWarning).toBe('24');
+    });
+
+    it('widens by the selected SG\'s own Outstanding for A35 — the S01/G01 live-reproduced case (Tight 24 + SG 10 = 34)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A3S'));
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '24' });
+      (c as any).pickerSelection.arrivalSgSnapshot = snapshot({ confirmedBalance: '10' });
+      expect(c.tightAvailableBalanceForWarning).toBe('34');
+    });
+  });
+
+  describe('isAmendDecreaseDirection (business instruction 2026-08-20, "A2 Decrease 輸入金額控制規則 B2 Decrease... 都適用")', () => {
+    it('is true for A2\'s own genuine AMEND_DECREASE movementType', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND_DECREASE';
+      expect(c.isAmendDecreaseDirection).toBe(true);
+    });
+
+    it('is false for A2\'s own AMEND_INCREASE', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND_INCREASE';
+      expect(c.isAmendDecreaseDirection).toBe(false);
+    });
+
+    it('is true for B2\'s own AMEND with amendDirection DECREASE — model.movementType is always \'AMEND\', never a distinct decrease movementType', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND';
+      c.amendDirection = 'DECREASE';
+      expect(c.isAmendDecreaseDirection).toBe(true);
+    });
+
+    it('is false for B2\'s own AMEND with amendDirection INCREASE', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND';
+      c.amendDirection = 'INCREASE';
+      expect(c.isAmendDecreaseDirection).toBe(false);
+    });
+
+    it('is false for a plain AMEND with no amendDirection set yet (B2 before the sub-choice is picked)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND';
+      c.amendDirection = null;
+      expect(c.isAmendDecreaseDirection).toBe(false);
+    });
+
+    it('is false for an unrelated movementType (e.g. UTILIZE)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'UTILIZE';
+      expect(c.isAmendDecreaseDirection).toBe(false);
+    });
+  });
+
+  describe('checksAgainstTightAvailable (business instruction 2026-08-20, "B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance")', () => {
+    it('is true for UTILIZE (A3/A3S)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'UTILIZE';
+      expect(c.checksAgainstTightAvailable).toBe(true);
+    });
+
+    it('is true for an AMEND_DECREASE (A2)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND_DECREASE';
+      expect(c.checksAgainstTightAvailable).toBe(true);
+    });
+
+    it('is true for CREATE against an aliased parent EPLC_CONFIRMATION (B3)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'CREATE';
+      c.selectedContract = contract({ instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.checksAgainstTightAvailable).toBe(true);
+    });
+
+    it('is false for CREATE against a non-EPLC_CONFIRMATION contract (e.g. A6\'s own IPLC_ACCEPTANCE)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'CREATE';
+      c.selectedContract = contract({ instrumentType: 'IPLC_ACCEPTANCE' });
+      expect(c.checksAgainstTightAvailable).toBe(false);
+    });
+
+    it('is true for ISSUE with hasParent (A8) — false for a root ISSUE with no parent (A1/B1)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'ISSUE';
+      c.model.instrumentType = 'SHGT'; // SHGT has a parent (IPLC_LC) — hasParent() reads model.instrumentType
+      expect(c.checksAgainstTightAvailable).toBe(true);
+
+      c.model.instrumentType = 'IPLC_LC'; // A1's own root ISSUE — no parent
+      expect(c.checksAgainstTightAvailable).toBe(false);
+    });
+
+    it('is false for an unrelated movementType/instrumentType combination', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'HONOUR';
+      c.selectedContract = contract({ instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.checksAgainstTightAvailable).toBe(false);
+    });
+  });
+
   describe('IB Index / context getters', () => {
     it('filteredIbIndexCatalog: passthrough for a non-decreasing movementType, filters 0-balance for a decreasing one', () => {
       const c = new MakerPanelComponent(mockApiD());
@@ -3551,7 +3809,7 @@ describe('MakerPanelComponent', () => {
       ];
       const api = mockApiD({
         catalog: jest.fn(() => of({ items: twoContracts, total: 2, page: 1, pageSize: 10 })) as any,
-        listMovements: jest.fn(() => of([{ status: 'PENDING', movementType: 'UTILIZE' }])) as any, // no sourceTransactionRef, on every contract
+        listMovements: jest.fn(() => of([{ status: 'PENDING', movementType: 'UTILIZE', acknowledgedAt: '2026-08-20T00:00:00.000Z' }])) as any, // no sourceTransactionRef, on every contract
       });
       const c = new MakerPanelComponent(api);
       triggerSelectFunction(c, fn('A4'));

@@ -211,7 +211,7 @@ describe('checkAmendDecreaseSufficiency — direct unit coverage of the §6.2 fo
     const result = checkAmendDecreaseSufficiency({
       amount: new Decimal('100000'),
       ceilingAmount: computeCeilingAmount('100000', '10', 'AMEND_DECREASE', 'IPLC_LC'),
-      availableBalance: new Decimal('110000'),
+      tightAvailableBalance: new Decimal('110000'),
     });
     expect(result.ok).toBe(true);
   });

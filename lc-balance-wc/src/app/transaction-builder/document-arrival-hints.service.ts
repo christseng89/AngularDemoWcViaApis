@@ -52,6 +52,16 @@ export class DocumentArrivalHintsService {
    * A3/A3S Document Arrival — an IPLC_LC/UTILIZE movement — on the SAME contract, not cross-contract like
    * B4's own EPLC_EXAMINATION check below), so this is one fetch/populate body rather than two copies of
    * the same forkJoin.
+   *
+   * Business instruction 2026-08-20 ("A4 選取 EARMARKED 的交易" / "狀態必須是 EARMARKED") — genuine 4-eyes
+   * separation: a Document Arrival that's only Maker-Submitted (EARMARKING, `acknowledgedAt` still null)
+   * is not yet eligible here; it must first be Checker-acknowledged by A3/A3S's own Checker (EARMARKED,
+   * see `balance-component.model.ts`'s own `displayStatus()` doc comment) before A4/A6 can act on it.
+   *
+   * Bug fixed same day (reviewer-reported live, "已經Submit 為何可以A4重複出現再選取" — S101 repro): once
+   * A4's OWN Maker Submit has already happened (`makerSubmittedAt` set — A6 never sets this field, so
+   * this exclusion is a no-op for A6), the item has nothing left for A4's own Maker step to do — it must
+   * also drop out of this same eligible list, not keep re-offering itself for a second (409-doomed) Submit.
    */
   private loadDocumentArrivalHints(list: BalanceContract[], ibs: Map<string, string[]>, movements: Map<string, BalanceMovement[]>, onDone: () => void): void {
     ibs.clear();
@@ -62,7 +72,7 @@ export class DocumentArrivalHintsService {
     }
     forkJoin(list.map((c) => this.api.listMovements(c.balanceContractId).pipe(catchError(() => of([] as any[]))))).subscribe((results) => {
       list.forEach((c, i) => {
-        const pending = (results[i] ?? []).filter((m: any) => m.status === 'PENDING' && m.movementType === 'UTILIZE');
+        const pending = (results[i] ?? []).filter((m: any) => m.status === 'PENDING' && m.movementType === 'UTILIZE' && !!m.acknowledgedAt && !m.makerSubmittedAt);
         if (pending.length) {
           ibs.set(
             c.balanceContractId,

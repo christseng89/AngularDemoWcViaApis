@@ -168,8 +168,17 @@ export const FUNCTION_STRATEGIES: Readonly<Record<string, FunctionStrategy>> = O
  *  - B4 (`derivesMovementTypeFromTenor`): HONOUR vs. ACCEPT, read from the contract at submit time.
  *  - A9 (`amountVsAvailableDerivation === 'REDEEM'`): PARTIAL_REDEEM derived from Amount vs. Available.
  *  - B5 (`amountVsAvailableDerivation === 'SETTLE'`): PARTIAL_SETTLE, same shape as A9's own REDEEM case.
+ *
+ * Exported (2026-08-20, business instruction "各功能 RELEASE 自己產生的 PENDING 或 EARMARKING 交易" — "A2
+ * 不該看到 UTILIZED 交易") for `checker-panel.component.ts`'s own `loadCheckerQueue()` too: several
+ * instrumentTypes are shared by more than one function (IPLC_LC: A1/A2/A3/A3S/A4; IPLC_ACCEPTANCE: A6/A7;
+ * SHGT: A8/A9; EPLC_CONFIRMATION: B1/B2/B4), so a plain `status === 'PENDING'` filter on the resolved
+ * contract mixes every function's own pending movements into one Checker Queue — e.g. A2's own screen
+ * showing an unrelated A3 UTILIZE. Filtering the queue to only movementTypes the CURRENTLY selected
+ * function could itself have produced fixes that, using the exact same "could this function have made
+ * this movement" question `resolveFunctionForMovement()` above already answers for Inquire Events.
  */
-function movementTypeMatchesFunction(fn: TransactionFunction, movementType: string): boolean {
+export function movementTypeMatchesFunction(fn: TransactionFunction, movementType: string): boolean {
   if (fn.movementType === movementType) return true;
   if (fn.subChoice?.options.some((o) => o.value === movementType)) return true;
   const strategy = FUNCTION_STRATEGIES[fn.code];

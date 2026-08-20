@@ -88,9 +88,19 @@ Three independently-versioned pieces talking over HTTP, not a shared in-process 
     layer.
 - **`analysis/`** — source-of-truth spec docs: `balance-component-api.yaml` (microservice OAS),
   `balance-component-channel-api.yaml` (thinner Web/Mobile Channel-API façade), the `.docx`/`.xlsx` specs,
-  and `contingent-liability-ledger.html` (self-contained Dr/Cr reference). The `.docx` pairs are binary
-  and unreadable by this tooling — this file's own decision log is the actual source of truth for changes
-  that would normally need a `.docx` update too.
+  and `contingent-liability-ledger.html` (self-contained Dr/Cr reference). Correction 2026-08-20: the
+  `.docx` files ARE readable (`pandoc <file>.docx -t plain`, available on this machine) — the earlier
+  claim that they were binary/unreadable was wrong. Direct binary editing is still not viable, though:
+  `Balance-Figures-Calculation-Logic.{md,docx}` is the one pair with an established edit workflow — edit
+  the `.md`, then regenerate the `.docx` via `pandoc Balance-Figures-Calculation-Logic.md -o
+  Balance-Figures-Calculation-Logic.docx --standalone -M title="<same title as the .md's own H1>"` — same
+  pattern to reuse for any other `.docx` pair that needs a text-content edit. `TF_Balance_Component_Spec-
+  {en,zh}.docx`/`TF_Contingent_Liability_Lifecycle-{en,zh}.docx` are the foundational design-rationale
+  references (their own `§N` section numbers do NOT match the `service/`/`domain/` source comments' own
+  "Design doc §N" citations — those point at a genuinely different, uncommitted document, per this file's
+  own decision log) — this file's own decision log remains the actual source of truth for changes that
+  would normally need one of THOSE two `.docx` pairs updated too, since no committed `.md` twin exists
+  for either to run the regenerate workflow against.
 
 ---
 
@@ -630,4 +640,169 @@ APPROVED" (repro'd live via S101/A2's own plain Release leaving the just-Approve
 `checkerQueueRefreshNonce` on any non-`'failed'` outcome — a real Release/Reject's own status change was
 always correctly excluded by `loadCheckerQueue()`'s `status === 'PENDING'` filter, but the stale
 already-fetched `checkerItems` array was never re-fetched to pick that up until this fix.
+
+## A4/A6 picker eligibility now requires genuine 4-eyes: EARMARKED (Checker-acknowledged), not just EARMARKING
+
+Business instruction: "A4 選取 EARMARKED 的交易" / "狀態必須是 EARMARKED" / "交易流程規定 4 EYES. 所以
+PENDING 或 EARMARKING 狀態的交易不得出現在下一個交易中" — a Document Arrival that's only Maker-Submitted
+(`acknowledgedAt` still null) must not be selectable in A4/A6's own picker (`document-arrival-hints.
+service.ts`'s Step-1 LC-level map, `picker-selection.service.ts`'s Step-2 payable-movement list) until
+A3/A3S's own Checker has genuinely acknowledged it. `displayStatus()`/`statusBadgeClass()` (`balance-
+component.model.ts`) gained an `acknowledgedAt` param so the same PENDING+acknowledged movement already
+displays EARMARKED (not EARMARKING) everywhere, matching what the picker now requires.
+
+Two follow-up bugs found via live reproduction (S101), same day:
+- **`loadCheckerQueue()`'s acknowledgedAt exclusion was too broad** — hiding an acknowledged item from
+  A3/A3S's own screen (intended) also hid it from A4's own Checker search on the SAME shared queue
+  component (`"A4 SUBMIT後無法APPROVED"`), since Checker Release for A4 targets that exact movement. Fixed
+  by scoping the exclusion to `deferSettlement` functions only (`selectedFunction`-aware), and — the
+  opposite direction — added a `releasesExistingMovementInPlace` (A4-only) requirement that a candidate be
+  already-EARMARKED before A4's own Checker Search will show it at all (`"Import A4 Checker Search
+  也要濾掉EARMARKING的交易"`).
+- **A4's own picker didn't exclude an item it had already Maker-Submitted itself** (`"已經Submit 為何可以
+  A4重複出現再選取"`) — added `!m.makerSubmittedAt` to both the Step-1 and Step-2 eligibility filters
+  (no-op for A6, which never sets this field).
+
+## A3S compound Submit now auto-rolls-back the SG redemption leg if the LC UTILIZE leg fails
+
+Reproduced live (A1 100 → A8 SG 10 → A35 15 against an over-limit Bill Amount): the SG redemption leg
+succeeded first, then the LC leg failed, leaving the SG redemption orphaned PENDING with no way to
+release/reuse the SG. `maker-submit.service.ts`'s `submitDocumentArrivalWithSg()` now calls
+`api.cancel()` on the already-created SG redemption when the second leg's `createMovement()` fails,
+surfacing a clear message either way (rollback succeeded vs. rollback itself also failed, pointing at A9's
+own Checker panel as the manual fallback).
+
+## Per-function Checker Queue now scoped to movements that function could itself have produced
+
+Business instruction: "各功能 RELEASE 自己產生的 PENDING 或 EARMARKING 交易 — 例如 A2 不該看到 UTILIZED
+交易" — several instrumentTypes are shared by more than one function (e.g. `IPLC_LC`: A1/A2/A3/A3S/A4).
+`CheckerPanelComponent.loadCheckerQueue()` now also filters via the existing `movementTypeMatchesFunction()`
+(`function-strategy.ts`, already used by Inquire Events for the same "could this function have produced
+this movement" question) alongside its existing EARMARKING/EARMARKED split.
+
+## Submit/EC/Approve audit trail — `cancelledBy`/`cancelledAt` split out from `releasedBy`/`releasedAt`
+
+Business instruction: "交易要有 SUBMIT DATETIME/USER, EC DATETIME/USER (optional) AND APPROVE
+DATETIME/USER". `cancel()` used to reuse `releasedBy`/`releasedAt` for EC, disambiguated only by
+`status === 'CANCELLED'`; new dedicated `cancelledBy`/`cancelledAt` columns (migration 11) let Submit
+(`createdBy`/`createdAt`), EC, and Approve (`releasedBy`/`releasedAt`, `status === 'RELEASED'` only) read
+as three independent facts. `reject()` is unaffected — still reuses `releasedBy`/`releasedAt`, no
+dedicated `rejectedBy`/`rejectedAt` pair was requested. Displayed in Look Up Current Balance's own Event
+Timeline (new "Audit Trail" column, stacked S/A/EC lines) and Inquire Events' Original Transaction Screen
+(Submitted/Approved/Rejected/EC rows, mutually exclusive per the movement's own real status).
+
+## A4's own Checker Queue now also requires Maker Submit, not just EARMARKED
+
+Business instruction: "A4 需要 SUBMIT 後 才能 APPROVE". `release()` already 409s server-side for a
+Sight-tenor UTILIZE missing `makerSubmittedAt` (BAL-123), but `loadCheckerQueue()`'s `requiresEarmarked`
+filter only checked `acknowledgedAt` — an EARMARKED-but-not-yet-Submitted item still showed as selectable.
+Now excludes `!m.makerSubmittedAt` too, same as `!m.acknowledgedAt`.
+
+## A35's own "exceeds Tight Available Balance" client warning was a false positive — didn't net the selected SG's Outstanding
+
+Reproduced live on S01/G01 (Tight Available 24, SG Outstanding 10): typing Bill Amount 34 wrongly warned
+"exceeds Tight Available Balance (24)", even though `checkUtilizeSufficiency()` nets the matched SG's own
+redemption out server-side first (see that function's own doc comment) — the real ceiling for A35 is
+`tightAvailableBalance + selected SG's Outstanding`. New `tightAvailableBalanceForWarning` getter
+(`maker-panel.component.ts`) widens by the selected SG's own `confirmedBalance` only for
+`documentArrivalWithSg` (A3S); every other function (plain A3) is unaffected, same value as before.
+
+## A2/B2 Decrease now checked against Tight Available Balance, not plain Available — matches A3/B3's own rule
+
+Business instruction: "A2 Decrease 輸入金額控制規則 B2 Decrease, A3 & B3 都適用" (A3's `checkUtilizeSufficiency`
+and B3's `checkPresentDocsIssueSufficiency` were already Tight-based; `checkAmendDecreaseSufficiency`
+— shared by A2's own `AMEND_DECREASE` and B2's own `AMEND` when its signed `ceilingAmount` is negative —
+was left on plain Available Balance when Tight Available Balance was introduced). Could let a Decrease
+shrink an LC's own ceiling below its outstanding off-balance-sheet exposure (live-reproduced on U01:
+Confirmed 100, SG Outstanding 10, plain Available 100, Tight 90 — a Decrease of 95 used to pass, leaving
+only 5 of real capacity under a still-outstanding 10 SG). `checkAmendDecreaseSufficiency` now takes
+`tightAvailableBalance` directly (computed per instrumentType in `balanceService.ts`, mirroring
+`assembleSnapshot()`'s own formula: SHGT exposure for IPLC_LC/EPLC_LC, Present Docs Earmark for
+EPLC_CONFIRMATION). Client-side: `maker-panel.component.ts`'s new `isAmendDecreaseDirection` getter
+covers B2's own Decrease (its `model.movementType` is always `'AMEND'`, so `DECREASING_MOVEMENT_TYPES`
+alone can never see it — B2 previously showed NO client-side balance warning at all); both the plain-
+Available and Tight-Available warnings in `maker-panel.component.html` now fire for A2/B2 Decrease, not
+just A3/A3S's own UTILIZE.
+
+## B3 (and A8) had NO live balance box/warning at all — selectedContract was never populated for them
+
+Business instruction: "B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance". B3/A8 create a brand-new
+child contract directly under a picked parent, with no further Step-2 picker of their own (unlike A6/B4's
+`settlesDocumentArrival` or B5's `usesSettleableBalanceIndex`) — `onSelectParent()` never set
+`selectedContract`/`selectedContractSnapshot` for this shape, and the whole balance box + both warnings
+are gated on `selectedContract` in the template, so neither ever rendered; the Maker got zero live
+feedback before a 409. `onSelectParent()` now aliases `selectedContract` to the parent for this specific
+shape only (`isCreatingMovement && !usesTwoFieldSearch && !settlesDocumentArrival &&
+!usesSettleableBalanceIndex`) and loads its snapshot. New `checksAgainstTightAvailable` getter
+(`maker-panel.component.ts`) extends the Tight Available Balance warning to B3 (`CREATE` against an
+aliased `EPLC_CONFIRMATION`, `checkPresentDocsIssueSufficiency`) and A8 (`ISSUE` with `hasParent`,
+`checkShgtIssueSufficiency`) — deliberately NOT under the plain-Available tier-1 warning, since neither
+has a separate looser server-side check.
+
+## A standalone PENDING SG redemption must not prematurely free capacity for an UNRELATED submission
+
+Business-reported scenario ("SG 贖回提早放行" — imported machinery, take-delivery-before-documents):
+`computeOffBalanceExposure()` netted a PENDING (not yet Checker-approved) `PARTIAL_REDEEM`/`FULL_REDEEM`
+the same as a RELEASED one — a standalone A9 redemption Maker-Submitted but not yet approved could let a
+SECOND, unrelated SG Issue (A8) or Document Arrival (A3) pass against capacity that wasn't really freed
+yet; if the Checker later rejects that redemption, the bank ends up over its real LC capacity. Now only
+nets a redemption once genuinely RELEASED, by default ("增加從嚴，對 LC Balance 而言") — **except** a
+redemption sharing a still-PENDING `UTILIZE`'s own `businessEventId` on the SAME LC (A3S's own matched
+compound pair, always released together or both auto-rolled-back — no cross-transaction leakage risk).
+`assembleSnapshot()` derives this matched set automatically from its own `movements` list, so the live
+`GET .../balance` query, the movement's own persisted `eventSnapshot`, and `release()`'s own re-capture
+all agree — closing a related display bug the same day ("A35 Refer to S02 G02 Tight Available Balance
+-8000???"): before this, A3S's own matched pair passed its sufficiency check via netting but the
+resulting displayed balance double-counted the same SG exposure once un-netted, landing on a confusing
+negative figure even though the transaction was correctly allowed.
+
+## Look Up Current Balance now auto-syncs on every LC selection, not just after Submit/Release
+
+Business instruction: "除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current Balance 自動輸入選取到的LC
+NUMBER 做 LOOKUP處理。A1 & B1 在SUBMIT或APPROVE時更新當筆LC NUMBER的LOOKUP。" `emitCheckerSync()`
+(selection-only, Checker search box only) and `emitCheckerAndLookupSync()` (Submit/Release success, both)
+collapsed into the one method — every LC/parent/IB-Index pick (A2-A9/B2-B5) now syncs Look Up immediately,
+not only the Checker queue. Also fixed a separate, pre-existing gap found in the process:
+`onSelectParent()` (A6/A7/A8/B3/B4/B5's own Parent LC pick) never called either sync method at all. A1/B1
+have no pick step (create a brand-new LC) so only ever reach this via their own Submit/Release success
+paths — already correct, unaffected.
+
+## B4's own still-PENDING Acceptance must also provisionally net the B3 Present Docs record it references
+
+Business-reported Export-side twin of the SG redemption fix above ("B4 U02 也有類似問題 Tight Available
+Balance -10000"): `computePresentDocsEarmark()`/`computePresentDocsEarmarkApproved()` netted the
+already-RELEASED B3 examination record even while a B4 that *references it* (`referencedTransactionId`)
+was still only Maker-Submitted, PENDING — displaying `-10000` instead of `0` even though B4's own
+provisional consumption is a foregone, self-balancing conclusion once Submitted, not a separate risk.
+New `derivePresentDocsProvisionallyConsumedIds()` derives, from a CONFIRMATION's own movement list, the
+set of `referencedTransactionId`s any still-PENDING B4 already provisionally consumes; `assembleSnapshot()`
+is the **only** call site wired to it — B3's own new-presentation sufficiency check and B2's own
+AMEND_DECREASE sufficiency check both stay strict (no override), same "增加從嚴，對 LC Balance 而言"
+posture as A8's own SG Issue check, so a genuinely independent transaction never benefits from another
+transaction's own provisional netting. Live-verified against the actual dev-DB U02 LC: `GET .../balance`
+now reads `presentDocsEarmarkApproved: "0"`, `tightAvailableBalance: "0"`, `pendingEarmarkTotal:
+"-10000"`; an unrelated new B3 presentation submitted afterward still correctly rejects against the
+strict `-10000` figure.
+
+## Doc-only fix: A9's own table/Quick-Reference row and the SG (Pending)/(Approved) formulas were left stale after the SG redemption code fix
+
+`Balance-Figures-Calculation-Logic.md`'s Figure #4 formula and banner note were updated for the SG
+redemption fix, but A9's own §6 table, its §8 Quick-Reference row, and Figures #8/#9's own formulas
+(the SG Pending/Approved decomposition) still described the old "reacts at Submit" behavior — breaking
+the doc's own "#8 + #9 = #4" invariant for a standalone still-PENDING redemption. No source code was
+wrong (`#8`/`#9` are this document's own derived breakdown, not real API fields) — corrected the doc only
+to match `computeOffBalanceExposure()`'s actual (already-correct) behavior: a standalone A9 redemption now
+reacts only at genuine Release; A3S's own matched-`businessEventId` pair remains the one Submit-time
+exception, called out explicitly wherever A9's behavior is described.
+
+## Doc-only fix: A3S's own Tight Available Balance row claimed "increases" — actually a net decrease
+
+`Balance-Figures-Calculation-Logic.md`'s A3S table said Tight Available Balance "increases" at Submit,
+describing only the Off-Balance Exposure release side while ignoring the LC's own simultaneous UTILIZE
+consuming Pending Decrease Total in the same Submit. Live-verified against `app.test.ts`'s own S02/G02
+numbers: Tight actually moves 2,000 → 0 (net **−2,000**), matching the business-confirmed "Pending
+Earmark Total = +8,000 (SG) − 2,000 (LC)" figure — combined effect is always downward or flat (redemption
+leg is MIN-capped at the SG's own Available Balance, never exceeds the UTILIZE's own ceilingAmount), never
+a pure increase. No source code was wrong — the sufficiency-check/display code already nets correctly
+(confirmed by the passing test suite); only this row's prose was stale.
 </content>

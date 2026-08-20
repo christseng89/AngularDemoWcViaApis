@@ -890,6 +890,16 @@
   white-space: nowrap;
 }
 
+// Submit/EC/Approve audit trail column (business instruction 2026-08-20) — Look Up Current Balance's
+// own Event Timeline. Stacked lines, not a single cell value, since a row can carry up to two facts
+// (Submit always, plus EC/Approve/Rejected mutually exclusive) — see the template's own doc comment.
+.tb-table__audit-trail {
+  color: var(--gray-muted);
+  font-size: 10px;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
 // Business instruction 2026-08-19 (60/40 split, requirement #5 — "Reduce unnecessary padding/spacing
 // in the Event Timeline where necessary to accommodate all columns") — Look Up Current Balance's own
 // 7-column Event Timeline table (Function/Type/Amount/Reference/Status/Balance After/Time) is now the

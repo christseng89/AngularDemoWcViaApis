@@ -253,6 +253,271 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
   });
 });
 
+describe('HTTP integration — AMEND_DECREASE now checked against Tight Available Balance, not plain Available (business instruction 2026-08-20, "A2 Decrease 輸入金額控制規則 B2, A3 & B3 都適用")', () => {
+  const app = createApp(createDb(':memory:'));
+  let lcId: string;
+  let lcLogicalId: string;
+
+  test('setup: LC0002B Issue 100,000 (no tolerance) + SG 10,000 outstanding -> plain Available 100,000, Tight Available 90,000', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC0002B' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    lcId = lc.body.balanceContractId;
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC0002B' }).expect(200);
+    lcLogicalId = lcContract.body.logicalContractId;
+
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'LC0002B', sgNumber: 'SG0002B' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${sg.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(lcSnapshot.body.availableBalance).toBe('100000');
+    expect(lcSnapshot.body.tightAvailableBalance).toBe('90000');
+  });
+
+  test('a Decrease of 95,000 -- within plain Available (100,000) but exceeding Tight Available (90,000) -- is now REJECTED (would leave only 5,000 of real capacity under a 10,000 outstanding SG)', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_DECREASE', eventSeq: 2, amount: '95000', currency: 'USD', createdBy: 'maker1' })
+      .expect(409);
+    expect(res.body.code).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
+    expect(res.body.message).toMatch(/exceeds Tight Available Balance \(90000/);
+  });
+
+  test('a Decrease of 90,000 -- exactly Tight Available -- is accepted', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_DECREASE', eventSeq: 3, amount: '90000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    expect(res.body.status).toBe('PENDING');
+  });
+});
+
+describe('HTTP integration — a still-PENDING (not yet Checker-approved) SG redemption must not prematurely release its own off-balance-sheet capacity for an UNRELATED submission (business-reported scenario 2026-08-20, "SG 贖回提早放行" — imported machinery, take-delivery-before-documents)', () => {
+  const app = createApp(createDb(':memory:'));
+  let lcId: string;
+  let lcLogicalId: string;
+  let sgId: string;
+
+  test('setup: LC S01-shape Issue 1,000,000 (no tolerance) + SG G01 800,000 issued and Released -> Confirmed 1,000,000, Off-Balance Exposure 800,000, Tight Available 200,000', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S01-SHAPE' }, movementType: 'ISSUE', eventSeq: 1, amount: '1000000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    lcId = lc.body.balanceContractId;
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'S01-SHAPE' }).expect(200);
+    lcLogicalId = lcContract.body.logicalContractId;
+
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S01-SHAPE', sgNumber: 'G01' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '800000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    sgId = sg.body.balanceContractId;
+    await request(app).post(`/balance-movements/${sg.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(lcSnapshot.body.offBalanceExposure).toBe('800000');
+    expect(lcSnapshot.body.tightAvailableBalance).toBe('200000');
+  });
+
+  let redeemMovementId: string;
+
+  test("Maker Submits G01's own FULL_REDEEM standalone (NOT part of an A3S compound submission -- no businessEventId shared with anything) -- stays PENDING, awaiting Checker", async () => {
+    const redeem = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'SHGT', balanceContractId: sgId, movementType: 'FULL_REDEEM', eventSeq: 2, amount: '800000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    redeemMovementId = redeem.body.movementId;
+    expect(redeem.body.status).toBe('PENDING');
+  });
+
+  test("BEFORE the Checker approves that redemption, the LC's own Tight Available Balance must NOT already reflect it -- still 200,000, not 1,000,000", async () => {
+    const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(lcSnapshot.body.offBalanceExposure).toBe('800000');
+    expect(lcSnapshot.body.tightAvailableBalance).toBe('200000');
+  });
+
+  test('a SECOND, unrelated SG Issue for 900,000 under the SAME LC is REJECTED against the still-800,000 exposure -- the unapproved redemption must not have freed capacity for it', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S01-SHAPE', sgNumber: 'G02' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '900000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(409);
+    expect(res.body.message).toMatch(/exceeds parent LC's Tight Available Balance 200000/);
+  });
+
+  test('a plain, unmatched Document Arrival for 300,000 (no businessEventId) is ALSO rejected against the still-800,000 exposure, not the prematurely-freed figure', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 2, amount: '300000', currency: 'USD', createdBy: 'maker1' })
+      .expect(409);
+    expect(res.body.message).toMatch(/exceeds Tight Available Balance 200000/);
+  });
+
+  test('once the Checker genuinely Releases the redemption, Off-Balance Exposure and Tight Available Balance update for real -- 0 and 1,000,000', async () => {
+    await request(app).post(`/balance-movements/${redeemMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(lcSnapshot.body.offBalanceExposure).toBe('0');
+    expect(lcSnapshot.body.tightAvailableBalance).toBe('1000000');
+  });
+
+  test('the SAME 900,000 SG Issue now succeeds -- capacity was genuinely freed this time', async () => {
+    await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S01-SHAPE', sgNumber: 'G02' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '900000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+  });
+});
+
+describe('HTTP integration — A3S\'s OWN matched SG redemption must still net for Tight Available Balance display (both the live GET .../balance query and the movement\'s own persisted eventSnapshot) — the OPPOSITE case from the previous describe block (business-reported live scenario 2026-08-20, "A35 Refer to S02 G02 Tight Available Balance -8000???")', () => {
+  const app = createApp(createDb(':memory:'));
+  let lcId: string;
+  let lcLogicalId: string;
+  let sgId: string;
+
+  test('setup: LC S02-shape Issue 10,000 (no tolerance) + SG G02 8,000 issued and Released -> Confirmed 10,000, Off-Balance Exposure 8,000, Tight Available 2,000', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S02-SHAPE' }, movementType: 'ISSUE', eventSeq: 1, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    lcId = lc.body.balanceContractId;
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'S02-SHAPE' }).expect(200);
+    lcLogicalId = lcContract.body.logicalContractId;
+
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S02-SHAPE', sgNumber: 'G02' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '8000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    sgId = sg.body.balanceContractId;
+    await request(app).post(`/balance-movements/${sg.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(lcSnapshot.body.offBalanceExposure).toBe('8000');
+    expect(lcSnapshot.body.tightAvailableBalance).toBe('2000');
+  });
+
+  test("A35 (Document Arrival w/ Shipping Gtee), Bill Amount 10,000: Maker creates the SG's own FULL_REDEEM (8,000, MIN of Bill Amount/SG Outstanding) PENDING first, then the LC's own UTILIZE (10,000) PENDING, sharing one businessEventId", async () => {
+    const redeem = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        balanceContractId: sgId,
+        movementType: 'FULL_REDEEM',
+        eventSeq: 2,
+        amount: '8000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        businessEventId: 'S02-G02-demo',
+      })
+      .expect(201);
+    expect(redeem.body.status).toBe('PENDING');
+
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lcId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        businessEventId: 'S02-G02-demo',
+      })
+      .expect(201);
+    expect(utilize.body.status).toBe('PENDING');
+
+    // The movement's OWN persisted eventSnapshot (frozen at this exact Submit) must show the SG's matched
+    // 8,000 already netted -- only the incremental 2,000 (Bill Amount 10,000 minus SG's own 8,000) is
+    // genuinely NEW LC-side occupancy, not the full 10,000 double-counted against the already-8,000
+    // off-balance exposure.
+    expect(utilize.body.eventSnapshot.offBalanceExposure).toBe('0');
+    expect(utilize.body.eventSnapshot.tightAvailableBalance).toBe('0');
+  });
+
+  test('the LIVE GET .../balance query immediately after Submit ALSO shows the netted figures, not the double-counted -8,000 (Pending Earmark Total splits as +8,000 SG-side / -2,000 LC-side net, per the business-confirmed live numbers)', async () => {
+    const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
+    expect(lcSnapshot.body.confirmedBalance).toBe('10000');
+    expect(lcSnapshot.body.availableBalance).toBe('0');
+    expect(lcSnapshot.body.offBalanceExposure).toBe('0');
+    expect(lcSnapshot.body.tightAvailableBalance).toBe('0');
+  });
+
+  test('an UNRELATED, standalone new SG Issue under the SAME LC is still correctly checked against the un-netted 8,000 exposure -- the matched-pair exception never leaks to a genuinely different submission', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'S02-SHAPE', sgNumber: 'G03' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(409);
+    // Confirmed 10,000 minus PendingDecreaseTotal 10,000 (the UTILIZE) minus 8,000 (G02's own still-PENDING,
+    // un-netted-for-this-DIFFERENT-request exposure) = -8,000 -- G03 has no businessEventId in common with
+    // either leg of the A35 pair above, so it must not benefit from that pair's own netting.
+    expect(res.body.message).toMatch(/exceeds parent LC's Tight Available Balance -8000/);
+  });
+});
+
 describe('HTTP integration — SG Issue capped at parent LC Available Balance (business instruction 2026-08-14, override of Design doc §5/§11)', () => {
   const app = createApp(createDb(':memory:'));
   let lcId: string;
@@ -1055,6 +1320,11 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
       .expect(200);
     expect(cancelled.body.status).toBe('CANCELLED');
     expect(cancelled.body.reasonCode).toBe('TYPO');
+    // 2026-08-20: cancel() writes its own cancelledBy/cancelledAt pair, not releasedBy/releasedAt.
+    expect(cancelled.body.cancelledBy).toBe('maker1');
+    expect(cancelled.body.cancelledAt).toBeTruthy();
+    expect(cancelled.body.releasedBy).toBeNull();
+    expect(cancelled.body.releasedAt).toBeNull();
 
     const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
     expect(lcSnapshot.body.confirmedBalance).toBe('100000');
@@ -1423,6 +1693,99 @@ describe('HTTP integration — B3 (Present Docs) real Release, then B4 consumes 
     cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
     expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('0');
     expect(cnfSnapshot.body.confirmedBalance).toBe('70000');
+  });
+});
+
+describe('HTTP integration — B4\'s OWN still-PENDING Accept (Maker Submit, before Checker Release) must ALSO provisionally net the B3 record it references, not just at Release (business-reported scenario 2026-08-20, "B4 U02 也有類似問題 Tight Available Balance -10000" — Export-side twin of the SG one above)', () => {
+  const app = createApp(createDb(':memory:'));
+  let cnfId: string;
+  let examMovementId: string;
+
+  test('setup: B1 Confirm LC 10,000 Usance (Approved) -> B3 Present Docs 10,000 (Approved) -> Present Docs Earmark Approved 10,000, Tight Available 0', async () => {
+    const cnf = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'U02-SHAPE' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    cnfId = cnf.body.balanceContractId;
+    await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'U02-SHAPE' }).expect(200);
+
+    const exam = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'U02-SHAPE', ibNumber: 'E01' },
+        parentLogicalContractId: cnfContract.body.logicalContractId,
+        movementType: 'CREATE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    examMovementId = exam.body.movementId;
+    await request(app).post(`/balance-movements/${exam.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfId}/balance`).expect(200);
+    expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('10000');
+    expect(cnfSnapshot.body.tightAvailableBalance).toBe('0');
+  });
+
+  test("B4 Maker Submits Acceptance 10,000 referencing the B3 record -- still PENDING (not yet Checker Release) -- Present Docs Earmark Approved must already read 0, and Tight Available Balance 0, not -10,000", async () => {
+    const accept = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        balanceContractId: cnfId,
+        movementType: 'ACCEPT',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        referencedTransactionId: examMovementId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(accept.body.status).toBe('PENDING');
+
+    // The movement's own persisted eventSnapshot (frozen at this exact Submit) must show the netted figures.
+    expect(accept.body.eventSnapshot.presentDocsEarmarkApproved).toBe('0');
+    expect(accept.body.eventSnapshot.tightAvailableBalance).toBe('0');
+
+    // The LIVE GET .../balance query immediately after Submit must ALSO show the netted figures.
+    const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfId}/balance`).expect(200);
+    expect(cnfSnapshot.body.presentDocsEarmarkApproved).toBe('0');
+    expect(cnfSnapshot.body.tightAvailableBalance).toBe('0');
+    expect(cnfSnapshot.body.pendingEarmarkTotal).toBe('-10000');
+  });
+
+  test('an UNRELATED new Present Docs (B3) submission under the SAME Confirmation is still correctly checked against the un-netted 10,000 earmark -- the provisional-consumption exception never leaks to a genuinely different presentation', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'U02-SHAPE', ibNumber: 'E02' },
+        parentLogicalContractId: (await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'U02-SHAPE' }).expect(200))
+          .body.logicalContractId,
+        movementType: 'CREATE',
+        eventSeq: 2,
+        amount: '5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(409);
+    // Confirmed 10,000 minus PendingDecreaseTotal 10,000 (the ACCEPT) minus 10,000 (E01's own still-PENDING
+    // Accept notwithstanding, still un-netted for this DIFFERENT presentation's own check) = -10,000.
+    expect(res.body.message).toMatch(/Present Earmark-adjusted Tight Available Balance -10000/);
   });
 });
 

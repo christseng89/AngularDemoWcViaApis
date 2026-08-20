@@ -106,18 +106,45 @@ export class MakerSubmitService {
         const secondary: MakerSubmitSecondary = { arrivalSgRedeemMovementId: redeemRes.body!.movementId, arrivalSgRedeemMovement: redeemRes.body! };
         return this.api.createMovement(req).pipe(
           map((res) => ({ kind: 'submitted' as const, result: res.body!, secondary })),
-          catchError((err) =>
-            of<MakerSubmitOutcome>({
-              kind: 'failed',
-              message: `Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed: ${describeApiError(err)}`,
-              // `req` (primary) failed — result stays absent (F-08); secondary's SG leg is unaffected.
-              secondary,
-            }),
-          ),
+          catchError((err) => this.rollbackArrivalSgRedeem(redeemRes.body!.movementId, ctx.model.createdBy!, describeApiError(err))),
         );
       }),
       catchError((err) =>
         of<MakerSubmitOutcome>({ kind: 'failed', message: `Could not reserve the Shipping Guarantee redemption: ${describeApiError(err)}`, secondary: {} }),
+      ),
+    );
+  }
+
+  /**
+   * Bug fixed 2026-08-20 (reviewer-reported live, "After the A3S transaction fails with an error, the
+   * selected SG becomes unavailable and cannot be selected or reused" — S001/G01+G02 repro): the SG's own
+   * redemption (`redeemMovementId`) already succeeded and sits genuinely PENDING when the LC's own
+   * UTILIZE (`req`) then fails — with no compensation, that reservation was permanently orphaned (nothing
+   * in the UI surfaced its movementId to cancel it, since a primary-call failure deliberately leaves
+   * `result` absent, F-08), and its own SG contract's live Available Balance stayed pinned at 0 forever,
+   * making `loadSgsForArrival()`'s own 0-balance filter exclude it (and, if it was the LC's only
+   * outstanding SG, the whole LC) from every future A3S attempt. Auto-cancels the just-reserved SG
+   * redemption as a compensating action (same `POST .../cancel` Maker EC endpoint `deleteMakerPending()`
+   * already uses for a Checker-visible compound submission's own reverse-order cleanup) so the SG's
+   * capacity is immediately usable again — `secondary` stays empty either way, since there is nothing
+   * left PENDING for a Checker to act on once the rollback succeeds.
+   */
+  private rollbackArrivalSgRedeem(redeemMovementId: string, cancelledBy: string, primaryErrorMessage: string): Observable<MakerSubmitOutcome> {
+    return this.api.cancel(redeemMovementId, cancelledBy, 'AUTO_ROLLBACK_LC_LEG_FAILED').pipe(
+      map(() => ({
+        kind: 'failed' as const,
+        message: `Document Arrival failed: ${primaryErrorMessage}. The reserved Shipping Guarantee redemption was automatically cancelled, so its capacity is available again.`,
+        secondary: {},
+      })),
+      catchError((cancelErr) =>
+        of<MakerSubmitOutcome>({
+          kind: 'failed',
+          message:
+            `Document Arrival failed: ${primaryErrorMessage}. Additionally, automatically cancelling the reserved Shipping Guarantee redemption ` +
+            `(movement ${redeemMovementId}) also failed: ${describeApiError(cancelErr)} — it will stay unavailable until a Checker rejects it ` +
+            `manually (search this SG under A9's own Checker panel).`,
+          secondary: {},
+        }),
       ),
     );
   }

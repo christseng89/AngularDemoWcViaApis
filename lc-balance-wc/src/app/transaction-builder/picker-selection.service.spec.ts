@@ -274,7 +274,9 @@ describe('PickerSelectionService', () => {
     it('sets naturalKey.ibNumber/model.amount-worthy outcome fields and needsRebuildFields', () => {
       const svc = new PickerSelectionService(
         makeApi({
-          listMovements: jest.fn(() => of([movement({ movementId: 'only-one', sourceTransactionRef: 'B01', amount: '30000' })])),
+          listMovements: jest.fn(() =>
+            of([movement({ movementId: 'only-one', sourceTransactionRef: 'B01', amount: '30000', acknowledgedAt: '2026-08-20T00:00:00.000Z' })]),
+          ),
         }),
       );
       let captured: ReturnType<PickerSelectionService['selectPayMovement']> | null = null;
@@ -291,6 +293,58 @@ describe('PickerSelectionService', () => {
       expect(captured!.modelAmount).toBe('30000');
       expect(captured!.needsRebuildFields).toBe(true);
       expect(captured!.clearsSubmitResult).toBe(false);
+    });
+
+    // Business instruction 2026-08-20 ("A4 選取 EARMARKED 的交易") — a still-PENDING UTILIZE that hasn't
+    // been Checker-acknowledged yet must not be offered as a payable candidate here either (mirrors
+    // DocumentArrivalHintsService's own Step-1 LC-level gate — needed again at this Step-2 layer since
+    // one LC can have multiple outstanding Document Arrivals).
+    it('excludes a still-PENDING UTILIZE with no acknowledgedAt from payableMovements', () => {
+      const svc = new PickerSelectionService(
+        makeApi({
+          listMovements: jest.fn(() => of([movement({ movementId: 'not-yet-acknowledged', sourceTransactionRef: 'B02' })])),
+        }),
+      );
+      svc.loadPayableMovements({
+        contractId: 'lc-1',
+        lcNumber: 'S001',
+        selectedFunction: A6,
+        selectedFunctionStrategy: deriveFunctionStrategy(A6),
+        onAutoPicked: () => {
+          throw new Error('should not auto-pick — nothing eligible');
+        },
+      });
+      expect(svc.payableMovements).toEqual([]);
+    });
+
+    // Bug fixed 2026-08-20 (reviewer-reported live, "已經Submit 為何可以A4重複出現再選取" — S101 repro):
+    // once A4 has already Maker-Submitted this same UTILIZE (makerSubmittedAt set), it must drop out of
+    // the Step-2 picker too — nothing left for A4's own Maker step to do.
+    it('excludes a UTILIZE that A4 has already Maker-Submitted (acknowledged AND makerSubmittedAt set)', () => {
+      const svc = new PickerSelectionService(
+        makeApi({
+          listMovements: jest.fn(() =>
+            of([
+              movement({
+                movementId: 'already-submitted',
+                sourceTransactionRef: 'B03',
+                acknowledgedAt: '2026-08-20T00:00:00.000Z',
+                makerSubmittedAt: '2026-08-20T01:00:00.000Z',
+              }),
+            ]),
+          ),
+        }),
+      );
+      svc.loadPayableMovements({
+        contractId: 'lc-1',
+        lcNumber: 'S001',
+        selectedFunction: A6,
+        selectedFunctionStrategy: deriveFunctionStrategy(A6),
+        onAutoPicked: () => {
+          throw new Error('should not auto-pick — nothing eligible');
+        },
+      });
+      expect(svc.payableMovements).toEqual([]);
     });
   });
 

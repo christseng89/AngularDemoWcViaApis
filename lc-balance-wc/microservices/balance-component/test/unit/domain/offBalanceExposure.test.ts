@@ -11,7 +11,7 @@ import {
 import type { BalanceMovement } from '../../../src/types';
 
 type M = Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>;
-type Exam = Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status' | 'presentDocsConsumedAt'>;
+type Exam = Pick<BalanceMovement, 'movementId' | 'movementType' | 'ceilingAmount' | 'status' | 'presentDocsConsumedAt'>;
 
 describe('computeOffBalanceExposure (Design doc §6.1)', () => {
   test('nets PENDING+RELEASED SHGT ISSUE against PARTIAL_REDEEM/FULL_REDEEM (v0.6)', () => {
@@ -48,32 +48,32 @@ describe('computeOffBalanceExposure (Design doc §6.1)', () => {
 describe('Present Docs Earmark (§6.1; basis changed 2026-08-18, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 now genuinely RELEASEs on its own, and stays counted until presentDocsConsumedAt) — computePresentDocsEarmark / Pending / Approved', () => {
   test('computePresentDocsEarmark sums PENDING and RELEASED-but-not-yet-consumed CREATEs (Pending + Approved combined) — a consumed one drops out entirely', () => {
     const exam: Exam[] = [
-      { movementType: 'CREATE', ceilingAmount: '50000', status: 'PENDING', presentDocsConsumedAt: null },
-      { movementType: 'CREATE', ceilingAmount: '70000', status: 'RELEASED', presentDocsConsumedAt: null },
-      { movementType: 'CREATE', ceilingAmount: '999999', status: 'RELEASED', presentDocsConsumedAt: '2026-08-18T00:00:00Z' },
+      { movementId: 'e1', movementType: 'CREATE', ceilingAmount: '50000', status: 'PENDING', presentDocsConsumedAt: null },
+      { movementId: 'e2', movementType: 'CREATE', ceilingAmount: '70000', status: 'RELEASED', presentDocsConsumedAt: null },
+      { movementId: 'e3', movementType: 'CREATE', ceilingAmount: '999999', status: 'RELEASED', presentDocsConsumedAt: '2026-08-18T00:00:00Z' },
     ];
     expect(computePresentDocsEarmark(exam).toFixed()).toBe('120000');
   });
 
   test('computePresentDocsEarmarkPending sums only still-PENDING (not yet Released) CREATEs', () => {
     const exam: Exam[] = [
-      { movementType: 'CREATE', ceilingAmount: '50000', status: 'PENDING', presentDocsConsumedAt: null },
-      { movementType: 'CREATE', ceilingAmount: '70000', status: 'RELEASED', presentDocsConsumedAt: null },
+      { movementId: 'e1', movementType: 'CREATE', ceilingAmount: '50000', status: 'PENDING', presentDocsConsumedAt: null },
+      { movementId: 'e2', movementType: 'CREATE', ceilingAmount: '70000', status: 'RELEASED', presentDocsConsumedAt: null },
     ];
     expect(computePresentDocsEarmarkPending(exam).toFixed()).toBe('50000');
   });
 
   test('computePresentDocsEarmarkApproved sums only RELEASED CREATEs not yet consumed by B4', () => {
     const exam: Exam[] = [
-      { movementType: 'CREATE', ceilingAmount: '50000', status: 'PENDING', presentDocsConsumedAt: null },
-      { movementType: 'CREATE', ceilingAmount: '70000', status: 'RELEASED', presentDocsConsumedAt: null },
-      { movementType: 'CREATE', ceilingAmount: '999999', status: 'RELEASED', presentDocsConsumedAt: '2026-08-18T00:00:00Z' },
+      { movementId: 'e1', movementType: 'CREATE', ceilingAmount: '50000', status: 'PENDING', presentDocsConsumedAt: null },
+      { movementId: 'e2', movementType: 'CREATE', ceilingAmount: '70000', status: 'RELEASED', presentDocsConsumedAt: null },
+      { movementId: 'e3', movementType: 'CREATE', ceilingAmount: '999999', status: 'RELEASED', presentDocsConsumedAt: '2026-08-18T00:00:00Z' },
     ];
     expect(computePresentDocsEarmarkApproved(exam).toFixed()).toBe('70000');
   });
 
   test('defensive guard: sumExaminationCreates (shared by all three functions above) throws on a movementType other than CREATE — EPLC_EXAMINATION only ever has CREATE movements', () => {
-    const exam: Exam[] = [{ movementType: 'AMEND', ceilingAmount: '1000', status: 'PENDING', presentDocsConsumedAt: null } as Exam];
+    const exam: Exam[] = [{ movementId: 'e1', movementType: 'AMEND', ceilingAmount: '1000', status: 'PENDING', presentDocsConsumedAt: null } as Exam];
     expect(() => computePresentDocsEarmark(exam)).toThrow(/unexpected EPLC_EXAMINATION movementType "AMEND"/);
   });
 });
