@@ -48,37 +48,47 @@ import type {
   TenorType,
 } from '../types';
 
-/** Design doc §5 — movementTypes that create a new Logical Contract when the natural key doesn't yet resolve. */
-const CREATING_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'CREATE']);
-
 /**
- * Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on Acceptance; ISSUE on
- * SHGT). 'AMEND' (B2) is deliberately NOT listed unconditionally — B2 has no separate AMEND_INCREASE/
- * AMEND_DECREASE movementType (direction rides the sign of `amount`), so whether it needs a check at all
- * depends on that sign; see the AMEND branch below (business instruction 2026-08-20, BA balance-check
- * review — B2's own Decrease direction was previously ungated entirely, unlike A2's).
+ * BAL-141 (2026-08-20 quality pass, desiger-comments.md-style finding) — was 4 separate movementType
+ * classification Sets (CREATING_MOVEMENT_TYPES/NO_CHECK_MOVEMENT_TYPES/UTILIZE_SHAPED_MOVEMENT_TYPES/
+ * OUTSTANDING_CAPPED_MOVEMENT_TYPES) plus a sequential if/else-if dispatch in createMovement() — a
+ * Data Clump: adding a movementType meant remembering to touch several of these in lockstep, with no
+ * compiler check if one was missed. Collapsed into one Strategy-pattern lookup table
+ * (buildMovementTypeRegistry(), built once per instance since several strategies close over
+ * `this.movements`) — one movementType, one entry, its creation semantics and its sufficiency check
+ * live together. Deliberately does NOT also absorb MOVEMENT_DIRECTION (balanceDerivation.ts) or
+ * TOLERANCE_APPLICABLE_MOVEMENT_TYPES (tolerance.ts) — both are genuinely domain-layer, pure, and
+ * already single-sourced in their own files; tolerance's own gate is additionally two-dimensional
+ * (instrumentType + movementType, since SHGT's own `ISSUE` shares its string with the LC's `ISSUE`),
+ * which a service-layer, movementType-only table cannot represent without reintroducing that exact
+ * ambiguity tolerance.ts's own doc comment warns against.
  */
-const NO_CHECK_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'CREATE']);
+interface MovementSufficiencyContext {
+  contract: BalanceContract;
+  existingMovements: readonly BalanceMovement[];
+  confirmedBalance: Decimal;
+  availableBalance: Decimal;
+  ceilingAmount: Decimal;
+  req: CreateMovementRequest;
+}
 
-/** Design doc §6/§6.1 — UTILIZE-shaped checks: sufficiency against Available Balance, plus the §6.1 off-balance WARNING (0 exposure for non-LC instrumentTypes). */
-const UTILIZE_SHAPED_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['UTILIZE', 'HONOUR', 'ACCEPT']);
+interface MovementSufficiencyOutcome {
+  ok: boolean;
+  error?: string;
+  warning?: MovementWarning;
+}
 
-/**
- * Design doc §5 (v0.6) — SHGT redemption + (reused, same "≤ outstanding" shape) Acceptance settlement.
- * 2026-08-15 (Export Confirmation Gap Analysis §4.2): REIMBURSE (CNF_REIMB — issuing bank actually
- * pays, clears EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE / EPLC_EXPORT_BILLS_DISCOUNTED)
- * and RECLASSIFY_OUT (CNF_DISCOUNT's outgoing leg — no cash, just relabels the same claim on the
- * issuing bank as EPLC_EXPORT_BILLS_DISCOUNTED via a linked CREATE on the new contract) share the same
- * "can't clear more than what's actually outstanding" shape, just never more than what's Available.
- */
-const OUTSTANDING_CAPPED_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
-  'PARTIAL_REDEEM',
-  'FULL_REDEEM',
-  'REIMBURSE',
-  'RECLASSIFY_OUT',
-  'PARTIAL_SETTLE',
-  'FULL_SETTLE',
-]);
+type MovementSufficiencyCheck = (ctx: MovementSufficiencyContext) => MovementSufficiencyOutcome | null;
+
+interface MovementTypeDescriptor {
+  /** Design doc §5 — creates a new Logical Contract when the natural key doesn't yet resolve. */
+  isCreating: boolean;
+  /** Returns null when this request needs no sufficiency check at all. */
+  checkSufficiency: MovementSufficiencyCheck;
+}
+
+/** BAL-141 — the `updateStatus()` params shape, reused by resolveSnapshotWriteTarget()'s callers below. */
+type UpdateMovementStatusParams = Parameters<BalanceMovementStore['updateStatus']>[0];
 
 /**
  * Business-reported gap 2026-08-18 ("S10 A1 Issue still in pending, then it should not allow for
@@ -133,6 +143,7 @@ export type CreateMovementResult = { created: true; movement: BalanceMovement } 
 export class BalanceService {
   private readonly contracts: BalanceContractStore;
   private readonly movements: BalanceMovementStore;
+  private readonly movementTypeRegistry: Readonly<Record<string, MovementTypeDescriptor>>;
 
   constructor(
     db: Db,
@@ -140,6 +151,114 @@ export class BalanceService {
   ) {
     this.contracts = new BalanceContractStore(db);
     this.movements = new BalanceMovementStore(db);
+    this.movementTypeRegistry = this.buildMovementTypeRegistry();
+  }
+
+  /**
+   * See MovementTypeDescriptor's own doc comment (module top) for why this table exists. Built once per
+   * instance, not module-level, since checkDecreaseShapedSufficiency()/checkUtilizeShapedSufficiency()
+   * below close over `this.movements` to fetch sibling SHGT/EPLC_EXAMINATION movements for off-balance-
+   * sheet netting.
+   */
+  private buildMovementTypeRegistry(): Readonly<Record<string, MovementTypeDescriptor>> {
+    const noCheck: MovementSufficiencyCheck = () => null;
+
+    /**
+     * B2's own AMEND (business instruction 2026-08-20, BA balance-check review, "占用從寬" — a Decrease
+     * occupies capacity as strictly as A2's own AMEND_DECREASE) has no separate AMEND_INCREASE/
+     * AMEND_DECREASE movementType — direction rides the sign of `amount` — so only a negative
+     * ceilingAmount (a genuine decrease) runs the decrease-shaped check; an increase or zero is
+     * unchecked, same as AMEND_INCREASE.
+     */
+    const amendShaped: MovementSufficiencyCheck = (ctx) => (ctx.ceilingAmount.isNegative() ? this.checkDecreaseShapedSufficiency(ctx) : null);
+    const decreaseShaped: MovementSufficiencyCheck = (ctx) => this.checkDecreaseShapedSufficiency(ctx);
+    /** Design doc §6/§6.1 — sufficiency against Available Balance, plus the §6.1 off-balance check (0 exposure for non-LC instrumentTypes). */
+    const utilizeShaped: MovementSufficiencyCheck = (ctx) => this.checkUtilizeShapedSufficiency(ctx);
+    /**
+     * Design doc §5 (v0.6) — SHGT redemption + (reused, same "≤ outstanding" shape) Acceptance
+     * settlement. 2026-08-15 (Export Confirmation Gap Analysis §4.2): REIMBURSE (CNF_REIMB — issuing
+     * bank actually pays, clears EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE /
+     * EPLC_EXPORT_BILLS_DISCOUNTED) and RECLASSIFY_OUT (CNF_DISCOUNT's outgoing leg — no cash, just
+     * relabels the same claim on the issuing bank as EPLC_EXPORT_BILLS_DISCOUNTED via a linked CREATE
+     * on the new contract) share the same "can't clear more than what's actually outstanding" shape.
+     */
+    const outstandingCapped: MovementSufficiencyCheck = (ctx) =>
+      checkRedeemSufficiency({ redeemAmount: ctx.ceilingAmount, sgAvailableBalance: ctx.availableBalance });
+
+    return {
+      // Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on
+      // Acceptance/EPLC_EXAMINATION; ISSUE on SHGT). SHGT's own ISSUE and EPLC_EXAMINATION's own
+      // CREATE already ran their own instrument-specific sufficiency check earlier, inside
+      // createMovement()'s "creating a new contract" branch, before this table is ever consulted for a
+      // brand-new contract's first movement — see checkShgtIssueSufficiency()/
+      // checkPresentDocsIssueSufficiency() above.
+      ISSUE: { isCreating: true, checkSufficiency: noCheck },
+      CREATE: { isCreating: true, checkSufficiency: noCheck },
+      AMEND_INCREASE: { isCreating: false, checkSufficiency: noCheck },
+      AMEND: { isCreating: false, checkSufficiency: amendShaped },
+      AMEND_DECREASE: { isCreating: false, checkSufficiency: decreaseShaped },
+      UTILIZE: { isCreating: false, checkSufficiency: utilizeShaped },
+      HONOUR: { isCreating: false, checkSufficiency: utilizeShaped },
+      ACCEPT: { isCreating: false, checkSufficiency: utilizeShaped },
+      PARTIAL_REDEEM: { isCreating: false, checkSufficiency: outstandingCapped },
+      FULL_REDEEM: { isCreating: false, checkSufficiency: outstandingCapped },
+      REIMBURSE: { isCreating: false, checkSufficiency: outstandingCapped },
+      RECLASSIFY_OUT: { isCreating: false, checkSufficiency: outstandingCapped },
+      PARTIAL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
+      FULL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
+    };
+  }
+
+  /**
+   * Business instruction 2026-08-20 ("A2 Decrease 輸入金額控制規則 B2, A3 & B3 都適用") — shared by
+   * AMEND_DECREASE (A2) and AMEND's own Decrease direction (B2): checked against Tight Available
+   * Balance, computed per instrumentType the same way assembleSnapshot() computes the persisted
+   * BalanceSnapshot.tightAvailableBalance field (SHGT exposure for IPLC_LC/EPLC_LC, Present Docs
+   * Earmark for EPLC_CONFIRMATION).
+   */
+  private checkDecreaseShapedSufficiency(ctx: MovementSufficiencyContext): MovementSufficiencyOutcome {
+    const { contract, existingMovements, confirmedBalance, availableBalance, ceilingAmount, req } = ctx;
+    const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
+    let tightAvailableForDecrease = availableBalance;
+    if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
+      const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
+      tightAvailableForDecrease = confirmedBalance.minus(pendingDecreaseTotal).minus(computeOffBalanceExposure(shgtMovements));
+    } else if (contract.instrumentType === 'EPLC_CONFIRMATION') {
+      // Deliberately STRICT (no provisionally-consumed override) — an AMEND_DECREASE is a genuinely
+      // independent transaction against the LC's own balance, same posture as B3's own new-presentation
+      // check; it must never benefit from another PENDING B4's own provisional netting.
+      const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
+      tightAvailableForDecrease = confirmedBalance.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements));
+    }
+    return checkAmendDecreaseSufficiency({
+      amount: parseMonetaryAmount(req.amount).abs(),
+      ceilingAmount: ceilingAmount.abs(),
+      tightAvailableBalance: tightAvailableForDecrease,
+    });
+  }
+
+  /** UTILIZE/HONOUR/ACCEPT — nets outstanding SHGT off-balance exposure for IPLC_LC/EPLC_LC only. */
+  private checkUtilizeShapedSufficiency(ctx: MovementSufficiencyContext): MovementSufficiencyOutcome {
+    const { contract, existingMovements, confirmedBalance, availableBalance, ceilingAmount, req } = ctx;
+    let offBalanceExposure = new Decimal(0);
+    if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
+      const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
+      // THIS movement (the LC's own UTILIZE) isn't inserted yet, so it can't appear in `existingMovements`
+      // for assembleSnapshot()'s own automatic businessEventId derivation to pick up — req.businessEventId
+      // matches ONLY A3S's own matched-SG redemption leg it just created in THIS same compound submission
+      // (see computeOffBalanceExposure()'s own doc comment for why this is the one deliberate exception to
+      // "a PENDING redemption never counts as netted").
+      const matchedPendingUtilizeBusinessEventIds = req.businessEventId ? new Set([req.businessEventId]) : undefined;
+      offBalanceExposure = computeOffBalanceExposure(shgtMovements, matchedPendingUtilizeBusinessEventIds);
+    }
+    const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
+    return checkUtilizeSufficiency({
+      requestedAmount: ceilingAmount,
+      availableBalance,
+      confirmedBalance,
+      pendingDecreaseTotal,
+      offBalanceExposure,
+    });
   }
 
   resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
@@ -376,6 +495,77 @@ export class BalanceService {
     return { acceptanceEventSnapshot, sgEventSnapshot };
   }
 
+  /**
+   * BAL-141 (2026-08-20 quality pass) — createMovement()/release() each independently resolved "own
+   * SHGT/EPLC_EXAMINATION siblings -> eventSnapshot -> parent's rootEventSnapshot -> unambiguous
+   * Acceptance/SG siblings" in the same four-step shape, differing only in which movements list and
+   * which child-movement-object to pass through. Collapsed into one shared bundle; each caller applies
+   * the result to its own destination (BalanceMovement fields for createMovement(), updateStatus()
+   * params — routed via resolveSnapshotWriteTarget() below — for release()).
+   *
+   * @param ownMovements this contract's own movement list AS OF the moment being captured — includes
+   *   the not-yet-inserted new movement for createMovement()'s own call, or the RELEASED-simulated list
+   *   for release()'s own call.
+   * @param childMovementForRootCapture the SAME movement, in the EXACT status/acknowledgedAt it has at
+   *   this capture moment (PENDING for createMovement(), RELEASED for release()) — see
+   *   captureRootEventSnapshot()'s own doc comment for why this can't just be re-read from ownMovements.
+   */
+  private captureSnapshotBundle(
+    contract: BalanceContract,
+    ownMovements: readonly BalanceMovement[],
+    childMovementForRootCapture: BalanceMovement,
+  ): {
+    eventSnapshot: BalanceSnapshot;
+    rootEventSnapshot: BalanceSnapshot | null;
+    acceptanceEventSnapshot: BalanceSnapshot | null;
+    sgEventSnapshot: BalanceSnapshot | null;
+  } {
+    const ownShgtMovements =
+      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC'
+        ? this.movements.listShgtMovementsForParent(contract.logicalContractId)
+        : [];
+    const ownExaminationMovements =
+      contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
+    const eventSnapshot = this.assembleSnapshot(contract, ownMovements, ownShgtMovements, ownExaminationMovements);
+
+    const parent = this.resolveParentContract(contract);
+    const rootEventSnapshot = parent ? this.captureRootEventSnapshot(parent, contract.instrumentType, childMovementForRootCapture) : null;
+
+    const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
+    const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
+
+    return { eventSnapshot, rootEventSnapshot, acceptanceEventSnapshot: siblings.acceptanceEventSnapshot, sgEventSnapshot: siblings.sgEventSnapshot };
+  }
+
+  /**
+   * BAL-141 — see release()'s own call site for the full "why" (BAL-123/2026-08-18 A4 finalize-freeze
+   * requirement, "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變"). Resolves ONCE, up front,
+   * which persisted-snapshot columns a release() call should write the captureSnapshotBundle() result
+   * into — replacing four separate inline ternaries scattered across the updateStatus() call (Fowler,
+   * "Replace Flag Argument with Resolved Policy Object"). Only a Sight-tenor IPLC_LC/UTILIZE (A4
+   * finalizing A3/A3S) routes to the finalize* columns; every other release() call uses the plain ones.
+   * rootEventSnapshot has no finalize variant — it is always (re)written into the same column, see
+   * release()'s own call site.
+   *
+   * Reviewer-noted (2026-08-20): takes the already-computed `isSightUtilizeFinalize` rather than
+   * re-deriving it from `movement`/`contract` itself — release() also needs the same boolean for its own
+   * BAL-123 Maker-Submit gate check, earlier in the method; computing it once and passing it through
+   * avoids evaluating the identical `movementType`/`instrumentType`/`tenorType` expression twice.
+   */
+  private resolveSnapshotWriteTarget(isSightUtilizeFinalize: boolean): {
+    eventSnapshotField: 'eventSnapshot' | 'finalizeEventSnapshot';
+    acceptanceSnapshotField: 'acceptanceEventSnapshot' | 'finalizeAcceptanceEventSnapshot';
+    sgSnapshotField: 'sgEventSnapshot' | 'finalizeSgEventSnapshot';
+  } {
+    return isSightUtilizeFinalize
+      ? {
+          eventSnapshotField: 'finalizeEventSnapshot',
+          acceptanceSnapshotField: 'finalizeAcceptanceEventSnapshot',
+          sgSnapshotField: 'finalizeSgEventSnapshot',
+        }
+      : { eventSnapshotField: 'eventSnapshot', acceptanceSnapshotField: 'acceptanceEventSnapshot', sgSnapshotField: 'sgEventSnapshot' };
+  }
+
   /** Event timeline (business instruction 2026-08-14) — every movement against one contract, in time order (eventSeq is already strictly increasing per contract, Design doc §8). */
   listMovements(balanceContractId: string): BalanceMovement[] {
     if (!this.contracts.findById(balanceContractId)) throw new NotFoundError(`No BalanceContract ${balanceContractId}`);
@@ -436,7 +626,7 @@ export class BalanceService {
     // (that would double-count the Ceiling/Confirmed Balance). This only
     // applies to the naturalKey path — an explicit balanceContractId already
     // implies the caller knows the contract exists.
-    if (contract && req.naturalKey && CREATING_MOVEMENT_TYPES.has(req.movementType)) {
+    if (contract && req.naturalKey && this.movementTypeRegistry[req.movementType]?.isCreating) {
       throw new NaturalKeyAlreadyExistsError(
         `An ACTIVE ${req.instrumentType} already exists for natural key ${JSON.stringify(req.naturalKey)} ` +
           `(balanceContractId ${contract.balanceContractId}) — cannot ${req.movementType} again. ` +
@@ -454,7 +644,7 @@ export class BalanceService {
 
     if (!contract) {
       if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
-      if (!CREATING_MOVEMENT_TYPES.has(req.movementType)) {
+      if (!this.movementTypeRegistry[req.movementType]?.isCreating) {
         throw new NotFoundError(`No ${req.instrumentType} Logical Contract for this natural key yet — only ISSUE/CREATE may implicitly create one.`);
       }
 
@@ -618,68 +808,29 @@ export class BalanceService {
     const confirmed = computeConfirmedBalance(existingMovements);
     const available = computeAvailableBalance(confirmed, existingMovements);
 
-    let warnings: MovementWarning[] | null = null;
-
-    if (NO_CHECK_MOVEMENT_TYPES.has(req.movementType) || (req.movementType === 'AMEND' && !ceilingAmount.isNegative())) {
-      // no sufficiency check — ISSUE (LC)/AMEND_INCREASE/CREATE, or B2's own AMEND when its signed
-      // ceilingAmount is an Increase (or zero). SHGT's own ISSUE is checked earlier, inside the
-      // "creating a new contract" branch above (before createContract()), not here — see that comment
-      // for why: a rejected check must never leave an orphaned, empty BalanceContract row behind.
-    } else if (req.movementType === 'AMEND_DECREASE' || req.movementType === 'AMEND') {
-      // Quality-report-balance.md BAL-115 — see the SG Issue check's own comment above. B2's own AMEND
-      // (business instruction 2026-08-20, BA balance-check review, "占用從寬" — a Decrease occupies
-      // capacity as strictly as A2's own AMEND_DECREASE) reaches here only when ceilingAmount is
-      // negative (the `else if` above already absorbed the Increase/zero case) — compared by magnitude,
-      // same floor check as A2, since checkAmendDecreaseSufficiency expects a positive "decrease by" amount.
-      //
-      // Business instruction 2026-08-20 ("A2 Decrease 輸入金額控制規則 B2, A3 & B3 都適用") — checked
-      // against Tight Available Balance, not plain `available`, computed the exact same way
-      // assembleSnapshot() computes the persisted BalanceSnapshot.tightAvailableBalance field for this
-      // contract's own instrumentType (SHGT exposure for IPLC_LC/EPLC_LC — A2's own case; Present Docs
-      // Earmark for EPLC_CONFIRMATION — B2's own case) — see amendDecrease.ts's own doc comment for why.
-      const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
-      let tightAvailableForDecrease = available;
-      if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
-        const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
-        tightAvailableForDecrease = confirmed.minus(pendingDecreaseTotal).minus(computeOffBalanceExposure(shgtMovements));
-      } else if (contract.instrumentType === 'EPLC_CONFIRMATION') {
-        // Deliberately STRICT (no provisionally-consumed override) — an AMEND_DECREASE is a genuinely
-        // independent transaction against the LC's own balance, same posture as B3's own new-presentation
-        // check above; it must never benefit from another PENDING B4's own provisional netting.
-        const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
-        tightAvailableForDecrease = confirmed.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements));
-      }
-      const check = checkAmendDecreaseSufficiency({
-        amount: parseMonetaryAmount(req.amount).abs(),
-        ceilingAmount: ceilingAmount.abs(),
-        tightAvailableBalance: tightAvailableForDecrease,
-      });
-      if (!check.ok) throw new InsufficientBalanceError(check.error!);
-    } else if (UTILIZE_SHAPED_MOVEMENT_TYPES.has(req.movementType)) {
-      let offBalanceExposure = new Decimal(0);
-      if (contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC') {
-        const shgtMovements = this.movements.listShgtMovementsForParent(contract.logicalContractId);
-        // THIS movement (the LC's own UTILIZE) isn't inserted yet, so it can't appear in `existingMovements`
-        // for assembleSnapshot()'s own automatic businessEventId derivation to pick up — req.businessEventId
-        // matches ONLY A3S's own matched-SG redemption leg it just created in THIS same compound submission
-        // (see computeOffBalanceExposure()'s own doc comment for why this is the one deliberate exception to
-        // "a PENDING redemption never counts as netted").
-        const matchedPendingUtilizeBusinessEventIds = req.businessEventId ? new Set([req.businessEventId]) : undefined;
-        offBalanceExposure = computeOffBalanceExposure(shgtMovements, matchedPendingUtilizeBusinessEventIds);
-      }
-      const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
-      const check = checkUtilizeSufficiency({ requestedAmount: ceilingAmount, availableBalance: available, confirmedBalance: confirmed, pendingDecreaseTotal, offBalanceExposure });
-      if (!check.ok) throw new InsufficientBalanceError(check.error!);
-      if (check.warning) warnings = [check.warning];
-    } else if (OUTSTANDING_CAPPED_MOVEMENT_TYPES.has(req.movementType)) {
-      // Bug fixed 2026-08-15 — must check against `available` (nets out other still-PENDING
-      // redemptions on this same SG), not the static `confirmed` balance; see shgtRedeem.ts's own
-      // doc comment for the live scenario this was caught from.
-      const check = checkRedeemSufficiency({ redeemAmount: ceilingAmount, sgAvailableBalance: available });
-      if (!check.ok) throw new InsufficientBalanceError(check.error!);
-    } else {
+    // BAL-141 — table lookup replacing the former NO_CHECK/AMEND-special-case/UTILIZE_SHAPED/
+    // OUTSTANDING_CAPPED if/else-if chain; see MovementTypeDescriptor's own doc comment (module top).
+    // SHGT's own ISSUE and EPLC_EXAMINATION's own CREATE already ran their own instrument-specific
+    // sufficiency check earlier, inside the "creating a new contract" branch above (before
+    // createContract()) — a rejected check there never leaves an orphaned, empty BalanceContract row
+    // behind; the registry's own ISSUE/CREATE entries are a deliberate no-op down here.
+    const descriptor = this.movementTypeRegistry[req.movementType];
+    if (!descriptor) {
       throw new RequestValidationError(`Unrecognized movementType "${req.movementType}" for instrumentType ${req.instrumentType}.`);
     }
+    // Bug fixed 2026-08-15 (outstanding-capped shape) — must check against `available` (nets out other
+    // still-PENDING redemptions on this same SG), not the static `confirmed` balance; see shgtRedeem.ts's
+    // own doc comment for the live scenario this was caught from.
+    const sufficiency = descriptor.checkSufficiency({
+      contract,
+      existingMovements,
+      confirmedBalance: confirmed,
+      availableBalance: available,
+      ceilingAmount,
+      req,
+    });
+    if (sufficiency && !sufficiency.ok) throw new InsufficientBalanceError(sufficiency.error!);
+    const warnings: MovementWarning[] | null = sufficiency?.warning ? [sufficiency.warning] : null;
 
     // analysis/contingent-liability-ledger.html — server-derived once, here, at creation time; never
     // recomputed later (Event-Level Relationship requirement). Uses the RESOLVED contract's own
@@ -728,30 +879,15 @@ export class BalanceService {
     };
 
     // 2026-08-17 ("不複雜 就是交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED)
-    // SAVED TO DB == EVENT BALANCE SNAPSHOT") — eventSnapshot is ALWAYS this movement's own contract's
-    // own plain balance, captured in-memory (existingMovements is already fetched above for the
-    // sufficiency checks; `movement` isn't inserted yet — no extra DB read, same "simulate rather than
-    // round-trip" posture release() below uses).
-    const ownShgtMovements =
-      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC'
-        ? this.movements.listShgtMovementsForParent(contract.logicalContractId)
-        : [];
-    const ownExaminationMovements =
-      contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
-    movement.eventSnapshot = this.assembleSnapshot(contract, [...existingMovements, movement], ownShgtMovements, ownExaminationMovements);
-
-    // ADDITIONALLY, for a child-ledger movement (SHGT/Acceptance/EPLC_EXAMINATION), also capture the
-    // PARENT LC/Confirmation's own plain balance at this same moment — see resolveParentContract()'s own
-    // doc comment. Never replaces eventSnapshot above.
-    const parent = this.resolveParentContract(contract);
-    if (parent) movement.rootEventSnapshot = this.captureRootEventSnapshot(parent, contract.instrumentType, movement);
-
-    // ADDITIONALLY, capture the one unambiguous sibling Acceptance's/SG's own CURRENT plain balance — see
-    // captureSiblingSnapshots()'s own doc comment ("就是交易當時LC所有的BALANCE的拍照存檔").
-    const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
-    const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
-    movement.acceptanceEventSnapshot = siblings.acceptanceEventSnapshot;
-    movement.sgEventSnapshot = siblings.sgEventSnapshot;
+    // SAVED TO DB == EVENT BALANCE SNAPSHOT") — eventSnapshot/rootEventSnapshot/siblings, captured
+    // in-memory (existingMovements is already fetched above for the sufficiency checks; `movement` isn't
+    // inserted yet — no extra DB read, same "simulate rather than round-trip" posture release() below
+    // uses). See captureSnapshotBundle()'s own doc comment for what it bundles and why.
+    const snapshotBundle = this.captureSnapshotBundle(contract, [...existingMovements, movement], movement);
+    movement.eventSnapshot = snapshotBundle.eventSnapshot;
+    movement.rootEventSnapshot = snapshotBundle.rootEventSnapshot;
+    movement.acceptanceEventSnapshot = snapshotBundle.acceptanceEventSnapshot;
+    movement.sgEventSnapshot = snapshotBundle.sgEventSnapshot;
 
     const result = this.movements.insert(movement);
     if (!result.created) return { created: false, existing: result.existing };
@@ -812,54 +948,40 @@ export class BalanceService {
     const after = before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
 
     // 2026-08-17 ("...SAVED TO DB == EVENT BALANCE SNAPSHOT") — this movement's own contract's own plain
-    // balance AS OF THIS RELEASE. Same in-memory simulation posture as before/after above: flip this one
-    // movement to RELEASED in the already-fetched movement list rather than reading the DB again after
-    // updateStatus() below writes it.
-    //
-    // 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變") — for every OTHER movement
-    // this figure is written into eventSnapshot itself, overwriting whatever createMovement() captured
-    // (unchanged from before this date). But for a Sight-tenor IPLC_LC/UTILIZE (isSightUtilizeFinalize —
-    // this release() call IS A4 finalizing A3's own earlier submission), eventSnapshot must instead stay
-    // frozen at A3's own original Create-time value — Inquire Events' own 'create' row reads it directly
-    // — so this release-time figure goes into the NEW finalizeEventSnapshot field instead (read by the
-    // 'finalize' row). See types.ts's BalanceMovement.eventSnapshot/finalizeEventSnapshot doc comments.
+    // balance AS OF THIS RELEASE, plus root/sibling snapshots (see captureSnapshotBundle()'s own doc
+    // comment for what it bundles). Same in-memory simulation posture as before/after above: flip this
+    // one movement to RELEASED in the already-fetched movement list rather than reading the DB again
+    // after updateStatus() below writes it.
     const releasedSelf = { ...movement, status: 'RELEASED' as const };
     const ownMovements = this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movementId ? releasedSelf : m));
-    const ownShgtMovements =
-      contract.instrumentType === 'IPLC_LC' || contract.instrumentType === 'EPLC_LC'
-        ? this.movements.listShgtMovementsForParent(contract.logicalContractId)
-        : [];
-    const ownExaminationMovements =
-      contract.instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParent(contract.logicalContractId) : [];
-    const releaseTimeSnapshot = this.assembleSnapshot(contract, ownMovements, ownShgtMovements, ownExaminationMovements);
+    const snapshotBundle = this.captureSnapshotBundle(contract, ownMovements, releasedSelf);
 
-    // ADDITIONALLY, for a child-ledger movement, also capture the PARENT's own plain balance — see
-    // resolveParentContract()'s own doc comment. Never replaces eventSnapshot above.
-    //
-    // SUPERSEDED 2026-08-18 for B3/EPLC_EXAMINATION specifically — see the isSightUtilizeFinalize/
-    // isPresentDocsFinalize doc comment further above: B3's own release() call is now its own genuine
-    // finalization event, so rootEventSnapshot ("Confirmed LC Balance" as of THIS Release) is correctly
-    // (re)written here just like every other child-ledger movement, not discarded.
-    const parent = this.resolveParentContract(contract);
-    const rootEventSnapshot = parent ? this.captureRootEventSnapshot(parent, contract.instrumentType, releasedSelf) : null;
-
-    // ADDITIONALLY, capture the one unambiguous sibling Acceptance's/SG's own CURRENT plain balance —
-    // see captureSiblingSnapshots()'s own doc comment ("就是交易當時LC所有的BALANCE的拍照存檔").
-    //
-    // 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — same exception
-    // as eventSnapshot/finalizeEventSnapshot above, extended to these two sibling fields: for
-    // isSightUtilizeFinalize, acceptanceEventSnapshot/sgEventSnapshot must stay frozen at whatever
-    // createMovement() originally captured (A3's own transaction time — reproduces LC S01 exactly: SG
-    // G01 didn't exist yet when A3 was submitted, so its own sgEventSnapshot was correctly null then;
-    // without this fix, A4's own much-later Release would silently overwrite that correct "didn't exist
-    // yet" picture with SG G01's by-then-existing balance) — so this release-time recomputation goes
-    // into the NEW finalizeAcceptanceEventSnapshot/finalizeSgEventSnapshot fields instead, and the keys
-    // themselves are OMITTED (not merely passed null) from the updateStatus() call below, so
-    // hasAcceptanceEventSnapshot/hasSgEventSnapshot correctly compute to 0 there. B3/EPLC_EXAMINATION
-    // (SUPERSEDED 2026-08-18, see above) is no longer special-cased here either — its own siblings are
-    // (re)written at release() like any other child-ledger movement.
-    const rootInstrumentType = parent?.instrumentType ?? contract.instrumentType;
-    const siblings = this.captureSiblingSnapshots(contract, rootInstrumentType);
+    // 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" / "SNAP SHOT保留當時 LC,
+    // SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — for every OTHER movement this release-time bundle
+    // overwrites eventSnapshot/acceptanceEventSnapshot/sgEventSnapshot directly (whatever
+    // createMovement() originally captured). But for a Sight-tenor IPLC_LC/UTILIZE
+    // (isSightUtilizeFinalize — this release() call IS A4 finalizing A3's own earlier submission), those
+    // three must instead stay frozen at Create-time — Inquire Events' own 'create' row reads them
+    // directly (reproduces LC S01 exactly: SG G01 didn't exist yet when A3 was submitted, so its own
+    // sgEventSnapshot was correctly null then; without this, A4's own much-later Release would silently
+    // overwrite that correct "didn't exist yet" picture with SG G01's by-then-existing balance) — so
+    // this release-time bundle goes into the finalize* columns instead. See
+    // resolveSnapshotWriteTarget()'s own doc comment, and types.ts's BalanceMovement.eventSnapshot/
+    // finalizeEventSnapshot doc comments. rootEventSnapshot has no finalize variant — it is always
+    // (re)written here just like every other child-ledger movement, not discarded (B3/EPLC_EXAMINATION's
+    // own former special-case here was SUPERSEDED 2026-08-18 — its own release() call is now its own
+    // genuine finalization event, so "Confirmed LC Balance" as of THIS Release is correctly captured).
+    const snapshotTarget = this.resolveSnapshotWriteTarget(isSightUtilizeFinalize);
+    const snapshotFields: Partial<UpdateMovementStatusParams> = {};
+    snapshotFields[snapshotTarget.eventSnapshotField] = JSON.stringify(snapshotBundle.eventSnapshot);
+    // acceptanceEventSnapshot/sgEventSnapshot use presence-based (not COALESCE) column writes in
+    // updateStatus() — only the ACTIVE key of this pair is set below, so the inactive one is OMITTED
+    // entirely (not merely passed null), same "hasAcceptanceEventSnapshot/hasSgEventSnapshot correctly
+    // compute to 0" behavior the original inline ternaries preserved.
+    snapshotFields[snapshotTarget.acceptanceSnapshotField] = snapshotBundle.acceptanceEventSnapshot
+      ? JSON.stringify(snapshotBundle.acceptanceEventSnapshot)
+      : null;
+    snapshotFields[snapshotTarget.sgSnapshotField] = snapshotBundle.sgEventSnapshot ? JSON.stringify(snapshotBundle.sgEventSnapshot) : null;
 
     this.movements.updateStatus({
       movementId,
@@ -868,18 +990,8 @@ export class BalanceService {
       releasedAt,
       balanceBefore: before.toFixed(),
       balanceAfter: after.toFixed(),
-      eventSnapshot: isSightUtilizeFinalize ? null : JSON.stringify(releaseTimeSnapshot),
-      finalizeEventSnapshot: isSightUtilizeFinalize ? JSON.stringify(releaseTimeSnapshot) : null,
-      rootEventSnapshot: rootEventSnapshot ? JSON.stringify(rootEventSnapshot) : null,
-      ...(isSightUtilizeFinalize
-        ? {
-            finalizeAcceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
-            finalizeSgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
-          }
-        : {
-            acceptanceEventSnapshot: siblings.acceptanceEventSnapshot ? JSON.stringify(siblings.acceptanceEventSnapshot) : null,
-            sgEventSnapshot: siblings.sgEventSnapshot ? JSON.stringify(siblings.sgEventSnapshot) : null,
-          }),
+      rootEventSnapshot: snapshotBundle.rootEventSnapshot ? JSON.stringify(snapshotBundle.rootEventSnapshot) : null,
+      ...snapshotFields,
     });
 
     // 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 must

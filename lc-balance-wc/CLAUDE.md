@@ -67,8 +67,10 @@ Three independently-versioned pieces talking over HTTP, not a shared in-process 
   `document-arrival-hints.service.ts`, `inquire-events.service.ts`, `CheckerPanelComponent`,
   `MakerPanelComponent`, `AccountEntriesDialogComponent`, `function-strategy.ts`, and three pure-function
   modules (`function-policy.ts`, `builder-fields.ts`, `submit-rules.ts`). The parent component is now a
-  thin orchestration/wiring layer. Test coverage is split by concern across multiple spec files per
-  source file, plus one dedicated spec file per extracted service/module.
+  thin orchestration/wiring layer — **436 lines**, down from a 2,923-line peak, and no longer even this
+  sub-project's largest file (`maker-panel.component.ts`, at 1,160 lines, is) — closing BAL-003 for good;
+  see `Quality-report-balance.md`'s own BAL-003 finding. Test coverage is split by concern across multiple
+  spec files per source file, plus one dedicated spec file per extracted service/module.
 - **`backend/server.js`** — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
   declarative registry of Import/Export Business Cases it replays (`createAndRelease()` collapses the
   common create-then-release pair; `RELEASE_SHAPED_STEP_TYPES` covers `release`/`makerSubmit`/`acknowledge`
@@ -577,6 +579,16 @@ resets all 7). Phases 4–7 not started; `PickerSelectionService` (a plain class
 separately extracted the Step-2 "2ndary Index" pickers (A3S's SG picker, B5's EB Index, A4/A6/B4's shared
 payable-movement picker) via the same Dependency-Inversion pattern as `CheckerActionsService`.
 
+**Closes BAL-003 (2026-08-20, user-confirmed — "transaction-builder.component.ts 這個檔案本身,已經不是
+God Component"):** `transaction-builder.component.ts` is now **436 lines**, down from its 2,923-line
+peak, and no longer the largest file in this sub-project (`maker-panel.component.ts`, at 1,160 lines, is
+— see `Quality-report-balance.md`'s own BAL-003 finding, closed the same day). What remains is
+genuinely one job — mode/function-side selection, wiring the panels/services together, the Account
+Entries dialog's own open/close state, and the Checker action-dispatch methods — not five or six
+unrelated ones, so Phases 4–7 of the original 8-phase proposal stay deliberately not pursued: further
+splitting this remaining orchestration would be decomposition for its own sake, not a fix for anything
+still wrong.
+
 ## B2 Direction/sign-handling — three related fixes
 
 B2 (Export LC Amendment) has no `AMEND_INCREASE`/`AMEND_DECREASE` split — direction rides the sign of
@@ -805,6 +817,15 @@ Earmark Total = +8,000 (SG) − 2,000 (LC)" figure — combined effect is always
 leg is MIN-capped at the SG's own Available Balance, never exceeds the UTILIZE's own ceilingAmount), never
 a pure increase. No source code was wrong — the sufficiency-check/display code already nets correctly
 (confirmed by the passing test suite); only this row's prose was stale.
+
+## BAL-141 — `balanceService.ts`'s 4 movementType classification Sets collapsed into one Strategy/Type-Object registry
+
+`createMovement()`'s NO_CHECK/UTILIZE_SHAPED/OUTSTANDING_CAPPED Sets + if/else-if chain, and `release()`'s
+4 scattered `isSightUtilizeFinalize` ternaries, replaced by `movementTypeRegistry`
+(`buildMovementTypeRegistry()`) and `resolveSnapshotWriteTarget()`/`captureSnapshotBundle()` — pure
+internal refactor, zero behavior change (all 3 suites green, no spec edits needed). Reviewer-noted
+follow-up: `resolveSnapshotWriteTarget()` now takes the already-computed `isSightUtilizeFinalize` as a
+param instead of re-deriving it, since `release()`'s own Maker-Submit gate check needs the same boolean.
 
 ## `balance-component-api.yaml` bumped to v1.15.0 — schema descriptions never caught up to v1.13.0's own changelog, and this session's two netting fixes were undocumented
 

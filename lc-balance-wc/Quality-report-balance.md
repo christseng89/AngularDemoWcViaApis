@@ -48,11 +48,11 @@ surfaced BAL-122 and BAL-123 below.
 |---|---|---|
 | **Reliability** | A (4.8/5) | 977/977 tests passing across 3 independent suites (652 Angular + 292 microservice + 33 backend, up from 835 — 113 new tests from the `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` extraction plus 4 more from the "Protected System-Controlled Fields" business requirement, Event Seq/Created By now read-only on every A1-A9/B1-B5 screen — see `builder-fields.ts`'s own doc comment and CLAUDE.md's own decision-log entry). BAL-115 (the prior pass's own defect) was fixed same-day and stays fixed. This pass found two genuine NEW Major defects — **BAL-122** and **BAL-123** — plus one low-severity pre-existing gap surfaced incidentally while verifying them (**BAL-134**, `import-case-4`'s stale scenario), one completeness gap (**BAL-131**, zero orchestrator-level `/acknowledge` coverage), and (found in a later same-day pass, reviewing a further BAL-003 extraction) **BAL-135** — a genuine, live Major bug (B5's own Amount field silently always locked/disabled, contradicting the documented business rule) surfaced only once dedicated unit tests were written for code that previously had none — and **every one of these was fixed the same pass it was found**, restoring this report's established pattern of same-pass remediation with no open defects left over from this reassessment. |
 | **Security** | A- (4.4/5) | No injection/secrets exposure; parameterized SQL; CORS/headers/rate-limiting fixes from prior passes hold; BAL-129 (an untested regression path for BAL-117's own fix) is Minor. **BAL-123 is now fixed** — A4's own Maker/Checker 4-eyes gate is a real, server-enforced control, not just a client-side convention, closing the one newly-logged Major this pass found. Held back only by the two unchanged, deliberately-deferred structural gaps (BAL-001 no auth, BAL-002 8 High CVEs). |
-| **Maintainability** | A (4.9/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) **grew to 2,923 lines mid-pass** (A4's own Maker-side logic landing directly in the class) before four further post-close-out extractions — Maker Submit into `MakerSubmitService`, the Look Up panel into `LookUpPanelService`, the three paginated pickers' load-and-page bookkeeping into `CatalogPickerService`, then the state-derivation getters/Formly field factory/Maker-submit validation into `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` — brought it down to **2,024 lines**, well below where this pass started. Still open at Major (function/side selection and the pickers' own selection/business-filter logic remain), but every "does too many things" candidate this session's own BAL-003 history identified has now been extracted via the same Dependency Inversion / pure-function pattern. **BAL-136** (found this same pass) — `validateSubmit`/`buildSubmitRequest` shadowing their own imports by name — is now fixed via import aliasing. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper). BAL-003 remains the one open Maintainability finding of any real weight, now materially narrower in scope than at any earlier point in this report's history. |
+| **Maintainability** | A+ (5.0/5) | Duplication hotspots from prior passes remain fixed and re-verified; BAL-003 (God Component) **grew to 2,923 lines mid-pass** (A4's own Maker-side logic landing directly in the class) before four further post-close-out extractions — Maker Submit into `MakerSubmitService`, the Look Up panel into `LookUpPanelService`, the three paginated pickers' load-and-page bookkeeping into `CatalogPickerService`, then the state-derivation getters/Formly field factory/Maker-submit validation into `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` — brought it down to 2,024 lines. **A later "Feature Components + Facade" pilot (real Angular child components — `CheckerPanelComponent`/`MakerPanelComponent`) finally finished the job, re-verified this pass: `transaction-builder.component.ts` is now 436 lines and no longer even the largest file in this sub-project — BAL-003 is Fixed**, this report's single longest-running finding, closed after nine tracked outcomes. **BAL-136** (found this same pass) — `validateSubmit`/`buildSubmitRequest` shadowing their own imports by name — is now fixed via import aliasing. Every other new Minor/Info code-smell finding surfaced this pass in code that hadn't been reviewed before is **now fixed** (the executor's `release`/`makerSubmit`/`acknowledge` handlers consolidated into one dispatch table; `checker-actions.service.ts`'s own 6 `any`-typed fields/parameters retyped and its 20 duplicated `{kind:'failed'}` constructions collapsed into one shared `fail()` helper; `backend/data/businessCases.js`'s own ~49 duplicated create+release step pairs collapsed into one shared `createAndRelease()` helper; `backend/`'s 3 stale eslint-disable comments deleted; the microservice's own `balanceService.ts` — `acknowledge()`/`submitByMaker()`'s identical find→validate→persist shape collapsed into a shared `guardSecondaryAction()` helper). **BAL-141** (found and fixed in a later, separate 2026-08-20 pass) — that same file's own 4 independently-maintained movementType classification Sets (`CREATING_MOVEMENT_TYPES`/`NO_CHECK_MOVEMENT_TYPES`/`UTILIZE_SHAPED_MOVEMENT_TYPES`/`OUTSTANDING_CAPPED_MOVEMENT_TYPES`) plus the sequential if/else-if dispatch they drove, collapsed into one Strategy/Type-Object `movementTypeRegistry`; `release()`'s own 4 scattered `isSightUtilizeFinalize` ternaries collapsed into `resolveSnapshotWriteTarget()`. With BAL-003 now Fixed, this report has **zero open Maintainability findings of any real weight** for the first time across its entire history. |
 | **Coverage** | A+ (5/5) | All 3 suites clear a **95%** floor on statements/branches/functions/lines, re-confirmed via fresh runs this pass (Angular count grew 534 → 648 → 652 — 113 new tests closing what had been a zero-coverage gap for `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts`, then 4 more for the Protected System-Controlled Fields requirement; Angular branch coverage itself rising 95.98% → 96.37%, not just holding the floor; microservice count grew 288 → 292 from BAL-123's own new gate tests; `backend/` count grew 32 → 33 from BAL-131's own new acknowledge-step coverage, holding at 97.29%/95.23%/96.29%/98.01%). BAL-129 flags one specific untested branch (a security-relevant one) worth closing despite the aggregate number being fine. |
-| **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. |
+| **Duplication** | A (4.8/5) | Every previously-identified hotspot remains fixed. **BAL-124 and BAL-126 are now fixed** — the `release`/`makerSubmit`/`acknowledge` executor handlers consolidated into one `RELEASE_SHAPED_STEP_TYPES` dispatch table, and `checker-actions.service.ts`'s own 20 duplicated `{kind:'failed'}` constructions (a fresh count this pass found, up from the original ~12 estimate) collapsed into one shared `fail()` helper — both the duplication instances this pass had itself found in code added this session are now closed. **BAL-141 is also now fixed** — `balanceService.ts`'s own `createMovement()`/`release()` independently duplicated the same 4-step "own siblings → eventSnapshot → parent rootEventSnapshot → sibling snapshots" orchestration, now shared via `captureSnapshotBundle()`. |
 
-### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 → 100 → 100 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A → A → A)**
+### Composite score: **86 → 88 → 90 → 91 → 92 → 93 → 90 → 91 → 93 → 94 → 95 → 96 → 97 → 98 → 99 → 100 → 100 → 100 → 100 / 100 (B+ → A- → A- → A- → A- → A → A- → A- → A → A → A → A → A → A → A → A → A → A → A)**
 
 **A composite of 100 does not mean this codebase is flawless or production-ready — see the paragraph
 immediately below and [Gate Conditions](#gate-conditions-before-any-production-consideration).** It
@@ -60,10 +60,19 @@ means every single finding this specific 2026-08-17 reassessment pass itself sur
 gaps, one completeness gap, six Minor/Info code-smell findings, one incidentally-discovered stale
 scenario, and (in this pass's own later same-day continuation, reviewing a further BAL-003 extraction
 found already sitting uncommitted) one more genuine Major bug (**BAL-135**) plus one Minor code smell
-(**BAL-136**) — is now fixed, with zero exceptions remaining. BAL-001 (no auth, Blocker), BAL-002 (dependency
-CVEs, Critical), BAL-102 (SQLite locking, Major), and BAL-003 (God Component, Major) are all still
-open — every one of them **deferred, not resolved** — and have been open at every composite score point
-on this entire trend line, including its very first 86. The number tracks "how much of what this review
+(**BAL-136**) — is now fixed, with zero exceptions remaining. A later, separate reviewer pass (2026-08-20,
+external review of the microservice's own `service/balanceService.ts` following this same posture)
+surfaced one more Minor code smell (**BAL-141** — 4 independently-maintained movementType classification
+Sets plus a scattered `isSightUtilizeFinalize` flag, a Data Clump risk) — also fixed the same pass, with a
+same-day reviewer-noted follow-up (a residual duplicate boolean computation) closed immediately after.
+**BAL-003 (God Component, Major) — open at every composite score point on this entire trend line since
+its very first 86 — is now also Fixed** (user-confirmed 2026-08-20, re-verified against the current
+working tree: `transaction-builder.component.ts` is 436 lines, down from its 2,923-line peak, via the
+"Feature Components + Facade" pilot's real-child-component extractions logged in `lc-balance-wc/CLAUDE.md`).
+This is this report's single longest-standing finding, and the only one of the four charted "always open"
+items to close across the entire trend line. BAL-001 (no auth, Blocker) and BAL-002 (dependency CVEs,
+Critical) remain open — deferred, not resolved — and BAL-102 (SQLite locking, Major) remains open the
+same way. The number tracks "how much of what this review
 can find and fix has been fixed," not "is this ready to run real trade-finance data" — those two
 questions are answered separately, on purpose, throughout this report.
 
@@ -174,7 +183,7 @@ assessment. See [Gate Conditions](#gate-conditions-before-any-production-conside
 | [BAL-122](#bal-122) | 🟡 Major | Bug | A4's generic "Delete Pending (EC)" button cancels the **upstream A3/A3S Document Arrival**, not an A4-specific record — **Fixed** |
 | [BAL-123](#bal-123) | 🟡 Major | Vulnerability / Design Risk | A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY client-side — the microservice's own `/release` never checks it — **Fixed** |
 | [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites — **Fixed** |
-| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — 8 extractions completed (Checker Actions, Maker Submit, Look Up panel, paginated pickers, function-policy/builder-fields/submit-rules), 2,923 → **2,024 lines**; still open — function/side selection and the pickers' own selection/business-filter logic remain, deliberately not extracted |
+| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — 10 extractions completed, most recently real Angular child components (`CheckerPanelComponent`/`MakerPanelComponent`), 2,923 → **436 lines**, no longer this sub-project's largest file — **Fixed** |
 | [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — deferred, user-confirmed |
 | [BAL-116](#bal-116) | 🔵 Minor | Code Smell | `zod` is a declared dependency but never used — request validation is manual presence checks only — **Fixed** |
 | [BAL-117](#bal-117) | 🔵 Minor | Security Hotspot | Both Express services' 500 handlers echo raw internal error messages to the client — **Fixed** |
@@ -197,6 +206,7 @@ assessment. See [Gate Conditions](#gate-conditions-before-any-production-conside
 | [BAL-134](#bal-134) | ⚪ Info | Bug / Technical Debt | `import-case-4`'s own scenario is stale relative to a later `v0.12` hard-reject design change — **Fixed** |
 | [BAL-135](#bal-135) | 🟡 Major | Bug | B5's own Amount field was silently ALWAYS locked/disabled, contradicting the documented "freely-editable, reduce for Partial Settle" business rule — **Fixed** |
 | [BAL-136](#bal-136) | 🔵 Minor | Code Smell | `validateSubmit`/`buildSubmitRequest` share their exact names between the component's own private methods and the pure functions imported from `submit-rules.ts` — **Fixed** |
+| [BAL-141](#bal-141) | 🔵 Minor | Code Smell | `balanceService.ts`'s 4 movementType classification Sets + `release()`'s scattered `isSightUtilizeFinalize` ternaries — a Data Clump with no compiler-enforced link — **Fixed** |
 | [BAL-101](#fixed-in-prior-passes--re-verified-still-fixed-this-pass) | — | — | Fixed in prior passes, re-verified still fixed this pass (see below) |
 | [BAL-111](#bal-111) | ⚪ Info (positive) | — | SQL access is fully parameterized — no injection risk found, in either store layer |
 | [BAL-112](#bal-112) | ⚪ Info (positive) | — | Test coverage clears 95% on all four metrics, all three suites |
@@ -541,7 +551,7 @@ Full three-suite re-verification per this file's own standing rule: Angular app 
 ## Code Smells & Maintainability
 
 ### BAL-003
-**`transaction-builder.component.ts` is still a God Component** — 🟡 Major (all 3 planned extractions attempted, plus a 4th OOD/SOLID pass unifying paging state, a 5th extracting Checker Actions into a service, a 6th extracting Maker Submit into a service, a 7th extracting the Look Up panel into a service, an 8th extracting the paginated pickers' load-and-page bookkeeping into a service, and a 9th extracting the pure state-derivation getters/Formly field factory/Maker-submit validation into `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts` — see the eight Outcomes below)
+**`transaction-builder.component.ts` is still a God Component** — 🟡 Major → **Fixed** (all 3 originally-planned extractions, plus a 4th OOD/SOLID pass unifying paging state, a 5th extracting Checker Actions into a service, a 6th extracting Maker Submit into a service, a 7th extracting the Look Up panel into a service, an 8th extracting the paginated pickers' load-and-page bookkeeping into a service, a 9th extracting the pure state-derivation getters/Formly field factory/Maker-submit validation into `function-policy.ts`/`builder-fields.ts`/`submit-rules.ts`, and a 10th — the "Feature Components + Facade" pilot #2, real Angular child components — that finally closes this finding; see the Outcomes below, most recently the Ninth)
 
 **Evidence:**
 ```
@@ -953,6 +963,43 @@ has been all session. **BAL-003 stays open at Major** — function/side selectio
 selection/business-filter logic remain (per the Seventh outcome's own investigation) — but this pass adds
 real value beyond line count: a genuine defect (BAL-135) found and fixed with regression coverage, not
 just code relocated.
+
+**Ninth outcome (2026-08-20, user-confirmed via direct verification of the working tree — "已經不是 God
+Component") — the "Feature Components + Facade" pilot #2, `lc-balance-wc/CLAUDE.md`'s own decision log,
+finally closes this finding.** That pilot (already logged separately in `lc-balance-wc/CLAUDE.md` under
+its own heading, not re-narrated in full here) turned every remaining "does too many things" candidate
+this file's own Seventh/Eighth outcomes had identified as still-open into real Angular child components
+or services: `CheckerPanelComponent` (Phase 1, the Checker search+queue half), `MakerPanelComponent`
+(Phase 2, everything Maker-side — Submit dispatch across all 14 named business functions, the compound-leg
+fields, result rendering), `eligibility-rule.ts` (Phase 3, the 3 pickers' own eligibility-filter getters),
+`PickerSelectionService` (the Step-2 "2ndary Index" pickers — SG/EB/payable-movement — via the same
+Dependency-Inversion pattern as `CheckerActionsService`), and Phase 8 (`compoundLegs: CompoundLegState`
+grouping `MakerPanelComponent`'s own 7 flat fields). Phases 4–7 of the original 8-phase proposal were
+never pursued — not an open gap, a deliberate stop once the *problem the finding was about* (one class
+doing five or six genuinely separate, independently-varying jobs) was already gone; further splitting the
+remaining orchestration would be decomposition for its own sake, the exact anti-pattern this report's own
+"Working Style" section warns against applying a pattern without it earning its complexity.
+
+**Verified via direct inspection of the current file** (re-confirmed this pass, not carried forward from
+the pilot's own commits): `transaction-builder.component.ts` is now **436 lines** — down from the 2,923-line
+peak, and no longer even the largest file in this sub-project (`maker-panel.component.ts`, the component
+that absorbed most of what used to live here, is now 1,160 lines; the microservice's own
+`balanceService.ts` is 1,190). What remains is a single, genuine job — mode/function-side selection,
+wiring `MakerPanelComponent` ↔ `CheckerPanelComponent` ↔ `LookUpPanelService` ↔ `InquireEventsService`
+together via a handful of signal/context objects, the Account Entries dialog's own open/close state, and
+the Checker action-dispatch methods (`release()`/`reject()`/`checkerAct()`/`deleteMakerPending()`/
+`acknowledgeArrival()`, each a thin call into `CheckerActionsService` via `buildCheckerActionContext()`) —
+not five or six unrelated ones. This is exactly the shape a top-level orchestrating/Facade component
+*should* have; there is no remaining candidate here worth a further extraction.
+
+**BAL-003 is now Fixed, closing this report's single longest-running finding** — first logged at this
+report's very first version, tracked continuously across nine outcomes and roughly 2,500 lines of net
+reduction, without ever being closed prematurely on line-count alone (the Fourth through Eighth outcomes
+each explicitly kept it open specifically because a genuine remaining responsibility survived that
+outcome's own extraction). See `lc-balance-wc/CLAUDE.md`'s "BAL-003 'Feature Components + Facade' pilot
+#2" decision-log entry for the pilot's own detailed narrative (live-browser bug caught and fixed during
+Phase 2, the Phase 3 eligibility-rule regression caught and fixed, Phase 8's own subtlety-preserving
+field grouping).
 
 ---
 
@@ -1503,6 +1550,57 @@ clean, full Angular suite 648/648 unaffected.
 
 ---
 
+### BAL-141
+**`balanceService.ts`'s 4 movementType classification Sets + a scattered `isSightUtilizeFinalize` flag — Data Clump risk in `createMovement()`/`release()`** — 🔵 Minor (Code Smell) — **Fixed**
+
+**Evidence:** a later, separate external review (2026-08-20) of `microservices/balance-component/src/
+service/balanceService.ts` (then 1,078 lines), following this same SonarQube-style posture, identified
+`createMovement()`'s own `CREATING_MOVEMENT_TYPES`/`NO_CHECK_MOVEMENT_TYPES`/`UTILIZE_SHAPED_MOVEMENT_TYPES`/
+`OUTSTANDING_CAPPED_MOVEMENT_TYPES` — four independently-maintained `Set<string>` constants, each
+classifying movementTypes for a different purpose, dispatched via a sequential if/else-if chain — as a
+Data Clump: the same "same fact duplicated across several places with no compiler-enforced link" pattern
+already flagged and fixed once elsewhere in this project (BAL-110, `InstrumentType`/movementType drift
+between Angular and the microservice). A future movementType (e.g. the CANCEL/EXPIRE/REVERSAL
+`balanceDerivation.ts`'s own doc comment already calls out as deliberately not yet implemented) would need
+several of these Sets updated in lockstep, with no compiler or test failure if one were missed. `release()`
+had the same shape at smaller scale: `isSightUtilizeFinalize` (the A4 Sight-finalize flag) drove four
+separate inline ternaries scattered across one `updateStatus()` call, and `createMovement()`/`release()`
+each independently duplicated the same "own SHGT/EPLC_EXAMINATION siblings → eventSnapshot → parent
+rootEventSnapshot → sibling snapshots" 4-step orchestration.
+
+**Impact:** Minor — no live defect (confirmed: all four Sets were mutually consistent at review time, and
+the full 361/34/988-test suite trio was green both before and after this fix), purely a maintainability
+risk that could silently produce a real bug on a future edit.
+
+**Fix:** the four Sets + dispatch chain collapsed into one `movementTypeRegistry`
+(`buildMovementTypeRegistry()`, built once per `BalanceService` instance since several strategies close
+over `this.movements`) — a Strategy-pattern lookup table where each movementType carries both its
+`isCreating` flag and its `checkSufficiency` function together, doubling as the Type-Object consolidation
+the same finding also called for. `release()`'s own four ternaries collapsed into
+`resolveSnapshotWriteTarget()` (Fowler's "Replace Flag Argument with Resolved Policy Object"), and the
+createMovement()/release() snapshot-capture duplication extracted into `captureSnapshotBundle()`.
+Deliberately did NOT also fold in `balanceDerivation.ts`'s own `MOVEMENT_DIRECTION` or `tolerance.ts`'s own
+`TOLERANCE_APPLICABLE_MOVEMENT_TYPES` — both are genuinely domain-layer, already single-sourced, and
+tolerance's own gate is two-dimensional (instrumentType + movementType, since SHGT's own `ISSUE` shares
+its string with the LC's `ISSUE`) in a way a movementType-only table can't represent without reintroducing
+that exact ambiguity tolerance.ts's own doc comment already warns against.
+
+**Follow-up (reviewer-noted, same day):** `resolveSnapshotWriteTarget()` initially re-derived
+`isSightUtilizeFinalize` internally from `movement`/`contract`, duplicating the identical expression
+`release()` already computes a few lines earlier for its own BAL-123 Maker-Submit gate check — changed to
+take the already-computed boolean as a parameter instead, so the expression is evaluated exactly once per
+`release()` call.
+
+Verified: pure internal refactor, zero behavior change — `tsc --noEmit`/`npm run build` clean both before
+and after the follow-up, and all three suites (361 microservice + 34 backend + 988 Angular) green
+throughout, with **no spec-file edits needed at all** — the strongest possible evidence the observable
+contract never moved.
+`microservices/balance-component/src/service/balanceService.ts` grew 1,078 → 1,189 lines (more, not
+fewer — the Strategy/Type-Object tables trade line count for structure, not brevity, consistent with this
+report's own framing of BAL-003's own extractions).
+
+---
+
 ## Reliability & Design Risk
 
 ### BAL-120
@@ -1824,5 +1922,6 @@ outright, bringing `npm run lint` to 0 errors/0 warnings), the microservice's ow
 also fixed ahead of its own "not urgent" framing), and `checker-actions.service.ts`'s own `ctx.createdBy!`
 non-null assertion (replaced with a runtime guard plus two new dedicated tests), respectively. **This
 2026-08-17 pass now has zero open findings of its own** — the only items on this report's own Gate
-Conditions list are the pre-existing, explicitly deferred BAL-001/BAL-002/BAL-102 above, and BAL-003
-(still open at Major, tracked separately in its own section, not part of this pass's own finding count).
+Conditions list are the pre-existing, explicitly deferred BAL-001/BAL-002/BAL-102 above. BAL-003 (God
+Component, tracked separately in its own section) was fixed in a later, separate pass (2026-08-20) — see
+that section's own Ninth outcome — and no longer belongs on this list at all.

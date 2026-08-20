@@ -58,7 +58,7 @@ Also relevant to trade finance accounting entries/exposure-transformation questi
 
 ## `lc-issue-angular/` — LC Issue demo
 
-Two-process dev setup: Angular app (port 4200) + Express mock backend (port 3001, proxied via `/api`).
+Two-process dev setup: Angular app (port 4200) + Express mock backend (port 3000, proxied via `/api`).
 
 ```bash
 cd lc-issue-angular
@@ -315,13 +315,19 @@ Same single-test syntax as `lc-payment-wc/` throughout (`npm test -- <file-or--t
 (this project's `tsconfig.json` also sets `noPropertyAccessFromIndexSignature`) — always `cd` into
 `microservices/balance-component` before running its own Jest commands.
 
+Coverage-tracking is inconsistent across this project's own three sub-projects, unlike `lc-payment-wc/`
+(same "tracked in git, not gitignored" convention for the whole project): the Angular app's `coverage/`
+and `backend/coverage/` are both tracked (`git status` will show them as modified after a test run — that
+alone isn't a sign something broke), but `microservices/balance-component/coverage/` has its own
+`.gitignore` entry excluding it. Don't assume the same behavior across all three.
+
 The Angular app's test suite is split across multiple spec files per source file where the source is
-large — most notably `transaction-builder.component.ts` (2,800+ lines; see Source layout below), which is
-covered by four separate spec files (`transaction-builder.component.spec.ts` for function/catalog
-selection, `.selection.spec.ts` for contract/movement selection, `.actions.spec.ts` for
-submit/release/reject/checker actions, and `.gaps.spec.ts` for the ~30 plain `get` accessors and
-leftover branch edge cases the other three didn't target) rather than one file per component — a
-convention specific to this file's size, not a project-wide pattern.
+large. `transaction-builder.component.ts` is still covered by four spec files
+(`transaction-builder.component.spec.ts` for function/mode selection, `.actions.spec.ts` for
+Maker/Checker action-dispatch wiring, `.gaps.spec.ts` for leftover getters/error branches, and
+`.inquire.spec.ts` for Inquire Events wiring) — a holdover from when the component itself was much larger
+(see Source layout below: it's now 436 lines, a thin orchestration layer, not a God Component), not a
+project-wide pattern.
 
 `lc-balance-wc/Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of
 this project (bugs, vulnerabilities, code smells, duplication, coverage) with prioritized findings and a
@@ -338,14 +344,19 @@ remediation log — check it before assuming an area is unreviewed; it records w
   exports a `BalanceMovement` interface mirroring the microservice's own `src/types.ts` shape by hand
   (kept in sync manually, same convention `balance-component.model.ts`'s own design-doc field tables
   already use) — every mutating/listing method is typed against it rather than `Observable<any>`.
-  `transaction-builder.component.ts` is the single largest file in this repo (~2,200 lines, down from
-  2,800+ across a sequence of BAL-003 extractions logged in `lc-balance-wc/CLAUDE.md` — it owns
-  function/side selection, three paginated catalog/parent/IB-index pickers, the Maker `submit()`
-  dispatch across all 14 named business functions, Checker release/reject/cancel, and the
-  Look Up panel); its three paginated-picker state machines share one private `loadPagedCatalog()`
-  helper and its ~30 API-calling methods share one `describeApiError()` helper — both extracted to close
-  duplication findings in `Quality-report-balance.md`, worth reusing rather than reintroducing the
-  pattern they replaced if you're adding a fourth picker or another API-calling method.
+  `transaction-builder.component.ts` was once this repo's single largest file (2,923 lines at its peak);
+  a sequence of BAL-003 extractions logged in `lc-balance-wc/CLAUDE.md` — most recently a
+  "Feature Components + Facade" pilot moving Maker-side logic into `MakerPanelComponent` and Checker
+  search/queue into `CheckerPanelComponent` — brought it down to **436 lines**, no longer even the
+  largest file in this sub-project (`maker-panel.component.ts`, at 1,160 lines, is). It's now a thin
+  orchestration/wiring layer: mode/function-side selection, wiring `MakerPanelComponent` ↔
+  `CheckerPanelComponent` ↔ `LookUpPanelService` ↔ `InquireEventsService` together via signal/context
+  objects, the Account Entries dialog's own open/close state, and the Checker action-dispatch methods
+  (`release()`/`reject()`/`checkerAct()`/`deleteMakerPending()`/`acknowledgeArrival()`, each a thin call
+  into `CheckerActionsService`) — no longer owns the 3 paginated pickers (now `CatalogPickerService`/
+  `PickerSelectionService`) or the Maker `submit()` dispatch across all 14 named business functions (now
+  `MakerPanelComponent`, via `MakerSubmitService`). Its ~30 API-calling methods still share one
+  `describeApiError()` helper, extracted to close a duplication finding in `Quality-report-balance.md`.
 - `backend/server.js` — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
   declarative registry of Import/Export cases it replays.
 - `microservices/balance-component/` — the real Balance Component microservice:
