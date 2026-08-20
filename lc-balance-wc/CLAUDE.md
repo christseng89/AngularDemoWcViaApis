@@ -165,6 +165,11 @@ Every code change needs matching Jest spec updates and a decision-log entry here
 suites (microservice, `backend/`, Angular root) before calling a change complete; each must clear its own
 coverage floor.
 
+## Standing rule: keep decision-log entries and code comments concise
+
+New decision-log entries here, and any code/doc comment documenting a change, should stay to ~2 lines —
+no dates, no quoted instructions, no verification narrative. State only the surviving rule/invariant.
+
 - **`InstrumentType`**: `IPLC_LC`, `EPLC_LC`, `IPLC_ACCEPTANCE`, `EPLC_ACCEPTANCE`, `SHGT`,
   `EPLC_CONFIRMATION`, plus `EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/
   `EPLC_EXPORT_BILLS_DISCOUNTED` (asset-side counterparts a Confirmation transforms into on Honour/Accept;
