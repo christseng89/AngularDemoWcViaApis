@@ -3,12 +3,8 @@ import { CURRENCY_OPTIONS, IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionF
 import type { BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 
 /**
- * BAL-003 (God Component) — dedicated unit coverage for `builder-fields.ts`'s `buildFields()`, added
- * alongside the 2026-08-17 extraction. This is where the Amount/Currency/Tenor "carried forward and
- * protected" business instructions are actually enforced in the UI (locked/disabled/hidden fields,
- * dynamic labels, Formly `expressions`) — asserted directly here rather than only indirectly through
- * the component's own template-binding tests (which this Jest config doesn't cover at all, per
- * `collectCoverageFrom`'s own exclusion of `.html` templates).
+ * BAL-003 (God Component) — dedicated unit coverage for `builder-fields.ts`'s `buildFields()`, where
+ * the Amount/Currency/Tenor "carried forward and protected" rules are actually enforced in the UI.
  */
 
 function fn(code: string): TransactionFunction {
@@ -61,9 +57,7 @@ function fieldByKey(fields: ReturnType<typeof buildFields>, key: string) {
 }
 
 describe('builder-fields', () => {
-  // Order updated 2026-08-19 ("Event Entry — 必填參考編號需求" — the applicable reference number must be
-  // the first input field on the transaction entry screen) — secondaryRef moved from after
-  // amount/currency to the very front; every other key's own relative order is unchanged.
+  // secondaryRef must be the first input field on the entry screen.
   it('returns the 8 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
     expect(fields.map((f) => f.key)).toEqual(['secondaryRef', 'amount', 'currency', 'tolerancePct', 'tenorType', 'tenorDays', 'eventSeq', 'createdBy']);
@@ -175,8 +169,6 @@ describe('builder-fields', () => {
       expect(currency.props?.label).toBe('Currency (carried from the existing record, protected)');
     });
 
-    // Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as
-    // a drop-down list, consistent with the existing implementation in lc-payment-wc").
     it('is a dropdown (type select, CURRENCY_OPTIONS) for A1', () => {
       const currency = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A1') })), 'currency');
       expect(currency.type).toBe('select');
@@ -342,7 +334,6 @@ describe('builder-fields', () => {
     });
   });
 
-  // Inquire Events (2026-08-17, OOD Design Patterns — Decorator).
   describe('toReadOnlyFields', () => {
     it('forces every field disabled, regardless of its own live-disabled state', () => {
       const fields = toReadOnlyFields(buildFields(baseCtx()));

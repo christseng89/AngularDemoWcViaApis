@@ -1,10 +1,6 @@
-<!-- ══════ View Voucher pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html;
-     retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement; extracted into this
-     standalone component 2026-08-19, BAL-003 pilot) ══════
-     The parent controls WHEN this exists at all (`*ngIf="accountEntryDialogMovement"` on the
-     `<app-account-entries-dialog>` tag) — `movement` is never actually null while this component is
-     alive in practice, but every binding below still guards on it (`movement as m`) to stay type-safe
-     against its own nullable @Input() rather than `!`-asserting throughout. -->
+<!-- View Voucher pop-up. The parent controls whether this exists at all (`*ngIf="accountEntryDialogMovement"`
+     on the `<app-account-entries-dialog>` tag) — `movement` is never actually null while alive, but every
+     binding below still guards on it (`movement as m`) to stay type-safe against the nullable @Input(). -->
 <div class="tb-dialog-overlay" *ngIf="movement as m" (click)="closed.emit()">
   <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="View Voucher" (click)="$event.stopPropagation()">
     <div class="tb-dialog__header">
@@ -46,10 +42,8 @@
         </tr>
       </tbody>
     </table>
-    <!-- 2026-08-18 — whole-row click (Look Up Current Balance's own Event Timeline) can open this
-         dialog for an event with no contingentAccountEntry at all (e.g. B3/EPLC_EXAMINATION, or any
-         instrumentType outside the contingent-liability scope contingentAccountEntry.ts enforces) —
-         this hint replaces what used to be a silently-blank "—" for exactly that case. -->
+    <!-- Whole-row click can open this dialog for an event with no contingentAccountEntry at all (e.g.
+         B3/EPLC_EXAMINATION, out of contingent-liability scope) — this hint covers that case. -->
     <p class="tb-hint mt-2" *ngIf="!m.contingentAccountEntry">No voucher entries recorded for this event.</p>
     <p class="tb-hint mt-2" *ngIf="m.contingentAccountEntry">Historical entries recorded with this event — never recalculated from the current balance.</p>
     <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closed.emit()">Close</button>

@@ -2,15 +2,8 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
 import { FUNCTION_STRATEGIES, deriveFunctionStrategy, resolveFunctionForMovement, payExistingUtilizeFunctionFor } from './function-strategy';
 
 /**
- * PR-2 of the F-01 Strategy refactoring — equivalence proof only. Every assertion here cross-references
- * a fact already locked in by PR-1's `transaction-function-flags.characterization.spec.ts` (search that
- * file's own `codesWith(...)` assertions for the flag-to-function-code mapping this file's own
- * expectations are derived from), so the two files independently arriving at the same answer is real
- * evidence of equivalence, not a coincidence of one being copy-pasted from the other's expected values.
- *
- * `FUNCTION_STRATEGIES` is not wired into any production code path yet — this file tests the new
- * scaffolding in isolation, the same way `paged-list-state.spec.ts` tests that class in isolation before
- * any consumer relies on it.
+ * Equivalence proof for `FUNCTION_STRATEGIES` — a derived projection over the registry, not a second
+ * source of truth.
  */
 describe('PR-2 — FunctionStrategy is a faithful projection of the current registry (not yet consumed by production code)', () => {
   it('every one of the 14 registered function codes has exactly one FunctionStrategy entry', () => {
@@ -107,11 +100,7 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
   });
 });
 
-/**
- * Relocated from `balance-component.model.spec.ts` in PR-5, alongside `resolveFunctionForMovement()`/
- * `payExistingUtilizeFunctionFor()` themselves (see `function-strategy.ts`'s own top-of-file doc comment
- * for why — a sixth real consumer of the 11 now-removed flags, discovered while removing them).
- */
+/** Mirrors `resolveFunctionForMovement()`/`payExistingUtilizeFunctionFor()` in `function-strategy.ts` — see that file's own doc comment. */
 describe('resolveFunctionForMovement', () => {
   it('resolves a literal fn.movementType match (A1 — IPLC_LC/ISSUE)', () => {
     expect(resolveFunctionForMovement('IPLC_LC', 'ISSUE')?.code).toBe('A1');
@@ -141,12 +130,8 @@ describe('resolveFunctionForMovement', () => {
     expect(resolveFunctionForMovement('EPLC_EXAMINATION', 'AMEND')).toBeUndefined();
   });
 
-  // Bug fixed 2026-08-18, reviewer-reported live (Inquire Events on LC U01 — the EPLC_ACCEPTANCE/
-  // CREATE row, B4's own Usance compound secondary leg, showed a blank "–" Function column). No
-  // EXPORT_FUNCTIONS entry has instrumentType EPLC_ACCEPTANCE + movementType CREATE — B4's own
-  // registry entry is instrumentType EPLC_CONFIRMATION, so the direct find() could never match this
-  // leg's own instrumentType (unlike A6 on the Import side, whose registry entry IS instrumentType
-  // IPLC_ACCEPTANCE/CREATE directly).
+  // B4's Usance compound leg (EPLC_ACCEPTANCE/CREATE) has no direct registry match — B4's own entry is
+  // instrumentType EPLC_CONFIRMATION (unlike A6, whose entry IS IPLC_ACCEPTANCE/CREATE).
   it("resolves EPLC_ACCEPTANCE/CREATE (B4's own Usance Acceptance-liability compound leg) to B4, via compoundSubmission.possibleShapes including confirmationAcceptWithReceivable, not a direct instrumentType match", () => {
     expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'CREATE')?.code).toBe('B4');
   });
@@ -160,9 +145,8 @@ describe('resolveFunctionForMovement', () => {
   });
 });
 
-// 2026-08-18, "A4 Sight Payment" ordering bug fix — InquireEventsService uses this instead of
-// resolveFunctionForMovement() specifically for the LATER (Release) half of a finalized Sight
-// Document Arrival, since the generic resolver above always returns A3 for that same pair.
+// InquireEventsService uses this instead of resolveFunctionForMovement() for the LATER (Release) half
+// of a finalized Sight Document Arrival, since the generic resolver always returns A3 for that pair.
 describe('payExistingUtilizeFunctionFor', () => {
   it('resolves IPLC_LC to A4 — the one function in the registry with releasesExistingMovementInPlace set', () => {
     expect(payExistingUtilizeFunctionFor('IPLC_LC')?.code).toBe('A4');

@@ -4,12 +4,9 @@ import { BalanceComponentApiService, BalanceMovement } from './balance-component
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
 
 /**
- * Bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG entries was not
- * shown"): direct CheckerActionsService tests for the businessEventId-based resolution this fix added
- * — the Maker/Checker action flow is otherwise only exercised indirectly through
- * transaction-builder.component.actions.spec.ts's calls into comp.release()/reject(), which doesn't
- * reach every branch of the new resolveLinkedMovementId fallback (the previous session's own fast-path/
- * only-in-memory-id tests never needed the businessEventId lookup at all).
+ * Direct CheckerActionsService tests for the businessEventId-based cross-session resolution — the
+ * Maker/Checker action flow is otherwise only exercised indirectly via comp.release()/reject() in
+ * transaction-builder.component.actions.spec.ts, which doesn't reach every resolveLinkedMovementId branch.
  */
 
 const A3S = IMPORT_FUNCTIONS.find((f) => f.code === 'A3S')!;
@@ -253,11 +250,8 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
   });
 
-  // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
-  // earmark) is now independently Checker-Released BEFORE B4 ever picks it, so B4's own compound
-  // release no longer re-releases it (would 409) — these tests updated to assert exactly that: the
-  // former "release source first" call is gone, and every remaining assertion's own call index shifts
-  // down by one.
+  // B3's Present Docs earmark is independently Checker-Released before B4 ever picks it, so B4's
+  // compound release must not re-release it (would 409) — these tests assert that call is gone.
   it('B4 Sight/HONOUR, cross-session: resolves the Due from Issuing Bank leg via a real findByBusinessEventId lookup (dueFromIssuingBankMovementId unknown) — does NOT re-release the already-RELEASED B3 source', (done) => {
     const linked = [
       makeMovement({ movementId: 'honour-1', movementType: 'HONOUR', businessEventId: 'be-b4s' }),
@@ -293,9 +287,7 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
 
     service.release(ctx).subscribe((outcome) => {
-      // The primary (HONOUR) still releases — only the downstream Due from Issuing Bank leg can't be
-      // resolved, so releaseAcceptance's own "neither downstream flag has an id" fallback applies. Only
-      // ONE api.release call total now — the source is never released here (already RELEASED).
+      // Primary still releases; only the unresolved downstream leg is skipped — one api.release call.
       expect(outcome.kind).toBe('released');
       expect(api.findByBusinessEventId).not.toHaveBeenCalled();
       expect(api.release).toHaveBeenCalledTimes(1);
@@ -394,9 +386,7 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
   });
 
-  // New coverage, 2026-08-18: proves the payableMovementRequiresRelease branch itself — B4 skips
-  // resolveSettlesDocumentArrivalIds's own sourceMovementId entirely and never checks for it, unlike
-  // A6's own "fail cleanly if no source resolvable" path above.
+  // B4 skips sourceMovementId resolution entirely, unlike A6's "fail cleanly if unresolvable" path above.
   it('B4: never attempts to resolve or release a source movement at all — the payableMovementRequiresRelease branch skips straight to the primary', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);

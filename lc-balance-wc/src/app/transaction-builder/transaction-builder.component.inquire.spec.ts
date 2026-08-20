@@ -4,11 +4,8 @@ import { InquireEventsService } from './inquire-events.service';
 import type { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
 
 /**
- * Inquire Events (2026-08-17) — component-level wiring only: activeMode/selectMode() and the
- * `inquireEvents` field construction. InquireEventsService's own orchestration logic (search/merge/
- * selectEvent) is covered directly in inquire-events.service.spec.ts, same "service owns its own
- * behavior, component spec only proves the wiring" split this file's own sibling specs
- * (checker-actions.service.spec.ts / maker-submit.service.spec.ts vs. .actions.spec.ts) already use.
+ * Component-level wiring only: activeMode/selectMode() and `inquireEvents` field construction.
+ * InquireEventsService's orchestration logic is covered in inquire-events.service.spec.ts.
  */
 
 function contract(overrides: Partial<BalanceContract> = {}): BalanceContract {

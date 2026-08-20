@@ -121,34 +121,9 @@
 <a name='L56'></a><a href='#L56'>56</a>
 <a name='L57'></a><a href='#L57'>57</a>
 <a name='L58'></a><a href='#L58'>58</a>
-<a name='L59'></a><a href='#L59'>59</a>
-<a name='L60'></a><a href='#L60'>60</a>
-<a name='L61'></a><a href='#L61'>61</a>
-<a name='L62'></a><a href='#L62'>62</a>
-<a name='L63'></a><a href='#L63'>63</a>
-<a name='L64'></a><a href='#L64'>64</a>
-<a name='L65'></a><a href='#L65'>65</a>
-<a name='L66'></a><a href='#L66'>66</a>
-<a name='L67'></a><a href='#L67'>67</a>
-<a name='L68'></a><a href='#L68'>68</a>
-<a name='L69'></a><a href='#L69'>69</a>
-<a name='L70'></a><a href='#L70'>70</a>
-<a name='L71'></a><a href='#L71'>71</a>
-<a name='L72'></a><a href='#L72'>72</a>
-<a name='L73'></a><a href='#L73'>73</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">7x</span>
+<a name='L59'></a><a href='#L59'>59</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -189,9 +164,6 @@
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -212,25 +184,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 &nbsp;
 /**
- * Business instruction 2026-08-15 ("Index LC and 2ndary Number should be
- * the same style" / "professional UI patterns without change the
- * functionality") — one shared presentation shell for every "pick from a
- * list of LC/IB/SG/pending-movement records" spot in the Transaction
- * Builder (LC Index, Parent LC picker, IB/SG "2ndary Index", A3S's SG
- * picker, A4/A6's PENDING Document Arrival picker, the Look Up panel's
- * Acceptance/SG pickers). Deliberately a pure PRESENTATION wrapper — it
- * owns none of the search/pagination/selection STATE or business logic,
- * only how a list of items is search-boxed, laid out as clickable rows,
- * paginated, and how loading/empty states read. Every call site keeps its
- * own existing component state and handler methods untouched; only the
- * markup around them changes, which is what keeps this a pure UI/UX
- * restyle rather than a functional change.
+ * One shared presentation shell for every "pick from a list of LC/IB/SG/pending-movement records" spot
+ * in the Transaction Builder (LC Index, Parent LC picker, IB/SG "2ndary Index", A3S's SG picker, A4/A6's
+ * PENDING Document Arrival picker, the Look Up panel's Acceptance/SG pickers). A pure PRESENTATION
+ * wrapper — owns none of the search/pagination/selection state or business logic, only how a list is
+ * search-boxed, laid out as clickable rows, paginated, and how loading/empty states read.
  *
- * Row content is fully caller-controlled via content projection
- * (`&lt;ng-template let-item&gt;…&lt;/ng-template&gt;`) — different pickers show very
- * different fields per row (an LC shows Number+Status+Pending hint; a
- * pending movement shows IB Number+Amount+earmark time; a Look Up SG shows
- * SG Number+Status only), and this component has no opinion about that.
+ * Row content is fully caller-controlled via content projection (`&lt;ng-template let-item&gt;…&lt;/ng-template&gt;`)
+ * — different pickers show very different fields per row, and this component has no opinion about that.
  */
 @Component({
   selector: 'app-index-picker',
@@ -266,13 +227,10 @@ export class IndexPickerComponent {
 &nbsp;
   /**
    * Every item in this app is either a BalanceContract (id = balanceContractId only) or a
-   * BalanceMovement (id = movementId — but a BalanceMovement ALSO carries its own parent
-   * balanceContractId as an ordinary field, e.g. the Checker queue's / A4/A6's payableMovements
-   * pickers). Bug (reviewer-reported 2026-08-15, "S001 Amendment A01... no Check Function to
-   * Approve" — clicking a movement row silently selected nothing): checking balanceContractId
-   * FIRST meant every movement row's id resolved to its PARENT CONTRACT's id instead of its own
-   * movementId, so onSelectCheckerMovement()/onSelectPayMovement() never found a match in their
-   * own movement-keyed lists. movementId must be checked first — only a BalanceContract lacks it.
+   * BalanceMovement (id = movementId — but also carries its own parent balanceContractId as an
+   * ordinary field). movementId must be checked first: checking balanceContractId first meant every
+   * movement row's id resolved to its parent contract's id instead of its own, so the selection
+   * handlers never found a match in their own movement-keyed lists.
    */
   itemId(item: unknown): string {
     const row = item as { balanceContractId?: string; movementId?: string };
@@ -286,7 +244,7 @@ export class IndexPickerComponent {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-20T01:13:07.641Z
+                at 2026-08-20T02:26:48.442Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

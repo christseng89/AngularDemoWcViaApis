@@ -2,13 +2,11 @@ import { AccountEntriesDialogComponent } from './account-entries-dialog.componen
 import type { BalanceMovement } from './balance-component-api.service';
 
 /**
- * Direct-instantiation, no-TestBed unit tests (same house style as every other spec file in this
- * project — see index-picker.component.spec.ts's own precedent for a genuine `@Component`, not just a
- * plain class, being tested this way). Covers this component's own class-level logic only — @Input
- * defaults, the @Output EventEmitter shape, and displayStatus()/statusBadgeClass()'s own delegation to
- * the shared balance-component.model.ts functions. The template itself (account-entries-dialog.component.html)
- * is verified via `ng build`'s strict-template check plus a live in-browser pass, same as every other
- * template in this project.
+ * Direct-instantiation, no-TestBed unit tests (see index-picker.component.spec.ts's own precedent for a
+ * genuine `@Component` tested this way). Covers class-level logic only — @Input defaults, the @Output
+ * EventEmitter shape, and displayStatus()/statusBadgeClass()'s own delegation to the shared
+ * balance-component.model.ts functions. The template itself is verified via `ng build`'s strict-template
+ * check plus a live in-browser pass.
  */
 function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
   return {
@@ -91,9 +89,8 @@ describe('AccountEntriesDialogComponent', () => {
     });
   });
 
-  // 2026-08-20, user-directed ("B2 Decrease...View Voucher 一併統一") — this dialog's own meta line was
-  // found as a 4th call site while implementing the two the user explicitly named (Look Up Current
-  // Balance, Inquire Events) plus the Checker queue the user confirmed adding.
+  // This dialog's own meta line is a 4th call site for the same AMEND_INCREASE/AMEND_DECREASE
+  // relabeling as Look Up Current Balance, Inquire Events, and the Checker queue.
   describe('displayMovementType()', () => {
     it('delegates to the shared rule, relabeling a negative B2 (EPLC_CONFIRMATION/AMEND) amount as AMEND_DECREASE', () => {
       const c = new AccountEntriesDialogComponent();

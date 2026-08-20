@@ -4,19 +4,9 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './
 import type { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
 
 /**
- * Direct-instantiation, no-TestBed unit tests (same house style as `index-picker.component.spec.ts`/
- * `account-entries-dialog.component.spec.ts`) — a genuine `@Component`, tested via plain `new
- * CheckerPanelComponent(mockApi)`. This file absorbed the behavioral coverage that used to live directly
- * on `TransactionBuilderComponent`'s own spec files (`searchCheckerLc`/`loadCheckerQueue`/
- * `onSelectCheckerMovement` describe blocks, plus the `checkerContractId`/`checkerSecondaryField`/
- * `checkerSecondaryLabel` getter test) before the BAL-003 pilot #2 extraction (2026-08-19,
- * desiger-comments.md) moved that state/logic here — every assertion below reproduces the ORIGINAL
- * test's own expectation, just against the new class. `ngOnChanges()`'s own reactive wiring
- * (`resetTrigger`/`syncSignal`) is new coverage this extraction itself needed — see
- * `CheckerPanelComponent`'s own class doc comment for why a plain method call (`ngOnChanges({...})`),
- * not `TestBed`, is enough to test it directly; the template itself
- * (checker-panel.component.html) is verified via `ng build`'s strict-template check plus a live
- * in-browser pass, same as every other template in this project.
+ * Direct-instantiation, no-TestBed unit tests (same house style as `index-picker.component.spec.ts`) —
+ * a genuine `@Component`, tested via plain `new CheckerPanelComponent(mockApi)`. The template itself is
+ * verified via `ng build`'s strict-template check plus a live in-browser pass.
  */
 
 function fn(code: string): TransactionFunction {
@@ -115,9 +105,7 @@ describe('CheckerPanelComponent', () => {
     });
   });
 
-  // 2026-08-20, user-directed ("B2 Decrease...Checker 佇列一併統一") — thin delegation to the shared
-  // displayMovementType()/displayMovementAmount() pure functions, reading instrumentType off this
-  // panel's own single resolved checkerContract (every row in checkerItems belongs to it).
+  // Thin delegation to the shared displayMovementType()/displayMovementAmount() pure functions.
   describe('displayMovementType / displayMovementAmount', () => {
     it('reads instrumentType off checkerContract, relabeling a negative B2 (EPLC_CONFIRMATION/AMEND) amount as AMEND_DECREASE with the de-signed magnitude', () => {
       const c = new CheckerPanelComponent(mockApi());

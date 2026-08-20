@@ -1,19 +1,10 @@
 /**
- * BAL-003 (OOD/SOLID follow-up, 2026-08-16): single-responsibility state
- * holder for one paginated picker's page/total/pageSize bookkeeping and
- * boundary math. Before this extraction, `TransactionBuilderComponent`
- * carried three near-identical copies of this same trio of fields (catalog
- * LC Index, Parent LC picker, IB/SG Index), the same
- * `Math.max(1, Math.ceil(total / pageSize))` totalPages formula, and the
- * same "am I already at the first/last page" boundary check — one instance
- * of this class per picker replaces all three copies with one tested
- * implementation (Single Responsibility), and adding a fourth paginated
- * picker in the future needs no new copy-pasted math (Open/Closed).
+ * Single-responsibility state holder for one paginated picker's page/total/pageSize bookkeeping and
+ * boundary math — replaces near-identical copies of this trio across the catalog LC Index, Parent LC
+ * picker, and IB/SG Index with one tested implementation.
  *
- * Deliberately does not own the actual fetch — `loadPagedCatalog()` (and
- * its three call sites' own `setPage`/`setTotal` callbacks) still decide
- * WHEN and HOW to reload; this class only answers "what page should Prev/
- * Next go to" and "how many pages are there".
+ * Deliberately does not own the actual fetch — callers still decide WHEN and HOW to reload; this class
+ * only answers "what page should Prev/Next go to" and "how many pages are there".
  */
 export class PagedListState {
   page = 1;

@@ -8,26 +8,16 @@ import type { MakerCheckerContext } from './maker-panel.component';
  * Covers: approveArrival(), arrivalAlreadyApproved, lookUp.syncFrom(), release(), reject(),
  * deleteMakerPending(), checkerAct(), onCheckerMovementPicked(), onCheckerQueueReloaded()/
  * onCheckerQueueLoadSucceeded(), runLookup(), selectLookupTab(), pagedLookupMovements/
- * lookupMovementsPaging, selectLookupSg(), selectLookupAcceptance() — the Checker-side release/reject/
- * acknowledge flow plus the Look Up Current Balance panel, all still parent-owned after the
- * MakerPanelComponent extraction (2026-08-19, desiger-comments.md "Feature Components + Facade" pilot
- * #3).
+ * lookupMovementsPaging, selectLookupSg(), selectLookupAcceptance() — the Checker-side release/reject
+ * flow plus the Look Up Current Balance panel, still parent-owned after the MakerPanelComponent
+ * extraction. submit() and its compound shapes moved to MakerPanelComponent — see
+ * maker-panel.component.spec.ts.
  *
- * submit() and its 4 compound shapes (A3S/B4 Sight/B4 Usance/B5), plus isSubmitReady, moved entirely to
- * MakerPanelComponent — see maker-panel.component.spec.ts.
+ * Maker context setup goes through `setMakerContext(comp, {...})`, which replaces the parent's private
+ * `makerContext` mirror — the field release()/reject()/deleteMakerPending()/checkerAct() read via
+ * buildCheckerActionContext().
  *
- * Wherever a test used to set up Maker context by poking comp.submitResult / comp.selectedPayMovement /
- * comp.acceptanceMovementId / comp.model.createdBy etc directly, it now goes through
- * `setMakerContext(comp, {...})`, which replaces the parent's own private `makerContext` mirror
- * (MakerCheckerContext) — the same field release()/reject()/deleteMakerPending()/checkerAct() actually
- * read via buildCheckerActionContext() now that MakerPanelComponent owns submitResult/selectedPayMovement/
- * the 4 compound-leg movementIds directly. `comp.selectedParent`/`comp.model.movementType` assignments in
- * the old tests are dropped — CheckerActionContext never carried either field (confirmed by reading
- * checker-actions.service.ts directly), so they were already inert before this migration, not something
- * this migration changes the meaning of.
- *
- * Direct instantiation (no TestBed), matching lc-payment-wc's business-case-runner.component.spec.ts
- * house style — `new TransactionBuilderComponent(mockApi as unknown as BalanceComponentApiService)`.
+ * Direct instantiation (no TestBed).
  */
 
 const A2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2')!;
@@ -77,13 +67,7 @@ function makeMovement(overrides: any = {}): any {
   };
 }
 
-/**
- * 2026-08-18 ("Look Up Current Balance's own Event Timeline should use the SAME status/display logic as
- * Inquire Events") — lookUp.lookupMovements/acceptanceMovements/sgMovements are now InquiredEvent[], not
- * a raw BalanceMovement[]. Only used where a test needs SOME pre-existing row present (to prove it gets
- * reset) — never for a fixture whose own toEventRows() split matters, since makeContract()'s default
- * (no tenorType) never triggers the Sight-UTILIZE split anyway.
- */
+/** lookUp.lookupMovements/acceptanceMovements/sgMovements are InquiredEvent[], not raw BalanceMovement[]. */
 function makeEventRow(overrides: any = {}): any {
   return { movement: makeMovement(), contract: makeContract(), eventTime: '2026-01-01T00:00:00Z', eventStatus: 'PENDING', phase: 'primary', ...overrides };
 }
@@ -112,13 +96,7 @@ function setup() {
   return { comp, api };
 }
 
-/**
- * Replaces the parent's own private `makerContext` mirror directly (the same `(x as any).privateField =
- * ...` pattern already used elsewhere in this codebase's own test files) — the mechanism
- * release()/reject()/deleteMakerPending()/checkerAct() actually read via buildCheckerActionContext()
- * now that MakerPanelComponent owns submitResult/selectedPayMovement/the 4 compound-leg movementIds
- * directly. Defaults mirror selectFunction()'s own fresh-makerContext shape exactly.
- */
+/** Replaces the parent's private `makerContext` mirror directly. Defaults mirror selectFunction()'s fresh-makerContext shape. */
 function setMakerContext(comp: TransactionBuilderComponent, overrides: Partial<MakerCheckerContext> = {}): void {
   (comp as any).makerContext = {
     submitResult: null,
@@ -137,11 +115,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // ---------------------------------------------------------------------
   // approveArrival()
   // ---------------------------------------------------------------------
-  // SUPERSEDED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
-  // approveArrival() no longer has a deferSettlementRequiresBackendAck branch at all (B3 no longer sets
-  // it, or deferSettlement itself — see balance-component.model.ts's own doc comment). It always just
-  // sets arrivalApproved locally now — A3 (its only remaining caller) is unaffected, this method never
-  // calls the backend for anyone any more.
+  // approveArrival() always sets arrivalApproved locally and never calls the backend (B3 no longer sets
+  // deferSettlement — see balance-component.model.ts). A3 is its only remaining caller.
   describe('approveArrival()', () => {
     it('always sets arrivalApproved locally, never calls the backend', () => {
       const { comp } = setup();
@@ -167,14 +142,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // ---------------------------------------------------------------------
   // arrivalAlreadyApproved
   // ---------------------------------------------------------------------
-  // Bug fixed 2026-08-18, reviewer-reported live (LC U01 / IB E03 — "The pending transaction ... cannot
-  // be approved by the Checker", the Approve button and its own hint stayed keyed on `arrivalApproved`
-  // alone, a per-session flag reset by onSelectCheckerMovement() every time an item is (re-)picked. B3's
-  // own acknowledge() is a REAL, persisted API call (unlike plain A3's client-only approveArrival()), so
-  // re-searching an already-acknowledged item in a fresh session/page-load left the button re-enabled
-  // even though a second click would 409 as "already acknowledged" — surfacing to the user as "cannot be
-  // approved". This getter is what the template's own disabled/label/hint bindings now read instead of
-  // the bare `arrivalApproved` flag.
+  // Combines the per-session `arrivalApproved` flag with the persisted `acknowledgedAt` — a
+  // re-searched, already-acknowledged item must not look re-enabled and 409 on a second click.
   describe('arrivalAlreadyApproved', () => {
     it('true when this session already clicked Approve (arrivalApproved), even with no persisted acknowledgedAt', () => {
       const { comp } = setup();
@@ -208,15 +177,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // ---------------------------------------------------------------------
   // lookUp.syncFrom() — child instrumentType -> parent LC/Confirmation mapping
   // ---------------------------------------------------------------------
-  // Bug fixed 2026-08-18, reviewer-reported ("B3 Present Docs -> Submit -> Release -> Look Up Current
-  // Balance" showed "No Logical Contract exists yet for this natural key"): syncLookupToContext() (called
-  // after a Maker Submit and whenever the Checker queue loads — see loadCheckerQueue()) passes the
-  // FUNCTION's own instrumentType to lookUp.syncFrom(), which must map every CHILD instrumentType to its
-  // PARENT LC/Confirmation before resolving — a child instrumentType's own natural key needs a second
-  // field (ibNumber/sgNumber) syncFrom() always clears to '', so resolving the child itself directly can
-  // never match. EPLC_EXAMINATION (B3) was missing from this map entirely and fell through to the
-  // `return instrumentType` default, unlike its siblings below — these tests cover every mapping
-  // together, not just the one that was broken, since no direct test of this method existed before.
+  // syncFrom() must map every CHILD instrumentType to its PARENT LC/Confirmation before resolving — a
+  // child's own natural key needs a second field (ibNumber/sgNumber) that syncFrom() always clears.
   describe('lookUp.syncFrom() — child instrumentType -> parent LC/Confirmation mapping', () => {
     it.each([
       ['IPLC_ACCEPTANCE', 'IPLC_LC'],
@@ -303,8 +265,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenNthCalledWith(1, 'mv-doc-arrival', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
-      // 2026-08-17 auto-reset UX: a genuine 'released' outcome returns to the SAME function with a
-      // fresh screen instead of leaving submitResult set to the compound's own final leg response.
+      // A genuine 'released' outcome returns to the same function with a fresh screen.
       expect(comp.selectedFunction).toBe(A6);
       expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
@@ -392,7 +353,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenNthCalledWith(1, 'mv-settle', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
-      // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
+      // See the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B5);
       expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
@@ -427,10 +388,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       });
     });
 
-    // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
-    // earmark) is now independently Checker-Released BEFORE B4 ever picks it, so B4's own compound
-    // release no longer re-releases it — the former "release source first" call is gone from every one
-    // of these tests, and every remaining api.release mock/assertion index shifts down by one.
+    // B4's source (B3's Present Docs earmark) is independently Checker-Released before B4 picks it, so
+    // B4's compound release never re-releases it.
     it('B4 Sight full compound release: Confirmation HONOUR -> Due from Issuing Bank asset (does NOT re-release the already-RELEASED B3 source)', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
@@ -448,7 +407,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenNthCalledWith(1, 'mv-honour', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
       expect(api.release).toHaveBeenCalledTimes(2);
-      // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
+      // See the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B4);
       expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
@@ -495,7 +454,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
       expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
       expect(api.release).toHaveBeenCalledTimes(3);
-      // 2026-08-17 auto-reset UX: see the A6 test above for why submitResult is null, not the leg response.
+      // See the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B4);
       expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.releaseSuccessHint).toContain('mv-accept');
@@ -566,9 +525,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.reject();
 
       expect(api.reject).toHaveBeenCalledWith('mv-1', 'checker1', 'MANUAL_TEST_REJECT');
-      // reject() forwards its outcome to the Maker child via makerOutcomeSignal rather than mutating
-      // makerContext directly (the parent has no submitResult field of its own to update) — see
-      // TransactionBuilderComponent.forwardOutcomeToMaker()'s own doc comment.
+      // reject() forwards its outcome via makerOutcomeSignal, not by mutating makerContext directly.
       expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'REJECTED' } });
       expect(comp.actionBusy).toBe(false);
     });
@@ -803,9 +760,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('dispatches to release() when isCheckerCompoundOwnSubmission and action=release', () => {
       const { comp } = setup();
       comp.selectFunction(A6);
-      // referencedTransactionId is required since the 2026-08-16 fix — a real A6 CREATE always carries
-      // one (see isCheckerCompoundOwnSubmission's own doc comment); makerContext.submitResult no longer
-      // needs to match.
+      // referencedTransactionId is required — a real A6 CREATE always carries one; submitResult need
+      // not match.
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', referencedTransactionId: 'mv-source' });
       setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1' }) });
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
@@ -820,9 +776,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('dispatches to reject() when isCheckerCompoundOwnSubmission and action=reject', () => {
       const { comp } = setup();
       comp.selectFunction(A3S);
-      // businessEventId is required since the 2026-08-16 fix — a real A3S UTILIZE always carries one
-      // (see isCheckerCompoundOwnSubmission's own doc comment); makerContext.submitResult is no longer
-      // needed to match.
+      // businessEventId is required — a real A3S UTILIZE always carries one; submitResult need not match.
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-1', businessEventId: 'be-1' });
       setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1' }) });
       const releaseSpy = jest.spyOn(comp, 'release').mockImplementation(() => undefined);
@@ -838,7 +792,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-2', movementType: 'UTILIZE' });
-      // not the same submission -> isCheckerCompoundOwnSubmission false (default makerContext.submitResult is null)
+      // not the same submission -> isCheckerCompoundOwnSubmission false
       const approveSpy = jest.spyOn(comp, 'approveArrival').mockImplementation(() => undefined);
 
       comp.checkerAct('release');
@@ -859,9 +813,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.reject).toHaveBeenCalledWith('mv-2', comp.checkerId, 'MANUAL_QUEUE_REJECT');
     });
 
-    // SUPERSEDED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B3 no longer sets
-    // deferSettlement at all, so checkerAct('release') for it now falls all the way through to the
-    // plain api.release path, same as A2/A8/etc. — it never routes through approveArrival() any more.
+    // B3 no longer sets deferSettlement, so checkerAct('release') falls through to the plain api.release path.
     it('B3 (no longer deferSettlement): checkerAct release calls api.release directly, never approveArrival()', () => {
       const { comp, api } = setup();
       comp.selectFunction(B3);
@@ -887,13 +839,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.checkerBusy).toBe(false);
     });
 
-    // 4-eyes redesign 2026-08-16 ("A4 Need Maker and Checker feature... Submit by Maker, then Release
-    // by Checker"): A4's own dedicated payExisting() release method was removed; A4's UTILIZE now
-    // relies on this SAME plain fallback path, same as A2 above — no special-casing needed since A4
-    // has none of the compound/defer flags either. Real Maker Submit redesign, same day ("Add real
-    // Maker Submit, then have Checker to Release it"): the plain path is now gated on
-    // makerSubmittedAt (see checkerAct()'s own doc comment) — a real A4 Submit always sets it, so a
-    // genuinely Maker-submitted item releases exactly as before.
+    // A4's UTILIZE uses the same plain fallback path as A2; gated on makerSubmittedAt (a real A4 Submit
+    // always sets it).
     it('plain path (A4, no defer/compound flags): a Checker-picked, Maker-submitted UTILIZE releases via api.release directly', () => {
       const { comp, api } = setup();
       comp.selectFunction(A4);
@@ -906,10 +853,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.checkerBusy).toBe(false);
     });
 
-    // Real Maker Submit redesign 2026-08-16 ("Add real Maker Submit, then have Checker to Release
-    // it"): the real gate this whole feature exists for — without it, a Checker could release A4's
-    // own picked item before any Maker ever used the new Submit A4 button, reproducing the original
-    // "no genuine 4-eyes separation" gap this session's own A4 redesign set out to close.
+    // Without this gate a Checker could release A4's own item before any Maker used Submit A4.
     it("A4: release is BLOCKED with a clear checkerError when the picked item's makerSubmittedAt is not set (Maker never clicked Submit A4)", () => {
       const { comp, api } = setup();
       comp.selectFunction(A4);
@@ -955,11 +899,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
-  // BAL-003 "Feature Components + Facade" pilot #2 (2026-08-19, desiger-comments.md) — loadCheckerQueue()/
-  // onSelectCheckerMovement() moved to CheckerPanelComponent; equivalent coverage (no-op with no
-  // contract, PENDING-only filtering, listMovements failure, movement pick/not-found) now lives in
-  // checker-panel.component.spec.ts. onCheckerMovementPicked()'s own arrivalApproved-reset behavior is
-  // covered below, under checkerAct()/release() (the actual parent-side consumer).
+  // loadCheckerQueue()/onSelectCheckerMovement() moved to CheckerPanelComponent — see
+  // checker-panel.component.spec.ts. onCheckerMovementPicked()'s arrivalApproved-reset is covered below.
   // ---------------------------------------------------------------------
 
   describe('onCheckerMovementPicked()', () => {
@@ -998,10 +939,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it("onCheckerQueueLoadSucceeded() delegates to syncLookupToContext() (via lookUp.syncFrom), reading the Maker's own last-known instrumentType/lcNumber carried by onMakerSyncRequested()", () => {
       const { comp } = setup();
       comp.selectFunction(A2);
-      // Mirrors what a real MakerPanelComponent.emitSync() -> onMakerSyncRequested() call already
-      // carries (lastMakerSync) — the Maker-owned model.instrumentType/selectedContract fields this test
-      // used to poke directly moved to MakerPanelComponent, so this is now the real, current mechanism
-      // for supplying lastMakerSync in isolation.
+      // Mirrors what a real MakerPanelComponent.emitSync() -> onMakerSyncRequested() call carries.
       comp.onMakerSyncRequested({ lcNumber: 'LC-SYNC', secondaryRef: null, alsoSyncLookup: false, instrumentType: 'IPLC_LC' });
       const syncFromSpy = jest.spyOn(comp.lookUp, 'syncFrom');
 
@@ -1037,12 +975,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       // SHGT has no Acceptance-tab type and isn't IPLC_LC, so neither extra catalog fetch fires.
     });
 
-    // 2026-08-18, user-requested ("Look Up Current Balance's own Event Timeline should use the SAME
-    // status/display logic as Inquire Events — must not maintain its own independent STATUS mapping"),
-    // reproducing the live LC S01 report: a finalized Sight IPLC_LC/UTILIZE (A3's own Document Arrival,
-    // later A4-finalized) must split into its own 'create' + 'finalize' rows here too — the exact same
-    // toEventRows() split Inquire Events already applies — not render as a single row reading the
-    // movement's own current (post-A4) status straight off it.
+    // A finalized Sight IPLC_LC/UTILIZE splits into 'create'/'finalize' rows, the same toEventRows()
+    // split Inquire Events applies — not a single row reading the current status straight off it.
     it('a finalized Sight IPLC_LC/UTILIZE splits into its own create+finalize rows, matching Inquire Events exactly — not a single row with the raw current status', () => {
       const { comp, api } = setup();
       const sightLc = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
@@ -1063,10 +997,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.lookUp.lookupMovements).toHaveLength(2);
       const [createRow, finalizeRow] = comp.lookUp.lookupMovements;
       expect(createRow.phase).toBe('create');
-      // Bug fixed 2026-08-18, reviewer-caught live on this EXACT scenario ("EARMARKING是指A3交易未被
-      // RELEASE 但是已經RELEASED了 就該是EARMARKED 不是嗎?"): the 'create' row's own eventStatus is now
-      // the movement's real, current status (RELEASED here) — NOT a stale forced 'PENDING' — reversing
-      // an earlier same-day design.
+      // The 'create' row's eventStatus is the movement's real current status, not a stale forced PENDING.
       expect(createRow.eventStatus).toBe('RELEASED');
       expect(createRow.eventTime).toBe('2026-08-18T01:00:00.000Z');
       expect(finalizeRow.phase).toBe('finalize');
@@ -1074,29 +1005,19 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(finalizeRow.eventTime).toBe('2026-08-18T05:00:00.000Z');
       // Both rows share the SAME underlying movement — the split is presentational, not two real records.
       expect(createRow.movement).toBe(finalizeRow.movement);
-      // Bug fixed 2026-08-18, reviewer-caught live ("Import LC S01 => A4 · Sight Settlement / IPLC_LC /
-      // UTILIZE ... EARMARKED — 應該是 Approved 對嗎?"): the 'finalize' row is A4's OWN Release, not
-      // A3/A3S's own earmark, so it must display APPROVED. The 'create' row (A3's own submission) is
-      // STILL A3/A3S's own earmark — now that its own eventStatus correctly shows RELEASED (not a stale
-      // PENDING), it correctly displays EARMARKED, not EARMARKING.
+      // The 'finalize' row is A4's own Release, not A3/A3S's earmark, so it displays APPROVED; the
+      // 'create' row is still the earmark, so it displays EARMARKED.
       expect(comp.displayStatus(createRow.eventStatus, createRow.contract.instrumentType, createRow.movement.movementType, createRow.phase)).toBe('EARMARKED');
       expect(comp.displayStatus(finalizeRow.eventStatus, finalizeRow.contract.instrumentType, finalizeRow.movement.movementType, finalizeRow.phase)).toBe(
         'APPROVED',
       );
-      // UX enhancement 2026-08-19 ("Look Up Current Balance → Event Timeline" gains a FUNCTION column
-      // that "must use the same Function mapping as Inquire Events... Do not implement a separate
-      // Function mapping") — lookUp.functionFor() delegates to the exact same functionForEvent() free
-      // function InquireEventsService.functionFor() itself now delegates to, so the 'create' row
-      // resolves to A3 and the 'finalize' row to A4, matching Inquire Events' own resolution exactly.
+      // lookUp.functionFor() delegates to the same functionForEvent() free function as
+      // InquireEventsService.functionFor() — no separate Function mapping.
       expect(comp.lookUp.functionFor(createRow)?.code).toBe('A3');
       expect(comp.lookUp.functionFor(finalizeRow)?.code).toBe('A4');
     });
 
-    // Companion to the test immediately above — a Sight Document Arrival that has NOT yet been
-    // finalized by A4 must stay a SINGLE 'primary' row showing EARMARKING (not RELEASED/EARMARKED) —
-    // toEventRows()'s own split never triggers while the movement is still genuinely PENDING (its own
-    // isFinalizedSightUtilize condition requires status !== 'PENDING'), so this case is entirely
-    // unaffected by the 2026-08-18 eventStatus fix above.
+    // toEventRows() never splits a still-PENDING movement — isFinalizedSightUtilize requires status !== 'PENDING'.
     it('a NOT-yet-finalized Sight IPLC_LC/UTILIZE (still genuinely PENDING) stays a single row showing EARMARKING, never splits', () => {
       const { comp, api } = setup();
       const sightLc = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
@@ -1174,11 +1095,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.catalog).not.toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001');
     });
 
-    // Bug fixed 2026-08-18, reviewer-reported live ("Look Up Current Balance → Event Timeline 明顯有漏
-    //資料...主要漏掉的是 B3 Present Docs / EPLC_EXAMINATION 的 Earmark Events") — the Confirmed LC's own
-    // Tab 1 Event Timeline previously only ever fetched movements for the LC's OWN contract, so every
-    // B3/EPLC_EXAMINATION Earmark event (each living on its own separate per-E01/E02/E03 contract) was
-    // invisible here even though Inquire Events' own already-merged timeline showed them correctly.
+    // Tab 1's Event Timeline used to fetch only the LC's own contract, so each B3/EPLC_EXAMINATION
+    // Earmark event (its own separate per-E01/E02/E03 contract) was invisible here.
     it('EPLC_CONFIRMATION contract: merges every B3/EPLC_EXAMINATION Earmark event into the LC tab timeline, sorted by true Event Date/Time across contracts', () => {
       const { comp, api } = setup();
       const confirmationLc = makeContract({
@@ -1221,8 +1139,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(e01Row.contract.instrumentType).toBe('EPLC_EXAMINATION');
       expect(e01Row.contract.naturalKey.ibNumber).toBe('E01');
       expect(e02Row.contract.naturalKey.ibNumber).toBe('E02');
-      // Status mapping stays the SAME shared logic (isEarmarkFunction) both screens use — B3 RELEASED →
-      // EARMARKED, B3 still-PENDING → EARMARKING — matching the reported table exactly.
+      // Same shared isEarmarkFunction logic both screens use.
       expect(comp.displayStatus(e01Row.eventStatus, e01Row.contract.instrumentType, e01Row.movement.movementType, e01Row.phase)).toBe('EARMARKED');
       expect(comp.displayStatus(e02Row.eventStatus, e02Row.contract.instrumentType, e02Row.movement.movementType, e02Row.phase)).toBe('EARMARKING');
     });
@@ -1336,7 +1253,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
-  // pagedLookupMovements / lookupMovementsPaging (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN")
+  // pagedLookupMovements / lookupMovementsPaging
   // ---------------------------------------------------------------------
   describe('pagedLookupMovements / lookupMovementsPaging', () => {
     it('windows a >10-item movements array to 10 per page and computes totalPages', () => {
@@ -1422,9 +1339,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp } = setup();
       comp.lookUp.lookupMovements = Array.from({ length: 12 }, (_, i) => makeEventRow({ movement: makeMovement({ movementId: `lc${i}` }) }));
       comp.lookUp.sgsUnderLookup = [makeContract({ balanceContractId: 'bc-sg-1' }), makeContract({ balanceContractId: 'bc-sg-2' })];
-      comp.lookUp.sgMovements = []; // no auto-select with 2+ candidates — mirrors the live-reproduced scenario exactly
+      comp.lookUp.sgMovements = []; // no auto-select with 2+ candidates
 
-      // Drive the LC tab to page 2 of 2 first, exactly like the live repro.
+      // Drive the LC tab to page 2 of 2 first.
       void comp.lookUp.pagedLookupMovements;
       comp.lookUp.nextLookupMovementsPage();
       expect(comp.lookUp.lookupMovementsPaging.page).toBe(2);

@@ -5,12 +5,9 @@ import type { BalanceContract, BalanceMovement, BalanceSnapshot } from './balanc
 import * as functionStrategyModule from './function-strategy';
 
 /**
- * BAL-003 (God Component) — dedicated unit coverage for `submit-rules.ts`'s two pure functions, added
- * alongside the 2026-08-17 extraction. Every guard's order/condition/message is asserted directly
- * (rather than only indirectly, through the component's own `.spec.ts`/`.actions.spec.ts` suites) so
- * these Maker-submit business rules stay independently testable and the two branches the pre-existing
- * component suites never exercised (A6/B4 "no pending record picked yet", B5 Partial Settle) get real
- * coverage instead of relying on the aggregate 95% floor to hide the gap.
+ * BAL-003 (God Component) — dedicated unit coverage for `submit-rules.ts`'s pure functions, asserting
+ * every guard's order/condition/message directly rather than only indirectly via the component's own
+ * suites.
  */
 
 function fn(code: string): TransactionFunction {
@@ -387,20 +384,11 @@ describe('submit-rules', () => {
 
   describe('validateSubmit — regression: an early guard’s patch survives a later guard’s own failure', () => {
     it('keeps tenorDays: 0 in the returned patch even when a LATER guard in the same call fails', () => {
-      // No REAL registry function combines A1's own tenorDays-patching guard (gated strictly on
-      // `code === 'A1'`, submit-rules.ts's own line ~106) with a LATER guard that can still fail for
-      // that same submission — A1 itself has no settlesDocumentArrival/documentArrivalWithSg/REDEEM/
-      // SETTLE behavior of its own, so once its own tenorDays check passes there's nothing left in the
-      // real guard sequence able to fail it. This test's whole point is verifying the GENERIC
-      // patch-survives-failure mechanism (SubmitValidation.patch's own doc comment: the caller must
-      // Object.assign the patch REGARDLESS of `error`, because in the original inline component code an
-      // early mutation — `this.model.tenorDays = 0` — was a real assignment to `this.model` that
-      // survived a later guard's own `return false`) independent of which real function reaches it — so
-      // it deliberately forces a code='A1' object to ALSO report settlesDocumentArrival via a Strategy
-      // stub, since PR-5 of the F-01 Strategy refactoring made Strategy resolution keyed strictly by
-      // `fn.code` (previously — through PR-4 — deriveFunctionStrategy() read raw flags directly off
-      // the object, so spreading `...fn('A6')` onto a code='A1' object worked without a stub; that
-      // spread-based technique stopped working the moment flags left TransactionFunction entirely).
+      // No real registry function combines A1's tenorDays-patching guard with a later guard that can
+      // still fail — this test verifies the generic patch-survives-failure invariant (patch must be
+      // applied REGARDLESS of `error`) independent of which real function reaches it, by forcing a
+      // code='A1' object to also report settlesDocumentArrival via a Strategy spy (Strategy resolution
+      // is keyed strictly by `fn.code`, so a plain object spread can't fake a second flag any more).
       const realDeriveFunctionStrategy = functionStrategyModule.deriveFunctionStrategy;
       const strategySpy = jest.spyOn(functionStrategyModule, 'deriveFunctionStrategy').mockImplementation((f) => {
         const real = realDeriveFunctionStrategy(f);

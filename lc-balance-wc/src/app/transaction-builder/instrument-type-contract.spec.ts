@@ -2,25 +2,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * BAL-110 (Design Risk — "Two independently-maintained domain-enum sources of
- * truth", cost-low fix requested 2026-08-16): `InstrumentType` and the legal
- * movementType-per-instrument rules are declared once in this Angular app
- * (`balance-component.model.ts`) and once again, independently, in the
- * microservice (`types.ts` for `InstrumentType`; `MOVEMENT_DIRECTION`'s own
- * keys for the flattened set of legal movementTypes — the microservice has
- * no per-instrument table of its own to compare against, only the union of
- * every movementType it knows a balance direction for). Nothing previously
- * detected drift if one side added/renamed a value without the other
+ * BAL-110 — `InstrumentType` and the legal movementType-per-instrument rules are declared once in this
+ * Angular app (`balance-component.model.ts`) and once again, independently, in the microservice
+ * (`types.ts` for `InstrumentType`; `MOVEMENT_DIRECTION`'s own keys for the flattened set of legal
+ * movementTypes). Nothing previously detected drift if one side added/renamed a value without the other
  * following.
  *
- * This test reads both sibling projects' source files as plain text (never
- * imports/compiles them) specifically so it can never cross the two
- * projects' separate tsconfigs/Jest configs — see this project's own
- * CLAUDE.md "never let the two Jest configs cross" caveat. A regex extracts
- * each side's literal string tokens from the relevant declaration; this is
- * intentionally simple text matching, not a TypeScript parse — if either
- * file's declaration shape changes enough to break the regex, that failure
- * itself is a signal this test needs to be revisited, not silently skipped.
+ * Reads both sibling projects' source files as plain text (never imports/compiles them) specifically so
+ * it can never cross the two projects' separate tsconfigs/Jest configs. Intentionally simple text
+ * matching, not a TypeScript parse — if either file's declaration shape changes enough to break the
+ * regex, that failure itself is a signal this test needs to be revisited.
  */
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8');

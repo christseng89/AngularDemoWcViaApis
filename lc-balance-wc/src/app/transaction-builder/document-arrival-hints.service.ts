@@ -5,41 +5,25 @@ import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './
 import { InstrumentType } from './balance-component.model';
 
 /**
- * BAL-003 (9th same-day pass — desiger-comments.md F-03 reassessment 2026-08-19, user-confirmed narrow
- * scope after being shown the current state: "只抽這個 session 新增的 paging/eligibility 狀態", mirroring
- * the earlier "8th pass" precedent of a deliberately narrowed BAL-003 extraction rather than the full
- * selection-flow one). Owns every A1-A9/B1-B5 function's own per-candidate LC Index eligibility data —
- * originally just A4/A6/B4's own "does this LC/Confirmation have an eligible outstanding A3/A3S Document
- * Arrival (or, for B4, an already-Released child B3 Present Docs record) of its own" hint maps (used for
- * BOTH their own inline hint text, e.g. A4's "— IB00001 — Pending: 25,000", AND their own eligibility
- * filtering — business requirement 2026-08-19, "A4/A6/B4 — LC Index Eligibility Criteria"); extended the
- * same day to A3S/A9's own genuinely different "does this LC have an outstanding SG Balance" eligibility
- * (business requirement 2026-08-19, "A3S/A9 — LC Index Criteria") — kept in this same service rather than
- * a new one, since it's the same underlying concept (per-candidate LC Index eligibility for a paginated
- * picker), just a different per-candidate check.
- *
- * `catalogPayableIbs`/`catalogPayableMovements` (A4) predate this session (business instruction
- * 2026-08-14, originally hint-display-only); everything else here is new this session. Moved/added
- * together since all of it is genuinely the SAME underlying concept, not a strict
- * "only literally-new-this-session lines" cut — matching this file's own precedent elsewhere of moving a
- * cohesive unit rather than half of one.
+ * Owns every A1-A9/B1-B5 function's own per-candidate LC Index eligibility data — A4/A6/B4's own "does
+ * this LC/Confirmation have an eligible outstanding A3/A3S Document Arrival (or, for B4, an
+ * already-Released child B3 Present Docs record) of its own" hint maps, used for both their own inline
+ * hint text (e.g. A4's "— IB00001 — Pending: 25,000") and their own eligibility filtering; plus A3S/A9's
+ * own "does this LC have an outstanding SG Balance" eligibility. Kept in one service since it's the same
+ * underlying concept (per-candidate LC Index eligibility for a paginated picker), just different checks.
  *
  * Deliberately does NOT own the picker's own `contracts`/`total`/paging (that's `CatalogPickerService`'s
  * job) or the business-rule filtering that CONSUMES these maps (`filteredCatalogContracts`/
- * `filteredParentCatalog` stay on `TransactionBuilderComponent` — they also read `model`/
- * `selectedFunctionStrategy`, which is Maker-flow orchestration, same reasoning `CatalogPickerService`'s
- * own module doc comment already gives for not owning selection/filtering either).
+ * `filteredParentCatalog` stay on `TransactionBuilderComponent` — Maker-flow orchestration).
  *
- * `@Injectable()`, no `providedIn` (desiger-comments.md F-04, 2026-08-19) — genuinely per-component-
- * instance state (its own per-candidate hint maps), not an app-wide singleton — see `LookUpPanelService`'s
- * own doc comment for the full reasoning and the `NullInjectorError` this class's own earlier F-04
- * attempt caused by skipping a real component-level provider entirely.
+ * `@Injectable()`, no `providedIn` — genuinely per-component-instance state, not an app-wide singleton —
+ * see `LookUpPanelService`'s own doc comment for the full reasoning.
  */
 @Injectable()
 export class DocumentArrivalHintsService {
   /** A4 (Sight Settlement) only — its own flat Catalog picker, same-contract still-PENDING UTILIZE. */
   readonly catalogPayableIbs = new Map<string, string[]>();
-  /** Full movement objects backing catalogPayableIbs, keyed the same way — business-reported gap "select S001 IB03 or S001 IB04 separately". */
+  /** Full movement objects backing catalogPayableIbs, keyed the same way. */
   readonly catalogPayableMovements = new Map<string, BalanceMovement[]>();
   /** A6 (Acceptance, Usance) only — its own Parent LC picker, same-contract still-PENDING UTILIZE. */
   readonly parentPayableIbs = new Map<string, string[]>();
@@ -92,11 +76,10 @@ export class DocumentArrivalHintsService {
   }
 
   /**
-   * B4 only — mirrors `loadPayableMovementsAcrossChildContracts()`'s own two-step candidate-resolution
-   * shape (catalog-search the child instrumentType by lcNumber, then fetch each child's own movements)
-   * exactly, run once per LC Index candidate rather than for the one already-picked LC — same RELEASED +
-   * not-yet-consumed condition, since B4 only ever picks an ALREADY-Released B3 record (a still-PENDING
-   * one isn't eligible, unlike A4/A6's own same-contract PENDING check above).
+   * B4 only — mirrors `loadPayableMovementsAcrossChildContracts()`'s own two-step resolution
+   * (catalog-search the child instrumentType by lcNumber, then fetch each child's own movements), run
+   * once per LC Index candidate. Same RELEASED + not-yet-consumed condition as B4's own Step-2 picker —
+   * a still-PENDING B3 record isn't eligible, unlike A4/A6's own same-contract PENDING check above.
    */
   loadChildHints(list: BalanceContract[], childInstrumentType: InstrumentType, wantedMovementType: string, onDone: () => void): void {
     this.catalogChildPayableIbs.clear();
@@ -144,13 +127,11 @@ export class DocumentArrivalHintsService {
   }
 
   /**
-   * Shared by A3S and A9 — business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria — Only LC
-   * Numbers with an outstanding SG Balance should be displayed... once SG Balance = 0, the LC Number
-   * should no longer appear"). For each LC Index candidate, catalog-searches its own child SHGT
-   * contracts by lcNumber, then fetches each child's own live snapshot — mirrors
-   * `loadSgsForArrival()`'s own "outstanding SG" filter (`availableBalance !== '0'`) exactly, run once
-   * per Step-1 candidate instead of for the one already-picked LC. A LC with no SHGT children at all is
-   * correctly not eligible (nothing to redeem), same as one whose every SHGT child is fully redeemed.
+   * Shared by A3S and A9 — only LC Numbers with an outstanding SG Balance are eligible. For each LC
+   * Index candidate, catalog-searches its own child SHGT contracts by lcNumber, then fetches each
+   * child's own live snapshot — mirrors `loadSgsForArrival()`'s own "outstanding SG" filter
+   * (`availableBalance !== '0'`), run once per Step-1 candidate. An LC with no SHGT children, or whose
+   * every SHGT child is fully redeemed, is not eligible.
    */
   private loadSgBalanceEligibility(list: BalanceContract[], eligible: Set<string>, onDone: () => void): void {
     eligible.clear();

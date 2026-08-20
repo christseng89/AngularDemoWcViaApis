@@ -216,38 +216,8 @@
 <a name='L151'></a><a href='#L151'>151</a>
 <a name='L152'></a><a href='#L152'>152</a>
 <a name='L153'></a><a href='#L153'>153</a>
-<a name='L154'></a><a href='#L154'>154</a>
-<a name='L155'></a><a href='#L155'>155</a>
-<a name='L156'></a><a href='#L156'>156</a>
-<a name='L157'></a><a href='#L157'>157</a>
-<a name='L158'></a><a href='#L158'>158</a>
-<a name='L159'></a><a href='#L159'>159</a>
-<a name='L160'></a><a href='#L160'>160</a>
-<a name='L161'></a><a href='#L161'>161</a>
-<a name='L162'></a><a href='#L162'>162</a>
-<a name='L163'></a><a href='#L163'>163</a>
-<a name='L164'></a><a href='#L164'>164</a>
-<a name='L165'></a><a href='#L165'>165</a>
-<a name='L166'></a><a href='#L166'>166</a>
-<a name='L167'></a><a href='#L167'>167</a>
-<a name='L168'></a><a href='#L168'>168</a>
-<a name='L169'></a><a href='#L169'>169</a>
-<a name='L170'></a><a href='#L170'>170</a>
-<a name='L171'></a><a href='#L171'>171</a>
-<a name='L172'></a><a href='#L172'>172</a>
-<a name='L173'></a><a href='#L173'>173</a>
-<a name='L174'></a><a href='#L174'>174</a>
-<a name='L175'></a><a href='#L175'>175</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L154'></a><a href='#L154'>154</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -310,10 +280,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -324,12 +290,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -359,8 +319,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-yes">185x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -423,19 +381,10 @@ import {
 } from './balance-component.model';
 &nbsp;
 /**
- * BAL-003 (God Component) — the pure, state-derivation half of
- * `TransactionBuilderComponent`'s own getters, extracted 2026-08-17.
- *
- * Every function here is a pure function of the small state slice it is handed: no `this`, no API
- * calls, no component mutation. That is the whole selection criterion — a getter earned a place in
- * this module only if it derives a value; anything that fetches, mutates, or orchestrates stayed on
- * the component (or had already moved to `CheckerActionsService`/`MakerSubmitService`/
- * `LookUpPanelService`/`CatalogPickerService` in this session's own earlier BAL-003 passes).
- *
- * The component's own getters are now one-line delegations to these functions, so every business
- * instruction each rule encodes travels WITH the rule rather than being left behind on a class that
- * no longer contains the logic — the same convention `balance-component.model.ts` already follows for
- * the `IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS` registry itself.
+ * The pure, state-derivation half of `TransactionBuilderComponent`'s own getters. Every function here
+ * is a pure function of the small state slice it is handed: no `this`, no API calls, no component
+ * mutation — anything that fetches, mutates, or orchestrates stays on the component or an extracted
+ * service. The component's own getters are one-line delegations to these functions.
  */
 &nbsp;
 /** The Transaction Builder's own Formly model. Moved here (from the component file, where it was a non-exported local interface) so the pure rule modules that read it needn't import from the component. */
@@ -447,7 +396,7 @@ export interface BuilderModel {
   tolerancePct?: string;
   eventSeq?: number;
   createdBy?: string;
-  /** Business instruction 2026-08-14 — generic secondary reference (Amendment No./IB Number/…), required on every function except LC Issue (A1/B1). Sent as sourceTransactionRef. */
+  /** Generic secondary reference (Amendment No./IB Number/…), required on every function except LC Issue (A1/B1). Sent as sourceTransactionRef. */
   secondaryRef?: string;
   /** Design doc §7 Tenor Type Routing (v0.7) — mandatory on Acceptance (A6/B4). */
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE';
@@ -481,12 +430,8 @@ export function requiredNaturalKeyFields(model: BuilderModel): ('ibNumber' | 'sg
 &nbsp;
 /**
  * IPLC_ACCEPTANCE uses Import Bill terminology (IB); EPLC_ACCEPTANCE uses Export Bill terminology
- * (EB) — same underlying `ibNumber` field, different real-world label.
- *
- * Business instruction 2026-08-15 ("Confirm LC Balance 控制" table review) — generalized from
- * checking EPLC_ACCEPTANCE specifically to activeFunctionSide, since B3 (EPLC_EXAMINATION) and B4's
- * own EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE asset creation both need "EB
- * Number" too — every Export instrumentType uses EB terminology, not just EPLC_ACCEPTANCE.
+ * (EB) — same underlying `ibNumber` field, different real-world label. Keyed off activeFunctionSide
+ * rather than EPLC_ACCEPTANCE specifically, since every Export instrumentType uses EB terminology.
  */
 export function ibNumberLabel(activeFunctionSide: 'IMPORT' | 'EXPORT'): string {
   return activeFunctionSide === 'EXPORT' ? 'EB Number' : 'IB Number';
@@ -501,22 +446,16 @@ export function parentOptions(model: BuilderModel): InstrumentType[] {
 }
 &nbsp;
 /**
- * Business instruction 2026-08-16 ("A1 Currency Code = Input; A2-A9 = Carry from A1 + Protected" /
- * "B1 = Input; B2-B5 = Carry from B1 + Protected") — every function except LC Issue (A1) / Confirm LC
- * (B1) operates on an existing LC/Confirmation, or a record that hangs off one, whose own Currency was
- * already fixed the moment it was first created — never re-typed a second time. Same "carry from
- * whichever contract is currently resolved, protected" shape as the existing Amount/Tenor precedent
- * (buildFields()'s amountLocked/tenorLocked), just unconditional across every function rather than
- * gated to specific ones, since A1/B1 structurally never populate selectedParent/selectedContract at
- * all (they create a brand-new record with no existing target to pick). `selectedParent` is checked
- * first — for a hasParent function (A6/A7/A8/A9/B3/B5) it resolves at Step 1, before any Step-2 child
- * picker/search does, so currency locks in as soon as the LC/Confirmation itself is picked.
+ * Every function except A1/B1 operates on an existing LC/Confirmation whose Currency is already fixed —
+ * carried and protected, never re-typed. `selectedParent` is checked first — for a hasParent function it
+ * resolves at Step 1, before any Step-2 picker/search, so currency locks in as soon as the
+ * LC/Confirmation itself is picked.
  */
 export function carriedCurrency(selectedParent: BalanceContract | null, selectedContract: BalanceContract | null): string | null {
   return selectedParent?.currency ?? selectedContract?.currency ?? null;
 }
 &nbsp;
-/** Business instruction 2026-08-14 — LC+IB / LC+SG two-field search replaces the flat Catalog dropdown for these instrumentTypes. */
+/** LC+IB / LC+SG two-field search replaces the flat Catalog dropdown for these instrumentTypes. */
 export function usesTwoFieldSearch(model: BuilderModel): boolean {
   return !isCreatingMovement(model) &amp;&amp; requiredNaturalKeyFields(model).length &gt; 0;
 }
@@ -536,11 +475,9 @@ export function lcNumberFromParent(model: BuilderModel): boolean {
 }
 &nbsp;
 /**
- * Business instruction 2026-08-15 ("Look Up Current Balance should use the existing LC Number on
- * Screen... instead of keyin") — whatever LC Number is currently resolved for THIS function, from
- * whichever picker shape it came from (freely typed A1/B1, Parent picker A6/A8, flat Catalog
- * A2-A5/A3S, or the LC+IB/SG two-field search A7/A9/B5). Feeds both the Checker queue and
- * runLookup()'s auto-fill.
+ * Whatever LC Number is currently resolved for THIS function, from whichever picker shape it came from
+ * (freely typed A1/B1, Parent picker A6/A8, flat Catalog A2-A5/A3S, or the LC+IB/SG two-field search
+ * A7/A9/B5). Feeds both the Checker queue and runLookup()'s auto-fill.
  */
 export function contextLcNumber(s: ContextRefState): string | null {
   if (lcNumberFromParent(s.model)) return s.selectedParent?.naturalKey.lcNumber ?? null;
@@ -579,7 +516,7 @@ export function checkerSecondaryLabel(selectedFunction: TransactionFunction | nu
     : 'SG Number';
 }
 &nbsp;
-/** Business instruction 2026-08-14 ("A6 =&gt; ...", "A7 should filter out LC records Tenor = Sight") — shared by loadParentPage()'s server-side filter and filteredParentCatalog()'s client-side one. */
+/** Shared by the parent picker's server-side filter and filteredParentCatalog()'s client-side one. */
 export function parentTenorFamily(selectedFunction: TransactionFunction | null): 'SIGHT' | 'USANCE' | undefined {
   if (selectedFunction?.tenorTypeOptions?.length) return 'USANCE';
   if (selectedFunction?.catalogTenorFilter === 'USANCE') return 'USANCE';
@@ -592,7 +529,7 @@ export function parentTenorFamily(selectedFunction: TransactionFunction | null):
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-20T01:13:07.641Z
+                at 2026-08-20T02:26:48.442Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

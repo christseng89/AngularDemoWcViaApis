@@ -7,36 +7,11 @@ import { describeApiError } from './api-error';
 import { deriveFunctionStrategy } from './function-strategy';
 
 /**
- * BAL-003 (Quality-report-balance.md — 4th same-day OOD/SOLID pass, "Checker Actions service"):
- * the compound Maker/Checker release(); reject(); deleteMakerPending() chain — previously ~230 lines
- * of `TransactionBuilderComponent`'s own private methods (`releaseMatchedReceivable`,
- * `releaseDueFromIssuingBank`, `releaseAcceptance`, `releaseAcceptanceLiability`,
- * `releaseAcceptanceReimbReceivable`, `releaseArrivalDocument`) — now owns exactly the API-call
- * orchestration: WHICH release/reject/cancel call to make, in what order, under what business
- * condition. This was explicitly rejected as "not worth it" in an earlier pass this same session (see
- * `finishCheckerAction`'s own doc comment in transaction-builder.component.ts) because a naive move
- * would need to pass ~10 pieces of component state back and forth. Reversed here via genuine
- * Dependency Inversion instead of a naive move:
- *  - the service depends only on `CheckerActionContext` (a narrow, read-only interface — Interface
- *    Segregation: exactly the fields these 3 flows read, nothing else) and the API client it already
- *    injects itself — never on `TransactionBuilderComponent`.
- *  - the service never mutates component state directly; every flow instead resolves to exactly one
- *    `CheckerActionOutcome`, and the component's own `applyCheckerActionOutcome()` (transaction-
- *    builder.component.ts) is the ONLY place that still touches `actionBusy`/`submitResult`/
- *    `submitError`/`arrivalApproved` and calls back into `refreshSelectedContractSnapshot()`/
- *    `syncCheckerToContext()`/`syncLookupToContext()`/`loadSgsForArrival()` — Single Responsibility:
- *    this service only ever decides "what happened", never "what the UI should do about it".
- *
- * `reloadPayables` (a `'released'` outcome flag, A6/B4's own compound legs) was removed 2026-08-17 once
- * superseded by the auto-reset UX: `release()` on the component now returns to a fully-reset screen on
- * ANY genuine `'released'` outcome instead of running `finishCheckerAction()`'s own in-place
- * `reloadPayableMovementsAfterCompound()` refresh, so a stale `payableMovements` list is no longer
- * observable — the Maker re-picks a contract from scratch for the next transaction, which loads it
- * fresh regardless. BAL-101-style dead-code removal, not a behavior regression.
- *
- * Every guard condition, branch order, and error-message string below is unchanged from the methods
- * it replaces — pure code motion re-expressed as RxJS `switchMap`/`catchError` chains instead of
- * nested `.subscribe()` callbacks, so the exact same sequential-and-conditional shape survives.
+ * Owns Checker release/reject/cancel API orchestration — which call to make, in what order, under what
+ * condition. Depends only on `CheckerActionContext` (Interface Segregation) and the API client, never on
+ * `TransactionBuilderComponent`. Never mutates component state — resolves to a `CheckerActionOutcome`;
+ * `applyCheckerActionOutcome()` on the component is the only place an outcome becomes a UI effect
+ * (Single Responsibility: this service decides "what happened", not "what the UI does about it").
  */
 export interface CheckerActionContext {
   readonly submitResult: BalanceMovement | null;
@@ -49,11 +24,9 @@ export interface CheckerActionContext {
   readonly arrivalSgRedeemMovementId: string | null;
   readonly createdBy: string | null | undefined;
   /**
-   * Bug fixed 2026-08-16 — the actual item a Checker session resolved via its OWN independent search
-   * (searchCheckerLc()), always real server data regardless of session. release()'s A3S/B5 branches use
-   * this (its own businessEventId) to resolve their linked leg when arrivalSgRedeemMovementId/
-   * matchedReceivableMovementId are unavailable (a genuinely separate Checker session) — see
-   * resolveLinkedMovementId's own doc comment.
+   * The item resolved by the Checker's own independent search — always real server data, unlike
+   * `submitResult` which only exists in the Maker's own session. Used to resolve linked legs via
+   * businessEventId for a genuinely separate Checker session — see `resolveLinkedMovementId`.
    */
   readonly selectedCheckerMovement: BalanceMovement | null;
 }
@@ -68,43 +41,20 @@ export type CheckerActionOutcome =
 export class CheckerActionsService {
   constructor(private readonly api: BalanceComponentApiService) {}
 
-  /**
-   * BAL-126 (Quality-report-balance.md): every `{ kind: 'failed', message }` outcome this service ever
-   * constructs — whether from a `catchError` or a plain pre-check return — collapsed into this one
-   * shared helper. Only the message text ever differed between the ~20 call sites it replaces.
-   */
+  /** Shared constructor for every `{ kind: 'failed', message }` outcome — only the message differs per call site. */
   private fail(message: string): Observable<CheckerActionOutcome> {
     return of<CheckerActionOutcome>({ kind: 'failed', message });
   }
 
   release(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
     const checkerId = ctx.createdBy === 'maker1' ? 'checker1' : 'checker2';
-    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — every flag read in this method now
-    // goes through the Strategy instead of the raw flag, including settlesDocumentArrival (shared with
-    // A6, deliberately left on the old path by PR-3 until B-series had its own wiring); behavior
-    // unchanged, including the A6-vs-B4 asymmetry captured in payableMovementRequiresRelease's own
-    // Strategy field (sourceAlreadyReleasedBeforePick).
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
 
-    // Business instruction 2026-08-14 (revised): "When Checker approve it, then LC Balance will be approved
-    // and Acceptance Balance will be approved too." — A6/B4. Release the picked source record FIRST
-    // (finalizes it), THEN release the Acceptance itself — only proceeding if the first genuinely succeeds.
-    // Bug fixed 2026-08-16 ("A6/B4 也修一下", extending the A3S/B5 fix above): selectedPayMovement
-    // (the source) and dueFromIssuingBankMovementId/acceptanceMovementId/acceptanceReimbReceivableMovementId
-    // (the downstream legs) are all only ever populated in the SAME session that Submitted — a
-    // genuinely separate Checker session always had them null, same root cause as A3S/B5. Now resolved
-    // via resolveSettlesDocumentArrivalIds() (source: referencedTransactionId, stamped on the primary
-    // at Submit time — businessEventId can't help here since the source predates this submission;
-    // downstream legs: businessEventId lookup, same mechanism as A3S/B5) before this chain runs at all.
-    //
-    // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own source (B3's Present Docs
-    // earmark) is now independently Checker-Released BEFORE B4 ever picks it (payableMovementRequiresRelease
-    // gates its Step-2 picker to already-RELEASED candidates only), so it must NOT be released again here
-    // — re-releasing an already-RELEASED movement is illegal (409). The microservice's own release()
-    // marks it "consumed" as a side effect of releasing the primary below (via referencedTransactionId),
-    // so B4 skips straight to that. A6's own source (a Usance Document Arrival, still acknowledgment-only
-    // — see balance-component.model.ts's own deferSettlement doc comment) is UNCHANGED — it has no
-    // payableMovementRequiresRelease flag, so it still takes the release-the-source-first path below.
+    // A6/B4: release the picked source record first, then the new primary. B4's own source (a B3
+    // Present Docs record) is already independently Checker-Released before B4 ever picks it, so
+    // re-releasing it here would be illegal (409) — release() marks it "consumed" as a side effect of
+    // releasing the primary instead. A6's own source (a Usance Document Arrival, acknowledgment-only)
+    // has no such flag and always takes the release-the-source-first path below.
     if (strategy?.checkerRelease.settlesDocumentArrival) {
       if (strategy?.checkerRelease.sourceAlreadyReleasedBeforePick) {
         return this.resolveSettlesDocumentArrivalIds(ctx).pipe(switchMap((ids) => this.releaseAcceptance(checkerId, ctx, ids)));
@@ -128,16 +78,10 @@ export class CheckerActionsService {
       );
     }
 
-    // Business instruction 2026-08-14 ("Redemp SG Balance in Approved via Checker approved") — A3S only.
-    // One Release click releases the SG's own redemption for real; the Document Arrival itself is only
-    // acknowledged after (never a real release call — the movement stays PENDING for A4/A6 to finalize).
-    // Bug fixed 2026-08-16: arrivalSgRedeemMovementId is only ever populated in the SAME browser
-    // session that just Submitted A3S — a genuinely separate Checker session (the normal case for real
-    // Maker/Checker 4-eyes separation) always had it null, silently skipping this branch entirely and
-    // leaving the SG's own redemption PENDING forever. Now resolves it via businessEventId when the
-    // in-memory id is missing — see resolveLinkedMovementId's own doc comment.
-    // PR-3 of the F-01 Strategy refactoring (desiger-comments.md) — documentArrivalWithSg (A3S-exclusive)
-    // now reads through the Strategy instead of the raw flag; behavior unchanged.
+    // A3S only: one Release click releases the SG's own redemption for real; the Document Arrival stays
+    // PENDING (acknowledgment only) for A4/A6 to finalize later. arrivalSgRedeemMovementId is only
+    // populated in the same session that Submitted A3S, so a cross-session Checker resolves it via
+    // businessEventId instead — see resolveLinkedMovementId.
     if (ctx.selectedFunction && deriveFunctionStrategy(ctx.selectedFunction).compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       return this.resolveLinkedMovementId(ctx, ctx.arrivalSgRedeemMovementId, 'FULL_REDEEM', 'PARTIAL_REDEEM').pipe(
         switchMap((arrivalSgRedeemMovementId) => {
@@ -154,12 +98,9 @@ export class CheckerActionsService {
       );
     }
 
-    // B5's Usance/CNF_MATURE branch (settlesAcceptanceOnMature) only — one Release does both the
-    // Acceptance's own FULL_SETTLE/PARTIAL_SETTLE and the matching Reimbursement Receivable's REIMBURSE,
-    // same businessEventId, per the frozen spec's own CNF_MATURE event. Bug fixed 2026-08-16: same root
-    // cause and same fix shape as documentArrivalWithSg above — matchedReceivableMovementId resolved via
-    // businessEventId when the in-memory id is missing, and the primary release uses
-    // selectedCheckerMovement (always real server data) instead of submitResult (session-only).
+    // B5's Usance/CNF_MATURE branch only — one Release does both the Acceptance's own FULL_SETTLE/
+    // PARTIAL_SETTLE and the matching Reimbursement Receivable's REIMBURSE, per the CNF_MATURE event.
+    // matchedReceivableMovementId resolves via businessEventId when unavailable, same as A3S above.
     if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE') {
       return this.resolveLinkedMovementId(ctx, ctx.matchedReceivableMovementId, 'REIMBURSE').pipe(
         switchMap((matchedReceivableMovementId) => {
@@ -185,10 +126,8 @@ export class CheckerActionsService {
   }
 
   reject(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
-    // Bug fixed 2026-08-16: prefer selectedCheckerMovement (always real server data from the Checker's
-    // OWN independent search) over submitResult (session-only) — same reasoning as release()'s A3S/B5
-    // branches above. Falls back to submitResult for parity with the pre-existing behavior on the one
-    // path that still relies on it (A6/B4's settlesDocumentArrival, unchanged by this fix).
+    // Prefers selectedCheckerMovement (real server data) over submitResult (session-only), same as
+    // release()'s A3S/B5 branches; falls back to submitResult for A6/B4's settlesDocumentArrival path.
     const movementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.reject(movementId!, 'checker1', 'MANUAL_TEST_REJECT').pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
@@ -197,21 +136,15 @@ export class CheckerActionsService {
   }
 
   /**
-   * Business instruction 2026-08-15 ("need a option for Maker to Delete Pending... for all functions")
-   * — Maker-initiated withdrawal of their own just-submitted item while still PENDING, via /cancel
+   * Maker-initiated withdrawal of their own just-submitted item while still PENDING, via /cancel
    * (distinct from /reject's Checker-side decline). For A3S/B3/B4-usance/B5, cancels the linked
    * secondary/asset leg(s) FIRST (reverse creation order) so an EC never leaves a later leg orphaned.
    */
   deleteMakerPending(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
-    // BAL-132 (Quality-report-balance.md): was `const cancelledBy = ctx.createdBy!;` — asserted away
-    // `CheckerActionContext.createdBy`'s own declared `string | null | undefined` type instead of
-    // proving it can't happen. Safe in practice today (the component's own submit() already requires
-    // model.createdBy before a Maker submission can exist to delete), but a real runtime guard costs
-    // nothing and doesn't silently mask a future caller reaching this method with it unset.
+    // Runtime guard rather than a non-null assertion — submit() already requires model.createdBy before
+    // a Maker submission can exist to delete, but this proves it rather than assuming it.
     if (!ctx.createdBy) return this.fail('Cannot delete this Maker submission — no Maker (createdBy) is known for it.');
     const cancelledBy = ctx.createdBy;
-    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 3 B-series-exclusive flag reads
-    // below now go through the Strategy instead of the raw flag; behavior unchanged.
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const cancelPrimary = (): Observable<CheckerActionOutcome> =>
       this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
@@ -275,18 +208,12 @@ export class CheckerActionsService {
   }
 
   /**
-   * Bug fixed 2026-08-16 — resolves a compound submission's linked leg movementId, preferring the
-   * caller's own already-known id (set moments earlier in the SAME session's Submit — the common case,
-   * zero extra HTTP call) and falling back to a businessEventId lookup only when that's unavailable (a
-   * genuinely separate Checker session, or the same session after navigating away/reloading). Matches
-   * by movementType alone (never instrumentType — not present on this DTO) — safe ONLY when every
-   * candidate movementType passed in is exclusive to one instrument in this service's own
-   * MOVEMENT_DIRECTION vocabulary (balanceDerivation.ts) AND at most one linked movement can ever match
-   * — true for FULL_REDEEM/PARTIAL_REDEEM (SHGT) and REIMBURSE (EPLC_ACCEPTANCE_REIMB_RECEIVABLE) here,
-   * but NOT true for B4 Usance's own two CREATE-typed downstream legs (both share the same movementType
-   * string) — see resolveSettlesDocumentArrivalIds's own doc comment for how those are disambiguated
-   * instead. Resolves `null` (not an error) when nothing can be found — the caller decides how to
-   * surface that as a CheckerActionOutcome.
+   * Resolves a linked leg's movementId — prefers the caller's already-known id (same-session Submit),
+   * falls back to a businessEventId lookup for a cross-session Checker. Matches by movementType alone
+   * (never instrumentType) — safe only when every candidate movementType is exclusive to one instrument
+   * AND at most one linked movement can match (true for FULL_REDEEM/PARTIAL_REDEEM/REIMBURSE, NOT true
+   * for B4 Usance's two CREATE-typed downstream legs — see resolveSettlesDocumentArrivalIds). Resolves
+   * `null`, not an error, when nothing is found.
    */
   private resolveLinkedMovementId(ctx: CheckerActionContext, knownId: string | null, ...movementTypes: string[]): Observable<string | null> {
     if (knownId) return of(knownId);
@@ -299,21 +226,12 @@ export class CheckerActionsService {
   }
 
   /**
-   * Bug fixed 2026-08-16 ("A6/B4 也修一下") — resolves everything settlesDocumentArrival's own release
-   * chain needs in one pass: the SOURCE record (A3's own Document Arrival / B3's own Present Docs —
-   * predates this submission, so it's correlated via referencedTransactionId, never businessEventId)
-   * plus, for B4 specifically, its downstream leg(s) created ALONGSIDE the primary (Sight/HONOUR: one
-   * Due from Issuing Bank CREATE; Usance/ACCEPT: an Acceptance liability CREATE then its Reimbursement
-   * Receivable CREATE, in that fixed creation order). Both downstream shapes share the identical
-   * movementType string 'CREATE', so unlike resolveLinkedMovementId's other callers they can't be told
-   * apart by movementType alone — this method instead first branches on the PRIMARY's own movementType
-   * (`selectedCheckerMovement.movementType`: 'HONOUR' vs 'ACCEPT', always exactly one) to decide WHICH
-   * shape to even look for, then relies on findByBusinessEventId's own oldest-first ordering (which
-   * submitConfirmationAcceptWithReceivable() guarantees matches submission order: primary ACCEPT, then
-   * liability, then receivable) to tell the Usance pair apart. Getting this branch wrong would silently
-   * cross-wire a Usance liability into the Sight due-from-issuing-bank slot (or vice versa) — confirmed
-   * live by a failing test before this fix, not just a theoretical risk. Makes at most ONE
-   * findByBusinessEventId call even when multiple ids need resolving.
+   * Resolves everything settlesDocumentArrival's release chain needs in one pass: the SOURCE (correlated
+   * via referencedTransactionId, since it predates this submission) plus, for B4, its downstream leg(s)
+   * created alongside the primary. B4 Usance's two downstream CREATEs share the same movementType, so
+   * they're disambiguated by the primary's own HONOUR-vs-ACCEPT branch plus findByBusinessEventId's
+   * oldest-first ordering (liability before receivable), not by movementType. At most one
+   * findByBusinessEventId call regardless of how many ids need resolving.
    */
   private resolveSettlesDocumentArrivalIds(ctx: CheckerActionContext): Observable<{
     sourceMovementId: string | null;
@@ -329,8 +247,6 @@ export class CheckerActionsService {
         acceptanceMovementId: ctx.acceptanceMovementId,
         acceptanceReimbReceivableMovementId: ctx.acceptanceReimbReceivableMovementId,
       });
-    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 2 flag reads below now go
-    // through the Strategy instead of the raw flag; behavior unchanged.
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const isHonour = ctx.selectedCheckerMovement?.movementType === 'HONOUR';
     const isAccept = ctx.selectedCheckerMovement?.movementType === 'ACCEPT';
@@ -357,21 +273,16 @@ export class CheckerActionsService {
   }
 
   /**
-   * A6/B4 — second leg of the compound Checker action, releasing the primary movement (A6: the newly-
-   * created Acceptance; B4: the Confirmation's own HONOUR or ACCEPT) after its source record was
-   * already released above. Branches into whichever third leg the function needs. Bug fixed
-   * 2026-08-16: prefers selectedCheckerMovement (always real server data from the Checker's own
-   * independent search) over submitResult (session-only) for the primary's own movementId — same
-   * reasoning as the A3S/B5 fix above; `ids` (the downstream legs, already resolved by
-   * resolveSettlesDocumentArrivalIds) is threaded through instead of each helper re-reading `ctx`.
+   * A6/B4 — second leg, releasing the primary (A6: the new Acceptance; B4: HONOUR/ACCEPT) after the
+   * source was released above, then branches into whichever third leg the function needs. `ids` (the
+   * downstream legs, already resolved by resolveSettlesDocumentArrivalIds) is threaded through rather
+   * than re-read from `ctx`.
    */
   private releaseAcceptance(
     checkerId: string,
     ctx: CheckerActionContext,
     ids: { dueFromIssuingBankMovementId: string | null; acceptanceMovementId: string | null; acceptanceReimbReceivableMovementId: string | null },
   ): Observable<CheckerActionOutcome> {
-    // PR-4 of the F-01 Strategy refactoring (desiger-comments.md) — the 2 flag reads below now go
-    // through the Strategy instead of the raw flag; behavior unchanged.
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.release(primaryMovementId!, checkerId).pipe(

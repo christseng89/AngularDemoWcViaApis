@@ -124,56 +124,8 @@
 <a name='L59'></a><a href='#L59'>59</a>
 <a name='L60'></a><a href='#L60'>60</a>
 <a name='L61'></a><a href='#L61'>61</a>
-<a name='L62'></a><a href='#L62'>62</a>
-<a name='L63'></a><a href='#L63'>63</a>
-<a name='L64'></a><a href='#L64'>64</a>
-<a name='L65'></a><a href='#L65'>65</a>
-<a name='L66'></a><a href='#L66'>66</a>
-<a name='L67'></a><a href='#L67'>67</a>
-<a name='L68'></a><a href='#L68'>68</a>
-<a name='L69'></a><a href='#L69'>69</a>
-<a name='L70'></a><a href='#L70'>70</a>
-<a name='L71'></a><a href='#L71'>71</a>
-<a name='L72'></a><a href='#L72'>72</a>
-<a name='L73'></a><a href='#L73'>73</a>
-<a name='L74'></a><a href='#L74'>74</a>
-<a name='L75'></a><a href='#L75'>75</a>
-<a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a>
-<a name='L78'></a><a href='#L78'>78</a>
-<a name='L79'></a><a href='#L79'>79</a>
-<a name='L80'></a><a href='#L80'>80</a>
-<a name='L81'></a><a href='#L81'>81</a>
-<a name='L82'></a><a href='#L82'>82</a>
-<a name='L83'></a><a href='#L83'>83</a>
-<a name='L84'></a><a href='#L84'>84</a>
-<a name='L85'></a><a href='#L85'>85</a>
-<a name='L86'></a><a href='#L86'>86</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L62'></a><a href='#L62'>62</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -237,41 +189,22 @@
 import { DECREASING_MOVEMENT_TYPES } from './balance-component.model';
 &nbsp;
 /**
- * BAL-003 "Feature Components + Facade" Phase 3 (2026-08-20, desiger-comments.md — user-directed after
- * being warned this exact unification was evaluated once already this session, during the
- * `CatalogPickerService` pagination pass, and judged not worth the risk/reward at the time; explicitly
- * overridden — "實作 eligibility 邏輯統一（接受風險）").
- *
  * Unifies the repeated TAIL of `filteredCatalogContracts`/`filteredParentCatalog`/`filteredIbIndexCatalog`
  * (`maker-panel.component.ts`) — each getter independently hand-rolled the identical "filter by a hint-set
  * of eligible contract ids, OR pass through unconditionally, OR fall back to excluding 0-Available-Balance
- * candidates but only for a decreasing movementType" shape. That mechanical tail is what this module
- * extracts; it is a pure function with zero DI, matching this project's own established convention for
- * shared picker-adjacent utility logic (`paged-list-state.ts`'s own precedent).
+ * candidates but only for a decreasing movementType" shape. Pure function, zero DI, matching this
+ * project's own convention for shared picker-adjacent utility logic (`paged-list-state.ts`'s precedent).
  *
- * **Deliberately NOT extended to also decide WHICH rule applies to a given function/picker** — that
- * decision reads `TransactionFunction` registry fields that were explicitly scoped OUT of the F-01 Strategy
- * migration (`payableMovementInstrumentType`, `catalogTenorFilter` — see `function-strategy.ts`'s own
- * top-of-file doc comment: only the 11 flags that were "scattered across 5 files" moved into
- * `FunctionStrategy`; every other registry field, including these two, was deliberately left alone).
- * Forcing them into a Strategy-shaped abstraction here would mean either (a) growing `function-strategy.ts`
- * beyond its own documented scope for a single caller, or (b) duplicating those two registry fields into a
- * second, independently-maintained place — both worse than the alternative: each getter still resolves its
- * OWN `EligibilityRule` value locally (unchanged branching, unchanged flags/fields read, unchanged order),
- * and only the FINAL "now apply it" step is shared. This keeps the unification honest about its own actual
- * scope — deduplicating a mechanical filtering step, not merging three different business-rule cascades
- * into one that could subtly drift from any of the three original ones.
+ * Deliberately does NOT decide WHICH rule applies to a given function/picker — that reads
+ * `TransactionFunction` registry fields scoped out of the F-01 Strategy migration
+ * (`payableMovementInstrumentType`, `catalogTenorFilter`); each getter still resolves its own
+ * `EligibilityRule` locally, and only the final "now apply it" step is shared.
  *
- * Also deliberately NOT a discriminated union keyed by picker (catalog/parent/ibIndex) — `filteredIbIndexCatalog`
- * has no special-case rule at all today (always `{kind: 'genericFallback'}`), and no function needs its
- * catalog-picker and parent-picker eligibility to differ (each function uses exactly one Step-1 picker
- * type, determined by `hasParent`), so one rule shape genuinely serves all three call sites without any
- * per-picker branching baked into the type itself.
+ * Not a discriminated union keyed by picker — no function needs its catalog-picker and parent-picker
+ * eligibility to differ (each uses exactly one Step-1 picker type, determined by `hasParent`), so one
+ * rule shape serves all three call sites.
  */
-/** Minimal structural type both `Set&lt;string&gt;` (`catalogSgEligible`/`parentSgEligible`) and
- * `Map&lt;string, string[]&gt;` (`catalogPayableIbs`/`parentPayableIbs`/`catalogChildPayableIbs` — these three
- * carry per-contract IB-number hint text alongside eligibility, per `DocumentArrivalHintsService`'s own
- * doc comment) already satisfy — `applyEligibilityRule()` only ever needs membership, never a value. */
+/** Minimal structural type both `Set&lt;string&gt;` (`catalogSgEligible`/`parentSgEligible`) and `Map&lt;string, string[]&gt;` (`catalogPayableIbs`/`parentPayableIbs`/`catalogChildPayableIbs`) already satisfy — `applyEligibilityRule()` only ever needs membership, never a value. */
 export interface EligibilityIdLookup {
   has(id: string): boolean;
 }
@@ -283,20 +216,15 @@ export type EligibilityRule =
  * Applies an already-resolved `EligibilityRule` to a (tenor-pre-filtered, picker-specific) candidate list.
  * `movementType`/`snapshots` are only read for the `'genericFallback'` case.
  *
- * `gatedByMovementType` preserves a real, pre-existing ASYMMETRY between the 3 original getters, found
- * while migrating this and confirmed via `git show HEAD:...` against the pre-unification source before
- * "fixing" it (out of scope — zero business logic change is the whole point of this pass):
+ * `gatedByMovementType` preserves a real, pre-existing asymmetry between the 3 original getters:
  * `filteredCatalogContracts`/`filteredIbIndexCatalog`'s own trailing branch only excluded 0-Available-
  * Balance candidates when `movementType` is one of `DECREASING_MOVEMENT_TYPES` (an Increase/Create never
  * needs to exclude an already-exhausted candidate — 0 is a normal starting point), but
- * `filteredParentCatalog`'s own trailing branch applied the 0-balance exclusion UNCONDITIONALLY, with no
- * `DECREASING_MOVEMENT_TYPES` gate at all. `gatedByMovementType: true` reproduces the first shape (catalog/
- * IB Index callers); `gatedByMovementType: false` reproduces the second (the parent-picker caller) — this
- * flag exists ONLY to keep that pre-existing difference intact, not because a new caller needs to choose
- * between the two.
+ * `filteredParentCatalog`'s own trailing branch applied the 0-balance exclusion unconditionally, with no
+ * `DECREASING_MOVEMENT_TYPES` gate at all. `gatedByMovementType: true` reproduces the first shape;
+ * `false` reproduces the second (parent-picker caller).
  *
- * A missing snapshot (still loading) is never excluded, matching the original
- * "!snap || snap.availableBalance !== '0'" condition verbatim in every case.
+ * A missing snapshot (still loading) is never excluded.
  */
 export function applyEligibilityRule(
   list: readonly BalanceContract[],
@@ -325,7 +253,7 @@ export function applyEligibilityRule(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-20T01:13:07.641Z
+                at 2026-08-20T02:26:48.442Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

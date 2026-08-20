@@ -12,13 +12,9 @@ import { PayMovementSelectionOutcome, PickerSelectionService } from './picker-se
 import { EligibilityRule, applyEligibilityRule } from './eligibility-rule';
 
 /**
- * F-04 pattern (desiger-comments.md, 2026-08-19) reused verbatim here — `CatalogPickerService` has NO
- * `@Injectable()` decorator at all (confirmed by direct file read before writing this), so it can only
- * ever be resolved via an explicit `useFactory` provider, never a bare class-type token; this component
- * needs THREE differently-configured instances (`fetchSize`), so each gets its own `InjectionToken`,
- * exactly mirroring `TransactionBuilderComponent`'s own `CATALOG_PICKER`/`PARENT_PICKER`/`IB_INDEX_PICKER`
- * tokens. Module-level `const`s, not class members — the `@Component({ providers: [...] })` array below
- * sits textually OUTSIDE the class body, so a `private`/`static` class member wouldn't be visible there.
+ * `CatalogPickerService` has no `@Injectable()` decorator, so it needs an explicit `useFactory` provider.
+ * Three differently-sized instances need three `InjectionToken`s. Module-level `const`s, not class
+ * members — the `providers` array sits outside the class body, so a class member wouldn't be visible there.
  */
 const CATALOG_PAGE_SIZE = 100;
 const PARENT_PAGE_SIZE = 100;
@@ -49,12 +45,9 @@ import { BuilderModel } from './function-policy';
 
 /**
  * The fields `TransactionBuilderComponent.buildCheckerActionContext()` needs from this panel's own
- * state, mirroring `CheckerActionContext`'s own shape minus `selectedFunction`/`selectedCheckerMovement`
- * (both stay parent-owned — see this component's own class doc comment). Emitted on `contextChanged`
- * every time any of these values actually change (`resetForFunction()`, a Submit outcome, applying an
- * `externalCheckerOutcome`, or picking a pay movement) — the parent keeps its own mirror copy, same
- * "child owns the write, parent keeps a read mirror via an event" convention `CheckerPanelComponent`'s
- * own `movementPicked` output already established in Phase 1.
+ * state — mirrors `CheckerActionContext`'s shape minus `selectedFunction`/`selectedCheckerMovement`
+ * (both stay parent-owned). Emitted on `contextChanged` whenever these values change; the parent keeps
+ * its own read mirror, same "child owns the write" convention as `CheckerPanelComponent.movementPicked`.
  */
 export interface MakerCheckerContext {
   submitResult: BalanceMovement | null;
@@ -68,15 +61,11 @@ export interface MakerCheckerContext {
 }
 
 /**
- * 2026-08-20 (desiger-comments.md Phase 8, narrowed scope — the 7 flat compound-leg movement fields
- * A3S/A6/B4/B5's own multi-leg submissions produce, grouped into ONE object rather than left scattered
- * across the class). Deliberately does NOT change `MakerCheckerContext`'s own shape above (still flat) —
- * only this component's own INTERNAL representation changes; `emitContext()` destructures the 5 ID
- * fields back out when building the emitted DTO, so the parent (`TransactionBuilderComponent`) and
- * `CheckerActionContext` are completely unaffected. `arrivalSgRedeemMovement`/`acceptanceMovement` (the
- * 2 full-`BalanceMovement` fields, vs. the other 5 which are bare `movementId` strings) are read only by
- * this panel's own template (the "Account Entries — SG Redemption"/"Account Entries — Acceptance"
- * buttons) — the Checker never needs the full object, only the id, for its own release/reject calls.
+ * The 7 flat compound-leg movement fields A3S/A6/B4/B5's multi-leg submissions produce, grouped into one
+ * object. Doesn't change `MakerCheckerContext`'s shape — `emitContext()` destructures the 5 id fields
+ * back out for the emitted DTO. `arrivalSgRedeemMovement`/`acceptanceMovement` (full `BalanceMovement`,
+ * vs. the other 5 bare `movementId` strings) back this panel's own "Account Entries — SG
+ * Redemption/Acceptance" buttons only — the Checker only ever needs the id.
  */
 export interface CompoundLegState {
   arrivalSgRedeemMovementId: string | null;
@@ -98,7 +87,7 @@ const EMPTY_COMPOUND_LEGS: CompoundLegState = {
   matchedReceivableMovementId: null,
 };
 
-/** A pending sync request for the Checker's own independent search AND (only when `alsoSyncLookup` is set) the Look Up Current Balance panel — see `TransactionBuilderComponent.syncCheckerToContext()`'s pre-extraction body for the original, single-component version of this. `instrumentType` is only read when `alsoSyncLookup` is true (Look Up's own `syncFrom()` needs it; the Checker's own search resolves its own instrumentType from `selectedFunction` already). */
+/** A pending sync request for the Checker's own search and (only when `alsoSyncLookup` is set) the Look Up Current Balance panel. `instrumentType` is only read when `alsoSyncLookup` is true. */
 export interface MakerSyncRequest {
   lcNumber: string;
   secondaryRef: string | null;
@@ -107,45 +96,21 @@ export interface MakerSyncRequest {
 }
 
 /**
- * BAL-003 "Feature Components + Facade" pilot #3 (2026-08-19, desiger-comments.md — Phase 2 of the
- * 8-phase architecture proposal, user-confirmed full scope after being warned it's materially riskier
- * than Phase 1's `CheckerPanelComponent`). Owns the Maker's own form/selection state — `model`/
- * `naturalKey`/`searchNaturalKey`/`selectedContract`/`selectedContractSnapshot`/`selectedParent`/
- * `subChoiceValue`/`amendDirection`/`fields`/`submitting`/`submitResult`/`submitError` — and every
- * picker/selection/validation/submit method built on top of them, including the "MAKER RESULT" panel
- * (Account Entries buttons, Delete Pending) that directly displays `submitResult`'s own outcome.
+ * Owns the Maker's own form/selection state — `model`/`naturalKey`/`searchNaturalKey`/`selectedContract`/
+ * `selectedContractSnapshot`/`selectedParent`/`subChoiceValue`/`amendDirection`/`fields`/`submitting`/
+ * `submitResult`/`submitError` — plus every picker/selection/validation/submit method built on them,
+ * including the "MAKER RESULT" panel.
  *
- * **Ownership boundary, decided after reading every one of the 7 files this state feeds** (`submit-
- * rules.ts`/`builder-fields.ts`/`function-policy.ts` are pure functions — genuinely caller-agnostic, need
- * zero interface changes; `MakerSubmitContext`/`CheckerActionContext` needed zero interface changes
- * either — only WHERE they're assembled moved; `PickerSelectionService`/`CatalogPickerService` needed no
- * interface changes, only which component injects/owns them). The one genuinely hard problem: `submit()`
- * (Maker-initiated) and the Checker's own `release()`/`reject()`/`deleteMakerPending()` (still parent-
- * owned, see below) BOTH write into `submitResult`/`arrivalApproved`/the 7 compound-leg movement fields —
- * a real shared-mutable-state case, not a clean one-directional producer/consumer split. Resolved the
- * SAME way Phase 1's own `syncFromContext()` resolved an analogous one-directional problem: an `@Input()`
- * SIGNAL object (`externalCheckerOutcome`, fresh reference per emission — same "the object itself is the
- * trigger, not (only) its contents" reasoning `CheckerSyncSignal`'s own doc comment already established),
- * reacted to in `ngOnChanges()` by applying the exact same state-mutation logic
- * `applyCheckerActionOutcome()`/`finishCheckerAction()`/`failCheckerAction()` used inline before this
- * extraction — now living here, since it needs to write into now-child-owned fields. The PARENT keeps
- * `checkerBusy`/`checkerError`/`checkerId`/`actionBusy`/`selectedCheckerMovement`/`releaseSuccessHint`
- * and the entire Checker ACTION layer (`checkerAct()`/`release()`/`reject()`/`deleteMakerPending()`/
- * `approveArrival()`/`isCheckerCompoundOwnSubmission`/`checkerActionButtonLabel`/
- * `isArrivalAcknowledgmentStep`/`checkerActionInFlight`) — those genuinely belong with the VISUAL Checker
- * section (the Release/Reject buttons render inside `<app-checker-panel>`'s own projected content, not
- * this panel's own template), and moving them here would misalign the component boundary with the actual
- * UI feature boundary for no real gain (Phase 1's own class doc comment already reached the identical
- * conclusion for the SAME reason, scoped to a smaller surface).
+ * `submit()` (Maker) and the Checker's own `release()`/`reject()`/`deleteMakerPending()` (still
+ * parent-owned) both write into `submitResult`/`arrivalApproved`/the compound-leg fields — a real
+ * shared-state case. Resolved via an `@Input()` signal object (`externalCheckerOutcome`, fresh reference
+ * per emission — the object itself is the trigger, not only its contents), applied in `ngOnChanges()`.
+ * The parent keeps `checkerBusy`/`checkerError`/`checkerId`/`actionBusy`/`selectedCheckerMovement`/
+ * `releaseSuccessHint` and the whole Checker action layer — those belong with the visual Checker section
+ * (`<app-checker-panel>`'s own projected content), not this panel's own template.
  *
- * A genuinely new coupling THIS extraction introduces (Phase 1 never needed it, since Checker's own
- * queue-reload trigger is one-directional): `contextChanged` (`MakerCheckerContext`, mirroring
- * `CheckerActionContext`'s Maker-derived fields) and `syncRequested` (`MakerSyncRequest`, replacing the
- * pre-extraction `syncCheckerToContext()`/`syncLookupToContext()` private methods, both of which read
- * Maker-owned `model`/`naturalKey`/`selectedContract`/`selectedParent` and call into parent-owned
- * `lookUp`/`checkerSyncSignal`) are the two outputs that make the reverse direction (child -> parent read
- * mirror) work without `@ViewChild` — same "Input/Output signal, never a direct instance reference"
- * discipline this whole session's F-04 incident already established as load-bearing in this project.
+ * `contextChanged` (mirrors `CheckerActionContext`'s Maker-derived fields) and `syncRequested` are the two
+ * outputs that make the child -> parent read-mirror work without `@ViewChild`.
  */
 @Component({
   selector: 'app-maker-panel',
@@ -154,17 +119,10 @@ export interface MakerSyncRequest {
   templateUrl: './maker-panel.component.html',
   styleUrl: './maker-panel.component.scss',
   /**
-   * desiger-comments.md F-04 (2026-08-19) — component-scoped providers for the 4 services that are
-   * genuinely per-component-instance mutable state, never app-wide singletons (each service's own
-   * `@Injectable()` doc comment explains why `providedIn: 'root'` would be wrong for it). Mirrors
-   * `TransactionBuilderComponent`'s own already-proven `providers` array exactly — see that component's
-   * own doc comment (and the "F-04 fully reverted"/"F-04 fixed for real" CLAUDE.md history) for the full
-   * incident this pattern exists to avoid: a constructor-parameter DEFAULT VALUE alone is NOT enough —
-   * Angular's real, Ivy-compiled production DI factory tries to inject every constructor parameter by
-   * type/token unconditionally, regardless of any TS default value, and throws `NullInjectorError` if no
-   * provider is registered. `MakerSubmitService` needs NO entry here — it is already a real, correctly
-   * `@Injectable({providedIn:'root'})` singleton (unchanged, confirmed by direct file read), so Angular's
-   * own root injector already satisfies it without any additional registration.
+   * Component-scoped providers for services that are genuinely per-component-instance state, never
+   * app-wide singletons. A constructor default value alone isn't enough — Angular's real DI factory
+   * injects every constructor parameter by type unconditionally and throws `NullInjectorError` if no
+   * provider is registered. `MakerSubmitService` needs no entry — it's already `providedIn: 'root'`.
    */
   providers: [
     DocumentArrivalHintsService,
@@ -177,24 +135,20 @@ export interface MakerSyncRequest {
 export class MakerPanelComponent implements OnChanges {
   @Input() selectedFunction: TransactionFunction | null = null;
   @Input() activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
-  /** Same counter-based reset signal as `CheckerPanelComponent.resetTrigger` — see that component's own doc comment; the parent increments ONE shared counter, bound to both children, every `selectFunction()` call. */
+  /** Same counter-based reset signal as `CheckerPanelComponent.resetTrigger` — one shared counter, bound to both children, incremented every `selectFunction()` call. */
   @Input() resetTrigger: number | null = null;
-  /** Fresh-object-per-emission signal carrying a Checker action's own outcome — see this component's own class doc comment for why this exists (the shared-mutable-state problem `submitResult`/the compound-leg fields create between Maker-initiated Submit and Checker-initiated Release/Reject/Delete-Pending). */
+  /** Fresh-object-per-emission signal carrying a Checker action's own outcome — see this component's own class doc comment for the shared-mutable-state problem it resolves. */
   @Input() externalCheckerOutcome: CheckerActionOutcome | null = null;
   /**
-   * A plain nonce-counter signal (same "any change, by `!==`, is the trigger" shape as `resetTrigger`) —
-   * mirrors `TransactionBuilderComponent.checkerAct()`'s own PLAIN (non-compound, non-`CheckerActionsService`)
-   * release/reject path: the ORIGINAL pre-extraction code called `refreshSelectedContractSnapshot()` +
-   * `syncCheckerToContext()` there directly, WITHOUT ever touching `submitResult` (a Checker acting on an
-   * item found via their own independent search may have nothing to do with any Maker session's own
-   * `submitResult` at all). Deliberately a SEPARATE signal from `externalCheckerOutcome` — routing this
-   * through that channel would incorrectly set `submitResult` on every plain Checker action, corrupting
-   * the MAKER RESULT panel's own display for an action the Maker may never even be aware of.
+   * A plain nonce-counter signal, same shape as `resetTrigger`. A plain (non-compound) Checker
+   * release/reject only refreshes the snapshot and re-syncs — it never touches `submitResult` (the item
+   * may have nothing to do with any Maker session's own `submitResult`). Kept separate from
+   * `externalCheckerOutcome` so a plain Checker action can't corrupt the MAKER RESULT panel.
    */
   @Input() refreshRequested: number | null = null;
   /** Parent-owned (Checker action layer) — read here only to drive the "Delete Pending (EC)" button's own `[disabled]`/label, which lives inside this panel's own MAKER RESULT block. */
   @Input() actionBusy = false;
-  /** Parent-owned (set by `release()`'s success path right after it re-invokes `selectFunction()`, see that method's own doc comment) — read here only to render the brief post-Release confirmation hint at the top of this panel's own template, which lives here because the Maker section markup itself moved here. */
+  /** Parent-owned (set by `release()`'s success path) — read here only to render the brief post-Release confirmation hint at the top of this panel's own template. */
   @Input() releaseSuccessHint: string | null = null;
 
   /** See `MakerCheckerContext`'s own doc comment. */
@@ -225,7 +179,7 @@ export class MakerPanelComponent implements OnChanges {
   submitting = false;
   submitResult: BalanceMovement | null = null;
   submitError: string | null = null;
-  /** A3 (Document Arrival (Sight)) only — set by `approveArrival()` (parent, Checker acknowledgment) via `externalCheckerOutcome`'s `documentArrivalAcknowledged` outcome kind. Displayed nowhere in THIS panel's own template — kept here purely because it's part of the same outcome-application state machine as `submitResult`. */
+  /** A3 only — set by `approveArrival()` via `externalCheckerOutcome`'s `documentArrivalAcknowledged` kind. Not displayed here — kept because it's part of the same outcome-application state machine as `submitResult`. */
   arrivalApproved = false;
 
   /** See `CompoundLegState`'s own doc comment for why these 7 fields (A3S/A6/B4/B5's own multi-leg submissions) are grouped here rather than left flat. */
@@ -256,10 +210,9 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   /**
-   * Both `@Input()`s are pure "something happened, react to it" signals — see `CheckerPanelComponent
-   .ngOnChanges()`'s own doc comment for why this is the correct (and only) place to convert either into
-   * an imperative call, and why it's still fully testable via a direct `new MakerPanelComponent(mockApi)`
-   * + `ngOnChanges({...})` call with no `TestBed`/view-init lifecycle needed.
+   * Each `@Input()` is a plain "something happened, react to it" signal, converted here into an
+   * imperative call — testable via `new MakerPanelComponent(mockApi)` + `ngOnChanges({...})`, no
+   * `TestBed` needed.
    */
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['resetTrigger']) this.resetForFunction();
@@ -287,7 +240,7 @@ export class MakerPanelComponent implements OnChanges {
     });
   }
 
-  /** Mirrors `TransactionBuilderComponent.syncCheckerToContext()`'s pre-extraction body — see `MakerSyncRequest`'s own doc comment for why `alsoSyncLookup` exists (only `applyMakerSubmitOutcome()`'s own 'submitted' branch used to ALSO call `syncLookupToContext()`, every other call site synced the Checker alone). */
+  /** See `MakerSyncRequest`'s own doc comment for why `alsoSyncLookup` exists — only a 'submitted' outcome also syncs the Look Up panel; every other call site syncs the Checker alone. */
   private emitSync(alsoSyncLookup = false): void {
     const lcNumber = this.contextLcNumber;
     if (!lcNumber) return;
@@ -300,8 +253,7 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   /*
-   * BAL-003 (God Component, 2026-08-17) — one-line delegations to `function-policy.ts`; unchanged from
-   * the pre-extraction component, only their owning class moved.
+   * One-line delegations to `function-policy.ts` — pure derivation logic lives there.
    */
   get isCreatingMovement(): boolean {
     return policy.isCreatingMovement(this.model);
@@ -357,7 +309,7 @@ export class MakerPanelComponent implements OnChanges {
     return policy.contextSecondaryRef(this.contextRefState);
   }
 
-  /** `displayStatus()` thin delegation, duplicated on this component the same way `AccountEntriesDialogComponent` already carries its own copy (Emulated view encapsulation / component-local template binding surface — see that component's own doc comment for the identical reasoning). */
+  /** `displayStatus()` thin delegation — duplicated on this component the same way `AccountEntriesDialogComponent` carries its own copy, since Emulated view encapsulation scopes a template's binding surface to its own component. */
   displayStatus(status: string, instrumentType?: InstrumentType | string | null, movementType?: string | null): string {
     return displayStatusShared(status, instrumentType, movementType);
   }
@@ -377,13 +329,8 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   /**
-   * Mirrors `TransactionBuilderComponent.selectFunction()`'s own pre-extraction Maker-state reset block
-   * exactly, plus the `afterResolved()` dispatch it used to trigger inline. Reads `this.selectedFunction`
-   * (the `@Input()`, already updated to its final value by the time `ngOnChanges()` fires — both
-   * `selectedFunction` and `resetTrigger` are set synchronously by the parent's own `selectFunction()` in
-   * the same JS tick, so Angular's own change-detection pass always sees both at their final values
-   * together, the same timing guarantee `CheckerPanelComponent`'s own `syncFromContext()` already relies
-   * on for `selectedFunction`).
+   * Reads `this.selectedFunction` (the `@Input()`, already at its final value when `ngOnChanges()` fires —
+   * `selectedFunction`/`resetTrigger` are set synchronously in the same JS tick).
    */
   private resetForFunction(): void {
     const fn = this.selectedFunction;
@@ -431,12 +378,10 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   /**
-   * 2026-08-20 — generalized to dispatch on `subChoice.key` (see that field's own doc comment) so B2
-   * can share this exact mechanism instead of a bespoke Direction `<select>`: `'amendDirection'` (B2)
-   * writes the picked value into `amendDirection` and returns, deliberately WITHOUT touching
-   * `model.movementType` (fixed at 'AMEND' from the registry) or calling `afterResolved()` (whose
-   * FULL_SETTLE/REDEEM/SETTLE derivations don't apply to B2). Every other function's own
-   * `key: 'movementType'` case (A2/A7) is byte-for-byte unchanged.
+   * Dispatches on `subChoice.key`: `'amendDirection'` (B2) sets `amendDirection` only — it doesn't touch
+   * `model.movementType` (fixed at 'AMEND') or call `afterResolved()` (whose FULL_SETTLE/REDEEM/SETTLE
+   * derivations don't apply to B2). `'movementType'` (A2/A7) sets `model.movementType` and calls
+   * `afterResolved()`.
    */
   onSubChoice(): void {
     if (!this.selectedFunction || !this.subChoiceValue) return;
@@ -547,12 +492,9 @@ export class MakerPanelComponent implements OnChanges {
     if (page !== null) this.catalogPicker.page = page;
   }
 
-  /** BAL-003 Phase 3 (2026-08-20) — see `eligibility-rule.ts`'s own doc comment for why this returns a
-   * value for `applyEligibilityRule()` rather than filtering directly: the mechanical "now apply it" tail
-   * is shared with `filteredParentCatalog`/`filteredIbIndexCatalog`, but WHICH rule applies to this
-   * picker/function combination stays local (it reads `payableMovementInstrumentType`, a registry field
-   * deliberately outside the `FunctionStrategy` migration). Branch order/conditions unchanged from before
-   * this unification. */
+  /** Returns a value for the shared `applyEligibilityRule()` tail rather than filtering directly — which
+   * rule applies here stays local (reads `payableMovementInstrumentType`, a registry field outside the
+   * `FunctionStrategy` migration). */
   private resolveCatalogEligibilityRule(): EligibilityRule {
     if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
       return { kind: 'hintSet', ids: this.documentArrivalHints.catalogPayableIbs };
@@ -624,12 +566,9 @@ export class MakerPanelComponent implements OnChanges {
     return policy.parentTenorFamily(this.selectedFunction);
   }
 
-  /** BAL-003 Phase 3 (2026-08-20) — see `resolveCatalogEligibilityRule()`'s own doc comment; same shared
-   * mechanism, this picker's own branch order/conditions unchanged from before this unification.
-   * `gatedByMovementType: false` on the trailing fallback is DELIBERATE, not a copy-paste of the catalog
-   * resolver's own `true` — see `eligibility-rule.ts`'s own doc comment on `EligibilityRule` for the real,
-   * pre-existing asymmetry this preserves (the parent picker's own 0-balance exclusion was never gated by
-   * `DECREASING_MOVEMENT_TYPES` before this unification either). */
+  /** Same mechanism as `resolveCatalogEligibilityRule()`. `gatedByMovementType: false` here is
+   * deliberate, not copy-paste — the parent picker's own 0-balance exclusion is never gated by
+   * `DECREASING_MOVEMENT_TYPES` (see `EligibilityRule`'s own doc comment). */
   private resolveParentEligibilityRule(): EligibilityRule {
     if (this.requiresEligibleParentDocumentArrival) {
       return { kind: 'hintSet', ids: this.documentArrivalHints.parentPayableIbs };
@@ -752,7 +691,7 @@ export class MakerPanelComponent implements OnChanges {
     }
   }
 
-  /** A4's own real Maker Submit — see `TransactionBuilderComponent.submitA4()`'s pre-extraction doc comment for the full "no movement of its own to create" reasoning. */
+  /** A4's own real Maker Submit — A4 has no movement of its own to create, so this releases the picked existing movement instead. */
   submitA4(): void {
     if (!this.pickerSelection.selectedPayMovement) return;
     this.submitting = true;
@@ -937,10 +876,8 @@ export class MakerPanelComponent implements OnChanges {
     this.emitSync();
   }
 
-  /** BAL-003 Phase 3 (2026-08-20) — no special-case eligibility rule exists for the IB Index picker
-   * today; always resolves to `genericFallback`, matching the pre-unification body exactly. Kept as its
-   * own resolver (not a bare `{kind: 'genericFallback'}` inlined at the call site) purely for symmetry
-   * with the catalog/parent resolvers, in case a future function genuinely needs one here. */
+  /** No special-case rule exists for the IB Index picker; always resolves to `genericFallback`. Kept as
+   * its own resolver for symmetry with the other two, in case a future function needs one. */
   private resolveIbIndexEligibilityRule(): EligibilityRule {
     return { kind: 'genericFallback', gatedByMovementType: true };
   }
@@ -1063,12 +1000,8 @@ export class MakerPanelComponent implements OnChanges {
 
   private applyMakerSubmitOutcome(outcome: MakerSubmitOutcome): void {
     this.submitting = false;
-    // Safe as a plain merge-spread, not 7 individual `!== undefined` guards: every MakerSubmitSecondary
-    // object maker-submit.service.ts ever constructs (confirmed by reading all of its own `secondary:`
-    // literals) includes ONLY the keys it actually has a value for — never an explicit `key: undefined`
-    // — so a key genuinely absent from `outcome.secondary` is also absent from the spread and cannot
-    // overwrite the existing `compoundLegs` value for it, matching the old guards' own "only overwrite
-    // when a value is actually present" behavior exactly.
+    // Safe as a plain merge-spread, not 7 `!== undefined` guards: every `secondary:` object
+    // maker-submit.service.ts constructs includes only keys it has a value for, never `key: undefined`.
     this.compoundLegs = { ...this.compoundLegs, ...outcome.secondary };
 
     if (outcome.kind === 'submitted') {
@@ -1091,20 +1024,16 @@ export class MakerPanelComponent implements OnChanges {
     this.submitResult = null;
     this.submitError = null;
     this.arrivalApproved = false;
-    // Deliberately a PARTIAL reset — only these 3 of the 7 compoundLegs fields, byte-for-byte matching
-    // the pre-grouping behavior (dueFromIssuingBankMovementId/acceptanceReimbReceivableMovementId/
-    // acceptanceMovementId/matchedReceivableMovementId are NOT cleared here, only by resetForFunction()).
+    // Deliberately a PARTIAL reset — only these 3 of the 7 compoundLegs fields; the other 4 are cleared
+    // only by resetForFunction().
     this.compoundLegs = { ...this.compoundLegs, arrivalSgRedeemMovementId: null, arrivalSgRedeemMovement: null, acceptanceMovement: null };
 
     this.makerSubmit.submit(req, this.buildMakerSubmitContext()).subscribe((outcome) => this.applyMakerSubmitOutcome(outcome));
   }
 
   /**
-   * Applies a Checker-initiated outcome (Release/Reject/Delete-Pending — all still parent-owned) into
-   * this panel's own state. Mirrors `TransactionBuilderComponent.applyCheckerActionOutcome()`/
-   * `finishCheckerAction()`/`failCheckerAction()` exactly, minus `actionBusy` (stays parent-owned — the
-   * parent's own subscribe callback resets it directly, unconditionally, for every outcome kind, matching
-   * the fact that every branch of the original did the same).
+   * Applies a Checker-initiated outcome (Release/Reject/Delete-Pending — still parent-owned) into this
+   * panel's own state, minus `actionBusy` (parent resets it directly for every outcome kind).
    */
   private applyCheckerOutcome(outcome: CheckerActionOutcome): void {
     if (outcome.kind === 'failed') {

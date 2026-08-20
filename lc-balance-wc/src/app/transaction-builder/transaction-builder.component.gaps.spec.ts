@@ -7,25 +7,12 @@ import type { MakerCheckerContext } from './maker-panel.component';
 import * as functionStrategyModule from './function-strategy';
 
 /**
- * Closes coverage gaps in TransactionBuilderComponent's own remaining, parent-owned surface, post-
- * MakerPanelComponent extraction (2026-08-19, desiger-comments.md "Feature Components + Facade" pilot
- * #3): the Look Up Current Balance `activeLookup*` getters (lookUp is still parent-owned), the
- * Checker-side `isCheckerCompoundOwnSubmission`/`checkerActionInFlight`/`isArrivalAcknowledgmentStep`/
- * `checkerActionButtonLabel` getters, `checkerAct()`'s own describeApiError fallback branch, and the
- * Account Entries dialog (openAccountEntryDialog/closeAccountEntryDialog/onEscapeKey — all still
- * parent-owned; the dialog UI itself moved into AccountEntriesDialogComponent, but the state/methods
- * driving it stayed on the parent).
- *
- * Every getter/method/get-accessor this file used to cover for Maker-owned state (isCreatingMovement,
- * requiredNaturalKeyFields, hasParent, parentOptions, toleranceApplicable, ready, usesTwoFieldSearch,
- * ibNumberLabel, currencyDecimalPlaces, amountDecimalMismatch, formLocked, displayFields, fieldsLocked,
- * requiresEligibleTarget, hasEligibleTargetSelected, noEligibleRecordsMessage, flattenedPayableRows,
- * catalogPicker/parentPicker paging+filtering getters, filteredPayableMovements, catalogPendingHint,
- * arrivalSgRedeem* getters, filteredIbIndexCatalog, lcNumberFromParent/contextLcNumber/
- * contextSecondaryRef, searchExistingContract's own branch coverage, the onSelectContract/onSelectParent
- * error-callback branches, afterResolved()'s amount-default branches, rebuildFields()'s own Formly
- * `expressions` callbacks) moved to maker-panel.component.spec.ts — MakerPanelComponent now owns all of
- * it directly.
+ * Closes coverage gaps in TransactionBuilderComponent's own remaining, parent-owned surface: the Look
+ * Up Current Balance `activeLookup*` getters, the Checker-side `isCheckerCompoundOwnSubmission`/
+ * `checkerActionInFlight`/`isArrivalAcknowledgmentStep`/`checkerActionButtonLabel` getters,
+ * `checkerAct()`'s describeApiError fallback branch, and the Account Entries dialog state/methods
+ * (the dialog UI itself lives in AccountEntriesDialogComponent). Maker-owned state coverage is in
+ * maker-panel.component.spec.ts.
  */
 
 function fn(code: string): TransactionFunction {
@@ -75,12 +62,7 @@ function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
   };
 }
 
-/**
- * 2026-08-18 ("Look Up Current Balance's own Event Timeline should use the SAME status/display logic as
- * Inquire Events") — lookUp.lookupMovements/acceptanceMovements/sgMovements are now InquiredEvent[], not
- * a raw BalanceMovement[]. These tests only exercise activeLookupMovements' own tab-routing (which array
- * it reads from), never the row shape itself, so a 'primary'-phase wrapper is enough.
- */
+/** lookUp.lookupMovements/acceptanceMovements/sgMovements are InquiredEvent[]; these tests exercise only tab-routing, so a 'primary'-phase wrapper is enough. */
 function eventRow(overrides: Partial<{ movement: BalanceMovement; contract: BalanceContract }> = {}): InquiredEvent {
   return { movement: movement(), contract: contract(), eventTime: movement().createdAt, eventStatus: movement().status, phase: 'primary', ...overrides };
 }
@@ -100,11 +82,7 @@ function mockApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
   } as unknown as BalanceComponentApiService;
 }
 
-/**
- * Replaces the parent's own private `makerContext` mirror directly — the same `(x as any).privateField =
- * ...` pattern already used elsewhere in this codebase's own test files, and the same helper shape
- * transaction-builder.component.actions.spec.ts's own `setMakerContext()` already establishes.
- */
+/** Replaces the parent's private `makerContext` mirror directly, same shape as actions.spec.ts's `setMakerContext()`. */
 function setMakerContext(comp: TransactionBuilderComponent, overrides: Partial<MakerCheckerContext> = {}): void {
   (comp as any).makerContext = {
     submitResult: null,
@@ -215,8 +193,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.lookUp.lookupHasSg).toBe(false);
     });
 
-    // UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design") — the Acceptance picker's own
-    // catalog rows (and the Acceptance tab button itself) need this side-aware label.
+    // The Acceptance picker's catalog rows and tab button need this side-aware label.
     it("acceptanceBalanceLabel is 'Acceptance Balance' with no lookupResult or for an Import LC, 'Confirmed LC Acceptance Balance' for an Export Confirmation", () => {
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.lookUp.acceptanceBalanceLabel).toBe('Acceptance Balance');
@@ -244,16 +221,15 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.checkerActionInFlight).toBe(true);
       (c as any).actionBusy = false;
 
-      // isCheckerCompoundOwnSubmission (A3S/documentArrivalWithSg): bug fixed 2026-08-16 — routes on
-      // the picked item's OWN shape (UTILIZE + a real businessEventId), no submitResult match required,
-      // so a genuinely separate Checker session (submitResult null/stale) still routes correctly.
+      // A3S/documentArrivalWithSg: routes on the picked item's own shape (UTILIZE + businessEventId), no
+      // submitResult match required.
       c.selectFunction(fn('A3S')); // documentArrivalWithSg
       c.selectedCheckerMovement = movement({ movementId: 'm-1', movementType: 'UTILIZE', businessEventId: 'be-1' });
       expect(c.isCheckerCompoundOwnSubmission).toBe(true);
       expect(c.isArrivalAcknowledgmentStep).toBe(true);
       expect(c.checkerActionButtonLabel).toBe('Release (Shipping Guarantee redemption)');
 
-      // makerContext.submitResult mismatch/absence no longer matters for A3S — confirms the cross-session fix.
+      // makerContext.submitResult mismatch/absence doesn't matter for A3S.
       setMakerContext(c, { submitResult: movement({ movementId: 'other' }) });
       expect(c.isCheckerCompoundOwnSubmission).toBe(true);
       setMakerContext(c, { submitResult: null });
@@ -268,10 +244,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectedCheckerMovement = null;
       expect(c.isCheckerCompoundOwnSubmission).toBe(false);
 
-      // isCheckerCompoundOwnSubmission (B5/settlesAcceptanceOnMature): bug fixed 2026-08-16 — same
-      // shape as A3S above, previously entirely unreachable (this flag was never even checked here, so
-      // checkerAct() could never route a B5 Release into the real compound at all, same or cross
-      // session alike).
+      // B5/settlesAcceptanceOnMature: same shape as A3S above.
       const cB5 = new TransactionBuilderComponent(mockApi());
       cB5.selectFunction(fn('B5'));
       cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'FULL_SETTLE', businessEventId: 'be-2' });
@@ -283,15 +256,9 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'CREATE', businessEventId: 'be-2' });
       expect(cB5.isCheckerCompoundOwnSubmission).toBe(false);
 
-      // createsIssuingBankReceivableOnHonour's own branch (movementType === 'HONOUR') sits behind the
-      // settlesDocumentArrival/documentArrivalWithSg check above, which always wins first. In the real
-      // registry every function carrying createsIssuingBankReceivableOnHonour (only B4) also carries
-      // settlesDocumentArrival, so that branch is unreachable via any real function object — exercise it
-      // directly via a synthetic Strategy variant with the earlier flag stripped, same pattern used
-      // elsewhere in this file for other doc-comment-confirmed "unreachable in practice" branches.
-      // Since PR-5 of the F-01 Strategy refactoring removed the raw flags from TransactionFunction
-      // entirely, this now stubs deriveFunctionStrategy() itself (real B4 in every other respect) rather
-      // than spreading a flag override onto a plain object literal.
+      // createsIssuingBankReceivableOnHonour's own branch is unreachable via any real function object
+      // (B4 also always carries settlesDocumentArrival, which wins first) — stub deriveFunctionStrategy()
+      // with that flag stripped to exercise it directly.
       const realDeriveFunctionStrategy = functionStrategyModule.deriveFunctionStrategy;
       const strategySpy = jest.spyOn(functionStrategyModule, 'deriveFunctionStrategy').mockImplementation((f) => {
         const real = realDeriveFunctionStrategy(f);
@@ -324,9 +291,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c4.isArrivalAcknowledgmentStep).toBe(true);
       expect(c4.checkerActionButtonLabel).toBe('Approve (acknowledgment only)');
 
-      // Neither deferSettlement nor documentArrivalWithSg set (A1) -> false, even with a UTILIZE-typed
-      // selectedCheckerMovement — both `||` operands must actually be evaluated and found falsy here,
-      // not just short-circuited true by an earlier one as in the A3/A3S cases above.
+      // Neither deferSettlement nor documentArrivalWithSg set (A1) -> false, even with UTILIZE.
       const c5 = new TransactionBuilderComponent(mockApi());
       c5.selectFunction(fn('A1'));
       c5.selectedCheckerMovement = movement({ movementId: 'm-5', movementType: 'UTILIZE' });
@@ -334,12 +299,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     });
   });
 
-  // payExisting() (A4's own dedicated release method) was removed in the 2026-08-16 4-eyes redesign
-  // — A4 now releases exclusively via the generic Checker panel's checkerAct('release'), same as
-  // every other function, so the describeApiError fallback is exercised through that path instead.
-  // makerSubmittedAt must be set (the real Maker Submit redesign, same day) or checkerAct() blocks
-  // before ever reaching api.release() — see transaction-builder.component.actions.spec.ts's own
-  // dedicated gate tests for that branch.
+  // A4 releases via the generic Checker panel's checkerAct('release'), same as every other function.
+  // makerSubmittedAt must be set or checkerAct() blocks before reaching api.release().
   describe('checkerAct() — describeApiError fallback branch', () => {
     it("checkerAct('release'): a release() error lacking err.error.message falls back to String(err)", () => {
       const api = mockApi({ release: jest.fn(() => throwError(() => 'plain string failure')) as any });
@@ -368,9 +329,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.accountEntryDialogMovement).toBe(m);
     });
 
-    // 2026-08-18 (EARMARK/APPROVED status split) — accountEntryDialogInstrumentType is the companion
-    // field displayStatus() needs alongside accountEntryDialogMovement, since BalanceMovement itself
-    // carries no instrumentType of its own.
+    // accountEntryDialogInstrumentType is the companion field displayStatus() needs, since
+    // BalanceMovement itself carries no instrumentType.
     it('openAccountEntryDialog also sets accountEntryDialogInstrumentType to the value passed in', () => {
       const c = new TransactionBuilderComponent(mockApi());
       expect(c.accountEntryDialogInstrumentType).toBeNull();
@@ -411,11 +371,8 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
     });
 
     it('the Look Up button (onLookUpClick) resets an open dialog (both fields) before reloading the Event Timeline', () => {
-      // F-04 (2026-08-19) — the dialog-closing callback moved from LookUpPanelService's own constructor
-      // to a call-time parameter on runLookup() (see that class's own doc comment); calling
-      // lookUp.runLookup() directly, with no callback, is a valid use on its own (e.g. re-running a
-      // search) and correctly does NOT close the dialog by itself — the real UI entry point,
-      // onLookUpClick(), is what supplies the callback, so THAT is what this test now drives.
+      // The dialog-closing callback is a call-time parameter on runLookup(); onLookUpClick() is the real
+      // UI entry point that supplies it.
       const c = new TransactionBuilderComponent(mockApi());
       c.openAccountEntryDialog(movement(), 'IPLC_LC');
       c.onLookUpClick();

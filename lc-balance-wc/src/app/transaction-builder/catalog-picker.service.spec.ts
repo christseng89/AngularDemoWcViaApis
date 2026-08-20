@@ -3,14 +3,9 @@ import { CatalogPickerService } from './catalog-picker.service';
 import { BalanceComponentApiService, BalanceContract } from './balance-component-api.service';
 
 /**
- * desiger-comments.md F-09 (2026-08-19, OCP) — direct unit tests for `load()`'s own `status`/
- * `requireIssueReleased` override, the one new extension point this fix added. This class's own
- * long-established convention (see its own class doc comment) is to test the fetch/populate/error shape
- * only indirectly, through `TransactionBuilderComponent`'s own 3 real callers — that convention still
- * holds for everything ELSE in this file, since the 3 existing callers' own behavior is completely
- * unchanged (both new params default to the exact literals they used to hardcode). This one small file
- * exists purely to prove the override itself actually works end to end, since none of the 3 existing
- * callers exercises a non-default value.
+ * desiger-comments.md F-09 — direct unit tests for `load()`'s own `status`/`requireIssueReleased`
+ * override (the class is otherwise tested only indirectly, through `TransactionBuilderComponent`'s own
+ * 3 real callers, none of which exercises a non-default value).
  */
 
 function contract(overrides: Partial<BalanceContract> = {}): BalanceContract {

@@ -4,21 +4,11 @@ import type { BalanceComponentApiService, BalanceMovement, BalanceSnapshot, Cata
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, TransactionFunction } from './balance-component.model';
 
 /**
- * Direct-instantiation, no-TestBed unit tests (house style — see
- * lc-payment-wc's leg-allocator.component.spec.ts) for TransactionBuilderComponent's own remaining
- * parent-owned surface, post-MakerPanelComponent extraction (2026-08-19, desiger-comments.md "Feature
- * Components + Facade" pilot #3): constructor (parent-owned defaults only), selectFunctionSide,
- * selectFunction (parent-owned reset only — the Maker-side reset this method used to perform inline now
- * lives on MakerPanelComponent.resetForFunction(), triggered via the shared checkerResetNonce/
- * resetTrigger signal — see maker-panel.component.spec.ts for that half), displayStatus, statusBadgeClass,
- * movementTypeChecksAvailableBalance.
- *
- * Everything that used to live in this file testing Maker-owned state directly (comp.model/
- * comp.selectedContract/comp.catalogPicker/comp.submitResult/reloadCatalog/onSubChoice/
- * onCatalogSearch/onSelectFlattenedPayable/catalogIbHint/catalogPrevPage-catalogNextPage/
- * CatalogPickerService.load/onParentInstrumentTypeChange/onParentSearch/parentPrevPage-parentNextPage/
- * onPayableMovementSearchChange/catalogPendingHint/movementTypeChecksAvailableBalance) moved to
- * maker-panel.component.spec.ts — MakerPanelComponent now owns all of it directly.
+ * Direct-instantiation, no-TestBed unit tests for TransactionBuilderComponent's remaining
+ * parent-owned surface: constructor, selectFunctionSide, selectFunction (parent-owned reset only —
+ * the Maker-side reset lives on MakerPanelComponent.resetForFunction()), displayStatus,
+ * statusBadgeClass, movementTypeChecksAvailableBalance. Maker-owned state is covered in
+ * maker-panel.component.spec.ts.
  */
 
 function findFn(list: TransactionFunction[], code: string): TransactionFunction {
@@ -87,8 +77,7 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.checkerBusy).toBe(false);
       expect(comp.checkerError).toBeNull();
       expect(comp.checkerId).toBe('checker1');
-      // BAL-003 pilot #2 (2026-08-19) — checkerLcNumber moved to CheckerPanelComponent, its own initial
-      // state now covered by checker-panel.component.spec.ts.
+      // checkerLcNumber moved to CheckerPanelComponent; covered by checker-panel.component.spec.ts.
       expect(comp.checkerSyncSignal).toBeNull();
       expect(comp.checkerResetNonce).toBe(0);
       expect(comp.actionBusy).toBe(false);
@@ -135,7 +124,7 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.arrivalApproved).toBe(false);
       expect(comp.accountEntryDialogMovement).toBeNull();
       expect(comp.accountEntryDialogInstrumentType).toBeNull();
-      // selectFunction() itself never calls the api — that's all Maker/Checker-child-owned now.
+      // selectFunction() never calls the api — Maker/Checker-child-owned now.
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
@@ -149,13 +138,8 @@ describe('TransactionBuilderComponent', () => {
 
       expect(comp.selectedCheckerMovement).toBeNull();
       expect(comp.checkerError).toBeNull();
-      // BAL-003 pilot #2 (2026-08-19) — checkerContract/checkerSearchError/checkerItems/checkerLcNumber
-      // moved to CheckerPanelComponent; selectFunction() now signals it to reset via checkerResetNonce
-      // instead (checkerLcNumber itself is still deliberately NOT part of that reset — see
-      // CheckerPanelComponent.resetPanel()'s own doc comment, unchanged reasoning). The equivalent
-      // Maker-side reset (model/naturalKey/catalogPicker/etc, ~30 fields) is now covered by
-      // maker-panel.component.spec.ts's own "resetForFunction() (via ngOnChanges resetTrigger)" describe
-      // block, triggered the same way a real template binding would (resetTrigger changing).
+      // Checker queue state moved to CheckerPanelComponent; selectFunction() signals it via
+      // checkerResetNonce (checkerLcNumber itself is deliberately excluded — see resetPanel()).
       expect(comp.checkerResetNonce).toBe(priorResetNonce + 1);
     });
 
@@ -171,10 +155,7 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
-  // Settled requirement, 2026-08-18 ("Both Look Up Current Balance and Inquire Events must use exactly
-  // the same Status mapping logic... do not get this wrong again") — the full mapping table:
-  //   Import A3/A3S, Export B3        : Not Released -> EARMARKING, Released -> EARMARKED
-  //   Every other function            : Not Released -> PENDING,    Released -> APPROVED
+  // Status mapping: Import A3/A3S, Export B3 -> EARMARKING/EARMARKED; every other function -> PENDING/APPROVED.
   describe('displayStatus', () => {
     it('relabels RELEASED as APPROVED (display-only) for a function OTHER than Document Arrival/Present Docs', () => {
       const { comp } = makeComponent();
@@ -213,13 +194,8 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.displayStatus('SUPERSEDED')).toBe('SUPERSEDED');
     });
 
-    // Bug fixed 2026-08-18, reviewer-caught live on the real running app: "Import LC S01 => A4 · Sight
-    // Settlement / IPLC_LC / UTILIZE / 12000 / B01 / — / EARMARKED / 8/18/26, 9:04 AM — 應該是 Approved
-    // 對嗎?" (shouldn't that be Approved?). Inquire Events' own merged timeline splits a finalized Sight
-    // Document Arrival into a 'create' row (A3's own submission) and a 'finalize' row (A4's own Release)
-    // — both sharing the IDENTICAL (IPLC_LC, UTILIZE), so the earlier fix (scoped by instrumentType/
-    // movementType alone) wrongly labeled A4's OWN row EARMARKED too, even though the Function column
-    // right next to it correctly said "A4 · Sight Settlement", not A3.
+    // A split UTILIZE's 'create' (A3) and 'finalize' (A4) rows share the same (instrumentType,
+    // movementType) — phase disambiguates which one is the real earmark.
     it("does NOT relabel RELEASED as EARMARKED for a 'finalize'-phase row (A4's own completion of a Sight Document Arrival) — reproduces the exact reported LC S01 case", () => {
       const { comp } = makeComponent();
       expect(comp.displayStatus('RELEASED', 'IPLC_LC', 'UTILIZE', 'finalize')).toBe('APPROVED');
@@ -233,10 +209,8 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
-  // 2026-08-18, user-requested ("EARMARK 可否用與APPROVED PENDING不同顏色區分" — a color distinct from
-  // both APPROVED and PENDING) — mirrors displayStatus()'s own EARMARKING/EARMARKED-vs-PENDING/APPROVED
-  // decision exactly. EARMARKING (a PENDING-status earmark movement) deliberately shares PENDING's own
-  // amber class, unchanged — only the RELEASED side gets a distinct color.
+  // Mirrors displayStatus()'s EARMARKING/EARMARKED split — EARMARKING shares PENDING's amber class;
+  // only the RELEASED side gets a distinct color.
   describe('statusBadgeClass', () => {
     it('returns the pending class for PENDING, regardless of instrumentType/movementType (EARMARKING included)', () => {
       const { comp } = makeComponent();
@@ -266,11 +240,8 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
-  // 2026-08-20, user-directed ("B2 Decrease...Look Up Current Balance and Inquire Events B2 Type與Amount
-  // 處理應該跟A2一樣 AMEND_INCREASE AMEND_DECREASE") — thin delegation to the shared
-  // displayMovementType()/displayMovementAmount() pure functions, same convention as displayStatus()/
-  // statusBadgeClass() above. Full branch coverage of the underlying rule itself lives in
-  // balance-component.model.spec.ts; these just prove the delegation wiring.
+  // Thin delegation to the shared displayMovementType()/displayMovementAmount() pure functions; full
+  // branch coverage lives in balance-component.model.spec.ts.
   describe('displayMovementType / displayMovementAmount', () => {
     it('relabels a negative B2 (EPLC_CONFIRMATION/AMEND) amount as AMEND_DECREASE with the de-signed magnitude', () => {
       const { comp } = makeComponent();

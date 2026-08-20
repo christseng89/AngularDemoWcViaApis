@@ -2,11 +2,7 @@ import { Subject, of, throwError } from 'rxjs';
 import { InquireEventsService, InquiredEvent } from './inquire-events.service';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 
-/**
- * Inquire Events (2026-08-17) — mirrors checker-actions.service.spec.ts's own mock-factory convention
- * (makeMovement()/makeContract()/makeApi() helpers, plain `new InquireEventsService(mockApi)`
- * construction, no TestBed) — same testability posture as this project's other extracted services.
- */
+/** Mirrors checker-actions.service.spec.ts's own mock-factory convention (no TestBed). */
 
 function makeContract(overrides: Partial<BalanceContract> = {}): BalanceContract {
   return {
@@ -53,7 +49,7 @@ function makeSnapshot(overrides: Partial<BalanceSnapshot> = {}): BalanceSnapshot
   };
 }
 
-/** Bug fix 2026-08-18 ("A4 Sight Payment" ordering fix) — InquiredEvent gained eventTime/eventStatus/phase; this wraps a bare {movement, contract} pair with the ordinary 'primary'-phase defaults every pre-existing test site expects. */
+/** Wraps a bare {movement, contract} pair with the ordinary 'primary'-phase defaults most test sites expect. */
 function makeEvent(overrides: Partial<InquiredEvent> & Pick<InquiredEvent, 'movement' | 'contract'>): InquiredEvent {
   return { eventTime: overrides.movement.createdAt, eventStatus: overrides.movement.status, phase: 'primary', ...overrides };
 }
@@ -137,27 +133,17 @@ describe('InquireEventsService', () => {
 
       expect(svc.rootContract).toBe(root);
       expect(svc.eventsLoading).toBe(false);
-      // sgMovement (2026-08-01) sorts before rootMovement (2026-08-02) — true Event Date/Time order,
-      // not registration/array order.
+      // sgMovement (earlier createdAt) sorts before rootMovement — true Event Date/Time order.
       expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-sg', 'mv-root']);
       expect(svc.events.find((e) => e.movement.movementId === 'mv-sg')?.contract).toBe(sg);
     });
 
-    /**
-     * Bug fixed 2026-08-18, business-reported live example — LC S01: "A1 Issue → A3 Document Arrival →
-     * A8 Shipping Guarantee Issue → A4 Sight Payment" is the real order, reproduced here field-for-field
-     * from the live DB dump (see InquiredEvent's own doc comment) — A1 ISSUE (createdAt 11:30:08), A3's
-     * own UTILIZE (createdAt 11:30:35, later Maker-Submitted/Released by A4 at 15:37:01/15:37:08), A8
-     * SHGT ISSUE (createdAt 11:31:01). Before this fix, the merged timeline showed only 3 rows, with the
-     * UTILIZE pinned at its EARLY createdAt position — A4's own much-later Release was invisible.
-     */
+    /** Reproduces LC S01's real chronological order — A1 Issue, A3 Document Arrival, A8 SG Issue, A4 Sight Settlement — see InquiredEvent's own doc comment. */
     it('splits a finalized Sight-tenor Document Arrival (A3/A4) into 2 rows and sorts the WHOLE merged timeline by true Event Date/Time — reproduces LC S01 exactly: A1, A3(create), A8, A4(finalize)', () => {
       const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S01' } });
       const sg = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S01', sgNumber: 'G01' } });
       const issueMovement = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-17T11:30:08.658Z' });
-      // A3's own Create-time snapshot (PENDING, per the microservice's own release() fix — 2026-08-18,
-      // "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" — release() no longer overwrites
-      // this) vs. A4's own separate finalize-time snapshot (RELEASED figures, a distinct field).
+      // A3's own frozen Create-time snapshot vs. A4's own separate finalize-time snapshot.
       const a3CreateSnapshot = makeSnapshot({ confirmedBalance: '100000', availableBalance: '77655' });
       const a4FinalizeSnapshot = makeSnapshot({ confirmedBalance: '60000', availableBalance: '60000' });
       const utilizeMovement = makeMovement({
@@ -190,23 +176,16 @@ describe('InquireEventsService', () => {
       expect(svc.events.length).toBe(4);
       expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-issue', 'mv-utilize', 'mv-sg', 'mv-utilize']);
       expect(svc.events.map((e) => e.phase)).toEqual(['primary', 'create', 'primary', 'finalize']);
-      // eventStatus is the movement's own real, current status on EVERY row (2026-08-18, business-
-      // mandated — "RELEASE 是指該筆交易是否已完成 RELEASE...不得誤判為RELEASED" reversing an earlier
-      // same-day design that forced the 'create' row to a stale 'PENDING' — see toEventRows()'s own doc
-      // comment for the full history).
+      // eventStatus is the movement's real current status on EVERY row, never a frozen 'PENDING' — see toEventRows().
       expect(svc.events.map((e) => e.eventStatus)).toEqual(['RELEASED', 'RELEASED', 'RELEASED', 'RELEASED']);
       expect(svc.events.map((e) => e.eventTime)).toEqual([issueMovement.createdAt, utilizeMovement.createdAt, sgMovement.createdAt, utilizeMovement.releasedAt]);
 
-      // Selecting the 'create' row resolves to A3 (Document Arrival) with the movement's real RELEASED
-      // status and its real before/after impact — the SAME real impact the 'finalize' row (A4) shows,
-      // since both rows represent the one real movement's one real release.
+      // 'create' resolves to A3 with the movement's real status/impact — same real impact 'finalize' (A4) shows.
       const createRow = svc.events.find((e) => e.phase === 'create')!;
       svc.selectEvent(createRow);
       expect(svc.selectedEventFunction?.code).toBe('A3');
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter });
-      // The core guarantee this fix protects: A3's own snapshot is exactly what createMovement()
-      // captured, never A4's own later result — even though BOTH rows share the identical underlying
-      // `movement` object (movement.finalizeEventSnapshot is NOT what the 'create' row shows).
+      // A3's own snapshot stays what createMovement() captured, never A4's later finalizeEventSnapshot.
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBe(a3CreateSnapshot);
 
       const finalizeRow = svc.events.find((e) => e.phase === 'finalize')!;
@@ -288,15 +267,7 @@ describe('InquireEventsService', () => {
     });
   });
 
-  /**
-   * LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC Master Records
-   * 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the SAME day, same
-   * wording, to Export Confirmed LC — "Same requirement for Export Confirmed"). Side-agnostic — the bulk
-   * of this describe block exercises the Import LC (`IPLC_LC`) shape (unchanged from the original,
-   * Import-only version), with a dedicated Export Confirmed (`EPLC_CONFIRMATION`) case for the one
-   * genuinely side-specific piece of logic (`deriveLcAmount()`'s ISSUE/AMEND vs. ISSUE/AMEND_INCREASE/
-   * AMEND_DECREASE branching) and a `selectSide()` case proving BOTH sides now auto-load their own Index.
-   */
+  /** Side-agnostic — mostly exercises Import LC; a dedicated Export case covers deriveLcAmount()'s side-specific AMEND branching. */
   describe('LC Master Records Index (loadIndex / searchIndex / paging / selectLcFromIndex / backToIndex)', () => {
     function s001(): BalanceContract {
       return makeContract({ balanceContractId: 'bc-s001', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' }, status: 'ACTIVE', currency: 'USD', tenorType: 'BUYERS_USANCE' });
@@ -313,8 +284,7 @@ describe('InquireEventsService', () => {
       const incS001 = makeMovement({ movementId: 'mv-inc-1', balanceContractId: 'bc-s001', movementType: 'AMEND_INCREASE', amount: '20000', createdAt: '2026-08-02T00:00:00.000Z' });
       const decS001 = makeMovement({ movementId: 'mv-dec-1', balanceContractId: 'bc-s001', movementType: 'AMEND_DECREASE', amount: '10000', createdAt: '2026-08-03T00:00:00.000Z' });
       const pendingUtilizeS001 = makeMovement({ movementId: 'mv-utl-1', balanceContractId: 'bc-s001', movementType: 'UTILIZE', amount: '5000', status: 'PENDING', createdAt: '2026-08-04T00:00:00.000Z' });
-      // A RELEASED movement whose movementType isn't one of the 3 face-amount-affecting ones — proves
-      // deriveLcAmount() also filters by movementType, not just status.
+      // A RELEASED but non-face-amount movementType — proves deriveLcAmount() filters by type too, not just status.
       const releasedUtilizeS001 = makeMovement({ movementId: 'mv-utl-2', balanceContractId: 'bc-s001', movementType: 'UTILIZE', amount: '7000', status: 'RELEASED', createdAt: '2026-08-04T12:00:00.000Z' });
       const sgIssue = makeMovement({ movementId: 'mv-sg-issue', balanceContractId: 'bc-sg-s001', movementType: 'ISSUE', amount: '12345', createdAt: '2026-08-05T00:00:00.000Z' });
       const issueS002 = makeMovement({ movementId: 'mv-issue-2', balanceContractId: 'bc-s002', movementType: 'ISSUE', amount: '9999', createdAt: '2026-07-01T00:00:00.000Z' });
@@ -347,12 +317,12 @@ describe('InquireEventsService', () => {
       expect(svc.indexRows.length).toBe(2);
 
       const row1 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S001')!;
-      expect(row1.lcAmount).toBe('110000'); // 100000 + 20000 - 10000; neither UTILIZE counts (one's PENDING, the other isn't a face-amount movementType at all).
+      expect(row1.lcAmount).toBe('110000'); // 100000 + 20000 - 10000; neither UTILIZE counts.
       expect(row1.availableBalance).toBe('77000');
       expect(row1.currency).toBe('USD');
       expect(row1.status).toBe('ACTIVE');
-      expect(row1.tenorType).toBe("Buyer's Usance"); // 2026-08-19 — Tenor Type column, positioned right after LC Number.
-      expect(row1.lastEventAt).toBe(sgIssue.createdAt); // 2026-08-05 — later than S001's own latest movement (2026-08-04).
+      expect(row1.tenorType).toBe("Buyer's Usance");
+      expect(row1.lastEventAt).toBe(sgIssue.createdAt); // later than S001's own latest movement.
 
       const row2 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S002')!;
       expect(row2.lcAmount).toBe('9999');
@@ -361,14 +331,7 @@ describe('InquireEventsService', () => {
       expect(row2.lastEventAt).toBe(issueS002.createdAt);
     });
 
-    /**
-     * Export Confirmed LC (2026-08-19, "Same requirement for Export Confirmed") — EPLC_CONFIRMATION has
-     * no separate AMEND_INCREASE/AMEND_DECREASE split; ONE `AMEND` movementType covers both, direction
-     * folded into the SIGN of `amount` itself (see deriveLcAmount()'s own doc comment and the
-     * microservice's own domain/contingentAccountEntry.ts doc comment). Proves the LC Amount column is
-     * genuinely correct for Export, not silently zero (AMEND_INCREASE/AMEND_DECREASE never match a
-     * Confirmation contract's own movements at all).
-     */
+    /** EPLC_CONFIRMATION has no AMEND_INCREASE/AMEND_DECREASE split — direction is the sign of AMEND's own amount. */
     it('loadIndex() on the Export Confirmed side derives lcAmount from ISSUE + signed AMEND (not AMEND_INCREASE/AMEND_DECREASE, which never apply to EPLC_CONFIRMATION)', () => {
       const confirmation = makeContract({ balanceContractId: 'bc-cnf01', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE', currency: 'USD', tenorType: 'SELLERS_USANCE' });
       const issue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf01', movementType: 'ISSUE', amount: '100000', createdAt: '2026-08-01T00:00:00.000Z' });
@@ -388,10 +351,9 @@ describe('InquireEventsService', () => {
       svc.loadIndex(1);
 
       expect(svc.indexRows.length).toBe(1);
-      expect(svc.indexRows[0].lcAmount).toBe('105000'); // 100000 + 20000 - 15000; the PENDING AMEND contributes nothing.
+      expect(svc.indexRows[0].lcAmount).toBe('105000'); // 100000 + 20000 - 15000; PENDING AMEND excluded.
       expect(svc.indexRows[0].contract.naturalKey.lcNumber).toBe('CNF01');
-      // Export Confirmed LC labels SELLERS_USANCE as plain "Usance" (tenorTypeLabel()'s own side-aware rule) —
-      // NOT "Seller's Usance", which is Import-only wording (Buyer's/Seller's is meaningless to the confirming bank).
+      // Export labels SELLERS_USANCE as plain "Usance" (tenorTypeLabel()'s side-aware rule), not Import's "Seller's Usance".
       expect(svc.indexRows[0].tenorType).toBe('Usance');
     });
 
@@ -420,7 +382,7 @@ describe('InquireEventsService', () => {
 
       expect(svc.indexRows.length).toBe(1);
       expect(svc.indexRows[0].lastEventAt).toBe(issue.createdAt);
-      // Only ONE catalog() call — the index page itself; no child-catalog lookups were ever attempted.
+      // Only one catalog() call — no child-catalog lookups attempted.
       expect(catalog).toHaveBeenCalledTimes(1);
     });
 
@@ -490,7 +452,7 @@ describe('InquireEventsService', () => {
       expect(svc.rootContract).toBe(contract);
       expect(svc.indexView).toBe('EVENTS');
       expect(svc.events.length).toBe(1);
-      // Preserved across the round trip, per the user's own requirement #3.
+      // Preserved across the round trip.
       expect(svc.indexRows.length).toBe(1);
       expect(svc.indexPaging.page).toBe(2);
       expect(svc.indexPaging.total).toBe(15);
@@ -543,8 +505,7 @@ describe('InquireEventsService', () => {
     });
   });
 
-  // UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — client-side windowing
-  // over the already-loaded `events` array (eventsPaging.pageSize is 10, so 25 events -> 3 pages).
+  // Client-side windowing over the already-loaded events array (pageSize 10, so 25 events -> 3 pages).
   describe('pagedEvents / eventsPaging (client-side pagination)', () => {
     function make25EventsService(): InquireEventsService {
       const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC' });
@@ -608,7 +569,7 @@ describe('InquireEventsService', () => {
       svc.nextEventsPage();
       expect(svc.eventsPaging.page).toBe(2);
 
-      // A second search (e.g. re-searching, or a different LC) must not leave stale page/total behind.
+      // A second search must not leave stale page/total behind.
       svc.search();
 
       expect(svc.eventsPaging.page).toBe(1);
@@ -617,8 +578,7 @@ describe('InquireEventsService', () => {
     });
   });
 
-  // UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位") — extracted from
-  // selectEvent()'s own resolution logic so the merged Events table can show it per row too.
+  // Extracted from selectEvent()'s own resolution logic so the merged table can show it per row too.
   describe('functionFor', () => {
     it('resolves a primary-phase event via the generic Strategy-table lookup (A1 — IPLC_LC/ISSUE)', () => {
       const svc = new InquireEventsService(makeApi());
@@ -691,12 +651,7 @@ describe('InquireEventsService', () => {
     });
   });
 
-  /**
-   * 2026-08-17, Balance Tabs (third revision — precise user spec, confirmed via AskUserQuestion): up to
-   * 3 tabs, gated purely by the root LC's own product type/tenor (selectedEventIsUsanceLc/
-   * selectedEventHasSg), a child tab (Acceptance/SG) populated ONLY when the selected Event belongs to
-   * that specific child.
-   */
+  /** Up to 3 tabs, gated by the root LC's own product type/tenor. */
   describe('selectEvent — Balance Tabs (tenor/side gating)', () => {
     it('Import Sight LC: exactly 2 tabs (LC, SG) — no Acceptance tab at all', () => {
       const svc = new InquireEventsService(makeApi());
@@ -867,12 +822,7 @@ describe('InquireEventsService', () => {
     });
   });
 
-  /**
-   * Business-confirmed live example 2026-08-17 (LC S02, 3rd event — a plain A3 Document Arrival UTILIZE
-   * with no direct SG movement, SG G01 already existing under the LC): "the CURRENT EVENT BALANCE
-   * SNAPSHOT should be [both LC Balance AND SG Balance]" — confirmed via AskUserQuestion: live current
-   * balance (api.getSnapshot()), not a historical "as of this event" computation.
-   */
+  /** A root-level event still needs its sibling SG/Acceptance balance shown, even with no direct movement of its own. */
   describe('selectEvent — sibling Acceptance/SG snapshots (movement.acceptanceEventSnapshot/sgEventSnapshot, persisted server-side)', () => {
     it('a root-level event (LC UTILIZE, no direct SG movement) reads the SG tab straight off movement.sgEventSnapshot — no API call at all', () => {
       const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S02' } });
@@ -892,7 +842,7 @@ describe('InquireEventsService', () => {
       const sgTab = svc.selectedEventTabs.find((t) => t.key === 'SG')!;
       expect(sgTab.snapshot).toBe(sgSnapshot);
       expect(sgTab.title).toBe('Shipping Guarantee Balance — LC S02');
-      // Still no impact on this tab — it's a DIFFERENT contract's own balance than the selected event's own.
+      // No impact here — a different contract's own balance than the selected event's.
       expect(sgTab.impact).toBeNull();
       // The LC tab itself is unaffected — still the event's own eventSnapshot.
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBe(utilizeMovement.eventSnapshot);
@@ -923,10 +873,7 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.snapshot).toBeNull();
     });
 
-    // 2026-08-18, business instruction ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變")
-    // — a 'finalize' row (A4) must show the SG's own balance AS OF A4's own release, via the SEPARATE
-    // finalizeSgEventSnapshot field, never the (frozen, create-time) sgEventSnapshot its sibling
-    // 'create' row (A3) reads — mirrors ownSnapshot's own finalize/create split, one level down.
+    // 'finalize' reads the separate finalizeSgEventSnapshot, never the frozen sgEventSnapshot its 'create' sibling reads.
     it("a 'finalize' row reads finalizeSgEventSnapshot for the SG tab (not the frozen sgEventSnapshot its sibling 'create' row reads)", () => {
       const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S01' } });
       const svc = new InquireEventsService(makeApi());
@@ -956,14 +903,7 @@ describe('InquireEventsService', () => {
     });
   });
 
-  /**
-   * Business instruction 2026-08-17 ("EPLC_EXAMINATION should carry E01/E02 as the Secondary Reference
-   * so that each Examination event can be clearly linked to its subsequent Honour/Acceptance event") —
-   * surfaces EPLC_EXAMINATION's own natural key (ibNumber, "EB Number") as a Secondary Ref column value,
-   * since B4's own Honour/Accept later carries that SAME value as its own sourceTransactionRef (already
-   * shown in the existing Reference column) — letting a reader visually connect "Examination E01" to
-   * "Honour E01" in the merged Event Timeline.
-   */
+  /** Surfaces EPLC_EXAMINATION's own ibNumber so a reader can connect it to B4's later Honour/Accept row. */
   describe('secondaryReferenceFor', () => {
     it('returns the ibNumber for an EPLC_EXAMINATION event', () => {
       const svc = new InquireEventsService(makeApi());
@@ -990,9 +930,7 @@ describe('InquireEventsService', () => {
       expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement(), contract: acceptanceContract }))).toBe('—');
     });
 
-    // 2026-08-17 ("the corresponding Shipping Guarantee Number (SG Number) should be displayed so the
-    // user can identify which Shipping Guarantee the event belongs to") — reproduces the business's own
-    // worked example exactly: LC S01, SHGT ISSUE 22345, "SG G01".
+    // Reproduces the worked example: LC S01, SHGT ISSUE, "SG G01".
     it('returns "SG {sgNumber}" for an SHGT event', () => {
       const svc = new InquireEventsService(makeApi());
       const sgContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S01', sgNumber: 'G01' } });

@@ -13,39 +13,25 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, TransactionFunction, InstrumentType
 import type { InquiredEvent } from './inquire-events.service';
 import * as functionStrategyModule from './function-strategy';
 
-// submit()'s compound branches (A3S/B4/B5) call `crypto.randomUUID()` to link legs via
-// businessEventId — jsdom's test environment doesn't always implement it. Polyfill once, module-load
-// time, same posture as any other jsdom API gap. `maker-submit.service.spec.ts` carries an identical
-// copy of this same polyfill — each Jest test FILE gets its own fresh module registry/globalThis, so
-// there's no single shared place to hoist this to without a global Jest setup-file change.
+// submit()'s compound branches (A3S/B4/B5) call `crypto.randomUUID()` to link legs via businessEventId —
+// jsdom's test environment doesn't always implement it. Polyfill once, module-load time.
 if (typeof (globalThis as any).crypto === 'undefined') {
   (globalThis as any).crypto = {};
 }
 if (typeof (globalThis as any).crypto.randomUUID !== 'function') {
-  // jsdom's `window.crypto` is a non-configurable getter — mutate the existing object in place
-  // rather than reassigning `globalThis.crypto` (a plain reassignment silently no-ops).
+  // jsdom's `window.crypto` is a non-configurable getter — mutate in place rather than reassigning
+  // `globalThis.crypto` (a plain reassignment silently no-ops).
   (globalThis as any).crypto.randomUUID = () => 'test-uuid-' + Math.random().toString(36).slice(2);
 }
 
 /**
- * Direct-instantiation, no-TestBed unit tests (house style — see lc-payment-wc's
- * leg-allocator.component.spec.ts) for MakerPanelComponent — the Maker-owned surface extracted out of
- * TransactionBuilderComponent (BAL-003 "Feature Components + Facade" pilot #3, 2026-08-19,
- * desiger-comments.md): the natural-key search, the 3 paginated pickers, the Formly form/submit()
- * dispatch across all 14 named business functions, submitResult, the 4 compound-leg movementId fields,
- * etc. This file is assembled from FOUR previously-broken spec files' own Maker-flow content, per that
- * migration's own task brief — file provenance/naming conventions preserved per-block below rather than
- * unified, since each origin file's own local fixture-builder helpers were kept as-is (this codebase
- * deliberately does not share fixture helpers across spec files).
+ * Direct-instantiation, no-TestBed unit tests for MakerPanelComponent — the Maker-owned surface of
+ * TransactionBuilderComponent: natural-key search, the 3 paginated pickers, the Formly form/submit()
+ * dispatch across all 14 named business functions, submitResult, the compound-leg movementId fields.
  *
- * resetForFunction() is private, triggered by a `resetTrigger` @Input() change via ngOnChanges() — the
- * same "@Input()/ngOnChanges(), fully testable via new MakerPanelComponent(mockApi) + ngOnChanges({...})
- * with no TestBed/view-init lifecycle needed" convention MakerPanelComponent's own class doc comment
- * already establishes. `triggerSelectFunction()` below is the one new piece of test machinery this
- * migration needed — it mirrors what TransactionBuilderComponent.selectFunction() used to do inline
- * (set selectedFunction, then run the Maker-state reset) by setting the @Input() then firing
- * ngOnChanges() with resetTrigger present and firstChange:false, exactly as the real parent-child
- * template binding does at runtime.
+ * `resetForFunction()` is private, triggered by a `resetTrigger` `@Input()` change via `ngOnChanges()`.
+ * `triggerSelectFunction()` below sets the `@Input()` then fires `ngOnChanges()` with `resetTrigger`
+ * present and `firstChange: false`, mirroring the real parent-child template binding.
  */
 
 function makeChange(
@@ -146,7 +132,7 @@ function makeComponentA() {
   return { comp, mockApi };
 }
 
-/** Mirrors TransactionBuilderComponent.selectFunction()'s own pre-extraction call shape — set the Input, then fire the resetTrigger change ngOnChanges() reacts to. */
+/** Sets the Input, then fires the resetTrigger change ngOnChanges() reacts to. */
 function triggerSelectFunction(comp: MakerPanelComponent, fnDef: TransactionFunction | null): void {
   comp.selectedFunction = fnDef;
   if (fnDef) comp.activeFunctionSide = fnDef.side;
@@ -385,9 +371,8 @@ describe('MakerPanelComponent', () => {
       const c2 = mkContract('c2', '002');
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([c1, c2], 2)));
       mockApi.getSnapshot.mockImplementation((id: string) => of(mkSnapshot(id)));
-      // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): A4's own LC Index now
-      // requires each candidate to have a real outstanding Document Arrival — both c1/c2 need one to
-      // still show up in catalogPicker.total/contracts below.
+      // A4's LC Index requires each candidate to have a real outstanding Document Arrival — both c1/c2
+      // need one to still show up in catalogPicker.total/contracts below.
       mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01' }]));
 
       comp.reloadCatalog();
@@ -447,9 +432,8 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // Business requirement 2026-08-19 ("B4 也是一樣的業務要求 (EARMARKING EVENTS ONLY) 差別是不分
-  // SIGHT/USANCE") — B4's own LC Index eligibility, cross-contract (a child EPLC_EXAMINATION contract's
-  // own CREATE, already RELEASED and not yet consumed), unlike A4/A6's same-contract check.
+  // B4's LC Index eligibility is cross-contract (a child EPLC_EXAMINATION contract's own CREATE,
+  // already RELEASED and not yet consumed), unlike A4/A6's same-contract check.
   describe('reloadCatalog — B4 cross-contract LC Index eligibility (loadEligibleChildDocumentHints)', () => {
     function setup(mockApi: ReturnType<typeof makeApiMock>, examMovements: any[]) {
       const c1 = mkContract('c1', 'CU01', { instrumentType: 'EPLC_CONFIRMATION' });
@@ -535,8 +519,7 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // Business requirement 2026-08-19 ("A3S/A9 — LC Index Criteria — Only LC Numbers with an outstanding
-  // SG Balance should be displayed... once SG Balance = 0, the LC Number should no longer appear").
+  // A3S/A9's LC Index only shows LC Numbers with an outstanding SG Balance; once it's 0 the LC drops out.
   describe('reloadCatalog — A3S LC Index SG Balance eligibility (loadCatalogSgEligibility)', () => {
     function setup(mockApi: ReturnType<typeof makeApiMock>, sgSnapshotOverrides: Partial<BalanceSnapshot>) {
       const c1 = mkContract('c1', 'S01');
@@ -727,10 +710,8 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // Business requirement 2026-08-19 (fixing "Page 1/2 (12 total)" wrongly counting unfiltered
-  // candidates): Prev/Next are now pure client-side windowing over the already-fetched, already-filtered
-  // set (display page size 5 — see CatalogPickerService's own module doc comment) — neither ever
-  // triggers a new api.catalog call any more.
+  // Prev/Next are pure client-side windowing over the already-fetched, already-filtered set (display
+  // page size 5 — see CatalogPickerService's own module doc comment); neither triggers a new api.catalog call.
   describe('catalogPrevPage / catalogNextPage', () => {
     it('catalogPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponentA();
@@ -810,13 +791,12 @@ describe('MakerPanelComponent', () => {
       comp.selectedParent = mkContract('p1', '001');
       comp.exposureNature = 'MEMO';
       // A6's own filteredParentCatalog requires a real, non-SIGHT tenorType — business requirement
-      // 2026-08-19 (parentPicker.total now tracks the TRUE qualified count, not the server's raw total,
-      // see CatalogPickerService's own module doc comment), so p1 needs one to genuinely qualify.
+      // parentPicker.total tracks the true qualified count, not the server's raw total, so p1 needs
+      // one to genuinely qualify.
       const p1 = mkContract('p1', '001', { tenorType: 'BUYERS_USANCE' });
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([p1], 1)));
       mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('p1')));
-      // Business requirement 2026-08-19 ("A6 — LC Index Eligibility Criteria"): p1 also needs a real
-      // outstanding Document Arrival of its own to pass A6's own eligibility filter.
+      // p1 also needs a real outstanding Document Arrival of its own to pass A6's eligibility filter.
       mockApi.listMovements.mockReturnValue(of([{ movementId: 'm1', status: 'PENDING', movementType: 'UTILIZE', sourceTransactionRef: 'IB01' }]));
 
       comp.onParentInstrumentTypeChange();
@@ -870,8 +850,7 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // Business requirement 2026-08-19: same client-side-only windowing as catalogPrevPage/catalogNextPage
-  // above — see CatalogPickerService's own module doc comment.
+  // Same client-side-only windowing as catalogPrevPage/catalogNextPage above.
   describe('parentPrevPage / parentNextPage', () => {
     it('parentPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponentA();
@@ -1173,8 +1152,8 @@ describe('MakerPanelComponent', () => {
         instrumentType: 'EPLC_EXAMINATION',
         naturalKey: { lcNumber: 'EXP1', ibNumber: 'EB01', sgNumber: null },
       });
-      // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — B4's own candidate filter now
-      // looks for status === 'RELEASED' (B3's own genuine Checker Release), not 'PENDING'+acknowledgedAt.
+      // B4's candidate filter looks for status === 'RELEASED' (B3's genuine Checker Release), not
+      // 'PENDING'+acknowledgedAt.
       const releasedCreate = { movementId: 'MX1', status: 'RELEASED', movementType: 'CREATE', amount: '2000' };
       const api = makeApi({
         catalog: jest.fn((instrumentType: InstrumentType) =>
@@ -1201,11 +1180,9 @@ describe('MakerPanelComponent', () => {
       expect(comp.naturalKey.ibNumber).toBe('EB01');
       expect(comp.model.secondaryRef).toBe('EB01');
       expect(comp.model.amount).toBe('2000');
-      // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
-      // event cannot be accessed") — deliberately NOT passed here, unlike every other action-picker call
-      // site: B3's own CREATE is designed to stay PENDING until B4's own compound Release finalizes it,
-      // so filtering by "creating movement already Released" would exclude every real candidate B4
-      // needs to find, not just an ineligible one.
+      // Deliberately NOT passed here, unlike every other action-picker call site: B3's CREATE stays
+      // PENDING until B4's compound Release finalizes it, so filtering by "already Released" would
+      // exclude every real candidate B4 needs to find.
       expect(api.catalog).toHaveBeenCalledWith('EPLC_EXAMINATION', 'ACTIVE', undefined, 1, 50, 'EXP1');
     });
 
@@ -1215,8 +1192,8 @@ describe('MakerPanelComponent', () => {
         instrumentType: 'EPLC_EXAMINATION',
         naturalKey: { lcNumber: 'EXP2', ibNumber: 'EB02', sgNumber: null },
       });
-      // 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易") — a B3 record that hasn't been
-      // genuinely Checker-Released yet (still PENDING) must not be selectable by B4.
+      // A B3 record that hasn't been genuinely Checker-Released yet (still PENDING) must not be
+      // selectable by B4.
       const stillPendingCreate = { movementId: 'MX2', status: 'PENDING', movementType: 'CREATE', amount: '3000' };
       const api = makeApi({
         catalog: jest.fn((instrumentType: InstrumentType) =>
@@ -1240,11 +1217,9 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.payableMovements).toHaveLength(0); // filtered out — still PENDING, not yet Released
     });
 
-    // Bug fixed 2026-08-18, reviewer-reported live ("Export Confirmed LC Sight B4 Submit後 不應該再出現
-    // S01 E01 E02" — a presentation B4 has ALREADY consumed kept showing up as a pickable candidate
-    // again): status alone isn't enough — an already-consumed record stays RELEASED forever (it never
-    // transitions again), so status === 'RELEASED' alone kept matching it. Must also exclude anything
-    // with presentDocsConsumedAt already set.
+    // Status alone isn't enough — an already-consumed record stays RELEASED forever, so
+    // status === 'RELEASED' alone would still match it. Must also exclude anything with
+    // presentDocsConsumedAt already set.
     it('B4: excludes an already-consumed B3 record (RELEASED, but presentDocsConsumedAt already set by an earlier B4)', () => {
       const examinationContract = makeContract({
         balanceContractId: 'EX3',
@@ -1295,9 +1270,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.sgsForArrival).toHaveLength(1);
       expect(comp.pickerSelection.selectedArrivalSg?.balanceContractId).toBe('SG1');
       expect(comp.pickerSelection.arrivalSgSnapshot?.availableBalance).toBe('3000');
-      // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
-      // event cannot be accessed") — an SG whose own A8 Issue isn't Released yet shouldn't be offered
-      // as a redemption target.
+      // An SG whose own A8 Issue isn't Released yet shouldn't be offered as a redemption target.
       expect(api.catalog).toHaveBeenCalledWith('SHGT', 'ACTIVE', undefined, 1, 50, 'LC1', undefined, true);
     });
   });
@@ -1391,16 +1364,10 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // 4-eyes redesign 2026-08-16 ("A4 Need Maker and Checker feature... Submit by Maker, then Release
-  // by Checker"): payExisting() (A4's own dedicated single-actor release method) was REMOVED — A4's
-  // picker (onSelectPayMovement, covered above) became browse-only, and release happens exclusively
-  // via the generic Checker panel's checkerAct('release'), covered in
-  // transaction-builder.component.actions.spec.ts's checkerAct() describe block (the "plain path (A4,
-  // no defer/compound flags)" case).
-  //
-  // Revised the SAME day ("Add real Maker Submit, then have Checker to Release it. Exactly the same
-  // as A1."): browse-only wasn't enough — submitA4() is A4's own real, genuinely backend-persisted
-  // Maker action (calls api.submitByMaker(), not api.release() or createMovement()).
+  // A4 has no single-actor release method — its picker (onSelectPayMovement, above) is browse-only, and
+  // release happens via the generic Checker panel's checkerAct('release'), covered in
+  // transaction-builder.component.actions.spec.ts's checkerAct() describe block. submitA4() is A4's own
+  // real, backend-persisted Maker action (calls api.submitByMaker(), not api.release() or createMovement()).
   describe('submitA4', () => {
     it('does nothing when no movement is selected', () => {
       const api = makeApi();
@@ -1724,9 +1691,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.settleableBalances).toEqual([
         { balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' },
       ]);
-      // Bug fixed 2026-08-18 ("There are function dependency, if pending in previous event, then next
-      // event cannot be accessed") — an Acceptance whose own CREATE isn't Released yet shouldn't be
-      // offered as a settlement target.
+      // An Acceptance whose own CREATE isn't Released yet shouldn't be offered as a settlement target.
       expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 50, 'EXP1', undefined, true);
     });
 
@@ -1778,8 +1743,7 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // Business instruction 2026-08-16: "A1 Currency Code = Input; A2-A9 = Carry from A1 + Protected" /
-  // "B1 = Input; B2-B5 = Carry from B1 + Protected".
+  // A1/B1 Currency Code is a plain input; every other function carries it from A1/B1, protected.
   describe('carriedCurrency / Currency carry-and-protect (business instruction 2026-08-16)', () => {
     function currencyFieldProps(comp: MakerPanelComponent): { label: string; disabled: boolean } {
       const field = comp.fields.find((f) => f.key === 'currency');
@@ -1864,10 +1828,8 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  // Business requirement 2026-08-19 (fixing "Page 1/2 (12 total)" wrongly counting unfiltered
-  // candidates — see CatalogPickerService's own module doc comment): Prev/Next are now pure
-  // client-side windowing over the already-fetched, already-filtered set (display page size 5) —
-  // neither ever triggers a new api.catalog call any more, regardless of LC context.
+  // Prev/Next are pure client-side windowing over the already-fetched, already-filtered set (display
+  // page size 5); neither triggers a new api.catalog call, regardless of LC context.
   describe('ibIndexPrevPage / ibIndexNextPage', () => {
     function setupIb() {
       const api = makeApi();
@@ -1939,11 +1901,9 @@ describe('MakerPanelComponent', () => {
   });
 
   /**
-   * BAL-003 (PickerSelectionService extraction, 2026-08-19) — the component's own arrivalSg/
-   * settleableBalances/payableMovements prevPage()/nextPage() methods are now one-line delegations to
-   * `pickerSelection`'s like-named methods (mirroring `ibIndexPrevPage`/`ibIndexNextPage`'s own
-   * already-established "thin wrapper, no reload" shape above) — direct tests proving the delegation
-   * itself works, since the underlying paging math is already covered by `picker-selection.service.spec.ts`.
+   * arrivalSg/settleableBalances/payableMovements prevPage()/nextPage() are one-line delegations to
+   * `pickerSelection`'s like-named methods — these tests prove the delegation itself; the underlying
+   * paging math is covered by `picker-selection.service.spec.ts`.
    */
   describe('arrivalSgPrevPage / arrivalSgNextPage / settleableBalancesPrevPage / settleableBalancesNextPage / payableMovementsPrevPage / payableMovementsNextPage — thin delegation to pickerSelection', () => {
     it('arrivalSgPrevPage/arrivalSgNextPage move pickerSelection.arrivalSgPaging.page within bounds', () => {
@@ -2349,7 +2309,7 @@ describe('MakerPanelComponent', () => {
   });
 
   // ---------------------------------------------------------------------
-  // isSubmitReady — business requirement 2026-08-19 ("Submit Button Enablement — A1–A9 / B1–B5")
+  // isSubmitReady
   // ---------------------------------------------------------------------
   describe('isSubmitReady', () => {
     it('A1 (no eligible-target requirement) — false with mandatory fields missing, true once Amount/LC Number are filled in', () => {
@@ -2464,9 +2424,8 @@ describe('MakerPanelComponent', () => {
 
       expect(comp.submitting).toBe(false);
       expect(comp.submitError).toBe('NATURAL_KEY_ALREADY_EXISTS: LC001 already exists');
-      // Bug fixed 2026-08-19 (desiger-comments.md F-08) — submitResult must stay null (not the raw HTTP
-      // error body) on a primary-call failure, since applyMakerSubmitOutcome() would otherwise wrongly
-      // copy it in and formLocked (!!submitResult) would incorrectly lock the form after a failed Submit.
+      // submitResult must stay null (not the raw HTTP error body) on a primary-call failure, or
+      // formLocked (!!submitResult) would incorrectly lock the form after a failed Submit.
       expect(comp.submitResult).toBeNull();
     });
 
@@ -2588,11 +2547,9 @@ describe('MakerPanelComponent', () => {
       expect(comp.submitting).toBe(false);
     });
 
-    // Bug fixed 2026-08-16, reviewer-reported ("A3S does not generate the related SG redemption
-    // entries in Pending"): the SG's own FULL_REDEEM/PARTIAL_REDEEM is a REAL, in-scope contingent
-    // account family, but its entry was silently dropped since submitResult only ever tracked the
-    // second (LC UTILIZE) call. arrivalSgRedeemMovement now carries the FULL first-leg response
-    // (not just its movementId) so the Account Entries button can be offered for this leg too.
+    // The SG's own FULL_REDEEM/PARTIAL_REDEEM is a real, in-scope contingent account family, but
+    // submitResult only ever tracks the second (LC UTILIZE) call — arrivalSgRedeemMovement carries the
+    // full first-leg response so its Account Entries button can be offered too.
     it("captures the SG redemption leg's own full response (including its contingentAccountEntry) separately from submitResult", () => {
       const { comp, api } = setupC();
       const sgEntry = {
@@ -3050,12 +3007,10 @@ describe('MakerPanelComponent', () => {
       expect(c.formLocked).toBe(true);
 
       triggerSelectFunction(c, fn('A2'));
-      // Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — A2 is one of the
-      // functions the new pre-Submit eligibility gate applies to, so displayFields also needs a
-      // selectedContract here to isolate THIS test's own concern (formLocked resetting on a function
-      // switch) from that separate, later-added gate — see the dedicated
-      // "requiresEligibleTarget / hasEligibleTargetSelected / fieldsLocked" describe block below for
-      // that gate's own coverage.
+      // A2 is subject to the pre-Submit eligibility gate too, so displayFields needs a selectedContract
+      // here to isolate this test's own concern (formLocked resetting on a function switch) from that
+      // separate gate — see the "requiresEligibleTarget / hasEligibleTargetSelected / fieldsLocked"
+      // describe block below for that gate's own coverage.
       c.selectedContract = contract();
       expect(c.formLocked).toBe(false);
       expect(c.displayFields).toBe(c.fields);
@@ -3151,10 +3106,9 @@ describe('MakerPanelComponent', () => {
         movement({ movementId: 'm-a2', sourceTransactionRef: 'IB02' }),
         movement({ movementId: 'm-a1', sourceTransactionRef: 'IB01' }),
       ]);
-      // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): filteredCatalogContracts
-      // (which flattenedPayableRows now windows via pagedFilteredCatalogContracts) requires a
-      // catalogPayableIbs entry too — always populated alongside catalogPayableMovements in real usage
-      // (loadDocumentArrivalHints()), so both need setting here.
+      // filteredCatalogContracts (which flattenedPayableRows windows via pagedFilteredCatalogContracts)
+      // requires a catalogPayableIbs entry too — always populated alongside catalogPayableMovements in
+      // real usage (loadDocumentArrivalHints()), so both need setting here.
       c.documentArrivalHints.catalogPayableIbs.set('b', ['IB02']);
       c.documentArrivalHints.catalogPayableIbs.set('a', ['IB02', 'IB01']);
       const rows = c.flattenedPayableRows;
@@ -3165,8 +3119,7 @@ describe('MakerPanelComponent', () => {
       const c = new MakerPanelComponent(mockApiD());
       expect(c.catalogPicker.totalPages).toBe(1);
       expect(c.parentPicker.totalPages).toBe(1);
-      // Business requirement 2026-08-19: display page size is 5 for every picker CatalogPickerService
-      // backs (uniform across Primary Key Index/2ndary Key Index) — see its own module doc comment.
+      // Display page size is 5 for every picker CatalogPickerService backs.
       c.catalogPicker.total = 13;
       expect(c.catalogPicker.totalPages).toBe(3);
       c.parentPicker.total = 21;
@@ -3213,9 +3166,8 @@ describe('MakerPanelComponent', () => {
         contract({ balanceContractId: 'usance', tenorType: 'BUYERS_USANCE' }),
         contract({ balanceContractId: 'legacy' }),
       ];
-      // Business requirement 2026-08-19 ("A4 — LC Index Eligibility Criteria"): both surviving candidates
-      // still need a catalogPayableIbs entry to pass A4's own eligibility filter — 'usance' is excluded
-      // by the tenor filter regardless, so it deliberately gets none.
+      // Both surviving candidates still need a catalogPayableIbs entry to pass A4's eligibility filter —
+      // 'usance' is excluded by the tenor filter regardless, so it deliberately gets none.
       c.documentArrivalHints.catalogPayableIbs.set('sight', ['IB01']);
       c.documentArrivalHints.catalogPayableIbs.set('legacy', ['IB02']);
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'sight'].sort());

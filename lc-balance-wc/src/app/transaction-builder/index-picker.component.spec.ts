@@ -40,11 +40,9 @@ describe('IndexPickerComponent', () => {
     });
 
     it('returns movementId — NOT balanceContractId — when a row carries BOTH (the documented regression case)', () => {
-      // A BalanceMovement also carries its own parent balanceContractId as an ordinary field
-      // (e.g. the Checker queue's / A4/A6's payableMovements pickers). Checking
-      // balanceContractId first was the reported bug (S001 Amendment A01 — clicking a movement
-      // row silently selected nothing because onSelectCheckerMovement()/onSelectPayMovement()
-      // never found a match keyed by the parent contract's id).
+      // A BalanceMovement also carries its own parent balanceContractId as an ordinary field.
+      // Checking balanceContractId first was the reported bug — a movement row's own id resolved
+      // to the parent contract's id, so the selection handlers never found a match.
       const row = { movementId: 'MV-1', balanceContractId: 'BC-1' };
       expect(component.itemId(row)).toBe('MV-1');
       expect(component.itemId(row)).not.toBe('BC-1');

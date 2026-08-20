@@ -179,9 +179,8 @@ describe('balance-component.model data invariants', () => {
       ['EPLC_CONFIRMATION', 'AMEND', true],
       ['EPLC_CONFIRMATION', 'HONOUR', false],
       ['EPLC_CONFIRMATION', 'ACCEPT', false],
-      // The gate checks BOTH instrumentType AND movementType — SHGT's own 'ISSUE' string collides
-      // with LC's 'ISSUE' but SHGT is not in the tolerance-applicable instrument set, so this must
-      // stay false ("Tolerance 只有開證與修證適用...SG或IB就是SG AMOUNT或BILLS AMOUNT").
+      // Gate checks BOTH instrumentType and movementType — SHGT's own 'ISSUE' collides with LC's
+      // 'ISSUE' string but SHGT isn't tolerance-applicable, so this must stay false.
       ['SHGT', 'ISSUE', false],
       ['SHGT', 'PARTIAL_REDEEM', false],
       ['SHGT', 'FULL_REDEEM', false],
@@ -213,7 +212,7 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  describe('DECREASING_MOVEMENT_TYPES — business instruction 2026-08-14, mirrors MOVEMENT_DIRECTION -1 rows', () => {
+  describe('DECREASING_MOVEMENT_TYPES — mirrors MOVEMENT_DIRECTION -1 rows', () => {
     it('is exactly the documented set', () => {
       expect(DECREASING_MOVEMENT_TYPES).toEqual(
         new Set([
@@ -302,9 +301,8 @@ describe('balance-component.model data invariants', () => {
       expect(a2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
-    // A3/A3S's own deferSettlement/documentArrivalWithSg behavior (F-01 Strategy flags, since PR-5 no
-    // longer stored on TransactionFunction at all) is covered by function-strategy.spec.ts instead —
-    // this file only asserts the registry's own non-flag configuration.
+    // A3/A3S's own Strategy-flag behavior is covered by function-strategy.spec.ts instead — this
+    // file only asserts the registry's own non-flag configuration.
     it('A3 targets IPLC_LC/UTILIZE', () => {
       const a3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3') as TransactionFunction;
       expect(a3.movementType).toBe('UTILIZE');
@@ -343,8 +341,7 @@ describe('balance-component.model data invariants', () => {
     });
 
     it('A1 is the sole function with no secondaryRefLabel (it creates a brand-new natural key with nothing to reference yet)', () => {
-      // Per the interface's own doc comment ("every function except LC Issue (A1/B1) requires ONE
-      // generic secondary reference").
+      // Every function except LC Issue requires one generic secondary reference.
       const a1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1') as TransactionFunction;
       expect(a1.secondaryRefLabel).toBeUndefined();
     });
@@ -400,11 +397,8 @@ describe('balance-component.model data invariants', () => {
       expect(b2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
-    // B3/B4/B5's own deferSettlement/settlesDocumentArrival/movementTypeFromContractTenor/
-    // createsIssuingBankReceivableOnHonour/createsAcceptanceReimbReceivableOnCreate/
-    // settlesAcceptanceOnMature/settleableBalanceIndex behavior (F-01 Strategy flags, since PR-5 no
-    // longer stored on TransactionFunction at all) is covered by function-strategy.spec.ts instead —
-    // this file only asserts the registry's own non-flag configuration.
+    // B3/B4/B5's own Strategy-flag behavior is covered by function-strategy.spec.ts instead — this
+    // file only asserts the registry's own non-flag configuration.
     it('B3 (Present Docs) is EPLC_EXAMINATION/CREATE and has no secondaryRefLabel of its own', () => {
       const b3 = EXPORT_FUNCTIONS.find((f) => f.code === 'B3') as TransactionFunction;
       expect(b3.instrumentType).toBe('EPLC_EXAMINATION');
@@ -439,7 +433,7 @@ describe('balance-component.model data invariants', () => {
       expect(b5.defaultParentInstrumentType).toBe('EPLC_CONFIRMATION');
     });
 
-    it('no EXPORT function ever creates a plain EPLC_LC movement (EBL is out of Balance Component scope, business instruction 2026-08-15)', () => {
+    it('no EXPORT function ever creates a plain EPLC_LC movement (EBL is out of Balance Component scope)', () => {
       for (const f of EXPORT_FUNCTIONS) {
         expect(f.instrumentType).not.toBe('EPLC_LC');
       }
@@ -586,15 +580,9 @@ describe('balance-component.model data invariants', () => {
       expect(groupThousands('123456789')).toBe('123,456,789');
     });
 
-    // Live bug, reviewer-reported 2026-08-16 ("All the Submit functions are not working in UI"): every
-    // test above passes a genuine string literal, which is exactly why the whole suite missed this —
-    // the Amount field is a native <input type="number">, and Angular's own NumberValueAccessor
-    // coerces its value to a real JS `number` before it ever reaches model.amount, regardless of the
-    // `amount?: string` compile-time type. `amount.split('.')` threw TypeError on a number, and since
-    // this function backs a template getter evaluated every change-detection cycle, the error re-fired
-    // continuously and froze the whole form for every business function, not just ones with a real
-    // violation. These prove the fix's `String(amount)` coercion makes it robust to a number, matching
-    // what the DOM/Formly layer actually passes in a live browser.
+    // Every test above passes a string literal — Angular's NumberValueAccessor actually delivers a
+    // real JS number to model.amount regardless of the compile-time `string` type, so this proves the
+    // `String(amount)` coercion is robust to that runtime shape.
     it('amountExceedsCurrencyDecimals: handles a NUMBER (not just a string) — the actual runtime shape a native <input type="number"> passes via Angular\'s NumberValueAccessor', () => {
       expect(amountExceedsCurrencyDecimals(10000, 'JPY')).toBe(false);
       expect(amountExceedsCurrencyDecimals(10000.5, 'JPY')).toBe(true);
@@ -604,8 +592,7 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // Inquire Events (2026-08-17) — defaultLcInstrumentTypeForSide/childInstrumentTypesOf/
-  // resolveFunctionForMovement.
+  // Inquire Events — defaultLcInstrumentTypeForSide/childInstrumentTypesOf/resolveFunctionForMovement.
   describe('defaultLcInstrumentTypeForSide', () => {
     it('IMPORT -> IPLC_LC, EXPORT -> EPLC_CONFIRMATION', () => {
       expect(defaultLcInstrumentTypeForSide('IMPORT')).toBe('IPLC_LC');
@@ -636,12 +623,11 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // resolveFunctionForMovement's own test coverage moved to function-strategy.spec.ts in PR-5 (the
-  // function itself relocated there — see balance-component.model.ts's own note at its former location).
+  // resolveFunctionForMovement's own test coverage moved to function-strategy.spec.ts (the function
+  // itself relocated there).
 
-  // 2026-08-18, business instruction — "APPROVED still required. EARMARK only applied for RELEASED
-  // event in Import LC Document Arrival and Export Present Docs" (narrowing an earlier same-day
-  // instruction that had, incorrectly, relabeled every RELEASED status to EARMARK universally).
+  // EARMARK applies only to RELEASED Import LC Document Arrival and Export Present Docs — every other
+  // function keeps APPROVED, not EARMARK universally.
   describe('isEarmarkFunction', () => {
     it('is true for Import LC Document Arrival (IPLC_LC/UTILIZE) — A3/A3S', () => {
       expect(isEarmarkFunction('IPLC_LC', 'UTILIZE')).toBe(true);
@@ -668,12 +654,9 @@ describe('balance-component.model data invariants', () => {
       expect(isEarmarkFunction(null, null)).toBe(false);
     });
 
-    // Bug fixed 2026-08-18, reviewer-caught live: "Import LC S01 => A4 · Sight Settlement / IPLC_LC /
-    // UTILIZE / ... / EARMARKED — 應該是 Approved 對嗎?" (shouldn't that be Approved?). A finalized Sight
-    // Document Arrival's own 'finalize' row (A4's own Release) shares the IDENTICAL (IPLC_LC, UTILIZE)
-    // as its sibling 'create' row (A3's own submission), but represents a DIFFERENT function's own real
-    // legal event — A4 is not A3/A3S, so it must NOT be treated as an earmark function.
-    it("is false for a 'finalize'-phase IPLC_LC/UTILIZE row (A4's own completion of a Sight Document Arrival) — the exact bug reported live on LC S01", () => {
+    // A4's own 'finalize' row (its Release) shares the identical (IPLC_LC, UTILIZE) pair as A3's
+    // 'create' row, but is a different function's real legal event — not an earmark.
+    it("is false for a 'finalize'-phase IPLC_LC/UTILIZE row (A4's own completion of a Sight Document Arrival)", () => {
       expect(isEarmarkFunction('IPLC_LC', 'UTILIZE', 'finalize')).toBe(false);
     });
 
@@ -688,7 +671,7 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // payExistingUtilizeFunctionFor's own test coverage moved to function-strategy.spec.ts in PR-5.
+  // payExistingUtilizeFunctionFor's own test coverage moved to function-strategy.spec.ts.
 
   describe('displayMovementType / displayMovementAmount', () => {
     it('B2 (EPLC_CONFIRMATION/AMEND): a positive amount reads as AMEND_INCREASE', () => {
@@ -752,8 +735,6 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // Business instruction 2026-08-17 ("For A1 and B1, the Currency Code field should be implemented as a
-  // drop-down list, consistent with the existing implementation in lc-payment-wc").
   describe('CURRENCY_OPTIONS', () => {
     it("matches lc-payment-wc/backend/data/currencies.json's own 10-code set exactly, no more no fewer", () => {
       expect(CURRENCY_OPTIONS.map((o) => o.value)).toEqual(['USD', 'EUR', 'JPY', 'GBP', 'TWD', 'IDR', 'CNY', 'HKD', 'SGD', 'AUD']);
@@ -770,9 +751,7 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // LC Master Records Index's own new "Tenor Type" column (2026-08-19, user-requested — positioned
-  // right after LC Number, both Import LC and Export Confirmed LC). Reuses A1's/B1's own tenorType
-  // Formly select option labels rather than a third copy of the same three strings.
+  // Reuses A1's/B1's own tenorType Formly select option labels rather than a third copy.
   describe('tenorTypeLabel', () => {
     it("Import side spells out Seller's/Buyer's Usance (matches A1's own tenorTypeOptions exactly)", () => {
       expect(tenorTypeLabel('SIGHT', 'IMPORT')).toBe('Sight');
