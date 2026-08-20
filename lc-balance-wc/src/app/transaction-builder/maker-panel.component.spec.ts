@@ -3608,6 +3608,29 @@ describe('MakerPanelComponent', () => {
       (c as any).pickerSelection.arrivalSgSnapshot = snapshot({ confirmedBalance: '10' });
       expect(c.tightAvailableBalanceForWarning).toBe('34');
     });
+
+    it('returns the plain tightAvailableBalance for B4 before a presentation is picked (no selectedPayMovement yet)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'HONOUR';
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '0' });
+      expect(c.tightAvailableBalanceForWarning).toBe('0');
+    });
+
+    it('widens by the referenced B3 presentation\'s own ceilingAmount for B4 HONOUR (Tight 0 + 10000 = 10000)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'HONOUR';
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '0' });
+      (c as any).pickerSelection.selectedPayMovement = mkMovement('b3-1', { ceilingAmount: '10000' });
+      expect(c.tightAvailableBalanceForWarning).toBe('10000');
+    });
+
+    it('widens the same way for B4 ACCEPT (Usance)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'ACCEPT';
+      c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '5000' });
+      (c as any).pickerSelection.selectedPayMovement = mkMovement('b3-2', { ceilingAmount: '10000' });
+      expect(c.tightAvailableBalanceForWarning).toBe('15000');
+    });
   });
 
   describe('isAmendDecreaseDirection (business instruction 2026-08-20, "A2 Decrease 輸入金額控制規則 B2 Decrease... 都適用")', () => {
@@ -3651,6 +3674,35 @@ describe('MakerPanelComponent', () => {
     });
   });
 
+  describe('checksAgainstPlainAvailable (bug found live 2026-08-20 — "B3 20000" against an LC already fully earmarked showed no warning at all)', () => {
+    it('is true for UTILIZE/HONOUR/ACCEPT (DECREASING_MOVEMENT_TYPES) — these have a genuine plain-Available tier', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'UTILIZE';
+      expect(c.checksAgainstPlainAvailable).toBe(true);
+      c.model.movementType = 'HONOUR';
+      expect(c.checksAgainstPlainAvailable).toBe(true);
+      c.model.movementType = 'ACCEPT';
+      expect(c.checksAgainstPlainAvailable).toBe(true);
+    });
+
+    it('is true for AMEND_DECREASE / B2\'s own Decrease direction', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'AMEND_DECREASE';
+      expect(c.checksAgainstPlainAvailable).toBe(true);
+    });
+
+    it('is false for CREATE (B3) and ISSUE (A8) — no separate plain-Available tier server-side', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'CREATE';
+      c.selectedContract = contract({ instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.checksAgainstPlainAvailable).toBe(false);
+
+      c.model.movementType = 'ISSUE';
+      c.model.instrumentType = 'SHGT';
+      expect(c.checksAgainstPlainAvailable).toBe(false);
+    });
+  });
+
   describe('checksAgainstTightAvailable (business instruction 2026-08-20, "B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance")', () => {
     it('is true for UTILIZE (A3/A3S)', () => {
       const c = new MakerPanelComponent(mockApiD());
@@ -3688,10 +3740,22 @@ describe('MakerPanelComponent', () => {
       expect(c.checksAgainstTightAvailable).toBe(false);
     });
 
-    it('is false for an unrelated movementType/instrumentType combination', () => {
+    it('is true for HONOUR (B4 Sight)', () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'HONOUR';
-      c.selectedContract = contract({ instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.checksAgainstTightAvailable).toBe(true);
+    });
+
+    it('is true for ACCEPT (B4 Usance)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'ACCEPT';
+      expect(c.checksAgainstTightAvailable).toBe(true);
+    });
+
+    it('is false for an unrelated movementType/instrumentType combination', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.model.movementType = 'PARTIAL_REDEEM';
+      c.selectedContract = contract({ instrumentType: 'SHGT' });
       expect(c.checksAgainstTightAvailable).toBe(false);
     });
   });

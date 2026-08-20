@@ -495,13 +495,25 @@
                        showed NO balance box or warning at all, since selectedContract was never populated for
                        their own "create a new child directly under the picked parent" shape; see
                        onSelectParent()'s own doc comment for the alias fix, and checksAgainstTightAvailable's
-                       own doc comment for the full movementType/instrumentType matrix this now covers. -->
+                       own doc comment for the full movementType/instrumentType matrix this now covers.
+                       Extended again 2026-08-20 ("A2-A9, B2-B5 對於金額輸入的檢查... 統一在金額輸入時都檢查")
+                       — B4 (HONOUR/ACCEPT) was the one remaining function checked only server-side at
+                       Submit; now widened by the referenced B3 presentation's own amount, same false-positive
+                       fix as A35's SG widening (see tightAvailableBalanceForWarning's own doc comment).
+                       Bug found live the same day (user-reported: an amount exceeding BOTH Available and
+                       Tight Available for B3 showed no warning at all) — the `<= availableBalance` guard
+                       below was written assuming every checksAgainstTightAvailable function also has a real
+                       plain-Available tier to fall back to (true for UTILIZE/HONOUR/ACCEPT/AMEND_DECREASE-
+                       direction), but B3/A8 have none (see checksAgainstTightAvailable's own doc comment) —
+                       so that guard silently suppressed their ONLY warning whenever the amount happened to
+                       also exceed plain Available. Now scoped via checksAgainstPlainAvailable: the guard
+                       only applies for functions that genuinely have both tiers. -->
             <div
               class="tb-error mt-2"
               *ngIf="
                 !formLocked &&
                 model.amount &&
-                +model.amount <= +selectedContractSnapshot.availableBalance &&
+                (!checksAgainstPlainAvailable || +model.amount <= +selectedContractSnapshot.availableBalance) &&
                 checksAgainstTightAvailable &&
                 tightAvailableBalanceForWarning !== null &&
                 +model.amount > +tightAvailableBalanceForWarning
@@ -515,7 +527,9 @@
               >{{
                 selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && pickerSelection.arrivalSgSnapshot
                   ? ', netted against the selected SG\'s own Outstanding (' + pickerSelection.arrivalSgSnapshot.confirmedBalance + ')'
-                  : ''
+                  : (model.movementType === 'HONOUR' || model.movementType === 'ACCEPT') && pickerSelection.selectedPayMovement
+                    ? ', netted against the referenced presentation\'s own amount (' + pickerSelection.selectedPayMovement.ceilingAmount + ')'
+                    : ''
               }} — only APPROVED amounts count as usable capacity).
               <ng-container *ngIf="model.movementType === 'UTILIZE' && !selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
                 >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping

@@ -366,13 +366,41 @@ export class MakerPanelComponent implements OnChanges {
    * Balance" tier-1 warning above: A8/B3 have no separate, looser plain-Available check server-side (unlike
    * UTILIZE/AMEND_DECREASE, which genuinely have both tiers) — Tight Available Balance is their only real
    * ceiling.
+   *
+   * B4 (`HONOUR`/`ACCEPT`) added 2026-08-20 ("A2-A9, B2-B5 對於金額輸入的檢查... 統一在金額輸入時都檢查") —
+   * closes the one remaining gap: `HONOUR`/`ACCEPT` are the exact same `checkUtilizeSufficiency`-backed
+   * `utilizeShaped` bucket `UTILIZE` already uses server-side (`movementTypeRegistry`,
+   * `microservices/balance-component/src/service/balanceService.ts`), and both movementTypes are B4-only
+   * (never used by any other function), so gating on the bare movementType here is exact — no strategy-flag
+   * check needed, same posture as the `UTILIZE` line above it. See `tightAvailableBalanceForWarning`'s own
+   * doc comment for why the THRESHOLD itself (not just whether to show the warning) also needed a B4-specific
+   * widening, not just this gate.
    */
   get checksAgainstTightAvailable(): boolean {
-    if (this.model.movementType === 'UTILIZE') return true;
+    if (this.model.movementType === 'UTILIZE' || this.model.movementType === 'HONOUR' || this.model.movementType === 'ACCEPT') return true;
     if (this.isAmendDecreaseDirection) return true;
     if (this.model.movementType === 'CREATE' && this.selectedContract?.instrumentType === 'EPLC_CONFIRMATION') return true;
     if (this.model.movementType === 'ISSUE' && this.hasParent) return true;
     return false;
+  }
+
+  /**
+   * Bug found live 2026-08-20 (user-reported, "B3 20000" against an LC already fully earmarked —
+   * Available 10000, Tight Available 0 — showed NO warning at all, even though the server would reject
+   * it): the "exceeds Tight Available Balance" warning below gates on
+   * `+model.amount <= +selectedContractSnapshot.availableBalance`, a guard written for functions that
+   * genuinely have BOTH tiers (UTILIZE/HONOUR/ACCEPT/AMEND_DECREASE-direction — suppress the Tight
+   * message in favor of the plain "exceeds Available Balance" one above it, so the two never show
+   * together for the same violation). But B3/A8 have no plain-Available tier at all — see
+   * `checksAgainstTightAvailable`'s own doc comment — so when a B3/A8 amount exceeds BOTH ceilings at
+   * once, that `<= availableBalance` guard silently suppressed their only warning, and the plain
+   * "exceeds Available Balance" block above never fires for them either (its own gate,
+   * `movementTypeChecksAvailableBalance`/`isAmendDecreaseDirection`, is `false` for `CREATE`/`ISSUE`).
+   * This getter identifies the functions that genuinely have a plain-Available tier to defer to; the
+   * Tight-tier warning's own `*ngIf` only applies the `<= availableBalance` guard when this is true.
+   */
+  get checksAgainstPlainAvailable(): boolean {
+    return this.movementTypeChecksAvailableBalance(this.model.movementType) || this.isAmendDecreaseDirection;
   }
 
   private describeApiError(err: any): string {
@@ -739,16 +767,33 @@ export class MakerPanelComponent implements OnChanges {
    * positive: `checkUtilizeSufficiency()` (offBalanceExposure.ts) never actually applies that raw
    * threshold here — the caller submits the matched SG's own redemption FIRST, netting that SG's
    * `confirmedBalance` (Outstanding) out of `offBalanceExposure` before the LC UTILIZE's own tier-2 check
-   * runs, so the REAL ceiling this movement can reach is `tightAvailableBalance + SG Outstanding`. Falls
-   * back to the plain `tightAvailableBalance` for every other function (plain A3, or A35 before an SG is
-   * picked) — same value as before this fix, this getter only widens the A35 case.
+   * runs, so the REAL ceiling this movement can reach is `tightAvailableBalance + SG Outstanding`.
+   *
+   * B4 (`HONOUR`/`ACCEPT`) widened the same day, same root cause, found while unifying every function's
+   * own live check to match its server formula ("A2-A9, B2-B5... 統一在金額輸入時都檢查"): the persisted
+   * `tightAvailableBalance` snapshot field, for an `EPLC_CONFIRMATION` contract, already nets OUT the full
+   * Present Docs Earmark (`assembleSnapshot()`'s own EPLC_CONFIRMATION branch, `balanceService.ts`) —
+   * including the very B3 presentation THIS B4 is about to consume. But B4's own actual server-side check
+   * (`checkUtilizeShapedSufficiency`) sets `offBalanceExposure = 0` for any non-IPLC_LC/EPLC_LC contract, so
+   * it never nets Present Docs Earmark at all — B4's real ceiling is `plain tightAvailableBalance + the
+   * referenced B3 record's own ceilingAmount` (the earmark this B4 is resolving, not a second exposure to
+   * subtract). Without this widening, B4 would show the exact same class of false positive A35 had.
+   *
+   * Falls back to the plain `tightAvailableBalance` for every other function (plain A3, A35/B4 before a
+   * matching SG/B3 record is picked) — same value as before either fix.
    */
   get tightAvailableBalanceForWarning(): string | null {
     const plain = this.selectedContractSnapshot?.tightAvailableBalance ?? null;
     if (plain === null || plain === undefined) return null;
-    if (!this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) return plain;
-    if (!this.pickerSelection.arrivalSgSnapshot) return plain;
-    return String(Number(plain) + Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance));
+    if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+      if (!this.pickerSelection.arrivalSgSnapshot) return plain;
+      return String(Number(plain) + Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance));
+    }
+    if (this.model.movementType === 'HONOUR' || this.model.movementType === 'ACCEPT') {
+      if (!this.pickerSelection.selectedPayMovement) return plain;
+      return String(Number(plain) + Number(this.pickerSelection.selectedPayMovement.ceilingAmount));
+    }
+    return plain;
   }
 
   onSelectPayMovement(movementId: string): void {

@@ -841,4 +841,27 @@ mirroring `Balance-Figures-Calculation-Logic.md`'s own wording. Checked `Balance
 `checkUtilizeSufficiency()` never actually returns a `warning` in current code, only `ok`/`error`, so the
 field genuinely never populates a live response; the OAS omission is still correct, just vestigial
 dead code left behind in the TypeScript side, not a spec bug.
+
+## Live input-time Tight Available Balance check extended to B4 (HONOUR/ACCEPT) — the one remaining function checked only at Submit
+
+Audited every A2–A9/B2–B5 function's live warning against its own server formula (business instruction
+"統一在金額輸入時都檢查"); only B4 was missing one. `checksAgainstTightAvailable` now also matches
+`HONOUR`/`ACCEPT` (both B4-only movementTypes, same `checkUtilizeSufficiency`-backed bucket `UTILIZE`
+already uses). `tightAvailableBalanceForWarning` widens by the referenced B3 presentation's own
+`ceilingAmount` for B4 — same false-positive fix as A35's own SG widening, since the persisted
+`tightAvailableBalance` for `EPLC_CONFIRMATION` already nets Present Docs Earmark (including the B3
+record B4 itself is resolving), while B4's actual server-side check never nets it at all
+(`offBalanceExposure` is 0 for any non-IPLC_LC/EPLC_LC contract).
+
+## Bug found live the same day, in B3 (not B4) — an amount exceeding BOTH Available and Tight Available showed no client-side warning at all
+
+The Tight-tier warning's own `*ngIf` gated on `+model.amount <= +selectedContractSnapshot.availableBalance`,
+written assuming every function it covers also has a genuine plain-Available tier to defer to (true for
+UTILIZE/HONOUR/ACCEPT/AMEND_DECREASE-direction, which show the plain "exceeds Available Balance" warning
+instead once the amount also exceeds Available — no double-message). B3/A8 have no plain-Available tier at
+all (their own server check is Tight-only), so that guard silently suppressed their only warning whenever
+the typed amount happened to exceed plain Available too — reproduced live: LC fully earmarked (Available
+10000, Tight 0), B3 amount 20000, zero warning shown even though the server would reject it. New
+`checksAgainstPlainAvailable` getter identifies the functions that genuinely have both tiers; the `<=
+availableBalance` guard now only applies for them — B3/A8 always fall through to the Tight-tier check.
 </content>
