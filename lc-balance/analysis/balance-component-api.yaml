@@ -451,7 +451,42 @@ info:
     description never caught up to reflect; and `POST /balance-movements`' own AMEND_DECREASE sufficiency
     check (and the parallel `EPLC_CONFIRMATION` `AMEND`-Decrease check) compares against Tight Available
     Balance, not plain Available Balance, same correction.
-  version: "1.15.0"
+
+
+    v1.16.0 (2026-08-21) — re-grounded against the real implementation again: catches this contract up to
+    A10 (Import LC Close) / B6 (Export Confirmed LC Close), and two smaller previously-undocumented query
+    parameters found in the same pass.
+      - ADDED: `movementType: 'CLOSE'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — writes off
+        whatever Confirmed Balance remains and retires the Logical Contract (`ContractStatus.CLOSED`,
+        reserved in this schema since the original design but never previously reachable through any
+        endpoint — it is now, exclusively via this movementType). Modelled on cs-tf-balance-knowhow
+        §3.9/§7.7's "cancellation before expiry" — same write-off entry as a natural expiry, but
+        Maker/Checker-triggered rather than date-triggered. Same direction as AMEND_DECREASE/UTILIZE (`-1`).
+      - ADDED business rules for CLOSE, checked identically at Maker Submit (`POST /balance-movements`)
+        and again at Checker Release (`POST /balance-movements/{id}/release`, since eligibility can move in
+        the window between the two): (a) only a root `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` is eligible —
+        `400` for any other instrumentType; (b) eligibility requires the contract not already CLOSED, its
+        own Shipping Guarantee AND Acceptance Confirmed Balance both exactly 0, and no open (PENDING, or a
+        RELEASED-but-not-yet-consumed `EPLC_EXAMINATION`) Event anywhere in its whole event tree (root plus
+        every SG/Acceptance/Examination child) — `409 INSUFFICIENT_AVAILABLE_BALANCE` at Submit if not met,
+        `409 ILLEGAL_STATE_TRANSITION` at Release if it stopped holding since Submit; (c) `amount` must
+        exactly equal the contract's own current Confirmed Balance at Submit time (may legitimately be
+        zero for an already fully-utilized LC, but never negative) — re-verified byte-for-byte unchanged at
+        Release, `409 ILLEGAL_STATE_TRANSITION` otherwise (the caller must cancel and resubmit with the
+        current figure, never auto-recomputed server-side).
+      - ADDED `GET /balance-contracts/close-eligible` — paginated Step-1 picker hint listing every ACTIVE
+        root contract of one instrumentType currently eligible for Close (same eligibility rule as above,
+        evaluated in memory over one batched fetch per instrumentType — a real N+1 query fix, not a
+        behavioral change; see `analysis/Balance-Component-DB-Optimization-Analysis.md` P2).
+      - ADDED query parameters, both previously live but undocumented: `GET /balance-contracts` gains
+        `legSeq` (already a `NaturalKey` field, used for Mixed Tenor LC leg resolution — Design doc §7.1,
+        also now added to the `NaturalKey` schema below) and `includeAnyStatus` (opt-in, default false;
+        inquiry-only callers — Look Up Current Balance, Inquire Events — pass `true` so a CLOSED contract
+        stays resolvable for inquiry even though it is no longer selectable to act on; every
+        transaction-creating caller omits it, unchanged ACTIVE-only behavior). `GET /balance-contracts/catalog`
+        gains `requireIssueReleased` (opt-in; excludes a candidate whose own root ISSUE is still PENDING —
+        used by every Maker-ACTION picker, omitted by inquiry-only contexts and B4's own Present Docs search).
+  version: "1.16.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -476,6 +511,14 @@ paths:
         depending on instrumentType — see the natural-key table in §3.1).
         Returns 404 if no Logical Contract exists yet for this natural key
         (the caller should then submit an ISSUE/CREATE movement instead).
+
+
+        v1.16.0 — `includeAnyStatus` (default false, opt-in) resolves regardless of `ContractStatus`, not
+        just `ACTIVE`: inquiry-only callers (Look Up Current Balance, Inquire Events) pass `true` so a
+        CLOSED (A10/B6) contract stays resolvable for inquiry even though it is no longer selectable to
+        act on; every transaction-creating caller omits it, unchanged ACTIVE-only behavior. When both an
+        ACTIVE and a CLOSED row exist for the same natural key (a re-ISSUE after a prior Close), the ACTIVE
+        one wins.
       parameters:
         - name: instrumentType
           in: query
@@ -493,6 +536,14 @@ paths:
           in: query
           schema: { type: string }
           description: Required when instrumentType is SHGT.
+        - name: legSeq
+          in: query
+          schema: { type: string }
+          description: v1.16.0 — Mixed Tenor LC leg discriminator (Design doc §7.1). Not required by any currently-implemented flow; carried through for future leg-level LC support, same posture as BalanceMovement.legRef.
+        - name: includeAnyStatus
+          in: query
+          schema: { type: boolean, default: false }
+          description: v1.16.0 — see this endpoint's own description above.
       responses:
         '200':
           description: Logical Contract found — its current ACTIVE version is returned.
@@ -536,6 +587,10 @@ paths:
           in: query
           description: Restricts to contracts whose own declared tenorType matches this family — SIGHT means tenorType=SIGHT exactly; USANCE means any Usance-family tenorType. Contracts with no recorded tenorType are never filtered out.
           schema: { type: string, enum: [SIGHT, USANCE] }
+        - name: requireIssueReleased
+          in: query
+          description: v1.16.0 — opt-in, previously live but undocumented (business-reported gap 2026-08-18, "S10 still shown in A4 function which is wrong" — S10's own ISSUE was still PENDING). Excludes a candidate whose own root ISSUE/CREATE is not yet RELEASED. Applied by every Maker-ACTION picker; omitted by inquiry-only contexts and B4's own Present Docs search, whose candidates are legitimately PENDING.
+          schema: { type: boolean, default: false }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -557,6 +612,58 @@ paths:
                   total: { type: integer }
                   page: { type: integer }
                   pageSize: { type: integer }
+
+  /balance-contracts/close-eligible:
+    get:
+      tags: [BalanceContracts]
+      summary: A10 (Import LC Close) / B6 (Export Confirmed LC Close) — Step-1 picker hint
+      description: >
+        v1.16.0 — real, previously-undocumented endpoint. Every ACTIVE root contract of one instrumentType
+        (`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — `400` for any other instrumentType) currently
+        eligible to Close: not already CLOSED, its own Shipping Guarantee AND Acceptance Confirmed Balance
+        both exactly 0, and no open Event anywhere in its whole event tree (root plus every SG/Acceptance/
+        Examination child — a still-PENDING movement, or a RELEASED-but-not-yet-consumed
+        `EPLC_EXAMINATION` CREATE, both block eligibility). The SAME eligibility rule
+        `POST /balance-movements` re-checks at Maker Submit and `POST /balance-movements/{id}/release`
+        re-checks at Checker Approve — a candidate that stops qualifying between the two is caught by
+        those endpoints, not silently allowed through. Distinct from `GET /balance-contracts/catalog`'s own
+        `requireIssueReleased` flag — eligibility here spans multiple tables/instrument types per
+        candidate, not expressible as a single WHERE clause.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          description: Exact lcNumber filter, same convention as GET /balance-contracts/catalog.
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of ACTIVE root contracts of this instrumentType currently eligible for Close.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '400':
+          description: instrumentType is missing, or is not one of IPLC_LC/EPLC_LC/EPLC_CONFIRMATION.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /balance-contracts/{balanceContractId}/balance:
     get:
@@ -693,6 +800,17 @@ paths:
         against **Tight** Available Balance, not plain Available Balance and
         not the raw `amount` (Design doc §6.2, v0.3.0; basis corrected to
         Tight in v1.13.0/v1.15.0 — see the top-level changelog).
+
+
+        v1.16.0 — `movementType: 'CLOSE'` (A10/B6, IPLC_LC/EPLC_LC/EPLC_CONFIRMATION only, `400` for any
+        other instrumentType) writes off the contract's remaining Confirmed Balance and, once Released,
+        retires it (`ContractStatus.CLOSED`). Eligibility (not already CLOSED, zero SG/Acceptance Confirmed
+        Balance, no open Event anywhere in the event tree) is a `409 INSUFFICIENT_AVAILABLE_BALANCE` if not
+        met at Submit — see `GET /balance-contracts/close-eligible` for a way to list candidates that
+        already qualify. `amount` must exactly equal the contract's own current Confirmed Balance (may be
+        zero, never negative); the same eligibility and exact-amount checks are re-run at
+        `POST /balance-movements/{id}/release` before actually flipping status — see that endpoint's own
+        description.
       requestBody:
         required: true
         content:
@@ -830,6 +948,15 @@ paths:
         (`presentDocsConsumedAt`/`presentDocsConsumedBy`) as a side effect —
         it does NOT re-release it (already `RELEASED` by then; attempting to
         would 409 — see the response below).
+
+
+        v1.16.0 (A10/B6 Close): releasing a `CLOSE` movement re-runs the SAME eligibility check
+        `POST /balance-movements` ran at Submit, against the THEN-current state — `409
+        ILLEGAL_STATE_TRANSITION` if it no longer holds, or if the contract's own Confirmed Balance has
+        changed since Submit (the movement's own frozen `ceilingAmount` no longer matches — the caller
+        must cancel and resubmit with the current figure, never auto-recomputed here). On success, this
+        call's own side effect retires the contract (`ContractStatus.CLOSED`, `effectiveTo` set) — the
+        movement itself is RELEASED exactly like any other.
       parameters:
         - name: movementId
           in: path
@@ -861,8 +988,10 @@ paths:
             explicitly rather than silently accepted (Design doc §8). Also
             returned (v1.5.0) for a Sight-tenor IPLC_LC's own UTILIZE that
             has not yet been Maker-submitted via
-            `POST /balance-movements/{id}/maker-submit` — see this
-            endpoint's own description above.
+            `POST /balance-movements/{id}/maker-submit`, and (v1.16.0) for a
+            `CLOSE` movement whose eligibility no longer holds or whose own
+            frozen amount no longer matches the contract's current Confirmed
+            Balance — see this endpoint's own description above.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1092,10 +1221,15 @@ components:
         Design doc §3.1 — a completely separate state machine from
         MovementStatus. A Contract being SUPERSEDED does not retroactively
         change the status of movements recorded against it while it was
-        ACTIVE. SUPERSEDED/CLOSED are carried in the schema for the state
-        machine's own completeness and future contract-versioning work
-        (see the v1.0.0 changelog note on the removed versioning endpoint);
-        no current endpoint transitions a contract into either.
+        ACTIVE. SUPERSEDED is carried in the schema for the state machine's
+        own completeness and future contract-versioning work (see the
+        v1.0.0 changelog note on the removed versioning endpoint) — no
+        current endpoint transitions a contract into it. CLOSED (v1.16.0)
+        IS now reachable: a root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION
+        transitions into it as a side effect of
+        POST /balance-movements/{movementId}/release on that contract's own
+        CLOSE movement — see A10/B6 Close in the top-level changelog and
+        that endpoint's own description.
       enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED]
 
     MovementStatus:
@@ -1145,6 +1279,7 @@ components:
         lcNumber: { type: string, description: "C_MAIN_REF of the underlying LC." }
         ibNumber: { type: string, description: "Required for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED — the presentation/bill reference." }
         sgNumber: { type: string, description: "Required for SHGT." }
+        legSeq: { type: string, description: "v1.16.0 — Mixed Tenor LC leg discriminator (Design doc §7.1). Not required by any currently-implemented flow." }
 
     AccountEntry:
       type: object
