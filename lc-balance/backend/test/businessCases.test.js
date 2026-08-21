@@ -13,6 +13,10 @@ const EXPECTED_IDS = [
   'import-case-5',
   'import-case-6',
   'import-case-7',
+  'import-case-8',
+  'import-case-9',
+  'import-case-10',
+  'import-case-11',
   'export-case-1',
   'export-case-2',
   'export-case-3',
@@ -20,6 +24,9 @@ const EXPECTED_IDS = [
   'export-case-5',
   'export-case-6',
   'export-case-7',
+  'export-case-8',
+  'export-case-9',
+  'export-case-10',
 ];
 
 const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
@@ -27,8 +34,8 @@ const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 's
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 14 business cases, Import Case 1-7 then Export Case #1-#7, in order', () => {
-    expect(registry).toHaveLength(14);
+  it('returns exactly 21 business cases, Import Case 1-11 then Export Case #1-#10, in order', () => {
+    expect(registry).toHaveLength(21);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -61,6 +68,15 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['export-case-7'].title).toBe(
       'Export Case #7 — USD Sellers Usance 120 days + Confirmed + Present Docs (B3) -> Accept (B4) -> Acceptance + Reimbursement Receivable -> Settlement (B5)',
     );
+    expect(byId['import-case-8'].title).toBe("Import Case 8 — USD Sellers Usance 120 days, full lifecycle to Close (A10)");
+    expect(byId['import-case-9'].title).toBe("Import Case 9 — USD Buyer's Usance 120 days, full lifecycle to Close (A10)");
+    expect(byId['import-case-10'].title).toBe(
+      'Import Case 10 — USD Sight, Shipping Guarantee + Document Arrival both taken to their own terminus, then Close (A10)',
+    );
+    expect(byId['import-case-11'].title).toBe('Import Case 11 — A10 Close eligibility gate, negative path (expect ERROR)');
+    expect(byId['export-case-8'].title).toBe('Export Case #8 — USD Sight + Confirmed, full lifecycle to Close (B6)');
+    expect(byId['export-case-9'].title).toBe("Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)");
+    expect(byId['export-case-10'].title).toBe('Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)');
   });
 
   it('every step has a type from the six the generic executor understands', () => {
@@ -132,7 +148,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     registry.forEach((c) => {
       const firstWithNaturalKey = c.steps.find((s) => s.type === 'createMovement' && s.request && s.request.naturalKey && s.request.naturalKey.lcNumber);
       expect(firstWithNaturalKey).toBeDefined();
-      expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(/^(IMP|EXP)-C\d-\d+-\d+$/);
+      expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(/^(IMP|EXP)-C\d+-\d+-\d+$/);
     });
   });
 
