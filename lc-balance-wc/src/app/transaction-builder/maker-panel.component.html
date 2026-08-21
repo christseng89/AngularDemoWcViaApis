@@ -1,6 +1,7 @@
 <!-- ══════════════════════════ MAKER ══════════════════════════ -->
 <section class="tb-section tb-section--maker">
   <div class="tb-section__header">
+    <app-tb-icon name="amend"></app-tb-icon>
     <span class="tb-role-badge tb-role-badge--maker">Maker</span>
     <h2 class="tb-section__title">{{ selectedFunction?.code }} — {{ selectedFunction?.label }}</h2>
   </div>
@@ -201,8 +202,9 @@
                 [(ngModel)]="naturalKey.lcNumber"
                 #lcNumberCtrl="ngModel"
                 [disabled]="formLocked"
+                [attr.aria-describedby]="lcNumberCtrl.invalid && lcNumberCtrl.touched ? 'lcNumberA1B1Error' : null"
               />
-              <div class="tb-error mt-1" *ngIf="lcNumberCtrl.invalid && lcNumberCtrl.touched">LC Number is mandatory.</div>
+              <div id="lcNumberA1B1Error" class="tb-error mt-1" role="alert" *ngIf="lcNumberCtrl.invalid && lcNumberCtrl.touched">LC Number is mandatory.</div>
             </div>
             <div *ngIf="lcNumberFromParent">
               <input class="tb-input" placeholder="LC Number" [ngModel]="naturalKey.lcNumber" disabled />
@@ -228,8 +230,9 @@
                 [(ngModel)]="naturalKey.ibNumber"
                 #ibNumberCtrl="ngModel"
                 [disabled]="formLocked"
+                [attr.aria-describedby]="ibNumberCtrl.invalid && ibNumberCtrl.touched ? 'naturalKeyIbNumberError' : null"
               />
-              <div class="tb-error mt-1" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
+              <div id="naturalKeyIbNumberError" class="tb-error mt-1" role="alert" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
             </div>
             <div *ngIf="requiredNaturalKeyFields.includes('sgNumber')">
               <label class="tb-field__label">SG Number <span class="tb-required-mark">*</span></label>
@@ -242,8 +245,9 @@
                 [(ngModel)]="naturalKey.sgNumber"
                 #sgNumberCtrl="ngModel"
                 [disabled]="formLocked"
+                [attr.aria-describedby]="sgNumberCtrl.invalid && sgNumberCtrl.touched ? 'naturalKeySgNumberError' : null"
               />
-              <div class="tb-error mt-1" *ngIf="sgNumberCtrl.invalid && sgNumberCtrl.touched">SG Number is mandatory.</div>
+              <div id="naturalKeySgNumberError" class="tb-error mt-1" role="alert" *ngIf="sgNumberCtrl.invalid && sgNumberCtrl.touched">SG Number is mandatory.</div>
             </div>
           </div>
         </ng-container>
@@ -286,7 +290,7 @@
             <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked || !!selectedContract">
               Search
             </button>
-            <div class="tb-error mt-2" *ngIf="searchError">{{ searchError }}</div>
+            <div class="tb-error mt-2" role="alert" *ngIf="searchError">{{ searchError }}</div>
             <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">
               Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}
             </div>
@@ -420,7 +424,9 @@
         </div>
 
         <div class="mt-2" *ngIf="selectedContract">
-          <div class="tb-hint" *ngIf="snapshotLoading">Loading balance…</div>
+          <div class="tb-hint" *ngIf="snapshotLoading" role="status" aria-live="polite" aria-busy="true">
+            <span class="tb-spinner" aria-hidden="true"></span>Loading balance…
+          </div>
           <div class="tb-balance-box" *ngIf="!snapshotLoading && selectedContractSnapshot">
             <div class="tb-balance-row">
               <span class="tb-balance-row__label">Confirmed</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.confirmedBalance }}</span>
@@ -470,6 +476,7 @@
                        client-side warning at all for a Decrease the server would reject). -->
             <div
               class="tb-error mt-2"
+              role="alert"
               *ngIf="
                 !formLocked &&
                 model.amount &&
@@ -510,6 +517,7 @@
                        only applies for functions that genuinely have both tiers. -->
             <div
               class="tb-error mt-2"
+              role="alert"
               *ngIf="
                 !formLocked &&
                 model.amount &&
@@ -677,7 +685,7 @@
                    hint. Disabled-once-submitResult-set convention matches the generic Submit button
                    below exactly (business instruction 2026-08-15, "按Submit...後 Button 直接灰掉"). -->
         <button class="tb-btn tb-btn--primary mt-2" (click)="submitA4()" [disabled]="!pickerSelection.selectedPayMovement || submitting || !!submitResult">
-          {{ submitting ? 'Submitting…' : 'Submit A4' }}
+          <span class="tb-spinner" aria-hidden="true" *ngIf="submitting"></span>{{ submitting ? 'Submitting…' : 'Submit A4' }}
         </button>
       </div>
 
@@ -694,7 +702,7 @@
           <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
         </form>
 
-        <div class="tb-error mt-2" *ngIf="amountDecimalMismatch">
+        <div class="tb-error mt-2" role="alert" *ngIf="amountDecimalMismatch">
           ⚠ Amount ({{ model.amount }}) has more decimal places than {{ model.currency }} allows ({{ currencyDecimalPlaces }}) — this will be rejected.
         </div>
 
@@ -712,16 +720,16 @@
                    unconditionally true for A1/B1, so only the mandatory-field-validity half is new for
                    them). -->
         <button class="tb-btn tb-btn--primary" (click)="submit()" [disabled]="submitting || !!submitResult || !isSubmitReady">
-          {{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction?.code }}
+          <span class="tb-spinner" aria-hidden="true" *ngIf="submitting"></span>{{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction?.code }}
         </button>
       </ng-container>
     </ng-container>
   </div>
 </section>
 
-<div class="tb-result" *ngIf="submitResult || submitError">
+<div class="tb-result" *ngIf="submitResult || submitError" role="status" aria-live="polite" aria-atomic="true">
   <h3 class="tb-result__title">Maker Result</h3>
-  <div class="tb-error" *ngIf="submitError">{{ submitError }}</div>
+  <div class="tb-error" role="alert" *ngIf="submitError">{{ submitError }}</div>
   <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
   <p class="tb-result__status" *ngIf="submitResult?.status">
     <strong>Status:</strong> {{ displayStatus(submitResult!.status, model.instrumentType, submitResult!.movementType, submitResult!.acknowledgedAt) }}
@@ -785,6 +793,6 @@
     (click)="deletePendingRequested.emit()"
     [disabled]="actionBusy"
   >
-    {{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
+    <span class="tb-spinner" aria-hidden="true" *ngIf="actionBusy"></span>{{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
   </button>
 </div>

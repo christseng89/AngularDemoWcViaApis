@@ -89,6 +89,16 @@ describe('AccountEntriesDialogComponent', () => {
     });
   });
 
+  describe('statusBadgeIcon() (P2 UI/UX pass)', () => {
+    it('derives the icon from statusBadgeClass(), not a second independent status mapping', () => {
+      const c = new AccountEntriesDialogComponent();
+      c.instrumentType = 'IPLC_LC';
+      c.movement = movement({ movementType: 'ISSUE', status: 'RELEASED' });
+      expect(c.statusBadgeIcon('RELEASED')).toBe('ok');
+      expect(c.statusBadgeIcon('PENDING')).toBe('pending');
+    });
+  });
+
   // This dialog's own meta line is a 4th call site for the same AMEND_INCREASE/AMEND_DECREASE
   // relabeling as Look Up Current Balance, Inquire Events, and the Checker queue.
   describe('displayMovementType()', () => {

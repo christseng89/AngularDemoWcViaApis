@@ -521,6 +521,35 @@ export function displayStatus(
   return status;
 }
 
+/**
+ * P2 UI/UX pass — function-chip action-type icon (`TbIconComponent`), one of 4 groups by underlying
+ * domain semantics rather than raw movementType: `issue` (ISSUE/CREATE establishing a new
+ * balance/facility record — A1/A6/A8/B1), `amend` (A2/B2), `utilize` (presentation/finalize —
+ * A3/A3S/A4/B3/B4), `redeem` (settle/close an existing exposure — A7/A9/B5). A plain lookup keyed by
+ * function `code`, not instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
+ * A4/B4 are all effectively UTILIZE-shaped) but land in the same group anyway, so re-deriving from
+ * movementType would be no simpler.
+ */
+const ISSUE_GROUP_CODES: ReadonlySet<string> = new Set(['A1', 'A6', 'A8', 'B1']);
+const AMEND_GROUP_CODES: ReadonlySet<string> = new Set(['A2', 'B2']);
+const UTILIZE_GROUP_CODES: ReadonlySet<string> = new Set(['A3', 'A3S', 'A4', 'B3', 'B4']);
+// Anything not in the 3 sets above (A7/A9/B5) falls into the redeem group — see functionActionIcon().
+
+export function functionActionIcon(code: string): 'issue' | 'amend' | 'utilize' | 'redeem' {
+  if (ISSUE_GROUP_CODES.has(code)) return 'issue';
+  if (AMEND_GROUP_CODES.has(code)) return 'amend';
+  if (UTILIZE_GROUP_CODES.has(code)) return 'utilize';
+  return 'redeem';
+}
+
+/** Status badge icon — so status isn't conveyed by color alone (accessibility). Derived from the CSS class `statusBadgeClass()` already returns, not re-computed from status/instrumentType/movementType/phase — one mapping, called at every `statusBadgeClass()` call site. */
+export function statusBadgeIcon(badgeClass: string): 'ok' | 'pending' | 'cross' | 'dash' {
+  if (badgeClass === 'tb-status-badge--approved' || badgeClass === 'tb-status-badge--earmark') return 'ok';
+  if (badgeClass === 'tb-status-badge--pending') return 'pending';
+  if (badgeClass === 'tb-status-badge--negative') return 'cross';
+  return 'dash';
+}
+
 /** Status badge CSS class — shares `displayStatus()`'s own mapping. */
 export function statusBadgeClass(
   status: string,

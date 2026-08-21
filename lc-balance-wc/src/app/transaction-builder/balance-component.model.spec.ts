@@ -25,6 +25,8 @@
   tenorTypeLabel,
   displayMovementType,
   displayMovementAmount,
+  functionActionIcon,
+  statusBadgeIcon,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -768,6 +770,45 @@ describe('balance-component.model data invariants', () => {
       expect(tenorTypeLabel(null, 'IMPORT')).toBe('—');
       expect(tenorTypeLabel(undefined, 'EXPORT')).toBe('—');
       expect(tenorTypeLabel('BUYERS_USANCE', 'EXPORT')).toBe('—');
+    });
+  });
+
+  describe('functionActionIcon (P2 UI/UX pass — function-chip action-type icon group)', () => {
+    it('every IMPORT_FUNCTIONS/EXPORT_FUNCTIONS code resolves to exactly one of the 4 documented groups', () => {
+      const expected: Record<string, 'issue' | 'amend' | 'utilize' | 'redeem'> = {
+        A1: 'issue',
+        A2: 'amend',
+        A3: 'utilize',
+        A3S: 'utilize',
+        A4: 'utilize',
+        A6: 'issue',
+        A7: 'redeem',
+        A8: 'issue',
+        A9: 'redeem',
+        B1: 'issue',
+        B2: 'amend',
+        B3: 'utilize',
+        B4: 'utilize',
+        B5: 'redeem',
+      };
+      for (const fn of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
+        expect(functionActionIcon(fn.code)).toBe(expected[fn.code]);
+      }
+    });
+
+    it('falls back to redeem for an unrecognized code (defensive default, never actually hit by a registered function)', () => {
+      expect(functionActionIcon('NOPE')).toBe('redeem');
+    });
+  });
+
+  describe('statusBadgeIcon (P2 UI/UX pass — status conveyed by icon, not color alone)', () => {
+    it('maps every statusBadgeClass() output to its own icon', () => {
+      expect(statusBadgeIcon('tb-status-badge--approved')).toBe('ok');
+      expect(statusBadgeIcon('tb-status-badge--earmark')).toBe('ok');
+      expect(statusBadgeIcon('tb-status-badge--pending')).toBe('pending');
+      expect(statusBadgeIcon('tb-status-badge--negative')).toBe('cross');
+      expect(statusBadgeIcon('tb-status-badge--neutral')).toBe('dash');
+      expect(statusBadgeIcon('')).toBe('dash');
     });
   });
 });

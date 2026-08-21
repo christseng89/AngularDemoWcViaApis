@@ -11,7 +11,9 @@
     <button type="button" class="index-picker__search-btn" (click)="search.emit()">Search</button>
   </div>
 
-  <div class="index-picker__loading" *ngIf="loading">Loading…</div>
+  <div class="index-picker__loading" *ngIf="loading" role="status" aria-live="polite" aria-busy="true">
+    <span class="tb-spinner" aria-hidden="true"></span>Loading…
+  </div>
 
   <ng-container *ngIf="!loading">
     <div class="index-picker__empty" *ngIf="!items.length">{{ emptyText }}</div>

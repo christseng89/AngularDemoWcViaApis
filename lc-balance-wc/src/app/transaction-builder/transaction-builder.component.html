@@ -47,6 +47,7 @@
           [title]="fn.help"
           (click)="selectFunction(fn)"
         >
+          <app-tb-icon [name]="functionActionIcon(fn.code)"></app-tb-icon>
           <span class="tb-function-chip__code">{{ fn.code }}</span>
           <span class="tb-function-chip__label">{{ fn.label }}</span>
         </button>
@@ -156,7 +157,7 @@
                   arrivalAlreadyApproved)
               "
             >
-              {{
+              <span class="tb-spinner" aria-hidden="true" *ngIf="checkerActionInFlight"></span>{{
                 checkerActionInFlight
                   ? 'Working…'
                   : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
@@ -168,13 +169,14 @@
             </button>
             <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
           </div>
-          <div class="tb-error mt-2" *ngIf="checkerError">{{ checkerError }}</div>
+          <div class="tb-error mt-2" role="alert" *ngIf="checkerError">{{ checkerError }}</div>
         </app-checker-panel>
       </div>
 
       <div class="tb-side">
         <section class="tb-section tb-section--lookup">
           <div class="tb-section__header">
+            <app-tb-icon name="lookup"></app-tb-icon>
             <h2 class="tb-section__title">Look Up Current Balance</h2>
           </div>
           <div class="tb-section__body">
@@ -214,7 +216,7 @@
               <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber" />
             </div>
             <button class="tb-btn tb-btn--outline mt-2" (click)="onLookUpClick()">Look Up</button>
-            <div class="tb-error mt-2" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
+            <div class="tb-error mt-2" role="alert" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
 
             <!-- Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC
                ... three tabs, LC Balance, Acceptance Balance, and SG Balance") — Acceptance only for Usance
@@ -376,6 +378,7 @@
                         <span
                           class="tb-status-badge"
                           [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)"
+                          ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt))"></app-tb-icon
                           >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt) }}</span
                         >
                       </td>
@@ -507,11 +510,13 @@
                 (keyup.enter)="inquireEvents.searchIndex()"
               />
               <button type="button" class="tb-btn tb-btn--outline" [disabled]="inquireEvents.indexLoading" (click)="inquireEvents.searchIndex()">
-                {{ inquireEvents.indexLoading ? 'Searching…' : 'Search' }}
+                <span class="tb-spinner" aria-hidden="true" *ngIf="inquireEvents.indexLoading"></span>{{ inquireEvents.indexLoading ? 'Searching…' : 'Search' }}
               </button>
             </div>
-            <div class="tb-error mt-2" *ngIf="inquireEvents.indexError">{{ inquireEvents.indexError }}</div>
-            <div class="tb-hint mt-2" *ngIf="inquireEvents.indexLoading">Loading {{ inquireEvents.indexEntityLabel }} Master Records…</div>
+            <div class="tb-error mt-2" role="alert" *ngIf="inquireEvents.indexError">{{ inquireEvents.indexError }}</div>
+            <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.indexLoading">
+              <span class="tb-spinner" aria-hidden="true"></span>Loading {{ inquireEvents.indexEntityLabel }} Master Records…
+            </div>
 
             <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
               <table class="tb-table">
@@ -577,7 +582,7 @@
             <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">
               ‹ Back to {{ inquireEvents.indexEntityLabel }} Index
             </button>
-            <div class="tb-error mt-2" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
+            <div class="tb-error mt-2" role="alert" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
             <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">
               Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}
             </div>
@@ -591,7 +596,9 @@
           <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
             <div class="mt-3" *ngIf="inquireEvents.rootContract">
               <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
-              <div class="tb-hint" *ngIf="inquireEvents.eventsLoading">Loading events…</div>
+              <div class="tb-hint" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.eventsLoading">
+                <span class="tb-spinner" aria-hidden="true"></span>Loading events…
+              </div>
               <!-- Business instruction 2026-08-17 ("Since the View screen already provides access to Account
                Entries, remove the Account Entries button from the Event List... The View button should
                serve as the single entry point for reviewing the selected Event, including its
@@ -658,6 +665,7 @@
                         <span
                           class="tb-status-badge"
                           [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt)"
+                          ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt))"></app-tb-icon
                           >{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt) }}</span
                         >
                       </td>

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
+import { TbIconComponent } from '../tb-icon.component';
 import {
   TransactionFunction,
   displayMovementType as displayMovementTypeRule,
@@ -31,7 +32,7 @@ export interface CheckerSyncSignal {
 @Component({
   selector: 'app-checker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, IndexPickerComponent],
+  imports: [CommonModule, FormsModule, IndexPickerComponent, TbIconComponent],
   templateUrl: './checker-panel.component.html',
   styleUrl: './checker-panel.component.scss',
 })

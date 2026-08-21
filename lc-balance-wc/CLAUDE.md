@@ -885,4 +885,65 @@ condition/message changed, all 361 microservice + 34 backend + 996 Angular tests
 edits, and independently re-verified live against the running dev stack (A1 re-ISSUE guard, A8 SG Issue
 both the InsufficientBalanceError and success paths, B3 Present Docs earmark rejection, SG sibling
 snapshot rendering) — every error message byte-for-byte identical to before.
+
+## UI/UX review P0 pass — `aria-live`/`aria-busy` on async state, `aria-describedby` on mandatory-field errors
+
+Template-only, `transaction-builder/` directory: `index-picker.component.html`'s shared loading state
+(`role="status" aria-live="polite" aria-busy="true"`) covers every paginated picker's loading text
+app-wide (LC/IB/SG/Acceptance/payable-movement indexes) in one place; `maker-panel.component.html`'s
+`.tb-result` banner and every `.tb-error`/balance-sufficiency-warning block got `role="alert"`/
+`aria-live="polite"` so a screen-reader user is told about a Submit outcome or validation failure without
+needing to re-scan the page; the three plain-`ngModel` mandatory Natural Key inputs (LC/IB/SG Number,
+the ones outside the Formly array — see BAL-117-era `tb-input--invalid` doc comment above) got
+`id`+`[attr.aria-describedby]` linking each to its own inline error message.
+`checker-panel.component.html`/`transaction-builder.component.html` got the same `role="alert"` treatment
+on their own search/action error blocks and `role="status"` on their own loading hints (Checker search,
+Inquire Events index/events load). Reuses the existing `account-entries-dialog.component.html`
+`role="dialog"`/`aria-modal`/`aria-label` pattern as-is — it's already the only modal in this sub-project,
+nothing else to retrofit. Pure template attribute additions, zero `.ts` changes; all 996 Angular + 34
+backend + 361 microservice tests still green with no spec edits.
+
+## UI/UX review P1 pass — CSS-only loading spinner on every "Loading…"/"Searching…"/"Submitting…"/"Working…" state
+
+`.tb-spinner`/`@keyframes tb-spin` (10px, `border` + `currentColor`, `prefers-reduced-motion` disables the
+animation) added ONCE to the global `src/styles.scss` rather than duplicated per component — a genuine
+cross-cutting design-system atom, and `maker-panel.component.scss`/`transaction-builder.component.scss`
+were already sitting close to (one of them already past, pre-existing and unrelated to this change — see
+below) the `anyComponentStyle` 12kb production-build budget, so a 4th/5th duplicate copy wasn't viable.
+Dropped into every existing loading branch across `index-picker`/`maker-panel`/`checker-panel`/
+`transaction-builder` (paginated-picker loading, Loading balance, Master Records/Events index loading,
+Search/Submit/Release/Delete-Pending buttons) — no new loading state introduced, purely a visual affordance
+on states that already existed. Template-only + one shared global CSS rule, zero `.ts` changes; all 996
+Angular tests still green with no spec edits (this project's no-TestBed convention means Jest never renders
+templates — verified for real via a live `ng build`, template-compiles clean).
+
+**Found, NOT fixed (pre-existing, unrelated to this session):** a production `ng build`
+(`defaultConfiguration: "production"` in `angular.json`) fails on `transaction-builder.component.scss`
+exceeding the `anyComponentStyle` 12kb hard-error budget by 24 bytes — confirmed via `git stash` that this
+already exists on a clean `main` checkout, before any of today's edits. Does NOT affect the documented dev
+workflow (`ng serve`'s own `defaultConfiguration` is `"development"`, which carries no budget block) or
+either `npm test`/`tsc --noEmit` gate — only a real `npm run build` hits it, which isn't part of this
+project's own standing "before calling a change complete" checklist. Flagged for a future pass (trim
+~30+ bytes of real CSS from that file, or raise the budget) rather than opportunistically fixed here, since
+it's unrelated to the spinner work and untouched CSS shouldn't be edited to chase an unrelated budget line.
+
+## UI/UX review P2 pass — function-chip/status/role icon set, icon toggle theme switcher
+
+`TbIconComponent` (`src/app/tb-icon.component.ts`, deliberately not nested under `transaction-builder/`
+since `AppComponent`'s theme toggle is a consumer too) — 13 hand-authored inline-SVG icons (16px, 1.5px
+stroke, `currentColor`, no fill/shadow; user-confirmed "細線條風格" style via `AskUserQuestion`). Global
+`.tb-icon` CSS in `src/styles.scss`, same anyComponentStyle-budget reasoning as `.tb-spinner` (P1) — never
+duplicated per component. New `functionActionIcon()`/`statusBadgeIcon()` pure functions
+(`balance-component.model.ts`) group the 14 A1–A9/B1–B5 chips into 4 action-type icons (issue/amend/
+utilize/redeem, keyed by function `code`) and derive a status-badge icon from the CSS class
+`statusBadgeClass()` already returns (ok/pending/cross/dash) — status no longer conveyed by color alone.
+Maker/Checker/Look Up section headers each get a fixed role icon (pencil/flag/magnifier). Theme switcher
+(`AppComponent`) replaced its plain-text `<select>` with an icon toggle button — one click steps
+System → Light → Dark → System (`ThemeService.cycleMode()`, new); the icon reflects `theme.mode` itself
+(a dedicated monitor icon for System), not `effectiveTheme`, since the two are genuinely different facts
+and the icon alone can't otherwise distinguish "System resolved to dark" from "explicit Dark" — the
+visible text label next to it carries the same distinction. All wiring verified live via `ng serve`
+(chips on both Import/Export sides, Maker/Checker/Look Up headers, an Inquire Events status-badge table,
+and all 3 theme states) in addition to `ng build`'s template compile check and the full Jest suite (1004
+Angular tests green, no regressions).
 </content>

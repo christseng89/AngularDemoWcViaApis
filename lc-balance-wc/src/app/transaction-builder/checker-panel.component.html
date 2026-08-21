@@ -1,12 +1,13 @@
 <section class="tb-section tb-section--checker">
   <div class="tb-section__header">
+    <app-tb-icon name="checker"></app-tb-icon>
     <span class="tb-role-badge tb-role-badge--checker">Checker</span>
     <h2 class="tb-section__title">
       Pending Approvals<ng-container *ngIf="checkerContract"> — LC {{ checkerContract.naturalKey.lcNumber }}</ng-container>
     </h2>
   </div>
   <div class="tb-section__body">
-    <div class="tb-field tb-field--inline tb-field--search">
+    <div class="tb-field tb-field--inline tb-field--search" [attr.aria-busy]="checkerSearching || null">
       <label class="tb-field__label">LC Number</label>
       <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="checkerLcNumber" (keyup.enter)="searchCheckerLc()" />
       <!-- Business-reported gap 2026-08-15 ("Check[er] function is not working for Shipping Gtee (Issue)",
@@ -23,10 +24,10 @@
         />
       </ng-container>
       <button type="button" class="tb-btn tb-btn--outline" (click)="searchCheckerLc()" [disabled]="checkerSearching">
-        {{ checkerSearching ? 'Searching…' : 'Search' }}
+        <span class="tb-spinner" aria-hidden="true" *ngIf="checkerSearching"></span>{{ checkerSearching ? 'Searching…' : 'Search' }}
       </button>
     </div>
-    <div class="tb-error mt-2" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
+    <div class="tb-error mt-2" role="alert" aria-live="polite" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
 
     <ng-container *ngIf="checkerContractId">
       <app-index-picker

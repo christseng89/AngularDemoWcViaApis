@@ -4,6 +4,7 @@ import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
+import { TbIconComponent } from '../tb-icon.component';
 import { CheckerActionOutcome } from './checker-actions.service';
 import { MakerSubmitContext, MakerSubmitOutcome, MakerSubmitService } from './maker-submit.service';
 import { CatalogPickerService } from './catalog-picker.service';
@@ -122,7 +123,7 @@ export interface MakerSyncRequest {
 @Component({
   selector: 'app-maker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, TbIconComponent],
   templateUrl: './maker-panel.component.html',
   styleUrl: './maker-panel.component.scss',
   /**

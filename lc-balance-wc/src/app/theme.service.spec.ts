@@ -97,6 +97,23 @@ describe('ThemeService', () => {
     });
   });
 
+  describe('cycleMode() (P2 UI/UX pass — backs the icon toggle button)', () => {
+    it('steps system -> light -> dark -> system, persisting each step', () => {
+      installMatchMedia(false);
+      const svc = freshTheme();
+      expect(svc.mode).toBe('system');
+      svc.cycleMode();
+      expect(svc.mode).toBe('light');
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
+      svc.cycleMode();
+      expect(svc.mode).toBe('dark');
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
+      svc.cycleMode();
+      expect(svc.mode).toBe('system');
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('system');
+    });
+  });
+
   describe('system mode resolution', () => {
     it('resolves to dark when the OS prefers dark', () => {
       installMatchMedia(true);

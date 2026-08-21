@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FormlyModule } from '@ngx-formly/core';
 import { IndexPickerComponent } from './index-picker.component';
+import { TbIconComponent } from '../tb-icon.component';
 import { BalanceComponentApiService, BalanceMovement } from './balance-component-api.service';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { LookUpPanelService } from './look-up-panel.service';
@@ -17,6 +18,8 @@ import {
   statusBadgeClass as statusBadgeClassShared,
   displayMovementType as displayMovementTypeShared,
   displayMovementAmount as displayMovementAmountShared,
+  functionActionIcon as functionActionIconShared,
+  statusBadgeIcon as statusBadgeIconShared,
 } from './balance-component.model';
 import { AccountEntriesDialogComponent } from './account-entries-dialog.component';
 import { CheckerPanelComponent, CheckerSyncSignal } from './checker-panel.component';
@@ -31,7 +34,16 @@ import { deriveFunctionStrategy } from './function-strategy';
 @Component({
   selector: 'app-transaction-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, FormlyModule, IndexPickerComponent, AccountEntriesDialogComponent, CheckerPanelComponent, MakerPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    FormlyModule,
+    IndexPickerComponent,
+    AccountEntriesDialogComponent,
+    CheckerPanelComponent,
+    MakerPanelComponent,
+    TbIconComponent,
+  ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
   providers: [LookUpPanelService, InquireEventsService],
@@ -192,6 +204,16 @@ export class TransactionBuilderComponent {
     acknowledgedAt?: string | null,
   ): string {
     return statusBadgeClassShared(status, instrumentType, movementType, phase, acknowledgedAt);
+  }
+
+  /** P2 UI/UX pass — thin delegation, same convention as `displayStatus()`/`statusBadgeClass()`. */
+  functionActionIcon(code: string) {
+    return functionActionIconShared(code);
+  }
+
+  /** P2 UI/UX pass — thin delegation, same convention as `displayStatus()`/`statusBadgeClass()`. */
+  statusBadgeIcon(badgeClass: string) {
+    return statusBadgeIconShared(badgeClass);
   }
 
   /** Thin delegation, same convention as `displayStatus()`/`statusBadgeClass()`. */

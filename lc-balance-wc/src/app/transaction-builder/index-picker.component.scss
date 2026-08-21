@@ -63,6 +63,9 @@
   padding: 6px 2px;
 }
 
+// .tb-spinner/@keyframes tb-spin (P1 loading spinner) moved to the global src/styles.scss — a
+// cross-cutting atom shared by this file/maker-panel/transaction-builder/checker-panel.
+
 .index-picker__list {
   display: flex;
   flex-direction: column;

@@ -194,26 +194,36 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.theme-switcher {
-  display: flex;
+// P2 UI/UX pass — replaces the former `.theme-switcher` (a plain-text `<select>`) with an icon
+// toggle button: bigger touch target, the icon alone signals state at a glance instead of requiring
+// a click to open a dropdown just to see the current choice.
+.theme-toggle {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-muted);
+  background: transparent;
+  border: 1px solid var(--gray-input-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
 
-  label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--gray-muted);
+  &:hover {
+    color: var(--blue);
+    border-color: var(--blue-border);
+    background: var(--blue-bg-soft);
   }
 
-  select {
-    font-size: 12px;
-    font-weight: 600;
-    padding: 4px 8px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--gray-input-border);
-    background: var(--bg-surface);
-    color: var(--gray-body);
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
   }
 }
 
@@ -276,4 +286,72 @@ pre.step-detail {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--gray-body);
+}
+
+// ── Loading spinner (P1 UI/UX pass) ──────────────────────────────────────
+// Global, not per-component: `.tb-spinner` is used across transaction-builder/checker-panel/
+// maker-panel/index-picker component templates, and each of those `.scss` files already sits close
+// to (or, once duplicated a 5th time, over) the `anyComponentStyle` 12kb build budget — a genuine
+// cross-cutting design-system atom belongs here next to the token palette above, not re-duplicated
+// per component. `currentColor` lets one rule fit both gray `.tb-hint` text and a colored `.tb-btn`
+// (white-on-blue, dark red outline text, …); `border-right-color: transparent` gives a 3/4-arc so
+// the spin reads as motion even at 10px.
+.tb-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1.5px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.75;
+  animation: tb-spin 0.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+// `.tb-btn` is display:inline-flex with its own `gap: 6px` (per-component, duplicated) — zero the
+// spinner's own margin there so the two spacing mechanisms don't stack.
+.tb-btn .tb-spinner {
+  margin-right: 0;
+}
+
+@keyframes tb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ── Function/status icon set (P2 UI/UX pass) ─────────────────────────────
+// `TbIconComponent` (src/app/tb-icon.component.ts) — one shared 16px inline-SVG set (user-confirmed
+// "細線條風格" via AskUserQuestion) for the A1–A9/B1–B5 function-chip action-type icon, the Maker/
+// Checker/Look Up section-header role icon, and the status-badge icon (so status isn't conveyed by
+// color alone). Global for the same anyComponentStyle-budget reason `.tb-spinner` above is global.
+.tb-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-right: 4px;
+  vertical-align: -3px;
+}
+
+// `.tb-function-chip`/`.tb-section__header` are already `display:flex` with their own `gap` (both
+// per-component, duplicated) — zero the icon's own margin there so the two spacing mechanisms don't
+// stack, same pattern as `.tb-btn .tb-spinner` above. `.tb-status-badge` stays `inline-block` (no
+// flex/gap), so its own icon keeps the base `margin-right` above.
+.tb-function-chip .tb-icon,
+.tb-section__header .tb-icon {
+  margin-right: 0;
+}
+
+// `.tb-status-badge` is a 10px-font pill — the base 16px icon size reads oversized there, so this one
+// context gets a smaller instance instead (CSS `width`/`height` override the `<svg>` element's own
+// attribute values).
+.tb-status-badge .tb-icon {
+  width: 10px;
+  height: 10px;
+  margin-right: 3px;
+  vertical-align: -1.5px;
 }

@@ -261,6 +261,22 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
+  // Thin delegation to the shared functionActionIcon()/statusBadgeIcon() pure functions (P2 UI/UX
+  // pass); full branch coverage lives in balance-component.model.spec.ts.
+  describe('functionActionIcon / statusBadgeIcon', () => {
+    it('delegates to the shared functionActionIcon() rule', () => {
+      const { comp } = makeComponent();
+      expect(comp.functionActionIcon('A1')).toBe('issue');
+      expect(comp.functionActionIcon('A2')).toBe('amend');
+    });
+
+    it('delegates to the shared statusBadgeIcon() rule', () => {
+      const { comp } = makeComponent();
+      expect(comp.statusBadgeIcon('tb-status-badge--approved')).toBe('ok');
+      expect(comp.statusBadgeIcon('tb-status-badge--pending')).toBe('pending');
+    });
+  });
+
   // Thin delegation to the shared displayMovementType()/displayMovementAmount() pure functions; full
   // branch coverage lives in balance-component.model.spec.ts.
   describe('displayMovementType / displayMovementAmount', () => {

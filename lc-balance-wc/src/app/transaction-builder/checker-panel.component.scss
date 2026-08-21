@@ -192,6 +192,9 @@
   }
 }
 
+// .tb-spinner/@keyframes tb-spin (P1 loading spinner) moved to the global src/styles.scss — a
+// cross-cutting atom shared by this file/maker-panel/transaction-builder/index-picker.
+
 .tb-error {
   font-size: 12px;
   color: var(--red-dark);

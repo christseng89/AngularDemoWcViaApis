@@ -1,10 +1,12 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BalanceMovement } from './balance-component-api.service';
+import { TbIconComponent } from '../tb-icon.component';
 import {
   InstrumentType,
   displayStatus as displayStatusRule,
   statusBadgeClass as statusBadgeClassRule,
+  statusBadgeIcon as statusBadgeIconRule,
   displayMovementType as displayMovementTypeRule,
 } from './balance-component.model';
 
@@ -29,7 +31,7 @@ import {
 @Component({
   selector: 'app-account-entries-dialog',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TbIconComponent],
   templateUrl: './account-entries-dialog.component.html',
   styleUrl: './account-entries-dialog.component.scss',
 })
@@ -52,6 +54,11 @@ export class AccountEntriesDialogComponent {
   /** Same aliasing reasoning as `displayStatus()` immediately above. */
   statusBadgeClass(status: string): string {
     return statusBadgeClassRule(status, this.instrumentType, this.movement?.movementType, this.phase);
+  }
+
+  /** P2 UI/UX pass — status conveyed by icon, not color alone. */
+  statusBadgeIcon(status: string) {
+    return statusBadgeIconRule(this.statusBadgeClass(status));
   }
 
   /** Same B2 AMEND_INCREASE/AMEND_DECREASE relabeling as `displayMovementType()` in `balance-component.model.ts`. */

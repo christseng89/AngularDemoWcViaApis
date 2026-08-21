@@ -77,6 +77,12 @@ export class ThemeService {
     this.applyEffectiveTheme();
   }
 
+  /** P2 UI/UX pass — backs the icon toggle button (`AppComponent`) that replaced the `<select>`: one click steps System → Light → Dark → System. */
+  cycleMode(): void {
+    const next: Record<ThemeMode, ThemeMode> = { system: 'light', light: 'dark', dark: 'system' };
+    this.setMode(next[this.mode]);
+  }
+
   get effectiveTheme(): EffectiveTheme {
     if (this.mode !== 'system') return this.mode;
     return this.systemPrefersDark() ? 'dark' : 'light';
