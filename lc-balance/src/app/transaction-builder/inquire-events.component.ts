@@ -11,6 +11,7 @@ import {
   displayStatus as displayStatusShared,
   statusBadgeClass as statusBadgeClassShared,
   contractStatusBadgeClass as contractStatusBadgeClassShared,
+  contractStatusLabel as contractStatusLabelShared,
   displayMovementType as displayMovementTypeShared,
   displayMovementAmount as displayMovementAmountShared,
   statusBadgeIcon as statusBadgeIconShared,
@@ -53,6 +54,7 @@ export class InquireEventsComponent {
   readonly displayStatus = displayStatusShared;
   readonly statusBadgeClass = statusBadgeClassShared;
   readonly contractStatusBadgeClass = contractStatusBadgeClassShared;
+  readonly contractStatusLabel = contractStatusLabelShared;
   readonly statusBadgeIcon = statusBadgeIconShared;
   readonly displayMovementType = displayMovementTypeShared;
   readonly displayMovementAmount = displayMovementAmountShared;

@@ -71,6 +71,14 @@ describe('InquireEventsComponent', () => {
       const c = new InquireEventsComponent();
       expect(c.contractStatusBadgeClass('ACTIVE')).toBe('tb-status-badge--approved');
       expect(c.contractStatusBadgeClass('CLOSED')).toBe('tb-status-badge--negative');
+      expect(c.contractStatusBadgeClass('ACTIVE', true)).toBe('tb-status-badge--negative');
+    });
+
+    it('contractStatusLabel() — CLOSING while ACTIVE + closingPending, plain status text otherwise', () => {
+      const c = new InquireEventsComponent();
+      expect(c.contractStatusLabel('ACTIVE', true)).toBe('CLOSING');
+      expect(c.contractStatusLabel('ACTIVE')).toBe('ACTIVE');
+      expect(c.contractStatusLabel('CLOSED')).toBe('CLOSED');
     });
 
     it('statusBadgeIcon()', () => {

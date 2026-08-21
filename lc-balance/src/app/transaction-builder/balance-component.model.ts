@@ -548,6 +548,11 @@ export function displayStatus(
   phase?: 'primary' | 'create' | 'finalize' | null,
   acknowledgedAt?: string | null,
 ): string {
+  // 2026-08-22 ("Highlight LC Close Event") — a red badge still reading "APPROVED" for a genuinely closed
+  // LC/Confirmation reads as contradictory (red usually signals a problem, "APPROVED" sounds positive);
+  // CLOSED/CLOSING make the row self-explanatory without relying on color alone. See statusBadgeClass()'s
+  // own doc comment just below for the full rationale — this mirrors that same PENDING/RELEASED split.
+  if (isCloseMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return status === 'PENDING' ? 'CLOSING' : 'CLOSED';
   const earmark = isEarmarkFunction(instrumentType, movementType, phase);
   if (status === 'PENDING') return earmark ? (acknowledgedAt ? 'EARMARKED' : 'EARMARKING') : 'PENDING';
   if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
@@ -590,6 +595,25 @@ export function statusBadgeIcon(badgeClass: string): 'ok' | 'pending' | 'cross' 
   return 'dash';
 }
 
+/**
+ * User-requested 2026-08-22 ("Highlight LC Close Event" — A10/B6's own event row must stand out in red in
+ * BOTH Look Up Current Balance and Inquire Events, "so that users can immediately recognize that the LC
+ * has been closed"). Both screens already funnel every row through this ONE function (see
+ * transaction-builder.component.html/inquire-events.component.html's own `[ngClass]="statusBadgeClass(...)"`
+ * bindings) — no per-screen change needed, just this shared mapping. Reuses the EXISTING `--negative` red
+ * token rather than inventing a new color, consistent with `contractStatusBadgeClass()`'s own established
+ * "red=negative/closed-out" language (2026-08-21) — and `statusBadgeIcon()` below already turns
+ * `--negative` into the same `cross` icon `functionActionIcon()`'s own CLOSE_GROUP_CODES already uses for
+ * A10/B6's function-chip, so the two independent icon sources agree by construction, not coincidence.
+ * Applies to PENDING (Maker-submitted, not yet closed) and RELEASED (genuinely closed) alike — both are a
+ * real Close *event* the user should notice, not just the terminal state; REJECTED/CANCELLED Close
+ * attempts fall through unchanged to the ordinary status handling below (already red via `--negative`,
+ * already correctly reads as "this failed", not "the LC is closed").
+ */
+function isCloseMovement(movementType?: string | null): boolean {
+  return movementType === 'CLOSE';
+}
+
 /** Status badge CSS class — shares `displayStatus()`'s own mapping. */
 export function statusBadgeClass(
   status: string,
@@ -598,6 +622,7 @@ export function statusBadgeClass(
   phase?: 'primary' | 'create' | 'finalize' | null,
   acknowledgedAt?: string | null,
 ): string {
+  if (isCloseMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return 'tb-status-badge--negative';
   if (status === 'PENDING') return isEarmarkFunction(instrumentType, movementType, phase) && acknowledgedAt ? 'tb-status-badge--earmark' : 'tb-status-badge--pending';
   if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
   if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
@@ -614,13 +639,27 @@ export function statusBadgeClass(
  * where ACTIVE/CLOSED previously rendered as the same plain `.tb-type-tag` regardless of status. Reuses
  * the SAME color tokens `statusBadgeClass()`/`statusBadgeIcon()` above already established app-wide
  * (green=approved/good, red=negative/closed-out) rather than inventing a second color language.
+ *
+ * `closingPending` (2026-08-22, "U03 應該是CLOSING狀態" — a Master Index row for an LC/Confirmation with a
+ * Maker-Submitted-but-not-yet-Released CLOSE movement still correctly reads `ContractStatus.ACTIVE` (it
+ * only flips to CLOSED at Release, see `markClosed()` on the microservice side) — but the Index should
+ * still flag it, same "don't wait for the terminal state to say something" reasoning as
+ * `statusBadgeClass()`'s own CLOSE special-case just above. `InquireEventsService.loadIndexRow()` already
+ * fetches every root movement per row (for `lastEventAt`), so detecting this costs no extra API call.
  */
-export function contractStatusBadgeClass(status: string): string {
+export function contractStatusBadgeClass(status: string, closingPending?: boolean): string {
+  if (status === 'ACTIVE' && closingPending) return 'tb-status-badge--negative';
   if (status === 'ACTIVE') return 'tb-status-badge--approved';
   if (status === 'CLOSED') return 'tb-status-badge--negative';
   if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
   if (status === 'CANCELLED') return 'tb-status-badge--negative';
   return 'tb-status-badge--neutral';
+}
+
+/** Display label pair to `contractStatusBadgeClass()` above — same "CLOSING while red but not yet actually CLOSED" reasoning as `displayStatus()`'s own CLOSE special-case. Every other status displays as its own raw `ContractStatus` string, unchanged. */
+export function contractStatusLabel(status: string, closingPending?: boolean): string {
+  if (status === 'ACTIVE' && closingPending) return 'CLOSING';
+  return status;
 }
 
 /** Display-only pair (with `displayMovementAmount()` below): EPLC_CONFIRMATION's shared `AMEND` movementType, whose direction rides the sign of the wire `amount`, reads like A2's distinct AMEND_INCREASE/AMEND_DECREASE in list views. Never written back to `model`; every other pair passes through unchanged. */

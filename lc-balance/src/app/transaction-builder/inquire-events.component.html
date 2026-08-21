@@ -89,9 +89,9 @@
                   <td class="tb-table__amount">{{ row.lcAmount }}</td>
                   <td class="tb-table__amount">{{ row.availableBalance }}</td>
                   <td class="tb-table__status">
-                    <span class="tb-status-badge" [ngClass]="contractStatusBadgeClass(row.status)"
-                      ><app-tb-icon [name]="statusBadgeIcon(contractStatusBadgeClass(row.status))"></app-tb-icon
-                      >{{ row.status }}</span
+                    <span class="tb-status-badge" [ngClass]="contractStatusBadgeClass(row.status, row.closingPending)"
+                      ><app-tb-icon [name]="statusBadgeIcon(contractStatusBadgeClass(row.status, row.closingPending))"></app-tb-icon
+                      >{{ contractStatusLabel(row.status, row.closingPending) }}</span
                     >
                   </td>
                   <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date: 'short') : '—' }}</td>

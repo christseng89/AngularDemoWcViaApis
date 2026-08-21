@@ -128,6 +128,17 @@ export interface LcIndexRow {
   availableBalance: string;
   status: string;
   lastEventAt: string | null;
+  /**
+   * User-requested 2026-08-22 ("Highlight LC Close Event", extended to the Index — "U03 應該是CLOSING狀態").
+   * True only while a `movementType === 'CLOSE'` root movement is genuinely still PENDING — `status` itself
+   * stays ACTIVE the whole time (ContractStatus only flips to CLOSED at Release), so this is the Index's
+   * own signal to show CLOSING instead of a plain ACTIVE that looks identical to any unrelated LC.
+   * Deliberately re-derived from `root` fresh on every load rather than cached — if the Checker later
+   * REJECTs that CLOSE (user-confirmed follow-up, same day), the movement's own status is no longer
+   * PENDING, this naturally becomes false again next load, and the row correctly reverts to plain ACTIVE
+   * with no special-casing needed for the reject path.
+   */
+  closingPending: boolean;
 }
 
 /**
@@ -388,6 +399,9 @@ export class InquireEventsService {
         const lastEventAt = allEvents.length
           ? allEvents.reduce((latest, e) => (new Date(e.eventTime).getTime() > new Date(latest).getTime() ? e.eventTime : latest), allEvents[0].eventTime)
           : null;
+        // A10/B6 Close is always a ROOT-level movement (see closeEligibility.ts — only IPLC_LC/EPLC_LC/
+        // EPLC_CONFIRMATION are eligible) — checking `root` alone, not `allEvents`, is correct and cheaper.
+        const closingPending = root.some((e) => e.movement.movementType === 'CLOSE' && e.eventStatus === 'PENDING');
         return {
           contract,
           currency: contract.currency,
@@ -396,6 +410,7 @@ export class InquireEventsService {
           availableBalance: snapshot ? snapshot.availableBalance : '—',
           status: contract.status,
           lastEventAt,
+          closingPending,
         };
       }),
     );

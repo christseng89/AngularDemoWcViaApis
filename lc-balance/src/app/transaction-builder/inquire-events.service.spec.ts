@@ -386,10 +386,68 @@ describe('InquireEventsService', () => {
       expect(catalog).toHaveBeenCalledTimes(1);
     });
 
+    // 2026-08-22, "U03 應該是CLOSING狀態" — ContractStatus itself stays ACTIVE the whole time a CLOSE
+    // movement is only Maker-Submitted (see closeEligibility.ts/markClosed() — only Release flips it),
+    // so loadIndexRow() must derive closingPending from the root movements themselves, not from
+    // contract.status. Deliberately a single describe covering all three status outcomes together, since
+    // they're one state machine (SUBMIT -> CLOSING -> APPROVE/CLOSED or REJECT/back to ACTIVE), not three
+    // unrelated facts.
+    describe('closingPending (LC Master Records Index — CLOSING while a Close movement is genuinely still PENDING)', () => {
+      const noChildContract = () => makeContract({ balanceContractId: 'bc-nc', instrumentType: 'EPLC_LC', naturalKey: { lcNumber: 'NC01' }, status: 'ACTIVE' });
+
+      it('a still-PENDING CLOSE movement -> closingPending true, even though contract.status itself already reads ACTIVE', () => {
+        const contract = noChildContract();
+        const issue = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-nc', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
+        const close = makeMovement({ movementId: 'mv-close', balanceContractId: 'bc-nc', movementType: 'CLOSE', status: 'PENDING', createdAt: '2026-08-02T00:00:00.000Z' });
+        const api = makeApi({ catalog: jest.fn(() => of({ items: [contract], total: 1, page: 1, pageSize: 10 })), listMovements: jest.fn(() => of([issue, close])) });
+        const svc = new InquireEventsService(api);
+
+        svc.loadIndex(1);
+
+        expect(svc.indexRows[0].status).toBe('ACTIVE');
+        expect(svc.indexRows[0].closingPending).toBe(true);
+      });
+
+      it('once the Checker Releases it, contract.status itself flips to CLOSED — closingPending is false (CLOSED already says everything CLOSING was foreshadowing)', () => {
+        const contract = makeContract({ balanceContractId: 'bc-nc', instrumentType: 'EPLC_LC', naturalKey: { lcNumber: 'NC01' }, status: 'CLOSED' });
+        const close = makeMovement({ movementId: 'mv-close', balanceContractId: 'bc-nc', movementType: 'CLOSE', status: 'RELEASED' });
+        const api = makeApi({ catalog: jest.fn(() => of({ items: [contract], total: 1, page: 1, pageSize: 10 })), listMovements: jest.fn(() => of([close])) });
+        const svc = new InquireEventsService(api);
+
+        svc.loadIndex(1);
+
+        expect(svc.indexRows[0].status).toBe('CLOSED');
+        expect(svc.indexRows[0].closingPending).toBe(false);
+      });
+
+      it('the Checker REJECTs the Close instead -> contract.status stays ACTIVE and closingPending reverts to false (the row shows plain ACTIVE again, not stuck on CLOSING)', () => {
+        const contract = noChildContract();
+        const close = makeMovement({ movementId: 'mv-close', balanceContractId: 'bc-nc', movementType: 'CLOSE', status: 'REJECTED' });
+        const api = makeApi({ catalog: jest.fn(() => of({ items: [contract], total: 1, page: 1, pageSize: 10 })), listMovements: jest.fn(() => of([close])) });
+        const svc = new InquireEventsService(api);
+
+        svc.loadIndex(1);
+
+        expect(svc.indexRows[0].status).toBe('ACTIVE');
+        expect(svc.indexRows[0].closingPending).toBe(false);
+      });
+
+      it('no CLOSE movement at all -> closingPending false (the ordinary, overwhelmingly common case)', () => {
+        const contract = noChildContract();
+        const issue = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-nc', movementType: 'ISSUE' });
+        const api = makeApi({ catalog: jest.fn(() => of({ items: [contract], total: 1, page: 1, pageSize: 10 })), listMovements: jest.fn(() => of([issue])) });
+        const svc = new InquireEventsService(api);
+
+        svc.loadIndex(1);
+
+        expect(svc.indexRows[0].closingPending).toBe(false);
+      });
+    });
+
     it('an empty page (no matching contracts) clears indexRows without any per-row fan-out calls', () => {
       const api = makeApi({ catalog: jest.fn(() => of(emptyCatalog())) });
       const svc = new InquireEventsService(api);
-      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null, closingPending: false }];
       svc.loadIndex(1);
       expect(svc.indexRows).toEqual([]);
       expect(svc.indexLoading).toBe(false);
@@ -441,7 +499,7 @@ describe('InquireEventsService', () => {
       const issue = makeMovement({ balanceContractId: 'bc-s001', movementType: 'ISSUE' });
       const api = makeApi({ listMovements: jest.fn(() => of([issue])) });
       const svc = new InquireEventsService(api);
-      svc.indexRows = [{ contract, currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '100', availableBalance: '100', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexRows = [{ contract, currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '100', availableBalance: '100', status: 'ACTIVE', lastEventAt: null, closingPending: false }];
       svc.indexPaging.page = 2;
       svc.indexPaging.total = 15;
       svc.indexSearch = 'S0';
@@ -462,7 +520,7 @@ describe('InquireEventsService', () => {
     it('backToIndex() only flips indexView back to INDEX — indexRows/indexPaging/indexSearch are untouched', () => {
       const svc = new InquireEventsService(makeApi());
       svc.indexView = 'EVENTS';
-      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null }];
+      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null, closingPending: false }];
       svc.indexPaging.page = 4;
       svc.indexSearch = 'kept';
 

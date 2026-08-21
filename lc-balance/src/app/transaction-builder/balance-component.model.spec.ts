@@ -27,7 +27,10 @@
   displayMovementAmount,
   functionActionIcon,
   statusBadgeIcon,
+  statusBadgeClass,
+  displayStatus,
   contractStatusBadgeClass,
+  contractStatusLabel,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -805,6 +808,42 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
+  describe('statusBadgeClass/displayStatus — CLOSE movement highlight (user-requested 2026-08-22, "Highlight LC Close Event")', () => {
+    it('A10/B6 (movementType CLOSE) get the red --negative badge for PENDING and RELEASED alike, on both IPLC_LC and EPLC_CONFIRMATION', () => {
+      expect(statusBadgeClass('PENDING', 'IPLC_LC', 'CLOSE')).toBe('tb-status-badge--negative');
+      expect(statusBadgeClass('RELEASED', 'IPLC_LC', 'CLOSE')).toBe('tb-status-badge--negative');
+      expect(statusBadgeClass('PENDING', 'EPLC_CONFIRMATION', 'CLOSE')).toBe('tb-status-badge--negative');
+      expect(statusBadgeClass('RELEASED', 'EPLC_CONFIRMATION', 'CLOSE')).toBe('tb-status-badge--negative');
+    });
+
+    it('a REJECTED/CANCELLED Close attempt is unaffected — already --negative via the ordinary status handling, not because of the CLOSE special-case', () => {
+      expect(statusBadgeClass('REJECTED', 'IPLC_LC', 'CLOSE')).toBe('tb-status-badge--negative');
+      expect(statusBadgeClass('CANCELLED', 'IPLC_LC', 'CLOSE')).toBe('tb-status-badge--negative');
+    });
+
+    it('every other movementType is unaffected by the CLOSE special-case (spot check)', () => {
+      expect(statusBadgeClass('RELEASED', 'IPLC_LC', 'AMEND_INCREASE')).toBe('tb-status-badge--approved');
+      expect(statusBadgeClass('PENDING', 'IPLC_LC', 'ISSUE')).toBe('tb-status-badge--pending');
+    });
+
+    it('displayStatus reads CLOSING/CLOSED for a CLOSE movement, not the generic PENDING/APPROVED text a red-but-"APPROVED" badge would contradict', () => {
+      expect(displayStatus('PENDING', 'IPLC_LC', 'CLOSE')).toBe('CLOSING');
+      expect(displayStatus('RELEASED', 'IPLC_LC', 'CLOSE')).toBe('CLOSED');
+      expect(displayStatus('RELEASED', 'EPLC_CONFIRMATION', 'CLOSE')).toBe('CLOSED');
+    });
+
+    it('displayStatus for a REJECTED/CANCELLED Close falls through unchanged (still reads REJECTED/CANCELLED, not CLOSED)', () => {
+      expect(displayStatus('REJECTED', 'IPLC_LC', 'CLOSE')).toBe('REJECTED');
+      expect(displayStatus('CANCELLED', 'IPLC_LC', 'CLOSE')).toBe('CANCELLED');
+    });
+
+    it('the red badge still resolves to the cross icon (same icon functionActionIcon() already uses for A10/B6\'s own function chip) — two independent sources agree', () => {
+      expect(statusBadgeIcon(statusBadgeClass('RELEASED', 'IPLC_LC', 'CLOSE'))).toBe('cross');
+      expect(functionActionIcon('A10')).toBe('cross');
+      expect(functionActionIcon('B6')).toBe('cross');
+    });
+  });
+
   describe('statusBadgeIcon (P2 UI/UX pass — status conveyed by icon, not color alone)', () => {
     it('maps every statusBadgeClass() output to its own icon', () => {
       expect(statusBadgeIcon('tb-status-badge--approved')).toBe('ok');
@@ -835,6 +874,23 @@ describe('balance-component.model data invariants', () => {
       for (const status of ['ACTIVE', 'CLOSED', 'SUPERSEDED', 'CANCELLED']) {
         expect(['ok', 'pending', 'cross', 'dash']).toContain(statusBadgeIcon(contractStatusBadgeClass(status)));
       }
+    });
+
+    it('closingPending (2026-08-22, "U03 應該是CLOSING狀態") overrides ACTIVE to red while a Close is Maker-Submitted but not yet Released', () => {
+      expect(contractStatusBadgeClass('ACTIVE', true)).toBe('tb-status-badge--negative');
+      expect(contractStatusLabel('ACTIVE', true)).toBe('CLOSING');
+    });
+
+    it('closingPending is ignored when status is not ACTIVE (already CLOSED/CANCELLED/etc. — nothing to override)', () => {
+      expect(contractStatusBadgeClass('CLOSED', true)).toBe('tb-status-badge--negative');
+      expect(contractStatusLabel('CLOSED', true)).toBe('CLOSED');
+    });
+
+    it('omitting closingPending (or passing false) behaves exactly as before — plain ACTIVE stays green/"ACTIVE"', () => {
+      expect(contractStatusBadgeClass('ACTIVE')).toBe('tb-status-badge--approved');
+      expect(contractStatusBadgeClass('ACTIVE', false)).toBe('tb-status-badge--approved');
+      expect(contractStatusLabel('ACTIVE', false)).toBe('ACTIVE');
+      expect(contractStatusLabel('ACTIVE')).toBe('ACTIVE');
     });
   });
 });
