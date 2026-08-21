@@ -27,6 +27,7 @@ const EXPECTED_IDS = [
   'export-case-8',
   'export-case-9',
   'export-case-10',
+  'export-case-11',
 ];
 
 const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
@@ -34,8 +35,8 @@ const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 's
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 21 business cases, Import Case 1-11 then Export Case #1-#10, in order', () => {
-    expect(registry).toHaveLength(21);
+  it('returns exactly 22 business cases, Import Case 1-11 then Export Case #1-#11, in order', () => {
+    expect(registry).toHaveLength(22);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -77,6 +78,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['export-case-8'].title).toBe('Export Case #8 — USD Sight + Confirmed, full lifecycle to Close (B6)');
     expect(byId['export-case-9'].title).toBe("Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)");
     expect(byId['export-case-10'].title).toBe('Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)');
+    expect(byId['export-case-11'].title).toBe('Export Case #11 — B6 Close eligibility gate, negative path (expect ERROR)');
   });
 
   it('every step has a type from the six the generic executor understands', () => {

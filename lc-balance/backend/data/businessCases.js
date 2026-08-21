@@ -2237,6 +2237,103 @@ function exportCase10(lc) {
   };
 }
 
+function exportCase11(lc, ib) {
+  return {
+    id: 'export-case-11',
+    title: 'Export Case #11 — B6 Close eligibility gate, negative path (expect ERROR)',
+    description:
+      "Confirm LC 100,000 (Sellers Usance) -> Present Docs (B3) -> Accept (B4, creates Acceptance Liability 10,000) -> Close attempted while the Acceptance Liability is still outstanding (Settlement/B5 never run) — domain/closeEligibility.ts must reject it (Acceptance Confirmed Balance != 0), not silently allow it.",
+    steps: [
+      ...createAndRelease(
+        'Confirm LC 100,000 (Sellers Usance, 120 days)',
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          createdBy: MAKER,
+        },
+        'Checker releases Confirmation Issue',
+      ),
+      ...createAndRelease(
+        'Present Docs 10,000 (B3 — EPLC_EXAMINATION memo earmark)',
+        'examination',
+        {
+          instrumentType: 'EPLC_EXAMINATION',
+          naturalKey: { lcNumber: lc, ibNumber: 'E01' },
+          parentLogicalContractIdRef: 'conf',
+          movementType: 'CREATE',
+          eventSeq: 1,
+          amount: '10000',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+        'Checker releases Present Docs (B3)',
+      ),
+      {
+        type: 'createMovement',
+        label: 'Issuing Bank Accept 10,000 (B4 — unified legal event; references the released Present Docs earmark)',
+        captureAs: 'accept',
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'ACCEPT',
+          eventSeq: 2,
+          amount: '10000',
+          currency: 'USD',
+          referencedTransactionIdRef: 'examination',
+          businessEventId: `${lc}-accept`,
+          createdBy: MAKER,
+        },
+      },
+      {
+        type: 'createMovement',
+        label: 'Create Acceptance Liability 10,000 (linked compound leg, same submission as Accept)',
+        captureAs: 'acceptance',
+        request: {
+          instrumentType: 'EPLC_ACCEPTANCE',
+          naturalKey: { lcNumber: lc, ibNumber: ib },
+          parentLogicalContractIdRef: 'conf',
+          movementType: 'CREATE',
+          eventSeq: 1,
+          amount: '10000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          exposureNature: 'ACTUAL',
+          businessEventId: `${lc}-accept`,
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Accept (the primary compound leg)', movementRef: 'accept', releasedBy: CHECKER },
+      { type: 'release', label: 'Checker releases Acceptance CREATE (the linked compound leg)', movementRef: 'acceptance', releasedBy: CHECKER },
+      { type: 'snapshot', label: 'Acceptance Liability before Close attempt (expect 10,000 — never settled)', contractRef: 'acceptance' },
+      {
+        type: 'createMovement',
+        label: 'B6 Close attempted while Acceptance Liability = 10,000 (not 0) — expect 409 eligibility ERROR',
+        captureAs: 'close',
+        expectError: true,
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'CLOSE',
+          eventSeq: 3,
+          amount: '90000',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'snapshot', label: 'CONF LIAB unchanged (expect still Confirmed 90,000, status still ACTIVE — the rejected Close never applied)', contractRef: 'conf' },
+      { type: 'snapshot', label: 'Acceptance Liability unchanged (expect still 10,000)', contractRef: 'acceptance' },
+    ],
+  };
+}
+
 /** Fresh natural keys per run so the same case can be re-run repeatedly against the same DB without idempotency-key/one-ACTIVE-per-logicalContractId collisions. */
 function buildRegistry() {
   return [
@@ -2261,6 +2358,7 @@ function buildRegistry() {
     exportCase8(lcNumberFor('EXP-C8')),
     exportCase9(lcNumberFor('EXP-C9'), 'IB0001'),
     exportCase10(lcNumberFor('EXP-C10')),
+    exportCase11(lcNumberFor('EXP-C11'), 'IB0001'),
   ];
 }
 
