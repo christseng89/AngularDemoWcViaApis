@@ -17,6 +17,7 @@ const EXPECTED_IDS = [
   'import-case-9',
   'import-case-10',
   'import-case-11',
+  'import-case-12',
   'export-case-1',
   'export-case-2',
   'export-case-3',
@@ -35,8 +36,8 @@ const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 's
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 22 business cases, Import Case 1-11 then Export Case #1-#11, in order', () => {
-    expect(registry).toHaveLength(22);
+  it('returns exactly 23 business cases, Import Case 1-12 then Export Case #1-#11, in order', () => {
+    expect(registry).toHaveLength(23);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -75,6 +76,7 @@ describe('data/businessCases.js buildRegistry()', () => {
       'Import Case 10 — USD Sight, Shipping Guarantee + Document Arrival both taken to their own terminus, then Close (A10)',
     );
     expect(byId['import-case-11'].title).toBe('Import Case 11 — A10 Close eligibility gate, negative path (expect ERROR)');
+    expect(byId['import-case-12'].title).toBe('Import Case 12 — A10 Close eligibility gate, negative path (Acceptance balance outstanding, expect ERROR)');
     expect(byId['export-case-8'].title).toBe('Export Case #8 — USD Sight + Confirmed, full lifecycle to Close (B6)');
     expect(byId['export-case-9'].title).toBe("Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)");
     expect(byId['export-case-10'].title).toBe('Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)');

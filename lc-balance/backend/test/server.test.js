@@ -64,13 +64,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('GET /api/business-cases', () => {
-    it('lists all 22 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
+    it('lists all 23 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
       global.fetch = jest.fn();
 
       const res = await request(app).get('/api/business-cases');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(22);
+      expect(res.body).toHaveLength(23);
 
       const registry = buildRegistry();
       res.body.forEach((c, i) => {

@@ -1284,6 +1284,83 @@ function importCase11(lc, sg) {
   };
 }
 
+function importCase12(lc, ib) {
+  return {
+    id: 'import-case-12',
+    title: 'Import Case 12 — A10 Close eligibility gate, negative path (Acceptance balance outstanding, expect ERROR)',
+    description:
+      "LC Issue 100,000 (no tolerance, kept simple) -> Document Arrival 50,000 (UTILIZE, carved into Acceptance) -> Accept creates Acceptance Liability 50,000, left unsettled -> Close attempted while the Acceptance Liability is still outstanding — domain/closeEligibility.ts must reject it (Acceptance Confirmed Balance != 0), not silently allow it. Mirrors export-case-11's Acceptance-balance gate on the Import side.",
+    steps: [
+      ...createAndRelease(
+        'LC Issue 100,000 (no tolerance, kept simple for this negative case)',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          createdBy: MAKER,
+        },
+        'Checker releases LC Issue',
+      ),
+      ...createAndRelease(
+        'Document Arrival 50,000 (Earmark)',
+        'utilize',
+        {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'UTILIZE',
+          eventSeq: 2,
+          amount: '50000',
+          currency: 'USD',
+          sourceTransactionRef: 'B01',
+          createdBy: MAKER,
+        },
+        'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability',
+      ),
+      { type: 'snapshot', label: 'LC Balance after Accept (expect 50,000 — 100,000 minus 50,000 utilized)', contractRef: 'lc' },
+      ...createAndRelease(
+        'Create Acceptance 50,000 (carved out of the LC, linked call) — left outstanding, never settled',
+        'acceptance',
+        {
+          instrumentType: 'IPLC_ACCEPTANCE',
+          naturalKey: { lcNumber: lc, ibNumber: ib },
+          parentLogicalContractIdRef: 'lc',
+          movementType: 'CREATE',
+          eventSeq: 1,
+          amount: '50000',
+          currency: 'USD',
+          exposureNature: 'ACTUAL',
+          createdBy: MAKER,
+        },
+        'Checker releases Acceptance CREATE',
+      ),
+      { type: 'snapshot', label: 'Acceptance Liability before Close attempt (expect 50,000 — never settled)', contractRef: 'acceptance' },
+      {
+        type: 'createMovement',
+        label: 'A10 Close attempted while Acceptance Liability = 50,000 (not 0) — expect 409 eligibility ERROR',
+        captureAs: 'close',
+        expectError: true,
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'CLOSE',
+          eventSeq: 3,
+          amount: '50000',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'snapshot', label: 'LC Balance unchanged (expect still Confirmed 50,000, status still ACTIVE — the rejected Close never applied)', contractRef: 'lc' },
+      { type: 'snapshot', label: 'Acceptance Liability unchanged (expect still 50,000)', contractRef: 'acceptance' },
+    ],
+  };
+}
+
 // ── Export LC ────────────────────────────────────────────────────────────
 // Business-confirmed 2026-08-14: CONF_LIAB only exists once Confirmed
 // (Case #1-#3); Case #4/#5 (Unconfirmed) never create Export Bank's own
@@ -2348,6 +2425,7 @@ function buildRegistry() {
     importCase9(lcNumberFor('IMP-C9'), 'IB0001'),
     importCase10(lcNumberFor('IMP-C10'), 'G01'),
     importCase11(lcNumberFor('IMP-C11'), 'G01'),
+    importCase12(lcNumberFor('IMP-C12'), 'IB0001'),
     exportCase1(lcNumberFor('EXP-C1')),
     exportCase2(lcNumberFor('EXP-C2'), 'IB0001'),
     exportCase3(lcNumberFor('EXP-C3'), 'IB0001'),
