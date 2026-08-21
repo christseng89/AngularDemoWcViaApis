@@ -8,6 +8,8 @@ import { BalanceComponentApiService, BalanceMovement } from './balance-component
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { LookUpPanelService } from './look-up-panel.service';
 import { InquireEventsService } from './inquire-events.service';
+import { InquireEventsComponent, InquireOpenAccountEntriesEvent } from './inquire-events.component';
+import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   EXPORT_FUNCTIONS,
@@ -44,6 +46,8 @@ import { deriveFunctionStrategy } from './function-strategy';
     CheckerPanelComponent,
     MakerPanelComponent,
     TbIconComponent,
+    InquireEventsComponent,
+    BalanceSnapshotBoxComponent,
   ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
@@ -181,6 +185,11 @@ export class TransactionBuilderComponent {
   /** Maker Result panel's "Account Entries" buttons, emitted from `MakerPanelComponent`. */
   onMakerOpenAccountEntries(e: { movement: BalanceMovement; instrumentType: InstrumentType | null }): void {
     this.openAccountEntryDialog(e.movement, e.instrumentType);
+  }
+
+  /** Inquire Events' own "Original Transaction Screen" Account Entries button, emitted from `InquireEventsComponent` — same convention as `onMakerOpenAccountEntries()` above. */
+  onInquireOpenAccountEntries(e: InquireOpenAccountEntriesEvent): void {
+    this.openAccountEntryDialog(e.movement, e.instrumentType, e.phase);
   }
 
   private describeApiError(err: any): string {

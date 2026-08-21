@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for app/transaction-builder/paged-list-state.ts</title>
+    <title>Code coverage report for app/transaction-builder/balance-snapshot-box.component.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> paged-list-state.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> balance-snapshot-box.component.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>0/0</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -96,7 +96,13 @@
 <a name='L31'></a><a href='#L31'>31</a>
 <a name='L32'></a><a href='#L32'>32</a>
 <a name='L33'></a><a href='#L33'>33</a>
-<a name='L34'></a><a href='#L34'>34</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -104,63 +110,72 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">2336x</span>
-<span class="cline-any cline-yes">2336x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2336x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">41x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1405x</span>
-<span class="cline-any cline-yes">1405x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">30x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
- * Single-responsibility state holder for one paginated picker's page/total/pageSize bookkeeping and
- * boundary math — replaces near-identical copies of this trio across the catalog LC Index, Parent LC
- * picker, and IB/SG Index with one tested implementation.
- *
- * Deliberately does not own the actual fetch — callers still decide WHEN and HOW to reload; this class
- * only answers "what page should Prev/Next go to" and "how many pages are there".
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Component, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { BalanceSnapshot } from './balance-component-api.service';
+&nbsp;
+/**
+ * `{before, after}` strings from a movement's own `balanceBefore`/`balanceAfter` — both null while the
+ * movement is still PENDING (Confirmed Balance doesn't move until Release). See this component's own
+ * template for how `snapshot.redirectedImpact` takes priority over this when present.
  */
-export class PagedListState {
-  page = 1;
-  total = 0;
+export interface BalanceSnapshotImpact {
+  before: string | null | undefined;
+  after: string | null | undefined;
+}
 &nbsp;
-  constructor(readonly pageSize: number) {}
-&nbsp;
-  get totalPages(): number {
-    return Math.max(1, Math.ceil(this.total / this.pageSize));
-  }
-&nbsp;
-  reset(): void {
-    this.page = 1;
-    this.total = 0;
-  }
-&nbsp;
-  /** Target page for a "Prev" click, or null if already on page 1. */
-  prevTarget(): number | null {
-    return this.page &gt; 1 ? this.page - 1 : null;
-  }
-&nbsp;
-  /** Target page for a "Next" click, or null if already on the last page. */
-  nextTarget(): number | null {
-    return this.page &lt; this.totalPages ? this.page + 1 : null;
-  }
+/**
+ * Part B (2026-08-21, "next sprint" tech-debt proposal, actioned same day at user request — "Part B 也一起做吧") —
+ * extracted from the former `#balanceSnapshotBox` `ng-template` in `transaction-builder.component.html`
+ * (2026-08-17), which `*ngTemplateOutlet` invoked from both the Look Up panel (Transaction Processing) and
+ * Inquire Events. A `ng-template` reference variable is local to the template that declares it, so once
+ * Inquire Events itself became its own child component (`InquireEventsComponent`, same pass), the outlet
+ * could no longer reach across that component boundary — converting to a real, standalone component is
+ * both the fix for that and the natural next step of the "one canonical box" intent the original 2026-08-17
+ * extraction already stated. Byte-for-byte identical rendering to the old template in both call sites.
+ */
+@Component({
+  selector: 'app-balance-snapshot-box',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './balance-snapshot-box.component.html',
+  styleUrl: './balance-snapshot-box.component.scss',
+})
+export class BalanceSnapshotBoxComponent {
+  @Input() title: string | null = null;
+  @Input() status: string | null | undefined = null;
+  @Input() snapshot: BalanceSnapshot | null = null;
+  /** Omitted (stays null) by the Look Up panel's own call site — that box shows plain, unannotated Confirmed Balance, unchanged. Only Inquire Events passes a real value. */
+  @Input() impact: BalanceSnapshotImpact | null = null;
 }
 &nbsp;</pre></td></tr></table></pre>
 

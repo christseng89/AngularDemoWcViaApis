@@ -926,17 +926,19 @@ either `npm test`/`tsc --noEmit` gate — only a real `npm run build` hits it, w
 project's own standing "before calling a change complete" checklist. Flagged for a future pass (trim
 ~30+ bytes of real CSS from that file, or raise the budget) rather than opportunistically fixed here, since
 it's unrelated to the spinner work and untouched CSS shouldn't be edited to chase an unrelated budget line.
-**Still NOT fixed as of 2026-08-21 (user asked directly whether it was resolved — it is not; verified
-live via a real `npm run build`, not assumed from "nothing touched this file recently").** The overage
-amount itself drifts with every unrelated edit to this file (P1 pass: 24 bytes; re-measured 2026-08-21,
-same `git stash`-then-`ng build` method, immediately before that day's own Inquire Events 60/40 split
-commit: 10 bytes; re-measured again same day, on `main` AFTER that commit landed: **25 bytes** — the
-60/40 split's own necessary CSS contribution, `flex-wrap: wrap` on `.tb-tabs`, added +15 bytes on top of
-the pre-existing 10-byte baseline; every other new rule that split needed was moved to the global
-stylesheet instead, see that commit's own message) — record the CURRENT figure with its own measurement
-date whenever this file is next touched, rather than trusting an old number as still accurate; no past
-measurement here was wrong, the file simply keeps moving. Still flagged for a future pass, not
-opportunistically fixed inline — same reasoning as above.
+**FIXED 2026-08-21** — same day, later pass ("Part B 也一起做吧,開始extract InquireEventsComponent"; see
+"Part B — InquireEventsComponent/BalanceSnapshotBoxComponent extraction" below for the full write-up). The
+overage amount had drifted with every unrelated edit to this file (P1 pass: 24 bytes; re-measured
+2026-08-21 immediately before that day's own Inquire Events 60/40 split commit: 10 bytes; re-measured again
+right after that commit landed: 25 bytes — record the CURRENT figure with its own measurement date
+whenever this file is next touched, rather than trusting an old number as still accurate; no past
+measurement here was wrong, the file simply kept moving) until the Part B extraction moved Inquire Events'
+entire view layer, plus the `.tb-workspace--single`/`.tb-balance-box*`/`.tb-balance-row*` rules it (and the
+former shared `#balanceSnapshotBox` `ng-template`) needed, out of this file into their own new components —
+confirmed via a real `npm run build`: `transaction-builder.component.scss` is now **9.84 kB total** (only
+1.84 kB over the 8 kB *warning* threshold, comfortably clear of the 12 kB *hard-error* one that used to
+fail the build). `maker-panel.component.scss`'s own separate warning (11.92 kB, 3.92 kB over 8 kB) is
+pre-existing and untouched by this pass — still just a warning, not a hard error, and out of scope here.
 
 ## UI/UX review P2 pass — function-chip/status/role icon set, icon toggle theme switcher
 
@@ -1087,3 +1089,64 @@ expected to ever actually fire for a movement `createMovement()` itself created)
 movementType) is exempted from the sign check — Direction there is carried by the amount's own sign, not
 a distinct movementType, so only an exact zero is rejected. `CLOSE` only rejects negative — see the A10/B6
 entry above.
+
+## Part B — `InquireEventsComponent`/`BalanceSnapshotBoxComponent` extraction (fixes the `anyComponentStyle` overage above)
+
+2026-08-21, same day as the A10/B6 Close pass above — first proposed as "next sprint" tech-debt (advisory
+only, not implemented) alongside Part A (the byte-count doc fix above) in two separate rounds of the same
+"給工程師的完整指示" instructions; actioned same day at explicit user request ("Part B 也一起做吧,開始
+extract InquireEventsComponent") once a third round of that same message disputed (incorrectly — see
+below) that either part, or the whole A10/B6 feature, existed in the checked-out repo at all. Re-verified
+directly against `git log`/`git status`/`git show` and live file reads before touching anything further:
+HEAD matched `origin/main` exactly (commit `c00be89`) with a clean working tree, and every file the user
+said was missing (`CLAUDE.md`'s own byte-count paragraph, `balance-component.model.ts`'s `A10`/`B6`/
+`CLOSE_GROUP_CODES`) was present and unchanged since being pushed — the discrepancy was a stale/mismatched
+local read on the user's own side, not a lost commit; confirmed with the user before proceeding.
+
+The whole Inquire Events section (side tabs, LC Master Records Index, Events timeline, Original Transaction
+Screen, Balance Tabs) moved out of `transaction-builder.component.html`/`.scss` into a new standalone
+`InquireEventsComponent` (own `anyComponentStyle` budget). `InquireEventsService` (all the actual
+orchestration/state logic) stays exactly where it already was — parent-constructed/parent-owned, unchanged
+`providers: [LookUpPanelService, InquireEventsService]` — and is passed down as a plain `@Input()
+inquireEvents`, so `selectMode()`'s own `loadIndex()` call and every existing test covering that wiring
+(`transaction-builder.component.inquire.spec.ts`) needed zero changes: only the VIEW layer moved. The
+Account Entries dialog it can open stays parent-owned too (also opened from the Maker Result panel and the
+Look Up panel's own Event Timeline) — the child bubbles the request up via a new `(openAccountEntries)`
+output instead of managing dialog state itself.
+
+The former shared `#balanceSnapshotBox` `ng-template` (declared once, invoked via `*ngTemplateOutlet` from
+both the Look Up panel and Inquire Events since 2026-08-17) could not simply move with Inquire Events — an
+`ng-template` reference variable is local to the template that declares it and cannot cross a component
+boundary. Converted into a real standalone `BalanceSnapshotBoxComponent` (`@Input() title/status/snapshot/
+impact`) instead, used by BOTH the Look Up panel (parent) and `InquireEventsComponent` (child) — the
+"one canonical box" intent the 2026-08-17 extraction already stated, now enforced by the type system rather
+than a template-local reference. Byte-for-byte identical rendering to the old template at both call sites,
+confirmed via `ng build`'s strict-template check (which the old `ng-template`'s untyped context variables
+had been silently exempt from — the new typed `@Input()`s surfaced two genuine `snapshot.redirectedImpact`
+possibly-null template errors the old code had been masking; fixed with a non-null assertion inside the
+`*ngIf="…redirectedImpact?.label === '…'"` guard that already ensures it, not a behavior change).
+
+Every class this template needs (`.tb-table`, `.tb-tabs`, `.tb-balance-box*`, `.tb-status-badge*`, etc.) had
+to be COPIED — not merely moved — into the new components' own stylesheets, per this project's own
+established "disclosed, deliberate copy" convention (see `transaction-builder.component.scss`'s own comment
+above `.tb-muted`, from the `AccountEntriesDialogComponent`/BAL-003 pilot): Angular's per-component view
+encapsulation means a class rule declared in one component's stylesheet never matches markup rendered by a
+DIFFERENT component's own template. Only classes truly exclusive to the moved markup (`.tb-workspace--single`,
+`.tb-balance-box*`, `.tb-balance-row*`) were actually REMOVED from `transaction-builder.component.scss` —
+everything else Inquire Events also needs (`.tb-tabs`, `.tb-table`, `.tb-hint`, `.tb-btn`, etc.) stayed in
+the parent too, since the Look Up panel's own Event Timeline (still parent-owned) needs the identical rules.
+While auditing which classes were genuinely still referenced, also found and removed three genuinely DEAD
+rule blocks in `transaction-builder.component.scss` — `.tb-quick-pick*`, `.tb-result*`, `.tb-row-sub` — zero
+usages anywhere in that file's own template even before this pass (leftover from the earlier Maker/Checker
+panel extraction, which already carries its own copies in `maker-panel.component.scss`); confirmed via a
+plain grep across every `.html` in this sub-project, not assumed.
+
+Result, confirmed via a real `npm run build`: `transaction-builder.component.scss` dropped from 12.025 kB
+(25 bytes over the 12 kB hard-error budget — see the P1 entry above) to **9.84 kB** (comfortably under,
+only 1.84 kB over the softer 8 kB warning). Neither new component's own stylesheet comes close to either
+threshold. Added two new spec files (`inquire-events.component.spec.ts`,
+`balance-snapshot-box.component.spec.ts`, same direct-instantiation/no-TestBed convention as
+`account-entries-dialog.component.spec.ts`) covering the new `@Output`/delegation-method surface; all
+existing specs needed zero edits. Full suite re-run and green across all three sub-projects per this file's
+own standing rule: Angular app 1049/1049 (29 suites, 98.73%/96.54%/96.95%/98.96% coverage), `backend/`
+34/34, `microservices/balance-component/` 396/396.

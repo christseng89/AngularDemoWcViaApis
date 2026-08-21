@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.76% </span>
+                <span class="strong">97.25% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>175/179</span>
+                <span class='fraction'>177/182</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.47% </span>
+                <span class="strong">91.48% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>43/46</span>
+                <span class='fraction'>43/47</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.17% </span>
+                <span class="strong">97.6% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>161/164</span>
+                <span class='fraction'>163/167</span>
             </div>
         
             
@@ -542,7 +542,18 @@
 <a name='L477'></a><a href='#L477'>477</a>
 <a name='L478'></a><a href='#L478'>478</a>
 <a name='L479'></a><a href='#L479'>479</a>
-<a name='L480'></a><a href='#L480'>480</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">4x</span>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
@@ -570,6 +581,8 @@
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -720,6 +733,11 @@
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1031,6 +1049,8 @@ import { BalanceComponentApiService, BalanceMovement } from './balance-component
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { LookUpPanelService } from './look-up-panel.service';
 import { InquireEventsService } from './inquire-events.service';
+import { InquireEventsComponent, InquireOpenAccountEntriesEvent } from './inquire-events.component';
+import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
   EXPORT_FUNCTIONS,
@@ -1067,6 +1087,8 @@ import { deriveFunctionStrategy } from './function-strategy';
     CheckerPanelComponent,
     MakerPanelComponent,
     TbIconComponent,
+    InquireEventsComponent,
+    BalanceSnapshotBoxComponent,
   ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
@@ -1204,6 +1226,11 @@ export class TransactionBuilderComponent {
   /** Maker Result panel's "Account Entries" buttons, emitted from `MakerPanelComponent`. */
 <span class="fstat-no" title="function not covered" >  onMakerOpenAccountEntries(</span>e: { movement: BalanceMovement; instrumentType: InstrumentType | null }): void {
 <span class="cstat-no" title="statement not covered" >    this.openAccountEntryDialog(e.movement, e.instrumentType);</span>
+  }
+&nbsp;
+  /** Inquire Events' own "Original Transaction Screen" Account Entries button, emitted from `InquireEventsComponent` — same convention as `onMakerOpenAccountEntries()` above. */
+<span class="fstat-no" title="function not covered" >  onInquireOpenAccountEntries(</span>e: InquireOpenAccountEntriesEvent): void {
+<span class="cstat-no" title="statement not covered" >    this.openAccountEntryDialog(e.movement, e.instrumentType, e.phase);</span>
   }
 &nbsp;
   private describeApiError(err: any): string {
@@ -1507,7 +1534,7 @@ export class TransactionBuilderComponent {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-21T08:19:13.424Z
+                at 2026-08-21T08:49:51.888Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

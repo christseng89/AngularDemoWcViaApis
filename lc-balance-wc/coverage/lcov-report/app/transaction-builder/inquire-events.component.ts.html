@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for app/transaction-builder/eligibility-rule.ts</title>
+    <title>Code coverage report for app/transaction-builder/inquire-events.component.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> eligibility-rule.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">app/transaction-builder</a> inquire-events.component.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>0/0</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -124,7 +124,16 @@
 <a name='L59'></a><a href='#L59'>59</a>
 <a name='L60'></a><a href='#L60'>60</a>
 <a name='L61'></a><a href='#L61'>61</a>
-<a name='L62'></a><a href='#L62'>62</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -164,86 +173,83 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">474x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">331x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">69x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">74x</span>
-<span class="cline-any cline-yes">63x</span>
-<span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { BalanceContract, BalanceSnapshot } from './balance-component-api.service';
-import { DECREASING_MOVEMENT_TYPES } from './balance-component.model';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { FormlyModule } from '@ngx-formly/core';
+import { TbIconComponent } from '../tb-icon.component';
+import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
+import { BalanceMovement } from './balance-component-api.service';
+import { InquireEventsService } from './inquire-events.service';
+import {
+  InstrumentType,
+  displayStatus as displayStatusShared,
+  statusBadgeClass as statusBadgeClassShared,
+  contractStatusBadgeClass as contractStatusBadgeClassShared,
+  displayMovementType as displayMovementTypeShared,
+  displayMovementAmount as displayMovementAmountShared,
+  statusBadgeIcon as statusBadgeIconShared,
+} from './balance-component.model';
 &nbsp;
-/**
- * Unifies the repeated TAIL of `filteredCatalogContracts`/`filteredParentCatalog`/`filteredIbIndexCatalog`
- * (`maker-panel.component.ts`) — each getter independently hand-rolled the identical "filter by a hint-set
- * of eligible contract ids, OR pass through unconditionally, OR fall back to excluding 0-Available-Balance
- * candidates but only for a decreasing movementType" shape. Pure function, zero DI, matching this
- * project's own convention for shared picker-adjacent utility logic (`paged-list-state.ts`'s precedent).
- *
- * Deliberately does NOT decide WHICH rule applies to a given function/picker — that reads
- * `TransactionFunction` registry fields scoped out of the F-01 Strategy migration
- * (`payableMovementInstrumentType`, `catalogTenorFilter`); each getter still resolves its own
- * `EligibilityRule` locally, and only the final "now apply it" step is shared.
- *
- * Not a discriminated union keyed by picker — no function needs its catalog-picker and parent-picker
- * eligibility to differ (each uses exactly one Step-1 picker type, determined by `hasParent`), so one
- * rule shape serves all three call sites.
- */
-/** Minimal structural type both `Set&lt;string&gt;` (`catalogSgEligible`/`parentSgEligible`) and `Map&lt;string, string[]&gt;` (`catalogPayableIbs`/`parentPayableIbs`/`catalogChildPayableIbs`) already satisfy — `applyEligibilityRule()` only ever needs membership, never a value. */
-export interface EligibilityIdLookup {
-  has(id: string): boolean;
+/** Emitted when the "Original Transaction Screen" panel's own Account Entries button is clicked — the dialog itself stays parent-owned (`TransactionBuilderComponent`), since it's also opened from the Maker Result panel and the Look Up panel's own Event Timeline, not just from here. */
+export interface InquireOpenAccountEntriesEvent {
+  movement: BalanceMovement;
+  instrumentType: InstrumentType | null | undefined;
+  phase?: 'primary' | 'create' | 'finalize';
 }
 &nbsp;
-export type EligibilityRule =
-  { kind: 'hintSet'; ids: EligibilityIdLookup } | { kind: 'unconditional' } | { kind: 'genericFallback'; gatedByMovementType: boolean };
-&nbsp;
 /**
- * Applies an already-resolved `EligibilityRule` to a (tenor-pre-filtered, picker-specific) candidate list.
- * `movementType`/`snapshots` are only read for the `'genericFallback'` case.
- *
- * `gatedByMovementType` preserves a real, pre-existing asymmetry between the 3 original getters:
- * `filteredCatalogContracts`/`filteredIbIndexCatalog`'s own trailing branch only excluded 0-Available-
- * Balance candidates when `movementType` is one of `DECREASING_MOVEMENT_TYPES` (an Increase/Create never
- * needs to exclude an already-exhausted candidate — 0 is a normal starting point), but
- * `filteredParentCatalog`'s own trailing branch applied the 0-balance exclusion unconditionally, with no
- * `DECREASING_MOVEMENT_TYPES` gate at all. `gatedByMovementType: true` reproduces the first shape;
- * `false` reproduces the second (parent-picker caller).
- *
- * A missing snapshot (still loading) is never excluded.
+ * Part B (2026-08-21, "next sprint" tech-debt proposal, actioned same day at user request — "Part B 也一起做吧,
+ * 開始extract InquireEventsComponent") — the whole Inquire Events section (side tabs, LC Master Records
+ * Index, Events timeline, Original Transaction Screen, Balance Tabs) extracted out of
+ * `transaction-builder.component.html`/`.scss` into its own standalone child component, so it gets its own
+ * `anyComponentStyle` production-build budget instead of sharing the parent's (which was already, separately,
+ * sitting over that 12kb budget — see `transaction-builder.component.scss`'s own "Found, NOT fixed" doc
+ * comment history). All actual state/orchestration logic stays exactly where it already was, in
+ * `InquireEventsService` (unchanged) — this component only moved the VIEW layer that used to render it
+ * directly inside `TransactionBuilderComponent`'s own template. `inquireEvents` stays parent-owned/
+ * parent-constructed (unchanged constructor-default-value convention, unchanged
+ * `transaction-builder.component.inquire.spec.ts` coverage of that wiring) and is passed down as a plain
+ * `@Input()` rather than re-provided here, so `selectMode()`'s own `loadIndex()` call and every other
+ * existing behavior around WHEN this section is shown/reset is untouched.
  */
-export function applyEligibilityRule(
-  list: readonly BalanceContract[],
-  rule: EligibilityRule,
-  movementType: string | undefined,
-  snapshots: ReadonlyMap&lt;string, BalanceSnapshot&gt;,
-): BalanceContract[] {
-  switch (rule.kind) {
-    case 'hintSet':
-      return list.filter((c) =&gt; rule.ids.has(c.balanceContractId));
-    case 'unconditional':
-      return [...list];
-    case 'genericFallback': {
-      if (rule.gatedByMovementType &amp;&amp; (!movementType || !DECREASING_MOVEMENT_TYPES.has(movementType))) return [...list];
-      return list.filter((c) =&gt; {
-        const snap = snapshots.get(c.balanceContractId);
-        return !snap || snap.availableBalance !== '0';
-      });
-    }
+@Component({
+  selector: 'app-inquire-events',
+  standalone: true,
+  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, BalanceSnapshotBoxComponent],
+  templateUrl: './inquire-events.component.html',
+  styleUrl: './inquire-events.component.scss',
+})
+export class InquireEventsComponent {
+  @Input() inquireEvents!: InquireEventsService;
+  @Output() openAccountEntries = new EventEmitter&lt;InquireOpenAccountEntriesEvent&gt;();
+&nbsp;
+  /** Thin delegations to the same pure shared functions `TransactionBuilderComponent` itself calls for its own remaining sections (Look Up panel) — assigned directly rather than re-declared as wrapper methods, since these never touch `this`. */
+  readonly displayStatus = displayStatusShared;
+  readonly statusBadgeClass = statusBadgeClassShared;
+  readonly contractStatusBadgeClass = contractStatusBadgeClassShared;
+  readonly statusBadgeIcon = statusBadgeIconShared;
+  readonly displayMovementType = displayMovementTypeShared;
+  readonly displayMovementAmount = displayMovementAmountShared;
+&nbsp;
+  openAccountEntryDialog(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined, phase?: 'primary' | 'create' | 'finalize'): void {
+    this.openAccountEntries.emit({ movement, instrumentType, phase });
   }
 }
 &nbsp;</pre></td></tr></table></pre>

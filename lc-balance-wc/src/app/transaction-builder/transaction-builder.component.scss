@@ -153,17 +153,6 @@
   }
 }
 
-// Business instruction 2026-08-19 — Inquire Events reuses .tb-workspace's shared properties (gap,
-// align-items) but supplies only ONE child (.tb-main, no .tb-side) — CSS Grid still reserves the
-// second 50%-width track regardless of whether anything occupies it, leaving half the screen unused.
-// A single full-width track lets Inquire Events' own content (especially the Event Timeline table)
-// use the whole available width instead. Deliberately a modifier on .tb-workspace, not a change to
-// its own base rule — Transaction Processing's genuine 50/50 split (Transaction Processing / Look Up
-// Current Balance) must stay exactly as-is.
-.tb-workspace--single {
-  grid-template-columns: 1fr;
-}
-
 // `container-type: inline-size` + a shared `container-name` — lets .tb-grid-3/.tb-grid-2 (below) respond
 // to THIS panel's own rendered width via @container queries, not the viewport's. Necessary now that
 // .tb-main is only ~50% of the workspace width instead of "most of it": a 3-column input grid keyed off
@@ -561,76 +550,12 @@
   margin-bottom: 14px;
 }
 
-// Business instruction 2026-08-15 ("confirmedBalance... should be separated by each line") — a proper
-// label/value definition list, one field per row, instead of the old wrapping flex row of bare spans.
-.tb-balance-box {
-  background: var(--blue-bg);
-  border: 1px solid var(--blue-border);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
-  color: var(--navy);
-
-  &--current {
-    background: var(--gray-bg);
-    border-color: var(--gray-border);
-    color: var(--gray-body);
-  }
-
-  &--asof {
-    background: var(--indigo-bg);
-    border-color: var(--indigo-border);
-  }
-
-  &__title {
-    font-family: var(--font-sans);
-    font-weight: 700;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 6px;
-  }
-}
-
-.tb-balance-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  padding: 3px 0;
-  font-size: 12px;
-  border-bottom: 1px dashed var(--gray-border);
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.tb-balance-row__label {
-  color: var(--gray-muted);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.tb-balance-row__value {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: inherit;
-  text-align: right;
-}
-
 // ── Rows shared by IndexPicker's projected templates ─────────────────────
 
 .tb-row-primary {
   display: block;
   font-weight: 600;
   font-family: var(--font-mono);
-}
-
-.tb-row-sub {
-  display: block;
-  font-size: 11px;
-  color: var(--gray-muted);
-  margin-top: 2px;
 }
 
 .tb-row-badge {
@@ -641,83 +566,7 @@
   margin-top: 2px;
 }
 
-.tb-quick-pick {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--gray-input-border);
-    border-radius: var(--radius-pill);
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
-
-.tb-quick-pick__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid var(--gray-border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  padding: 7px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-
-  transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast);
-
-  // Same &:hover/&--active specificity pitfall as .tb-function-chip above (2026-08-15 fix).
-  &:hover:not(.tb-quick-pick__row--active) {
-    background: var(--blue-bg-soft);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--blue);
-    outline-offset: 1px;
-  }
-
-  &--active {
-    background: var(--blue-bg);
-    border-color: var(--blue);
-  }
-}
-
-// ── Maker result banner ──────────────────────────────────────────────────
-
-.tb-result {
-  background: var(--blue-bg-soft);
-  border: 1px solid var(--gray-border);
-  border-radius: var(--radius-lg);
-  padding: 14px 18px;
-}
-
-.tb-result__title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--navy);
-  margin: 0 0 8px;
-}
-
-.tb-result__status {
-  font-size: 13px;
-  color: var(--gray-body);
-  margin: 0 0 6px;
-}
+// ── Checker action row ─────────────────────────────────────────────────
 
 .tb-checker-actions {
   display: flex;
@@ -993,6 +842,14 @@
 // `.tb-table.tb-table--static` override, none of which any OTHER section of this template ever used)
 // moved with it, into account-entries-dialog.component.scss. The shared "design-system atom" classes it
 // also needs (`.tb-table`/`.tb-status-badge`/`.tb-type-tag`/`.tb-muted`/`.tb-hint`/`.tb-btn`) are still
-// defined here too, since this file's OWN other sections (Look Up Current Balance's Event Timeline,
-// Inquire Events' merged table, the Maker Result panel, etc.) still use them — see that new component's
-// own stylesheet for why they're a disclosed, deliberate COPY rather than a shared/imported source.
+// defined here too, since this file's OWN remaining section (Look Up Current Balance's Event Timeline)
+// still uses them — see that new component's own stylesheet for why they're a disclosed, deliberate COPY
+// rather than a shared/imported source. Inquire Events' own merged table used to be part of that "still
+// use them" list too, until it was extracted into its own InquireEventsComponent (2026-08-21, Part B) —
+// `.tb-workspace--single`/`.tb-balance-box*`/`.tb-balance-row*` (Inquire-exclusive) moved out of this file
+// entirely at that point, into inquire-events.component.scss and balance-snapshot-box.component.scss
+// (the shared "Current Balance" box, also extracted that same pass — see its own class doc comment for
+// why a real component replaced the old `#balanceSnapshotBox` ng-template). Everything ELSE Inquire Events
+// still needs (`.tb-table`, `.tb-tabs`, etc.) is a disclosed, deliberate copy in its own stylesheet too,
+// same convention as this paragraph describes — not moved, since Look Up Current Balance (this file) still
+// needs its own copy of the exact same classes.
