@@ -261,6 +261,16 @@ describe('TransactionBuilderComponent', () => {
     });
   });
 
+  // Contract-level ContractStatus (LC Master Records Index), user-requested 2026-08-21 ("LC Active shows
+  // Green, Close shows Red") — a different enum from statusBadgeClass()'s own MovementStatus above.
+  describe('contractStatusBadgeClass', () => {
+    it('returns the approved (green) class for ACTIVE and the negative (red) class for CLOSED', () => {
+      const { comp } = makeComponent();
+      expect(comp.contractStatusBadgeClass('ACTIVE')).toBe('tb-status-badge--approved');
+      expect(comp.contractStatusBadgeClass('CLOSED')).toBe('tb-status-badge--negative');
+    });
+  });
+
   // Thin delegation to the shared functionActionIcon()/statusBadgeIcon() pure functions (P2 UI/UX
   // pass); full branch coverage lives in balance-component.model.spec.ts.
   describe('functionActionIcon / statusBadgeIcon', () => {

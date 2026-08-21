@@ -179,6 +179,29 @@ describe('BalanceComponentApiService', () => {
     });
   });
 
+  describe('closeEligible() — A10/B6', () => {
+    it('GETs the close-eligible endpoint with instrumentType and the default pageSize=200 when lcNumber is omitted', () => {
+      service.closeEligible('IPLC_LC');
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/close-eligible', {
+        params: { instrumentType: 'IPLC_LC', pageSize: 200 },
+      });
+    });
+
+    it('adds lcNumber when present', () => {
+      service.closeEligible('EPLC_CONFIRMATION', 'S001');
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/close-eligible', {
+        params: { instrumentType: 'EPLC_CONFIRMATION', pageSize: 200, lcNumber: 'S001' },
+      });
+    });
+
+    it('respects an explicit pageSize override', () => {
+      service.closeEligible('IPLC_LC', undefined, 50);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/close-eligible', {
+        params: { instrumentType: 'IPLC_LC', pageSize: 50 },
+      });
+    });
+  });
+
   it('getSnapshot() GETs the /balance sub-path for the given contract id', () => {
     service.getSnapshot('BC-1');
     expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/BC-1/balance');

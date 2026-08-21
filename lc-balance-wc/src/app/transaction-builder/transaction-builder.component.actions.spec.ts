@@ -194,7 +194,9 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.lookUp.syncFrom('E001', childType as any);
 
       expect(comp.lookUp.lookup.instrumentType).toBe(expectedLookupType);
-      expect(api.resolveContract).toHaveBeenCalledWith(expectedLookupType, expect.objectContaining({ lcNumber: 'E001' }));
+      // 3rd arg true — Look Up is an inquiry context, must still resolve a CLOSED (A10/B6) contract; see
+      // BalanceComponentApiService.resolveContract()'s own includeAnyStatus doc comment.
+      expect(api.resolveContract).toHaveBeenCalledWith(expectedLookupType, expect.objectContaining({ lcNumber: 'E001' }), true);
     });
   });
 

@@ -37,12 +37,15 @@ export const INSTRUMENT_TYPE_OPTIONS: { value: InstrumentType; label: string }[]
 
 /** Design doc §5 — the only legal movementType values per instrumentType, as actually implemented. */
 export const MOVEMENT_TYPES_BY_INSTRUMENT: Record<InstrumentType, string[]> = {
-  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE'],
+  // 'CLOSE' — A10/B6 (Import LC / Export Confirmed LC Close). Write-off + retire the root contract
+  // (ContractStatus.CLOSED, reserved since the original design but never previously set anywhere) —
+  // see microservices/balance-component/src/domain/closeEligibility.ts for the preconditions.
+  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
   EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
   IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
   EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
   SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT'],
+  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
   EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
   EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
   EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -186,6 +189,7 @@ export const DECREASING_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
   'FULL_REDEEM',
   'REIMBURSE',
   'RECLASSIFY_OUT',
+  'CLOSE',
 ]);
 
 /** Named business functions — each pins down instrumentType + movementType (and a sub-choice where one exists) so the UI never makes the user pick raw combinations by hand. Grouped Import (A-series) / Export (B-series). */
@@ -229,6 +233,8 @@ export interface TransactionFunction {
   deferSettlementLabel?: string;
   /** "go to X to actually finalize it" — which function(s) the Maker/Checker should go to next. Defaults to 'A4 (Sight Settlement) or A6 (Acceptance)' when unset. */
   deferSettlementNextStepHint?: string;
+  /** A10/B6 (Close) only — its own flat Catalog picker filters to `documentArrivalHints.catalogCloseEligible` (a server-computed hint-set, not a client-side per-candidate check) instead of the generic 0-Available-Balance fallback every other flat-Catalog function uses. */
+  requiresCloseEligibility?: boolean;
 }
 
 const ALL_TENOR_OPTIONS = [
@@ -377,6 +383,18 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     defaultParentInstrumentType: 'IPLC_LC',
     help: "Search by LC Number + SG Number (below) — a single LC can have multiple Shipping Guarantees. Amount defaults to the SG's current Available Balance and stays editable, capped at it — reduce it for a Partial Redeem, leave it as-is for a Full Redeem (no separate type to pick). Design doc §6.1: redemption is NOT auto-linked to Document Arrival (A3) — it's a separate, explicit action.",
   },
+  // cs-tf-balance-knowhow rationale §3.9's "cancellation before expiry" analog — same write-off entry as
+  // a natural expiry, but Maker/Checker-triggered. Flat Catalog picker like A2/A3 (no parent concept —
+  // this function acts on the root LC itself), filtered to only currently-eligible LCs.
+  {
+    code: 'A10',
+    label: 'LC Close',
+    side: 'IMPORT',
+    instrumentType: 'IPLC_LC',
+    movementType: 'CLOSE',
+    requiresCloseEligibility: true,
+    help: 'Writes off whatever Confirmed Balance remains and retires the LC. Only LCs with Shipping Guarantee Balance = 0, Acceptance Balance = 0, and no open Events anywhere in the tree (including SG/Acceptance children) are shown below — redeem the SG (A9) and settle the Acceptance (A7) first if either is still outstanding. Amount is never typed — it is carried from the current Confirmed Balance and locked; 0 is a normal figure for an already fully-utilized LC. Once Released, this LC can no longer be selected by any other function.',
+  },
 ];
 
 /** Export Confirmed side ONLY models Confirmed Export LC — per rationale-en.md §6/§7.4b, plain advising creates no contingent and Unconfirmed negotiation (EBL) belongs to a separate Loan Component. `EPLC_LC` stays valid but no function here creates one. */
@@ -464,6 +482,16 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     catalogTenorFilter: 'USANCE',
     help: "Confirm LC Settlement — Usance held-to-maturity only (CNF_MATURE): one compound settles BOTH the Acceptance (this bank's own DPU liability, paid to the beneficiary) AND its matching Reimbursement Receivable (the issuing bank's own reimbursement to this bank), same amount, in a single Checker Release. Pick the LC (LC Index, Usance only), then the EB Number (EB Index) — a single LC can have multiple Document Presentations. Sight settlement (Due from Issuing Bank) is out of Balance Component's own scope — Balance Component only owns the contingent/liability side; B4 still creates that asset, but collecting it happens outside this system. Nego'd/discounted Usance (EPLC_EXPORT_BILLS_DISCOUNTED) is still follow-up work, not this function.",
   },
+  // Export analog of A10 — see A10's own help text/doc comment above for the shared rationale.
+  {
+    code: 'B6',
+    label: 'Confirmed LC Close',
+    side: 'EXPORT',
+    instrumentType: 'EPLC_CONFIRMATION',
+    movementType: 'CLOSE',
+    requiresCloseEligibility: true,
+    help: 'Writes off whatever Confirmed Balance remains and retires the Confirmation. Only Confirmations with Acceptance Balance = 0 and no open Events anywhere in the tree — including a RELEASED-but-not-yet-consumed B3 Present Docs presentation (B4 has not Honoured/Accepted it yet) — are shown below; settle the Acceptance (B5) or complete B4 first if either is still outstanding. Amount is never typed — it is carried from the current Confirmed Balance and locked; 0 is a normal figure once every presentation has been fully honoured/accepted. Once Released, this Confirmation can no longer be selected by any other function.',
+  },
 ];
 
 // movementTypeMatchesFunction() / resolveFunctionForMovement() relocated to function-strategy.ts —
@@ -525,8 +553,9 @@ export function displayStatus(
  * P2 UI/UX pass — function-chip action-type icon (`TbIconComponent`), one of 4 groups by underlying
  * domain semantics rather than raw movementType: `issue` (ISSUE/CREATE establishing a new
  * balance/facility record — A1/A6/A8/B1), `amend` (A2/B2), `utilize` (presentation/finalize —
- * A3/A3S/A4/B3/B4), `redeem` (settle/close an existing exposure — A7/A9/B5). A plain lookup keyed by
- * function `code`, not instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
+ * A3/A3S/A4/B3/B4), `redeem` (settle/close an existing exposure — A7/A9/B5, and A10/B6 by the same
+ * "closes out an exposure" fallback default below — Close never needed its own 5th icon group). A plain
+ * lookup keyed by function `code`, not instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
  * A4/B4 are all effectively UTILIZE-shaped) but land in the same group anyway, so re-deriving from
  * movementType would be no simpler.
  */
@@ -563,6 +592,24 @@ export function statusBadgeClass(
   if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
   if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
   return '';
+}
+
+/**
+ * Contract-level `ContractStatus` (ACTIVE/CLOSED/SUPERSEDED/CANCELLED) — a genuinely different enum from
+ * `MovementStatus` above (PENDING/RELEASED/REJECTED/CANCELLED/SUPERSEDED — 'CANCELLED'/'SUPERSEDED' are
+ * shared strings but mean different things on the two enums), so this is its own small function rather
+ * than overloading `statusBadgeClass()` with a status space it was never designed for. User-requested
+ * 2026-08-21 ("LC Active shows Green, Close shows Red... 容易識別") for the LC Master Records Index,
+ * where ACTIVE/CLOSED previously rendered as the same plain `.tb-type-tag` regardless of status. Reuses
+ * the SAME color tokens `statusBadgeClass()`/`statusBadgeIcon()` above already established app-wide
+ * (green=approved/good, red=negative/closed-out) rather than inventing a second color language.
+ */
+export function contractStatusBadgeClass(status: string): string {
+  if (status === 'ACTIVE') return 'tb-status-badge--approved';
+  if (status === 'CLOSED') return 'tb-status-badge--negative';
+  if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
+  if (status === 'CANCELLED') return 'tb-status-badge--negative';
+  return 'tb-status-badge--neutral';
 }
 
 /** Display-only pair (with `displayMovementAmount()` below): EPLC_CONFIRMATION's shared `AMEND` movementType, whose direction rides the sign of the wire `amount`, reads like A2's distinct AMEND_INCREASE/AMEND_DECREASE in list views. Never written back to `model`; every other pair passes through unchanged. */

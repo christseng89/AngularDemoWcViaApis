@@ -35,6 +35,7 @@ import {
 import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
+import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
 import { IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
@@ -196,6 +197,38 @@ export class BalanceService {
     const outstandingCapped: MovementSufficiencyCheck = (ctx) =>
       checkRedeemSufficiency({ redeemAmount: ctx.ceilingAmount, sgAvailableBalance: ctx.availableBalance });
 
+    /**
+     * A10/B6 Close — unlike every other entry in this table, "sufficiency" here isn't affordability, it's
+     * eligibility (see domain/closeEligibility.ts) PLUS an exact-amount check: the caller's own amount
+     * (auto-derived client-side from the current Confirmed Balance, never user-typed — see
+     * function-strategy.ts's own MovementDerivationStrategy.amountAutoFilledFrom) must equal
+     * ctx.confirmedBalance exactly, not merely be within it, since this movement's whole purpose is to
+     * write the balance down to precisely 0. release() below re-runs the same two checks against the
+     * THEN-current state before actually flipping status, since Confirmed Balance/eligibility can move in
+     * the window between Maker Submit and Checker Release.
+     */
+    const closeShaped: MovementSufficiencyCheck = (ctx) => {
+      if (!ROOT_INSTRUMENT_TYPES.has(ctx.contract.instrumentType)) {
+        return {
+          ok: false,
+          error: `Close only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${ctx.contract.instrumentType} is not eligible.`,
+        };
+      }
+      const eligibility = this.evaluateContractCloseEligibility(ctx.contract);
+      if (!eligibility.eligible) {
+        return { ok: false, error: `Cannot Close ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}` };
+      }
+      if (!ctx.ceilingAmount.equals(ctx.confirmedBalance)) {
+        return {
+          ok: false,
+          error:
+            `Close amount must exactly equal the current Confirmed Balance (${ctx.confirmedBalance.toFixed()}) — ` +
+            `submitted ${ctx.ceilingAmount.toFixed()}. Re-derive the amount from the current balance and resubmit.`,
+        };
+      }
+      return { ok: true };
+    };
+
     return {
       // Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on
       // Acceptance/EPLC_EXAMINATION; ISSUE on SHGT). SHGT's own ISSUE and EPLC_EXAMINATION's own
@@ -217,6 +250,7 @@ export class BalanceService {
       RECLASSIFY_OUT: { isCreating: false, checkSufficiency: outstandingCapped },
       PARTIAL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
       FULL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
+      CLOSE: { isCreating: false, checkSufficiency: closeShaped },
     };
   }
 
@@ -361,12 +395,85 @@ export class BalanceService {
     if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error);
   }
 
-  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
-    return this.contracts.findActiveByNaturalKey(instrumentType, naturalKey);
+  /**
+   * @param includeAnyStatus opt-in (default false, preserving every existing transaction-creating
+   *   caller's own ACTIVE-only behavior — same "Maker-ACTION picker vs. inquiry-only context" split as
+   *   CatalogFilter.requireIssueReleased). Look Up Current Balance / Inquire Events pass true so a
+   *   CLOSED (A10/B6) contract stays resolvable for inquiry even though it's no longer selectable to act
+   *   on — see BalanceContractStore.findByNaturalKey()'s own doc comment.
+   */
+  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey, includeAnyStatus = false): BalanceContract | undefined {
+    return includeAnyStatus ? this.contracts.findByNaturalKey(instrumentType, naturalKey) : this.contracts.findActiveByNaturalKey(instrumentType, naturalKey);
   }
 
   catalog(filter: CatalogFilter): CatalogPage {
     return this.contracts.listCatalog(filter);
+  }
+
+  /**
+   * A10/B6 Close — the ONE shared eligibility check (domain/closeEligibility.ts) used by
+   * listCloseEligibleContracts() below (Step-1 picker hint), createMovement()'s own closeShaped
+   * sufficiency check (Maker Submit), and release()'s own re-check (Checker Approve). Walks the whole
+   * event tree via parentLogicalContractId — the root's own movements plus every SG/Acceptance/
+   * Examination child's own movements — not just this contract's own history.
+   *
+   * @param excludeMovementId release()'s own re-check passes the CLOSE movement's own movementId here —
+   *   at that point it is STILL PENDING (this runs before updateStatus() flips it), so without excluding
+   *   it, its own "open event" scan would always see itself and self-reject every Release. createMovement()
+   *   never needs this (the new CLOSE movement isn't inserted yet at that point).
+   */
+  private evaluateContractCloseEligibility(contract: BalanceContract, excludeMovementId?: string): CloseEligibilityResult {
+    const ownMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== excludeMovementId);
+    let hasOpenEvents = ownMovements.some((m) => m.status === 'PENDING');
+
+    const sgMovements = contract.instrumentType === 'IPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
+    if (sgMovements.some((m) => m.status === 'PENDING')) hasOpenEvents = true;
+
+    const acceptanceMovements = this.movements.listAcceptanceMovementsForParent(contract.logicalContractId);
+    if (acceptanceMovements.some((m) => m.status === 'PENDING')) hasOpenEvents = true;
+
+    // A RELEASED-but-not-yet-presentDocsConsumedAt EPLC_EXAMINATION/CREATE (B3 Checker-approved, but B4
+    // hasn't Honoured/Accepted it yet) is not caught by a plain PENDING scan — see
+    // domain/offBalanceExposure.ts's own computePresentDocsEarmark doc comment for why `status ===
+    // 'RELEASED'` alone doesn't mean this exposure is actually resolved.
+    if (contract.instrumentType === 'EPLC_CONFIRMATION') {
+      const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
+      for (const m of examinationMovements) {
+        if (m.status === 'PENDING') hasOpenEvents = true;
+        if (m.status === 'RELEASED' && m.movementType === 'CREATE' && !m.presentDocsConsumedAt) hasOpenEvents = true;
+      }
+    }
+
+    return evaluateCloseEligibility({
+      alreadyClosed: contract.status === 'CLOSED',
+      rootConfirmedBalance: computeConfirmedBalance(ownMovements),
+      sgConfirmedBalance: computeConfirmedBalance(sgMovements),
+      acceptanceConfirmedBalance: computeConfirmedBalance(acceptanceMovements),
+      hasOpenEvents,
+    });
+  }
+
+  /**
+   * A10/B6 Close, Step-1 picker hint — every ACTIVE root contract of this instrumentType currently
+   * eligible for Close. Eligibility spans multiple tables/instrument types (SG/Acceptance/Examination
+   * children), not expressible as a single SQL WHERE clause the way CatalogFilter.requireIssueReleased
+   * is — so this fetches one capped raw batch (same "capped batch, then filter, then paginate over the
+   * FILTERED result" convention CatalogPickerService already uses on the Angular side — see that
+   * service's own doc comment) and evaluates each candidate in memory. 200 is a deliberate, documented
+   * cap, not a silent truncation: large enough for this prototype's own data volumes, revisit if a real
+   * deployment's ACTIVE-catalog size per instrumentType ever approaches it.
+   */
+  listCloseEligibleContracts(instrumentType: InstrumentType, opts: { lcNumber?: string; page?: number; pageSize?: number } = {}): CatalogPage {
+    if (!ROOT_INSTRUMENT_TYPES.has(instrumentType)) {
+      throw new RequestValidationError(`Close only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${instrumentType} is not eligible.`);
+    }
+    const rawBatch = this.contracts.listCatalog({ instrumentType, status: 'ACTIVE', lcNumber: opts.lcNumber, pageSize: 200 }).items;
+    const eligible = rawBatch.filter((c) => this.evaluateContractCloseEligibility(c).eligible);
+
+    const page = opts.page && opts.page > 0 ? opts.page : 1;
+    const pageSize = opts.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;
+    const start = (page - 1) * pageSize;
+    return { items: eligible.slice(start, start + pageSize), total: eligible.length, page, pageSize };
   }
 
   /**
@@ -967,6 +1074,31 @@ export class BalanceService {
     }
 
     const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
+
+    // A10/B6 Close — re-run the SAME eligibility check createMovement() ran at Submit, against the
+    // THEN-current state, before actually flipping status (Checker Approve is the 3rd of 3 layers sharing
+    // evaluateContractCloseEligibility() — see that method's own doc comment). Confirmed Balance is also
+    // re-verified still EXACTLY equal to this movement's own frozen ceilingAmount (`before`, computed just
+    // above, IS that current figure) — a movement's own ceilingAmount is fixed forever at Submit time
+    // (never recomputed here, same invariant every other movementType relies on), so if anything changed
+    // it in the Submit-to-Approve window, this Close would either under- or over-write the real balance;
+    // safer to force a fresh Submit with the current figure than to special-case CLOSE into recomputing
+    // its own amount at Release time.
+    if (movement.movementType === 'CLOSE') {
+      const eligibility = this.evaluateContractCloseEligibility(contract, movement.movementId);
+      if (!eligibility.eligible) {
+        throw new IllegalStateTransitionError(
+          `Cannot release CLOSE movement ${movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this CLOSE request and re-submit.`,
+        );
+      }
+      if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
+        throw new IllegalStateTransitionError(
+          `Cannot release CLOSE movement ${movementId} — Confirmed Balance has changed since Submit ` +
+            `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this CLOSE request and re-submit with the current figure.`,
+        );
+      }
+    }
+
     const releasedAt = this.now();
     // Compute the after-figure by simulating this one movement flipping to RELEASED,
     // rather than a second DB round-trip — cheaper and avoids a two-write window.
@@ -1040,6 +1172,15 @@ export class BalanceService {
       if (referenced && referencedContract?.instrumentType === 'EPLC_EXAMINATION' && referenced.movementType === 'CREATE') {
         this.movements.markPresentDocsConsumed({ movementId: referenced.movementId, presentDocsConsumedBy: releasedBy, presentDocsConsumedAt: releasedAt });
       }
+    }
+
+    // A10/B6 Close — the movement itself is now RELEASED (recording WHO/WHEN, same as every other
+    // movement); this side effect additionally retires the CONTRACT it acted on, mirroring how the
+    // referencedTransactionId branch above updates a DIFFERENT record's own state as a release() side
+    // effect. ContractStatus.CLOSED was reserved in types.ts from the original design but never
+    // previously set anywhere — this is the one place it now is.
+    if (movement.movementType === 'CLOSE') {
+      this.contracts.markClosed(contract.balanceContractId, releasedAt);
     }
 
     return this.movements.findById(movementId)!;

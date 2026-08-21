@@ -16,6 +16,7 @@ import {
   TransactionFunction,
   displayStatus as displayStatusShared,
   statusBadgeClass as statusBadgeClassShared,
+  contractStatusBadgeClass as contractStatusBadgeClassShared,
   displayMovementType as displayMovementTypeShared,
   displayMovementAmount as displayMovementAmountShared,
   functionActionIcon as functionActionIconShared,
@@ -204,6 +205,11 @@ export class TransactionBuilderComponent {
     acknowledgedAt?: string | null,
   ): string {
     return statusBadgeClassShared(status, instrumentType, movementType, phase, acknowledgedAt);
+  }
+
+  /** Contract-level ContractStatus (ACTIVE/CLOSED/...) — a different enum from statusBadgeClass()'s own MovementStatus, see contractStatusBadgeClass()'s own doc comment. Thin delegation, same convention as displayStatus()/statusBadgeClass(). */
+  contractStatusBadgeClass(status: string): string {
+    return contractStatusBadgeClassShared(status);
   }
 
   /** P2 UI/UX pass — thin delegation, same convention as `displayStatus()`/`statusBadgeClass()`. */

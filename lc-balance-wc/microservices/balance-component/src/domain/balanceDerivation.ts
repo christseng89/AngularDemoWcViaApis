@@ -42,6 +42,10 @@ export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1>> = {
   // clear it, same OUTSTANDING_CAPPED shape as PARTIAL_REDEEM/FULL_REDEEM above.
   REIMBURSE: -1,
   RECLASSIFY_OUT: -1,
+  // IPLC_LC / EPLC_LC / EPLC_CONFIRMATION — A10/B6 Close (cs-tf-balance-knowhow §3.9/§7.7's "cancellation
+  // before expiry" analog: writes off whatever Confirmed Balance remains, same direction as AMEND_DECREASE/
+  // UTILIZE). domain/closeEligibility.ts's own doc comment covers the preconditions gating this movement.
+  CLOSE: -1,
 };
 
 /** movementTypes whose `amount` field represents a face-level delta needing §6.2 Tolerance conversion before it contributes to Confirmed Balance — see domain/tolerance.ts. Confirmed/Available Balance derivation always uses ceilingAmount (already converted), never amount, so this list is informational/for callers assembling movements. */

@@ -41,7 +41,12 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // Same default-to-Available/capped shape as amountCappedAtSg above, for B5's own Usance branch.
   const amountCappedAtAcceptance =
     strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
-  const amountLocked = amountFromDocArrival || amountFromFullSettle;
+  // A10/B6 only — Amount is NEVER typed, unlike amountCappedAtSg/amountCappedAtAcceptance above (which
+  // stay editable, just capped); fully locked like amountFromDocArrival/amountFromFullSettle, since the
+  // write-off must equal the current Confirmed Balance exactly (see submit-rules.ts's own closeShaped
+  // exact-amount comment on the microservice side).
+  const amountFromClose = strategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance' && !!selectedContractSnapshot;
+  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose;
   const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
   // A1/B1 = Input; every other function = carry from A1/B1 + protected — see carriedCurrency (function-policy.ts).
   const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
@@ -69,9 +74,11 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
               ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
               : strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')
                 ? 'Bill Amount (actual document amount — see SG Redemption Amount below)'
-                : amountLocked
-                  ? 'Amount (carried from the Document Arrival, protected)'
-                  : 'Amount (face-level, per Design doc §6.2)',
+                : amountFromClose
+                  ? 'Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)'
+                  : amountLocked
+                    ? 'Amount (carried from the Document Arrival, protected)'
+                    : 'Amount (face-level, per Design doc §6.2)',
         required: true,
         type: 'number',
         disabled: amountLocked,

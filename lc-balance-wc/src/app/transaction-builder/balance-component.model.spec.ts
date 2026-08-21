@@ -27,6 +27,7 @@
   displayMovementAmount,
   functionActionIcon,
   statusBadgeIcon,
+  contractStatusBadgeClass,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -81,12 +82,12 @@ describe('balance-component.model data invariants', () => {
 
   describe('MOVEMENT_TYPES_BY_INSTRUMENT — design doc §5, exact legal movementType sets', () => {
     const expected: Record<InstrumentType, string[]> = {
-      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE'],
+      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
       EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
       IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT'],
+      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
       EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
       EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
       EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -228,6 +229,7 @@ describe('balance-component.model data invariants', () => {
           'FULL_REDEEM',
           'REIMBURSE',
           'RECLASSIFY_OUT',
+          'CLOSE',
         ]),
       );
     });
@@ -247,8 +249,8 @@ describe('balance-component.model data invariants', () => {
   });
 
   describe('IMPORT_FUNCTIONS (A-series)', () => {
-    it('has exactly the 9 surviving A-codes, in order (A5 was retired, not reused)', () => {
-      expect(IMPORT_FUNCTIONS.map((f) => f.code)).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9']);
+    it('has exactly the 10 surviving A-codes, in order (A5 was retired, not reused)', () => {
+      expect(IMPORT_FUNCTIONS.map((f) => f.code)).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10']);
     });
 
     it('every function has a unique code', () => {
@@ -350,8 +352,8 @@ describe('balance-component.model data invariants', () => {
   });
 
   describe('EXPORT_FUNCTIONS (B-series)', () => {
-    it('has exactly the 5 B-codes, in order', () => {
-      expect(EXPORT_FUNCTIONS.map((f) => f.code)).toEqual(['B1', 'B2', 'B3', 'B4', 'B5']);
+    it('has exactly the 6 B-codes, in order', () => {
+      expect(EXPORT_FUNCTIONS.map((f) => f.code)).toEqual(['B1', 'B2', 'B3', 'B4', 'B5', 'B6']);
     });
 
     it('every function has a unique code', () => {
@@ -445,8 +447,8 @@ describe('balance-component.model data invariants', () => {
   describe('cross-cutting registry invariants (IMPORT_FUNCTIONS + EXPORT_FUNCTIONS combined)', () => {
     const ALL_FUNCTIONS = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS];
 
-    it('has 14 total functions (9 Import + 5 Export)', () => {
-      expect(ALL_FUNCTIONS).toHaveLength(14);
+    it('has 16 total functions (10 Import + 6 Export)', () => {
+      expect(ALL_FUNCTIONS).toHaveLength(16);
     });
 
     it('every function code is globally unique across both sides', () => {
@@ -785,11 +787,13 @@ describe('balance-component.model data invariants', () => {
         A7: 'redeem',
         A8: 'issue',
         A9: 'redeem',
+        A10: 'redeem',
         B1: 'issue',
         B2: 'amend',
         B3: 'utilize',
         B4: 'utilize',
         B5: 'redeem',
+        B6: 'redeem',
       };
       for (const fn of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
         expect(functionActionIcon(fn.code)).toBe(expected[fn.code]);
@@ -809,6 +813,28 @@ describe('balance-component.model data invariants', () => {
       expect(statusBadgeIcon('tb-status-badge--negative')).toBe('cross');
       expect(statusBadgeIcon('tb-status-badge--neutral')).toBe('dash');
       expect(statusBadgeIcon('')).toBe('dash');
+    });
+  });
+
+  describe('contractStatusBadgeClass (LC Master Records Index, user-requested 2026-08-21 "LC Active shows Green, Close shows Red")', () => {
+    it('ACTIVE -> approved (green), CLOSED -> negative (red)', () => {
+      expect(contractStatusBadgeClass('ACTIVE')).toBe('tb-status-badge--approved');
+      expect(contractStatusBadgeClass('CLOSED')).toBe('tb-status-badge--negative');
+    });
+
+    it('SUPERSEDED -> neutral (gray); CANCELLED -> negative (red), same as CLOSED', () => {
+      expect(contractStatusBadgeClass('SUPERSEDED')).toBe('tb-status-badge--neutral');
+      expect(contractStatusBadgeClass('CANCELLED')).toBe('tb-status-badge--negative');
+    });
+
+    it('an unrecognized status falls back to neutral rather than an unstyled empty class', () => {
+      expect(contractStatusBadgeClass('SOMETHING_ELSE')).toBe('tb-status-badge--neutral');
+    });
+
+    it('every output is a real statusBadgeIcon() input, so the Index badge always gets an icon too, not just color', () => {
+      for (const status of ['ACTIVE', 'CLOSED', 'SUPERSEDED', 'CANCELLED']) {
+        expect(['ok', 'pending', 'cross', 'dash']).toContain(statusBadgeIcon(contractStatusBadgeClass(status)));
+      }
     });
   });
 });

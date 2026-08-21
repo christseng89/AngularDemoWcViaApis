@@ -120,6 +120,7 @@ function makeApiMock() {
     acknowledge: jest.fn(),
     resolveContract: jest.fn(),
     catalog: jest.fn(() => of(mkCatalogPage([]))),
+    closeEligible: jest.fn(() => of(mkCatalogPage([]))),
     getSnapshot: jest.fn((id: string) => of(mkSnapshot(id))),
     listMovements: jest.fn(() => of([] as any[])),
     submitByMaker: jest.fn(),
@@ -3126,6 +3127,7 @@ describe('MakerPanelComponent', () => {
       acknowledge: jest.fn(),
       resolveContract: jest.fn(() => of(contract())),
       catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
+      closeEligible: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 200 })),
       getSnapshot: jest.fn(() => of(snapshot())),
       listMovements: jest.fn(() => of([])),
       ...overrides,
@@ -3413,6 +3415,40 @@ describe('MakerPanelComponent', () => {
       c.documentArrivalHints.catalogSgEligible.add('sg-eligible');
       // 'sg-exhausted' has no catalogSgEligible entry at all — every child SG is fully redeemed (or none exist).
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['sg-eligible']);
+    });
+
+    it('filteredCatalogContracts: Close (A10) is close-eligibility-driven — keeps a candidate the server-computed hint-set includes, excludes one it doesn\'t, regardless of Available Balance', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A10'));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'close-eligible' }), contract({ balanceContractId: 'close-ineligible' })];
+      (c as any).catalogPicker.snapshots.set('close-eligible', snapshot({ availableBalance: '0' }));
+      c.documentArrivalHints.catalogCloseEligible.add('close-eligible');
+      // 'close-ineligible' has no catalogCloseEligible entry — SG/Acceptance still outstanding, or an open Event.
+      expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['close-eligible']);
+    });
+
+    it('reloadCatalog() (A10) also fetches the close-eligible hint-set via ONE aggregate call — not per-candidate like every other hint above', () => {
+      const api = mockApiD({
+        catalog: jest.fn(() => of({ items: [contract({ balanceContractId: 'c1' }), contract({ balanceContractId: 'c2' })], total: 2, page: 1, pageSize: 10 })),
+        closeEligible: jest.fn(() => of({ items: [contract({ balanceContractId: 'c1' })], total: 1, page: 1, pageSize: 200 })),
+      });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A10'));
+
+      expect(api.closeEligible).toHaveBeenCalledTimes(1);
+      expect(api.closeEligible).toHaveBeenCalledWith('IPLC_LC');
+      expect(c.documentArrivalHints.catalogCloseEligible).toEqual(new Set(['c1']));
+    });
+
+    it('onSelectContract (A10) auto-fills model.amount from the snapshot\'s Confirmed Balance, not Available Balance, once resolved', () => {
+      const api = mockApiD({ getSnapshot: jest.fn(() => of(snapshot({ confirmedBalance: '7000', availableBalance: '9000' }))) });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A10'));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'c1' })];
+
+      c.onSelectContract('c1');
+
+      expect(c.model.amount).toBe('7000');
     });
 
     it('parentTenorFamily: undefined with no function, USANCE when tenorTypeOptions is set (A6), USANCE when catalogTenorFilter is USANCE (A7)', () => {

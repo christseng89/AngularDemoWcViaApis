@@ -191,6 +191,31 @@ export class BalanceContractStore {
     return row ? rowToContract(row) : undefined;
   }
 
+  /**
+   * A10/B6 Close — Look Up Current Balance / Inquire Events must still be able to resolve a CLOSED
+   * contract by natural key (user-reported gap, 2026-08-21: "CLOSE LC => Release 後出現 'No Logical
+   * Contract exists yet for this natural key.' 這是不對的... LOOKUP也應該看到此LC 項下所有的交易包括CLOSE
+   * EVENT" — inquiry contexts must see it, only transaction-creating ones stay ACTIVE-only via
+   * findActiveByNaturalKey above). Same WHERE clause minus `status = 'ACTIVE'`, ordered so an ACTIVE row
+   * wins if one exists (the common case), else the most recently created row — covers the edge case of a
+   * natural key re-ISSUEd after its own prior CLOSE (re-ISSUE's own guard only blocks a duplicate while
+   * an ACTIVE version exists, see service/balanceService.ts's own resolveOrCreateContract()), so a stale
+   * CLOSED row from BEFORE a genuine re-ISSUE never shadows the current one.
+   */
+  findByNaturalKey(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM balance_contracts
+         WHERE instrument_type = ?
+           AND lc_number = ?
+           AND ib_number IS ? AND sg_number IS ? AND leg_seq IS ?
+         ORDER BY (status = 'ACTIVE') DESC, created_at DESC
+         LIMIT 1`,
+      )
+      .get(instrumentType, naturalKey.lcNumber, naturalKey.ibNumber ?? null, naturalKey.sgNumber ?? null, naturalKey.legSeq ?? null) as ContractRow | undefined;
+    return row ? rowToContract(row) : undefined;
+  }
+
   /** Design doc §7.3 — full version history of a Logical Contract, ordered by contractVersion ascending. */
   listVersions(logicalContractId: string): BalanceContract[] {
     const rows = this.db
@@ -262,5 +287,18 @@ export class BalanceContractStore {
          WHERE balance_contract_id = @balanceContractId`,
       )
       .run({ balanceContractId, supersededByBalanceContractId, effectiveTo });
+  }
+
+  /**
+   * A10/B6 Close — release() side effect once its own CLOSE movement is Checker-Released (mirrors
+   * markSuperseded() above's shape). `effectiveTo` matches how `effective_from` is stamped at ISSUE
+   * (service/balanceService.ts's own createContract()) — the contract's own lifecycle end date, not the
+   * CLOSE movement's own createdAt/releasedAt pair (already recorded on that movement itself).
+   */
+  markClosed(balanceContractId: string, effectiveTo: string): void {
+    this.db.prepare(`UPDATE balance_contracts SET status = 'CLOSED', effective_to = @effectiveTo WHERE balance_contract_id = @balanceContractId`).run({
+      balanceContractId,
+      effectiveTo,
+    });
   }
 }

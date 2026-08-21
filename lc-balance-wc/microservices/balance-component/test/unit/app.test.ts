@@ -2313,6 +2313,106 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(afterRelease.body.items[0].naturalKey.lcNumber).toBe('LC-ISSUEPENDING');
   });
 
+  test('GET /balance-contracts/close-eligible without instrumentType -> 400', async () => {
+    const res = await request(app).get('/balance-contracts/close-eligible').expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/instrumentType is required/);
+  });
+
+  test('GET /balance-contracts/close-eligible (A10/B6 Step-1 picker hint) returns a Closeable LC and excludes one with a non-zero SG Balance', async () => {
+    const eligible = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-CLOSEHINT-OK' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${eligible.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const ineligible = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-CLOSEHINT-SG' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${ineligible.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const ineligibleLc = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-CLOSEHINT-SG' }).expect(200);
+    const sgIssue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'LC-CLOSEHINT-SG', sgNumber: 'SG01' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '2000',
+        currency: 'USD',
+        parentLogicalContractId: ineligibleLc.body.logicalContractId,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${sgIssue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app).get('/balance-contracts/close-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    const lcNumbers = (res.body.items as Array<{ naturalKey: { lcNumber: string } }>).map((c) => c.naturalKey.lcNumber);
+    expect(lcNumbers).toContain('LC-CLOSEHINT-OK');
+    expect(lcNumbers).not.toContain('LC-CLOSEHINT-SG');
+  });
+
+  test('GET /balance-contracts?includeAnyStatus=true still resolves a CLOSED (A10) LC by natural key — user-reported gap 2026-08-21 ("LOOKUP也應該看到此LC 項下所有的交易包括CLOSE EVENT"); the default (no flag) stays 404, matching every existing ACTIVE-only caller', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-CLOSED-LOOKUP' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const lc = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-CLOSED-LOOKUP' }).expect(200);
+
+    const close = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'CLOSE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${close.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-CLOSED-LOOKUP' }).expect(404);
+
+    const anyStatus = await request(app)
+      .get('/balance-contracts')
+      .query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-CLOSED-LOOKUP', includeAnyStatus: 'true' })
+      .expect(200);
+    expect(anyStatus.body.status).toBe('CLOSED');
+    expect(anyStatus.body.balanceContractId).toBe(lc.body.balanceContractId);
+
+    // The Events Timeline (Inquire Events/Look Up) must still show the CLOSE event itself.
+    const movements = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+    expect(movements.body.map((m: any) => m.movementType)).toEqual(['ISSUE', 'CLOSE']);
+  });
+
   test('POST /balance-movements/:movementId/release without releasedBy -> 400', async () => {
     const lc = await request(app)
       .post('/balance-movements')

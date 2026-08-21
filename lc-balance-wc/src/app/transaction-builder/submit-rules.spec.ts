@@ -582,6 +582,28 @@ describe('submit-rules', () => {
       const result = validateSubmit(ctx({ model: { amount: '0', currency: 'JPY' } }));
       expect(result.error).toBe('Amount must be greater than 0.');
     });
+
+    it('A10/B6 (Close) are exempted — 0 is a legitimate write-off figure for an already fully-utilized LC, not a "no real transaction" signal', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A10'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE', amount: '0', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).not.toBe('Amount must be greater than 0.');
+    });
+
+    it('the CLOSE exemption skips this guard entirely, not just for 0 — a negative Amount also isn\'t caught here (the exact-equals-Confirmed-Balance check that would reject it lives server-side, closeShaped in balanceService.ts, since this pure function has no snapshot to compare against)', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A10'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE', amount: '-1', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).not.toBe('Amount must be greater than 0.');
+    });
   });
 
   describe('validateSubmit/buildSubmitRequest — B2 Direction / signed Amount (business requirement 2026-08-19, follow-up: "Input the Decrease Amount > 0, then it turns to negative figure to call the APIs"; bug fixed 2026-08-20 — model.amount must NEVER be mutated, only the wire request)', () => {

@@ -67,7 +67,12 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // Applies uniformly, including B2 (which used to accept a negative Amount to express Decrease — now
   // always positive; see the amendDirection guard below). Checked before that guard's own transform
   // runs, so this always validates the RAW typed value.
-  if (Number(model.amount) <= 0) {
+  //
+  // A10/B6 (Close) exempted — its own Amount is system-derived from the current Confirmed Balance
+  // (never user-typed, see builder-fields.ts's own amountFromClose), and 0 is a legitimate, common write-
+  // off figure for an already fully-utilized LC (nothing left to reserve). Every OTHER function still
+  // means "0 isn't a real transaction" here.
+  if (model.movementType !== 'CLOSE' && Number(model.amount) <= 0) {
     return fail('Amount must be greater than 0.');
   }
   if (ctx.dynamicSecondaryRefLabel && !model.secondaryRef) {

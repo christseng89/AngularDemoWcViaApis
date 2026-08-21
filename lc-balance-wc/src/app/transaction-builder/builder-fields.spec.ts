@@ -138,6 +138,32 @@ describe('builder-fields', () => {
       expect(amount.props?.label).toBe('Bill Amount (actual document amount — see SG Redemption Amount below)');
     });
 
+    it('is FULLY locked (not merely capped) and labeled "Close — carried..." for A10 once a snapshot resolves — unlike A9/B5, which stay editable/capped', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A10'), model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE' }, selectedContractSnapshot: snapshot() });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.props?.disabled).toBe(true);
+      expect(amount.props?.label).toBe('Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)');
+      expect(amount.props?.max).toBeUndefined();
+    });
+
+    it('B6 (Close, Export) is also fully locked once a snapshot resolves', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B6'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'CLOSE' },
+        selectedContractSnapshot: snapshot(),
+      });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.props?.disabled).toBe(true);
+      expect(amount.props?.label).toBe('Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)');
+    });
+
+    it('A10 stays editable with the plain face-level label before a snapshot resolves (nothing picked yet)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A10'), model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE' }, selectedContractSnapshot: null });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.props?.disabled).toBe(false);
+      expect(amount.props?.label).toBe('Amount (face-level, per Design doc §6.2)');
+    });
+
     it('sets the spinner step from the currency’s own decimal places (JPY has none — step 1)', () => {
       const amount = fieldByKey(buildFields(baseCtx({ model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', currency: 'JPY' } })), 'amount');
       expect(amount.props?.step).toBe(1);

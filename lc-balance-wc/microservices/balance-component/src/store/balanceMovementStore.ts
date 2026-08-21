@@ -279,6 +279,25 @@ export class BalanceMovementStore {
     return rows.map(rowToMovement);
   }
 
+  /**
+   * A10/B6 Close (domain/closeEligibility.ts) — same shape as listShgtMovementsForParent/
+   * listExaminationMovementsForParent above, covering BOTH IPLC_ACCEPTANCE (Import) and EPLC_ACCEPTANCE
+   * (Export) in one query since a given parent only ever has children of the one type its own root
+   * instrumentType produces — the OR costs nothing and avoids the caller needing to know which side it's
+   * on (unlike ACCEPTANCE_TYPE_BY_ROOT in service/balanceService.ts, which resolves that distinction for
+   * the single-sibling snapshot lookups; this method is a full aggregate, not a "just the one" lookup).
+   */
+  listAcceptanceMovementsForParent(parentLogicalContractId: string): BalanceMovement[] {
+    const rows = this.db
+      .prepare(
+        `SELECT bm.* FROM balance_movements bm
+         JOIN balance_contracts bc ON bc.balance_contract_id = bm.balance_contract_id
+         WHERE bc.instrument_type IN ('IPLC_ACCEPTANCE', 'EPLC_ACCEPTANCE') AND bc.parent_logical_contract_id = ?`,
+      )
+      .all(parentLogicalContractId) as unknown as MovementRow[];
+    return rows.map(rowToMovement);
+  }
+
   updateStatus(params: {
     movementId: string;
     status: MovementStatus;

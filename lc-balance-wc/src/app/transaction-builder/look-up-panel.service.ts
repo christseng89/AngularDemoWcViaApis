@@ -185,11 +185,17 @@ export class LookUpPanelService {
     this.sgSnapshot = null;
     this.sgMovements = [];
     this.api
-      .resolveContract(this.lookup.instrumentType, {
-        lcNumber: this.lookup.lcNumber,
-        ibNumber: this.lookup.ibNumber || null,
-        sgNumber: this.lookup.sgNumber || null,
-      })
+      .resolveContract(
+        this.lookup.instrumentType,
+        {
+          lcNumber: this.lookup.lcNumber,
+          ibNumber: this.lookup.ibNumber || null,
+          sgNumber: this.lookup.sgNumber || null,
+        },
+        // Inquiry, not an action — a CLOSED (A10/B6) LC must still resolve here (business-reported gap
+        // 2026-08-21, "CLOSE LC => Release 後出現...LOOKUP也應該看到此LC 項下所有的交易包括CLOSE EVENT").
+        true,
+      )
       .subscribe({
         next: (contract) => {
           // Export Confirmed LC's own B3/EPLC_EXAMINATION events have no dedicated Balance Tab, so

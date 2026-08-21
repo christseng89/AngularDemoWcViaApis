@@ -34,6 +34,8 @@ export class DocumentArrivalHintsService {
   readonly catalogSgEligible = new Set<string>();
   /** A9 (Shipping Gtee Redemption) only — its own Parent LC picker. Same eligibility rule as catalogSgEligible above. */
   readonly parentSgEligible = new Set<string>();
+  /** A10/B6 (Close) only — see loadCloseEligibility()'s own doc comment for why this is populated by ONE aggregate server call, unlike every other Set/Map above. */
+  readonly catalogCloseEligible = new Set<string>();
 
   constructor(private readonly api: BalanceComponentApiService) {}
 
@@ -129,6 +131,26 @@ export class DocumentArrivalHintsService {
   /** A3S's own hint fetch — see loadSgBalanceEligibility()'s own doc comment. */
   loadCatalogSgEligibility(list: BalanceContract[], onDone: () => void): void {
     this.loadSgBalanceEligibility(list, this.catalogSgEligible, onDone);
+  }
+
+  /**
+   * A10/B6 (Close) only. Unlike every other hint method in this service, this does NOT fan out one
+   * request per Step-1 candidate — SG/Acceptance-balance-plus-whole-event-tree eligibility is exactly
+   * what `GET /balance-contracts/close-eligible` already computes server-side (BalanceService's own
+   * `evaluateContractCloseEligibility()`), so replicating that per-candidate on the client would mean
+   * several extra round-trips per LC for no benefit — unlike the other loadXxx methods, this takes no
+   * `list` param at all; the eligible set is derived directly from the server's own response, not
+   * filtered from an already-fetched catalog page.
+   */
+  loadCloseEligibility(instrumentType: InstrumentType, onDone: () => void): void {
+    this.catalogCloseEligible.clear();
+    this.api.closeEligible(instrumentType).subscribe({
+      next: (result) => {
+        result.items.forEach((c) => this.catalogCloseEligible.add(c.balanceContractId));
+        onDone();
+      },
+      error: () => onDone(),
+    });
   }
 
   /** A9's own hint fetch — see loadSgBalanceEligibility()'s own doc comment. */

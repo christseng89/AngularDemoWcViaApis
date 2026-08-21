@@ -525,6 +525,13 @@ export class MakerPanelComponent implements OnChanges {
             this.catalogPicker.total = this.filteredCatalogContracts.length;
           });
         }
+        // A10/B6 only — one aggregate server call, not per-candidate like every hint above; see
+        // DocumentArrivalHintsService.loadCloseEligibility()'s own doc comment for why.
+        if (this.selectedFunction?.requiresCloseEligibility) {
+          this.documentArrivalHints.loadCloseEligibility(this.model.instrumentType!, () => {
+            this.catalogPicker.total = this.filteredCatalogContracts.length;
+          });
+        }
       },
     });
   }
@@ -590,6 +597,9 @@ export class MakerPanelComponent implements OnChanges {
     }
     if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       return { kind: 'hintSet', ids: this.documentArrivalHints.catalogSgEligible };
+    }
+    if (this.selectedFunction?.requiresCloseEligibility) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.catalogCloseEligible };
     }
     return { kind: 'genericFallback', gatedByMovementType: true };
   }
@@ -854,6 +864,12 @@ export class MakerPanelComponent implements OnChanges {
           this.rebuildFields();
         } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
           this.model.amount = snap.availableBalance;
+          this.rebuildFields();
+        } else if (this.selectedFunctionStrategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance') {
+          // A10/B6 — the RELEASED figure (Confirmed Balance), not availableBalance (which also nets
+          // still-PENDING deltas) — Close writes off what has actually been approved, not what a
+          // not-yet-approved movement would leave behind.
+          this.model.amount = snap.confirmedBalance;
           this.rebuildFields();
         }
       },

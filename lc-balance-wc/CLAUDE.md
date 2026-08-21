@@ -919,13 +919,20 @@ templates — verified for real via a live `ng build`, template-compiles clean).
 
 **Found, NOT fixed (pre-existing, unrelated to this session):** a production `ng build`
 (`defaultConfiguration: "production"` in `angular.json`) fails on `transaction-builder.component.scss`
-exceeding the `anyComponentStyle` 12kb hard-error budget by 24 bytes — confirmed via `git stash` that this
-already exists on a clean `main` checkout, before any of today's edits. Does NOT affect the documented dev
+exceeding the `anyComponentStyle` 12kb hard-error budget — confirmed via `git stash` that this already
+exists on a clean `main` checkout, before any of today's edits. Does NOT affect the documented dev
 workflow (`ng serve`'s own `defaultConfiguration` is `"development"`, which carries no budget block) or
 either `npm test`/`tsc --noEmit` gate — only a real `npm run build` hits it, which isn't part of this
 project's own standing "before calling a change complete" checklist. Flagged for a future pass (trim
 ~30+ bytes of real CSS from that file, or raise the budget) rather than opportunistically fixed here, since
 it's unrelated to the spinner work and untouched CSS shouldn't be edited to chase an unrelated budget line.
+The overage amount itself drifts with every unrelated edit to this file (P1 pass: 24 bytes; re-measured
+2026-08-21, same `git stash`-then-`ng build` method, immediately before that day's own Inquire Events
+60/40 split commit: 10 bytes) — record the CURRENT figure with its own measurement date when next
+touched here, rather than trusting either number as still accurate; neither observer mis-measured, the
+file simply kept moving. See the Inquire Events 60/40 split decision-log entry below for how that same
+day's own change stayed net-positive against this budget (moved new CSS to the global stylesheet, reused
+an existing grid rule) rather than making the drift worse.
 
 ## UI/UX review P2 pass — function-chip/status/role icon set, icon toggle theme switcher
 
@@ -1009,4 +1016,13 @@ as a module-level free function in `inquire-events.service.ts` (same convention 
 already established) — both `InquireEventsService.secondaryReferenceFor()` and the new
 `LookUpPanelService.secondaryReferenceFor()` delegate to it, so the two screens can never disagree on this
 mapping either. Live-verified (LC S01 / SG G01 — SG Balance tab correctly shows "SG G01" on every row).
-</content>
+
+## Inquire Events — Event Details 60/40 split (Original Transaction Screen / Balance Tabs), Account Entries button moved to title row
+
+User-requested layout pass, 2026-08-21. A/B are grid-placed via the existing `.tb-workspace` rule (reused
+as-is, not duplicated under a new class) — real bug caught and fixed before shipping: without wrapping B's
+tab-strip + `ngTemplateOutlet` output into one element, Grid auto-placement split them across two DOM
+children, landing the Balance Tabs content on row 2 under column A instead of column B. B now wraps in its
+own `.tb-balance-box` so it gets the same outer frame as A. Account Entries moved into a new
+`.tb-balance-box__header` row (global `styles.scss`, not the component file — see this file's own
+budget-drift note above).

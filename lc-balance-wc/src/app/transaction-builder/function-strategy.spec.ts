@@ -6,9 +6,9 @@ import { FUNCTION_STRATEGIES, deriveFunctionStrategy, resolveFunctionForMovement
  * source of truth.
  */
 describe('PR-2 — FunctionStrategy is a faithful projection of the current registry (not yet consumed by production code)', () => {
-  it('every one of the 14 registered function codes has exactly one FunctionStrategy entry', () => {
+  it('every one of the 16 registered function codes has exactly one FunctionStrategy entry', () => {
     const allCodes = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((f) => f.code);
-    expect(allCodes).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'B1', 'B2', 'B3', 'B4', 'B5']);
+    expect(allCodes).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6']);
     expect(Object.keys(FUNCTION_STRATEGIES).sort()).toEqual([...allCodes].sort());
   });
 
@@ -25,9 +25,18 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
       expect(settleCodes.map((s) => s.code)).toEqual(['B5']);
     });
 
-    it('every other function derives neither (null)', () => {
+    it('every other function derives neither (null) — A10/B6 included: amountAutoFilledFrom is a genuinely different dimension, see that field\'s own doc comment', () => {
       const neither = Object.values(FUNCTION_STRATEGIES).filter((s) => s.movementDerivation.amountVsAvailableDerivation === null);
-      expect(neither.map((s) => s.code).sort()).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'B1', 'B2', 'B3', 'B4'].sort());
+      expect(neither.map((s) => s.code).sort()).toEqual(
+        ['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A10', 'B1', 'B2', 'B3', 'B4', 'B6'].sort(),
+      );
+    });
+
+    it('A10/B6 (amountAutoFilledFrom) -> confirmedBalance, no other function derives it', () => {
+      expect(FUNCTION_STRATEGIES['A10'].movementDerivation.amountAutoFilledFrom).toBe('confirmedBalance');
+      expect(FUNCTION_STRATEGIES['B6'].movementDerivation.amountAutoFilledFrom).toBe('confirmedBalance');
+      const autoFilled = Object.values(FUNCTION_STRATEGIES).filter((s) => s.movementDerivation.amountAutoFilledFrom !== null);
+      expect(autoFilled.map((s) => s.code).sort()).toEqual(['A10', 'B6']);
     });
 
     it('B4 (movementTypeFromContractTenor) is the ONLY function reading movementType from the contract\'s own tenor', () => {
@@ -58,7 +67,7 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
         .filter((s) => s.compoundSubmission.possibleShapes.length === 1 && s.compoundSubmission.possibleShapes[0] === 'plain')
         .map((s) => s.code)
         .sort();
-      expect(plainCodes).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A7', 'A8', 'A9', 'B1', 'B2', 'B3'].sort());
+      expect(plainCodes).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'B1', 'B2', 'B3', 'B6'].sort());
     });
   });
 
@@ -114,6 +123,12 @@ describe('resolveFunctionForMovement', () => {
   it('resolves via derivesMovementTypeFromTenor for BOTH derived movementTypes (B4 — EPLC_CONFIRMATION/HONOUR and ACCEPT)', () => {
     expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'HONOUR')?.code).toBe('B4');
     expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'ACCEPT')?.code).toBe('B4');
+  });
+
+  it('bug fixed 2026-08-21 (user-reported, U03\'s own CLOSE event displayed as "B4 Honour/Acceptance" in Look Up/Inquire Events): derivesMovementTypeFromTenor must NOT swallow every other EPLC_CONFIRMATION movementType into B4 — ISSUE/AMEND/CLOSE each resolve to their OWN function, not B4', () => {
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'ISSUE')?.code).toBe('B1');
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'AMEND')?.code).toBe('B2');
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'CLOSE')?.code).toBe('B6');
   });
 
   it("resolves the derived PARTIAL_REDEEM via amountVsAvailableDerivation 'REDEEM' (A9), not only the registry's own literal FULL_REDEEM default", () => {

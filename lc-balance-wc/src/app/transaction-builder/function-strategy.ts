@@ -20,6 +20,15 @@ export interface MovementDerivationStrategy {
   derivesMovementTypeFromTenor: boolean;
   /** Non-null when FULL_x/PARTIAL_x is derived from Amount vs. Available at submit time (A9 → 'REDEEM', B5 → 'SETTLE'); null otherwise (movementType is fixed or user-picked via subChoice). */
   amountVsAvailableDerivation: 'REDEEM' | 'SETTLE' | null;
+  /**
+   * A10/B6 (Close) only — genuinely different from `amountVsAvailableDerivation` above: A9/B5 still let
+   * the Maker TYPE an amount (compared against Available to derive FULL_/PARTIAL_); Close's own Amount is
+   * NEVER typed at all, only ever carried from the selected contract's current Confirmed Balance and
+   * locked (`builder-fields.ts`'s own `amountFromClose`) — see `maker-panel.component.ts`'s
+   * `refreshSelectedContractSnapshot()` for where the value itself gets read from `snap.confirmedBalance`
+   * (not `availableBalance` — Close writes off the RELEASED figure, not the PENDING-inclusive one).
+   */
+  amountAutoFilledFrom: 'confirmedBalance' | null;
 }
 
 /** `maker-submit.service.ts`'s own dispatch-table shape — which submission method a function's own Submit uses. */
@@ -58,7 +67,7 @@ export interface FunctionStrategy {
 
 const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
   code: '',
-  movementDerivation: Object.freeze({ derivesMovementTypeFromTenor: false, amountVsAvailableDerivation: null }),
+  movementDerivation: Object.freeze({ derivesMovementTypeFromTenor: false, amountVsAvailableDerivation: null, amountAutoFilledFrom: null }),
   compoundSubmission: Object.freeze({ possibleShapes: Object.freeze(['plain']) as readonly SubmissionShape[] }),
   checkerRelease: Object.freeze({ releasesExistingMovementInPlace: false, settlesDocumentArrival: false, sourceAlreadyReleasedBeforePick: false, deferSettlement: false }),
   selectionFlow: Object.freeze({ usesSettleableBalanceIndex: false }),
@@ -85,6 +94,8 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
  * - B5 — amountVsAvailableDerivation 'SETTLE' (same shape as A9's REDEEM derivation); compoundSubmission
  *   acceptanceSettleWithReceivable (settles the Acceptance and its linked Reimbursement Receivable
  *   together); usesSettleableBalanceIndex (a dedicated "EB Index" Step-2 picker).
+ * - A10/B6 — amountAutoFilledFrom 'confirmedBalance' (Amount is never typed at all, unlike A9/B5's own
+ *   amountVsAvailableDerivation above — see that field's own doc comment for the distinction).
  */
 const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> = {
   A1: { ...NO_SPECIAL_BEHAVIOR, code: 'A1' },
@@ -117,6 +128,11 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     code: 'A9',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'REDEEM' },
   },
+  A10: {
+    ...NO_SPECIAL_BEHAVIOR,
+    code: 'A10',
+    movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
+  },
   B1: { ...NO_SPECIAL_BEHAVIOR, code: 'B1' },
   B2: { ...NO_SPECIAL_BEHAVIOR, code: 'B2' },
   B3: { ...NO_SPECIAL_BEHAVIOR, code: 'B3' },
@@ -133,6 +149,11 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'SETTLE' },
     compoundSubmission: { possibleShapes: ['acceptanceSettleWithReceivable'] },
     selectionFlow: { usesSettleableBalanceIndex: true },
+  },
+  B6: {
+    ...NO_SPECIAL_BEHAVIOR,
+    code: 'B6',
+    movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
   },
 };
 
@@ -152,7 +173,7 @@ export function deriveFunctionStrategy(fn: TransactionFunction): FunctionStrateg
   };
 }
 
-/** One `FunctionStrategy` per registered function code (A1-A9, B1-B5) — built once from the current registry. */
+/** One `FunctionStrategy` per registered function code (A1-A10, B1-B6) — built once from the current registry. */
 export const FUNCTION_STRATEGIES: Readonly<Record<string, FunctionStrategy>> = Object.fromEntries(
   [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((fn) => [fn.code, deriveFunctionStrategy(fn)]),
 );
@@ -182,7 +203,17 @@ export function movementTypeMatchesFunction(fn: TransactionFunction, movementTyp
   if (fn.movementType === movementType) return true;
   if (fn.subChoice?.options.some((o) => o.value === movementType)) return true;
   const strategy = FUNCTION_STRATEGIES[fn.code];
-  if (strategy?.movementDerivation.derivesMovementTypeFromTenor) return true;
+  // Bug fixed 2026-08-21 (user-reported, "A10 B6 也是交易EVENT 所以 LOOKUP & INQUIRE EVENTS都應該顯示這筆
+  // CLOSE EVENT" — U03's own CLOSE row displayed as "B4 Honour/Acceptance" instead of "B6 Confirmed LC
+  // Close"): this branch used to return true UNCONDITIONALLY whenever derivesMovementTypeFromTenor is
+  // set, regardless of movementType — B4 is the only function with this flag, so it silently swallowed
+  // EVERY otherwise-unmatched EPLC_CONFIRMATION movementType (CLOSE included, and any future one) into
+  // matching B4, since B4 is registered before B6 and `resolveFunctionForMovement()`'s own `.find()`
+  // takes the first match. The doc comment above always said "HONOUR vs. ACCEPT" — the code just never
+  // actually checked that, harmless only because no OTHER movementType existed on EPLC_CONFIRMATION
+  // until CLOSE. Also fixes the same latent bug in loadCheckerQueue() (this function's other caller) —
+  // a PENDING CLOSE could have shown up in B4's own Checker Queue.
+  if (strategy?.movementDerivation.derivesMovementTypeFromTenor && (movementType === 'HONOUR' || movementType === 'ACCEPT')) return true;
   if (strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && movementType === 'PARTIAL_REDEEM') return true;
   if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && movementType === 'PARTIAL_SETTLE') return true;
   return false;

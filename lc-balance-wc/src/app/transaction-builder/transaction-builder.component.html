@@ -546,8 +546,11 @@
                     <td>{{ row.currency }}</td>
                     <td class="tb-table__amount">{{ row.lcAmount }}</td>
                     <td class="tb-table__amount">{{ row.availableBalance }}</td>
-                    <td>
-                      <span class="tb-type-tag">{{ row.status }}</span>
+                    <td class="tb-table__status">
+                      <span class="tb-status-badge" [ngClass]="contractStatusBadgeClass(row.status)"
+                        ><app-tb-icon [name]="statusBadgeIcon(contractStatusBadgeClass(row.status))"></app-tb-icon
+                        >{{ row.status }}</span
+                      >
                     </td>
                     <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date: 'short') : '—' }}</td>
                   </tr>

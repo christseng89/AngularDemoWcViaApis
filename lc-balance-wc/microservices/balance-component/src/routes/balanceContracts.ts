@@ -6,18 +6,26 @@ import type { InstrumentType } from '../types';
 export function balanceContractsRouter(service: BalanceService): Router {
   const router = Router();
 
-  // GET /balance-contracts?instrumentType=&lcNumber=&ibNumber=&sgNumber=&legSeq=
+  // GET /balance-contracts?instrumentType=&lcNumber=&ibNumber=&sgNumber=&legSeq=&includeAnyStatus=
+  // includeAnyStatus — opt-in (business-reported gap 2026-08-21, "CLOSE LC => Release 後出現 'No Logical
+  // Contract exists yet'... LOOKUP也應該看到" — inquiry contexts must still resolve a CLOSED contract).
+  // Look Up Current Balance passes true; every transaction-creating caller omits it, same ACTIVE-only
+  // behavior as before.
   router.get('/balance-contracts', (req, res) => {
-    const { instrumentType, lcNumber, ibNumber, sgNumber, legSeq } = req.query;
+    const { instrumentType, lcNumber, ibNumber, sgNumber, legSeq, includeAnyStatus } = req.query;
     if (!instrumentType || !lcNumber) {
       throw new RequestValidationError('instrumentType and lcNumber are required.');
     }
-    const contract = service.resolveContract(instrumentType as InstrumentType, {
-      lcNumber: lcNumber as string,
-      ibNumber: (ibNumber as string) ?? null,
-      sgNumber: (sgNumber as string) ?? null,
-      legSeq: (legSeq as string) ?? null,
-    });
+    const contract = service.resolveContract(
+      instrumentType as InstrumentType,
+      {
+        lcNumber: lcNumber as string,
+        ibNumber: (ibNumber as string) ?? null,
+        sgNumber: (sgNumber as string) ?? null,
+        legSeq: (legSeq as string) ?? null,
+      },
+      includeAnyStatus === 'true',
+    );
     if (!contract) throw new NotFoundError('No Logical Contract exists yet for this natural key.');
     res.json(contract);
   });
@@ -45,6 +53,24 @@ export function balanceContractsRouter(service: BalanceService): Router {
         page: page ? Number(page) : undefined,
         pageSize: pageSize ? Number(pageSize) : undefined,
         requireIssueReleased: requireIssueReleased === 'true',
+      }),
+    );
+  });
+
+  // GET /balance-contracts/close-eligible?instrumentType=&lcNumber=&page=&pageSize=
+  // A10/B6 Close, Step-1 picker hint (domain/closeEligibility.ts) — every ACTIVE root LC/Confirmation
+  // currently eligible to Close (SG Balance = 0, Acceptance Balance = 0, no open Events anywhere in the
+  // tree, not already Closed). Deliberately its own route, not a CatalogFilter flag on /catalog — the
+  // check spans multiple tables/instrument types per candidate, unlike requireIssueReleased's single
+  // EXISTS subquery.
+  router.get('/balance-contracts/close-eligible', (req, res) => {
+    const { instrumentType, lcNumber, page, pageSize } = req.query;
+    if (!instrumentType) throw new RequestValidationError('instrumentType is required.');
+    res.json(
+      service.listCloseEligibleContracts(instrumentType as InstrumentType, {
+        lcNumber: lcNumber as string | undefined,
+        page: page ? Number(page) : undefined,
+        pageSize: pageSize ? Number(pageSize) : undefined,
       }),
     );
   });

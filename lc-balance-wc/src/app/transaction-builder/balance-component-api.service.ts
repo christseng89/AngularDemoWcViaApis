@@ -221,10 +221,17 @@ export class BalanceComponentApiService {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/maker-submit`, { makerSubmittedBy });
   }
 
-  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): Observable<BalanceContract> {
+  /**
+   * @param includeAnyStatus opt-in (default false) — A10/B6 Close means a natural key can resolve to a
+   *   CLOSED contract; every transaction-creating caller of this method must keep failing on one (the
+   *   "no longer selectable" locking behavior), so this defaults to the existing ACTIVE-only behavior.
+   *   Look Up Current Balance's own runLookup()/syncFrom() pass true — an inquiry context, not an action.
+   */
+  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey, includeAnyStatus = false): Observable<BalanceContract> {
     const params: Record<string, string> = { instrumentType, lcNumber: naturalKey.lcNumber };
     if (naturalKey.ibNumber) params['ibNumber'] = naturalKey.ibNumber;
     if (naturalKey.sgNumber) params['sgNumber'] = naturalKey.sgNumber;
+    if (includeAnyStatus) params['includeAnyStatus'] = 'true';
     return this.http.get<BalanceContract>(`${this.base}/balance-contracts`, { params });
   }
 
@@ -255,6 +262,21 @@ export class BalanceComponentApiService {
     if (tenorFamily) params['tenorFamily'] = tenorFamily;
     if (requireIssueReleased) params['requireIssueReleased'] = 'true';
     return this.http.get<CatalogPage>(`${this.base}/balance-contracts/catalog`, { params });
+  }
+
+  /**
+   * A10/B6 (Close) only — the Step-1 picker hint, backed by the microservice's own dedicated
+   * `evaluateContractCloseEligibility()` (SG Balance = 0, Acceptance Balance = 0, no open Events
+   * anywhere in the tree, not already Closed) rather than a client-side per-candidate check — see
+   * document-arrival-hints.service.ts's own loadCloseEligibility() doc comment for why this is ONE
+   * aggregate call, unlike every other hint in that service. `pageSize` defaults to 200 — the caller
+   * wants the WHOLE eligible set to build a hint-set from, not one picker page of it (the server's own
+   * raw-candidate cap is also 200, see balanceService.ts's own listCloseEligibleContracts() doc comment).
+   */
+  closeEligible(instrumentType: InstrumentType, lcNumber?: string, pageSize = 200): Observable<CatalogPage> {
+    const params: Record<string, string | number> = { instrumentType, pageSize };
+    if (lcNumber) params['lcNumber'] = lcNumber;
+    return this.http.get<CatalogPage>(`${this.base}/balance-contracts/close-eligible`, { params });
   }
 
   getSnapshot(balanceContractId: string): Observable<BalanceSnapshot> {
