@@ -316,10 +316,13 @@ Same single-test syntax as `lc-payment-wc/` throughout (`npm test -- <file-or--t
 `microservices/balance-component` before running its own Jest commands.
 
 Coverage-tracking is inconsistent across this project's own three sub-projects, unlike `lc-payment-wc/`
-(same "tracked in git, not gitignored" convention for the whole project): the Angular app's `coverage/`
-and `backend/coverage/` are both tracked (`git status` will show them as modified after a test run — that
-alone isn't a sign something broke), but `microservices/balance-component/coverage/` has its own
-`.gitignore` entry excluding it. Don't assume the same behavior across all three.
+(same "tracked in git, not gitignored" convention for the whole project): `microservices/balance-component/coverage/`
+has its own `.gitignore` entry excluding it entirely. The Angular app's `coverage/` and `backend/coverage/`
+are a middle case (2026-08-22) — `lc-balance/.gitignore` (a new file; this sub-project previously had none)
+excludes only `**/coverage/lcov-report/` (the bulky generated HTML report, regenerated on every test run);
+`lcov.info` (the compact text summary) stays tracked as before, so `git status` will still show it as
+modified after a `test:coverage` run — that alone isn't a sign something broke, but a plain `lcov-report/`
+diff should no longer appear. Don't assume the same behavior across all three.
 
 The Angular app's test suite is split across multiple spec files per source file where the source is
 large. `transaction-builder.component.ts` is still covered by four spec files
