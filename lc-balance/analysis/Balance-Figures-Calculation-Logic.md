@@ -6,8 +6,8 @@ Balance**, **Available Balance**, **Pending Earmark Total**, **Off-Balance Expos
 Available Balance**, plus three earmark/sub-ledger breakdowns — **Present Docs Earmark (Pending /
 Approved)**, **SG (Pending / Approved)**, and **Document Arrival (Pending / Approved)** — and exactly
 how each one updates at **Submit** (Maker, movement status `PENDING`) versus **Approved** (Checker
-Release, movement status `RELEASED`), across all fourteen named business functions, A1–A9 (Import LC)
-and B1–B5 (Export Confirmed LC). A2 and B2 are each split into their own **Increase** and **Decrease**
+Release, movement status `RELEASED`), across all sixteen named business functions, A1–A10 (Import LC)
+and B1–B6 (Export Confirmed LC). A2 and B2 are each split into their own **Increase** and **Decrease**
 sub-tables, since the two directions move every figure the opposite way.
 
 **Source of truth:** `microservices/balance-component/src/domain/balanceDerivation.ts`,
@@ -91,6 +91,23 @@ Approved split, applied to one specific movement).
 > strict against the un-netted figure, so a genuinely independent transaction never benefits from another
 > transaction's own provisional netting. See B3/B4's own tables in §7 below.
 
+> **A10/B6 Close added, 2026-08-21.** A new movementType, `CLOSE` (`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION`
+> only), writes off whatever Confirmed Balance remains and retires the Logical Contract
+> (`ContractStatus.CLOSED`, reserved since the original design but never previously reachable — see
+> `domain/closeEligibility.ts`). Same direction as AMEND_DECREASE/UTILIZE (`-1` — see the updated §3
+> table) and the same general Submit-vs-Approved shape as any other decrease-shaped movement (§5's general
+> pattern), with two rules unique to it: `amount` must exactly equal the current Confirmed Balance at
+> Submit (may be zero, never negative), and eligibility (not already Closed; zero SG/Acceptance Confirmed
+> Balance; no open Event anywhere in the whole event tree) is checked BOTH at Submit and again at Approve,
+> since it can stop holding in between. See A10/B6's own tables at the end of §6/§7.
+
+> **A9 locked to Full Redeem only, 2026-08-21** (BA-confirmed, `TF_Balance_Component_Mapping-{en,zh}.xlsx`
+> Rule #1 — "SG discharge is instrument-based, not amount-based"). A9's own Amount field is now protected
+> (disabled), carried from the SG's Available Balance — `PARTIAL_REDEEM` is no longer reachable through
+> this function; `ceilingAmount` in A9's own table (§6) is therefore always the FULL outstanding figure. No
+> formula changed — reference-client (Angular) scope only; A3S's own matched, genuinely-partial redemption
+> leg is a separate code path and unaffected. See A9's own section for the full detail.
+
 ## 1. The Five Core Figures — Exact Formulas
 
 All five are **derived at query time from the full movement history of one `BalanceContract`** — none is
@@ -141,6 +158,7 @@ fixed **+1** (increases the balance) or **−1** (decreases it), keyed by `movem
 | `EPLC_DUE_FROM_ISSUING_BANK` / `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` | `CREATE` | **+1** |
 | | `REIMBURSE` / `RECLASSIFY_OUT` | **−1** |
 | `EPLC_EXAMINATION` (B3) | `CREATE` | — never contributes to Confirmed/Available at all; see B3's own section |
+| `IPLC_LC` / `EPLC_LC` / `EPLC_CONFIRMATION` | `CLOSE` (A10/B6, added 2026-08-21) | **−1** |
 
 ## 4. Tolerance / `ceilingAmount` Conversion
 
@@ -234,7 +252,7 @@ explicitly, leg by leg, in their own tables below.
 
 ---
 
-## 6. Import LC Functions (A1–A9)
+## 6. Import LC Functions (A1–A10)
 
 ### A1 — LC Issue (`IPLC_LC` / `ISSUE`)
 
@@ -397,10 +415,26 @@ This is the one figure whose COMBINED total reacts **at Submit and never again a
 Pending/Approved SPLIT still genuinely migrates between the two buckets at Release, same shape as B3's
 own Present Docs Earmark.
 
-### A9 — Shipping Gtee Redemption (`SHGT` / `FULL_REDEEM` or `PARTIAL_REDEEM`, auto-derived from amount vs. outstanding)
+### A9 — Shipping Gtee Redemption (`SHGT` / `FULL_REDEEM` — locked, `PARTIAL_REDEEM` no longer reachable through this function)
 
-Amount defaults to (and is capped at) the SG's own current Available Balance; `FULL_REDEEM` vs.
-`PARTIAL_REDEEM` is derived automatically, not picked separately.
+Amount is carried from the SG's own current Available Balance and protected (disabled) — `FULL_REDEEM` is
+the only outcome; there is no longer a way to submit a Partial Redeem through A9.
+
+> **Locked down 2026-08-21 (BA-confirmed — `TF_Balance_Component_Mapping-{en,zh}.xlsx`'s own Rule #1, "SG
+> discharge is instrument-based, not amount-based": `SG_RELEASE` is always the FULL amount, no residual).**
+> Previously the Amount field stayed editable, capped at Available Balance, with `FULL_REDEEM` vs.
+> `PARTIAL_REDEEM` derived from whether the typed amount still equalled it — this let a Maker submit a
+> genuine standalone Partial Redeem through A9, contradicting the Mapping workbook's own non-negotiable
+> rule. `builder-fields.ts`'s own Amount field (and `submit-rules.ts`'s own defense-in-depth backstop) now
+> lock it to Available Balance outright, so `ceilingAmount` below is always the FULL outstanding figure —
+> the formulas themselves are unchanged, only the reachable amount is. This is a reference-client
+> (Angular Transaction Builder) change only — the microservice's own `PARTIAL_REDEEM`/`FULL_REDEEM`
+> movementTypes and `checkRedeemSufficiency()` are both untouched and still accept a Partial Redeem from
+> any other caller (a known, disclosed scope limit, not closed in this pass). **A3S's own matched SG
+> redemption leg is unaffected** — it is a completely separate code path (`documentArrivalWithSg`),
+> genuinely capped at `MIN(Bill Amount, SG Available Balance)` and tied to a real Document Arrival via
+> `businessEventId`, not a standalone user-typed amount; see A3S's own table above, which can still
+> legitimately be `PARTIAL_REDEEM`.
 
 > **Updated 2026-08-20 (see banner note above, "Off-Balance Exposure basis").** This table now covers the
 > **standalone** case — an A9 redemption submitted **without** sharing a still-PENDING `UTILIZE`'s own
@@ -421,9 +455,32 @@ Amount defaults to (and is capped at) the SG's own current Available Balance; `F
 | Present Docs Earmark (P/A) | N/A | N/A |
 | Document Arrival (Pending / Approved) | N/A | N/A |
 
+### A10 — Import LC Close (`IPLC_LC` / `EPLC_LC` / `CLOSE`)
+
+Added 2026-08-21. Root-only (`IPLC_LC`/`EPLC_LC`) — writes off whatever Confirmed Balance remains and, once
+Approved, retires the Logical Contract (`ContractStatus.CLOSED`). `amount` must exactly equal the current
+Confirmed Balance at Submit (may be 0 for an already fully-utilized LC, never negative) — never
+auto-derived from anything else. Eligibility (not already Closed; SG AND Acceptance Confirmed Balance both
+exactly 0; no open Event anywhere in the whole event tree — root plus every SG/Acceptance/Examination
+child) is checked at Submit **and again at Approve**, since it can stop holding in between (e.g. a fresh
+Event submitted against a child ledger in that window) — the Checker Release fails outright rather than
+silently re-deriving a different write-off amount.
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **−= ceilingAmount — drops to exactly 0** |
+| Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **−= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | unaffected — Close is only eligible once it's already 0 | unaffected |
+| Tight Available Balance | **−= ceilingAmount** (Pending Decrease Total, same as any other decrease-shaped movement) | unchanged (already reflected) |
+| Present Docs Earmark (P/A) | N/A — Import side | N/A |
+| SG (Pending / Approved) | N/A — Close is only eligible once outstanding SG is 0 | N/A |
+| Document Arrival (Pending / Approved) | N/A — not a `UTILIZE` | N/A |
+| **Contract status** | unchanged, still `ACTIVE` | **`ACTIVE` → `CLOSED`** (side effect of this Release, not a figure) |
+
 ---
 
-## 7. Export Confirmed LC Functions (B1–B5)
+## 7. Export Confirmed LC Functions (B1–B6)
 
 ### B1 — Confirm LC (`EPLC_CONFIRMATION` / `ISSUE`)
 
@@ -558,6 +615,28 @@ releases both in the same order.
 Sight settlement (collecting `EPLC_DUE_FROM_ISSUING_BANK`) is explicitly out of Balance Component's own
 scope — B4 books that asset, but nothing in this registry ever settles it.
 
+### B6 — Export Confirmed LC Close (`EPLC_CONFIRMATION` / `CLOSE`)
+
+Added 2026-08-21. Same mechanics as A10 (§6), on `EPLC_CONFIRMATION` instead of `IPLC_LC`/`EPLC_LC` —
+eligibility nets Present Docs Earmark rather than SG exposure (no SHGT children on the Export side), but
+is otherwise identical: not already Closed; zero Acceptance Confirmed Balance; no open Event anywhere in
+the whole event tree (root plus every Acceptance/Examination child — including a RELEASED-but-not-yet-
+`presentDocsConsumedAt` `EPLC_EXAMINATION`, which a plain PENDING scan would miss). `amount` must exactly
+equal the current Confirmed Balance at Submit (may be 0, never negative); eligibility and the exact-amount
+match are both re-checked at Approve.
+
+| Figure | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| Confirmed Balance | unchanged | **−= ceilingAmount — drops to exactly 0** |
+| Available Balance | **−= ceilingAmount** | unchanged (already reflected) |
+| Pending Earmark Total | **−= ceilingAmount** | reverts to 0 |
+| Off-Balance Exposure | `null` (Import-only figure) | `null` |
+| Tight Available Balance | **−= ceilingAmount** (Pending Decrease Total, same as any other decrease-shaped movement) | unchanged (already reflected) |
+| Present Docs Earmark (P/A) | unaffected — Close is only eligible once no open Present Docs presentation remains | unaffected |
+| SG (Pending / Approved) | N/A — Export side | N/A |
+| Document Arrival (Pending / Approved) | N/A — Import-only concept | N/A |
+| **Contract status** | unchanged, still `ACTIVE` | **`ACTIVE` → `CLOSED`** (side effect of this Release, not a figure) |
+
 ---
 
 ## 8. Quick-Reference — Which Function Touches Which Figure
@@ -573,16 +652,19 @@ scope — B4 books that asset, but nothing in this registry ever settles it.
 | A7 | own contract | `null` | `null` | — | — | — |
 | A8 | SG's own contract | **LC (reacts at Submit)** | LC | — | **LC (splits at Release)** | — |
 | A9 | SG's own contract | **LC (reacts at Release only — standalone; A3S's own matched pair is the one exception, reacts at Submit)** | LC | — | **LC (Approved bucket only, no Pending-side reaction)** | — |
+| A10 | own contract (writes off to 0) | — (only eligible once already 0) | own contract | — | — (only eligible once already 0) | — |
 | B1 | own contract | `null` | own contract | unaffected | — | — |
 | B2 (Inc/Dec) | own contract | `null` | own contract | unaffected | — | — |
 | B3 | `null` effect on Confirmed/Available (MEMO_ONLY) | `null` | Confirmation (via Earmark) | **own contract, splits at Release** | — | — |
 | B4 | Confirmation + new asset/liability contract(s) | `null` | Confirmation (Approved bucket consumed) | **Confirmation (Approved drops)** | — | — |
 | B5 | Acceptance + Receivable | `null` | `null` | unaffected | — | — |
+| B6 | own contract (writes off to 0) | `null` | own contract | — (only eligible once already 0) | — | — |
 
 ---
 
 *Generated from `microservices/balance-component/src/domain/balanceDerivation.ts`,
 `domain/offBalanceExposure.ts`, `domain/amendDecrease.ts`, `domain/tolerance.ts`,
-`service/balanceService.ts`, and `src/app/transaction-builder/balance-component.model.ts`'s own
-`IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS` registry. See `lc-balance-wc/CLAUDE.md`'s own decision log for the
-business rationale/history behind each rule.*
+`domain/closeEligibility.ts`, `service/balanceService.ts`, and
+`src/app/transaction-builder/balance-component.model.ts`'s own `IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS`
+registry. See `lc-balance/CLAUDE.md`'s own decision log for the business rationale/history behind each
+rule.*
