@@ -432,6 +432,25 @@ describe('InquireEventsService', () => {
         expect(svc.indexRows[0].closingPending).toBe(false);
       });
 
+      it('B6 (EPLC_CONFIRMATION, Export side) — the same still-PENDING-CLOSE detection applies, confirming this is not an Import-only (A10) fix', () => {
+        const confirmation = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE' });
+        const issue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
+        const close = makeMovement({ movementId: 'mv-cnf-close', balanceContractId: 'bc-cnf', movementType: 'CLOSE', status: 'PENDING', createdAt: '2026-08-02T00:00:00.000Z' });
+        // EPLC_CONFIRMATION has real child instrument types (EPLC_EXAMINATION/EPLC_ACCEPTANCE/...) — the
+        // catalog() mock must return the root contract only for the root's OWN instrumentType, empty for
+        // every child-fan-out call, or childMovementsOf$() would wrongly treat this same contract as its
+        // own child too.
+        const catalog = jest.fn((instrumentType: string) => of(instrumentType === 'EPLC_CONFIRMATION' ? { items: [confirmation], total: 1, page: 1, pageSize: 10 } : emptyCatalog()));
+        const api = makeApi({ catalog, listMovements: jest.fn(() => of([issue, close])) });
+        const svc = new InquireEventsService(api);
+        svc.side = 'EXPORT';
+
+        svc.loadIndex(1);
+
+        expect(svc.indexRows[0].status).toBe('ACTIVE');
+        expect(svc.indexRows[0].closingPending).toBe(true);
+      });
+
       it('no CLOSE movement at all -> closingPending false (the ordinary, overwhelmingly common case)', () => {
         const contract = noChildContract();
         const issue = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-nc', movementType: 'ISSUE' });
