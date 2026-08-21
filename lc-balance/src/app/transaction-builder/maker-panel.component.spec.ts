@@ -2485,14 +2485,14 @@ describe('MakerPanelComponent', () => {
       expect(api.createMovement).not.toHaveBeenCalled();
     });
 
-    it('A9 autoRedeemType: rejects an amount exceeding Available Balance', () => {
+    it('A9 (locked to Full Redeem, BA-confirmed 2026-08-21): rejects an amount exceeding Available Balance', () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A9);
       comp.model.amount = '2000';
       comp.selectedContract = makeContractC({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
       comp.selectedContractSnapshot = makeSnapshotC({ availableBalance: '1000' });
       comp.submit();
-      expect(comp.submitError).toBe("Amount must not exceed the SG's Available Balance (1000).");
+      expect(comp.submitError).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (1000) — Partial Redeem is no longer supported here.');
       expect(api.createMovement).not.toHaveBeenCalled();
     });
 
@@ -2691,7 +2691,7 @@ describe('MakerPanelComponent', () => {
       expect(req.exposureNature).toBe('ACTUAL');
     });
 
-    it('A9 autoRedeemType: derives FULL_REDEEM when the typed amount equals Available Balance', () => {
+    it('A9 (locked to Full Redeem): submits FULL_REDEEM when the (locked) amount equals Available Balance', () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A9);
       comp.selectedContract = makeContractC({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
@@ -2703,7 +2703,7 @@ describe('MakerPanelComponent', () => {
       expect(lastReqC(api).movementType).toBe('FULL_REDEEM');
     });
 
-    it('A9 autoRedeemType: derives PARTIAL_REDEEM when the typed amount is below Available Balance', () => {
+    it('A9 (locked to Full Redeem, BA-confirmed 2026-08-21): rejects rather than deriving PARTIAL_REDEEM when amount is below Available Balance — the Amount field is disabled in the real UI (builder-fields.ts amountFromSgRedeem); this exercises submit-rules.ts\'s own defense-in-depth backstop for a caller that bypasses it', () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A9);
       comp.selectedContract = makeContractC({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
@@ -2712,7 +2712,8 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(lastReqC(api).movementType).toBe('PARTIAL_REDEEM');
+      expect(comp.submitError).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (500) — Partial Redeem is no longer supported here.');
+      expect(api.createMovement).not.toHaveBeenCalled();
     });
 
     it('A6 (settlesDocumentArrival, plain): submit only creates the Acceptance and never releases anything — LC Balance stays untouched', () => {
