@@ -550,24 +550,30 @@ export function displayStatus(
 }
 
 /**
- * P2 UI/UX pass — function-chip action-type icon (`TbIconComponent`), one of 4 groups by underlying
+ * P2 UI/UX pass — function-chip action-type icon (`TbIconComponent`), one of 5 groups by underlying
  * domain semantics rather than raw movementType: `issue` (ISSUE/CREATE establishing a new
  * balance/facility record — A1/A6/A8/B1), `amend` (A2/B2), `utilize` (presentation/finalize —
- * A3/A3S/A4/B3/B4), `redeem` (settle/close an existing exposure — A7/A9/B5, and A10/B6 by the same
- * "closes out an exposure" fallback default below — Close never needed its own 5th icon group). A plain
- * lookup keyed by function `code`, not instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
+ * A3/A3S/A4/B3/B4), `redeem` (settle an existing exposure — A7/A9/B5), `cross` (retire the LC/
+ * Confirmation outright — A10/B6). User-requested 2026-08-21 ("Close 不應該用打勾") — A10/B6 used to fall
+ * into the `redeem` fallback below, but `redeem`'s own icon (`TbIconComponent`'s own `'redeem'` case) is
+ * the identical checkmark shape as `'ok'`, which reads as "settled/approved", not "closed out" — `cross`
+ * (the existing rejected/cancelled X icon, already in `TbIconComponent`'s shared set, no new SVG) is the
+ * more honest signal for an irreversible retirement action. A plain lookup keyed by function `code`, not
+ * instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
  * A4/B4 are all effectively UTILIZE-shaped) but land in the same group anyway, so re-deriving from
  * movementType would be no simpler.
  */
 const ISSUE_GROUP_CODES: ReadonlySet<string> = new Set(['A1', 'A6', 'A8', 'B1']);
 const AMEND_GROUP_CODES: ReadonlySet<string> = new Set(['A2', 'B2']);
 const UTILIZE_GROUP_CODES: ReadonlySet<string> = new Set(['A3', 'A3S', 'A4', 'B3', 'B4']);
-// Anything not in the 3 sets above (A7/A9/B5) falls into the redeem group — see functionActionIcon().
+const CLOSE_GROUP_CODES: ReadonlySet<string> = new Set(['A10', 'B6']);
+// Anything not in the 4 sets above (A7/A9/B5) falls into the redeem group — see functionActionIcon().
 
-export function functionActionIcon(code: string): 'issue' | 'amend' | 'utilize' | 'redeem' {
+export function functionActionIcon(code: string): 'issue' | 'amend' | 'utilize' | 'redeem' | 'cross' {
   if (ISSUE_GROUP_CODES.has(code)) return 'issue';
   if (AMEND_GROUP_CODES.has(code)) return 'amend';
   if (UTILIZE_GROUP_CODES.has(code)) return 'utilize';
+  if (CLOSE_GROUP_CODES.has(code)) return 'cross';
   return 'redeem';
 }
 

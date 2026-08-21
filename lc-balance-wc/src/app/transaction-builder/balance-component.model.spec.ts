@@ -776,8 +776,8 @@ describe('balance-component.model data invariants', () => {
   });
 
   describe('functionActionIcon (P2 UI/UX pass — function-chip action-type icon group)', () => {
-    it('every IMPORT_FUNCTIONS/EXPORT_FUNCTIONS code resolves to exactly one of the 4 documented groups', () => {
-      const expected: Record<string, 'issue' | 'amend' | 'utilize' | 'redeem'> = {
+    it('every IMPORT_FUNCTIONS/EXPORT_FUNCTIONS code resolves to exactly one of the 5 documented groups', () => {
+      const expected: Record<string, 'issue' | 'amend' | 'utilize' | 'redeem' | 'cross'> = {
         A1: 'issue',
         A2: 'amend',
         A3: 'utilize',
@@ -787,13 +787,13 @@ describe('balance-component.model data invariants', () => {
         A7: 'redeem',
         A8: 'issue',
         A9: 'redeem',
-        A10: 'redeem',
+        A10: 'cross',
         B1: 'issue',
         B2: 'amend',
         B3: 'utilize',
         B4: 'utilize',
         B5: 'redeem',
-        B6: 'redeem',
+        B6: 'cross',
       };
       for (const fn of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
         expect(functionActionIcon(fn.code)).toBe(expected[fn.code]);

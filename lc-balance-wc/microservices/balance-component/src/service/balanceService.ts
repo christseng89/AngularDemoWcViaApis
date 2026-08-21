@@ -910,7 +910,44 @@ export class BalanceService {
     return this.createContract(req);
   }
 
+  /**
+   * Business requirement 2026-08-19 ("A1-A9, B1-B5 Amount figure should > 0") — server-side backstop for
+   * submit-rules.ts's own client-side validateSubmit() guard on the Angular side, which is trivially
+   * bypassable by any caller that doesn't go through that UI (confirmed live 2026-08-21: a direct
+   * `POST /balance-movements` with `amount: "0"` or `amount: "-5000"` was accepted outright before this
+   * fix). Called from BOTH createMovement() (Submit) and release() (Approve) — user-reported
+   * ("SUBMIT & RELEASE API 也要有交易金額控制檢查") — same defense-in-depth posture as A10/B6 Close's own
+   * eligibility/amount re-check at Release: a Submit-time-only check can't catch a bad amount that
+   * reached PENDING some other way (a future second caller, a migration, a seeded fixture).
+   *
+   * AMEND (B2's own movementType only) is the one case where Direction (Increase/Decrease) is carried by
+   * the amount's own sign rather than a distinct movementType (see buildSubmitRequest()'s own doc comment
+   * on the Angular side, and MOVEMENT_DIRECTION.AMEND's own fixed +1 in balanceDerivation.ts) — only an
+   * exact zero is rejected there, a negative sign is legitimate. CLOSE's own amount is a system-derived
+   * write-off that legitimately reaches exactly 0 (an already fully-utilized LC, see
+   * domain/closeEligibility.ts) but must never be negative. Every other movementType requires a strictly
+   * positive magnitude — this is the general case a raw API caller could otherwise use to create a
+   * zero- or negative-faced LC/Acceptance/SG/etc., corrupting every balance derived from it.
+   */
+  private assertValidAmount(movementType: string, amount: string): void {
+    const amt = parseMonetaryAmount(amount);
+    if (movementType === 'AMEND') {
+      if (amt.isZero()) throw new RequestValidationError(`amount "${amount}" must not be zero for AMEND — Direction is carried by its own sign.`);
+      return;
+    }
+    if (movementType === 'CLOSE') {
+      if (amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must not be negative for CLOSE.`);
+      return;
+    }
+    if (amt.isZero() || amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must be greater than 0.`);
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
+    // Checked BEFORE resolveOrCreateContract() — a rejected ISSUE/CREATE must never leave an orphaned,
+    // empty BalanceContract row behind (same "checked before createContract()" posture the SG/Present-
+    // Docs sufficiency checks already use, a few lines below in resolveOrCreateContract() itself).
+    this.assertValidAmount(req.movementType, req.amount);
+
     const contract = this.resolveOrCreateContract(req);
 
     const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
@@ -1031,6 +1068,12 @@ export class BalanceService {
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
 
     applyStatusTransition({ currentStatus: movement.status, action: 'RELEASE', createdBy: movement.createdBy, actingUser: releasedBy });
+
+    // Re-check (not just at Submit) — see assertValidAmount()'s own doc comment for why. Uses the
+    // movement's own already-persisted amount, unchanged since Submit (movements are immutable once
+    // created); this is a pure defense-in-depth backstop, not expected to ever actually fire for a
+    // movement createMovement() itself created — only for one that reached PENDING some other way.
+    this.assertValidAmount(movement.movementType, movement.amount);
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
 

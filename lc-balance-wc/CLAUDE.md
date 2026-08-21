@@ -926,13 +926,17 @@ either `npm test`/`tsc --noEmit` gate — only a real `npm run build` hits it, w
 project's own standing "before calling a change complete" checklist. Flagged for a future pass (trim
 ~30+ bytes of real CSS from that file, or raise the budget) rather than opportunistically fixed here, since
 it's unrelated to the spinner work and untouched CSS shouldn't be edited to chase an unrelated budget line.
-The overage amount itself drifts with every unrelated edit to this file (P1 pass: 24 bytes; re-measured
-2026-08-21, same `git stash`-then-`ng build` method, immediately before that day's own Inquire Events
-60/40 split commit: 10 bytes) — record the CURRENT figure with its own measurement date when next
-touched here, rather than trusting either number as still accurate; neither observer mis-measured, the
-file simply kept moving. See the Inquire Events 60/40 split decision-log entry below for how that same
-day's own change stayed net-positive against this budget (moved new CSS to the global stylesheet, reused
-an existing grid rule) rather than making the drift worse.
+**Still NOT fixed as of 2026-08-21 (user asked directly whether it was resolved — it is not; verified
+live via a real `npm run build`, not assumed from "nothing touched this file recently").** The overage
+amount itself drifts with every unrelated edit to this file (P1 pass: 24 bytes; re-measured 2026-08-21,
+same `git stash`-then-`ng build` method, immediately before that day's own Inquire Events 60/40 split
+commit: 10 bytes; re-measured again same day, on `main` AFTER that commit landed: **25 bytes** — the
+60/40 split's own necessary CSS contribution, `flex-wrap: wrap` on `.tb-tabs`, added +15 bytes on top of
+the pre-existing 10-byte baseline; every other new rule that split needed was moved to the global
+stylesheet instead, see that commit's own message) — record the CURRENT figure with its own measurement
+date whenever this file is next touched, rather than trusting an old number as still accurate; no past
+measurement here was wrong, the file simply keeps moving. Still flagged for a future pass, not
+opportunistically fixed inline — same reasoning as above.
 
 ## UI/UX review P2 pass — function-chip/status/role icon set, icon toggle theme switcher
 
@@ -1026,3 +1030,60 @@ children, landing the Balance Tabs content on row 2 under column A instead of co
 own `.tb-balance-box` so it gets the same outer frame as A. Account Entries moved into a new
 `.tb-balance-box__header` row (global `styles.scss`, not the component file — see this file's own
 budget-drift note above).
+
+## A10/B6 Close — write off the remaining Confirmed Balance and retire the LC/Confirmation
+
+cs-tf-balance-knowhow rationale §3.9/§7.7's "cancellation before expiry" analog (same write-off entry as
+a natural expiry, but Maker/Checker-triggered). One shared eligibility check
+(`domain/closeEligibility.ts`: SG Balance = 0, Acceptance Balance = 0, no open Events anywhere in the
+tree — including a RELEASED-but-not-yet-`presentDocsConsumedAt` B3 Present Docs presentation — not
+already Closed) backs all three defense layers: the Step-1 picker's own server-computed hint-set (new
+`GET /balance-contracts/close-eligible`, one aggregate call, not per-candidate like every other hint in
+`document-arrival-hints.service.ts`), `createMovement()`'s own sufficiency check, and `release()`'s own
+re-check before flipping `ContractStatus` to `CLOSED` (reserved in `types.ts` since the original design,
+never previously set anywhere). The write-off amount must exactly equal the current Confirmed Balance,
+re-verified at both Submit and Release — a balance change in between forces a re-submit rather than
+silently over/under-writing it (movements stay immutable-once-created, same invariant every other
+movementType relies on; Close does not get a special-cased exception). Amount is never typed — a new
+`amountAutoFilledFrom` `FunctionStrategy` dimension carries it from Confirmed Balance and locks the
+field, genuinely different from A9/B5's own `amountVsAvailableDerivation` (which still lets the Maker
+type a value to compare against Available).
+
+New `GET /balance-contracts?includeAnyStatus=` lets Look Up Current Balance keep resolving a CLOSED
+contract by natural key (business-reported gap, "LOOKUP也應該看到此LC 項下所有的交易包括CLOSE EVENT") —
+every transaction-creating caller stays ACTIVE-only by omitting the flag, so a Closed LC is still no
+longer selectable for any other function. Inquire Events needed no equivalent fix — its own LC Master
+Records Index already omits the `status` filter, and `selectLcFromIndex()` already skips the ACTIVE-only
+`resolveContract()` round trip entirely.
+
+Two bugs found live while building/testing this, both fixed:
+- `movementTypeMatchesFunction()`'s `derivesMovementTypeFromTenor` branch (B4-only) returned true for
+  ANY `EPLC_CONFIRMATION` movementType regardless of value, not just HONOUR/ACCEPT — pre-existing,
+  harmless until CLOSE became the first other movementType ever recorded against that instrumentType;
+  silently mislabeled every CLOSE event as "B4 · Honour/Acceptance" in Look Up/Inquire Events (both read
+  `resolveFunctionForMovement()`, which iterates the registry and takes the first match — B4 is declared
+  before B6). Now checks `movementType === 'HONOUR' || 'ACCEPT'` explicitly.
+- The Event Details 60/40 split's own release()-time eligibility re-check counted the CLOSE movement
+  being released as one of its own blocking "open events" (it's still PENDING at that exact instant) —
+  self-rejecting every Release. `evaluateContractCloseEligibility()` now takes an `excludeMovementId`.
+
+Also same session: LC Master Records Index status badge color-codes ACTIVE (green)/CLOSED (red) with an
+icon (`contractStatusBadgeClass()`, reusing the existing `statusBadgeClass()`/`statusBadgeIcon()` token
+system rather than the plain, status-blind `.tb-type-tag` it used before) — user-requested, "容易識別".
+`functionActionIcon()` gained a 5th group, `cross` (A10/B6 only) — they used to fall into the `redeem`
+fallback, whose icon is the identical checkmark shape as `ok`/"approved", which reads wrong for an
+irreversible retirement action; `cross` (the existing rejected/cancelled X, already in `TbIconComponent`'s
+shared set) needed no new SVG.
+
+## Server-side "Amount must be > 0" backstop — `assertValidAmount()`, checked at both Submit and Release
+
+Business-reported gap, "SUBMIT & RELEASE API 也要有交易金額控制檢查" — the 2026-08-19 "A1-A9, B1-B5 Amount
+figure should > 0" rule only ever lived in `submit-rules.ts` on the Angular side; confirmed live via a
+direct `POST /balance-movements` that `amount: "0"` and `amount: "-5000"` were both silently accepted for
+a plain ISSUE. New `BalanceService.assertValidAmount()`, called from both `createMovement()` (before
+`resolveOrCreateContract()`, so a rejected ISSUE/CREATE never leaves an orphaned contract row) and
+`release()` (a defense-in-depth backstop for a bad amount that reached PENDING some other way — not
+expected to ever actually fire for a movement `createMovement()` itself created). `AMEND` (B2's own
+movementType) is exempted from the sign check — Direction there is carried by the amount's own sign, not
+a distinct movementType, so only an exact zero is rejected. `CLOSE` only rejects negative — see the A10/B6
+entry above.

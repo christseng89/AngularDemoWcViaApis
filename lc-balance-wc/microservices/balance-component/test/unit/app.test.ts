@@ -2413,6 +2413,36 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(movements.body.map((m: any) => m.movementType)).toEqual(['ISSUE', 'CLOSE']);
   });
 
+  test('POST /balance-movements with amount "0" or a negative amount -> 400 (user-reported gap 2026-08-21, "SUBMIT & RELEASE API 也要有交易金額控制檢查" — live-reproduced before this fix: both were silently accepted)', async () => {
+    const zero = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'AMT-HTTP-ZERO-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '0',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+    expect(zero.body.code).toBe('REQUEST_VALIDATION_FAILED');
+
+    const negative = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'AMT-HTTP-NEG-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '-5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+    expect(negative.body.code).toBe('REQUEST_VALIDATION_FAILED');
+  });
+
   test('POST /balance-movements/:movementId/release without releasedBy -> 400', async () => {
     const lc = await request(app)
       .post('/balance-movements')

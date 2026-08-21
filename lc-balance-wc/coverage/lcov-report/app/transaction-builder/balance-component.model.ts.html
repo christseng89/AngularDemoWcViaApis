@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">99.1% </span>
+                <span class="strong">99.13% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>111/112</span>
+                <span class='fraction'>114/115</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.64% </span>
+                <span class="strong">98.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>73/74</span>
+                <span class='fraction'>74/75</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.85% </span>
+                <span class="strong">98.87% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>86/87</span>
+                <span class='fraction'>88/89</span>
             </div>
         
             
@@ -702,7 +702,13 @@
 <a name='L637'></a><a href='#L637'>637</a>
 <a name='L638'></a><a href='#L638'>638</a>
 <a name='L639'></a><a href='#L639'>639</a>
-<a name='L640'></a><a href='#L640'>640</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a>
+<a name='L643'></a><a href='#L643'>643</a>
+<a name='L644'></a><a href='#L644'>644</a>
+<a name='L645'></a><a href='#L645'>645</a>
+<a name='L646'></a><a href='#L646'>646</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1263,6 +1269,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-yes">16x</span>
@@ -1273,6 +1284,7 @@
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1893,24 +1905,30 @@ export function displayStatus(
 }
 &nbsp;
 /**
- * P2 UI/UX pass — function-chip action-type icon (`TbIconComponent`), one of 4 groups by underlying
+ * P2 UI/UX pass — function-chip action-type icon (`TbIconComponent`), one of 5 groups by underlying
  * domain semantics rather than raw movementType: `issue` (ISSUE/CREATE establishing a new
  * balance/facility record — A1/A6/A8/B1), `amend` (A2/B2), `utilize` (presentation/finalize —
- * A3/A3S/A4/B3/B4), `redeem` (settle/close an existing exposure — A7/A9/B5, and A10/B6 by the same
- * "closes out an exposure" fallback default below — Close never needed its own 5th icon group). A plain
- * lookup keyed by function `code`, not instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
+ * A3/A3S/A4/B3/B4), `redeem` (settle an existing exposure — A7/A9/B5), `cross` (retire the LC/
+ * Confirmation outright — A10/B6). User-requested 2026-08-21 ("Close 不應該用打勾") — A10/B6 used to fall
+ * into the `redeem` fallback below, but `redeem`'s own icon (`TbIconComponent`'s own `'redeem'` case) is
+ * the identical checkmark shape as `'ok'`, which reads as "settled/approved", not "closed out" — `cross`
+ * (the existing rejected/cancelled X icon, already in `TbIconComponent`'s shared set, no new SVG) is the
+ * more honest signal for an irreversible retirement action. A plain lookup keyed by function `code`, not
+ * instrumentType/movementType — several codes share a movementType (e.g. A3/A3S/
  * A4/B4 are all effectively UTILIZE-shaped) but land in the same group anyway, so re-deriving from
  * movementType would be no simpler.
  */
 const ISSUE_GROUP_CODES: ReadonlySet&lt;string&gt; = new Set(['A1', 'A6', 'A8', 'B1']);
 const AMEND_GROUP_CODES: ReadonlySet&lt;string&gt; = new Set(['A2', 'B2']);
 const UTILIZE_GROUP_CODES: ReadonlySet&lt;string&gt; = new Set(['A3', 'A3S', 'A4', 'B3', 'B4']);
-// Anything not in the 3 sets above (A7/A9/B5) falls into the redeem group — see functionActionIcon().
+const CLOSE_GROUP_CODES: ReadonlySet&lt;string&gt; = new Set(['A10', 'B6']);
+// Anything not in the 4 sets above (A7/A9/B5) falls into the redeem group — see functionActionIcon().
 &nbsp;
-export function functionActionIcon(code: string): 'issue' | 'amend' | 'utilize' | 'redeem' {
+export function functionActionIcon(code: string): 'issue' | 'amend' | 'utilize' | 'redeem' | 'cross' {
   if (ISSUE_GROUP_CODES.has(code)) return 'issue';
   if (AMEND_GROUP_CODES.has(code)) return 'amend';
   if (UTILIZE_GROUP_CODES.has(code)) return 'utilize';
+  if (CLOSE_GROUP_CODES.has(code)) return 'cross';
   return 'redeem';
 }
 &nbsp;
@@ -1987,7 +2005,7 @@ export function displayMovementAmount(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-21T08:00:50.687Z
+                at 2026-08-21T08:19:13.424Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
