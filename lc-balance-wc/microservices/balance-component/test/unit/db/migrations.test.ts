@@ -18,6 +18,17 @@ function bareDbWithBalanceMovementsTable(): DatabaseSync {
       status TEXT NOT NULL
     )
   `);
+  // Migration 12 (2026-08-21, idx_contracts_parent composite-index upgrade) is the first migration to
+  // touch balance_contracts rather than balance_movements alone — minimal subset (just enough for
+  // DROP/CREATE INDEX to resolve real column names) added here so this file's own "bare DB, no full
+  // SCHEMA_SQL" harness still exercises every migration, not just 1-11.
+  db.exec(`
+    CREATE TABLE balance_contracts (
+      balance_contract_id TEXT PRIMARY KEY,
+      parent_logical_contract_id TEXT,
+      instrument_type TEXT NOT NULL
+    )
+  `);
   return db;
 }
 
@@ -75,6 +86,14 @@ describe('runMigrations (src/db/migrations.ts)', () => {
           status TEXT NOT NULL,
           acknowledged_by TEXT,
           acknowledged_at TEXT
+        )
+      `);
+      // See bareDbWithBalanceMovementsTable()'s own comment above — migration 12 needs this table too.
+      db.exec(`
+        CREATE TABLE balance_contracts (
+          balance_contract_id TEXT PRIMARY KEY,
+          parent_logical_contract_id TEXT,
+          instrument_type TEXT NOT NULL
         )
       `);
       expect(() => runMigrations(db)).not.toThrow();

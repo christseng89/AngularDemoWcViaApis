@@ -59,9 +59,17 @@ CREATE INDEX IF NOT EXISTS idx_contracts_naturalkey
 CREATE INDEX IF NOT EXISTS idx_contracts_catalog
   ON balance_contracts(instrument_type, status);
 
--- §6.1 off-balance exposure lookup: find SHGT contracts hanging off a given LC.
+-- §6.1 off-balance exposure lookup: find SHGT contracts hanging off a given LC. Composite, not
+-- parent_logical_contract_id alone (analysis/Balance-Component-DB-Optimization-Analysis.md P2,
+-- 2026-08-21) — every real caller (listShgtMovementsForParent/listExaminationMovementsForParent/
+-- listAcceptanceMovementsForParent and their batch "ForParents" counterparts in
+-- balanceMovementStore.ts) filters on both columns together, so the composite avoids a table-row
+-- lookup just to re-check instrument_type after the index narrows on parent_logical_contract_id
+-- alone. A pre-existing on-disk DB that already created this index under its old single-column
+-- definition is upgraded by migration 12 (migrations.ts) — CREATE INDEX IF NOT EXISTS here only
+-- takes effect for a genuinely fresh database, since SQLite's IF NOT EXISTS only checks the name.
 CREATE INDEX IF NOT EXISTS idx_contracts_parent
-  ON balance_contracts(parent_logical_contract_id);
+  ON balance_contracts(parent_logical_contract_id, instrument_type);
 
 CREATE TABLE IF NOT EXISTS balance_movements (
   movement_id             TEXT PRIMARY KEY,

@@ -57,10 +57,10 @@ db.exec('PRAGMA busy_timeout = 5000');
 |---|---|---|
 | 前導萬用字元 LIKE | `balanceContractStore.ts` `listCatalog()` 222-223 行 | `lc_number LIKE '%q%'` 無法使用任何 B-tree 索引，會退化成 `instrument_type` 篩選後的全掃描。資料量變大或搜尋頻繁時，可改前綴比對（`LIKE @q || '%'`，索引可用）或導入 FTS5。 |
 | OFFSET 分頁 | 同上 250 行 `LIMIT ... OFFSET` | 深分頁時需先掃過並丟棄前面的 offset 筆，資料量大會線性變慢。未來可考慮改 keyset/cursor pagination。 |
-| 複合索引缺口 | `schema.ts` 63-64 行 `idx_contracts_parent` | 目前僅索引 `parent_logical_contract_id` 單欄，但實際查詢（`balanceMovementStore.ts` 259/276/295 行——原分析漏列了 295 行的 Acceptance 查詢，同一模式共 3 個呼叫點）是 `instrument_type = ? AND parent_logical_contract_id = ?` 兩個等值條件並用，複合索引 `(parent_logical_contract_id, instrument_type)` 可省去命中索引後再回表比對 instrument_type 的動作。 |
+| ~~複合索引缺口~~ — **已修復（2026-08-21）** | `schema.ts` `idx_contracts_parent` | 原本僅索引 `parent_logical_contract_id` 單欄，但實際查詢（`balanceMovementStore.ts` 259/276/295 行——原分析漏列了 295 行的 Acceptance 查詢，同一模式共 3 個呼叫點）是 `instrument_type = ? AND parent_logical_contract_id = ?` 兩個等值條件並用。已改為複合索引 `(parent_logical_contract_id, instrument_type)`；`schema.ts` 直接改新定義（涵蓋全新 DB），並新增 `migrations.ts` migration 12（`DROP INDEX IF EXISTS` + 重建）處理既有 on-disk DB 檔案仍是舊單欄定義的情況（`CREATE INDEX IF NOT EXISTS` 只認索引名稱、不會自動升級既有定義）。新增 `test/unit/db/index.test.ts` 直接驗證：手動建立帶舊版單欄索引的檔案，經 `createDb()` 重新開啟後 `PRAGMA index_info` 確認已升級為複合索引。 |
 | 缺少 CHECK 約束 | `schema.ts` 全檔 | `status`/`instrument_type`/`movement_type`/`exposure_nature`/`tenor_type` 等列舉型欄位完全沒有 CHECK 約束，型別安全完全依賴 TS 層（`types.ts`）。建議補上 `CHECK (status IN (...))` 作為最後一道防線。 |
 | 金額欄位用 TEXT 儲存 | `schema.ts` 多處 | 這是正確決定（SQLite 無原生 DECIMAL、REAL 有浮點誤差風險），但代表這些欄位無法在 SQL 層直接 `SUM` 或做數值排序；現有程式碼本來就都在 TS 層計算，一致，僅提醒未來若有人想直接對 DB 寫報表查詢須留意此限制。 |
-| **N+1（2026-08-21 補充，原分析範圍外）** | `service/balanceService.ts` `listCloseEligibleContracts()`/`evaluateContractCloseEligibility()` | 原分析範圍只寫明 `store/` 兩個檔案的查詢寫法，沒涵蓋 service 層的呼叫模式。A10/B6 Close 的 Step-1 picker 先撈最多 200 筆 ACTIVE contract，再對**每一筆**呼叫 `evaluateContractCloseEligibility()`——該函式本身又對每筆候選發 3～4 個查詢（`listByContract` + SG/Acceptance/[Examination] JOIN），worst case 約 1 + 200×4 ≈ 800 次查詢跑一次。現有 demo 資料量下每個查詢都吃得到索引，感受不出來，但屬於典型會隨資料量線性變差的 N+1，資料量成長後應優先處理（例如一次 JOIN 撈全部候選底下的 SG/Acceptance/Examination 事件，在記憶體裡依 `parent_logical_contract_id` 分組評估，取代逐筆查詢）。**僅記錄，未動程式碼**——這是這次追加分析發現的新項目，跟原本 P0/P1/P2 清單的其餘項目一樣屬於「不急但值得記錄」等級。 |
+| ~~N+1（2026-08-21 補充，原分析範圍外）~~ — **已修復（2026-08-21）** | `service/balanceService.ts` `listCloseEligibleContracts()`/`evaluateContractCloseEligibility()` | 原分析範圍只寫明 `store/` 兩個檔案的查詢寫法，沒涵蓋 service 層的呼叫模式。A10/B6 Close 的 Step-1 picker 原本先撈最多 200 筆 ACTIVE contract，再對**每一筆**呼叫 `evaluateContractCloseEligibility()`（該函式本身又對每筆候選發 3～4 個查詢），worst case 約 1 + 200×4 ≈ 800 次查詢跑一次。已改為批次：新增 `balanceMovementStore.ts` 的 `listByContractIds()`/`listShgtMovementsForParents()`/`listAcceptanceMovementsForParents()`/`listExaminationMovementsForParents()`，一次 IN-clause 查詢撈完整批候選的所有子事件（依 IPLC_LC/EPLC_CONFIRMATION 條件性略過不需要的批次），`evaluateContractCloseEligibility()` 新增可選的 `preFetched` 參數接住這批資料；`createMovement()`/`release()` 自己的單筆重新檢查（未傳 `preFetched`）完全不受影響，繼續走原本的逐筆查詢路徑。查詢數從 1+4N 降到固定 ~5 次，與候選筆數無關。**驗證方式**：新增 `test/unit/service/closeEligibleContractsBatch.test.ts`，涵蓋（a）5 種候選情境（own-PENDING/SG-PENDING/SG-RELEASED 非零/Acceptance-PENDING/Examination 已核准未消化）加上兩個乾淨案例的完整行為等價測試，先在 `git stash` 回舊實作上跑過確認通過、再 `stash pop` 回新實作重跑同一份測試確認結果完全一致（不只是「測試綠燈」，是實際數值/清單一致）；（b）用 `jest.spyOn` 直接證明批次方法各只呼叫一次、逐筆方法完全不再從這條路徑被呼叫；（c）另外驗證 `createMovement()`/`release()` 的單筆路徑仍走原本方法、從未觸及新的批次方法。 |
 
 ---
 
@@ -70,8 +70,9 @@ db.exec('PRAGMA busy_timeout = 5000');
 
 | 項目 | 實作方式 | 工程量 |
 |---|---|---|
-| `busy_timeout` | 加一行 `PRAGMA` | 極小 |
-| 複合索引 `idx_contracts_parent` | 普通 `CREATE INDEX` | 極小 |
+| ~~`busy_timeout`~~ | 加一行 `PRAGMA` | 極小 — **已完成** |
+| ~~複合索引 `idx_contracts_parent`~~ | 普通 `CREATE INDEX` + 一筆 migration | 極小 — **已完成** |
+| ~~`listCloseEligibleContracts()` 的 N+1~~ | store 層加 4 個批次查詢方法，service 層改用 `preFetched` | 中 — **已完成** |
 | LIKE 前綴比對 / FTS5 | 純查詢層改寫，SQLite 內建 FTS5 虛擬表 | 小 |
 | OFFSET → keyset 分頁 | 純查詢層改寫 | 小 |
 | 正規化 `movement_actions`/`movement_snapshots` | 建新表、搬資料、改寫 store 層查詢 | 中～大，但與資料庫引擎無關 |
@@ -89,7 +90,7 @@ db.exec('PRAGMA busy_timeout = 5000');
 ## 4. 建議優先順序總結
 
 1. ~~**立即可做**：補 `PRAGMA busy_timeout`~~ — **已完成（2026-08-21）**。
-2. **短期可做，低風險**：複合索引、LIKE 前綴比對、keyset 分頁、`listCloseEligibleContracts()` 的 N+1（P2 中不涉及 schema 變更的項目）。
-3. **中期規劃**：補 FK/CHECK 約束（需要重建表流程，建議集中排一次 migration 做完，而非逐項零散進行）。
+2. ~~**短期可做，低風險**：複合索引、`listCloseEligibleContracts()` 的 N+1~~ — **已完成（2026-08-21，A+B 一起做）**。**LIKE 前綴比對維持不做**——這不是純技術決定：Maker/Checker 查 LC 常用尾碼/中間字串，收斂成前綴比對會拿掉現有的「打中間/尾碼也能查到」能力，是使用者搜尋行為的限縮，不能單方面替使用者決定。之後資料量真的變成效能痛點時，優先考慮 FTS5（保留子字串搜尋），而非前綴比對。**keyset 分頁維持不做**——現有資料量不需要，且會動到 API 介面。
+3. **中期規劃（獨立排期，不與 A/B 同批）**：補 FK/CHECK 約束（需要重建表流程，風險主要在搬資料正確性，不是程式邏輯本身；可合併成同一次 migration 一起做，但驗收要跟低風險項目分開）。
 4. **與 PostgreSQL 遷移一併處理**：`movement_actions`/`movement_snapshots` 正規化——屆時反正要重新設計表結構，一次到位成本最低。
 5. **架構性、必須換 DB 才能達成**：行級鎖 / 跨 LC 並行寫入需求，繼續依 `schema.ts` 既有文件的方向規劃 PostgreSQL 遷移。

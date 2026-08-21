@@ -298,6 +298,72 @@ export class BalanceMovementStore {
     return rows.map(rowToMovement);
   }
 
+  /**
+   * analysis/Balance-Component-DB-Optimization-Analysis.md P2 N+1 fix (2026-08-21) — batch counterpart of
+   * listByContract() for BalanceService.listCloseEligibleContracts()'s own Step-1 picker: one query for
+   * every candidate contract in the batch instead of one query per candidate. Returns a Map keyed by
+   * balanceContractId; a candidate with zero movements simply has no entry (callers default to `[]`).
+   * Same row shape/ordering guarantee as listByContract() (ORDER BY event_seq ASC within each contract).
+   */
+  listByContractIds(balanceContractIds: string[]): Map<string, BalanceMovement[]> {
+    const map = new Map<string, BalanceMovement[]>();
+    if (balanceContractIds.length === 0) return map;
+    const placeholders = balanceContractIds.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(`SELECT * FROM balance_movements WHERE balance_contract_id IN (${placeholders}) ORDER BY balance_contract_id, event_seq ASC`)
+      .all(...balanceContractIds) as unknown as MovementRow[];
+    for (const row of rows) {
+      const movement = rowToMovement(row);
+      const list = map.get(movement.balanceContractId);
+      if (list) list.push(movement);
+      else map.set(movement.balanceContractId, [movement]);
+    }
+    return map;
+  }
+
+  /** Batch counterpart of listShgtMovementsForParent() — same N+1 fix, same convention as listByContractIds() above. Map keyed by parentLogicalContractId. */
+  listShgtMovementsForParents(parentLogicalContractIds: string[]): Map<string, BalanceMovement[]> {
+    return this.listMovementsForParentsByInstrumentTypes(parentLogicalContractIds, [`'SHGT'`]);
+  }
+
+  /** Batch counterpart of listExaminationMovementsForParent() — same N+1 fix, same convention as listByContractIds() above. Map keyed by parentLogicalContractId. */
+  listExaminationMovementsForParents(parentLogicalContractIds: string[]): Map<string, BalanceMovement[]> {
+    return this.listMovementsForParentsByInstrumentTypes(parentLogicalContractIds, [`'EPLC_EXAMINATION'`]);
+  }
+
+  /** Batch counterpart of listAcceptanceMovementsForParent() — same N+1 fix, same convention as listByContractIds() above. Map keyed by parentLogicalContractId. */
+  listAcceptanceMovementsForParents(parentLogicalContractIds: string[]): Map<string, BalanceMovement[]> {
+    return this.listMovementsForParentsByInstrumentTypes(parentLogicalContractIds, [`'IPLC_ACCEPTANCE'`, `'EPLC_ACCEPTANCE'`]);
+  }
+
+  /**
+   * Shared implementation behind the three batch "ForParents" methods above — `instrumentTypeLiterals` are
+   * pre-quoted SQL string literals (not bound params; this internal helper is only ever called with the
+   * fixed literal sets above, never caller-supplied input), matching this store's own existing single-
+   * candidate JOIN shape (listShgtMovementsForParent() etc.) but grouped over an IN-list of parents instead
+   * of one `= ?`. `bc.parent_logical_contract_id` is selected alongside `bm.*` purely to know which
+   * caller-supplied parent each row belongs to — rowToMovement() ignores the extra column.
+   */
+  private listMovementsForParentsByInstrumentTypes(parentLogicalContractIds: string[], instrumentTypeLiterals: string[]): Map<string, BalanceMovement[]> {
+    const map = new Map<string, BalanceMovement[]>();
+    if (parentLogicalContractIds.length === 0) return map;
+    const placeholders = parentLogicalContractIds.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(
+        `SELECT bm.*, bc.parent_logical_contract_id AS __parent_logical_contract_id FROM balance_movements bm
+         JOIN balance_contracts bc ON bc.balance_contract_id = bm.balance_contract_id
+         WHERE bc.instrument_type IN (${instrumentTypeLiterals.join(', ')}) AND bc.parent_logical_contract_id IN (${placeholders})`,
+      )
+      .all(...parentLogicalContractIds) as unknown as (MovementRow & { __parent_logical_contract_id: string })[];
+    for (const row of rows) {
+      const movement = rowToMovement(row);
+      const list = map.get(row.__parent_logical_contract_id);
+      if (list) list.push(movement);
+      else map.set(row.__parent_logical_contract_id, [movement]);
+    }
+    return map;
+  }
+
   updateStatus(params: {
     movementId: string;
     status: MovementStatus;

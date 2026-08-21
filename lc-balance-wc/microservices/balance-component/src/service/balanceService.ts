@@ -421,15 +421,28 @@ export class BalanceService {
    *   at that point it is STILL PENDING (this runs before updateStatus() flips it), so without excluding
    *   it, its own "open event" scan would always see itself and self-reject every Release. createMovement()
    *   never needs this (the new CLOSE movement isn't inserted yet at that point).
+   * @param preFetched analysis/Balance-Component-DB-Optimization-Analysis.md P2 N+1 fix (2026-08-21) —
+   *   listCloseEligibleContracts() below batch-fetches all 4 movement lists for its WHOLE candidate set up
+   *   front (one query each, not one per candidate) and passes the slice for THIS contract here instead of
+   *   letting this method issue its own per-candidate queries. createMovement()/release()'s own single-
+   *   contract call sites omit this (undefined), unchanged from before this fix — they still query
+   *   directly, exactly as this method always has.
    */
-  private evaluateContractCloseEligibility(contract: BalanceContract, excludeMovementId?: string): CloseEligibilityResult {
-    const ownMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== excludeMovementId);
+  private evaluateContractCloseEligibility(
+    contract: BalanceContract,
+    excludeMovementId?: string,
+    preFetched?: { ownMovements: BalanceMovement[]; sgMovements: BalanceMovement[]; acceptanceMovements: BalanceMovement[]; examinationMovements: BalanceMovement[] },
+  ): CloseEligibilityResult {
+    const ownMovements = (preFetched?.ownMovements ?? this.movements.listByContract(contract.balanceContractId)).filter(
+      (m) => m.movementId !== excludeMovementId,
+    );
     let hasOpenEvents = ownMovements.some((m) => m.status === 'PENDING');
 
-    const sgMovements = contract.instrumentType === 'IPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : [];
+    const sgMovements =
+      preFetched?.sgMovements ?? (contract.instrumentType === 'IPLC_LC' ? this.movements.listShgtMovementsForParent(contract.logicalContractId) : []);
     if (sgMovements.some((m) => m.status === 'PENDING')) hasOpenEvents = true;
 
-    const acceptanceMovements = this.movements.listAcceptanceMovementsForParent(contract.logicalContractId);
+    const acceptanceMovements = preFetched?.acceptanceMovements ?? this.movements.listAcceptanceMovementsForParent(contract.logicalContractId);
     if (acceptanceMovements.some((m) => m.status === 'PENDING')) hasOpenEvents = true;
 
     // A RELEASED-but-not-yet-presentDocsConsumedAt EPLC_EXAMINATION/CREATE (B3 Checker-approved, but B4
@@ -437,7 +450,7 @@ export class BalanceService {
     // domain/offBalanceExposure.ts's own computePresentDocsEarmark doc comment for why `status ===
     // 'RELEASED'` alone doesn't mean this exposure is actually resolved.
     if (contract.instrumentType === 'EPLC_CONFIRMATION') {
-      const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
+      const examinationMovements = preFetched?.examinationMovements ?? this.movements.listExaminationMovementsForParent(contract.logicalContractId);
       for (const m of examinationMovements) {
         if (m.status === 'PENDING') hasOpenEvents = true;
         if (m.status === 'RELEASED' && m.movementType === 'CREATE' && !m.presentDocsConsumedAt) hasOpenEvents = true;
@@ -462,13 +475,39 @@ export class BalanceService {
    * service's own doc comment) and evaluates each candidate in memory. 200 is a deliberate, documented
    * cap, not a silent truncation: large enough for this prototype's own data volumes, revisit if a real
    * deployment's ACTIVE-catalog size per instrumentType ever approaches it.
+   *
+   * analysis/Balance-Component-DB-Optimization-Analysis.md P2 N+1 fix (2026-08-21) — used to call
+   * evaluateContractCloseEligibility() once per candidate with no preFetched data, so each candidate ran
+   * its own 3-4 queries (up to ~800 for a full 200-item batch). Every instrumentType in ONE call shares the
+   * same `instrumentType` param (SG only applies when it's IPLC_LC, Examination only when
+   * EPLC_CONFIRMATION — the same condition evaluateContractCloseEligibility() itself branches on), so the
+   * 4 movement lists this whole batch could ever need are fetched in ONE query each up front instead, and
+   * sliced per candidate from the resulting Maps — a constant ~5 queries total regardless of candidate
+   * count, not 1 + 4N.
    */
   listCloseEligibleContracts(instrumentType: InstrumentType, opts: { lcNumber?: string; page?: number; pageSize?: number } = {}): CatalogPage {
     if (!ROOT_INSTRUMENT_TYPES.has(instrumentType)) {
       throw new RequestValidationError(`Close only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${instrumentType} is not eligible.`);
     }
     const rawBatch = this.contracts.listCatalog({ instrumentType, status: 'ACTIVE', lcNumber: opts.lcNumber, pageSize: 200 }).items;
-    const eligible = rawBatch.filter((c) => this.evaluateContractCloseEligibility(c).eligible);
+
+    const balanceContractIds = rawBatch.map((c) => c.balanceContractId);
+    const logicalContractIds = rawBatch.map((c) => c.logicalContractId);
+    const ownMovementsByContract = this.movements.listByContractIds(balanceContractIds);
+    const sgMovementsByParent = instrumentType === 'IPLC_LC' ? this.movements.listShgtMovementsForParents(logicalContractIds) : new Map<string, BalanceMovement[]>();
+    const acceptanceMovementsByParent = this.movements.listAcceptanceMovementsForParents(logicalContractIds);
+    const examinationMovementsByParent =
+      instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParents(logicalContractIds) : new Map<string, BalanceMovement[]>();
+
+    const eligible = rawBatch.filter(
+      (c) =>
+        this.evaluateContractCloseEligibility(c, undefined, {
+          ownMovements: ownMovementsByContract.get(c.balanceContractId) ?? [],
+          sgMovements: sgMovementsByParent.get(c.logicalContractId) ?? [],
+          acceptanceMovements: acceptanceMovementsByParent.get(c.logicalContractId) ?? [],
+          examinationMovements: examinationMovementsByParent.get(c.logicalContractId) ?? [],
+        }).eligible,
+    );
 
     const page = opts.page && opts.page > 0 ? opts.page : 1;
     const pageSize = opts.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;

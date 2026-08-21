@@ -127,6 +127,15 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('cancelled_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_at TEXT');
     },
   },
+  {
+    id: 12,
+    description:
+      'Upgrade idx_contracts_parent from a single-column (parent_logical_contract_id) to a composite (parent_logical_contract_id, instrument_type) index (2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P2 N+1/index-gap fix) — every real caller filters on both columns together. schema.ts already creates the composite version for a brand-new database (CREATE INDEX IF NOT EXISTS is a no-op there since it only checks the index name), so DROP+CREATE here only does real work against a pre-existing on-disk DB whose idx_contracts_parent still has the old single-column definition; harmless to re-run against an already-composite index (drops and recreates the identical thing).',
+    up: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_contracts_parent');
+      db.exec('CREATE INDEX idx_contracts_parent ON balance_contracts(parent_logical_contract_id, instrument_type)');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {
