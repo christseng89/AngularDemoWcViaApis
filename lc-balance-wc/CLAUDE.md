@@ -986,4 +986,27 @@ businessEventId query) plus 6 new unit tests covering the identical "Submit → 
 → Release/Reject this PENDING movement" scenario for all 4 affected functions (A6, A3S, B4 Sight+Usance,
 B5) and confirming the true no-op case (nothing selected at all) still no-ops; full suite green (1017
 Angular tests, 98.78% coverage, no regressions).
+
+## Look Up Current Balance's own Event Timeline — Type column removed, Status column nowrap-protected, Secondary Ref. column added
+
+User-confirmed (2026-08-21): the row-click Account Entries voucher already reconstructs full Dr/Cr
+detail per event, so this table's own per-row movementType badge (Type column) was redundant —
+overview/navigation only, not carrying full audit-trail responsibility itself. Removed from
+`transaction-builder.component.html` (the only file that renders this table — `maker-panel.component.scss`
+only ever carried a duplicate CSS copy, never the markup); `.tb-table--lookup-timeline`'s own
+`.tb-type-tag` size override removed from both `.scss` duplicates, the shared base `.tb-type-tag` rule
+left untouched (Account Entries/Function column still use it). New `.tb-table__status { white-space:
+nowrap; }` (+ `white-space: nowrap` added to `.tb-status-badge` itself) protects the Status column the
+same way `.tb-table__amount`/`__time` already were, so a longer status label added later can't get
+squeezed. Found and corrected while doing this: the removal comment's own stale "7-column" count never
+accounted for the Audit Trail column added later — actual count is 8 → 7, not 7 → 6; horizontal scroll on
+`.tb-table-scroll` still applies at the 40%-split width even after the removal, live-confirmed (LC S02).
+
+Same day, same table: added a Secondary Ref. column (user instruction, "Lookup 除了 REFERENCE 還要有
+SECONDARY REF") — EPLC_EXAMINATION's own EB Number / SHGT's own SG Number (`"SG G01"`-prefixed), distinct
+from the Reference column's own free-text `sourceTransactionRef`. Extracted `secondaryReferenceForEvent()`
+as a module-level free function in `inquire-events.service.ts` (same convention `functionForEvent()`
+already established) — both `InquireEventsService.secondaryReferenceFor()` and the new
+`LookUpPanelService.secondaryReferenceFor()` delegate to it, so the two screens can never disagree on this
+mapping either. Live-verified (LC S01 / SG G01 — SG Balance tab correctly shows "SG G01" on every row).
 </content>

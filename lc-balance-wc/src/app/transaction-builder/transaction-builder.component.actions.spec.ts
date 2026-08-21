@@ -1215,6 +1215,20 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.lookUp.functionFor(finalizeRow)?.code).toBe('A4');
     });
 
+    // User instruction 2026-08-21 ("Lookup 除了 REFERENCE 還要有 SECONDARY REF") — lookUp.secondaryReferenceFor()
+    // delegates to the same secondaryReferenceForEvent() free function as
+    // InquireEventsService.secondaryReferenceFor() — no separate Secondary Ref. mapping.
+    it("lookUp.secondaryReferenceFor() delegates to the shared secondaryReferenceForEvent() rule", () => {
+      const { comp } = setup();
+      const sgRow = makeEventRow({ contract: makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: 'G01' } }) });
+      const examRow = makeEventRow({ contract: makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'LC001', ibNumber: 'E01', sgNumber: null } }) });
+      const lcRow = makeEventRow({ contract: makeContract({ instrumentType: 'IPLC_LC' }) });
+
+      expect(comp.lookUp.secondaryReferenceFor(sgRow)).toBe('SG G01');
+      expect(comp.lookUp.secondaryReferenceFor(examRow)).toBe('E01');
+      expect(comp.lookUp.secondaryReferenceFor(lcRow)).toBe('—');
+    });
+
     // toEventRows() never splits a still-PENDING movement — isFinalizedSightUtilize requires status !== 'PENDING'.
     it('a NOT-yet-finalized Sight IPLC_LC/UTILIZE (still genuinely PENDING) stays a single row showing EARMARKING, never splits', () => {
       const { comp, api } = setup();

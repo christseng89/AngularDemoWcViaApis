@@ -3,7 +3,7 @@ import { Observable, forkJoin } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
-import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$ } from './inquire-events.service';
+import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$, secondaryReferenceForEvent } from './inquire-events.service';
 import { PagedListState } from './paged-list-state';
 
 /**
@@ -111,6 +111,11 @@ export class LookUpPanelService {
   /** Delegates to the same `functionForEvent()` free function `InquireEventsService.functionFor()` uses, so both screens resolve the Function badge identically by construction. */
   functionFor(event: InquiredEvent): TransactionFunction | undefined {
     return functionForEvent(event);
+  }
+
+  /** Delegates to the same `secondaryReferenceForEvent()` free function `InquireEventsService.secondaryReferenceFor()` uses (user instruction 2026-08-21, "Lookup 除了 REFERENCE 還要有 SECONDARY REF"), so both screens resolve the Secondary Ref. column identically by construction. */
+  secondaryReferenceFor(event: InquiredEvent): string {
+    return secondaryReferenceForEvent(event);
   }
 
   /** LC Number is the one natural-key field every instrumentType always carries (Design doc §3.1), so it's always the primary label; suffixed with IB#/SG# only when drilled into that specific Acceptance/SG. */

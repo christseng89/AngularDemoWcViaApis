@@ -62,6 +62,23 @@ export function functionForEvent(event: InquiredEvent): TransactionFunction | un
   );
 }
 
+/**
+ * Module-level function, not a private method — LookUpPanelService's own Event Timeline reuses the
+ * exact same mapping rather than a second copy (user instruction 2026-08-21, "Lookup 除了 REFERENCE
+ * 還要有 SECONDARY REF"). Shared with `InquireEventsService.secondaryReferenceFor()` below, which
+ * delegates to this — named distinctly to avoid an unqualified call silently shadowing that same-named
+ * method, same convention as `functionForEvent()` above.
+ *
+ * EPLC_EXAMINATION's own `ibNumber` (B3's EB Number) is the same value B4's Honour/Accept later carries
+ * as `sourceTransactionRef` — shown bare ("E01") so a reader can connect the two rows. SHGT's `sgNumber`
+ * is shown prefixed ("SG G01"). Every other instrumentType returns "—".
+ */
+export function secondaryReferenceForEvent(event: InquiredEvent): string {
+  if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
+  if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
+  return '—';
+}
+
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
   const isFinalizedSightUtilize =
     contract.instrumentType === 'IPLC_LC' &&
@@ -289,15 +306,9 @@ export class InquireEventsService {
     this.selectedEventTab = tab;
   }
 
-  /**
-   * EPLC_EXAMINATION's own `ibNumber` (B3's EB Number) is the same value B4's Honour/Accept later
-   * carries as `sourceTransactionRef` — shown bare ("E01") so a reader can connect the two rows. SHGT's
-   * `sgNumber` is shown prefixed ("SG G01"). Every other instrumentType returns "—".
-   */
+  /** Delegates to the same `secondaryReferenceForEvent()` free function `LookUpPanelService.secondaryReferenceFor()` uses, so both screens resolve the Secondary Ref. column identically by construction. */
   secondaryReferenceFor(event: InquiredEvent): string {
-    if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
-    if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
-    return '—';
+    return secondaryReferenceForEvent(event);
   }
 
   search(): void {

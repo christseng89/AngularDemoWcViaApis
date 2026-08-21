@@ -902,12 +902,11 @@
 
 // Business instruction 2026-08-19 (60/40 split, requirement #5 — "Reduce unnecessary padding/spacing
 // in the Event Timeline where necessary to accommodate all columns") — Look Up Current Balance's own
-// 7-column Event Timeline table (Function/Type/Amount/Reference/Status/Balance After/Time) is now the
-// tightest-fitting table in the app, sitting in the narrower 40% side of the split. Scoped to THIS
-// table specifically via a modifier class applied alongside .tb-table only on this one <table> — not a
-// global .tb-table change, which would also shrink Inquire Events' own merged Events table (already
-// tuned for its own full-width layout, see .tb-workspace--single above) and the LC Master Index, neither
-// of which needs this.
+// Event Timeline table is now the tightest-fitting table in the app, sitting in the narrower 40% side
+// of the split. Scoped to THIS table specifically via a modifier class applied alongside .tb-table only
+// on this one <table> — not a global .tb-table change, which would also shrink Inquire Events' own
+// merged Events table (already tuned for its own full-width layout, see .tb-workspace--single above)
+// and the LC Master Index, neither of which needs this.
 .tb-table--lookup-timeline {
   font-size: 11px;
 
@@ -918,11 +917,6 @@
 
   th {
     font-size: 9px;
-  }
-
-  .tb-type-tag {
-    font-size: 9px;
-    padding: 1px 5px;
   }
 }
 
@@ -938,8 +932,15 @@
   padding: 2px 6px;
 }
 
+// Same never-truncate protection as .tb-table__amount/__time above, so a longer status label added
+// later can't silently squeeze this column.
+.tb-table__status {
+  white-space: nowrap;
+}
+
 .tb-status-badge {
   display: inline-block;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;

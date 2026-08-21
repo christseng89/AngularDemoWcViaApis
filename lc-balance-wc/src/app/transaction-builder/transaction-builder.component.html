@@ -301,7 +301,7 @@
               <div class="tb-table-scroll" *ngIf="lookUp.activeLookupMovements.length">
                 <!-- 2026-08-19 (60/40 split, requirement #5) — tb-table--lookup-timeline tightens this
                  specific table's own cell padding/font-size (transaction-builder.component.scss) so its
-                 7 columns fit the now-narrower 40% Look Up Current Balance panel without truncation. -->
+                 columns fit the now-narrower 40% Look Up Current Balance panel without truncation. -->
                 <table class="tb-table tb-table--lookup-timeline">
                   <caption class="visually-hidden">
                     Event Timeline —
@@ -322,9 +322,9 @@
                   <thead>
                     <tr>
                       <th>Function</th>
-                      <th>Type</th>
                       <th>Amount</th>
                       <th>Reference</th>
+                      <th>Secondary Ref.</th>
                       <th>Status</th>
                       <th>Balance After</th>
                       <th>Time</th>
@@ -359,13 +359,14 @@
                      reversal of an earlier same-day design that forced 'create' to show a stale PENDING).
                      Balance After likewise reads row.movement.balanceAfter unconditionally now — no more
                      blanking for a 'create' row, same reasoning. -->
+                    <!-- Type column removed (user-confirmed, 2026-08-21) — Account Entries (the row-click
+                     voucher pop-up) already reconstructs the full Dr/Cr detail per event; this table's
+                     own job is overview/navigation, not carrying full audit-trail responsibility itself,
+                     so the redundant per-row movementType badge was dropped. -->
                     <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
                       <td>
                         <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
                         <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
-                      </td>
-                      <td>
-                        <span class="tb-type-tag">{{ displayMovementType(row.contract.instrumentType, row.movement.movementType, row.movement.amount) }}</span>
                       </td>
                       <td class="tb-table__amount">
                         {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) }}
@@ -374,7 +375,8 @@
                         >
                       </td>
                       <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
-                      <td>
+                      <td class="tb-table__ref">{{ lookUp.secondaryReferenceFor(row) }}</td>
+                      <td class="tb-table__status">
                         <span
                           class="tb-status-badge"
                           [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)"
