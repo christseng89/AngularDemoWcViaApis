@@ -31,6 +31,12 @@ export function createDb(filePath: string): DatabaseSync {
     db.exec('PRAGMA journal_mode = WAL');
   }
   db.exec('PRAGMA foreign_keys = ON');
+  // analysis/Balance-Component-DB-Optimization-Analysis.md P0 (2026-08-21) — without this, SQLite's
+  // default behavior when it can't get the write lock is to throw SQLITE_BUSY immediately, not queue.
+  // Design doc §6 requires same-LC concurrent requests to serialize; a bare SQLITE_BUSY on the second
+  // writer is a failure, not the serialization that requirement describes. 5000ms is generous for this
+  // prototype's own write volume, not tuned against a real production load.
+  db.exec('PRAGMA busy_timeout = 5000');
   db.exec(SCHEMA_SQL);
   // Quality-report-balance.md BAL-106 — see migrations.ts's own doc comment for what changed and why.
   runMigrations(db);

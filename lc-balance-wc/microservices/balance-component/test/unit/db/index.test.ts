@@ -68,6 +68,22 @@ describe('createDb — real file path (src/db/index.ts)', () => {
     }
   });
 
+  // analysis/Balance-Component-DB-Optimization-Analysis.md P0 — without this PRAGMA, a second writer
+  // that can't get the lock throws SQLITE_BUSY immediately instead of queueing, which is not the
+  // same-LC serialization Design doc §6 requires. Applies to both branches (unconditional in createDb()),
+  // unlike WAL which is file-only.
+  test('busy_timeout is set on both a real file and :memory: — unconditional, unlike the WAL branch', () => {
+    const fileDb = createDb(join(dir, 'balance-component-busy-timeout.sqlite'));
+    const memDb = createDb(':memory:');
+    try {
+      expect((fileDb.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(5000);
+      expect((memDb.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(5000);
+    } finally {
+      fileDb.close();
+      memDb.close();
+    }
+  });
+
   test('re-opening the SAME real file a second time hits the migrate() no-op path (columns already present from the first createDb() call) without error', () => {
     const filePath = join(dir, 'balance-component-reopen.sqlite');
     const db1 = createDb(filePath);

@@ -24,15 +24,15 @@
 
 ### P0 — 現有限制之外的具體漏洞
 
-**缺少 `PRAGMA busy_timeout`**（`index.ts` `createDb()`）
+**~~缺少 `PRAGMA busy_timeout`~~ — 已修復（2026-08-21）**（`index.ts` `createDb()`）
 
 SQLite 拿不到寫鎖時，預設行為是立刻丟出 `SQLITE_BUSY` 錯誤，而不是排隊等待。設計文件 §6 要求「同一張 LC 底下的多筆同時申請會被正確序列化」，但沒有 `busy_timeout` 的話，現況其實是「第二筆並發寫入直接失敗」，並非真正的序列化排隊。
 
-建議修法：
+已加上：
 ```ts
 db.exec('PRAGMA busy_timeout = 5000');
 ```
-在 SQLite 仍是主力儲存的這段期間，這個問題比「換資料庫」更急迫——因為現有實作連自己宣稱的行為都還沒真正兌現。
+無條件套用在 file 跟 `:memory:` 兩種分支（不像 WAL 只在 file 分支開），並新增 `test/unit/db/index.test.ts` 的直接驗證（`PRAGMA busy_timeout` 回讀確認為 5000）。全套 397 個 microservice 測試、`tsc --noEmit` 皆綠燈。
 
 ### P1 — 結構性：寬表持續用 ALTER TABLE 長胖
 
@@ -57,9 +57,10 @@ db.exec('PRAGMA busy_timeout = 5000');
 |---|---|---|
 | 前導萬用字元 LIKE | `balanceContractStore.ts` `listCatalog()` 222-223 行 | `lc_number LIKE '%q%'` 無法使用任何 B-tree 索引，會退化成 `instrument_type` 篩選後的全掃描。資料量變大或搜尋頻繁時，可改前綴比對（`LIKE @q || '%'`，索引可用）或導入 FTS5。 |
 | OFFSET 分頁 | 同上 250 行 `LIMIT ... OFFSET` | 深分頁時需先掃過並丟棄前面的 offset 筆，資料量大會線性變慢。未來可考慮改 keyset/cursor pagination。 |
-| 複合索引缺口 | `schema.ts` 63-64 行 `idx_contracts_parent` | 目前僅索引 `parent_logical_contract_id` 單欄，但實際查詢（`balanceMovementStore.ts` 259/276 行）是 `instrument_type = ? AND parent_logical_contract_id = ?` 兩個等值條件並用，複合索引 `(parent_logical_contract_id, instrument_type)` 可省去命中索引後再回表比對 instrument_type 的動作。 |
+| 複合索引缺口 | `schema.ts` 63-64 行 `idx_contracts_parent` | 目前僅索引 `parent_logical_contract_id` 單欄，但實際查詢（`balanceMovementStore.ts` 259/276/295 行——原分析漏列了 295 行的 Acceptance 查詢，同一模式共 3 個呼叫點）是 `instrument_type = ? AND parent_logical_contract_id = ?` 兩個等值條件並用，複合索引 `(parent_logical_contract_id, instrument_type)` 可省去命中索引後再回表比對 instrument_type 的動作。 |
 | 缺少 CHECK 約束 | `schema.ts` 全檔 | `status`/`instrument_type`/`movement_type`/`exposure_nature`/`tenor_type` 等列舉型欄位完全沒有 CHECK 約束，型別安全完全依賴 TS 層（`types.ts`）。建議補上 `CHECK (status IN (...))` 作為最後一道防線。 |
 | 金額欄位用 TEXT 儲存 | `schema.ts` 多處 | 這是正確決定（SQLite 無原生 DECIMAL、REAL 有浮點誤差風險），但代表這些欄位無法在 SQL 層直接 `SUM` 或做數值排序；現有程式碼本來就都在 TS 層計算，一致，僅提醒未來若有人想直接對 DB 寫報表查詢須留意此限制。 |
+| **N+1（2026-08-21 補充，原分析範圍外）** | `service/balanceService.ts` `listCloseEligibleContracts()`/`evaluateContractCloseEligibility()` | 原分析範圍只寫明 `store/` 兩個檔案的查詢寫法，沒涵蓋 service 層的呼叫模式。A10/B6 Close 的 Step-1 picker 先撈最多 200 筆 ACTIVE contract，再對**每一筆**呼叫 `evaluateContractCloseEligibility()`——該函式本身又對每筆候選發 3～4 個查詢（`listByContract` + SG/Acceptance/[Examination] JOIN），worst case 約 1 + 200×4 ≈ 800 次查詢跑一次。現有 demo 資料量下每個查詢都吃得到索引，感受不出來，但屬於典型會隨資料量線性變差的 N+1，資料量成長後應優先處理（例如一次 JOIN 撈全部候選底下的 SG/Acceptance/Examination 事件，在記憶體裡依 `parent_logical_contract_id` 分組評估，取代逐筆查詢）。**僅記錄，未動程式碼**——這是這次追加分析發現的新項目，跟原本 P0/P1/P2 清單的其餘項目一樣屬於「不急但值得記錄」等級。 |
 
 ---
 
@@ -87,8 +88,8 @@ db.exec('PRAGMA busy_timeout = 5000');
 
 ## 4. 建議優先順序總結
 
-1. **立即可做**：補 `PRAGMA busy_timeout`（P0，一行修改，行為缺口明確）。
-2. **短期可做，低風險**：複合索引、LIKE 前綴比對、keyset 分頁（P2 中不涉及 schema 變更的項目）。
+1. ~~**立即可做**：補 `PRAGMA busy_timeout`~~ — **已完成（2026-08-21）**。
+2. **短期可做，低風險**：複合索引、LIKE 前綴比對、keyset 分頁、`listCloseEligibleContracts()` 的 N+1（P2 中不涉及 schema 變更的項目）。
 3. **中期規劃**：補 FK/CHECK 約束（需要重建表流程，建議集中排一次 migration 做完，而非逐項零散進行）。
 4. **與 PostgreSQL 遷移一併處理**：`movement_actions`/`movement_snapshots` 正規化——屆時反正要重新設計表結構，一次到位成本最低。
 5. **架構性、必須換 DB 才能達成**：行級鎖 / 跨 LC 並行寫入需求，繼續依 `schema.ts` 既有文件的方向規劃 PostgreSQL 遷移。
