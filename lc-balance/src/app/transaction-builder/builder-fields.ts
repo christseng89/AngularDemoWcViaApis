@@ -34,19 +34,25 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const amountFromDocArrival = !!strategy?.checkerRelease.settlesDocumentArrival && !!ctx.selectedPayMovement;
   const amountFromFullSettle =
     strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
-  // A9 only — Amount defaults to the SG's Available Balance (nets an already-PENDING redemption on the
-  // same SG) and is capped there, never disabled. FULL_REDEEM vs PARTIAL_REDEEM is derived at submit()
-  // time (autoRedeemType), not picked by the user.
-  const amountCappedAtSg = strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && !!selectedContractSnapshot;
-  // Same default-to-Available/capped shape as amountCappedAtSg above, for B5's own Usance branch.
+  // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
+  // instrument-based, not amount-based" — SG_RELEASE is always the FULL amount, no residual): Amount is
+  // now fully LOCKED to the SG's own Available Balance (nets an already-PENDING redemption on the same
+  // SG), not merely capped-but-editable — Partial Redeem is no longer reachable through this function at
+  // all (see submit-rules.ts's own hard-reject backstop). Previously stayed editable/capped here with
+  // FULL_REDEEM vs PARTIAL_REDEEM derived at submit() time (autoRedeemType); A3S's own matched SG
+  // redemption leg (documentArrivalWithSg) is a completely separate code path and is unaffected — it
+  // never sets amountVsAvailableDerivation, so this flag is still exclusively an A9 marker.
+  const amountFromSgRedeem = strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && !!selectedContractSnapshot;
+  // Same default-to-Available/capped shape amountFromSgRedeem used to have, for B5's own Usance branch —
+  // B5 keeps the original editable-but-capped Partial Settle behavior; only A9 was locked down.
   const amountCappedAtAcceptance =
     strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
-  // A10/B6 only — Amount is NEVER typed, unlike amountCappedAtSg/amountCappedAtAcceptance above (which
-  // stay editable, just capped); fully locked like amountFromDocArrival/amountFromFullSettle, since the
-  // write-off must equal the current Confirmed Balance exactly (see submit-rules.ts's own closeShaped
-  // exact-amount comment on the microservice side).
+  // A10/B6 only — Amount is NEVER typed, same fully-locked shape amountFromSgRedeem now also has (unlike
+  // amountCappedAtAcceptance above, which stays editable, just capped); the write-off must equal the
+  // current Confirmed Balance exactly (see submit-rules.ts's own closeShaped exact-amount comment on the
+  // microservice side).
   const amountFromClose = strategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance' && !!selectedContractSnapshot;
-  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose;
+  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose || amountFromSgRedeem;
   const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
   // A1/B1 = Input; every other function = carry from A1/B1 + protected — see carriedCurrency (function-policy.ts).
   const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
@@ -68,8 +74,8 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       props: {
         label: amountFromFullSettle
           ? "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)"
-          : amountCappedAtSg
-            ? "Amount (defaults to the Shipping Guarantee's Available Balance — reduce for a Partial Redeem, must not exceed it)"
+          : amountFromSgRedeem
+            ? "Amount (Full Redeem only — carried from the Shipping Guarantee's Available Balance, protected; Partial Redeem is no longer supported here)"
             : amountCappedAtAcceptance
               ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
               : strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')
@@ -82,7 +88,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
         required: true,
         type: 'number',
         disabled: amountLocked,
-        max: amountCappedAtSg || amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
+        max: amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
         // Smallest representable positive value for the typed Currency — refuses 0/negative before the
         // real submit-time backstop (validateSubmit()'s "Amount must be greater than 0.").
         min: Math.pow(10, -decimalPlacesForCurrency(model.currency)),

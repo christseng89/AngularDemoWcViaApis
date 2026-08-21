@@ -372,8 +372,13 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     // Submit if exceeded), overriding Design doc §5/§11's earlier LMTS-based sufficiency design.
     help: "Independent contingent liability, issued against the LC as parent. Amount is capped at the parent LC's current Available Balance — rejected at Submit if exceeded (business instruction 2026-08-14, overriding the original LMTS-based sufficiency design). See Design doc §6.1 for the separate, non-blocking off-balance WARNING that also applies later against the LC's own UTILIZE. SG Number is SHGT's own natural key field (below), not a separate reference.",
   },
-  // No Full/Partial subChoice — movementType is a FULL_REDEEM placeholder; the real value is derived at
-  // submit() time (autoRedeemType) from whether the typed Amount still equals the SG's own Available Balance.
+  // No Full/Partial subChoice — movementType is always FULL_REDEEM. BA-confirmed 2026-08-21
+  // (TF_Balance_Component_Mapping Rule #1, "SG discharge is instrument-based, not amount-based" —
+  // SG_RELEASE is always the FULL amount, no residual): Partial Redeem is no longer reachable through
+  // this function — Amount is locked to the SG's own Available Balance (builder-fields.ts's own
+  // amountFromSgRedeem), not merely capped-but-editable. A3S's own matched SG redemption leg
+  // (documentArrivalWithSg) is unaffected — genuinely tied to a real Document Arrival, a separate code
+  // path entirely.
   {
     code: 'A9',
     label: 'Shipping Gtee (Redemption)',
@@ -381,7 +386,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     instrumentType: 'SHGT',
     movementType: 'FULL_REDEEM',
     defaultParentInstrumentType: 'IPLC_LC',
-    help: "Search by LC Number + SG Number (below) — a single LC can have multiple Shipping Guarantees. Amount defaults to the SG's current Available Balance and stays editable, capped at it — reduce it for a Partial Redeem, leave it as-is for a Full Redeem (no separate type to pick). Design doc §6.1: redemption is NOT auto-linked to Document Arrival (A3) — it's a separate, explicit action.",
+    help: "Search by LC Number + SG Number (below) — a single LC can have multiple Shipping Guarantees. Amount is carried from the SG's current Available Balance and protected (Full Redeem only) — Partial Redeem is no longer supported through this function. Design doc §6.1: redemption is NOT auto-linked to Document Arrival (A3) — it's a separate, explicit action.",
   },
   // cs-tf-balance-knowhow rationale §3.9's "cancellation before expiry" analog — same write-off entry as
   // a natural expiry, but Maker/Checker-triggered. Flat Catalog picker like A2/A3 (no parent concept —

@@ -18,7 +18,7 @@ import { EXPORT_FUNCTIONS, IMPORT_FUNCTIONS, type InstrumentType, type Transacti
 export interface MovementDerivationStrategy {
   /** B4 only — HONOUR vs. ACCEPT is derived from the contract's own tenorType at submit time, not user-picked. */
   derivesMovementTypeFromTenor: boolean;
-  /** Non-null when FULL_x/PARTIAL_x is derived from Amount vs. Available at submit time (A9 → 'REDEEM', B5 → 'SETTLE'); null otherwise (movementType is fixed or user-picked via subChoice). */
+  /** 'SETTLE' (B5): FULL_x/PARTIAL_x still genuinely derived from Amount vs. Available at submit time. 'REDEEM' (A9): historically the same derivation, but BA-confirmed 2026-08-21 this is now an A9 identity marker only — Amount is locked and movementType is hardcoded FULL_REDEEM, see that function's own registry doc comment below. Null otherwise (movementType is fixed or user-picked via subChoice). */
   amountVsAvailableDerivation: 'REDEEM' | 'SETTLE' | null;
   /**
    * A10/B6 (Close) only — genuinely different from `amountVsAvailableDerivation` above: A9/B5 still let
@@ -84,8 +84,12 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
  *   place; A4 itself never creates a new movement).
  * - A6 — settlesDocumentArrival, without sourceAlreadyReleasedBeforePick (its source, a plain Document
  *   Arrival, is still PENDING at pick time — released as the first leg of the compound release).
- * - A9 — amountVsAvailableDerivation 'REDEEM' (FULL_REDEEM vs. PARTIAL_REDEEM derived from Amount vs.
- *   the SG's own Available Balance, never user-picked).
+ * - A9 — amountVsAvailableDerivation 'REDEEM'. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping
+ *   Rule #1, "SG discharge is instrument-based, not amount-based"): Amount is locked to the SG's own
+ *   Available Balance and movementType is hardcoded FULL_REDEEM — this flag now serves purely as an A9
+ *   identity marker (parent-eligibility hints, historical PARTIAL_REDEEM redisplay via
+ *   `movementTypeMatchesFunction` below), not a live amount-vs-available derivation choice; see
+ *   `builder-fields.ts`'s own `amountFromSgRedeem` and `submit-rules.ts`'s own REDEEM branch.
  * - B4 — derivesMovementTypeFromTenor (HONOUR vs. ACCEPT read from the Confirmation's own tenorType);
  *   settlesDocumentArrival WITH sourceAlreadyReleasedBeforePick (the A6-vs-B4 asymmetry — B3's Present
  *   Docs record is already released by pick time); compoundSubmission has both

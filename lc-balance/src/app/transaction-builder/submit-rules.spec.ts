@@ -299,7 +299,7 @@ describe('submit-rules', () => {
     });
   });
 
-  describe('validateSubmit — A9 (Shipping Gtee Redemption): Full/Partial Redeem derived from Amount vs Available', () => {
+  describe('validateSubmit — A9 (Shipping Gtee Redemption): locked to Full Redeem only (BA-confirmed 2026-08-21, TF_Balance_Component_Mapping Rule #1)', () => {
     const a9Ctx = (overrides: Partial<SubmitRulesContext> = {}) =>
       ctx({
         selectedFunction: fn('A9'),
@@ -312,31 +312,30 @@ describe('submit-rules', () => {
       expect(validateSubmit(a9Ctx({ selectedContractSnapshot: null })).error).toBe('Search for the Shipping Guarantee to redeem first.');
     });
 
-    it('fails when the typed amount exceeds the Available Balance', () => {
+    it('fails when the (defense-in-depth backstop) amount exceeds the Available Balance', () => {
       const result = validateSubmit(
         a9Ctx({
           model: { instrumentType: 'SHGT', movementType: 'FULL_REDEEM', amount: '90000', currency: 'USD', createdBy: 'maker1' },
           selectedContractSnapshot: snapshot({ availableBalance: '80000' }),
         }),
       );
-      expect(result.error).toBe("Amount must not exceed the SG's Available Balance (80000).");
+      expect(result.error).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (80000) — Partial Redeem is no longer supported here.');
     });
 
-    it('derives FULL_REDEEM (boundary — amount exactly equals Available)', () => {
+    it('submits FULL_REDEEM (boundary — amount exactly equals Available, the only value the UI now permits)', () => {
       const result = validateSubmit(a9Ctx({ selectedContractSnapshot: snapshot({ availableBalance: '80000' }) }));
       expect(result.error).toBeNull();
       expect(result.patch.movementType).toBe('FULL_REDEEM');
     });
 
-    it('derives PARTIAL_REDEEM when the typed amount is reduced below Available', () => {
+    it('fails (defense-in-depth backstop) rather than deriving PARTIAL_REDEEM when amount is below Available — the real UI can no longer produce this, builder-fields.ts locks the field', () => {
       const result = validateSubmit(
         a9Ctx({
           model: { instrumentType: 'SHGT', movementType: 'FULL_REDEEM', amount: '50000', currency: 'USD', createdBy: 'maker1' },
           selectedContractSnapshot: snapshot({ availableBalance: '80000' }),
         }),
       );
-      expect(result.error).toBeNull();
-      expect(result.patch.movementType).toBe('PARTIAL_REDEEM');
+      expect(result.error).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (80000) — Partial Redeem is no longer supported here.');
     });
   });
 

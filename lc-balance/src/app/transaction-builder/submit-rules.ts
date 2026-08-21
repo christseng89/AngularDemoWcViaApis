@@ -113,18 +113,25 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
     return fail('Pick the Shipping Guarantee this Document Arrival is against first.');
   }
-  // A9 only. Checked against Available (not Confirmed) — same distinction as shgtRedeem.ts's
-  // commitment-control fix. movementType is DERIVED, never picked: FULL_REDEEM when the typed amount
-  // still equals Available, PARTIAL_REDEEM otherwise.
+  // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
+  // instrument-based, not amount-based" — SG_RELEASE is always the FULL amount, no residual): movementType
+  // is now hardcoded FULL_REDEEM, never derived/picked — Partial Redeem is no longer reachable through
+  // this function. Checked against Available (not Confirmed), same distinction as shgtRedeem.ts's own
+  // commitment-control fix. This is a defense-in-depth backstop for builder-fields.ts's own field lock
+  // (amountFromSgRedeem, now disabled) — a mismatch here should only ever happen if the SG's own Available
+  // Balance moved between snapshot-resolve and Submit (e.g. a concurrent transaction), not from ordinary
+  // UI use. A3S's own matched SG redemption leg (documentArrivalWithSg) is a completely separate code
+  // path — genuinely MIN(Bill Amount, SG Available)-capped and tied to a real Document Arrival via
+  // businessEventId — and never routes through this branch at all.
   if (strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
     if (!ctx.selectedContractSnapshot) {
       return fail('Search for the Shipping Guarantee to redeem first.');
     }
     const available = ctx.selectedContractSnapshot.availableBalance;
-    if (Number(model.amount) > Number(available)) {
-      return fail(`Amount must not exceed the SG's Available Balance (${available}).`);
+    if (Number(model.amount) !== Number(available)) {
+      return fail(`A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (${available}) — Partial Redeem is no longer supported here.`);
     }
-    patch.movementType = Number(model.amount) === Number(available) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM';
+    patch.movementType = 'FULL_REDEEM';
   }
   // B5 only, same "derive Full/Partial from amount vs Available" shape as A9 above, targeting SETTLE.
   // Grounded in impl-spec-en.md's CNF_MATURE row — ONE event clears both the Acceptance liability and

@@ -85,16 +85,17 @@ describe('builder-fields', () => {
       expect(amount.props?.label).toBe("Amount (Full Settle — carried from the Acceptance's Available Balance, protected)");
     });
 
-    it('is capped at (not disabled by) the Available Balance for A9 (autoRedeemType) once a snapshot resolves', () => {
+    it('is locked (disabled, no max) to the Available Balance for A9 (amountFromSgRedeem) once a snapshot resolves — BA-confirmed 2026-08-21, Partial Redeem no longer supported', () => {
       const ctx = baseCtx({
         selectedFunction: fn('A9'),
         model: { instrumentType: 'SHGT', movementType: 'FULL_REDEEM' },
         selectedContractSnapshot: snapshot({ availableBalance: '80000' }),
       });
       const amount = fieldByKey(buildFields(ctx), 'amount');
-      expect(amount.props?.disabled).toBe(false);
-      expect(amount.props?.max).toBe(80000);
+      expect(amount.props?.disabled).toBe(true);
+      expect(amount.props?.max).toBeUndefined();
       expect(amount.props?.label).toContain("Shipping Guarantee's Available Balance");
+      expect(amount.props?.label).toContain('protected');
     });
 
     it('is capped at (not disabled by) the Available Balance for B5 (settlesAcceptanceOnMature) once a snapshot resolves', () => {
