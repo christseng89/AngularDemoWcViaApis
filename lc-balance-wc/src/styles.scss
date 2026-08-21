@@ -355,3 +355,15 @@ pre.step-detail {
   margin-right: 3px;
   vertical-align: -1.5px;
 }
+
+// ── Balance-box title + action row (Event Details 60/40 split, 2026-08-21) ──────────────
+// Global, not per-component: `transaction-builder.component.scss` already sits at the
+// `anyComponentStyle` 12kb budget ceiling (see `.tb-spinner`/`.tb-icon` above for the same reasoning) —
+// a title-and-button flex row is small but genuinely cross-cutting (any `.tb-balance-box` can use it),
+// so it lives here rather than pushing that file further over.
+.tb-balance-box__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}

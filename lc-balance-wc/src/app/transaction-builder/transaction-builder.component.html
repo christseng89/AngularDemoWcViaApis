@@ -705,13 +705,30 @@
               <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
             </div>
 
+            <!-- Event Details 60/40 split (business instruction 2026-08-21, "Event Details 版面調整") —
+             Original Transaction Screen (A, 60%) alongside the Balance Tabs (B, 40%). Reuses the bare
+             .tb-workspace grid rule as-is (same 3fr/2fr ratio, gap, 1100px breakpoint already needed
+             here) rather than duplicating an identical rule under a new class name — this is a plain
+             CSS Grid utility, unrelated to the outer .tb-workspace--single full-width modifier a few
+             lines above (that one governs the OUTER Inquire Events panel, not this inner split). -->
+            <div class="tb-workspace">
             <!-- Original transaction screen, restored, read-only — same buildFields()/<formly-form> the live
              Maker Submit screen uses, decorated via toReadOnlyFields() (builder-fields.ts). -->
             <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel">
-              <div class="tb-balance-box__title">
-                Original Transaction Screen —
-                <ng-container *ngIf="inquireEvents.selectedEventFunction as fn">{{ fn.code }} · {{ fn.label }}</ng-container>
-                <ng-container *ngIf="!inquireEvents.selectedEventFunction">(function not resolved — showing captured transaction data)</ng-container>
+              <div class="tb-balance-box__header">
+                <div class="tb-balance-box__title">
+                  Original Transaction Screen —
+                  <ng-container *ngIf="inquireEvents.selectedEventFunction as fn">{{ fn.code }} · {{ fn.label }}</ng-container>
+                  <ng-container *ngIf="!inquireEvents.selectedEventFunction">(function not resolved — showing captured transaction data)</ng-container>
+                </div>
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny"
+                  *ngIf="sel.movement.contingentAccountEntry"
+                  (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase)"
+                >
+                  Account Entries
+                </button>
               </div>
               <div class="tb-balance-row">
                 <span class="tb-balance-row__label">LC Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.lcNumber }}</span>
@@ -759,14 +776,6 @@
                 <span class="tb-balance-row__label">EC (Cancelled)</span
                 ><span class="tb-balance-row__value">{{ sel.movement.cancelledBy }} — {{ sel.movement.cancelledAt | date: 'short' }}</span>
               </div>
-              <button
-                type="button"
-                class="tb-btn tb-btn--tiny mt-2"
-                *ngIf="sel.movement.contingentAccountEntry"
-                (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase)"
-              >
-                Account Entries
-              </button>
             </div>
 
             <!-- Balance Tabs (2026-08-17, user-specified — up to 3 tabs: LC/Confirmed LC Balance (always),
@@ -777,28 +786,37 @@
              AskUserQuestion) — the LC tab is always populated (own ledger for a root Event, the parent's
              own balance — rootEventSnapshot — for a child Event). Reuses the SAME #balanceSnapshotBox
              shared template Transaction Processing's own Look Up panel uses above, and the same
-             .tb-tabs/.tb-tab tab-strip markup pattern as the Look Up panel's own LC/Acceptance/SG tabs. -->
-            <div class="tb-tabs mt-3" *ngIf="inquireEvents.selectedEventTabs.length > 1">
-              <button
-                type="button"
-                class="tb-tab"
-                *ngFor="let tab of inquireEvents.selectedEventTabs"
-                [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key"
-                (click)="inquireEvents.selectEventTab(tab.key)"
-              >
-                {{ tab.label }}
-              </button>
+             .tb-tabs/.tb-tab tab-strip markup pattern as the Look Up panel's own LC/Acceptance/SG tabs.
+             Wrapped in .tb-balance-box (2026-08-21) so column B gets the SAME outer frame as column A's
+             own Original Transaction Screen box — also required structurally: .tb-workspace's grid
+             auto-places DIRECT children into its 2 columns, so the tab-strip + [ngTemplateOutlet]'s own
+             rendered content (a THIRD/FOURTH sibling otherwise, since <ng-container> itself renders no
+             wrapping element) must be one single element to land in column 2 rather than wrapping onto
+             a second row under column A. -->
+            <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent">
+              <div class="tb-tabs" *ngIf="inquireEvents.selectedEventTabs.length > 1">
+                <button
+                  type="button"
+                  class="tb-tab"
+                  *ngFor="let tab of inquireEvents.selectedEventTabs"
+                  [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key"
+                  (click)="inquireEvents.selectEventTab(tab.key)"
+                >
+                  {{ tab.label }}
+                </button>
+              </div>
+              <ng-container
+                *ngIf="inquireEvents.selectedEvent as sel2"
+                [ngTemplateOutlet]="balanceSnapshotBox"
+                [ngTemplateOutletContext]="{
+                  title: inquireEvents.activeEventTab?.title,
+                  status: sel2.contract.status,
+                  snapshot: inquireEvents.activeEventTab?.snapshot,
+                  impact: inquireEvents.activeEventTab?.impact,
+                }"
+              ></ng-container>
             </div>
-            <ng-container
-              *ngIf="inquireEvents.selectedEvent as sel2"
-              [ngTemplateOutlet]="balanceSnapshotBox"
-              [ngTemplateOutletContext]="{
-                title: inquireEvents.activeEventTab?.title,
-                status: sel2.contract.status,
-                snapshot: inquireEvents.activeEventTab?.snapshot,
-                impact: inquireEvents.activeEventTab?.impact,
-              }"
-            ></ng-container>
+            </div>
           </ng-container>
         </div>
       </section>

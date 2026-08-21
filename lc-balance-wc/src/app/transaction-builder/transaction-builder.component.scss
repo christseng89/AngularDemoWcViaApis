@@ -730,6 +730,7 @@
 
 .tb-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   border-bottom: 1px solid var(--gray-border);
   padding-bottom: 0;
