@@ -15,23 +15,85 @@
  * before the per-instrument-concurrency requirement can be considered
  * actually validated.
  */
+
+/**
+ * analysis/Balance-Component-DB-Optimization-Analysis.md P1 CHECK-constraint fix (2026-08-21) —
+ * legal-value lists for every enum-typed column, exported so migrations.ts's own table-rebuild
+ * migration (13) can reuse the EXACT same literals rather than risking drift between two hand-typed
+ * copies. Two different authorities, deliberately NOT unified into one convention:
+ *   - InstrumentType/ContractStatus/TenorType/MovementStatus/ExposureNature mirror src/types.ts's own
+ *     union types verbatim (that file is already this app's single authority for these five — see its
+ *     own top doc comment).
+ *   - MovementType has NO src/types.ts union (`movementType` is typed as plain `string` there — see
+ *     BalanceMovement.movementType's own comment); the real authority is
+ *     BalanceService's own `movementTypeRegistry` (`buildMovementTypeRegistry()`), which
+ *     `createMovement()` already enforces at runtime (`Unrecognized movementType "..."` — see that
+ *     method's own doc comment). Verified against the live dev DB before adding these (2026-08-21,
+ *     `SELECT DISTINCT ... GROUP BY` per column) — every value actually persisted so far is already a
+ *     proper subset of the lists below; no dirty/unexpected data found, so the CHECK lists below encode
+ *     the full DECLARED legal domain, not merely what happened to be exercised in the demo dataset.
+ */
+export const INSTRUMENT_TYPE_VALUES = [
+  'IPLC_LC',
+  'EPLC_LC',
+  'IPLC_ACCEPTANCE',
+  'EPLC_ACCEPTANCE',
+  'SHGT',
+  'EPLC_CONFIRMATION',
+  'EPLC_DUE_FROM_ISSUING_BANK',
+  'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+  'EPLC_EXPORT_BILLS_DISCOUNTED',
+  'EPLC_EXAMINATION',
+] as const;
+
+export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCELLED'] as const;
+
+export const TENOR_TYPE_VALUES = ['SIGHT', 'BUYERS_USANCE', 'SELLERS_USANCE', 'DP', 'DA'] as const;
+
+export const MOVEMENT_STATUS_VALUES = ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'] as const;
+
+export const EXPOSURE_NATURE_VALUES = ['CONTINGENT', 'ACTUAL', 'MEMO'] as const;
+
+/** Mirrors BalanceService's own buildMovementTypeRegistry() key set — see this module's own top doc comment. */
+export const MOVEMENT_TYPE_VALUES = [
+  'ISSUE',
+  'CREATE',
+  'AMEND_INCREASE',
+  'AMEND',
+  'AMEND_DECREASE',
+  'UTILIZE',
+  'HONOUR',
+  'ACCEPT',
+  'PARTIAL_REDEEM',
+  'FULL_REDEEM',
+  'REIMBURSE',
+  'RECLASSIFY_OUT',
+  'PARTIAL_SETTLE',
+  'FULL_SETTLE',
+  'CLOSE',
+] as const;
+
+function sqlInList(values: readonly string[]): string {
+  return values.map((v) => `'${v}'`).join(',');
+}
+
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS balance_contracts (
   balance_contract_id            TEXT PRIMARY KEY,
   logical_contract_id            TEXT NOT NULL,
   contract_version               INTEGER NOT NULL,
-  instrument_type                TEXT NOT NULL,
+  instrument_type                TEXT NOT NULL CHECK (instrument_type IN (${sqlInList(INSTRUMENT_TYPE_VALUES)})),
   lc_number                      TEXT NOT NULL,
   ib_number                      TEXT,
   sg_number                      TEXT,
   leg_seq                        TEXT,
   parent_logical_contract_id     TEXT,
-  status                         TEXT NOT NULL,
-  supersedes_balance_contract_id TEXT,
-  superseded_by_balance_contract_id TEXT,
+  status                         TEXT NOT NULL CHECK (status IN (${sqlInList(CONTRACT_STATUS_VALUES)})),
+  supersedes_balance_contract_id TEXT REFERENCES balance_contracts(balance_contract_id),
+  superseded_by_balance_contract_id TEXT REFERENCES balance_contracts(balance_contract_id),
   currency                       TEXT NOT NULL,
   tolerance_pct                  TEXT,
-  tenor_type                     TEXT,
+  tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
   tenor_days                     INTEGER,
   maturity_date                  TEXT,
   opening_balance                TEXT NOT NULL,
@@ -76,8 +138,8 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   balance_contract_id     TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
   event_seq               INTEGER NOT NULL,
   business_event_id       TEXT,
-  movement_type           TEXT NOT NULL,
-  exposure_nature         TEXT NOT NULL,
+  movement_type           TEXT NOT NULL CHECK (movement_type IN (${sqlInList(MOVEMENT_TYPE_VALUES)})),
+  exposure_nature         TEXT NOT NULL CHECK (exposure_nature IN (${sqlInList(EXPOSURE_NATURE_VALUES)})),
   amount                  TEXT NOT NULL,
   ceiling_amount          TEXT NOT NULL,
   currency                TEXT NOT NULL,
@@ -88,9 +150,9 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- {drAccount, crAccount, currency, amount}. Null when out of contingent scope.
   contingent_account_entry TEXT,
   lmts_reservation_id     TEXT,
-  status                  TEXT NOT NULL,
-  superseded_movement_id  TEXT,
-  reversal_of_movement_id TEXT,
+  status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
+  superseded_movement_id  TEXT REFERENCES balance_movements(movement_id),
+  reversal_of_movement_id TEXT REFERENCES balance_movements(movement_id),
   reason_code             TEXT,
   remarks                 TEXT,
   transaction_date        TEXT,

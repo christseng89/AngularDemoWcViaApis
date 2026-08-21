@@ -264,10 +264,21 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     // per-logicalContractId partial unique index (§3.1) would otherwise
     // reject having both versions ACTIVE at once, same ordering a real
     // version-transition transaction must follow.
+    //
+    // markSuperseded()'s own doc comment already says "caller wraps this + the new insert() in one
+    // db.transaction()" — that's not optional once superseded_by_balance_contract_id carries a real FK
+    // (2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P1 migration 13): at the
+    // instant this call sets it to 'bc-v2', that row doesn't exist yet, which a strict per-statement FK
+    // check would reject outright. `PRAGMA defer_foreign_keys = ON` (session-scoped, auto-resets at the
+    // next COMMIT) postpones FK verification to COMMIT time instead of per-statement, which is exactly
+    // what this transient forward-reference needs — by COMMIT, 'bc-v2' below has been inserted for real.
+    db.exec('PRAGMA defer_foreign_keys = ON');
+    db.exec('BEGIN IMMEDIATE');
     contracts.markSuperseded('bc-v1', 'bc-v2', '2026-08-14T01:00:00Z');
     contracts.insert(
       makeContract({ balanceContractId: 'bc-v2', logicalContractId: 'lc-1', contractVersion: 2, status: 'ACTIVE', supersedesBalanceContractId: 'bc-v1' }),
     );
+    db.exec('COMMIT');
 
     const versions = contracts.listVersions('lc-1');
     expect(versions).toHaveLength(2);

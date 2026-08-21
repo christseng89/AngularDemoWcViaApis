@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { createDb } from '../../../src/db';
 import { BalanceContractStore } from '../../../src/store/balanceContractStore';
+import { createLegacyBalanceContractsTable, createLegacyBalanceMovementsTable } from '../helpers/legacyDbFixture';
 
 describe('createDb — real file path (src/db/index.ts)', () => {
   let dir: string;
@@ -107,40 +108,16 @@ describe('createDb — real file path (src/db/index.ts)', () => {
   test('a pre-existing on-disk DB with the OLD single-column idx_contracts_parent is upgraded to the composite (parent_logical_contract_id, instrument_type) definition on re-open', () => {
     const filePath = join(dir, 'balance-component-index-upgrade.sqlite');
 
-    // Simulate a file created by a pre-fix version of this app: the FULL balance_contracts column set
-    // (createDb() itself runs schema.ts's own CREATE TABLE IF NOT EXISTS afterward, which no-ops once
-    // the table already exists by name — so every column its own CREATE INDEX statements reference must
-    // already be present here, or those statements fail with "no such column") but with the OLD
-    // single-column idx_contracts_parent, no schema_migrations table (so migrations 1-11 also apply
-    // fresh here, same as any genuinely pre-fix file).
+    // Simulate a file created by a pre-fix version of this app: the FULL column set for both tables
+    // (createDb() itself runs schema.ts's own CREATE TABLE IF NOT EXISTS afterward, which no-ops once a
+    // table already exists by name — so every column its own CREATE INDEX/migration-13 rebuild references
+    // must already be present here, or those statements fail with "no such column") but with the OLD
+    // single-column idx_contracts_parent, no schema_migrations table (so migrations 1-13 also apply fresh
+    // here, same as any genuinely pre-fix file) — see test/unit/helpers/legacyDbFixture.ts.
     const preFixDb = new DatabaseSync(filePath);
-    preFixDb.exec(`
-      CREATE TABLE balance_contracts (
-        balance_contract_id TEXT PRIMARY KEY,
-        logical_contract_id TEXT NOT NULL,
-        contract_version INTEGER NOT NULL,
-        instrument_type TEXT NOT NULL,
-        lc_number TEXT NOT NULL,
-        ib_number TEXT,
-        sg_number TEXT,
-        leg_seq TEXT,
-        parent_logical_contract_id TEXT,
-        status TEXT NOT NULL,
-        currency TEXT NOT NULL,
-        opening_balance TEXT NOT NULL,
-        effective_from TEXT NOT NULL,
-        created_by TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX idx_contracts_parent ON balance_contracts(parent_logical_contract_id);
-      CREATE TABLE balance_movements (
-        movement_id TEXT PRIMARY KEY,
-        balance_contract_id TEXT NOT NULL,
-        event_seq INTEGER NOT NULL,
-        business_event_id TEXT,
-        status TEXT NOT NULL
-      );
-    `);
+    createLegacyBalanceContractsTable(preFixDb);
+    createLegacyBalanceMovementsTable(preFixDb);
+    preFixDb.exec('CREATE INDEX idx_contracts_parent ON balance_contracts(parent_logical_contract_id)');
     const oldIndexInfo = preFixDb.prepare('PRAGMA index_info(idx_contracts_parent)').all() as { name: string }[];
     expect(oldIndexInfo.map((c) => c.name)).toEqual(['parent_logical_contract_id']);
     preFixDb.close();
