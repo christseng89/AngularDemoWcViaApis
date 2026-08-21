@@ -183,7 +183,7 @@ assessment. See [Gate Conditions](#gate-conditions-before-any-production-conside
 | [BAL-122](#bal-122) | 🟡 Major | Bug | A4's generic "Delete Pending (EC)" button cancels the **upstream A3/A3S Document Arrival**, not an A4-specific record — **Fixed** |
 | [BAL-123](#bal-123) | 🟡 Major | Vulnerability / Design Risk | A4's Maker/Checker 4-eyes gate (`makerSubmittedAt`) is enforced ONLY client-side — the microservice's own `/release` never checks it — **Fixed** |
 | [BAL-115](#bal-115) | 🟡 Major | Bug | `money.ts`'s "only module allowed to construct a Decimal from a wire string" invariant is bypassed at 3 call sites — **Fixed** |
-| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — 10 extractions completed, most recently real Angular child components (`CheckerPanelComponent`/`MakerPanelComponent`), 2,923 → **436 lines**, no longer this sub-project's largest file — **Fixed** |
+| [BAL-003](#bal-003) | 🟡 Major | Code Smell | `transaction-builder.component.ts` God Component — 11 extractions completed, most recently `InquireEventsComponent`/`BalanceSnapshotBoxComponent` (2026-08-21), which also fixed the `transaction-builder.component.scss` `anyComponentStyle` production-build budget overage as a side effect — **Fixed** |
 | [BAL-102](#bal-102) | 🟡 Major | Technical Debt | SQLite whole-file locking blocks per-instrument concurrency — deferred, user-confirmed |
 | [BAL-116](#bal-116) | 🔵 Minor | Code Smell | `zod` is a declared dependency but never used — request validation is manual presence checks only — **Fixed** |
 | [BAL-117](#bal-117) | 🔵 Minor | Security Hotspot | Both Express services' 500 handlers echo raw internal error messages to the client — **Fixed** |
@@ -1000,6 +1000,18 @@ outcome's own extraction). See `lc-balance-wc/CLAUDE.md`'s "BAL-003 'Feature Com
 #2" decision-log entry for the pilot's own detailed narrative (live-browser bug caught and fixed during
 Phase 2, the Phase 3 eligibility-rule regression caught and fixed, Phase 8's own subtlety-preserving
 field grouping).
+
+**Tenth outcome (2026-08-21, user-directed — "Part B 也一起做吧,開始extract InquireEventsComponent"), after
+BAL-003 was already Fixed:** Inquire Events (side tabs, LC Master Records Index, Events Timeline, Original
+Transaction Screen, Balance Tabs) extracted into its own `InquireEventsComponent`; the former shared
+`#balanceSnapshotBox` `ng-template` converted into a real `BalanceSnapshotBoxComponent` alongside it (a
+template ref can't cross a component boundary). Not itself a BAL-003 reopening — the finding's own
+"one class, five/six unrelated jobs" problem was already gone — but it further shrank the file
+(`transaction-builder.component.ts` now 488 lines, `.html` 493, `.scss` 855, down from the Ninth outcome's
+own 436/998ish) and, as a side effect, fixed the separately-tracked `anyComponentStyle` production-build
+budget overage on `transaction-builder.component.scss` (see `lc-balance-wc/CLAUDE.md`'s own decision log).
+`maker-panel.component.ts` (1,222 lines) remains this sub-project's largest file. See
+`lc-balance-wc/CLAUDE.md`'s "Part B" decision-log entry for the full write-up.
 
 ---
 
