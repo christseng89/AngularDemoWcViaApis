@@ -1150,3 +1150,60 @@ threshold. Added two new spec files (`inquire-events.component.spec.ts`,
 existing specs needed zero edits. Full suite re-run and green across all three sub-projects per this file's
 own standing rule: Angular app 1049/1049 (29 suites, 98.73%/96.54%/96.95%/98.96% coverage), `backend/`
 34/34, `microservices/balance-component/` 396/396.
+
+## A9 (SG Redemption) locked to Full Redeem only — BA-confirmed, resolves the `TF_Balance_Component_Mapping` Rule #1 conflict
+
+BA verdict (2026-08-21) on the SG-discharge conflict flagged between `analysis/TF_Balance_Component_Mapping-{en,zh}.xlsx`'s
+own Rule #1 ("SG discharge is instrument-based, not amount-based") and the shipped `PARTIAL_REDEEM`
+capability: **A9 must be Full Redeem only, Amount PROTECTED** (equal to the SG's own Available Balance,
+not user-typed); **A3S is correct as-is, no change** — its own matched SG redemption leg is genuinely
+tied to a real Document Arrival (`MIN(Bill Amount, SG Available Balance)`, linked via `businessEventId`),
+not a standalone partial. Scope confirmed as A9-only, reference-client (Angular) only — the microservice's
+own `PARTIAL_REDEEM` movementType and `domain/shgtRedeem.ts`'s `checkRedeemSufficiency()` are unchanged
+and still accept a Partial Redeem from any other direct API caller (confirmed via code inspection —
+`checkRedeemSufficiency()` checks only `amount <= availableBalance`, with no `businessEventId`/A3S-pairing
+check at all); this is a known, disclosed trade-off, not closed in this pass.
+
+Implemented as a UI-layer lock, not a new backend rule: `builder-fields.ts`'s own Amount field (new
+`amountFromSgRedeem`, folded into `amountLocked`) is now `disabled`, sourced from the SG's Available
+Balance — same fully-locked shape `amountFromClose`/`amountFromFullSettle` already use, just a different
+source figure (Available, not Confirmed — A9 must still net an already-PENDING redemption on the same SG,
+unlike A10/B6's write-off). `submit-rules.ts`'s own REDEEM branch is a defense-in-depth backstop:
+`movementType` is now hardcoded `FULL_REDEEM` and a non-exact-match amount is a hard reject, not a silent
+downgrade to `PARTIAL_REDEEM`. `function-strategy.ts`'s `amountVsAvailableDerivation: 'REDEEM'` flag is
+kept on A9's registry entry unchanged — it now serves purely as an A9 identity marker (parent-eligibility
+hints, historical `PARTIAL_REDEEM` redisplay), not a live derivation choice; `maker-panel.component.ts`'s
+`afterResolved()`/`refreshSelectedContractSnapshot()` already set `model.amount = availableBalance` for
+this case and needed no change. `Balance-Figures-Calculation-Logic.md`/`.docx` updated with the same
+scope note. Full suite re-run and green: Angular app 1049/1049, `backend/` 34/34,
+`microservices/balance-component/` 425/425.
+
+## A9 lock basis clarified: Available Balance, not Confirmed Balance as `Balance-Component-Business-Rule-Decisions-2026-08-21.md`'s own Decision 1 literally says
+
+That memo's own action-item table (item 1) reads `amountAutoFilledFrom: 'confirmedBalance'`, matching
+A10/B6's mechanism verbatim — but user-confirmed via a concrete worked example (SG G01 issued 10,000 →
+A3S already redeems 2,000 against it → A9 must then redeem exactly the remaining **8,000**): Confirmed
+Balance would wrongly still read 10,000 whenever another movement on the same SG is still PENDING at
+redemption time, double-counting capacity already reserved elsewhere. Available Balance (nets PENDING) is
+therefore the correct basis and what was actually implemented (see the entry immediately above) — that
+memo is a point-in-time record per its own convention and is not being edited to reflect this; treat
+`amountAutoFilledFrom: 'availableBalance'` (the shipped behavior) as controlling over that memo's literal
+`'confirmedBalance'` wording wherever the two disagree.
+
+## Balance-Component-Test-Case-Proposal.md §4 — 7 new Business Case Registry entries added, live-verified
+
+`import-case-8` (Sellers Usance → A10 Close), `import-case-9` (Buyer's Usance → A10 Close), `import-case-10`
+(Sight, SG + Document Arrival both to their own terminus → standalone A9 → A10 Close), `import-case-11`
+(A10 eligibility gate negative case, `expectError: true`), `export-case-8` (Sight → B6 Close),
+`export-case-9` (Sellers Usance → B6 Close), `export-case-10` (standalone B2 Amendment, increase then a
+decrease past Tight Available, `expectError: true`) — each extends an existing case's own path through to
+Close rather than inventing a new scenario, since `domain/closeEligibility.ts`'s own preconditions (SG/
+Acceptance Confirmed Balance = 0, no open Event anywhere in the tree) mean A10/B6 can never be a minimal
+standalone case. `backend/data/businessCases.js`'s registry grew from 14 to 21 cases;
+`businessCases.test.js`/`server.test.js` updated to match (`EXPECTED_IDS`, registry-size assertions, the
+`lcNumber` pattern regex widened for two-digit case numbers). All 7 driven live against the real
+microservice via `POST /balance-movements` (Submit) + `/release` (Approve) +
+`import-case-10`'s own real `/maker-submit` — see `analysis/Balance-Component-New-Test-Cases-Verification-2026-08-21.md`
+for the full trace-by-trace result (7/7 pass, both negative cases fail exactly as designed). Action items
+2/3 from the Business Rule Decisions memo (backend `businessEventId` enforcement, `BUYERS_USANCE`
+rejection/normalization) remain deliberately out of scope for this pass, by explicit user direction.
