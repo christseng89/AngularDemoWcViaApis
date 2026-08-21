@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { CheckerPanelComponent } from './checker-panel.component';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
-import type { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
+import type { BalanceComponentApiService, BalanceContract, BalanceMovement, CatalogPage } from './balance-component-api.service';
 
 /**
  * Direct-instantiation, no-TestBed unit tests (same house style as `index-picker.component.spec.ts`) —
@@ -44,10 +44,15 @@ function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
   } as BalanceMovement;
 }
 
+function catalogPage(items: BalanceContract[]): CatalogPage {
+  return { items, total: items.length, page: 1, pageSize: 100 };
+}
+
 function mockApi(overrides: Partial<Record<keyof BalanceComponentApiService, jest.Mock>> = {}) {
   return {
     resolveContract: jest.fn(() => of(contract())),
     listMovements: jest.fn(() => of([])),
+    catalog: jest.fn(() => of(catalogPage([]))),
     ...overrides,
   } as unknown as BalanceComponentApiService;
 }
@@ -70,6 +75,8 @@ describe('CheckerPanelComponent', () => {
     expect(c.checkerItems).toEqual([]);
     expect(c.checkerLoading).toBe(false);
     expect(c.selectedCheckerMovement).toBeNull();
+    expect(c.checkerSecondaryCandidates).toEqual([]);
+    expect(c.checkerAutoPickedHint).toBeNull();
   });
 
   it('exposes movementPicked/queueReloaded/queueLoadSucceeded as EventEmitters', () => {
@@ -130,6 +137,8 @@ describe('CheckerPanelComponent', () => {
       c.checkerContract = contract();
       c.checkerItems = [movement()];
       c.selectedCheckerMovement = movement();
+      c.checkerSecondaryCandidates = [contract({ balanceContractId: 'sg-1' })];
+      c.checkerAutoPickedHint = 'stale hint';
 
       c.ngOnChanges({ resetTrigger: { previousValue: undefined, currentValue: 0, firstChange: true, isFirstChange: () => true } });
       expect(c.checkerContract).not.toBeNull(); // unaffected — firstChange is ignored
@@ -139,6 +148,8 @@ describe('CheckerPanelComponent', () => {
       expect(c.checkerSearchError).toBeNull();
       expect(c.checkerItems).toEqual([]);
       expect(c.selectedCheckerMovement).toBeNull();
+      expect(c.checkerSecondaryCandidates).toEqual([]);
+      expect(c.checkerAutoPickedHint).toBeNull();
       // checkerLcNumber is deliberately NOT part of the reset — see resetPanel()'s own doc comment.
       c.checkerLcNumber = 'S001';
       c.ngOnChanges({ resetTrigger: { previousValue: 1, currentValue: 2, firstChange: false, isFirstChange: () => false } });
@@ -255,8 +266,13 @@ describe('CheckerPanelComponent', () => {
       expect(api.resolveContract).not.toHaveBeenCalled();
     });
 
-    it("requires the secondary ref (IB/SG Number) when the function's instrumentType has one", () => {
-      const api = mockApi();
+    // Business-reported gap 2026-08-21 ("單獨執行 A9 Checker 輸入LC NUMBER 無法自動找到PENDING交易") —
+    // superseded the old blocking "Type a IB/SG Number to search" error: when the secondary field is
+    // left blank, searchCheckerLc() now browses every candidate under the LC instead of demanding the
+    // Checker already know the exact one. See the searchCheckerCandidatesByLcOnly() describe block below
+    // for the 0/1/many-candidate branches.
+    it("delegates to searchCheckerCandidatesByLcOnly() (via catalog()), not a blocking error, when the secondary ref is blank", () => {
+      const api = mockApi({ catalog: jest.fn(() => of(catalogPage([]))) });
       const c = new CheckerPanelComponent(api);
       c.selectedFunction = fn('A7'); // IPLC_ACCEPTANCE -> ibNumber
       c.checkerLcNumber = 'LC1';
@@ -264,7 +280,7 @@ describe('CheckerPanelComponent', () => {
 
       c.searchCheckerLc();
 
-      expect(c.checkerSearchError).toContain('Type a IB Number to search');
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 100, 'LC1');
       expect(api.resolveContract).not.toHaveBeenCalled();
     });
 
@@ -326,6 +342,113 @@ describe('CheckerPanelComponent', () => {
       c.searchCheckerLc();
 
       expect(picked).toHaveBeenCalledWith(null);
+    });
+  });
+
+  // Business-reported gap 2026-08-21 ("單獨執行 A9 Checker 輸入LC NUMBER 無法自動找到PENDING交易") —
+  // A9 (and A6/A7/A8/B3/B4/B5, every function whose instrumentType carries a 2nd natural-key field)
+  // no longer needs the Checker to already know the SG/IB Number before searching.
+  describe('searchCheckerCandidatesByLcOnly() (LC Number typed, secondary ref left blank — triggered from searchCheckerLc())', () => {
+    it('zero candidates: a real error, not a silent empty queue', () => {
+      const api = mockApi({ catalog: jest.fn(() => of(catalogPage([]))) });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9'); // SHGT -> sgNumber, "SG Number"
+      c.checkerLcNumber = 'LC1';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSearchError).toBe('No SG Number record found under this LC.');
+      expect(c.checkerContract).toBeNull();
+      expect(c.checkerSecondaryCandidates).toEqual([]);
+    });
+
+    it('exactly one candidate: auto-resolves, sets checkerAutoPickedHint, and loads its Checker queue — no resolveContract() round trip needed', () => {
+      const sole = contract({ balanceContractId: 'sg-1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G01' } });
+      const pendingRedeem = movement({ movementId: 'redeem-1', status: 'PENDING', movementType: 'FULL_REDEEM', balanceContractId: 'sg-1' });
+      const api = mockApi({
+        catalog: jest.fn(() => of(catalogPage([sole]))),
+        listMovements: jest.fn(() => of([pendingRedeem])),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9');
+      c.checkerLcNumber = 'LC1';
+
+      c.searchCheckerLc();
+
+      expect(api.resolveContract).not.toHaveBeenCalled();
+      expect(c.checkerContract?.balanceContractId).toBe('sg-1');
+      expect(c.checkerSecondaryRef).toBe('G01'); // reflects what was auto-picked, not left blank
+      expect(c.checkerAutoPickedHint).toBe('Only one SG Number under this LC — picked automatically.');
+      expect(c.checkerItems.map((m) => m.movementId)).toEqual(['redeem-1']); // loadCheckerQueue() ran
+    });
+
+    it('more than one candidate: surfaces checkerSecondaryCandidates for the user to pick, without resolving a contract yet', () => {
+      const g01 = contract({ balanceContractId: 'sg-1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G01' } });
+      const g02 = contract({ balanceContractId: 'sg-2', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G02' } });
+      const api = mockApi({ catalog: jest.fn(() => of(catalogPage([g01, g02]))) });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9');
+      c.checkerLcNumber = 'LC1';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSecondaryCandidates).toEqual([g01, g02]);
+      expect(c.checkerContract).toBeNull();
+      expect(c.checkerAutoPickedHint).toBeNull();
+      expect(api.listMovements).not.toHaveBeenCalled();
+    });
+
+    it('a catalog() failure sets checkerSearchError from the server message', () => {
+      const api = mockApi({ catalog: jest.fn(() => apiErr('boom')) });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9');
+      c.checkerLcNumber = 'LC1';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSearchError).toBe('boom');
+      expect(c.checkerSearching).toBe(false);
+    });
+
+    it('a fresh search clears a previous round\'s leftover checkerSecondaryCandidates/checkerAutoPickedHint', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.selectedFunction = fn('A9');
+      c.checkerSecondaryCandidates = [contract()];
+      c.checkerAutoPickedHint = 'stale hint';
+      c.checkerLcNumber = 'LC1';
+      c.checkerSecondaryRef = 'G01'; // a direct, non-ambiguous search this time
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSecondaryCandidates).toEqual([]);
+      expect(c.checkerAutoPickedHint).toBeNull();
+    });
+  });
+
+  describe('onSelectSecondaryCandidate()', () => {
+    it('resolves the matching candidate, sets checkerSecondaryRef from its own natural key, and loads the Checker queue', () => {
+      const g02 = contract({ balanceContractId: 'sg-2', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G02' } });
+      const api = mockApi({ listMovements: jest.fn(() => of([movement({ movementId: 'redeem-1', status: 'PENDING' })])) });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9');
+      c.checkerSecondaryCandidates = [contract({ balanceContractId: 'sg-1' }), g02];
+
+      c.onSelectSecondaryCandidate('sg-2');
+
+      expect(c.checkerSecondaryCandidates).toEqual([]);
+      expect(c.checkerContract?.balanceContractId).toBe('sg-2');
+      expect(c.checkerSecondaryRef).toBe('G02');
+      expect(api.listMovements).toHaveBeenCalledWith('sg-2');
+    });
+
+    it('an unmatched id clears the candidate list without resolving any contract (defensive — app-index-picker only ever emits an id from the list it was given)', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerSecondaryCandidates = [contract({ balanceContractId: 'sg-1' })];
+
+      c.onSelectSecondaryCandidate('does-not-exist');
+
+      expect(c.checkerSecondaryCandidates).toEqual([]);
+      expect(c.checkerContract).toBeNull();
     });
   });
 

@@ -78,6 +78,15 @@ export class CheckerPanelComponent implements OnChanges {
   checkerLoading = false;
   /** This panel's own copy, for `app-index-picker`'s `[selectedId]` highlighting. */
   selectedCheckerMovement: BalanceMovement | null = null;
+  /**
+   * Business-reported gap 2026-08-21 ("單獨執行 A9 Checker 輸入LC NUMBER 無法自動找到PENDING交易") —
+   * populated when `searchCheckerLc()` is run with the SG/IB Number left blank AND more than one
+   * candidate exists under this LC (so which one is genuinely ambiguous, not knowable server-side).
+   * Non-empty only while awaiting that pick; `onSelectSecondaryCandidate()`/a fresh search both clear it.
+   */
+  checkerSecondaryCandidates: BalanceContract[] = [];
+  /** Set alongside a single-candidate auto-resolve — same "picked automatically" convention `app-index-picker`'s own `autoPickedHint` already uses elsewhere in this app. */
+  checkerAutoPickedHint: string | null = null;
 
   constructor(private readonly api: BalanceComponentApiService) {}
 
@@ -115,6 +124,8 @@ export class CheckerPanelComponent implements OnChanges {
     this.checkerSearchError = null;
     this.checkerItems = [];
     this.selectedCheckerMovement = null;
+    this.checkerSecondaryCandidates = [];
+    this.checkerAutoPickedHint = null;
   }
 
   /** Convenience auto-fill for the Checker's own independent search — pre-fills from the Maker's current LC and re-searches; the field stays fully usable on its own regardless, this is a default not a binding. */
@@ -127,14 +138,18 @@ export class CheckerPanelComponent implements OnChanges {
 
   /**
    * Resolves via this function's own `instrumentType`, so a Checker can search/act on a PENDING item
-   * without touching the Maker's own selection flow. The secondary field (IB/SG Number) is mandatory
-   * whenever `checkerSecondaryField` is set — SHGT/Acceptance contracts are keyed by LC + SG/IB Number,
-   * and one LC can have multiple.
+   * without touching the Maker's own selection flow. When the secondary field (IB/SG Number) is set
+   * for this instrumentType (SHGT/Acceptance — LC Number alone doesn't identify which record) AND left
+   * blank, this no longer hard-errors (business-reported gap 2026-08-21, "單獨執行 A9 Checker 輸入LC
+   * NUMBER 無法自動找到PENDING交易") — `searchCheckerCandidatesByLcOnly()` browses every candidate under
+   * this LC instead, auto-picking the sole one or offering a picker when genuinely ambiguous.
    */
   searchCheckerLc(): void {
     this.checkerSearchError = null;
     this.checkerContract = null;
     this.checkerItems = [];
+    this.checkerSecondaryCandidates = [];
+    this.checkerAutoPickedHint = null;
     this.selectedCheckerMovement = null;
     this.movementPicked.emit(null);
     if (!this.selectedFunction) return;
@@ -144,7 +159,7 @@ export class CheckerPanelComponent implements OnChanges {
     }
     const secondaryField = this.checkerSecondaryField;
     if (secondaryField && !this.checkerSecondaryRef) {
-      this.checkerSearchError = `Type a ${this.checkerSecondaryLabel} to search — this LC may have multiple ${this.checkerSecondaryLabel} records, and LC Number alone doesn't identify which one.`;
+      this.searchCheckerCandidatesByLcOnly(secondaryField);
       return;
     }
     this.checkerSearching = true;
@@ -164,6 +179,54 @@ export class CheckerPanelComponent implements OnChanges {
         this.checkerSearchError = describeApiErrorShared(err);
       },
     });
+  }
+
+  /**
+   * LC Number typed, SG/IB Number left blank — browses every ACTIVE candidate of this function's own
+   * instrumentType under `checkerLcNumber` (same `catalog()` + exact-`lcNumber`-match convention the
+   * Maker's own IB/SG Index pickers already use), rather than demanding the Checker already know the
+   * exact secondary key. Zero candidates is a real error; exactly one auto-resolves (mirrors
+   * `app-index-picker`'s own `autoPickedHint` "picked automatically" convention); more than one is
+   * genuinely ambiguous and surfaces as a pick-one list (`checkerSecondaryCandidates`).
+   */
+  private searchCheckerCandidatesByLcOnly(secondaryField: 'ibNumber' | 'sgNumber'): void {
+    if (!this.selectedFunction) return;
+    this.checkerSearching = true;
+    this.api.catalog(this.selectedFunction.instrumentType, 'ACTIVE', undefined, 1, 100, this.checkerLcNumber).subscribe({
+      next: (result) => {
+        this.checkerSearching = false;
+        const items = result.items;
+        if (items.length === 0) {
+          this.checkerSearchError = `No ${this.checkerSecondaryLabel} record found under this LC.`;
+          return;
+        }
+        if (items.length === 1) {
+          this.resolveCheckerContract(items[0]);
+          this.checkerAutoPickedHint = `Only one ${this.checkerSecondaryLabel} under this LC — picked automatically.`;
+          return;
+        }
+        this.checkerSecondaryCandidates = items;
+      },
+      error: (err) => {
+        this.checkerSearching = false;
+        this.checkerSearchError = describeApiErrorShared(err);
+      },
+    });
+  }
+
+  /** A row click from the `checkerSecondaryCandidates` picker — `app-index-picker`'s `pick` emits the row's own `balanceContractId`, same convention as `onSelectCheckerMovement()` below. The contract itself is already in hand from `catalog()`, no extra `resolveContract()` round trip needed. */
+  onSelectSecondaryCandidate(balanceContractId: string): void {
+    const contract = this.checkerSecondaryCandidates.find((c) => c.balanceContractId === balanceContractId);
+    this.checkerSecondaryCandidates = [];
+    if (contract) this.resolveCheckerContract(contract);
+  }
+
+  /** Shared tail for both the single-candidate auto-resolve and a genuine pick from `checkerSecondaryCandidates` — mirrors what `searchCheckerLc()`'s own direct `resolveContract()` success handler does. */
+  private resolveCheckerContract(contract: BalanceContract): void {
+    const field = this.checkerSecondaryField;
+    if (field) this.checkerSecondaryRef = contract.naturalKey[field] ?? '';
+    this.checkerContract = contract;
+    this.loadCheckerQueue();
   }
 
   /**

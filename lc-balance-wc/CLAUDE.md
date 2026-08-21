@@ -946,4 +946,17 @@ visible text label next to it carries the same distinction. All wiring verified 
 (chips on both Import/Export sides, Maker/Checker/Look Up headers, an Inquire Events status-badge table,
 and all 3 theme states) in addition to `ng build`'s template compile check and the full Jest suite (1004
 Angular tests green, no regressions).
+
+## Checker's own independent search auto-resolves SG/IB Number when left blank — business-reported gap ("單獨執行 A9 Checker 輸入LC NUMBER 無法自動找到PENDING交易")
+
+`searchCheckerLc()` (`checker-panel.component.ts`) no longer hard-errors "Type a SG/IB Number to search"
+for SHGT/Acceptance-typed functions (A6–A9/B3–B5) when only the LC Number is typed — same gap first
+reported 2026-08-15 for A8, now recurring for A9 standalone Checker use. New
+`searchCheckerCandidatesByLcOnly()` browses every ACTIVE candidate of the function's own instrumentType
+under that LC via `catalog()` (same exact-`lcNumber`-match convention the Maker's own IB/SG Index pickers
+already use): zero candidates is a real error, exactly one auto-resolves and loads its Checker queue
+directly (`checkerAutoPickedHint`, same "picked automatically" convention `app-index-picker`'s own
+`autoPickedHint` already uses), more than one surfaces a pick-one list (`checkerSecondaryCandidates` +
+`onSelectSecondaryCandidate()`) since which one is genuinely ambiguous. Live-verified against the dev DB
+(S01/S02, both single-SG LCs) — SG Number auto-fills and the queue loads with zero manual typing.
 </content>
