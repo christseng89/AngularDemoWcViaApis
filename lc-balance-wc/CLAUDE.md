@@ -959,4 +959,31 @@ directly (`checkerAutoPickedHint`, same "picked automatically" convention `app-i
 `autoPickedHint` already uses), more than one surfaces a pick-one list (`checkerSecondaryCandidates` +
 `onSelectSecondaryCandidate()`) since which one is genuinely ambiguous. Live-verified against the dev DB
 (S01/S02, both single-SG LCs) — SG Number auto-fills and the queue loads with zero manual typing.
+
+## A6/A3S/B4/B5's compound Checker Release/Reject silently no-opped in a genuinely independent Checker session — business-reported ("B4 Submit 後跳出交易 再進入B4 SEARCH U04或U06 找出交易後點選RELEASE => 無法處理")
+
+Root cause: `TransactionBuilderComponent.release()`/`reject()`'s own top-of-method guard required
+`makerContext.submitResult` (the CURRENT session's own Maker state) — but `isCheckerCompoundOwnSubmission`
+routes A6/B4 (`checkerRelease.settlesDocumentArrival`) into these two methods based purely on
+`selectedCheckerMovement.referencedTransactionId` being set (true for EVERY A6/B4 movement regardless of
+which session Submitted it), and A3S (`documentArrivalWithSg`)/B5 (`amountVsAvailableDerivation ===
+'SETTLE'`) based purely on `businessEventId` being set (same story) — so a Checker who searches
+independently (no Submit in THIS session, `submitResult` null) had the click silently swallowed before
+ever calling the API: no network request, no error, nothing. Reproduced live exactly as reported (B4
+Usance, LC U06) — clicking Release did nothing observable; confirmed via direct microservice calls that
+the release chain itself has zero server-side defect (all 3 legs release cleanly with a proper
+`checkerId`) — the bug is 100% client-side. Fixed by relaxing the guard to
+`!selectedCheckerMovement && !makerContext.submitResult?.movementId` (either is sufficient) — mirrors the
+same "prefer `selectedCheckerMovement`, fall back to `submitResult`" pattern `checkerActions.release()`/
+`reject()` (`checker-actions.service.ts`) and `buildCheckerActionContext()` already use throughout;
+`CheckerActionContext.selectedCheckerMovement`'s own doc comment already documented the intent ("always
+real server data... for a genuinely separate Checker session") — the component's own guard just hadn't
+been updated to match. Scoped to exactly A6/A3S/B4/B5 — every other function (A1–A5, A7–A9, B1–B3) uses
+`checkerAct()`'s own plain-release fallback (`this.api.release(movementId, checkerId)` directly, keyed off
+`selectedCheckerMovement` alone already), which was never affected. Verified: live end-to-end (B4 Usance,
+LC U06 — Release now correctly releases all 3 linked legs, confirmed via the microservice's own
+businessEventId query) plus 6 new unit tests covering the identical "Submit → exit → re-enter as Checker
+→ Release/Reject this PENDING movement" scenario for all 4 affected functions (A6, A3S, B4 Sight+Usance,
+B5) and confirming the true no-op case (nothing selected at all) still no-ops; full suite green (1017
+Angular tests, 98.78% coverage, no regressions).
 </content>

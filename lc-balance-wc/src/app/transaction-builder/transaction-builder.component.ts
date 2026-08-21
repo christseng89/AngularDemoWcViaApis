@@ -355,9 +355,23 @@ export class TransactionBuilderComponent {
     }
   }
 
-  /** A successful Release resets the screen for a new transaction via `selectFunction()`. */
+  /**
+   * A successful Release resets the screen for a new transaction via `selectFunction()`.
+   *
+   * Bug fixed (business-reported 2026-08-21, "B4 Submit 後跳出交易 再進入B4 SEARCH... 點選RELEASE =>
+   * 無法處理" — B4 Submit, leave the screen, re-enter B4, search independently, click Release => nothing
+   * happens): this guard used to require `makerContext.submitResult` (the CURRENT session's own Maker
+   * state) alone — but `isCheckerCompoundOwnSubmission`'s own `settlesDocumentArrival` branch (B4/A6)
+   * routes here based purely on `selectedCheckerMovement.referencedTransactionId` being set, true for
+   * EVERY B4/A6 movement regardless of which session Submitted it — so a genuinely independent Checker
+   * search (submitResult null in THIS session) silently no-opped right here, before ever calling the
+   * API. `buildCheckerActionContext()`/`checkerActions.release()` below already prefer
+   * `selectedCheckerMovement` over `submitResult` throughout (that field's own doc comment: "always real
+   * server data... for a genuinely separate Checker session") — this guard now mirrors that same
+   * either/or, rather than requiring specifically THIS session's own submitResult.
+   */
   release(): void {
-    if (!this.makerContext.submitResult?.movementId) return;
+    if (!this.selectedCheckerMovement && !this.makerContext.submitResult?.movementId) return;
     this.actionBusy = true;
     const fn = this.selectedFunction;
     this.checkerActions.release(this.buildCheckerActionContext()).subscribe((outcome) => {
@@ -438,8 +452,9 @@ export class TransactionBuilderComponent {
     });
   }
 
+  /** Same fix and reasoning as `release()`'s own doc comment immediately above — was gated on `submitResult` alone, silently no-opping for a genuinely independent Checker session on a B4/A6/A3S/B5-shaped movement. */
   reject(): void {
-    if (!this.makerContext.submitResult?.movementId) return;
+    if (!this.selectedCheckerMovement && !this.makerContext.submitResult?.movementId) return;
     this.actionBusy = true;
     this.checkerActions.reject(this.buildCheckerActionContext()).subscribe((outcome) => {
       this.actionBusy = false;

@@ -337,6 +337,27 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.actionBusy).toBe(false);
     });
 
+    // Bug fixed (business-reported 2026-08-21, same guard fix as the B4 test below) — 把所有交易都測一遍:
+    // A6 is the other Import-side settlesDocumentArrival function. A genuinely independent Checker
+    // session never has selectedPayMovement (only ever populated by the SAME Maker session's own picker)
+    // — resolveSettlesDocumentArrivalIds() falls back to selectedCheckerMovement.referencedTransactionId
+    // for the source id instead.
+    it('A6 settlesDocumentArrival, genuinely independent Checker session (submitResult and selectedPayMovement both null): still releases source then Acceptance via referencedTransactionId, not a silent no-op', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A6);
+      setMakerContext(comp, { createdBy: 'maker1' });
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-acceptance', movementType: 'CREATE', status: 'PENDING', referencedTransactionId: 'mv-doc-arrival' });
+      api.release
+        .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
+        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
+
+      comp.release();
+
+      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-doc-arrival', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
+      expect(comp.makerOutcomeSignal?.kind).not.toBe('failed');
+    });
+
     it('A3S documentArrivalWithSg: releases the SG redemption for real, then acknowledges the Document Arrival WITHOUT a second real release call', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3S);
@@ -365,6 +386,26 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       });
       expect(comp.arrivalApproved).toBe(false);
       expect(comp.actionBusy).toBe(false);
+    });
+
+    // Bug fixed (business-reported 2026-08-21, same guard fix as the B4 test below) — 把所有交易都測一遍:
+    // A3S's own linked SG redemption id (arrivalSgRedeemMovementId) is only ever populated in the SAME
+    // Maker session that Submitted it — an independent Checker session resolves it via businessEventId
+    // instead (resolveLinkedMovementId()).
+    it('A3S documentArrivalWithSg, genuinely independent Checker session (submitResult and arrivalSgRedeemMovementId both null): still resolves the SG redemption via businessEventId and acknowledges, not a silent no-op', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A3S);
+      setMakerContext(comp, { createdBy: 'maker1' });
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-doc-arrival', movementType: 'UTILIZE', status: 'PENDING', businessEventId: 'be-2' });
+      api.findByBusinessEventId.mockReturnValueOnce(of([makeMovement({ movementId: 'mv-sg-redeem', movementType: 'FULL_REDEEM', status: 'PENDING' })]) as any);
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-sg-redeem', status: 'RELEASED' }) as any);
+
+      comp.release();
+
+      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-2');
+      expect(api.release).toHaveBeenCalledWith('mv-sg-redeem', 'checker1');
+      expect(api.acknowledge).toHaveBeenCalledWith('mv-doc-arrival', 'checker1');
+      expect(comp.arrivalApproved).toBe(true);
     });
 
     it('B5 settlesAcceptanceOnMature: releases the Acceptance then the matching Receivable, then auto-resets to a fresh B5 screen', () => {
@@ -412,6 +453,28 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
         kind: 'failed',
         message: 'Acceptance settled, but the matching Reimbursement Receivable failed to release: ILLEGAL_STATE_TRANSITION',
       });
+    });
+
+    // Bug fixed (business-reported 2026-08-21, same guard fix as the B4 test below) — 把所有交易都測一遍:
+    // B5's own matchedReceivableMovementId is only ever populated in the SAME Maker session that
+    // Submitted it — an independent Checker session resolves it via businessEventId instead, same
+    // resolveLinkedMovementId() helper A3S uses above.
+    it('B5 settlesAcceptanceOnMature, genuinely independent Checker session (submitResult and matchedReceivableMovementId both null): still resolves the Receivable via businessEventId and releases both legs, not a silent no-op', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(B5);
+      setMakerContext(comp, { createdBy: 'maker1' });
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-settle', movementType: 'FULL_SETTLE', status: 'PENDING', businessEventId: 'be-3' });
+      api.findByBusinessEventId.mockReturnValueOnce(of([makeMovement({ movementId: 'mv-receivable', movementType: 'REIMBURSE', status: 'PENDING' })]) as any);
+      api.release
+        .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
+        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
+
+      comp.release();
+
+      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-3');
+      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-settle', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
+      expect(comp.makerOutcomeSignal?.kind).not.toBe('failed');
     });
 
     // B4's source (B3's Present Docs earmark) is independently Checker-Released before B4 picks it, so
@@ -529,13 +592,64 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
         message: 'Acceptance released, but the Reimbursement Receivable asset failed to release: ILLEGAL_STATE_TRANSITION',
       });
     });
+
+    // Bug fixed (business-reported 2026-08-21, "B4 Submit 後跳出交易 再進入B4 SEARCH U04或U06 找出交易後
+    // 點選RELEASE => 無法處理" — B4 Submit, leave the screen, re-enter B4, search independently, click
+    // Release => nothing happens): a genuinely SEPARATE Checker session never has submitResult or any of
+    // the makerContext.*MovementId fields (those only ever exist in the SAME session that Submitted) —
+    // only selectedCheckerMovement (real server data from the Checker's own independent search) and the
+    // businessEventId/referencedTransactionId correlation it carries. Before the fix, release()'s own
+    // top-of-method guard required submitResult and silently no-opped here, before ever calling the API.
+    it('B4 Usance, genuinely independent Checker session (submitResult and every makerContext leg id null): still resolves and releases all 3 legs via businessEventId, not a silent no-op', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(B4);
+      setMakerContext(comp, { createdBy: 'maker1' }); // submitResult/selectedPayMovement/acceptance*MovementId all null — fresh session
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-accept',
+        movementType: 'ACCEPT',
+        status: 'PENDING',
+        businessEventId: 'be-1',
+        referencedTransactionId: 'mv-b3',
+      });
+      api.findByBusinessEventId.mockReturnValueOnce(
+        of([
+          makeMovement({ movementId: 'mv-accept', movementType: 'ACCEPT', status: 'PENDING' }),
+          makeMovement({ movementId: 'mv-acceptance', movementType: 'CREATE', status: 'PENDING' }),
+          makeMovement({ movementId: 'mv-receivable', movementType: 'CREATE', status: 'PENDING' }),
+        ]) as any,
+      );
+      api.release
+        .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
+        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
+        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
+
+      comp.release();
+
+      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-1');
+      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-accept', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
+      expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
+      expect(comp.makerOutcomeSignal).not.toEqual({ kind: 'failed', message: expect.stringContaining('no') });
+    });
+
+    it('true no-op case survives: neither selectedCheckerMovement nor submitResult set', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(B4);
+      setMakerContext(comp); // submitResult null by default
+      comp.selectedCheckerMovement = null;
+
+      comp.release();
+
+      expect(api.release).not.toHaveBeenCalled();
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
+    });
   });
 
   // ---------------------------------------------------------------------
   // reject()
   // ---------------------------------------------------------------------
   describe('reject()', () => {
-    it('no-ops when there is no submitResult.movementId', () => {
+    it('no-ops when there is no submitResult.movementId (and no selectedCheckerMovement either)', () => {
       const { comp, api } = setup();
 
       comp.reject();
@@ -565,6 +679,19 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'NOT_FOUND' });
       expect(comp.actionBusy).toBe(false);
+    });
+
+    // Same bug/fix as release()'s own "genuinely independent Checker session" test above.
+    it('genuinely independent Checker session (submitResult null): still calls api.reject via selectedCheckerMovement, not a silent no-op', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(B4);
+      setMakerContext(comp, { createdBy: 'maker1' });
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-accept', movementType: 'ACCEPT', status: 'PENDING', businessEventId: 'be-1', referencedTransactionId: 'mv-b3' });
+      api.reject.mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'REJECTED' }) as any);
+
+      comp.reject();
+
+      expect(api.reject).toHaveBeenCalledWith('mv-accept', 'checker1', 'MANUAL_TEST_REJECT');
     });
 
     // Business instruction 2026-08-20 — forwardOutcomeToMaker() now reloads the Checker Queue for any
