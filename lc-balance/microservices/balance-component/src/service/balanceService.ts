@@ -14,7 +14,7 @@
  */
 import { randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
-import { parseMonetaryAmount } from '../money';
+import { describeAmountScaleViolation, parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
@@ -36,7 +36,7 @@ import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
-import { IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
+import { CurrencyMismatchError, IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
   BalanceContract,
@@ -117,7 +117,14 @@ export interface CreateMovementRequest {
   movementType: string;
   eventSeq: number;
   amount: string;
-  currency: string;
+  /**
+   * OAS-GAP-16 direction (a), 2026-08-22 — optional per CURRENCY DERIVATION (balance-component-api.yaml,
+   * documented since v1.0.0, now genuinely enforced): required only for a genuinely root new Logical
+   * Contract (no existing resolution, no parentLogicalContractId); every other case may omit it and the
+   * server derives + validates from the resolved contract or its parent — see
+   * resolveOrCreateContract()'s own doc comment.
+   */
+  currency?: string;
   legRef?: string | null;
   accountEntries?: AccountEntry[] | null;
   businessEventId?: string | null;
@@ -904,7 +911,19 @@ export class BalanceService {
       this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
     }
 
-    if (contract) return contract;
+    if (contract) {
+      // OAS-GAP-16 direction (a), 2026-08-22 — CURRENCY DERIVATION rule 1 (balance-component-api.yaml,
+      // documented since v1.0.0, now genuinely enforced): an existing contract's own currency is
+      // authoritative; a caller-supplied value that disagrees is rejected, omitting it entirely is fine.
+      if (req.currency && req.currency !== contract.currency) {
+        throw new CurrencyMismatchError(
+          `Supplied currency "${req.currency}" does not match this contract's own currency "${contract.currency}" ` +
+            `(balanceContractId ${contract.balanceContractId}) — omit currency entirely; it is derived automatically ` +
+            `from the resolved contract.`,
+        );
+      }
+      return contract;
+    }
 
     if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
     if (!this.movementTypeRegistry[req.movementType]?.isCreating) {
@@ -916,9 +935,26 @@ export class BalanceService {
     // already be Checker-Released. Resolved defensively here (each instrument-specific block below
     // re-resolves the same parent for its own sufficiency check) — a not-found/inactive parent falls
     // through to that block's own, more specific error instead of a generic one here.
+    //
+    // OAS-GAP-16 direction (a) — CURRENCY DERIVATION rule 2, same 2026-08-22 change: a new child
+    // contract takes its currency from THIS parent, never freely typed. A not-found parent leaves
+    // `derivedCurrency` undefined, falling through to rule 3's "genuinely root" branch below — same
+    // lenient "not-found parent is someone else's more specific error to raise" posture the
+    // assertRootIssueReleased check right above already uses.
+    let derivedCurrency: string | undefined;
     if (req.parentLogicalContractId) {
       const parentForIssueCheck = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-      if (parentForIssueCheck) this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
+      if (parentForIssueCheck) {
+        this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
+        if (req.currency && req.currency !== parentForIssueCheck.currency) {
+          throw new CurrencyMismatchError(
+            `Supplied currency "${req.currency}" does not match the parent contract's own currency ` +
+              `"${parentForIssueCheck.currency}" (parentLogicalContractId ${req.parentLogicalContractId}) — omit ` +
+              `currency entirely; it is derived automatically from the parent.`,
+          );
+        }
+        derivedCurrency = parentForIssueCheck.currency;
+      }
     }
 
     // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
@@ -951,7 +987,19 @@ export class BalanceService {
     const newContractCheck = this.newContractSufficiencyRegistry[`${req.instrumentType}:${req.movementType}`];
     if (newContractCheck) newContractCheck(req);
 
-    return this.createContract(req);
+    // OAS-GAP-16 direction (a) — CURRENCY DERIVATION rule 3: a genuinely root new Logical Contract (no
+    // parent resolved above) requires currency to be caller-supplied; it becomes this new contract's own
+    // authoritative value for every future movement against it or anything created under it.
+    if (!derivedCurrency) {
+      if (!req.currency) {
+        throw new RequestValidationError(
+          'currency is required when creating a new root Logical Contract (no existing resolution and no resolvable parentLogicalContractId).',
+        );
+      }
+      derivedCurrency = req.currency;
+    }
+
+    return this.createContract(req, derivedCurrency);
   }
 
   /**
@@ -993,6 +1041,15 @@ export class BalanceService {
     this.assertValidAmount(req.movementType, req.amount);
 
     const contract = this.resolveOrCreateContract(req);
+
+    // OAS-GAP-16 direction (a), 2026-08-22 — the request-layer currency-decimal-scale check
+    // (validation/requestSchema.ts) only runs when the caller supplied `currency`, since that layer has
+    // no contract to resolve one from. Now that `currency` is optional on every non-root call, re-run the
+    // same check here against the RESOLVED contract's own currency — covers both the omitted case (only
+    // checked here) and the supplied-and-matching case (re-checked defensively; the two can never
+    // disagree by this point, resolveOrCreateContract() already rejected a mismatch).
+    const scaleViolation = describeAmountScaleViolation(req.amount, contract.currency);
+    if (scaleViolation) throw new RequestValidationError(scaleViolation);
 
     const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
     if (existing) return { created: false, existing };
@@ -1049,14 +1106,16 @@ export class BalanceService {
 
     // analysis/contingent-liability-ledger.html — server-derived once, here, at creation time; never
     // recomputed later (Event-Level Relationship requirement). Uses the RESOLVED contract's own
-    // tenorType (its declared Sight/Buyer's Usance/Seller's Usance, set at Issue) — not req.tenorType,
-    // which is only ever supplied when THIS call is itself the one creating that contract; for every
-    // other movement against an already-existing contract, contract.tenorType is the only source.
+    // tenorType (its declared Sight/Buyer's Usance/Seller's Usance, set at Issue) and, since 2026-08-22
+    // (OAS-GAP-16 direction (a)), its own resolved currency too — not req.tenorType/req.currency, which
+    // are only ever (optionally) supplied when THIS call is itself the one creating that contract; for
+    // every other movement against an already-existing contract, contract.tenorType/currency are the
+    // only source, and req.currency may be omitted entirely.
     const contingentAccountEntry = deriveContingentAccountEntry({
       instrumentType: req.instrumentType,
       movementType: req.movementType,
       amount: req.amount,
-      currency: req.currency,
+      currency: contract.currency,
       tenorType: contract.tenorType,
     });
 
@@ -1069,7 +1128,7 @@ export class BalanceService {
       exposureNature: req.exposureNature ?? 'CONTINGENT',
       amount: req.amount,
       ceilingAmount: ceilingAmount.toFixed(),
-      currency: req.currency,
+      currency: contract.currency,
       legRef: req.legRef ?? null,
       accountEntries: req.exposureNature === 'MEMO' ? null : (req.accountEntries ?? null),
       contingentAccountEntry,
@@ -1421,7 +1480,10 @@ export class BalanceService {
     return this.movements.findById(movementId)!;
   }
 
-  private createContract(req: CreateMovementRequest): BalanceContract {
+  /** `currency` is the caller's own OAS-GAP-16-derived value (resolveOrCreateContract()'s own three
+   * CURRENCY DERIVATION rules) — never read from `req.currency` directly here, since for a new CHILD
+   * contract it comes from the parent, not necessarily from what the caller typed (or omitted). */
+  private createContract(req: CreateMovementRequest, currency: string): BalanceContract {
     const now = this.now();
     const contract: BalanceContract = {
       balanceContractId: randomUUID(),
@@ -1431,7 +1493,7 @@ export class BalanceService {
       naturalKey: req.naturalKey!,
       parentLogicalContractId: req.parentLogicalContractId ?? null,
       status: 'ACTIVE',
-      currency: req.currency,
+      currency,
       tolerancePct: req.tolerancePct ?? null,
       tenorType: req.tenorType ?? null,
       tenorDays: req.tenorDays ?? null,

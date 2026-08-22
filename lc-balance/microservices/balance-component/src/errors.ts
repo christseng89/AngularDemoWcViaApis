@@ -70,3 +70,16 @@ export class NaturalKeyAlreadyExistsError extends ApiError {
   readonly httpStatus = 409;
   readonly code = 'NATURAL_KEY_ALREADY_EXISTS';
 }
+
+/**
+ * OAS-GAP-16 (Balance Contract Integration Proposal.md), business/architecture-decided 2026-08-22,
+ * direction (a) — CURRENCY DERIVATION (documented in balance-component-api.yaml since v1.0.0) is now
+ * genuinely enforced server-side: a caller-supplied `currency` that does not match the resolved
+ * contract's own (existing contract, or its parent for a new child contract) is rejected outright.
+ * Previously documented but never implemented — `currency` was silently stored verbatim with no
+ * comparison at all; this class, and the throw sites in `resolveOrCreateContract()`, are the fix.
+ */
+export class CurrencyMismatchError extends ApiError {
+  readonly httpStatus = 409;
+  readonly code = 'CURRENCY_MISMATCH';
+}

@@ -30,6 +30,7 @@ grep 結果，沒有未經查證的推測。不是對 OAS 逐條 schema validate
 | 2026-08-22 | 第四輪外部覆核（實機拉取本機檔案核對） | 8.3/10（原 7.2/10） | 確認 CURRENCY DERIVATION 警語處理得當（披露但不擅自決定方向）。**新發現同類問題**：`Error.details.reasonCode`（v1.17.0 新增的 schema）從未真正接通——`ApiError.toBody()` 只回傳 `{code, message}`，`details` 送不出去，OAS-GAP-06 因此被誤標成已解決。獨立核實屬實後**不只補警語，直接修好**：`errors.ts` 的 `ApiError` 新增 `details` 建構子參數，5 個 domain sufficiency-check 函式 + CLOSE 的兩個檢查改為回傳 `reasonCode`，串接到全部相關 `throw` 呼叫點；三個子專案測試套件（微服務 425/425、backend 34/34、Angular 1064/1064）全部重跑並全數通過，OAS 升版至 v1.18.0，本文件同步回填 GAP-06 狀態。此輪也指出一個小的自洽性問題（新增警語沒跟著版本號一起跳）——已在補實作的同一版一併處理 |
 | 2026-08-22 | 第五輪外部覆核（獨立 `tsc --noEmit` 驗證） | 9.4/10（原 8.3/10） | 逐一追蹤全部 8 個 `reasonCode` 值到各自的 `throw` 呼叫點，含最容易漏掉的 CLOSE Release 時重新檢查，確認沒有「宣告了但沒接上」的殘留；獨立在覆核端重跑 `tsc --noEmit` 乾淨過關（Jest 因覆核端掛載環境限制無法獨立重跑，三個測試套件通過數字仍是採信回報，非獨立驗證）。**發現**：本人上一則訊息口頭聲稱 GAP-16「已發決策請求」，但文件本身（rollout 表、GAP-16 小節）當時仍寫「決策請求未發出」——兩邊沒同步。已修正為統一措辭「🟢 決策請求文件已備妥，待轉發」（比單純改成「已發出」更誠實：文件本身無法驗證是否真的轉發出去了），GAP-09 那列同步套用同一措辭 |
 | 2026-08-22 | 第六輪外部覆核（三份決策請求文件核對） | 9.6/10（原 9.4/10） | 確認「已備妥待轉發」措辭統一套用到 GAP-16/09/15 三列，全文 grep 無殘留「已發出」；核實新建的 `Natural-Expiry-Scope-Decision-Request.md` 格式/範疇界定品質跟前兩份一致；確認 `TF-Solutions-Tenant-Topology-Decision-Request.md` 確實未被改動。**發現**：本表本身這輪沒有跟著 rollout 表狀態欄更新留下自己的一列——本列即補記 |
+| 2026-08-22 | 業務/架構回覆落地 | — | 業務/架構側回覆：GAP-16 選方向 (a) 服務端補實作，GAP-09 確認需對接多家分行/多家銀行，GAP-15 本輪暫緩列入下一輪計畫。GAP-16 直接落地為程式碼：`errors.ts` 新增 `CurrencyMismatchError`，`resolveOrCreateContract()` 加上三條 CURRENCY DERIVATION 規則的真正推導/比對邏輯，`createContract()`/`createMovement()` 兩處改用已解析的 `contract.currency`，`validation/requestSchema.ts` 的 `currency` 改為選填並把小數位檢查在省略情境下移到 service 層重跑；新增 7 個單元測試，三個子專案測試套件全部重跑綠燈（微服務 432/432、backend 34/34、Angular 1064/1064）；OAS 移除矛盾警告、改為 RESOLVED 說明，v1.18.0 → v1.19.0。GAP-09 拓撲定案寫入文件，但技術方案（含程式碼）依提案自己原本的範圍界定，留待 GAP-01 認證機制選型後才動手，這輪未寫程式碼 |
 
 各輪完整評分細項（分維度分數、逐條複驗過程）留在覆核當下的討論紀錄，不重複嵌入本文件正文——避免文件
 隨覆核輪次增加而越來越像審查紀錄，而非工程合約規格。
@@ -49,14 +50,18 @@ grep 結果，沒有未經查證的推測。不是對 OAS 逐條 schema validate
 3. **內容都在，但結構鬆散、要讀者自己拼湊；或屬於更長期的架構/治理備註**（P2）——不會直接出錯，但拖
    慢整合團隊上手速度，或需要提早記錄以免將來設計互相打架。
 
-（2026-08-22 更新：目前共 16 項發現 [OAS-GAP-01～16]，其中 GAP-06/GAP-10 已實際落地到 OAS v1.17.0，
-GAP-03/GAP-05 的警語也已補進 OAS 正文——完整版本歷程與各項目目前狀態，詳見上方「審查與版本歷程」和下方
-「建議落地順序」表格最後一欄。**OAS-GAP-16 優先度高於 P0**，是本文件目前唯一標記 🔴 的項目，見下方
-「🔴 OAS-GAP-16」獨立小節。）
+（2026-08-22 更新：目前共 16 項發現 [OAS-GAP-01～16]，其中 GAP-06/GAP-10/**GAP-16** 已實際落地到 OAS
+（v1.17.0、v1.19.0），GAP-03/GAP-05 的警語也已補進 OAS 正文，GAP-09 的租戶拓撲已定案（多機構，技術方案
+待 GAP-01 認證機制選型）——完整版本歷程與各項目目前狀態，詳見上方「審查與版本歷程」和下方「建議落地
+順序」表格最後一欄。GAP-16 原本優先度高於 P0，現已解決，見下方「✅ OAS-GAP-16」獨立小節。）
 
 ---
 
-## 🔴 OAS-GAP-16 — CURRENCY DERIVATION 規則與實際微服務行為直接矛盾（比 P0 更優先）
+## ✅ OAS-GAP-16 — CURRENCY DERIVATION 規則與實際微服務行為直接矛盾（曾比 P0 更優先，已解決）
+
+> **✅ 已解決（2026-08-22，OAS v1.19.0）**：業務/架構側選擇 **方向 (a) — 服務端補實作**，讓行為追上
+> 文件，已落地並通過三個子專案測試套件驗證。見本節末尾「實作狀態」小節。以下內容保留原本的分析與判斷
+> 依據，作為歷史紀錄。
 
 **分級比 P0 更高**：P0～P2 的其他 15 項都是「合約沒講清楚」或「合約裡缺東西」；這一項不同——**合約講得
 非常詳細、非常肯定，但服務端的真實行為完全是另一回事**。任何相信這份合約去做直接對接的團隊會立刻撞牆，
@@ -98,6 +103,20 @@ v1.0.0 就存在，一路延續到 v1.17.0，不是這次修訂引入的新問�
 **建議**：這是需要問業務/架構側的問題，跟 OAS-GAP-09 的租戶拓撲問題性質一樣——先確認方向再動手，不要
 假設答案。可以比照 `TF-Solutions-Tenant-Topology-Decision-Request.md` 的做法，另外發一份決策請求。
 
+**實作狀態：✅ 已完成（2026-08-22，OAS v1.18.0 → v1.19.0）**。落地內容——`errors.ts` 新增
+`CurrencyMismatchError`（`409 CURRENCY_MISMATCH`）；`resolveOrCreateContract()` 加上真正的推導/比對邏輯
+（三種情境：解析到既有合約 → 比對其 currency，不符則拒絕；創建子合約且 parent 可解析 → 比對 parent 的
+currency；沒有可推導來源的根創建 → currency 仍然必填，成為新合約的權威值）；`createContract()` 改成接
+收已推導好的 currency 參數，不再直接讀 `req.currency`；`createMovement()` 裡兩處原本用 `req.currency`
+的地方（`contingentAccountEntry` 推導、`BalanceMovement.currency` 欄位）改用已解析的 `contract.currency`；
+`validation/requestSchema.ts` 的 `currency` 改成選填（非空字串限制仍在），原本綁在該層的幣別小數位檢查
+在 currency 省略時改成在 service 層對已推導出的 currency 重新驗證一次，確保省略 currency 時精度檢查不
+會被繞過。這是真正的行為變更，不是純文件補強——但對現有呼叫方（Angular UI，每次都送 currency 且必然
+一致）沒有影響，只有省略 currency 或送出不一致 currency 的呼叫方會看到新行為。新增 7 個單元測試涵蓋
+既有合約/父合約的比對成功與失敗案例、根創建仍必填、省略時的小數位檢查；三個子專案測試套件全部重跑確認
+綠燈（微服務 432/432、backend 34/34、Angular 1064/1064）才算完成。OAS 的「已確認矛盾」警告已移除，
+CURRENCY DERIVATION 區塊改成「✅ RESOLVED」說明，新增 v1.19.0 changelog 條目。
+
 ---
 
 ## P0 — 會直接擋掉正式對外開放，不只是文件問題
@@ -122,10 +141,11 @@ OAuth2 client-credentials？內部 API Gateway 簽章?），才能回頭補 `sec
 
 ### OAS-GAP-09 — 完全沒有租戶/分行/機構區隔欄位（外部覆核新增，2026-08-22）
 
-> **⚠️ 待業務確認**：本項的 P0 定級前提是「TF Solutions 需要對接多家分行或多家銀行」——這是覆核當下
-> 的假設，尚未跟業務側確認過。若 TF Solutions 實際上只對接單一機構，本項可降級為 P1 甚至延後至第二個
-> 外部串接方出現時再處理。**啟動本項工作前的第一個動作項，是確認 TF Solutions 的租戶拓撲，而不是直接
-> 假設多租戶並開始設計**——見下方「建議落地順序」的第 0 步。
+> **✅ 拓撲已定案（2026-08-22）**：業務側回覆——TF Solutions 需要對接**多家分行/多家銀行**。P0 定級
+> 前提成立，維持 P0，跟 OAS-GAP-01 併同一輪決策。**但技術方案尚未設計**：`TF-Solutions-Tenant-
+> Topology-Decision-Request.md` 本身已明確把「租戶隔離的具體技術方案」和「認證機制選型」都列為這次
+> 決策範圍之外、留給後續工程設計階段——而 OAS-GAP-01 的認證機制（mTLS/OAuth2/API Gateway 簽章）目前
+> 仍未有人決定。在認證機制定案之前，不會直接寫租戶隔離的程式碼——兩者要一起設計，分開做會需要之後重工。
 
 全檔 grep `tenant`/`branch`/`entityId`/`businessUnit` 零命中。`BalanceContract`/`BalanceMovement` 的
 自然鍵（LC/IB/SG Number）目前是**單一全域命名空間**——沒有任何欄位標示「這筆合約屬於哪個分行/哪個銀行
@@ -428,6 +448,9 @@ Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以
 
 ### OAS-GAP-15 — 找不到 `EXPIRE`（自然到期）對應的 movementType 或事件（外部覆核新增，2026-08-22）
 
+> **⏸️ 本輪暫緩，列入下一輪計畫（2026-08-22）**：業務/架構側這輪尚未回覆，決策請求先保留在「已備妥待
+> 轉發」狀態，不阻塞這輪 GAP-16/GAP-09 的落地工作。
+
 > **⚠️ 待業務/架構確認，不是缺陷**：A10/B6 Close 的設計明確自比為「cancellation before expiry」——也就
 > 是說，Close 是 Maker/Checker 觸發的**提前**結案，隱含存在一個對應的、日期觸發的**自然到期**流程。但
 > 整份合約（15 個 `movementType` 值逐一核對過，見 OAS-GAP-06 新增的 enum）裡找不到任何 `EXPIRE` 或等效
@@ -445,10 +468,10 @@ Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以
 
 | 順序 | 項目 | 決策負責單位 | 粗估工作量 | 狀態 |
 |---|---|---|---|---|
-| 🔴 -1 | **OAS-GAP-16 — CURRENCY DERIVATION 該補實作還是改文件**，兩個方向互斥，需先定案（見上方對照表） | 業務 + 架構 | 小（1 次會議，決定方向）＋依方向而定的後續工作量 | 🟢 決策請求文件已備妥（`Currency-Derivation-Decision-Request.md`），待轉發——優先度高於第 0 步 |
+| — | ~~OAS-GAP-16 — CURRENCY DERIVATION 該補實作還是改文件~~ | 業務 + 架構 → 後端 | 已完成 | ✅ 已完成（方向 (a)，OAS v1.19.0，見 ✅ OAS-GAP-16 小節「實作狀態」） |
 | 0 | 確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度 | 業務 | 小（1 次會議） | 🟢 決策請求文件已備妥（`TF-Solutions-Tenant-Topology-Decision-Request.md`），待轉發 |
 | — | 確認自然到期（EXPIRE）是否屬於本合約範圍 — 決定 OAS-GAP-15 要不要成為正式項目 | 業務 + 架構 | 小（1 次會議，可與第 0 步併同一次討論） | 🟢 決策請求文件已備妥（`Natural-Expiry-Scope-Decision-Request.md`），待轉發 |
-| 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（視第 0 步的租戶模型決策而定，含 Angular UI／Business Case Runner 同步改造） | ⬜ 未開始 |
+| 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（拓撲已定案為多機構，範圍不會再縮小；仍卡在 GAP-01 認證機制選型未決定） | 🟡 拓撲已定案（多機構），技術方案待 GAP-01 認證機制選型後才能設計，未動程式碼 |
 | 2 | OAS-GAP-02（跨合約 Checker 待辦清單端點，設計時一併記錄 OAS-GAP-11 的長期方向） | 架構 + 前端 | 中 | ⬜ 未開始 |
 | 3 | OAS-GAP-03（A9 UI 政策 vs API 實際行為的落差，含全面盤點是否還有類似落差） | 業務 + 架構 | 小～中（盤點階段小，若發現更多落差則視數量放大） | 🟡 文件面已補警語，行為/政策決策未落地 |
 | 4 | OAS-GAP-06（`Error.code` 改 `enum` + `details.reasonCode`） | 後端 | 小 | ✅ 已完成（schema v1.17.0，實作接通 v1.18.0） |

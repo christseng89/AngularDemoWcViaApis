@@ -12,7 +12,7 @@
 import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { InvalidMonetaryAmountError } from '../../../src/money';
-import { IllegalStateTransitionError } from '../../../src/errors';
+import { CurrencyMismatchError, IllegalStateTransitionError, RequestValidationError } from '../../../src/errors';
 
 describe('BalanceService.createMovement — parseMonetaryAmount enforcement at the service layer (BAL-115)', () => {
   test('AMEND_DECREASE with a malformed amount throws InvalidMonetaryAmountError, not a silent NaN comparison', () => {
@@ -986,5 +986,165 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
     // referenced movement's own presentDocsConsumedAt — it isn't an EPLC_EXAMINATION/CREATE at all, so
     // the auto-consume side effect's own type/instrumentType guard must correctly skip it.
     expect(() => service.release(acceptance.movement.movementId, 'checker1')).not.toThrow();
+  });
+});
+
+describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026-08-22 business/architecture decision: server-side implementation, not a doc rewrite)', () => {
+  test("a caller-supplied currency that disagrees with an EXISTING contract's own currency is rejected", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CUR-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.movement.balanceContractId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: 2,
+        amount: '1000',
+        currency: 'EUR',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(CurrencyMismatchError);
+  });
+
+  test('omitting currency against an EXISTING contract derives it automatically — no error, no currency required', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CUR-002' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_INCREASE',
+      eventSeq: 2,
+      amount: '1000',
+      createdBy: 'maker1',
+      // currency intentionally omitted
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+    expect(amend.movement.currency).toBe('USD');
+  });
+
+  test("a caller-supplied currency that disagrees with the PARENT contract's own currency is rejected when creating a new child contract", () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CUR-003' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'CUR-003', sgNumber: 'G01' },
+        parentLogicalContractId: issue.movement.eventSnapshot!.logicalContractId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'EUR',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(CurrencyMismatchError);
+  });
+
+  test('omitting currency when creating a new child contract under a parent derives it from the parent', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CUR-004' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const sg = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'CUR-004', sgNumber: 'G01' },
+      parentLogicalContractId: issue.movement.eventSnapshot!.logicalContractId,
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '1000',
+      createdBy: 'maker1',
+      // currency intentionally omitted
+    });
+    if (!sg.created) throw new Error('expected a new movement');
+    expect(sg.movement.currency).toBe('USD');
+  });
+
+  test('creating a genuinely root new Logical Contract (no existing resolution, no parent) still requires currency', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'CUR-005' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+        // currency intentionally omitted — nothing to derive it from
+      }),
+    ).toThrow(RequestValidationError);
+  });
+
+  test('an omitted currency still gets the decimal-scale check applied server-side, against the derived currency', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CUR-006' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'JPY',
+      tenorType: 'SIGHT',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.movement.balanceContractId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: 2,
+        amount: '1000.50', // JPY allows 0 decimal places — this layer never saw a `currency` to check it against
+        createdBy: 'maker1',
+        // currency intentionally omitted
+      }),
+    ).toThrow(RequestValidationError);
   });
 });
