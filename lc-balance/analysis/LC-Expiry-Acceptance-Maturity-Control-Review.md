@@ -1,7 +1,7 @@
 # LC Expiry Date / Acceptance Maturity Date 控制提案 — 審查與修訂
 
 **審查對象**：LC Expiry Date 與 Acceptance Maturity Date 對 A2–A10 / B2–B6 的控制設計
-**審查依據**：`lc-balance/CLAUDE.md` 決策日誌、`microservices/balance-component/src` 實際原始碼、`cs-tf-balance-knowhow` 知識庫（`rationale-en.md` §3.9/§7.7、`impl-spec-en.md` 不變式 I4/I12）——`closeEligibility.ts` 檔頭註解本身就引用「cs-tf-balance-knowhow's rationale §3.9/§7.7」，所以這份知識庫是本提案理應對齊的同一份權威依據，不是外部引入的新標準
+**審查依據**：`lc-balance/CLAUDE.md` 決策日誌、`microservices/balance-component/src` 實際原始碼、`cs-tf-balance-knowhow` 知識庫（`rationale-en.md` §3.9/§7.7、§12 不變式 I4/I12、§14「Implementation checklist」；`impl-spec-en.md` §13「Deployment validation gates」/§14「Build sequence」——**兩份文件的章節編號各自獨立，同樣是「§14」但內容不同，第四輪外部覆核發現本文件第一版把 §12/§14 的內容誤標成 `impl-spec-en.md`，已於本版全數改為正確的 `rationale-en.md` 出處**）——`closeEligibility.ts` 檔頭註解本身就引用「cs-tf-balance-knowhow's rationale §3.9/§7.7」，所以這份知識庫是本提案理應對齊的同一份權威依據，不是外部引入的新標準
 **審查日期**：2026-08-22
 
 ## 審查與版本歷程
@@ -10,15 +10,17 @@
 |---|---|---:|---|
 | 第一輪 | 逐條核對原提案與現行原始碼，發現「Expiry 只擋新曝險、未觸發殘值釋放」為 Critical 缺口，並補上被遺漏的 B6 | — | 已交付 |
 | 第二輪 | 依第二輪覆核意見（同一角色設定，9.3/10，要求三項修正後採用）逐項採納：**A7/B5 Maturity 改為可授權的 Early Settlement 例外而非硬性 Gate**、**`mail_float_grace` 改為可配置政策**、**Presentation Date 缺口優先級由 Medium 提升至 High**；另修正「第三種控制」與原提案既有③重號的編號錯誤（改為④），並補上 Export B6 的範疇界定說明 | 9.3 → 全數採納 | 已交付 |
-| 第三輪（本版） | 依第三輪覆核意見（9.7/10，**APPROVE WITH MINOR ENHANCEMENTS**）採納三項次要建議：**Phase Sequencing 依 Risk Priority 重排**（A7/B5 Maturity Control 提前到 Phase 1）、**Acceptance Maturity Date 正式定義為 Calculated（Base Date + Tenor + Business Day Convention），Maker 僅在被授權時可覆寫**、**`floatDays` 補上 Calendar/Business Days 區分與 `holidayCalendar`/`placeOfExpiryTimezone`**；並依覆核意見在文件開頭正式標註為「已核准的 Design Decision Basis」，附上最高層 Business Principle | 9.7 — **APPROVE WITH MINOR ENHANCEMENTS** | 本文件 |
+| 第三輪 | 依第三輪覆核意見（9.7/10，**APPROVE WITH MINOR ENHANCEMENTS**）採納三項次要建議：**Phase Sequencing 依 Risk Priority 重排**（A7/B5 Maturity Control 提前到 Phase 1）、**Acceptance Maturity Date 正式定義為 Calculated（Base Date + Tenor + Business Day Convention），Maker 僅在被授權時可覆寫**、**`floatDays` 補上 Calendar/Business Days 區分與 `holidayCalendar`/`placeOfExpiryTimezone`**；並依覆核意見在文件開頭正式標註為「已核准的 Design Decision Basis」，附上最高層 Business Principle | 9.7 — APPROVE WITH MINOR ENHANCEMENTS | 已交付 |
+| 第四輪 | 獨立於前三輪的**引用核實**（直接逐條比對 `cs-tf-balance-knowhow` 原始檔案，而非只核對程式碼宣稱），8.6/10，「可開發但分兩軌走」。發現兩項引用問題，**逐條重新核對原始檔案後**：**引用出處錯誤（真實）**——第 9 節/文件開頭把 `rationale-en.md` §14「Implementation checklist」（含「Must fix before go-live」清單，`LC_EXPIRE`/`CNF_EXPIRE` 確實列於其中）誤標成 `impl-spec-en.md` §14——`impl-spec-en.md` §14 其實是「Build sequence」，內容不同，兩份文件章節編號各自獨立；已修正出處，並補上 `impl-spec-en.md` §14 Phase 2 scope「expiry batch」作為第二份文件的獨立佐證。**I4/I12「被揉合改寫」的指控（不成立）**——直接重新對照 `rationale-en.md` §12 原文，本文件的 I4/I12 引用逐字相符，未被改寫；已於附錄四記錄核對過程與結論 | 8.6（其中「引用出處錯誤」項成立並已修正；「I4/I12 被改寫」項經重新核對不成立） | 已交付 |
+| 第五輪（本版） | 第四輪覆核者自行重新核對 `rationale-en.md` 第 1557-1576 行、第 1663-1685 行後，**撤回自己上一輪「I4/I12 被揉合改寫」的指控**，確認附錄四的核對結果（引用逐字相符、未被改寫）成立，錯誤出在第四輪覆核只查了 `impl-spec-en.md` 自己的 I4/I12 與 §14，沒意識到兩份文件章節編號各自獨立。「引用出處標錯檔名」（`impl-spec-en.md` → `rationale-en.md`）維持認定為真實問題，已在第四版修正，本身不影響設計邏輯與程式碼層面宣稱的正確性。**最終結論：Phase 0–3 可交付開發，④EXPIRY RESIDUAL RELEASE 續與 GAP-15 掛鉤，文件本身可送出** | 9.5（出處標錯本身仍列入文件品質扣分，內容與設計邏輯全部確認無誤） | 本文件 |
 
-各輪覆核的完整意見與計分保留在會議/對話紀錄中，不重複嵌入本文件正文（比照 `Balance Contract Integration Proposal.md` 自己的既有慣例：版本歷程只記重點，不把每輪覆核全文搬進來）。本文件末尾附錄二、附錄三分別列出第二輪、第三輪覆核逐點的採納結果。
+各輪覆核的完整意見與計分保留在會議/對話紀錄中，不重複嵌入本文件正文（比照 `Balance Contract Integration Proposal.md` 自己的既有慣例：版本歷程只記重點，不把每輪覆核全文搬進來）。本文件末尾附錄二、附錄三、附錄四分別列出第二、第三、第四輪覆核逐點的採納/核實結果。
 
 ---
 
-> ## ✅ 已核准 — 正式 Design Decision Basis（第三輪覆核，9.7/10，APPROVE WITH MINOR ENHANCEMENTS）
+> ## ✅ 已核准並確認可送出（第三輪 9.7/10 APPROVE WITH MINOR ENHANCEMENTS → 第四輪引用核實 8.6/10 → 第五輪覆核者自行覆核後確認引用準確、定案 9.5/10）
 >
-> 本文件經三輪覆核（同一 CITF/Trade Finance Balance Solution Architect 角色設定）後核准，作為 **Balance Component Expiry / Maturity Date Control 的正式 Design Decision Basis**。以下最高層 Business Principle 為本文件的結論濃縮，比照 CLAUDE.md 既有「建議寫進最高層 Business Rule」的慣例（見 `lc-payment-wc/CLAUDE.md`「Charge Component ↔ Payment Component boundary」段落同一寫法），可直接引用進未來的 Design Doc 或決策日誌：
+> 本文件經三輪內部覆核（同一 CITF/Trade Finance Balance Solution Architect 角色設定）後核准，作為 **Balance Component Expiry / Maturity Date Control 的正式 Design Decision Basis**；第四輪為獨立於前三輪之外的**引用核實**（直接比對 `cs-tf-balance-knowhow` 原始檔案），修正了一處真實的引用出處錯誤（見附錄四）；第五輪由第四輪覆核者自行重新核對原始檔案後，撤回上一輪對 I4/I12 的錯誤指控，確認引用準確，設計邏輯與程式碼層面的宣稱始終未被推翻——**Phase 0–3（欄位補齊、A7/B5 Maturity Control、NEW EXPOSURE 控制、Amendment 子類型）可交付開發，④EXPIRY RESIDUAL RELEASE 維持與 GAP-15 決策掛鉤，文件本身可送出**。以下最高層 Business Principle 為本文件的結論濃縮，比照 CLAUDE.md 既有「建議寫進最高層 Business Rule」的慣例（見 `lc-payment-wc/CLAUDE.md`「Charge Component ↔ Payment Component boundary」段落同一寫法），可直接引用進未來的 Design Doc 或決策日誌：
 >
 > > **LC Expiry Date governs new contingent exposure and the eventual release of residual unused contingent liability, but does not automatically extinguish valid existing obligations. Acceptance Maturity Date governs the due lifecycle of an established Acceptance, while settlement before maturity must be explicitly classified and authorized rather than automatically rejected.**
 >
@@ -76,7 +78,7 @@
 
 Export/Confirmation 側（§7.7）是同一個問題、同一個修正：「Trigger on `expiry_date + mail_float_grace` at the **place of expiry**」。
 
-對應到 `impl-spec-en.md` 的不變式：
+對應到 `rationale-en.md` §12「Invariants to enforce in code, not in reporting」的不變式（原文逐字引用，非摘要改寫——第四輪外部覆核質疑這兩條被「揉合改寫」，經直接重新核對原始檔案確認並無此事，見附錄四）：
 
 ```text
 I4  No undertaking may remain OUTSTANDING past expiry + presentation period + float
@@ -368,7 +370,7 @@ A10/B6 Close 刻意不畫進這張圖——如第 5 節所述，它與 Expiry Da
 
 本專案目前有一份**尚未拿到答案**的決策請求，問的正是「LC/Confirmation 的自然到期是不是 Balance Component 該管的事」。這份文件的討論（尤其第 1、5、6、8 節）跟這份決策請求問的是同一件事，兩者應該併同討論，而不是各自獨立存在。
 
-本文件立場是：不代替業務/架構側做決定，但**指出這個決策請求本身引用的權威依據（`cs-tf-balance-knowhow` §3.9/§7.7，同時也是 `closeEligibility.ts` A10/B6 設計時引用的同一份依據），已經對這個問題給出了明確立場**——`impl-spec-en.md` §14「Implementation checklist」把 `LC_EXPIRE`/`CNF_EXPIRE` 列在「**Must fix before go-live**」，不是「視情況而定」的選配項。這不等於 GAP-15 就該直接結案定調成「要做」——租戶拓撲、SLA、跟外部批次系統的分工都還沒釐清，是合理的、需要另外討論的落地考量——但「這件事在概念上屬不屬於 Balance Component 的職責範圍」這個較窄的問題，手上已有的同一份設計依據並不支持「完全是外部批次流程的職責、跟本合約無關」這個答案。
+本文件立場是：不代替業務/架構側做決定，但**指出這個決策請求本身引用的權威依據（`cs-tf-balance-knowhow` §3.9/§7.7，同時也是 `closeEligibility.ts` A10/B6 設計時引用的同一份依據），已經對這個問題給出了明確立場**——`rationale-en.md` §14「Implementation checklist」把 `LC_EXPIRE`/`CNF_EXPIRE` 列在「**Must fix before go-live**」，不是「視情況而定」的選配項；`impl-spec-en.md` §14「Build sequence」的 Phase 2（Import）scope 欄位也把「expiry batch」列為 Import 建置範圍的一部分，兩份獨立文件方向一致（`impl-spec-en.md` §13「Deployment validation gates」的 G1–G14 沒有專門針對 `LC_EXPIRE`/`CNF_EXPIRE` 命名的部署 gate，這一點不影響上述結論——建置排程與部署 gate 是兩個不同層次的問題，前者已經明講要做，後者沒有專屬 gate 只代表這個事件目前沒有被獨立列為上線關卡，不代表它不屬於建置範圍）。這不等於 GAP-15 就該直接結案定調成「要做」——租戶拓撲、SLA、跟外部批次系統的分工都還沒釐清，是合理的、需要另外討論的落地考量——但「這件事在概念上屬不屬於 Balance Component 的職責範圍」這個較窄的問題，手上已有的同一份設計依據並不支持「完全是外部批次流程的職責、跟本合約無關」這個答案。
 
 **建議**：把本文件（尤其第 1、5、6 節）作為 `Natural-Expiry-Scope-Decision-Request.md` 那次會議的討論素材之一併送出。
 
@@ -414,6 +416,22 @@ A10/B6 Close 刻意不畫進這張圖——如第 5 節所述，它與 Expiry Da
 | Export B6 應標註「主要範疇是 A2–A10/B2–B5，B6 為 Related Close Control」 | ✅ 第 4 節新增範疇界定說明框 |
 | Business Date ≠ System Timestamp 應列為架構不變式 | ✅ 第 2 節新增 |
 | 整合 Date Control Lifecycle 圖 | ✅ 第 8 節採納，依本文件既有用詞調整後納入 |
+
+## 附錄四：第四輪「引用核實」逐項覆核結果
+
+第四輪覆核的方法是獨立於前三輪之外，直接逐條比對 `cs-tf-balance-knowhow` 的原始參考檔案（`rationale-en.md`、`impl-spec-en.md`），而不只是核對程式碼層面的宣稱。以下是本版重新核對後的結論，附核對方式，供後續任何人再次覆核時可直接重現：
+
+| 覆核指控 | 重新核對方式 | 結論 |
+|---|---|---|
+| 程式碼層面宣稱（`expiryDate` 不存在、`maturityDate` 孤兒欄位、`closeEligibility.ts`/`evaluateCloseEligibility()`、Angular 無 `maturityDate` 輸入點） | 沿用第 2、5 節已列出的檔案/行號 | ✅ 全部屬實，覆核本身也確認無誤，不需修改 |
+| `rationale-en.md` §3.9/§7.7 直接引用文字 | 覆核逐字比對原始檔案 | ✅ 屬實，覆核確認無誤 |
+| `LC_AMD_TENOR` 事件定義 | 覆核逐字比對原始檔案 | ✅ 屬實，覆核確認無誤 |
+| 「`impl-spec-en.md` §14「Implementation checklist」把 LC_EXPIRE/CNF_EXPIRE 列在 Must fix before go-live」——覆核指控這是編造，因為 `impl-spec-en.md` §14 實為「Build sequence」 | 本版重新直接 grep 兩份檔案的章節標題：`impl-spec-en.md` §13 = "Deployment validation gates"（G1–G14 全部列出，無 LC_EXPIRE 專屬 gate）、§14 = "Build sequence"；`rationale-en.md` §14 = "Implementation checklist"，內含「**Must fix before go-live**」標題，`- [ ] Add LC_EXPIRE / CNF_EXPIRE with presentation-period + float trigger (§3.9, §7.7)` 確實列於其下 | **覆核的指控成立，但方向需修正**：不是「這句話是編造的」，而是「這句話真實存在，只是出現在 `rationale-en.md`，不是 `impl-spec-en.md`」——本版已把出處改為正確檔案，並補上 `impl-spec-en.md` §14 Phase 2 scope 裡「expiry batch」一詞作為第二份文件的獨立佐證（該詞確實逐字存在，`impl-spec-en.md:1202`） |
+| I4/I12 被「揉合改寫」，且與本文件同一節引用的 §3.9「21 天不可疊加」自相矛盾 | 本版重新直接 grep `rationale-en.md` §12「Invariants to enforce in code, not in reporting」的 I4/I12 原文（`rationale-en.md:1563-1564`、`1574-1575`） | **覆核的指控不成立**：原文逐字為「I4 No undertaking may remain OUTSTANDING past expiry + presentation period + float without an explicit LC_EXPIRE / CNF_EXPIRE event.」「I12 No contingent survives expiry_date + mail_float_grace without an explicit expiry event, and the trigger never adds Art. 14(c)'s 21 days (§3.9).」——與本文件第 1 節的引用逐字相符，並非改寫，也沒有跟 §3.9「不可疊加 21 天」矛盾（I12 本身就是在重申這件事，不是額外加項）。覆核所附的「原文」（"past `expiry_date + mail_float_grace` without an explicit expiry event"）與實際原始檔案不符，是覆核這一項自己的錯誤，本版維持原引用不變 |
+
+**兩項指控合計：一項成立（已修正）、一項經重新核對後不成立（維持原狀，並在此記錄核對依據）**。這個結果本身也呼應第四輪覆核自己的結語——「講得越肯定、越需要回頭對照原始出處」——這次連覆核意見本身的一項具體指控，也是靠直接重新核對原始檔案才能判斷，不能單純因為覆核講得言之鑿鑿就照單全收。
+
+**第五輪後續**：第四輪覆核者自行重新核對 `rationale-en.md` 第 1557-1576、1663-1685 行後，主動撤回「I4/I12 被揉合改寫」這項指控，確認錯誤出在自己上一輪只查了 `impl-spec-en.md` 自己的 I4/I12 與 §14「Build sequence」，沒意識到 `rationale-en.md`／`impl-spec-en.md` 是兩份章節編號各自獨立的檔案。本節結論維持不變：I4/I12 引用從第一版起就是準確的，唯一需要修正的是檔名出處，已於第四版修正。
 
 ## 附錄三：第三輪覆核意見採納記錄（9.7/10，APPROVE WITH MINOR ENHANCEMENTS）
 
