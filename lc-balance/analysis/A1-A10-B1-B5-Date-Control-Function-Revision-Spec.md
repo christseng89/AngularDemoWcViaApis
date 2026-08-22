@@ -25,7 +25,8 @@ B6**——`closeEligibility.ts` 檔頭註解與審查文件第 4 節已確認 B6
 | 第四版 | 2026-08-23 | 業務回覆落地 | GAP-15 業務側正式回覆：不需要 `LC_EXPIRE`/`CNF_EXPIRE`，由外部系統批次呼叫既有 A10/B6 API 觸發，兩次獨立呼叫（沿用既有 Maker/Checker 兩步驟形狀），Maker/Checker 身份分離比照 `statusTransition.ts` 既有設計、無新例外。第 6 節整節改寫為「已解決」紀錄，`ExpiryReleasePolicy`/`domain/expiryRelease.ts`/`LC_EXPIRE`/`CNF_EXPIRE`/`EXPIRY_RELEASE_NOT_ELIGIBLE` 全數確認不需要實作；movementType 新增數回歸為 1 個（僅 `AMEND_EXPIRY`，15+1=16）；全文件（第 0–9 節）現在都可交付開發 |
 | 第五版 | 2026-08-23 | 使用者 | 指出 GAP-15 落地最直覺但錯誤的做法，是在 `evaluateCloseEligibility()` 裡加一條「`expiryDate` 必須已過期」的條件——這會違反既有「cancellation before expiry」設計。第 6 節新增「⚠️ 常見誤解」警語明講這件事，避免開發組員誤加 |
 | 第六版 | 2026-08-23 | 外部覆核 | 發現第 3/25 行的日期跟第 16 行的「日期：2026-08-22」欄位互相矛盾——已改成「初稿/最後更新」雙欄位，不再單獨維護單一日期；並指出子帳未結清時批次呼叫 A10/B6 預期會失敗（`409`，既有行為，不是 bug）這件事沒被寫進第 9 節——已補上一條，提醒外部批次系統的失敗重試邏輯要能分辨「子帳未結清」跟「真正的系統錯誤」 |
-| 第七版（本版） | 2026-08-23 | 使用者 | 第 4 節補上 UCP 600 依據（Art. 12(b) 授權 nominated bank 對 Acceptance/deferred payment undertaking 的 prepayment/purchase；Art. 7(c)/8(c) 銀行間 reimbursement 仍在 Maturity 到期；ICC Banking Commission 意見佐證），並明確框定：`earlySettlementAuthorized` 記錄的是「明確辨識、經授權的 Early Settlement」，不是「忽略 Maturity Date」——`maturityDate` 仍是分類判斷基準，只是分類結果從一律拒絕改成需授權才放行。設計本身未變，此版是加強法規依據 |
+| 第七版 | 2026-08-23 | 使用者 | 第 4 節補上 UCP 600 依據（Art. 12(b) 授權 nominated bank 對 Acceptance/deferred payment undertaking 的 prepayment/purchase；Art. 7(c)/8(c) 銀行間 reimbursement 仍在 Maturity 到期；ICC Banking Commission 意見佐證），並明確框定：`earlySettlementAuthorized` 記錄的是「明確辨識、經授權的 Early Settlement」，不是「忽略 Maturity Date」——`maturityDate` 仍是分類判斷基準，只是分類結果從一律拒絕改成需授權才放行。設計本身未變，此版是加強法規依據 |
+| 第八版（本版） | 2026-08-23 | 使用者 | 指出 GAP-15 遺漏一環：`expiryDate` 只加了欄位，沒有任何查詢端點能篩選它，外部系統/UI 無法有效率找到候選 LC。新增第 0.1 節，比照本系統既有的 A10/B6 三層防線慣例（Discovery／Maker／Checker）設計：`close-eligible` 新增 `expiredBefore` 篩選參數（第 1 層，唯一做判斷的一層）；Maker Submit／Checker Release 各自新增純資訊性的 `triggeredByExpiry` 稽核欄位（第 2/3 層，只記錄不判斷，絕不能把 `expiryDate` 變成放行條件，延續第 6 節既有警語）。使用者確認：業務控制邏輯全系統一致要求三層檢查，這不是本案例的特例 |
 
 ---
 
@@ -48,6 +49,24 @@ documentPresentationDate?: string | null;   // 提示日期，UCP 14(c) 判斷�
 `maturityDate`（已存在但從未被讀取的孤兒欄位）不需要新增，只需要被第 2/3 節 A6/B4 那兩列的 Calculated
 Maturity Date 邏輯，以及第 4 節 A7/B5 的 Early Settlement 判斷真正讀取——三者都屬於 Phase 0–3，不受
 GAP-15 影響。
+
+### 0.1 外部系統/UI 如何找到候選 LC——三層檢查（Discovery／Maker／Checker），2026-08-23 補充
+
+`expiryDate` 目前只是 `BalanceContract` 的一個欄位，沒有任何查詢端點可以用它篩選——外部批次系統或
+Angular UI 都無法有效率地問「哪些 ACTIVE 合約已經過期？」，只能整批拉下所有 ACTIVE 合約自己在外部過濾。
+比照本系統既有的 A10/B6 三層防線慣例（`MAKER-CHECKER-RULE-002`：Picker Hint／Submit／Release 三層共用
+同一份資格判斷），這裡也設計成三層——**但關鍵分寸是：`expiryDate` 只能出現在第 1 層（發現/查詢），
+第 2、3 層絕對不能把它當成放行條件**，這是延續第 6 節「⚠️ 常見誤解」的同一個原則，不是新規則：
+
+| 層級 | 對應端點/介面 | `expiryDate` 的角色 |
+|---|---|---|
+| **第 1 層——Discovery（查詢/UI）** | `GET /balance-contracts/close-eligible` 新增選填 query 參數 `expiredBefore`（ISO date）——篩選出「根合約 `expiryDate` 早於此日期」**且**已滿足既有 SG=0/Acceptance=0/無 Open Events 的候選清單。省略此參數時行為完全不變（既有呼叫方不受影響）。Angular UI（若人工也要瀏覽過期 LC）與外部批次系統共用同一個查詢能力，不需要各自維護一份 LC 清單。 | **唯一被拿來做篩選判斷的一層** |
+| **第 2 層——Maker Submit**（`POST /balance-movements`，`movementType: 'CLOSE'`） | 不變——`createMovement()` 仍然只檢查 `evaluateCloseEligibility()`（SG/Acceptance/Open Events/未 Closed）+ 金額精確相符，**完全不讀 `expiryDate`**。新增一個**選填、純資訊性**的 `triggeredByExpiry?: boolean` 欄位（比照 `sourceModule`/`sourceFunction` 既有的自由文字 audit-metadata 慣例，passthrough only，不驗證、不影響任何判斷），供呼叫方標記「這筆 Close 是批次到期流程觸發的」，方便稽核追溯，但**拿掉這個欄位、或呼叫方沒填，Close 一樣正常運作**。 | **僅供稽核記錄，不影響任何判斷** |
+| **第 3 層——Checker Release**（`POST .../release`） | 不變——`release()` 的 CLOSE 重新檢查（`CLOSE_NOT_ELIGIBLE`/`CLOSE_AMOUNT_MISMATCH`）維持原樣，同樣不讀 `expiryDate`。第 2 層寫入的 `triggeredByExpiry` 隨 `BalanceMovement` 一起持久化，Checker 審核時可以在畫面上看到「這筆是到期觸發的」這個背景資訊，**但不會、也不應該影響 Checker 能不能核准**。 | **僅供稽核記錄，不影響任何判斷** |
+
+**跟三輪前那個「常見誤解」警語的關係**：這個三層設計刻意把 `expiryDate` 的**判斷力**鎖死在第 1 層，
+第 2/3 層只搬運一個布林值供人看，不做任何比對——這樣才能同時滿足「業務控制邏輯要三層一致」（你這次提的
+原則）跟「Close 資格不能被 Expiry 綁架」（上一輪已確認的既有設計）兩個要求，不互相矛盾。
 
 ---
 
@@ -186,10 +205,11 @@ Checker being the same person is NOT enforced here... out of scope for this serv
 machine」（2026-08-14 業務指示，已是既定設計）。批次觸發沒有引入新的例外，這是呼叫方（外部系統/銀行
 權限政策）自己的責任，不是 Balance Component 的狀態機要管的事。
 
-**Balance Component 因此需要的東西，全部已經涵蓋在第 0、5 節裡**：`expiryDate` 欄位（第 0 節，Phase
-0–3，供外部系統讀取）+ `GET /balance-contracts/close-eligible` 查詢維持準確（已存在，見第 5 節）。
-**沒有額外的第六節工程工作**——這一節保留只是為了記錄「為什麼原本規劃的新事件類型最後沒有做」，供未來
-回頭查證用。
+**Balance Component 因此需要的東西**：`expiryDate` 欄位（第 0 節）+ `close-eligible` 查詢加上
+`expiredBefore` 篩選參數、外加兩個純資訊性的稽核欄位（第 0.1 節，三層檢查：Discovery 篩選、Maker/
+Checker 僅記錄不判斷）+ `GET /balance-contracts/close-eligible` 既有資格判斷維持準確、不變（見第 5
+節）。**沒有額外的排程機制、沒有新的 `movementType`**——這一節保留是為了記錄「為什麼原本規劃的新事件
+類型最後沒有做」，供未來回頭查證用。
 
 ---
 
