@@ -148,6 +148,15 @@ expiryRelease.ts`（獨立於 `closeEligibility.ts` 的資格判斷）**不需�
 設定 schema——排程/計日邏輯是外部系統自己的事，Balance Component 的 `evaluateCloseEligibility()`
 （`closeEligibility.ts`）維持完全不變，本來就是給任何呼叫方用的通用檢查，不分是人還是排程系統呼叫。
 
+> **⚠️ 常見誤解，實作前務必看清楚**：GAP-15 落地**不是**「在 `evaluateCloseEligibility()`／
+> `closeEligibility.ts` 裡加一條『`expiryDate` 必須已過期』的條件判斷」。這樣加是**錯的**，會直接違反
+> 已經確認的既有設計——`closeEligibility.ts` 檔頭自己講的「cancellation **before** expiry」，A10/B6
+> Close 本來就允許在 LC **尚未過期**時提前結案（第 5 節），這條規則沒有被本次 GAP-15 決策改變。
+> `expiryDate` 過期與否的判斷**只發生在 Balance Component 外部**（呼叫方自己決定何時觸發呼叫），
+> Balance Component 收到 A10/B6 的 Submit/Release 呼叫時，一律只看 SG/Acceptance/Open Events 這三個
+> 既有條件，完全不看 `expiryDate`。唯一要做的事是讓 `expiryDate` 這個**欄位**存在、可以被外部系統
+> 讀取——是加欄位，不是加判斷式。
+
 **批次觸發的 Maker/Checker 身份分離**：查證 `domain/statusTransition.ts` 既有設計——「Maker and
 Checker being the same person is NOT enforced here... out of scope for this service's own state
 machine」（2026-08-14 業務指示，已是既定設計）。批次觸發沒有引入新的例外，這是呼叫方（外部系統/銀行
