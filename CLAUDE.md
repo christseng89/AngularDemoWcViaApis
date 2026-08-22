@@ -12,7 +12,7 @@ relevant project before running any command.
 |---|---|---|
 | `lc-issue-angular/` | yes | Angular 17 + Formly demo for LC (Letter of Credit) **Issue** — charge calculation, balance/tolerance commission. |
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
-| `lc-balance-wc/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`. |
+| `lc-balance/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`. |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
@@ -36,12 +36,12 @@ than belongs here; treat entries marked "reviewer-confirmed"/"business-requireme
 settled, don't re-litigate them without new information from the user, and check that file directly rather
 than assuming a specific past decision is still current — it changes frequently.
 
-`lc-balance-wc/` has an analogous nested `CLAUDE.md` of its own (same solution-architect persona,
+`lc-balance/` has an analogous nested `CLAUDE.md` of its own (same solution-architect persona,
 same "reviewer-confirmed" decision-log convention), covering the Balance Component's own domain model
 (`InstrumentType`/`MovementStatus`/`ExposureNature`), balance-derivation direction table, Tolerance
 conversion, off-balance-sheet exposure hardening (incl. the Present Docs Earmark), SHGT/Acceptance
 redemption, and the Maker/Checker service-layer guards (re-ISSUE, tenor routing, SG issue cap,
-idempotency) — check that file directly before touching anything under `lc-balance-wc/`, same caveats
+idempotency) — check that file directly before touching anything under `lc-balance/`, same caveats
 as above (entries supersede each other; don't assume a decision is still current without checking). It
 does **not** have its own leg-allocator or an OAS Reference/Event model decision log (both are
 `lc-payment-wc/`-specific — the Balance Component has no per-leg split grid, and no analogous D-1…D-N
@@ -193,7 +193,16 @@ Formly/Angular-dependent and only reachable through the full `ng serve` app.
 - `microservices/payment-component/` — the real Payment Component microservice the Simulator tab talks to;
   a separate Node/TypeScript project (own `package.json`, `jest.config.js`, README), nested here rather than
   promoted to the repo root.
-- `docs/` — bilingual (EN/zh-TW) user manuals.
+- `docs/` — bilingual (EN/zh-TW) user manuals, plus `docs/obsidian-payment-kb/` — a generated Obsidian
+  vault reverse-engineering this microservice's business knowledge (domain concepts, business rules,
+  payment/FX/accounting flows, decision tables, requirement→code→test traceability) out of source, APIs,
+  and tests; start from `00-Home/Payment-Knowledge-Home.md`. **Gitignored** (root `.gitignore`'s
+  `obsidian-payment-kb/` rule) — a local generated artifact, not tracked in git. A companion
+  `docs/obsidian-payment-kb.zip` sits alongside it, untracked but NOT excluded by that rule (which only
+  matches the directory) — an optional versioned-backup path nobody has opted into yet. See
+  `lc-payment-wc/CLAUDE.md`'s own "Payment Knowledge Base (Obsidian)" section for its evidence-status
+  convention (CONFIRMED/INFERRED/UNCLEAR/CONFLICT) and staleness caveat before trusting it over the code
+  or this file's decision log.
 - `analysis/` — source-of-truth spec documents: `payment-instructions-post.yaml` (OAS), FSD and
   calculation-validation `.docx`, gap-analysis notes. Code comments citing "§N" or a named validation rule
   refer here. The OAS file's own `info.version` field and changelog prose lag the actual implementation by
@@ -254,7 +263,7 @@ touching this logic):
   `Debit_Chk_Total_Pct()` screen check verbatim, because the single-POST request shape has no equivalent
   shared total field.
 
-## `lc-balance-wc/` — LC Balance Component demo
+## `lc-balance/` — LC Balance Component demo
 
 **Three-process** dev setup, same shape as `lc-payment-wc/`:
 
@@ -269,7 +278,7 @@ away). Same failure mode as `lc-payment-wc/`: if a backend isn't running, the co
 or hangs with no obvious hint — check the process before assuming a bug.
 
 ```bash
-cd lc-balance-wc
+cd lc-balance
 npm install
 cd backend && npm install && cd ..
 cd microservices/balance-component && npm install && cd ../..
@@ -288,22 +297,22 @@ Unlike `lc-issue-angular/`, **all three processes have their own Jest suite here
 `lc-payment-wc/`'s own setup) specifically to close that gap. All three are gated at a **95%**
 `coverageThreshold` (statements/branches/functions/lines) in their own `jest.config.js` — higher than
 `lc-payment-wc/`'s 90% floor; a change that drops any of the four metrics below 95% in any of the three
-fails `npm test`, and per `lc-balance-wc/CLAUDE.md`'s own standing rule, all three must be re-run and
+fails `npm test`, and per `lc-balance/CLAUDE.md`'s own standing rule, all three must be re-run and
 green (not just the one you touched) before a change counts as complete.
 
 ```bash
-# Angular app (from lc-balance-wc/)
+# Angular app (from lc-balance/)
 npm test                    # jest — src/app/**/*.ts
 npm run test:coverage       # jest --coverage
 npx tsc -p tsconfig.app.json --noEmit   # typecheck (no dedicated "typecheck" npm script for this project)
 
 # backend/ (中台 orchestrator)
-cd lc-balance-wc/backend
+cd lc-balance/backend
 npm test
 npm run test:coverage
 
 # microservices/balance-component/
-cd lc-balance-wc/microservices/balance-component
+cd lc-balance/microservices/balance-component
 npm run typecheck        # tsc --noEmit
 npm test                  # Jest (test/unit/) — domain logic, schema, and full case-walkthrough tests
 npm run test:coverage
@@ -332,7 +341,7 @@ Maker/Checker action-dispatch wiring, `.gaps.spec.ts` for leftover getters/error
 (see Source layout below: it's now 436 lines, a thin orchestration layer, not a God Component), not a
 project-wide pattern.
 
-`lc-balance-wc/Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of
+`lc-balance/Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of
 this project (bugs, vulnerabilities, code smells, duplication, coverage) with prioritized findings and a
 remediation log — check it before assuming an area is unreviewed; it records what's already been fixed
 (and what was deliberately deferred, and why) rather than needing to be re-derived from scratch.
@@ -348,7 +357,7 @@ remediation log — check it before assuming an area is unreviewed; it records w
   (kept in sync manually, same convention `balance-component.model.ts`'s own design-doc field tables
   already use) — every mutating/listing method is typed against it rather than `Observable<any>`.
   `transaction-builder.component.ts` was once this repo's single largest file (2,923 lines at its peak);
-  a sequence of BAL-003 extractions logged in `lc-balance-wc/CLAUDE.md` — most recently a
+  a sequence of BAL-003 extractions logged in `lc-balance/CLAUDE.md` — most recently a
   "Feature Components + Facade" pilot moving Maker-side logic into `MakerPanelComponent` and Checker
   search/queue into `CheckerPanelComponent` — brought it down to **436 lines**, no longer even the
   largest file in this sub-project (`maker-panel.component.ts`, at 1,160 lines, is). It's now a thin
@@ -367,7 +376,7 @@ remediation log — check it before assuming an area is unreviewed; it records w
     `balanceMovements.ts` are the two Express routers (contract lookup/catalog/balance/movements-history
     vs. movement post/release/reject/cancel/maker-submit — a maker-checker-style lifecycle per movement;
     the `acknowledge` endpoint that used to sit here was removed 2026-08-18 — B3 now uses the standard
-    release path, see `lc-balance-wc/CLAUDE.md`'s own decision log for the redesign).
+    release path, see `lc-balance/CLAUDE.md`'s own decision log for the redesign).
   - `src/domain/` — `balanceDerivation.ts`, `tolerance.ts`, `statusTransition.ts`, `amendDecrease.ts`,
     `offBalanceExposure.ts` — the actual accounting/exposure logic, cited to
     `analysis/TF_Balance_Component_Spec-{en,zh}.docx` / `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`
@@ -385,3 +394,17 @@ remediation log — check it before assuming an area is unreviewed; it records w
   `TF_Balance_Component_Spec-{en,zh}.docx`, `TF_Balance_Component_Mapping-{en,zh}.xlsx`,
   `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`. Code comments citing a spec section refer here,
   same convention as `lc-payment-wc/analysis/`.
+- `docs/obsidian-balance-kb-v3.2/` — a generated Obsidian vault mirroring `lc-payment-wc/docs/
+  obsidian-payment-kb/`'s role for this project: reverse-engineers the Balance Component's business
+  knowledge (703 notes — 206 business rules, 98 decision tables, 220 test scenarios) out of source,
+  APIs, and tests, self-scored against a 9-dimension quality rubric; start from
+  `00-Home/Balance-Knowledge-Home.md`. **Gitignored** (root `.gitignore`'s `obsidian-balance-kb*/`
+  wildcard rule — covers this directory and any other `-vN` suffix). A companion
+  `docs/obsidian-balance-kb-v3.2.zip` sits alongside it, untracked but NOT excluded by that rule (which
+  only matches directories) — an optional versioned-backup path nobody has opted into yet. Supersedes an
+  earlier unversioned `docs/obsidian-balance-kb/` vault (683 files, written in English) — that directory
+  and its own companion zip have since been deleted from disk, not merely renamed; don't go looking for
+  them. The current vault is written primarily in **Simplified Chinese**. See `lc-balance/CLAUDE.md`'s
+  own "Balance Knowledge Base (Obsidian)" section for its evidence-status convention
+  (CONFIRMED/INFERRED/UNCLEAR/CONFLICT) and staleness caveat before trusting it over the code or this
+  file's decision log.

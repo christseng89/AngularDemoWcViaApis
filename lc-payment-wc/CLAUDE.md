@@ -130,6 +130,47 @@ When proposing solutions, prefer:
 
 Always challenge requirements when they conflict with banking, accounting, payment, or architectural best practices.
 
+## Knowledge Engineering
+
+You also act as a **Senior Code Analyst / Enterprise Knowledge Engineer / Obsidian Knowledge Base
+Architect** for this microservice: capable of reverse-engineering business knowledge (not just
+documenting source) out of code, APIs, tests, and configuration, and organizing it as a traceable,
+linked knowledge base for BAs, architects, testers, and other AI agents — see "Payment Knowledge Base
+(Obsidian)" below for the existing artifact and its conventions.
+
+---
+
+# Payment Knowledge Base (Obsidian)
+
+`docs/obsidian-payment-kb/` is **gitignored** (root `.gitignore`'s `obsidian-payment-kb/` rule) — a
+locally generated artifact, not tracked in git, so it may not exist in every checkout. A companion
+`docs/obsidian-payment-kb.zip` snapshot sits alongside it: the gitignore rule only matches the directory,
+so the zip is a plain untracked file, not excluded — anyone can `git add` it to keep a versioned backup
+without committing the 354 individual notes, though a zip is opaque to `git diff`/`grep` and can't be
+browsed or `[[Wiki Link]]`-navigated on GitHub the way the unpacked vault can; as of this writing it has
+not been added. Where present, the unpacked vault (354 files) reverse-engineers this
+microservice's **business** knowledge — not just its code — out of source, APIs, data models, tests, and
+this file itself: domain concepts, business rules, payment/FX/accounting flows, decision tables, and a
+requirement→code→test traceability matrix, cross-linked with `[[Wiki Links]]` rather than left as
+unrelated files. Start from `00-Home/Payment-Knowledge-Home.md`; the vault root also carries the
+`01-Domain-Concepts/` … `12-Traceability/`, `90-Unclear-and-Conflicts/`, `99-Source-Map/` folder layout.
+
+Every note carries an evidence status — **CONFIRMED** (directly supported by code/tests), **INFERRED**
+(strongly implied but not explicit), **UNCLEAR**, or **CONFLICT** (sources disagree) — and cites its
+source file(s)/test(s)/commit rather than embedding large code blocks; genuine open questions live in
+`90-Unclear-and-Conflicts/Knowledge-Gaps.md` instead of being silently resolved. Treat CONFIRMED notes
+the same way as this file's own "reviewer-confirmed" decision-log entries below (settled, don't
+re-litigate without new information); treat INFERRED/UNCLEAR/CONFLICT notes as leads to verify against
+source, not settled fact.
+
+The vault is not necessarily current with every later decision logged below — it was generated against a
+specific commit (each note's `last_verified_commit` frontmatter records which) and isn't regenerated
+automatically as this file's decision log grows. When code and vault disagree, this file and the source
+win; treat the vault as a map into the codebase, not a replacement for reading it. The generation spec
+that produced it (extraction methodology, evidence-priority ordering, vault structure, regeneration
+procedure for updating only impacted notes after a diff) is `Payment_Component_Obsidian.md`, in this same
+directory.
+
 ---
 
 # Confirmed Architecture Decisions (reviewer-confirmed — do not re-ask)

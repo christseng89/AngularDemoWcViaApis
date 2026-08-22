@@ -158,6 +158,61 @@ Design Patterns when reviewing service boundaries/communication/resilience acros
 Always challenge requirements when they conflict with banking, accounting, contingent liability/balance, or
 architectural best practices.
 
+## Knowledge Engineering
+
+You also act as a **Senior Code Analyst / Enterprise Knowledge Engineer / Obsidian Knowledge Base
+Architect** for this microservice: capable of reverse-engineering business knowledge (not just
+documenting source) out of code, APIs, tests, and configuration, and organizing it as a traceable, linked
+knowledge base for BAs, architects, testers, and other AI agents — see "Balance Knowledge Base
+(Obsidian)" below for the existing artifact and its conventions.
+
+---
+
+# Balance Knowledge Base (Obsidian)
+
+`docs/obsidian-balance-kb-v3.2/` is **gitignored** (root `.gitignore`'s `obsidian-balance-kb*/` wildcard
+rule — matches this directory and any other `-vN` suffix) — a locally generated artifact, not tracked in
+git, so it may not exist in every checkout. It supersedes an earlier unversioned `docs/obsidian-balance-kb/`
+vault (683 files, written in English); that directory and its own companion zip have since been deleted
+from disk, not merely renamed — don't go looking for them. A companion `docs/obsidian-balance-kb-v3.2.zip`
+snapshot sits alongside the current vault: the gitignore rule only matches directories, so the zip is a
+plain untracked file, not excluded — an optional versioned-backup path (opaque to `git diff`/`grep`, not
+browsable/`[[Wiki Link]]`-navigable on GitHub the way the unpacked vault is) that nobody has opted into
+yet. An empty `vault-v2/` subfolder also sits inside the vault root — a naming leftover from the
+regeneration process (the vault's own `Knowledge-Quality-Report.md` refers to itself as reviewing
+"vault-v2" even though the note folder is named `-v3.2`); it holds no content, safe to ignore.
+
+Where present, the vault (703 notes, written primarily in **Simplified Chinese** — a change from the
+superseded vault's English) reverse-engineers this microservice's **business** knowledge — not just its
+code — out of source, APIs, data models, tests, and this file itself: 206 business rules, 98 decision
+tables, 220 test scenarios across 20 source domains, cross-linked with `[[Wiki Links]]` (4,112+ links, 0
+broken, per the vault's own self-audit) rather than left as unrelated files. Start from
+`00-Home/Balance-Knowledge-Home.md`; the vault root also carries the `01-Domain-Concepts/` …
+`06-Maker-Checker/` … `12-Traceability/`, `90-Unclear-and-Conflicts/`, `99-Source-Map/` folder layout.
+`00-Home/Knowledge-Quality-Report.md` self-scores the vault against a 9-dimension rubric (target ≥9.3,
+≥9.5 for Code Traceability/Hallucination Control) — 6/9 dimensions pass; the 3 that don't (Tolerance Rule
+Coverage 9.2, Test Traceability 9.0, Maintainability 8.6) each carry a disclosed reason and remediation
+plan in that same report rather than being padded to pass — e.g. the Maintainability gap is mostly that
+`07-API/`'s English `## Source Evidence`/`## Related Knowledge` section headers were never translated
+when the rest of the vault switched to Simplified Chinese.
+
+Every note carries an evidence status — **CONFIRMED** (directly supported by code/tests), **INFERRED**
+(strongly implied but not explicit), **UNCLEAR**, or **CONFLICT** (sources disagree) — and cites its
+source file(s)/test(s)/commit rather than embedding large code blocks; genuine open questions live in
+`90-Unclear-and-Conflicts/Knowledge-Gaps.md` instead of being silently resolved. Treat CONFIRMED notes
+the same way as this file's own "reviewer-confirmed" decision-log entries below (settled, don't
+re-litigate without new information); treat INFERRED/UNCLEAR/CONFLICT notes as leads to verify against
+source, not settled fact.
+
+The vault is not necessarily current with every later decision logged below — it was generated against a
+specific commit (each note's `last_verified_commit` frontmatter records which) and isn't regenerated
+automatically as this file's decision log grows. When code and vault disagree, this file and the source
+win; treat the vault as a map into the codebase, not a replacement for reading it. The generation spec
+that produced it (extraction methodology, evidence-priority ordering, vault structure, regeneration
+procedure for updating only impacted notes after a diff) is `Balance_Component_Obsidian.md`, in this same
+directory — adapted from `lc-payment-wc/Payment_Component_Obsidian.md`'s equivalent spec for the Payment
+Component.
+
 ---
 
 # Confirmed Architecture Decisions (reviewer-confirmed — do not re-ask)

@@ -6,3 +6,6 @@ dist/
 /scratchpad_out*.md
 .sonartmp/
 .scannerwork/
+obsidian-payment-kb*/
+obsidian-balance-kb*/
+lc-balance-src.tar*.*
