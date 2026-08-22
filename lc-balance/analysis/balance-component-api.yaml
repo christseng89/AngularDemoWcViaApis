@@ -106,6 +106,16 @@ info:
     even when they happen to match — the caller must submit the redemption
     explicitly.
 
+    KNOWN DEVIATION, added 2026-08-22 (does not change this endpoint's own accepted values — see
+    v0.4.0 immediately above, still current at the API layer): a 2026-08-21 BA decision restricts a
+    STANDALONE SG redemption (i.e. one not tied to a specific matched Document Arrival via
+    `businessEventId` — see the compound-submission note elsewhere in this document) to `FULL_REDEEM`
+    only. This restriction is enforced **only by the reference Angular client**, not by this service —
+    `PARTIAL_REDEEM` remains a fully legal, accepted value for any other direct caller of this endpoint.
+    A caller integrating directly against this contract should confirm current bank policy before relying
+    on a standalone `PARTIAL_REDEEM` — this API will not reject one. See
+    `lc-balance/Balance Contract Integration Proposal.md` OAS-GAP-03 for the full analysis.
+
 
     v0.5.0 / v0.6.0 (draft, 2026-08-14): SG `ISSUE` is hard-capped at its
     parent LC's current Tight Available Balance (Available Balance minus
@@ -486,7 +496,51 @@ info:
         transaction-creating caller omits it, unchanged ACTIVE-only behavior). `GET /balance-contracts/catalog`
         gains `requireIssueReleased` (opt-in; excludes a candidate whose own root ISSUE is still PENDING —
         used by every Maker-ACTION picker, omitted by inquiry-only contexts and B4's own Present Docs search).
-  version: "1.16.0"
+
+    v1.17.0 (2026-08-22) — MINOR, non-breaking documentation-only release closing structural-contract gaps
+    flagged by `lc-balance/Balance Contract Integration Proposal.md` (OAS-GAP-06, OAS-GAP-10) and, in a
+    same-day follow-up pass reviewing the raw contract directly (rather than the proposal about it), several
+    further findings folded into this same MINOR release rather than fragmented into 1.17.1+: no
+    request/response field, status code, or business rule changed anywhere in this release — every item
+    below tightens what was already true at runtime, never redefines it. First real-world precedent for the
+    version-policy question OAS-GAP-12 raises: a documentation-only tightening of an already-true runtime
+    behavior is MINOR, not PATCH — it changes what a strict/enum-validating client can rely on, even though
+    the server's actual behavior is unchanged.
+      - ADDED: `Error.code` is now a real `enum` (previously a bare `string`, with the seven legal values
+        only ever documented in this schema's own free-text `description`) — no new codes, purely a type
+        tightening of the already-documented set.
+      - ADDED: `Error.details.reasonCode` — an optional, structured sub-classification for the two codes
+        that previously collapsed several genuinely distinct business reasons into one string a caller had
+        to pattern-match out of `message` (see the `Error` schema below for the full enum and which
+        endpoint/movementType each value corresponds to). Additive and optional: an existing caller that
+        never reads `details` is unaffected.
+      - ADDED: `429` response + `RateLimit-Limit`/`RateLimit-Remaining`/`RateLimit-Reset` response headers,
+        documented on every `/balance-movements*` endpoint (`POST /balance-movements` and all seven
+        `POST`/`GET /balance-movements/{movementId}/*` sub-endpoints — `express-rate-limit` is mounted once
+        on the shared `/balance-movements` path prefix in `src/app.ts`, so it has always applied to all
+        eight; only the documentation was missing, not the behavior). Limit is 120 requests/60s per the
+        current server configuration — see the response description for the caveat that this figure is
+        operational configuration, not a contractual guarantee, and may change without a version bump.
+      - ADDED: `movementType` (`BalanceMovement.movementType` and `BalanceMovementCreateRequest.movementType`)
+        is now a real `enum` of all 15 legal values (previously a bare `string`, with the values only ever
+        documented across the changelog/individual endpoint prose) — the exhaustive list is taken verbatim
+        from `service/balanceService.ts`'s own `buildMovementTypeRegistry()`, the authoritative source per
+        `STATUS-RULE-017`. Catches a typo'd/made-up value; does NOT enforce per-instrumentType legality
+        (still caller-owned — see the field's own description).
+      - ADDED caveat to `BalanceMovementCreateRequest.eventSeq`'s own description: idempotent replay
+        (same `(balanceContractId, eventSeq)`, same payload) was already documented as safe; now explicitly
+        states that a resubmission with a DIFFERENT payload under the same key still silently returns the
+        original record rather than erroring — a previously undocumented, disclosed-elsewhere-but-not-here
+        limitation (see `MAKER-CHECKER-RULE-050` in the Obsidian KB).
+      - ADDED caveat to the v0.4.0 `PARTIAL_REDEEM`/`FULL_REDEEM` changelog entry: a standalone SG
+        redemption is restricted to `FULL_REDEEM`-only by a 2026-08-21 BA decision, but ONLY at the
+        reference Angular client — this endpoint itself still accepts a standalone `PARTIAL_REDEEM` from
+        any other caller. Previously undocumented in this file; see OAS-GAP-03 in the Proposal.
+      - ADDED `required:` arrays to `BalanceContract`, `BalanceMovement`, `BalanceSnapshot` — response
+        schemas that, unlike the request schemas, had never declared which of their fields the server
+        always populates (every field NOT already marked `nullable: true` is now listed `required`, derived
+        directly from each field's own existing nullability, not a new judgment call).
+  version: "1.17.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -833,10 +887,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
-          description: Available Balance insufficient for this movementType (INSUFFICIENT_AVAILABLE_BALANCE), the natural key already resolves to an ACTIVE contract for a creating movementType (NATURAL_KEY_ALREADY_EXISTS), or the caller-supplied currency does not match the derived one (CURRENCY_MISMATCH). No record is created in any case.
+          description: Available Balance insufficient for this movementType (INSUFFICIENT_AVAILABLE_BALANCE — see `Error.details.reasonCode`), the natural key already resolves to an ACTIVE contract for a creating movementType (NATURAL_KEY_ALREADY_EXISTS), or the caller-supplied currency does not match the derived one (CURRENCY_MISMATCH). No record is created in any case.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
     get:
       tags: [BalanceMovements]
@@ -869,6 +924,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/balance-as-of:
     get:
@@ -896,6 +952,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/release:
     post:
@@ -991,10 +1048,14 @@ paths:
             `POST /balance-movements/{id}/maker-submit`, and (v1.16.0) for a
             `CLOSE` movement whose eligibility no longer holds or whose own
             frozen amount no longer matches the contract's current Confirmed
-            Balance — see this endpoint's own description above.
+            Balance — see this endpoint's own description above. The two
+            CLOSE-specific cases set `Error.details.reasonCode` to
+            `CLOSE_NOT_ELIGIBLE`/`CLOSE_AMOUNT_MISMATCH` (v1.17.0); every
+            other rejection under this status code leaves `reasonCode` unset.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/maker-submit:
     post:
@@ -1050,6 +1111,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/acknowledge:
     post:
@@ -1108,6 +1170,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/reject:
     post:
@@ -1151,6 +1214,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/cancel:
     post:
@@ -1192,8 +1256,40 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
 components:
+  headers:
+    RateLimitLimit:
+      description: v1.17.0 — the request-count ceiling for the current 60-second window (currently 120; see `TooManyRequests` response for the operational-vs-contractual caveat).
+      schema: { type: integer }
+    RateLimitRemaining:
+      description: v1.17.0 — requests remaining in the current 60-second window.
+      schema: { type: integer }
+    RateLimitReset:
+      description: v1.17.0 — seconds until the current window resets.
+      schema: { type: integer }
+
+  responses:
+    TooManyRequests:
+      description: >
+        v1.17.0 — documents an always-live behavior, not a new restriction: `express-rate-limit` has been
+        mounted on the shared `/balance-movements` path prefix (`src/app.ts`) since BAL-104, applying
+        identically to all eight `/balance-movements*` endpoints (the create/release/reject/cancel/
+        maker-submit/acknowledge Maker/Checker write surface, plus the two GET query endpoints under the
+        same prefix) — only the OAS documentation was previously missing. Current configuration: 120
+        requests per 60-second window per server instance (not per caller/IP — see the source comment this
+        references). This figure is **operational configuration, not a contractual ceiling** — it may be
+        tuned without a version bump; a caller should read `RateLimit-Remaining`/`RateLimit-Reset` at
+        runtime rather than hardcoding 120.
+      headers:
+        RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
+        RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
+        RateLimit-Reset: { $ref: '#/components/headers/RateLimitReset' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
   schemas:
 
     InstrumentType:
@@ -1316,6 +1412,7 @@ components:
     BalanceContract:
       type: object
       description: Design doc §3.1 — one immutable version snapshot of a Logical Contract.
+      required: [balanceContractId, logicalContractId, contractVersion, instrumentType, naturalKey, status, currency, openingBalance, effectiveFrom, createdBy, createdAt]
       properties:
         balanceContractId: { type: string, format: uuid }
         logicalContractId: { type: string, format: uuid }
@@ -1353,12 +1450,16 @@ components:
     BalanceMovement:
       type: object
       description: Design doc §3.2/§3.3 — append-only, never physically deleted.
+      required: [movementId, balanceContractId, eventSeq, movementType, exposureNature, amount, currency, status, createdBy, createdAt]
       properties:
         movementId: { type: string, format: uuid }
         balanceContractId: { type: string, format: uuid }
         eventSeq: { type: integer }
         businessEventId: { type: string, format: uuid, nullable: true }
-        movementType: { type: string, description: "Legal values depend on instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side; that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table." }
+        movementType:
+          type: string
+          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE]
+          description: "v1.17.0 — enumerated (previously a bare string): these 15 values are the service's own complete, authoritative registry (service/balanceService.ts's buildMovementTypeRegistry(), the same source STATUS-RULE-017 cites as authoritative over this schema). The enum catches a typo'd/made-up value; it does NOT enforce which of the 15 are legal for a GIVEN instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side, that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table, and `Error.details.reasonCode` for which bucket actually rejected a given request."
         exposureNature: { $ref: '#/components/schemas/ExposureNature' }
         amount:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
@@ -1575,10 +1676,22 @@ components:
             hangs off of. Used both for the parent-sufficiency check at
             creation time and, per CURRENCY DERIVATION, as the source of
             this new child contract's own currency.
-        movementType: { type: string }
+        movementType:
+          type: string
+          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE]
+          description: v1.17.0 — see BalanceMovement.movementType's own description for the full rule (enumerated for typo protection; per-instrumentType legality is still caller-owned, not schema-enforced).
         eventSeq:
           type: integer
-          description: Caller-supplied, scoped to the resolved balanceContractId. Design doc §8 — the idempotency key is (balanceContractId, eventSeq); resubmitting the same pair is safe.
+          description: >
+            Caller-supplied, scoped to the resolved balanceContractId. Design doc §8 — the idempotency key
+            is (balanceContractId, eventSeq); resubmitting the same pair with the SAME payload is safe
+            (returns the original record unchanged, 200). v1.17.0 caveat, previously undocumented: this
+            service does **not** compare the resubmitted payload against the original — a resubmission with
+            a genuinely DIFFERENT payload under the same (balanceContractId, eventSeq) still returns the
+            original record, silently discarding the new payload, rather than erroring
+            (`DUPLICATE_REF_PAYLOAD_MISMATCH`-style rejection was proposed in an earlier design pass but
+            never implemented). A caller must guarantee its own eventSeq→payload mapping never actually
+            changes across a real retry — this endpoint will not catch a violation of that assumption.
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
         currency:
           type: string
@@ -1640,6 +1753,7 @@ components:
         own field description); null for every other instrumentType.
         presentDocsEarmarkPending/presentDocsEarmarkApproved (v0.8.0,
         EPLC_CONFIRMATION only) are null for any other instrumentType.
+      required: [balanceContractId, logicalContractId, currency, confirmedBalance, availableBalance, pendingEarmarkTotal]
       properties:
         balanceContractId: { type: string, format: uuid }
         logicalContractId: { type: string, format: uuid }
@@ -1736,16 +1850,73 @@ components:
       type: object
       required: [code, message]
       description: >
-        `code` is one of: `REQUEST_VALIDATION_FAILED` (400),
-        `INSUFFICIENT_AVAILABLE_BALANCE` (409),
-        `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0),
-        `CURRENCY_MISMATCH` (409, v1.0.0 — new, see CURRENCY DERIVATION),
-        `ILLEGAL_STATE_TRANSITION` (409),
-        `NOT_FOUND` (404),
-        `INTERNAL_ERROR` (500 — the response body always carries a fixed,
-        generic message; the real error detail is logged server-side only,
-        never echoed to the client).
+        v1.17.0 — `code` is now a real enum (previously a bare string with the same seven values only
+        documented here in prose); `details.reasonCode`, on the two codes broad enough to cover several
+        genuinely distinct business reasons, is new and optional (see `ErrorDetails` below). Both changes
+        are additive/non-breaking — see the v1.17.0 changelog entry above.
       properties:
-        code: { type: string }
+        code:
+          type: string
+          enum:
+            - REQUEST_VALIDATION_FAILED
+            - INSUFFICIENT_AVAILABLE_BALANCE
+            - NATURAL_KEY_ALREADY_EXISTS
+            - CURRENCY_MISMATCH
+            - ILLEGAL_STATE_TRANSITION
+            - NOT_FOUND
+            - INTERNAL_ERROR
+          description: >
+            `REQUEST_VALIDATION_FAILED` (400); `INSUFFICIENT_AVAILABLE_BALANCE` (409 — see
+            `details.reasonCode` for which of several distinct sufficiency checks actually failed);
+            `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0); `CURRENCY_MISMATCH` (409, v1.0.0 — see CURRENCY
+            DERIVATION); `ILLEGAL_STATE_TRANSITION` (409 — a movement/contract not in the required state
+            for this action; `details.reasonCode` is set for the CLOSE-specific cases, unset for a plain
+            not-PENDING/already-submitted rejection); `NOT_FOUND` (404); `INTERNAL_ERROR` (500 — the
+            response body always carries a fixed, generic message; the real error detail is logged
+            server-side only, never echoed to the client).
         message: { type: string }
-        details: { type: object, additionalProperties: true }
+        details: { $ref: '#/components/schemas/ErrorDetails' }
+
+    ErrorDetails:
+      type: object
+      additionalProperties: true
+      description: >
+        v1.17.0 — freeform (`additionalProperties: true` preserved for backward compatibility with any
+        existing caller reading arbitrary keys), with one now-structured field. Every other key a caller
+        may have previously seen here is unchanged and still untyped.
+      properties:
+        reasonCode:
+          type: string
+          nullable: true
+          enum:
+            - EXCEEDS_AVAILABLE_BALANCE
+            - EXCEEDS_TIGHT_AVAILABLE_BALANCE
+            - AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE
+            - SG_ISSUE_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE
+            - PRESENT_DOCS_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE
+            - EXCEEDS_RECORD_AVAILABLE_BALANCE
+            - CLOSE_NOT_ELIGIBLE
+            - CLOSE_AMOUNT_MISMATCH
+          description: >
+            Set only on `INSUFFICIENT_AVAILABLE_BALANCE` and the CLOSE-specific `ILLEGAL_STATE_TRANSITION`
+            cases; absent (or `null`) on every other error, including a plain not-PENDING
+            `ILLEGAL_STATE_TRANSITION`. `EXCEEDS_AVAILABLE_BALANCE` / `EXCEEDS_TIGHT_AVAILABLE_BALANCE` —
+            UTILIZE/HONOUR/ACCEPT's own two-tier check (`checkUtilizeSufficiency`), first against plain
+            Available Balance, then against Tight Available Balance (nets outstanding SHGT exposure) — A3,
+            A3S, B4. `AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE` — the Tolerance-converted decrease
+            amount exceeds Tight Available Balance (`checkAmendDecreaseSufficiency`) — A2's own
+            AMEND_DECREASE, and B2's AMEND in its decrease direction (negative `ceilingAmount`).
+            `SG_ISSUE_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE` — a new Shipping Guarantee ISSUE exceeds the
+            parent LC's own Tight Available Balance, net of the LC's other outstanding SG exposure
+            (`checkShgtIssueSufficiency`) — A8, checked before the child contract is created.
+            `PRESENT_DOCS_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE` — a new Present Docs presentation exceeds
+            the parent Confirmation's own Present-Earmark-adjusted Tight Available Balance
+            (`checkPresentDocsIssueSufficiency`) — B3's own `EPLC_EXAMINATION` CREATE, checked before the
+            child contract is created. `EXCEEDS_RECORD_AVAILABLE_BALANCE` — a redemption/settlement amount
+            exceeds that specific record's own Available Balance (`checkRedeemSufficiency`) — A7
+            (Acceptance Settlement), A9 (SG Redemption), B5 (Acceptance Settlement/Reimburse), and the
+            asset-side REIMBURSE/RECLASSIFY_OUT movementTypes. `CLOSE_NOT_ELIGIBLE` — one or more of the
+            A10/B6 Close eligibility conditions (see `GET /balance-contracts/close-eligible`) is not met;
+            `message` carries the specific reason(s) joined together, since more than one can fail at once.
+            `CLOSE_AMOUNT_MISMATCH` — the submitted/frozen Close amount no longer exactly equals the
+            contract's current Confirmed Balance.
