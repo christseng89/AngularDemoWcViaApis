@@ -1262,3 +1262,9 @@ microservice via `POST /balance-movements` (Submit) + `/release` (Approve) +
 for the full trace-by-trace result (7/7 pass, both negative cases fail exactly as designed). Action items
 2/3 from the Business Rule Decisions memo (backend `businessEventId` enforcement, `BUYERS_USANCE`
 rejection/normalization) remain deliberately out of scope for this pass, by explicit user direction.
+
+## LC Expiry Date / Acceptance Maturity Date Control — approved Design Decision Basis for A2–A10/B2–B6
+
+Full review: `analysis/LC-Expiry-Acceptance-Maturity-Control-Review.md` (3-round CITF/architect review, 9.7/10, APPROVE WITH MINOR ENHANCEMENTS; a `LCExpiryAcceptanceMaturityControlReview_v3.docx` twin sits alongside it in `analysis/`, same pattern as `Balance-Figures-Calculation-Logic.{md,docx}` — edit the .md, regenerate the .docx via pandoc). Neither `expiryDate` nor a live, enforced `maturityDate` exists yet in `types.ts`/domain logic — this document is the target-state design, not an as-is gap list; its own Phase 0 (schema + `ExpiryReleasePolicy` calendar/business-day config) must land before any of it is enforceable.
+
+Standing principle: LC Expiry Date governs new contingent exposure and the eventual release of residual unused contingent liability, but does not automatically extinguish valid existing obligations. Acceptance Maturity Date governs the due lifecycle of an established Acceptance — Source of Truth is a Calculated value (Base Date + Tenor + Business Day Convention), Maker override only when authorized — and settlement before maturity must be explicitly classified and authorized, never auto-rejected. A10/B6 Close and a future `LC_EXPIRE`/`CNF_EXPIRE` residual-release event are independent triggers with different eligibility shapes (Close requires SG/Acceptance = 0; residual release does not) — never share `closeEligibility.ts` between them.

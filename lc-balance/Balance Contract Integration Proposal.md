@@ -135,7 +135,8 @@ OAuth2 client-credentials？內部 API Gateway 簽章?），才能回頭補 `sec
 不符合 Maker/Checker 4-eyes 的真實安全要求。
 
 **建議**：正式開放前，最少要有 (a) 一個 `securitySchemes` 定義，(b) `releasedBy`/`makerSubmittedBy`/
-`createdBy` 改成從已驗證的呼叫方身份（token claim）帶入，而非請求 body 裡的自由文字。
+`createdBy` 改成從已驗證的呼叫方身份（token claim）帶入，而非請求 body 裡的自由文字。決策請求已備妥，
+跟 GAP-09 併同一份，見 `Auth-And-Tenant-Isolation-Decision-Request.md`。
 
 ---
 
@@ -146,6 +147,7 @@ OAuth2 client-credentials？內部 API Gateway 簽章?），才能回頭補 `sec
 > Topology-Decision-Request.md` 本身已明確把「租戶隔離的具體技術方案」和「認證機制選型」都列為這次
 > 決策範圍之外、留給後續工程設計階段——而 OAS-GAP-01 的認證機制（mTLS/OAuth2/API Gateway 簽章）目前
 > 仍未有人決定。在認證機制定案之前，不會直接寫租戶隔離的程式碼——兩者要一起設計，分開做會需要之後重工。
+> 承接這個決策的合併決策請求已備妥：`Auth-And-Tenant-Isolation-Decision-Request.md`，待轉發。
 
 全檔 grep `tenant`/`branch`/`entityId`/`businessUnit` 零命中。`BalanceContract`/`BalanceMovement` 的
 自然鍵（LC/IB/SG Number）目前是**單一全域命名空間**——沒有任何欄位標示「這筆合約屬於哪個分行/哪個銀行
@@ -471,7 +473,7 @@ Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以
 | — | ~~OAS-GAP-16 — CURRENCY DERIVATION 該補實作還是改文件~~ | 業務 + 架構 → 後端 | 已完成 | ✅ 已完成（方向 (a)，OAS v1.19.0，見 ✅ OAS-GAP-16 小節「實作狀態」） |
 | 0 | 確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度 | 業務 | 小（1 次會議） | 🟢 決策請求文件已備妥（`TF-Solutions-Tenant-Topology-Decision-Request.md`），待轉發 |
 | — | 確認自然到期（EXPIRE）是否屬於本合約範圍 — 決定 OAS-GAP-15 要不要成為正式項目 | 業務 + 架構 | 小（1 次會議，可與第 0 步併同一次討論） | 🟢 決策請求文件已備妥（`Natural-Expiry-Scope-Decision-Request.md`），待轉發 |
-| 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（拓撲已定案為多機構，範圍不會再縮小；仍卡在 GAP-01 認證機制選型未決定） | 🟡 拓撲已定案（多機構），技術方案待 GAP-01 認證機制選型後才能設計，未動程式碼 |
+| 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（拓撲已定案為多機構，範圍不會再縮小；仍卡在 GAP-01 認證機制選型未決定） | 🟢 決策請求文件已備妥（`Auth-And-Tenant-Isolation-Decision-Request.md`），待轉發——未動程式碼 |
 | 2 | OAS-GAP-02（跨合約 Checker 待辦清單端點，設計時一併記錄 OAS-GAP-11 的長期方向） | 架構 + 前端 | 中 | ⬜ 未開始 |
 | 3 | OAS-GAP-03（A9 UI 政策 vs API 實際行為的落差，含全面盤點是否還有類似落差） | 業務 + 架構 | 小～中（盤點階段小，若發現更多落差則視數量放大） | 🟡 文件面已補警語，行為/政策決策未落地 |
 | 4 | OAS-GAP-06（`Error.code` 改 `enum` + `details.reasonCode`） | 後端 | 小 | ✅ 已完成（schema v1.17.0，實作接通 v1.18.0） |
