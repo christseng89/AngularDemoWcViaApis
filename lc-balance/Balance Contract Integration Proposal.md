@@ -24,6 +24,10 @@ grep 結果，沒有未經查證的推測。不是對 OAS 逐條 schema validate
 | 2026-08-22 | 初稿 | — | OAS-GAP-01～08，8 項發現 |
 | 2026-08-22 | 第一輪外部覆核 | 8.6/10 | 複驗原始 8 項全部屬實；新增 OAS-GAP-09～12（租戶隔離、限流文件化、事件推送方向、版本政策） |
 | 2026-08-22 | 第二輪外部覆核 | 9.3/10 | 複驗新增 4 項全部屬實；未再發現新缺口，審查深度確認已足夠；本段落格式精簡化（本次採納的建議） |
+| 2026-08-22 | 治理建議套用 | 9.6/10 | 套用五項治理層面建議（GAP-09 標示待確認假設、新增「落地衝擊」章節、落地順序改表格、範疇邊界聲明、OAS diff 預告）；標題層級小修正 |
+| 2026-08-22 | OAS 實作落地 | — | GAP-06/GAP-10 正式落地到 `analysis/balance-component-api.yaml`（v1.16.0 → v1.17.0）。獨立覆核直接審查 OAS 原始檔本身（非本提案文件，且讀到的是落地前的舊快照），確認該覆核已知的兩項（GAP-06/GAP-10）已解決，另發現 7 項新觀察：`movementType` 未 enum 化、idempotency 措辭誤導、`PARTIAL_REDEEM` 缺 A9 政策警語、回應 schema 缺 `required:`（以上 4 項低風險，已同步修進 v1.17.0）；`GET .../movements` 無分頁、七個 snapshot 欄位分散、`EXPIRE` 開放問題（以上 3 項需要架構/業務決策，新增為 OAS-GAP-13～15，未動 OAS 本身）；並回填 GAP-03/05/06/10 在本文件裡的完成狀態 |
+| 2026-08-22 | 第三輪外部覆核（v1.17.0 逐項核實 + 深入原始碼） | 7.2/10（原 9.6/10，因本輪新發現大幅下修） | v1.17.0 的六項修補全數逐項核實準確（`Error.code`/`movementType` 枚舉值、429 端點數、`required:` 欄位、idempotency/`PARTIAL_REDEEM` 警語）。**新發現 OAS-GAP-16**：CURRENCY DERIVATION 規則（合約裡篇幅最長、被引用最多的核心規則）與實際微服務行為直接矛盾，三個獨立源碼角度核實（`errors.ts` 無 `CurrencyMismatchError`、`createContract()` 零推導邏輯、zod schema 把 currency 列為必填），自 v1.0.0 起即存在，非本輪引入。已在 OAS 加上安全的警告性文字（不預設解法），並在本文件新增 OAS-GAP-16、標記優先度高於 P0，需業務/架構側裁決兩個互斥方向。覆核同時指出檔案路徑的一個前提錯誤（誤判磁碟上仍是 v1.16.0），已現場核對 `git diff`/`git log` 澄清——不影響 GAP-16 本身的正確性，該發現獨立成立 |
+| 2026-08-22 | 第四輪外部覆核（實機拉取本機檔案核對） | 8.3/10（原 7.2/10） | 確認 CURRENCY DERIVATION 警語處理得當（披露但不擅自決定方向）。**新發現同類問題**：`Error.details.reasonCode`（v1.17.0 新增的 schema）從未真正接通——`ApiError.toBody()` 只回傳 `{code, message}`，`details` 送不出去，OAS-GAP-06 因此被誤標成已解決。獨立核實屬實後**不只補警語，直接修好**：`errors.ts` 的 `ApiError` 新增 `details` 建構子參數，5 個 domain sufficiency-check 函式 + CLOSE 的兩個檢查改為回傳 `reasonCode`，串接到全部相關 `throw` 呼叫點；三個子專案測試套件（微服務 425/425、backend 34/34、Angular 1064/1064）全部重跑並全數通過，OAS 升版至 v1.18.0，本文件同步回填 GAP-06 狀態。此輪也指出一個小的自洽性問題（新增警語沒跟著版本號一起跳）——已在補實作的同一版一併處理 |
 
 各輪完整評分細項（分維度分數、逐條複驗過程）留在覆核當下的討論紀錄，不重複嵌入本文件正文——避免文件
 隨覆核輪次增加而越來越像審查紀錄，而非工程合約規格。
@@ -43,8 +47,54 @@ grep 結果，沒有未經查證的推測。不是對 OAS 逐條 schema validate
 3. **內容都在，但結構鬆散、要讀者自己拼湊；或屬於更長期的架構/治理備註**（P2）——不會直接出錯，但拖
    慢整合團隊上手速度，或需要提早記錄以免將來設計互相打架。
 
-（2026-08-22 更新：經過一輪外部覆核，原本 8 項發現 [OAS-GAP-01～08] 全部逐條複驗屬實，另新增 4 項
-[OAS-GAP-09～12]——詳見上方「審查與版本歷程」。）
+（2026-08-22 更新：目前共 16 項發現 [OAS-GAP-01～16]，其中 GAP-06/GAP-10 已實際落地到 OAS v1.17.0，
+GAP-03/GAP-05 的警語也已補進 OAS 正文——完整版本歷程與各項目目前狀態，詳見上方「審查與版本歷程」和下方
+「建議落地順序」表格最後一欄。**OAS-GAP-16 優先度高於 P0**，是本文件目前唯一標記 🔴 的項目，見下方
+「🔴 OAS-GAP-16」獨立小節。）
+
+---
+
+## 🔴 OAS-GAP-16 — CURRENCY DERIVATION 規則與實際微服務行為直接矛盾（比 P0 更優先）
+
+**分級比 P0 更高**：P0～P2 的其他 15 項都是「合約沒講清楚」或「合約裡缺東西」；這一項不同——**合約講得
+非常詳細、非常肯定，但服務端的真實行為完全是另一回事**。任何相信這份合約去做直接對接的團隊會立刻撞牆，
+而且很難第一時間意識到問題出在文件本身、不是自己的實作。這是外部覆核在第三輪對照原始碼逐項核實後才發
+現的，前兩輪都沒抓到（覆核自己也坦白說明了這點）。
+
+**OAS 怎麼講**（文件開頭篇幅最長、被 `BalanceContract.currency`/`BalanceMovementCreateRequest.currency`/
+`POST /balance-movements` 端點說明反覆引用的核心規則，即「CURRENCY DERIVATION」）：除了真正全新的根合
+約（ISSUE/CREATE 且無父合約）以外，`currency` 應該省略，服務端會從既有合約或父合約推導並校驗，不匹配
+就 `409 CURRENCY_MISMATCH`。
+
+**實際微服務怎麼做**（三個獨立角度核實，我這邊也重新對照原始碼確認過一致）：
+
+1. `errors.ts`（全倉庫唯一的錯誤類別定義檔）裡**沒有** `CurrencyMismatchError`，全倉庫 grep
+   `CURRENCY_MISMATCH`/`CurrencyMismatch` 在 `src/`/`test/` 都是零命中。
+2. `createContract()` 對 `currency` 的處理，三個呼叫點全部是 `currency: req.currency`——原樣存值，沒有
+   任何跟既有合約或父合約比較的邏輯。
+3. 實際生效的 zod 請求校驗（`validation/requestSchema.ts` 第 27 行）把 `currency` 列為**每一次**
+   `POST /balance-movements` 請求都必填的欄位（`required_error: 'currency is required.'`），跟 OAS 說
+   的「省略才是推薦做法」完全相反。
+
+**影響**：如果呼叫方老實照 OAS 說明實作（非根創建時省略 `currency`，信任伺服器推導），每一次呼叫都會被
+現行服務以 `400 currency is required` 拒絕——不是隱蔽的邊界情況，是**完全相反**的行為。這個落差從
+v1.0.0 就存在，一路延續到 v1.17.0，不是這次修訂引入的新問題。
+
+**已做的處理（2026-08-22，安全、不預設結論的文件層面警告）**：在 OAS 的 CURRENCY DERIVATION 區塊本身、
+以及 `Error.code` 的 `CURRENCY_MISMATCH` 枚舉說明旁，都加上了明確的「⚠️ 已確認矛盾」警告，並保留
+`CURRENCY_MISMATCH` 在枚舉裡（不預設要拿掉，因為拿不拿掉正是待決策的部分）——只是讓現在讀這份合約的
+任何人，至少會被提醒「這條規則目前不可信，先別照做」。
+
+**沒有做的處理，且不應該由工程單方面決定**：CURRENCY DERIVATION 這條規則本身該怎麼收尾，有兩個方向，
+彼此互斥，需要業務/架構側裁決：
+
+| 方向 | 意涵 | 影響範圍 |
+|---|---|---|
+| (a) 服務端補實作，讓行為追上文件 | 需要真的寫 currency 推導/比對邏輯，並把 zod schema 的 `currency` 改成非根創建時可選 | 這是一個真正的行為變更（`400 currency is required` 會消失、新增 `409 CURRENCY_MISMATCH` 的真實觸發路徑）——對現有呼叫方（Angular UI）而言，目前每次都送 currency 仍然合法（推導邏輯只在省略時介入），但需要完整回歸測試 |
+| (b) 文件改成符合實作現狀 | 拿掉 CURRENCY DERIVATION 的三條推導規則和 `CURRENCY_MISMATCH`，改寫成「currency 每次呼叫都必填，服務端不推導、不校驗一致性」 | 對外部整合方而言更誠實，但等於承認這個「服務端會保護 currency 一致性」的設計意圖從未真正落地——後續如果真的有多幣別合約下 currency 打錯的風險，目前完全沒有防線 |
+
+**建議**：這是需要問業務/架構側的問題，跟 OAS-GAP-09 的租戶拓撲問題性質一樣——先確認方向再動手，不要
+假設答案。可以比照 `TF-Solutions-Tenant-Topology-Decision-Request.md` 的做法，另外發一份決策請求。
 
 ---
 
@@ -144,6 +194,11 @@ OAS-GAP-01（認證）、OAS-GAP-09（租戶區隔）一旦落地，會直接影
 
 ### OAS-GAP-03 — A9 Full-Redeem-only 是 UI 層業務政策，OAS 內容甚至互相矛盾
 
+> **🟡 文件面已部分處理（v1.17.0，2026-08-22）**：OAS 已在 v0.4.0 changelog 條目旁補上明確的
+> KNOWN DEVIATION 說明，讓直接讀合約的外部整合方至少能知道這個政策落差存在。**但下方「為什麼擋開放」
+> 描述的實際行為本身沒有改變**——這個端點仍然合法接受任意呼叫方送出 `PARTIAL_REDEEM`，只是現在呼叫方
+> 至少有機會在合約裡讀到警告。是否要把限制下沉到伺服器端強制執行，仍是未決事項。
+
 OAS 第 103 行（v0.4.0 changelog）明白寫著：
 
 > SG's `REDEEM` movementType is replaced by `PARTIAL_REDEEM`/`FULL_REDEEM` — a redemption may now
@@ -191,6 +246,11 @@ Submit now auto-rolls-back the SG redemption leg if the LC UTILIZE leg fails」�
 
 ### OAS-GAP-05 — Idempotency Key 沒有規定「payload 不一致」時該怎麼辦
 
+> **🟡 文件面已部分處理（v1.17.0，2026-08-22）**：`eventSeq` 的 description 已經補上明確警語，講清楚
+> 「只有 payload 也相同才安全，payload 不同時會靜默回傳舊紀錄」。**但實際行為本身沒有改變**——下方
+> 「建議」列的兩個真正修法（payload hash 比對 + `409`，或 `isReplay` 欄位）都還沒實作，需要業務/架構
+> 團隊先決策才能真的關掉這個坑，目前只是讓呼叫方讀得到警告。
+
 OAS 第 756-758 行只寫：
 
 > resubmitting the same (balanceContractId, eventSeq) pair returns the existing record (200) instead
@@ -212,9 +272,18 @@ OAS 第 756-758 行只寫：
 
 ---
 
-### OAS-GAP-06 — `Error.code` 是 `type: string`，不是 `enum`
+### OAS-GAP-06 — `Error.code` 是 `type: string`，不是 `enum` ✅ 已解決（v1.17.0 schema + v1.18.0 實作）
 
-第 1735-1745 行的 `Error` schema：
+> `Error.code` 已改成真正的 `enum`（7 個值）。`Error.details.reasonCode`（8 個值）v1.17.0 當下只加了
+> schema，**但 `ApiError.toBody()` 從頭到尾只回傳 `{code, message}`，`details` 根本送不出去**——這是
+> 外部覆核第四輪對照 `errors.ts` 才抓到的，跟 CURRENCY DERIVATION 同一種「文件寫得很肯定、實作完全不存
+> 在」的錯誤，只是這次是我自己這輪引入的新問題，不是繼承自舊版本。已在 v1.18.0 修好：`ApiError` 新增
+> `details` 建構子參數，5 個 sufficiency-check domain 函式 + CLOSE 的兩個檢查全部改為回傳 `reasonCode`，
+> 逐一串接到對應的 `throw` 呼叫點（含 Release 時 CLOSE 的重新檢查）。三個子專案測試套件全部重跑過
+> （微服務 425/425、backend 34/34、Angular 1064/1064），涵蓋率都在各自門檻之上才算完成。以下內容保留
+> 作為歷史紀錄，說明原本的問題與判斷依據。
+
+第 1735-1745 行的 `Error` schema（v1.17.0 之前的行號，供歷史對照）：
 
 ```yaml
 Error:
@@ -242,7 +311,11 @@ Error:
 
 ---
 
-### OAS-GAP-10 — 實際存在的限流機制，OAS 完全沒有文件化（外部覆核新增，2026-08-22）
+### OAS-GAP-10 — 實際存在的限流機制，OAS 完全沒有文件化（外部覆核新增，2026-08-22） ✅ 已解決（v1.17.0）
+
+> 全部 8 個 `/balance-movements*` 端點已補上 `429` 回應 + `RateLimit-Limit`/`RateLimit-Remaining`/
+> `RateLimit-Reset` response header 定義（先去 `app.ts` 確認限流真的掛在共用 path prefix 上，涵蓋全部
+> 8 個操作，不是只有 create）。以下內容保留作為歷史紀錄。
 
 `microservices/balance-component/src/app.ts:23`：
 
@@ -314,21 +387,74 @@ MAJOR 才允許破壞性變更）；(b) 破壞性變更需要在 changelog 標�
 (c) 把現有分散在各端點 description 裡的 changelog 敘述，集中到一個獨立章節（可與 OAS-GAP-07 的
 「集中決策表」建議一併處理）。
 
+> **🟢 已有第一個實戰先例（v1.17.0，2026-08-22）**：OAS-GAP-06/GAP-10 落地時，即採用「MINOR、非破壞性、
+> 純文件補強」的版本判斷（v1.16.0 → v1.17.0），並在 changelog 裡明講這個判斷邏輯本身。上方 (a)(b)(c)
+> 三項正式政策仍未定案，但至少已經有一次真實案例可以參照，不是空談。
+
+### OAS-GAP-13 — `GET /balance-contracts/{id}/movements` 無分頁、無伺服器端篩選（外部覆核新增，2026-08-22）
+
+這個端點回傳一個合約底下的**完整**事件歷史，`newest first`，沒有 `page`/`pageSize`，也沒有
+`status`/`businessEventId` 等篩選參數——對比之下，`GET /balance-contracts/catalog` 是有分頁的。
+
+**來源證據**：OAS 自己的 changelog 明講這是刻意設計，不是遺漏——「REMOVED `GET
+/balance-contracts/{balanceContractId}/movements`'s query filters (`status`/`legRef`/`businessEventId`/
+`businessDate`) — the real endpoint takes none; every filter currently happens client-side on the full
+result set」。也就是說：現在的行為完全符合文件描述，這不是「文件缺口」，而是「架構決策是否還適用」的
+問題。
+
+**為什麼值得列進來**：append-only、永不刪除的儲存模型下，一個存續很久、事件很多的合約（例如 Mixed
+Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以目前的資料量大概不是問題，但正式對外開放、且
+有外部呼叫方長期高頻查詢的情境下，這個假設可能不再成立。
+
+**建議**：不是現在就要改——先向架構側提出這個問題，確認「目前無上限的完整回傳」在正式開放的資料量與
+呼叫頻率下是否仍然可接受。如果確認要改，比照 `catalog` 端點已經有的分頁 pattern 加上去即可，不是新設計。
+
+### OAS-GAP-14 — `BalanceMovement` 的七個 snapshot 欄位分散、可合併但不是正確性問題（外部覆核新增，2026-08-22）
+
+`eventSnapshot`/`rootEventSnapshot`/`acceptanceEventSnapshot`/`sgEventSnapshot`/`finalizeEventSnapshot`/
+`finalizeAcceptanceEventSnapshot`/`finalizeSgEventSnapshot`——七個獨立欄位，各自的 nullable 規則都各自
+獨立文件化得很仔細，但七條規則要同時記在腦子裡，對寫 client SDK 的人是負擔。這七個欄位是七次獨立的漸進
+式修補（v1.6.0～v1.10.0）疊加出來的，不是一次設計出的形狀。
+
+**為什麼不是缺陷**：每個欄位本身都有清楚、正確的文件；這是設計品質觀察，不是正確性問題——**不影響本文
+件其他 GAP 項目的優先度判斷**。
+
+**建議**：不建議現在動——把七個欄位合併成一個 `relatedSnapshots: { self, root, acceptance, sg }` +
+`phase: created|finalized` 判別欄位的物件，是一個真正的 breaking change（現有欄位名稱全部消失），只適
+合規劃進下一個 MAJOR 版本，而且要先確認有沒有現存呼叫方依賴目前這七個獨立欄位名稱。列在這裡純粹是留下
+記錄，避免將來設計 MAJOR 版本時，這七個欄位的歷史包袱被遺忘。
+
+### OAS-GAP-15 — 找不到 `EXPIRE`（自然到期）對應的 movementType 或事件（外部覆核新增，2026-08-22）
+
+> **⚠️ 待業務/架構確認，不是缺陷**：A10/B6 Close 的設計明確自比為「cancellation before expiry」——也就
+> 是說，Close 是 Maker/Checker 觸發的**提前**結案，隱含存在一個對應的、日期觸發的**自然到期**流程。但
+> 整份合約（15 個 `movementType` 值逐一核對過，見 OAS-GAP-06 新增的 enum）裡找不到任何 `EXPIRE` 或等效
+> 事件。**這不代表一定是缺口**——自然到期完全可能是外部批次流程的職責，本來就不該經過這個 API。但目前
+> 沒有任何一份文件（OAS、`CLAUDE.md`、Obsidian KB）明講答案是哪一個。
+
+**建議**：這是一個需要直接問業務/架構側的問題，不是工程面能自己判斷的：「LC/Confirmation 的自然到期，
+是由外部批次流程處理、完全不經過 Balance Component，還是這個微服務本來就該有、但目前尚未實作的一塊？」
+確認答案之前不建議編號成正式的實作項目——先弄清楚這是不是真的需要做的事，比先假設它需要做更重要。
+
 ---
 
 ## 建議落地順序
 
-| 順序 | 項目 | 決策負責單位 | 粗估工作量 |
-|---|---|---|---|
-| 0 | 確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度 | 業務 | 小（1 次會議） |
-| 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（視第 0 步的租戶模型決策而定，含 Angular UI／Business Case Runner 同步改造） |
-| 2 | OAS-GAP-02（跨合約 Checker 待辦清單端點，設計時一併記錄 OAS-GAP-11 的長期方向） | 架構 + 前端 | 中 |
-| 3 | OAS-GAP-03（A9 UI 政策 vs API 實際行為的落差，含全面盤點是否還有類似落差） | 業務 + 架構 | 小～中（盤點階段小，若發現更多落差則視數量放大） |
-| 4 | OAS-GAP-06（`Error.code` 改 `enum` + `details.reasonCode`） | 後端 | 小 |
-| 5 | OAS-GAP-10（限流 429/RateLimit header 文件化） | 後端 | 小 |
-| 6 | OAS-GAP-04 / OAS-GAP-05（多腿失敗補償契約、idempotency payload-mismatch 語意） | 業務 + 架構 | 中（需要先做政策決策，才能回頭寫進合約與程式碼） |
-| 7 | OAS-GAP-12（版本演進/棄用政策） | 架構 | 小 |
-| 8 | OAS-GAP-07 / OAS-GAP-08（文件結構調整，優先度最低，可與其他項目並行） | 技術寫作 | 小 |
+| 順序 | 項目 | 決策負責單位 | 粗估工作量 | 狀態 |
+|---|---|---|---|---|
+| 🔴 -1 | **OAS-GAP-16 — CURRENCY DERIVATION 該補實作還是改文件**，兩個方向互斥，需先定案（見上方對照表） | 業務 + 架構 | 小（1 次會議，決定方向）＋依方向而定的後續工作量 | 🟢 決策請求文件已備妥（`Currency-Derivation-Decision-Request.md`），待轉發——優先度高於第 0 步 |
+| 0 | 確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度 | 業務 | 小（1 次會議） | 🟢 決策請求文件已備妥（`TF-Solutions-Tenant-Topology-Decision-Request.md`），待轉發 |
+| — | 確認自然到期（EXPIRE）是否屬於本合約範圍 — 決定 OAS-GAP-15 要不要成為正式項目 | 業務 + 架構 | 小（1 次會議，可與第 0 步併同一次討論） | ⬜ 決策請求文件尚未建立 |
+| 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（視第 0 步的租戶模型決策而定，含 Angular UI／Business Case Runner 同步改造） | ⬜ 未開始 |
+| 2 | OAS-GAP-02（跨合約 Checker 待辦清單端點，設計時一併記錄 OAS-GAP-11 的長期方向） | 架構 + 前端 | 中 | ⬜ 未開始 |
+| 3 | OAS-GAP-03（A9 UI 政策 vs API 實際行為的落差，含全面盤點是否還有類似落差） | 業務 + 架構 | 小～中（盤點階段小，若發現更多落差則視數量放大） | 🟡 文件面已補警語，行為/政策決策未落地 |
+| 4 | OAS-GAP-06（`Error.code` 改 `enum` + `details.reasonCode`） | 後端 | 小 | ✅ 已完成（schema v1.17.0，實作接通 v1.18.0） |
+| 5 | OAS-GAP-10（限流 429/RateLimit header 文件化） | 後端 | 小 | ✅ 已完成（v1.17.0） |
+| 6 | OAS-GAP-04 / OAS-GAP-05（多腿失敗補償契約、idempotency payload-mismatch 語意） | 業務 + 架構 | 中（需要先做政策決策，才能回頭寫進合約與程式碼） | 🟡 GAP-05 文件面已補警語；GAP-04 未開始；兩者行為本身都未變 |
+| 7 | OAS-GAP-12（版本演進/棄用政策） | 架構 | 小 | 🟡 已有 v1.17.0 一次實戰先例，正式政策 (a)(b)(c) 三項仍未定案 |
+| 8 | OAS-GAP-07 / OAS-GAP-08（文件結構調整，優先度最低，可與其他項目並行） | 技術寫作 | 小 | ⬜ 未開始 |
+| 9 | OAS-GAP-13（`GET .../movements` 分頁/篩選——先確認是否需要，不預設要做） | 架構 | 小（確認階段）～中（若確認要做） | ⬜ 未開始（先問架構側） |
+| 10 | OAS-GAP-14（七個 snapshot 欄位整併為 `relatedSnapshots`） | 架構 | 大（breaking change，只適合規劃進下一個 MAJOR 版本） | ⬜ 不建議現在做，僅留紀錄 |
 
 工作量為粗略量級（小/中/大），不精算到人天；重點是標出「這項卡在誰手上」，讓文件從分析報告更進一步變
 成可以直接排進 sprint 的行動清單。

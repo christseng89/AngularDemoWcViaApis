@@ -74,7 +74,7 @@ interface MovementSufficiencyContext {
 }
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see domain/tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
-type MovementSufficiencyOutcome = { ok: true; warning?: MovementWarning } | { ok: false; error: string };
+type MovementSufficiencyOutcome = { ok: true; warning?: MovementWarning } | { ok: false; error: string; reasonCode?: string };
 
 type MovementSufficiencyCheck = (ctx: MovementSufficiencyContext) => MovementSufficiencyOutcome | null;
 
@@ -216,7 +216,11 @@ export class BalanceService {
       }
       const eligibility = this.evaluateContractCloseEligibility(ctx.contract);
       if (!eligibility.eligible) {
-        return { ok: false, error: `Cannot Close ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}` };
+        return {
+          ok: false,
+          error: `Cannot Close ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}`,
+          reasonCode: 'CLOSE_NOT_ELIGIBLE',
+        };
       }
       if (!ctx.ceilingAmount.equals(ctx.confirmedBalance)) {
         return {
@@ -224,6 +228,7 @@ export class BalanceService {
           error:
             `Close amount must exactly equal the current Confirmed Balance (${ctx.confirmedBalance.toFixed()}) — ` +
             `submitted ${ctx.ceilingAmount.toFixed()}. Re-derive the amount from the current balance and resubmit.`,
+          reasonCode: 'CLOSE_AMOUNT_MISMATCH',
         };
       }
       return { ok: true };
@@ -355,7 +360,7 @@ export class BalanceService {
     // called directly from tests/other callers that bypass the route.
     const requestedAmount = parseMonetaryAmount(req.amount);
     const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentConfirmedBalance: parentConfirmed, parentPendingDecreaseTotal, existingShgtExposure });
-    if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error);
+    if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error, { reasonCode: sgCheck.reasonCode });
   }
 
   /**
@@ -392,7 +397,7 @@ export class BalanceService {
       presentDocsEarmark,
       parentConfirmationBalanceContractId: parentConfirmation.balanceContractId,
     });
-    if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error);
+    if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error, { reasonCode: presentDocsCheck.reasonCode });
   }
 
   /**
@@ -1037,7 +1042,9 @@ export class BalanceService {
       ceilingAmount,
       req,
     });
-    if (sufficiency && !sufficiency.ok) throw new InsufficientBalanceError(sufficiency.error);
+    if (sufficiency && !sufficiency.ok) {
+      throw new InsufficientBalanceError(sufficiency.error, sufficiency.reasonCode ? { reasonCode: sufficiency.reasonCode } : undefined);
+    }
     const warnings: MovementWarning[] | null = sufficiency?.warning ? [sufficiency.warning] : null;
 
     // analysis/contingent-liability-ledger.html — server-derived once, here, at creation time; never
@@ -1171,12 +1178,14 @@ export class BalanceService {
       if (!eligibility.eligible) {
         throw new IllegalStateTransitionError(
           `Cannot release CLOSE movement ${movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this CLOSE request and re-submit.`,
+          { reasonCode: 'CLOSE_NOT_ELIGIBLE' },
         );
       }
       if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
         throw new IllegalStateTransitionError(
           `Cannot release CLOSE movement ${movementId} — Confirmed Balance has changed since Submit ` +
             `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this CLOSE request and re-submit with the current figure.`,
+          { reasonCode: 'CLOSE_AMOUNT_MISMATCH' },
         );
       }
     }

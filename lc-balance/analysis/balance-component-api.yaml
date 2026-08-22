@@ -80,6 +80,22 @@ info:
     business-function codes at all — it only needs to know whether a
     request resolves to an existing contract, or a parent, or neither.
 
+    ⚠️ CONFIRMED CONTRACT-VS-IMPLEMENTATION CONTRADICTION, added 2026-08-22 (do not rely on the three
+    numbered rules above until this is resolved — see OAS-GAP-16 in `lc-balance/Balance Contract
+    Integration Proposal.md` for the full analysis and open business/architecture question): the actual
+    running microservice does none of this. `createContract()` stores `currency: req.currency` verbatim,
+    with zero comparison against an existing or parent contract's own currency, at every one of its three
+    call sites; the real request validation (`validation/requestSchema.ts`) makes `currency` a REQUIRED
+    field on every single `POST /balance-movements` call, not an omit-and-derive one; and neither a
+    `CurrencyMismatchError` class nor a `CURRENCY_MISMATCH` code exists anywhere in `src/errors.ts` or is
+    ever thrown — `409 CURRENCY_MISMATCH`, referenced by this section and by the `Error.code` enum below,
+    is never actually producible by this service today. This has been true since v1.0.0; it was not
+    introduced by any later change. A caller who implements this section exactly as written (omitting
+    `currency` on a non-root call, trusting server-side derivation) will have every such call rejected
+    with `400 currency is required` by the service as it actually runs. Whether the fix is implementing
+    this derivation server-side, or rewriting this section (and removing `CURRENCY_MISMATCH`) to match the
+    zod schema's actual always-required behavior, is an open decision — not resolved by this note.
+
 
     v0.1.0 (draft, 2026-08-14): initial extraction from the design
     documents.
@@ -540,7 +556,20 @@ info:
         schemas that, unlike the request schemas, had never declared which of their fields the server
         always populates (every field NOT already marked `nullable: true` is now listed `required`, derived
         directly from each field's own existing nullability, not a new judgment call).
-  version: "1.17.0"
+    v1.18.0 (2026-08-22) — MINOR: `Error.details.reasonCode` (added in v1.17.0's own schema) is now
+    genuinely producible by the running server — v1.17.0 shipped the schema/enum but never wired it
+    through to an actual HTTP response, an external review caught this the same day (same category of bug
+    as the CURRENCY DERIVATION contradiction above: documented in detail, unreachable in practice). Fixed
+    at the source, not just re-worded: `ApiError` gained a `details` constructor param (previously
+    silently dropped by `toBody()`, which only ever returned `{code, message}`); every sufficiency-check
+    domain function (`checkUtilizeSufficiency`, `checkAmendDecreaseSufficiency`, `checkRedeemSufficiency`,
+    `checkShgtIssueSufficiency`, `checkPresentDocsIssueSufficiency`) and the CLOSE eligibility/exact-amount
+    checks now populate `reasonCode` on their `{ok: false}` result, threaded through to the thrown error at
+    every call site (Submit AND, for CLOSE specifically, the Release-time re-check too). Purely additive —
+    no existing field, status code, or error message text changed; all three sub-project test suites
+    (microservice 425/425, backend 34/34, Angular 1064/1064) re-run green, each above its own coverage
+    floor, before this version was cut.
+  version: "1.18.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1852,8 +1881,11 @@ components:
       description: >
         v1.17.0 — `code` is now a real enum (previously a bare string with the same seven values only
         documented here in prose); `details.reasonCode`, on the two codes broad enough to cover several
-        genuinely distinct business reasons, is new and optional (see `ErrorDetails` below). Both changes
-        are additive/non-breaking — see the v1.17.0 changelog entry above.
+        genuinely distinct business reasons, is new and optional (see `ErrorDetails` below). v1.18.0 — the
+        `reasonCode` schema shipped in v1.17.0 is now genuinely producible end-to-end; it shipped that
+        version documented-but-unwired (`ApiError.toBody()` silently dropped `details` entirely) — see the
+        v1.18.0 changelog entry above for the fix. Both `code` and `details.reasonCode` remain
+        additive/non-breaking.
       properties:
         code:
           type: string
@@ -1869,7 +1901,9 @@ components:
             `REQUEST_VALIDATION_FAILED` (400); `INSUFFICIENT_AVAILABLE_BALANCE` (409 — see
             `details.reasonCode` for which of several distinct sufficiency checks actually failed);
             `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0); `CURRENCY_MISMATCH` (409, v1.0.0 — see CURRENCY
-            DERIVATION); `ILLEGAL_STATE_TRANSITION` (409 — a movement/contract not in the required state
+            DERIVATION; **⚠️ documented but not currently producible — see that section's own 2026-08-22
+            confirmed-contradiction note before relying on this code ever actually appearing**);
+            `ILLEGAL_STATE_TRANSITION` (409 — a movement/contract not in the required state
             for this action; `details.reasonCode` is set for the CLOSE-specific cases, unset for a plain
             not-PENDING/already-submitted rejection); `NOT_FOUND` (404); `INTERNAL_ERROR` (500 — the
             response body always carries a fixed, generic message; the real error detail is logged

@@ -8,8 +8,19 @@ export abstract class ApiError extends Error {
   abstract readonly httpStatus: number;
   abstract readonly code: string;
 
+  /**
+   * v1.17.0 — was previously accepted by nothing: every subclass relied on the implicit no-arg
+   * constructor chain up to `Error(message)`, so `details` had no way to reach `toBody()` even though
+   * `ApiErrorBody.details` had been declared in `types.ts` since v1.1.0. See OAS-GAP-06's own
+   * `reasonCode` design (`Balance Contract Integration Proposal.md`) — undocumented-but-live vs.
+   * documented-but-unreachable are both real bugs; this fixes the latter.
+   */
+  constructor(message: string, readonly details?: Record<string, unknown>) {
+    super(message);
+  }
+
   toBody(): ApiErrorBody {
-    return { code: this.code, message: this.message };
+    return this.details ? { code: this.code, message: this.message, details: this.details } : { code: this.code, message: this.message };
   }
 }
 
