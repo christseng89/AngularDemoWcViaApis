@@ -24,7 +24,8 @@ B6**——`closeEligibility.ts` 檔頭註解與審查文件第 4 節已確認 B6
 | 第三版 | 2026-08-22 | 外部覆核 | 發現 `ExpiryReleasePolicy` 仍留在「不依賴 GAP-15」的第 0 節、但只有第 6 節用到——已移至第 6 節，第 0 節只留 Phase 0–3 實際會用到的三個欄位；獨立複核確認全部四項問題（核准依據、隔離標記、movementType 計數、`ExpiryReleasePolicy` 範疇）已修正，9.7/10，無新發現 |
 | 第四版 | 2026-08-23 | 業務回覆落地 | GAP-15 業務側正式回覆：不需要 `LC_EXPIRE`/`CNF_EXPIRE`，由外部系統批次呼叫既有 A10/B6 API 觸發，兩次獨立呼叫（沿用既有 Maker/Checker 兩步驟形狀），Maker/Checker 身份分離比照 `statusTransition.ts` 既有設計、無新例外。第 6 節整節改寫為「已解決」紀錄，`ExpiryReleasePolicy`/`domain/expiryRelease.ts`/`LC_EXPIRE`/`CNF_EXPIRE`/`EXPIRY_RELEASE_NOT_ELIGIBLE` 全數確認不需要實作；movementType 新增數回歸為 1 個（僅 `AMEND_EXPIRY`，15+1=16）；全文件（第 0–9 節）現在都可交付開發 |
 | 第五版 | 2026-08-23 | 使用者 | 指出 GAP-15 落地最直覺但錯誤的做法，是在 `evaluateCloseEligibility()` 裡加一條「`expiryDate` 必須已過期」的條件——這會違反既有「cancellation before expiry」設計。第 6 節新增「⚠️ 常見誤解」警語明講這件事，避免開發組員誤加 |
-| 第六版（本版） | 2026-08-23 | 外部覆核 | 發現第 3/25 行的日期跟第 16 行的「日期：2026-08-22」欄位互相矛盾——已改成「初稿/最後更新」雙欄位，不再單獨維護單一日期；並指出子帳未結清時批次呼叫 A10/B6 預期會失敗（`409`，既有行為，不是 bug）這件事沒被寫進第 9 節——已補上一條，提醒外部批次系統的失敗重試邏輯要能分辨「子帳未結清」跟「真正的系統錯誤」 |
+| 第六版 | 2026-08-23 | 外部覆核 | 發現第 3/25 行的日期跟第 16 行的「日期：2026-08-22」欄位互相矛盾——已改成「初稿/最後更新」雙欄位，不再單獨維護單一日期；並指出子帳未結清時批次呼叫 A10/B6 預期會失敗（`409`，既有行為，不是 bug）這件事沒被寫進第 9 節——已補上一條，提醒外部批次系統的失敗重試邏輯要能分辨「子帳未結清」跟「真正的系統錯誤」 |
+| 第七版（本版） | 2026-08-23 | 使用者 | 第 4 節補上 UCP 600 依據（Art. 12(b) 授權 nominated bank 對 Acceptance/deferred payment undertaking 的 prepayment/purchase；Art. 7(c)/8(c) 銀行間 reimbursement 仍在 Maturity 到期；ICC Banking Commission 意見佐證），並明確框定：`earlySettlementAuthorized` 記錄的是「明確辨識、經授權的 Early Settlement」，不是「忽略 Maturity Date」——`maturityDate` 仍是分類判斷基準，只是分類結果從一律拒絕改成需授權才放行。設計本身未變，此版是加強法規依據 |
 
 ---
 
@@ -98,6 +99,27 @@ GAP-15 影響。
 這是審查文件標記為 Critical 的唯一一項——`maturityDate` 存在但從未被 `checkRedeemSufficiency`（`domain/
 shgtRedeem.ts`，A7/B5 共用的同一個函式）讀取，代表 Settlement 目前可以在到期前無條件送出，且**沒有任何
 分類**（連「這是提早清償」這件事本身都沒有記錄下來）。
+
+### UCP 600 依據——這是「明確分類 + 授權」的業務情境，不是「Maturity Date 可以忽略」
+
+Early Settlement 在 Trade Finance 實務上是被 UCP 600 明確承認、可以接受的業務情境，本規格的設計方向
+（分類點 + 明確授權，而非硬性拒絕）跟這個框架完全一致，不是在弱化 Maturity Date 的約束力：
+
+- **UCP 600 Art. 12(b)**：明確授權 nominated bank 對其已接受的 draft（Acceptance）或已承擔的 deferred
+  payment undertaking，進行 prepayment（提前付款）/purchase（貼現買入）。
+- **UCP 600 Art. 7(c)／Art. 8(c)**：即使 nominated bank 在 maturity 前已經 prepaid/purchased，**銀行間
+  的 reimbursement 義務仍然是在 maturity 到期時履行**——也就是說，Early Settlement 是 nominated bank
+  自己承擔的商業決定（例如自行貼現融資），不會改變、也不會提前 issuing bank／confirming bank 自己在
+  Maturity Date 的義務。
+- ICC Banking Commission 的相關意見進一步確認：符合條件時，prepayment 可以在 maturity 前進行。
+
+**這對本規格的設計意涵**：`earlySettlementAuthorized` 這個欄位，記錄的正是「這筆清償是一個被明確辨識、
+經授權的 Early Settlement/Prepayment 情境」，不是讓系統「忽略」Maturity Date 的存在——`maturityDate`
+本身仍然是分類的判斷基準（`settlementDate < contract.maturityDate` 這行判斷式不會被拿掉），只是分類
+結果從「一律拒絕」改成「需要授權才放行」。這跟 Art. 12(b) 承認 Early Settlement 是合法商業行為、但
+Art. 7(c)/8(c) 同時保留 Maturity Date 作為銀行間清算基準的精神完全對應——Balance Component 這裡管的
+是「這筆 Acceptance/SG 的曝險何時真正解除」，不是 nominated bank 自己的融資決定，兩者層次不同，這也是
+為什麼這個 gate 只需要記錄「有無授權」，不需要延伸去判斷 Early Settlement 背後的商業理由是否合理。
 
 ### 修正規格
 
