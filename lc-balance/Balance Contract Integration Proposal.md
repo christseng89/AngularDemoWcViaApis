@@ -1,8 +1,10 @@
 # Balance Component — Contract Integration Proposal
 
-**Scope:** `analysis/balance-component-api.yaml`（Microservice OAS, `info.version: "1.16.0"`, 1751 行）——
-評估這份「結構契約」（schema/類型/必填欄位）與「行為契約」（業務規則、狀態機、失敗處理）之間的落差，
-判斷正式對外開放給銀行內部/外部 TF 交易系統整合前，還缺哪些東西。
+**Scope:** `analysis/balance-component-api.yaml`（Microservice OAS，初次審查時 `info.version: "1.16.0"`、
+1751 行；經本文件記錄的多輪落地，現已是 `1.19.0`——OAS 版本以檔案本身為準，此處數字僅供追溯初次審查
+基準，不隨每次落地更新，避免跟下方版本歷程表兜不起來）——評估這份「結構契約」（schema/類型/必填欄位）
+與「行為契約」（業務規則、狀態機、失敗處理）之間的落差，判斷正式對外開放給銀行內部/外部 TF 交易系統
+整合前，還缺哪些東西。
 
 **Method:** 直接逐段讀取 OAS 原始檔內容（`paths`/`components/schemas`/`Error` schema），並與
 `lc-balance/CLAUDE.md` 決策日誌、`microservices/balance-component/src/service/balanceService.ts` 的實際
@@ -10,7 +12,8 @@
 grep 結果，沒有未經查證的推測。不是對 OAS 逐條 schema validate（那是 lint 工具的工作），而是找「schema
 本身表達得出來、但目前沒表達」和「schema 表達不出來、只能靠文件補」這兩類落差。
 
-**Review date:** 2026-08-22
+**Review date:** 初次審查 2026-08-22；最後更新 2026-08-23（逐輪日期見下方「審查與版本歷程」表，此欄不
+再單獨維護）
 
 **Reviewer posture:** 把這份 OAS 當作「準備正式對外開放」的候選合約來審查，不是當作內部原型文件審查——
 落差分級以「會不會讓外部整合方做出跟銀行業務政策不一致的事」為主要判準，其次才是文件完整度/結構品質。
