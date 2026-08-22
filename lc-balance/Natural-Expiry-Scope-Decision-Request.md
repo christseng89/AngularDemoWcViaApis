@@ -8,6 +8,32 @@ Solutions 租戶拓撲）併同一次會議討論。
 
 ---
 
+## ✅ 已回覆（2026-08-23）
+
+**答案**：自然到期由**外部系統依交易條件批次判斷，透過既有的 A10/B6 Close API（Maker Submit + Checker
+Release）觸發**，跟人工在 UI 上操作走同一條路徑，Balance Component 不知道、也不需要知道呼叫方是排程
+系統還是真人。
+
+**對照下方表格**：屬於第一列「自然到期是外部批次流程的職責，不經過本 API」的一個精確變體——批次觸發的
+決策/排程邏輯確實在外部，但**呼叫的是既有的通用 API**，不是完全繞過 Balance Component。結論相同：
+**GAP-15 結案，不需要新增 `movementType` 或事件**（不需要 `LC_EXPIRE`/`CNF_EXPIRE`）。
+
+**釐清的附帶問題**：批次觸發時 Maker Submit／Checker Release 是否需要兩個不同身份，以維持 4-eyes 分離？
+——業務回覆：分別呼叫兩次，本來就是 A10/B6 各自獨立的 Maker/Checker API（`POST /balance-movements` 建立
+PENDING + `POST .../release` 核准），批次流程沿用既有的兩步驟呼叫形狀，不需要新端點或特殊行為。至於這
+兩次呼叫是否用不同身份執行，查證 `domain/statusTransition.ts` 自己的既有設計：「Maker and Checker being
+the same person is NOT enforced here... out of scope for this service's own state machine」（2026-08-14
+業務指示，已是既定設計）——身份分離是銀行自己的權限政策問題，不是 Balance Component 的狀態機要管的事，
+批次觸發沒有引入新的例外。
+
+**Balance Component 因此需要／不需要做的事**：
+- 需要：`expiryDate` 欄位存在（Phase 0，已在 `A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md`
+  規劃中，且這件事本來就跟 GAP-15 本身無關——供外部批次系統讀取，決定何時觸發）、`close-eligible`
+  查詢維持準確（已存在，`GET /balance-contracts/close-eligible`）
+- 不需要：新的 `movementType`、排程機制本身、`ExpiryReleasePolicy` 這類設定 schema
+
+---
+
 ## 背景（30 秒版）
 
 A10（Import LC Close）/B6（Export Confirmed LC Close）這兩個功能，設計上明確自比為「cancellation before

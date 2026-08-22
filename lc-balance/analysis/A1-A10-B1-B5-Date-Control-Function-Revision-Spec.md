@@ -1,15 +1,12 @@
 # A1–A10 / B1–B5 功能修正規格 — LC Expiry Date / Acceptance Maturity Date Control 落地
 
-**核准依據（2026-08-22 更正）**：本文件第一版曾誤寫「GAP-15 已通過」——經核對 `Natural-Expiry-Scope-
-Decision-Request.md`（檔案時間戳記從未變動）、`Balance Contract Integration Proposal.md` 的落地順序表
-（GAP-15 那列仍是「決策請求文件已備妥，待轉發」，不是已回覆）、以及 `lc-balance/CLAUDE.md` 自己最新的
-決策日誌條目（白紙黑字：「④EXPIRY RESIDUAL RELEASE (`LC_EXPIRE`/`CNF_EXPIRE`) stays gated on the
-still-open GAP-15 business/architecture decision, not implemented speculatively」），**GAP-15 目前仍
-是未決事項，沒有任何可查證的核准紀錄**。本次更正依 `analysis/LC-Expiry-Acceptance-Maturity-Control-
-Review.md`（現為 5 輪覆核，9.5/10，`LCExpiryAcceptanceMaturityControlReview_v5.docx`）自己的最終結論
-重新界定範疇：**Phase 0–3（本文件第 0–5、7–9 節）本身不依賴 GAP-15，可交付開發；第 6 節
-（`LC_EXPIRE`/`CNF_EXPIRE`）維持草稿狀態，待 GAP-15 有可查證的核准紀錄後才生效**——見第 6 節開頭的
-獨立標記。
+**核准依據（2026-08-23 更新：GAP-15 已定案）**：本文件第一版曾誤寫「GAP-15 已通過」，第二/三版更正為
+「GAP-15 未決，第 6 節維持草稿」。**2026-08-23 業務側已正式回覆 GAP-15**：LC/Confirmation 自然到期的
+殘值釋放，不需要 Balance Component 新增 `movementType` 或事件，由外部系統批次判斷後直接呼叫既有的
+A10/B6 Maker/Checker API 觸發（完整記錄見 `Natural-Expiry-Scope-Decision-Request.md`）。**因此本文件
+現在整份（第 0–9 節，含原本掛在 GAP-15 上的第 6 節）都可以交付開發**——第 6 節內容已改寫為「為何原本
+規劃的新事件類型最後確認不需要」的紀錄，不再是待核准草稿。`Balance Contract Integration Proposal.md`
+與 `lc-balance/CLAUDE.md` 已同步更新。
 **範疇**：A1–A10（Import，10 個功能全部列出，含明確標記「不受影響」的功能）、B1–B5（Export）。**不含
 B6**——`closeEligibility.ts` 檔頭註解與審查文件第 4 節已確認 B6 與 A10 共用同一份資格判斷邏輯、且是
 「Related Close Control」而非本次 Date-Control 修正的對象，不需另外開規格；本文件最後一節另有簡短說明。
@@ -24,15 +21,17 @@ B6**——`closeEligibility.ts` 檔頭註解與審查文件第 4 節已確認 B6
 |---|---|---|---|
 | 第一版 | 2026-08-22 | — | 初稿，誤寫「GAP-15 已通過」，`ExpiryReleasePolicy` 誤放進 Phase 0 |
 | 第二版 | 2026-08-22 | 外部覆核 | 發現核准依據不成立，更正開頭前提、第 6 節加隔離標記、修正 movementType 計數（15+3=18，非「第 16 個」） |
-| 第三版（本版） | 2026-08-22 | 外部覆核 | 發現 `ExpiryReleasePolicy` 仍留在「不依賴 GAP-15」的第 0 節、但只有第 6 節用到——已移至第 6 節，第 0 節只留 Phase 0–3 實際會用到的三個欄位；獨立複核確認全部四項問題（核准依據、隔離標記、movementType 計數、`ExpiryReleasePolicy` 範疇）已修正，9.7/10，無新發現 |
+| 第三版 | 2026-08-22 | 外部覆核 | 發現 `ExpiryReleasePolicy` 仍留在「不依賴 GAP-15」的第 0 節、但只有第 6 節用到——已移至第 6 節，第 0 節只留 Phase 0–3 實際會用到的三個欄位；獨立複核確認全部四項問題（核准依據、隔離標記、movementType 計數、`ExpiryReleasePolicy` 範疇）已修正，9.7/10，無新發現 |
+| 第四版（本版） | 2026-08-23 | 業務回覆落地 | GAP-15 業務側正式回覆：不需要 `LC_EXPIRE`/`CNF_EXPIRE`，由外部系統批次呼叫既有 A10/B6 API 觸發，兩次獨立呼叫（沿用既有 Maker/Checker 兩步驟形狀），Maker/Checker 身份分離比照 `statusTransition.ts` 既有設計、無新例外。第 6 節整節改寫為「已解決」紀錄，`ExpiryReleasePolicy`/`domain/expiryRelease.ts`/`LC_EXPIRE`/`CNF_EXPIRE`/`EXPIRY_RELEASE_NOT_ELIGIBLE` 全數確認不需要實作；movementType 新增數回歸為 1 個（僅 `AMEND_EXPIRY`，15+1=16）；全文件（第 0–9 節）現在都可交付開發 |
 
 ---
 
 ## 0. Phase 0 前置：Schema 變更（審查文件 §2、§6.1）
 
 在任何 A1–A10/B1–B5 的功能修正之前，必須先完成的欄位新增（`microservices/balance-component/src/types.ts`
-+ `src/db/migrations.ts`）——**僅限 Phase 0–3（第 1–5、7–9 節）實際會用到的欄位**，`ExpiryReleasePolicy`
-只服務第 6 節（GAP-15 草稿範疇），已移到該節，不放在這裡（2026-08-22 更正，見版本說明）：
++ `src/db/migrations.ts`）——**僅限第 1–5、7–9 節實際會用到的欄位**。`ExpiryReleasePolicy` 原本規劃只
+服務第 6 節（原④EXPIRY RESIDUAL RELEASE 草稿範疇），2026-08-22 曾從本節移到第 6 節；2026-08-23 GAP-15
+定案後確認整個 `ExpiryReleasePolicy` 概念都不需要實作，詳見第 6 節：
 
 ```ts
 // BalanceContract — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION 適用；SHGT/Acceptance 不適用
@@ -133,57 +132,31 @@ Expiry Date **互相獨立、不互為先決條件**。本次修正**不改動**
 
 ---
 
-## 6. 🚧 草稿，待 GAP-15 核准後才生效：`LC_EXPIRE` / `CNF_EXPIRE`（審查文件 §1，④EXPIRY RESIDUAL RELEASE CONTROL）
+## 6. ✅ GAP-15 已解決（2026-08-23）：不需要 `LC_EXPIRE` / `CNF_EXPIRE`，沿用既有 A10/B6 API
 
-> **本節與第 0–5、7–9 節性質不同，不要一起送給開發組員**：第 0–5、7–9 節（Phase 0–3）不依賴 GAP-15，
-> `lc-balance/CLAUDE.md` 決策日誌已明確標記可交付開發。本節（`LC_EXPIRE`/`CNF_EXPIRE`，對應審查文件的
-> ④EXPIRY RESIDUAL RELEASE CONTROL）**仍與尚未有可查證核准紀錄的 GAP-15 掛鉤**——`Natural-Expiry-
-> Scope-Decision-Request.md` 目前仍是「決策請求文件已備妥，待轉發」狀態。本節內容僅供設計參考，正式
-> 開工前必須先在 `Natural-Expiry-Scope-Decision-Request.md`／`Balance Contract Integration
-> Proposal.md`／`lc-balance/CLAUDE.md` 三處一致回填業務/架構側的實際回覆，再拿回來覆核一次。
+> **本節內容已由第一/二版取代**：原本規劃的 `LC_EXPIRE`/`CNF_EXPIRE`（審查文件 §1，④EXPIRY RESIDUAL
+> RELEASE CONTROL）**不需要實作**。業務回覆：LC/Confirmation 自然到期的殘值釋放，由**外部系統**依
+> `expiryDate` + 自己的業務政策批次判斷，分別呼叫既有的 A10（Import）/B6（Export）Maker/Checker API
+> （`POST /balance-movements` 建立 PENDING、`POST .../release` 核准，兩次獨立呼叫——本來就是既有的
+> 兩步驟形狀，不需要新端點），跟人工在 UI 上操作走同一條路徑。Balance Component 不知道、也不需要知道
+> 呼叫方是排程系統還是真人——這正是 `service/balanceService.ts` 本來就不知道呼叫方身份的既有設計
+> 哲學。完整回覆記錄見 `Natural-Expiry-Scope-Decision-Request.md`。
 
-**不屬於 A1–A10/B1–B5 這組 Maker/Checker Function**——這是日期觸發（排程/批次），本規格只列出它對現有
-15 值 `movementType` 註冊表（`buildMovementTypeRegistry()`，OAS-GAP-06 v1.17.0 建立）的影響，實作細節
-（排程機制本身）不在本規格範圍。**注意編號**：本文件總共新增 3 個 movementType 值——第 2/3 節的
-`AMEND_EXPIRY`（不受 GAP-15 影響，屬於 Phase 0–3）+ 本節的 `LC_EXPIRE`/`CNF_EXPIRE`（受 GAP-15 影響）
-——15 + 3 = 18，不是「第 16 個」：
+**這代表**：`buildMovementTypeRegistry()` **不需要**新增 `LC_EXPIRE`/`CNF_EXPIRE`，`domain/
+expiryRelease.ts`（獨立於 `closeEligibility.ts` 的資格判斷）**不需要**建立，`ExpiryReleasePolicy`
+（floatDays/holidayCalendar/placeOfExpiryTimezone 等排程參數）**不需要**當作 Balance Component 自己的
+設定 schema——排程/計日邏輯是外部系統自己的事，Balance Component 的 `evaluateCloseEligibility()`
+（`closeEligibility.ts`）維持完全不變，本來就是給任何呼叫方用的通用檢查，不分是人還是排程系統呼叫。
 
-```ts
-// buildMovementTypeRegistry() 新增（待 GAP-15 核准後才落地，此處僅為設計草稿）
-LC_EXPIRE: { isCreating: false, checkSufficiency: expiryResidualReleaseShaped },  // Import
-CNF_EXPIRE: { isCreating: false, checkSufficiency: expiryResidualReleaseShaped }, // Export
-```
+**批次觸發的 Maker/Checker 身份分離**：查證 `domain/statusTransition.ts` 既有設計——「Maker and
+Checker being the same person is NOT enforced here... out of scope for this service's own state
+machine」（2026-08-14 業務指示，已是既定設計）。批次觸發沒有引入新的例外，這是呼叫方（外部系統/銀行
+權限政策）自己的責任，不是 Balance Component 的狀態機要管的事。
 
-**設定 schema（審查文件 §1.1，比照 `tolerancePct` 既有慣例，合約層可配置，不寫死常數；2026-08-22 從第 0
-節移到本節——這個 interface 只服務本節的觸發時機計算，放進「不依賴 GAP-15」的 Phase 0 清單裡會自相矛盾，
-見版本說明）**：
-
-```ts
-interface ExpiryReleasePolicy {
-  placeOfExpiry: string;
-  floatDays: number;
-  floatDayCountConvention: 'CALENDAR_DAYS' | 'BUSINESS_DAYS';
-  holidayCalendar?: string;               // BUSINESS_DAYS 時必填
-  placeOfExpiryTimezone: string;
-  deliveryChannel?: 'COURIER' | 'BANK_COUNTER' | 'ELECTRONIC';
-  requiresOpenPresentationCheck: boolean; // 沿用 closeEligibility.ts 的 hasOpenEvents 精神
-}
-```
-
-**資格條件（獨立函式，審查文件 §5 明確要求不與 `closeEligibility.ts` 共用）**：
-
-```ts
-// 建議新檔案 domain/expiryRelease.ts（審查文件 §5 明講不要塞進 closeEligibility.ts）
-function evaluateExpiryReleaseEligibility(inputs): { eligible: boolean; reasons: string[] } {
-  // 只看 Root 自身 Confirmed Balance 是否 > 0；不要求 SG/Acceptance 先歸零（跟 A10/B6 資格條件本質不同）
-  // 檢查是否有 PENDING 的 Document Arrival/Present Docs（A3/A3S/B3）尚未終結 → 暫緩釋放
-}
-```
-
-**觸發時機**：`expiryDate + ExpiryReleasePolicy.floatDays`（依 `floatDayCountConvention` 計日，`BUSINESS_
-DAYS` 時套用 `holidayCalendar`）——不是 Expiry Date 當天，也絕不額外加 UCP Art. 14(c) 的 21 天。
-
-**新 `reasonCode`**：`EXPIRY_RELEASE_NOT_ELIGIBLE`（尚有 Open Presentation 事件時暫緩釋放的情境）。
+**Balance Component 因此需要的東西，全部已經涵蓋在第 0、5 節裡**：`expiryDate` 欄位（第 0 節，Phase
+0–3，供外部系統讀取）+ `GET /balance-contracts/close-eligible` 查詢維持準確（已存在，見第 5 節）。
+**沒有額外的第六節工程工作**——這一節保留只是為了記錄「為什麼原本規劃的新事件類型最後沒有做」，供未來
+回頭查證用。
 
 ---
 
@@ -208,7 +181,8 @@ type DateControlKind =
 
 // A6/B4(Usance 分支) 的 Calculated Maturity Date 邏輯不是獨立 dateControl 分類，
 // 是 movementDerivation 底下的欄位自動帶入行為（同 amountAutoFilledFrom 既有模式）——
-// 審查文件④EXPIRY_RESIDUAL_RELEASE 分類不掛在任何 A/B code 上（第 6 節），FUNCTION_STRATEGIES 裡不會出現
+// 審查文件④EXPIRY RESIDUAL RELEASE 對應的 movementType 已於 GAP-15 定案後確認不需要實作（見第 6 節），
+// 沒有對應的 dateControl 值，FUNCTION_STRATEGIES 裡不會出現
 ```
 
 `dateControl: 'NONE'` 的顯式標記，比照審查文件 §7 引用的既有教訓（F-09 `eligibility-rule.ts` 合併時
@@ -221,9 +195,11 @@ A8 的 0-balance exclusion 被默默吃掉）——A1/A4/A9/A10/B1 必須顯式�
 
 | `reasonCode` | 觸發函式 | 對應 Function |
 |---|---|---|
-| `PRESENTATION_AFTER_EXPIRY` | A3/A3S 的 `checkUtilizeSufficiency` 前置檢查、B3 的 `checkPresentDocsIssueSufficiency` 前置檢查 | A3、A3S、B3（Phase 0–3，不受 GAP-15 影響） |
-| `SETTLEMENT_BEFORE_MATURITY_NOT_AUTHORIZED` | A7/B5 共用的 `checkRedeemSufficiency` 前置分類 gate | A7、B5（Phase 0–3，不受 GAP-15 影響） |
-| `EXPIRY_RELEASE_NOT_ELIGIBLE` | 新 `evaluateExpiryReleaseEligibility()` | `LC_EXPIRE`/`CNF_EXPIRE`（🚧 第 6 節範疇，待 GAP-15 核准，暫不併入 OAS） |
+| `PRESENTATION_AFTER_EXPIRY` | A3/A3S 的 `checkUtilizeSufficiency` 前置檢查、B3 的 `checkPresentDocsIssueSufficiency` 前置檢查 | A3、A3S、B3 |
+| `SETTLEMENT_BEFORE_MATURITY_NOT_AUTHORIZED` | A7/B5 共用的 `checkRedeemSufficiency` 前置分類 gate | A7、B5 |
+
+（原本規劃的 `EXPIRY_RELEASE_NOT_ELIGIBLE` 已隨 GAP-15 定案移除——見第 6 節，不需要新的 eligibility
+函式，`closeEligibility.ts` 既有的 reasonCode 已足夠。）
 
 ---
 
@@ -232,10 +208,11 @@ A8 的 0-balance exclusion 被默默吃掉）——A1/A4/A9/A10/B1 必須顯式�
 - **`AMEND_EXPIRY` 是否需要獨立 sufficiency 檢查**——本規格假設走 `noCheck`（延展 Expiry 不動 Balance），
   但若延展 Expiry 同時牽動 ECL/CCF 重新計算（知識庫 `LC_AMD_TENOR` 描述），這部分屬於 Payment/Charge
   Component 職責（範疇界線，`CLAUDE.md` 開頭），本規格不預設 Balance Component 自己要算。
-- **`LC_EXPIRE`/`CNF_EXPIRE` 的排程機制本身**（誰觸發、多久跑一次、失敗重試）——這是部署/維運層級的
-  設計，不屬於本規格（本規格只定義事件本身的資格條件與資料形狀）。
 - **A6/B4 Maturity Date 覆寫的 Checker 端 UI**——本規格只定義資料要存證，畫面上 Checker 端具體怎麼呈現
   覆寫理由，留給前端設計階段。
+- **外部批次系統本身的排程/計日邏輯**（誰觸發、多久跑一次、失敗重試、`floatDays`/`holidayCalendar` 這
+  類參數）——GAP-15 定案後確認完全是外部系統自己的職責，不屬於 Balance Component 的規格範圍，本文件
+  不再涵蓋。
 
 ## B6 附註（範疇外，僅供交叉確認）
 

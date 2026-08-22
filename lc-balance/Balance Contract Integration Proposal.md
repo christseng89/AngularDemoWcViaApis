@@ -31,6 +31,7 @@ grep 結果，沒有未經查證的推測。不是對 OAS 逐條 schema validate
 | 2026-08-22 | 第五輪外部覆核（獨立 `tsc --noEmit` 驗證） | 9.4/10（原 8.3/10） | 逐一追蹤全部 8 個 `reasonCode` 值到各自的 `throw` 呼叫點，含最容易漏掉的 CLOSE Release 時重新檢查，確認沒有「宣告了但沒接上」的殘留；獨立在覆核端重跑 `tsc --noEmit` 乾淨過關（Jest 因覆核端掛載環境限制無法獨立重跑，三個測試套件通過數字仍是採信回報，非獨立驗證）。**發現**：本人上一則訊息口頭聲稱 GAP-16「已發決策請求」，但文件本身（rollout 表、GAP-16 小節）當時仍寫「決策請求未發出」——兩邊沒同步。已修正為統一措辭「🟢 決策請求文件已備妥，待轉發」（比單純改成「已發出」更誠實：文件本身無法驗證是否真的轉發出去了），GAP-09 那列同步套用同一措辭 |
 | 2026-08-22 | 第六輪外部覆核（三份決策請求文件核對） | 9.6/10（原 9.4/10） | 確認「已備妥待轉發」措辭統一套用到 GAP-16/09/15 三列，全文 grep 無殘留「已發出」；核實新建的 `Natural-Expiry-Scope-Decision-Request.md` 格式/範疇界定品質跟前兩份一致；確認 `TF-Solutions-Tenant-Topology-Decision-Request.md` 確實未被改動。**發現**：本表本身這輪沒有跟著 rollout 表狀態欄更新留下自己的一列——本列即補記 |
 | 2026-08-22 | 業務/架構回覆落地 | — | 業務/架構側回覆：GAP-16 選方向 (a) 服務端補實作，GAP-09 確認需對接多家分行/多家銀行，GAP-15 本輪暫緩列入下一輪計畫。GAP-16 直接落地為程式碼：`errors.ts` 新增 `CurrencyMismatchError`，`resolveOrCreateContract()` 加上三條 CURRENCY DERIVATION 規則的真正推導/比對邏輯，`createContract()`/`createMovement()` 兩處改用已解析的 `contract.currency`，`validation/requestSchema.ts` 的 `currency` 改為選填並把小數位檢查在省略情境下移到 service 層重跑；新增 7 個單元測試，三個子專案測試套件全部重跑綠燈（微服務 432/432、backend 34/34、Angular 1064/1064）；OAS 移除矛盾警告、改為 RESOLVED 說明，v1.18.0 → v1.19.0。GAP-09 拓撲定案寫入文件，但技術方案（含程式碼）依提案自己原本的範圍界定，留待 GAP-01 認證機制選型後才動手，這輪未寫程式碼 |
+| 2026-08-23 | GAP-15 業務回覆落地 | — | 業務側回覆：LC/Confirmation 自然到期不需要 Balance Component 新增 `movementType` 或事件，由外部系統批次判斷後分別呼叫既有 A10/B6 Maker/Checker API 觸發（兩次獨立呼叫，沿用既有兩步驟形狀，不需新端點）。Maker/Checker 身份分離查證 `domain/statusTransition.ts` 既有設計（同一人不被此狀態機強制分開，2026-08-14 業務指示），批次觸發未引入新例外。GAP-15 結案，`Natural-Expiry-Scope-Decision-Request.md`／本文件／`lc-balance/CLAUDE.md`／`A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md` 第 6 節同步更新 |
 
 各輪完整評分細項（分維度分數、逐條複驗過程）留在覆核當下的討論紀錄，不重複嵌入本文件正文——避免文件
 隨覆核輪次增加而越來越像審查紀錄，而非工程合約規格。
@@ -448,21 +449,29 @@ Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以
 合規劃進下一個 MAJOR 版本，而且要先確認有沒有現存呼叫方依賴目前這七個獨立欄位名稱。列在這裡純粹是留下
 記錄，避免將來設計 MAJOR 版本時，這七個欄位的歷史包袱被遺忘。
 
-### OAS-GAP-15 — 找不到 `EXPIRE`（自然到期）對應的 movementType 或事件（外部覆核新增，2026-08-22）
+### OAS-GAP-15 — 找不到 `EXPIRE`（自然到期）對應的 movementType 或事件（外部覆核新增，2026-08-22） ✅ 已解決（2026-08-23）
 
-> **⏸️ 本輪暫緩，列入下一輪計畫（2026-08-22）**：業務/架構側這輪尚未回覆，決策請求先保留在「已備妥待
-> 轉發」狀態，不阻塞這輪 GAP-16/GAP-09 的落地工作。
+> **✅ 已回覆並定案（2026-08-23）**：LC/Confirmation 自然到期的殘值釋放，**不需要 Balance Component
+> 新增 `movementType` 或事件**。由外部系統依交易條件（`expiryDate` + 業務政策）批次判斷，分別呼叫既有
+> 的 A10（Import）/B6（Export）Close API（`POST /balance-movements` 建立 PENDING、`POST .../release`
+> 核准，兩次獨立呼叫——本來就是既有的 Maker/Checker 兩步驟形狀，不需要新端點），跟人工在 UI 上操作走
+> 同一條路徑。Balance Component 不知道、也不需要知道呼叫方是排程系統還是真人——這正是 `service/
+> balanceService.ts` 本來就不知道呼叫方身份、不知道有沒有「named business-function code」的既有設計
+> 哲學。批次觸發的 Maker/Checker 身份是否分離，比照 `domain/statusTransition.ts` 既有設計（「same
+> person is NOT enforced here... out of scope for this service's own state machine」，2026-08-14 業務
+> 指示），沒有引入新的例外。完整回覆記錄見 `Natural-Expiry-Scope-Decision-Request.md`。
 
-> **⚠️ 待業務/架構確認，不是缺陷**：A10/B6 Close 的設計明確自比為「cancellation before expiry」——也就
-> 是說，Close 是 Maker/Checker 觸發的**提前**結案，隱含存在一個對應的、日期觸發的**自然到期**流程。但
-> 整份合約（15 個 `movementType` 值逐一核對過，見 OAS-GAP-06 新增的 enum）裡找不到任何 `EXPIRE` 或等效
-> 事件。**這不代表一定是缺口**——自然到期完全可能是外部批次流程的職責，本來就不該經過這個 API。但目前
-> 沒有任何一份文件（OAS、`CLAUDE.md`、Obsidian KB）明講答案是哪一個。
+> **⚠️ 原始待確認說明（保留作為歷史紀錄）**：A10/B6 Close 的設計明確自比為「cancellation before
+> expiry」——也就是說，Close 是 Maker/Checker 觸發的**提前**結案，隱含存在一個對應的、日期觸發的**自然
+> 到期**流程。但整份合約（15 個 `movementType` 值逐一核對過，見 OAS-GAP-06 新增的 enum）裡找不到任何
+> `EXPIRE` 或等效事件。**這不代表一定是缺口**——自然到期完全可能是外部批次流程的職責，本來就不該經過
+> 這個 API。但當時沒有任何一份文件（OAS、`CLAUDE.md`、Obsidian KB）明講答案是哪一個。
 
-**建議**：這是一個需要直接問業務/架構側的問題，不是工程面能自己判斷的：「LC/Confirmation 的自然到期，
-是由外部批次流程處理、完全不經過 Balance Component，還是這個微服務本來就該有、但目前尚未實作的一塊？」
-確認答案之前不建議編號成正式的實作項目——先弄清楚這是不是真的需要做的事，比先假設它需要做更重要。決策
-請求已備妥，見 `Natural-Expiry-Scope-Decision-Request.md`。
+**已解決**：答案是「外部批次流程職責，透過既有 API 觸發」這個方向的精確變體——決策/排程邏輯在外部，但
+呼叫的是既有的通用 A10/B6 API，不是完全繞過 Balance Component。不需要新增 `movementType`、不需要排程
+機制、不需要 `ExpiryReleasePolicy` 這類設定 schema——只需要 `expiryDate` 欄位存在（Phase 0，跟本決定
+本身無關）供外部系統讀取，以及維持 `close-eligible` 查詢的準確性（已存在）。決策請求記錄見
+`Natural-Expiry-Scope-Decision-Request.md`。
 
 ---
 
@@ -472,7 +481,7 @@ Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以
 |---|---|---|---|---|
 | — | ~~OAS-GAP-16 — CURRENCY DERIVATION 該補實作還是改文件~~ | 業務 + 架構 → 後端 | 已完成 | ✅ 已完成（方向 (a)，OAS v1.19.0，見 ✅ OAS-GAP-16 小節「實作狀態」） |
 | 0 | 確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度 | 業務 | 小（1 次會議） | 🟢 決策請求文件已備妥（`TF-Solutions-Tenant-Topology-Decision-Request.md`），待轉發 |
-| — | 確認自然到期（EXPIRE）是否屬於本合約範圍 — 決定 OAS-GAP-15 要不要成為正式項目 | 業務 + 架構 | 小（1 次會議，可與第 0 步併同一次討論） | 🟢 決策請求文件已備妥（`Natural-Expiry-Scope-Decision-Request.md`），待轉發 |
+| — | ~~OAS-GAP-15 — 自然到期是否屬於本合約範圍~~ | 業務 + 架構 | 已完成 | ✅ 已解決（2026-08-23，外部批次流程透過既有 A10/B6 API 觸發，不需新增 movementType，見 `Natural-Expiry-Scope-Decision-Request.md`） |
 | 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（拓撲已定案為多機構，範圍不會再縮小；仍卡在 GAP-01 認證機制選型未決定） | 🟢 決策請求文件已備妥（`Auth-And-Tenant-Isolation-Decision-Request.md`），待轉發——未動程式碼 |
 | 2 | OAS-GAP-02（跨合約 Checker 待辦清單端點，設計時一併記錄 OAS-GAP-11 的長期方向） | 架構 + 前端 | 中 | ⬜ 未開始 |
 | 3 | OAS-GAP-03（A9 UI 政策 vs API 實際行為的落差，含全面盤點是否還有類似落差） | 業務 + 架構 | 小～中（盤點階段小，若發現更多落差則視數量放大） | 🟡 文件面已補警語，行為/政策決策未落地 |
