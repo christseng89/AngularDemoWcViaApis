@@ -18,12 +18,21 @@ B6**——`closeEligibility.ts` 檔頭註解與審查文件第 4 節已確認 B6
 為了讓 A1–A10/B1–B5 逐項可落地而補上的工程判斷，需要在下一輪覆核裡確認，不視為已核准。
 **日期**：2026-08-22
 
+## 版本說明
+
+| 輪次 | 內容 |
+|---|---|
+| 第一版 | 初稿，誤寫「GAP-15 已通過」，`ExpiryReleasePolicy` 誤放進 Phase 0 |
+| 第二版 | 外部覆核發現核准依據不成立，更正開頭前提、第 6 節加隔離標記、修正 movementType 計數（15+3=18，非「第 16 個」） |
+| 第三版（本版） | 外部覆核發現 `ExpiryReleasePolicy` 仍留在「不依賴 GAP-15」的第 0 節、但只有第 6 節用到——已移至第 6 節，第 0 節只留 Phase 0–3 實際會用到的三個欄位 |
+
 ---
 
-## 0. Phase 0 前置：Schema 變更（審查文件 §2、§1.1、§6.1）
+## 0. Phase 0 前置：Schema 變更（審查文件 §2、§6.1）
 
 在任何 A1–A10/B1–B5 的功能修正之前，必須先完成的欄位新增（`microservices/balance-component/src/types.ts`
-+ `src/db/migrations.ts`）：
++ `src/db/migrations.ts`）——**僅限 Phase 0–3（第 1–5、7–9 節）實際會用到的欄位**，`ExpiryReleasePolicy`
+只服務第 6 節（GAP-15 草稿範疇），已移到該節，不放在這裡（2026-08-22 更正，見版本說明）：
 
 ```ts
 // BalanceContract — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION 適用；SHGT/Acceptance 不適用
@@ -32,20 +41,11 @@ issueDate?: string | null;
 
 // BalanceMovement — A3/A3S/B3 適用
 documentPresentationDate?: string | null;   // 提示日期，UCP 14(c) 判斷基準，Business Date 不是 Technical Timestamp
-
-// 新增設定表或掛在 BalanceContract 上（審查文件 §1.1，比照 tolerancePct 既有慣例，合約層可配置，不寫死常數）
-interface ExpiryReleasePolicy {
-  placeOfExpiry: string;
-  floatDays: number;
-  floatDayCountConvention: 'CALENDAR_DAYS' | 'BUSINESS_DAYS';
-  holidayCalendar?: string;               // BUSINESS_DAYS 時必填
-  placeOfExpiryTimezone: string;
-  deliveryChannel?: 'COURIER' | 'BANK_COUNTER' | 'ELECTRONIC';
-  requiresOpenPresentationCheck: boolean; // 沿用 closeEligibility.ts 的 hasOpenEvents 精神
-}
 ```
 
-`maturityDate`（已存在但從未被讀取的孤兒欄位）不需要新增，只需要被第 6 節的邏輯真正讀取。
+`maturityDate`（已存在但從未被讀取的孤兒欄位）不需要新增，只需要被第 2/3 節 A6/B4 那兩列的 Calculated
+Maturity Date 邏輯，以及第 4 節 A7/B5 的 Early Settlement 判斷真正讀取——三者都屬於 Phase 0–3，不受
+GAP-15 影響。
 
 ---
 
@@ -152,6 +152,22 @@ Expiry Date **互相獨立、不互為先決條件**。本次修正**不改動**
 // buildMovementTypeRegistry() 新增（待 GAP-15 核准後才落地，此處僅為設計草稿）
 LC_EXPIRE: { isCreating: false, checkSufficiency: expiryResidualReleaseShaped },  // Import
 CNF_EXPIRE: { isCreating: false, checkSufficiency: expiryResidualReleaseShaped }, // Export
+```
+
+**設定 schema（審查文件 §1.1，比照 `tolerancePct` 既有慣例，合約層可配置，不寫死常數；2026-08-22 從第 0
+節移到本節——這個 interface 只服務本節的觸發時機計算，放進「不依賴 GAP-15」的 Phase 0 清單裡會自相矛盾，
+見版本說明）**：
+
+```ts
+interface ExpiryReleasePolicy {
+  placeOfExpiry: string;
+  floatDays: number;
+  floatDayCountConvention: 'CALENDAR_DAYS' | 'BUSINESS_DAYS';
+  holidayCalendar?: string;               // BUSINESS_DAYS 時必填
+  placeOfExpiryTimezone: string;
+  deliveryChannel?: 'COURIER' | 'BANK_COUNTER' | 'ELECTRONIC';
+  requiresOpenPresentationCheck: boolean; // 沿用 closeEligibility.ts 的 hasOpenEvents 精神
+}
 ```
 
 **資格條件（獨立函式，審查文件 §5 明確要求不與 `closeEligibility.ts` 共用）**：
