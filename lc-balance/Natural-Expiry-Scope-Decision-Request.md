@@ -30,7 +30,15 @@ the same person is NOT enforced here... out of scope for this service's own stat
 - 需要：`expiryDate` 欄位存在（Phase 0，已在 `A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md`
   規劃中，且這件事本來就跟 GAP-15 本身無關——供外部批次系統讀取，決定何時觸發）、`close-eligible`
   查詢維持準確（已存在，`GET /balance-contracts/close-eligible`）
-- 不需要：新的 `movementType`、排程機制本身、`ExpiryReleasePolicy` 這類設定 schema
+- 不需要：新的 `movementType`、排程機制本身、`ExpiryReleasePolicy` 這類設定 schema、對
+  `evaluateCloseEligibility()` 的任何修改（**不要**加一條「`expiryDate` 必須已過期」的條件——這會違反
+  既有的「cancellation before expiry」設計，A10/B6 本來就允許在 LC 尚未過期時提前結案，這條規則沒有被
+  這次決定改變）
+
+**預期會遇到的正常拒絕，不是系統故障**：如果 LC 過期當下 SG 或 Acceptance Balance 還沒歸零，外部系統
+呼叫 A10/B6 會被既有的資格條件擋下（`409`）——這是既有行為，不是 bug，不需要 Balance Component 做任何
+修改。外部批次系統自己的失敗重試邏輯需要能分辨「這次拒絕是因為子帳未結清（正常，之後重試或交給人工先
+用 A9/A7 結清）」還是「真正的系統錯誤」，避免第一次遇到批次呼叫失敗時被誤判成系統故障。
 
 ---
 
