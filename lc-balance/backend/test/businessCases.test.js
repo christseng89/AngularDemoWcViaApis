@@ -18,6 +18,7 @@ const EXPECTED_IDS = [
   'import-case-10',
   'import-case-11',
   'import-case-12',
+  'import-case-13',
   'export-case-1',
   'export-case-2',
   'export-case-3',
@@ -29,6 +30,7 @@ const EXPECTED_IDS = [
   'export-case-9',
   'export-case-10',
   'export-case-11',
+  'export-case-12',
 ];
 
 const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
@@ -36,8 +38,8 @@ const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 's
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 23 business cases, Import Case 1-12 then Export Case #1-#11, in order', () => {
-    expect(registry).toHaveLength(23);
+  it('returns exactly 25 business cases, Import Case 1-13 then Export Case #1-#12, in order', () => {
+    expect(registry).toHaveLength(25);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -81,6 +83,12 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['export-case-9'].title).toBe("Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)");
     expect(byId['export-case-10'].title).toBe('Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)');
     expect(byId['export-case-11'].title).toBe('Export Case #11 — B6 Close eligibility gate, negative path (expect ERROR)');
+    expect(byId['import-case-13'].title).toBe(
+      "Import Case 13 — Clearing Bank Calendar Profile: A1 Usance ISSUE, A2 amends the profile, A6 Acceptance auto-calculates Maturity Date live via Standing",
+    );
+    expect(byId['export-case-12'].title).toBe(
+      'Export Case #12 — Clearing Bank Calendar Profile: B1 Usance ISSUE, B2 amends the profile, B4 Accept auto-calculates Maturity Date live via Standing',
+    );
   });
 
   it('every step has a type from the six the generic executor understands', () => {
