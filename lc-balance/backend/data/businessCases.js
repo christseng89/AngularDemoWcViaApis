@@ -157,6 +157,11 @@ function importCase2(lc, ib) {
           tenorType: 'BUYERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement (A7 below) now requires maturityDateStatus === 'APPROVED', which requires a
+          // verified Base Date source; FIXED_MATURITY_DATE is the only one wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases LC Issue',
@@ -676,6 +681,11 @@ function importCase7(lc) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement (A7 below) now requires maturityDateStatus === 'APPROVED', which requires a
+          // verified Base Date source; FIXED_MATURITY_DATE is the only one wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases LC Issue',
@@ -863,6 +873,11 @@ function importCase8(lc) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement (A7 below) now requires maturityDateStatus === 'APPROVED', which requires a
+          // verified Base Date source; FIXED_MATURITY_DATE is the only one wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases LC Issue',
@@ -1055,6 +1070,11 @@ function importCase9(lc, ib) {
           tenorType: 'BUYERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement (A7 below) now requires maturityDateStatus === 'APPROVED', which requires a
+          // verified Base Date source; FIXED_MATURITY_DATE is the only one wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases LC Issue',
@@ -1458,6 +1478,11 @@ function exportCase2(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement below now requires maturityDateStatus === 'APPROVED', which requires a verified
+          // Base Date source; FIXED_MATURITY_DATE is the only one wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases Confirmation Issue',
@@ -1548,6 +1573,11 @@ function exportCase3(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement below now requires maturityDateStatus === 'APPROVED', which requires a verified
+          // Base Date source; FIXED_MATURITY_DATE is the only one wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases Confirmation Issue',
@@ -1642,6 +1672,11 @@ function exportCase4(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement below now requires maturityDateStatus === 'APPROVED' (applies uniformly, MEMO
+          // exposureNature included); FIXED_MATURITY_DATE is the only verified Base Date source wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases LC Issue',
@@ -1718,6 +1753,11 @@ function exportCase5(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — Acceptance
+          // Settlement below now requires maturityDateStatus === 'APPROVED' (applies uniformly, MEMO
+          // exposureNature included); FIXED_MATURITY_DATE is the only verified Base Date source wired today.
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases LC Issue',
@@ -1894,6 +1934,12 @@ function exportCase7(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — B5 Acceptance
+          // Settlement now requires maturityDateStatus === 'APPROVED', which requires a verified Base
+          // Date source; FIXED_MATURITY_DATE is the only one wired today. Harmless on a case that never
+          // reaches Settlement (e.g. a negative Close-eligibility test).
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases Confirmation Issue',
@@ -2141,6 +2187,12 @@ function exportCase9(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — B5 Acceptance
+          // Settlement now requires maturityDateStatus === 'APPROVED', which requires a verified Base
+          // Date source; FIXED_MATURITY_DATE is the only one wired today. Harmless on a case that never
+          // reaches Settlement (e.g. a negative Close-eligibility test).
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases Confirmation Issue',
@@ -2356,6 +2408,12 @@ function exportCase11(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           expiryDate: '2030-12-31',
+          // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 (Risk Containment Gate) — B5 Acceptance
+          // Settlement now requires maturityDateStatus === 'APPROVED', which requires a verified Base
+          // Date source; FIXED_MATURITY_DATE is the only one wired today. Harmless on a case that never
+          // reaches Settlement (e.g. a negative Close-eligibility test).
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2027-04-30',
           createdBy: MAKER,
         },
         'Checker releases Confirmation Issue',
@@ -2437,12 +2495,12 @@ function exportCase11(lc, ib) {
 function importCase13(lc, ib) {
   return {
     id: 'import-case-13',
-    title: 'Import Case 13 — Clearing Bank Calendar Profile: A1 Usance ISSUE, A2 amends the profile, A6 Acceptance auto-calculates Maturity Date live via Standing',
+    title: 'Import Case 13 — Clearing Bank Calendar Profile: A1 Usance ISSUE (FIXED_MATURITY_DATE), A2 amends the profile, A6 Acceptance auto-calculates Operational Payment Date live via Standing',
     description:
-      "LC Issue 100,000 (Buyer's Usance 90 days) with a TW+JP Clearing Bank Calendar Profile -> A2 Update Clearing Bank Calendars to USD+Fedwire -> Document Arrival 40,000 (with Document Presentation Date) -> A6 Acceptance CREATE with NO caller-supplied maturityDate — the microservice inherits the LC's own (amended) calendar config and calls the real Standing microservice (POST /business-days/adjust) to compute it live.",
+      "LC Issue 100,000 (Buyer's Usance, tenorBasis=FIXED_MATURITY_DATE) with a TW+JP Clearing Bank Calendar Profile -> A2 Update Clearing Bank Calendars to USD+Fedwire -> Document Arrival 40,000 (with Document Presentation Date) -> A6 Acceptance CREATE with NO caller-supplied maturityDate — the microservice inherits the LC's own (amended) calendar config + fixedMaturityDate and calls the real Standing microservice (POST /business-days/adjust) to compute the calendar-adjusted Operational Payment Date live (Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 Risk Containment Gate — FIXED_MATURITY_DATE is the only tenorBasis with a verified Base Date source wired today).",
     steps: [
       ...createAndRelease(
-        'LC Issue 100,000, Buyer\'s Usance 90 days, Clearing Bank Calendar Profile = TW (domestic) + JP (paying bank)',
+        'LC Issue 100,000, Buyer\'s Usance, FIXED_MATURITY_DATE 2026-12-25, Clearing Bank Calendar Profile = TW (domestic) + JP (paying bank)',
         'lc',
         {
           instrumentType: 'IPLC_LC',
@@ -2452,7 +2510,8 @@ function importCase13(lc, ib) {
           amount: '100000',
           currency: 'USD',
           tenorType: 'BUYERS_USANCE',
-          tenorDays: 90,
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2026-12-25',
           expiryDate: '2030-12-31',
           maturityDateCalendars: [
             { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
@@ -2505,10 +2564,10 @@ function importCase13(lc, ib) {
       {
         type: 'note',
         label:
-          "A6 below deliberately omits maturityDate entirely — routes/balanceMovements.ts reads the LC's CURRENT calendar config (USD+Fedwire, post-A2) via getMaturityDateCalendarsFromParent() and calls the real standing-mock service to compute it. The computed value lands on the new Acceptance CONTRACT's own maturityDate field (not echoed on this createMovement step's own response) — confirm it via GET /balance-contracts?instrumentType=IPLC_ACCEPTANCE&... or the Transaction Builder's Inquire Events screen.",
+          "A6 below deliberately omits maturityDate entirely — routes/balanceMovements.ts's own Risk Containment Gate reads the LC's CURRENT calendar config (USD+Fedwire, post-A2) and tenorBasis/fixedMaturityDate via getMaturityDateCalendarsFromParent(), uses fixedMaturityDate directly as the Contractual Maturity Date candidate (no Tenor Days arithmetic — that's FIXED_MATURITY_DATE's own defining trait), and calls the real standing-mock service for the calendar-adjusted Operational Payment Date. Both dates land on the new Acceptance CONTRACT's own contractualMaturityDate/operationalPaymentDate fields (not echoed on this createMovement step's own response) — confirm via GET /balance-contracts?instrumentType=IPLC_ACCEPTANCE&... or the Transaction Builder's Inquire Events screen. maturityDateStatus starts PENDING_APPROVAL, becomes APPROVED only once this Acceptance CREATE is itself Checker-Released below.",
       },
       ...createAndRelease(
-        'Create Acceptance 40,000 (A6 — no maturityDate supplied, calculated live via Standing from tenorDays=90 + the LC\'s current calendar config)',
+        'Create Acceptance 40,000 (A6 — no maturityDate supplied, Operational Payment Date calculated live via Standing from the LC\'s fixedMaturityDate + current calendar config)',
         'acceptance',
         {
           instrumentType: 'IPLC_ACCEPTANCE',
@@ -2519,7 +2578,6 @@ function importCase13(lc, ib) {
           amount: '40000',
           currency: 'USD',
           tenorType: 'BUYERS_USANCE',
-          tenorDays: 90,
           exposureNature: 'ACTUAL',
           createdBy: MAKER,
         },
@@ -2535,12 +2593,12 @@ function importCase13(lc, ib) {
 function exportCase12(lc, ib) {
   return {
     id: 'export-case-12',
-    title: 'Export Case #12 — Clearing Bank Calendar Profile: B1 Usance ISSUE, B2 amends the profile, B4 Accept auto-calculates Maturity Date live via Standing',
+    title: 'Export Case #12 — Clearing Bank Calendar Profile: B1 Usance ISSUE (FIXED_MATURITY_DATE), B2 amends the profile, B4 Accept auto-calculates Operational Payment Date live via Standing',
     description:
-      'Confirm LC 100,000 (Sellers Usance 60 days) with a TW+GB Clearing Bank Calendar Profile -> B2 Update Clearing Bank Calendars to TW-domestic-only -> Present Docs 25,000 (B3) -> Accept 25,000 (B4, unified legal event) with NO caller-supplied maturityDate on the linked Acceptance-Liability leg — computed live via the real Standing microservice.',
+      'Confirm LC 100,000 (Sellers Usance, tenorBasis=FIXED_MATURITY_DATE) with a TW+GB Clearing Bank Calendar Profile -> B2 Update Clearing Bank Calendars to TW-domestic-only -> Present Docs 25,000 (B3) -> Accept 25,000 (B4, unified legal event) with NO caller-supplied maturityDate on the linked Acceptance-Liability leg — computed live via the real Standing microservice (Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8 Risk Containment Gate — FIXED_MATURITY_DATE is the only tenorBasis with a verified Base Date source wired today).',
     steps: [
       ...createAndRelease(
-        'Confirm LC 100,000, Sellers Usance 60 days, Clearing Bank Calendar Profile = TW (domestic) + GB (paying bank)',
+        'Confirm LC 100,000, Sellers Usance, FIXED_MATURITY_DATE 2026-11-30, Clearing Bank Calendar Profile = TW (domestic) + GB (paying bank)',
         'conf',
         {
           instrumentType: 'EPLC_CONFIRMATION',
@@ -2550,7 +2608,8 @@ function exportCase12(lc, ib) {
           amount: '100000',
           currency: 'USD',
           tenorType: 'SELLERS_USANCE',
-          tenorDays: 60,
+          tenorBasis: 'FIXED_MATURITY_DATE',
+          fixedMaturityDate: '2026-11-30',
           expiryDate: '2030-12-31',
           maturityDateCalendars: [
             { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
@@ -2599,7 +2658,7 @@ function exportCase12(lc, ib) {
       {
         type: 'note',
         label:
-          "The linked Acceptance-Liability CREATE below deliberately omits maturityDate — it inherits the Confirmation's CURRENT calendar config (TW-domestic-only, post-B2) and calls the real standing-mock service to compute it live. The computed value lands on the new Acceptance-Liability CONTRACT's own maturityDate field (not echoed on this createMovement step's own response) — confirm it via GET /balance-contracts?instrumentType=EPLC_ACCEPTANCE&... or the Transaction Builder's Inquire Events screen.",
+          "The linked Acceptance-Liability CREATE below deliberately omits maturityDate — routes/balanceMovements.ts's own Risk Containment Gate inherits the Confirmation's CURRENT calendar config (TW-domestic-only, post-B2) and tenorBasis/fixedMaturityDate, uses fixedMaturityDate directly as the Contractual Maturity Date candidate (no Tenor Days arithmetic), and calls the real standing-mock service for the calendar-adjusted Operational Payment Date. Both land on the new Acceptance-Liability CONTRACT's own contractualMaturityDate/operationalPaymentDate fields (not echoed on this createMovement step's own response) — confirm via GET /balance-contracts?instrumentType=EPLC_ACCEPTANCE&... or the Transaction Builder's Inquire Events screen.",
       },
       {
         type: 'createMovement',
@@ -2630,7 +2689,6 @@ function exportCase12(lc, ib) {
           amount: '25000',
           currency: 'USD',
           tenorType: 'SELLERS_USANCE',
-          tenorDays: 60,
           exposureNature: 'ACTUAL',
           businessEventId: `${lc}-accept`,
           createdBy: MAKER,

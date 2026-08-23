@@ -19,8 +19,10 @@ import {
   CONTRACT_STATUS_VALUES,
   EXPOSURE_NATURE_VALUES,
   INSTRUMENT_TYPE_VALUES,
+  MATURITY_DATE_STATUS_VALUES,
   MOVEMENT_STATUS_VALUES,
   MOVEMENT_TYPE_VALUES,
+  TENOR_BASIS_VALUES,
   TENOR_TYPE_VALUES,
 } from './schema';
 
@@ -561,6 +563,91 @@ export const MIGRATIONS: Migration[] = [
           CREATE UNIQUE INDEX idx_movements_idempotency ON balance_movements(balance_contract_id, event_seq);
           CREATE INDEX idx_movements_contract_status ON balance_movements(balance_contract_id, status);
           CREATE INDEX idx_movements_business_event ON balance_movements(business_event_id);
+        `);
+
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+    },
+  },
+  {
+    id: 20,
+    description:
+      'Add tenor_basis/fixed_maturity_date (root LC/Confirmation) and contractual_maturity_date/operational_payment_date/standing_calculation_id/calendar_snapshot_id/maturity_date_status (Acceptance contract) to balance_contracts (Maturity-Date-Tenor-Basis-Decision-Review.md v29). Full rebuild, not ALTER TABLE ADD COLUMN — tenor_basis/maturity_date_status each need a CHECK constraint, which node:sqlite cannot add to an existing table (same reason migration 17/19 rebuilt balance_movements). The column list here is the FULL current set for balance_contracts, copied explicitly by name.',
+    up: (db) => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        db.exec(`
+          CREATE TABLE balance_contracts_new (
+            balance_contract_id            TEXT PRIMARY KEY,
+            logical_contract_id            TEXT NOT NULL,
+            contract_version               INTEGER NOT NULL,
+            instrument_type                TEXT NOT NULL CHECK (instrument_type IN (${sqlInList(INSTRUMENT_TYPE_VALUES)})),
+            lc_number                      TEXT NOT NULL,
+            ib_number                      TEXT,
+            sg_number                      TEXT,
+            leg_seq                        TEXT,
+            parent_logical_contract_id     TEXT,
+            status                         TEXT NOT NULL CHECK (status IN (${sqlInList(CONTRACT_STATUS_VALUES)})),
+            supersedes_balance_contract_id TEXT REFERENCES balance_contracts_new(balance_contract_id),
+            superseded_by_balance_contract_id TEXT REFERENCES balance_contracts_new(balance_contract_id),
+            currency                       TEXT NOT NULL,
+            tolerance_pct                  TEXT,
+            tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
+            tenor_days                     INTEGER,
+            maturity_date                  TEXT,
+            expiry_date                    TEXT,
+            issue_date                     TEXT,
+            maturity_date_calendars        TEXT,
+            maturity_date_combination_rule TEXT,
+            maturity_date_convention       TEXT,
+            tenor_basis                     TEXT CHECK (tenor_basis IS NULL OR tenor_basis IN (${sqlInList(TENOR_BASIS_VALUES)})),
+            fixed_maturity_date             TEXT,
+            contractual_maturity_date       TEXT,
+            operational_payment_date        TEXT,
+            standing_calculation_id         TEXT,
+            calendar_snapshot_id            TEXT,
+            maturity_date_status            TEXT CHECK (maturity_date_status IS NULL OR maturity_date_status IN (${sqlInList(MATURITY_DATE_STATUS_VALUES)})),
+            opening_balance                TEXT NOT NULL,
+            source_amendment_no            INTEGER,
+            effective_from                 TEXT NOT NULL,
+            effective_to                   TEXT,
+            created_by                     TEXT NOT NULL,
+            created_at                     TEXT NOT NULL
+          )
+        `);
+        db.exec(`
+          INSERT INTO balance_contracts_new (
+            balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
+            ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
+            supersedes_balance_contract_id, superseded_by_balance_contract_id, currency, tolerance_pct,
+            tenor_type, tenor_days, maturity_date, expiry_date, issue_date, maturity_date_calendars,
+            maturity_date_combination_rule, maturity_date_convention, opening_balance,
+            source_amendment_no, effective_from, effective_to, created_by, created_at
+          )
+          SELECT
+            balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
+            ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
+            supersedes_balance_contract_id, superseded_by_balance_contract_id, currency, tolerance_pct,
+            tenor_type, tenor_days, maturity_date, expiry_date, issue_date, maturity_date_calendars,
+            maturity_date_combination_rule, maturity_date_convention, opening_balance,
+            source_amendment_no, effective_from, effective_to, created_by, created_at
+          FROM balance_contracts
+        `);
+        db.exec('DROP TABLE balance_contracts');
+        db.exec('ALTER TABLE balance_contracts_new RENAME TO balance_contracts');
+        db.exec(`
+          CREATE UNIQUE INDEX idx_contracts_logical_version ON balance_contracts(logical_contract_id, contract_version);
+          CREATE UNIQUE INDEX idx_contracts_one_active ON balance_contracts(logical_contract_id) WHERE status = 'ACTIVE';
+          CREATE INDEX idx_contracts_naturalkey ON balance_contracts(instrument_type, lc_number, ib_number, sg_number, leg_seq);
+          CREATE INDEX idx_contracts_catalog ON balance_contracts(instrument_type, status);
+          CREATE INDEX idx_contracts_parent ON balance_contracts(parent_logical_contract_id, instrument_type);
         `);
 
         db.exec('COMMIT');

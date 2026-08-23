@@ -84,10 +84,10 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['export-case-10'].title).toBe('Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)');
     expect(byId['export-case-11'].title).toBe('Export Case #11 — B6 Close eligibility gate, negative path (expect ERROR)');
     expect(byId['import-case-13'].title).toBe(
-      "Import Case 13 — Clearing Bank Calendar Profile: A1 Usance ISSUE, A2 amends the profile, A6 Acceptance auto-calculates Maturity Date live via Standing",
+      "Import Case 13 — Clearing Bank Calendar Profile: A1 Usance ISSUE (FIXED_MATURITY_DATE), A2 amends the profile, A6 Acceptance auto-calculates Operational Payment Date live via Standing",
     );
     expect(byId['export-case-12'].title).toBe(
-      'Export Case #12 — Clearing Bank Calendar Profile: B1 Usance ISSUE, B2 amends the profile, B4 Accept auto-calculates Maturity Date live via Standing',
+      'Export Case #12 — Clearing Bank Calendar Profile: B1 Usance ISSUE (FIXED_MATURITY_DATE), B2 amends the profile, B4 Accept auto-calculates Operational Payment Date live via Standing',
     );
   });
 

@@ -57,6 +57,34 @@ export type ExposureNature = 'CONTINGENT' | 'ACTUAL' | 'MEMO';
 
 export type TenorType = 'SIGHT' | 'BUYERS_USANCE' | 'SELLERS_USANCE' | 'DP' | 'DA';
 
+/**
+ * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §1/§2 (business-confirmed) — the UCP 600 Art. 3
+ * from/after Maturity Date starting-point rule, independent of TenorType (which reflects funding
+ * structure, not the date-calculation rule). Only meaningful for BUYERS_USANCE/SELLERS_USANCE — must be
+ * `null` for SIGHT (see domain/tenorBasis.ts's own validateTenorBasisTypeCombination()). `AFTER_SIGHT`
+ * is this product's routing signal for Export settlement (see resolveExportSettlementRoute()); the other
+ * five values all resolve to ACCEPTANCE on both Import and Export.
+ */
+export type TenorBasis = 'AFTER_SIGHT' | 'AFTER_BL_DATE' | 'AFTER_INVOICE_DATE' | 'AFTER_SHIPMENT_DATE' | 'AFTER_ACCEPTANCE' | 'FIXED_MATURITY_DATE';
+export const TENOR_BASIS_VALUES: readonly TenorBasis[] = [
+  'AFTER_SIGHT',
+  'AFTER_BL_DATE',
+  'AFTER_INVOICE_DATE',
+  'AFTER_SHIPMENT_DATE',
+  'AFTER_ACCEPTANCE',
+  'FIXED_MATURITY_DATE',
+];
+
+/**
+ * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §4 (business-confirmed three-stage lifecycle) — only
+ * `APPROVED` may be referenced by any downstream consumer (A7/B5 settlement, reports, reminders,
+ * overdue judgment). Lives on the Acceptance's own BalanceContract (see maturityDateStatus's own doc
+ * comment below) alongside contractualMaturityDate/operationalPaymentDate — a separate dimension from
+ * BalanceMovement.status (PENDING/RELEASED), tracking whether the DATE itself has a verified basis, not
+ * whether the movement has been Checker-approved.
+ */
+export type MaturityDateStatus = 'PENDING_BASE_DATE' | 'PENDING_APPROVAL' | 'APPROVED';
+
 export interface NaturalKey {
   lcNumber: string;
   ibNumber?: string | null;
@@ -124,7 +152,44 @@ export interface BalanceContract {
   tolerancePct?: string | null;
   tenorType?: TenorType | null;
   tenorDays?: number | null;
+  /**
+   * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1 (business-confirmed) — the UCP 600 Art. 3
+   * from/after starting-point rule for this LC/Confirmation's own Maturity Date calculation, captured at
+   * A1/B1 root ISSUE alongside tenorType/tenorDays, amendable via A2/B2 (see §7's re-routing rule). Must
+   * be `null` for a SIGHT-tenor contract — see domain/tenorBasis.ts's own validateTenorBasisTypeCombination().
+   */
+  tenorBasis?: TenorBasis | null;
+  /**
+   * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1/§4 (business-confirmed) — required and only
+   * meaningful when tenorBasis === 'FIXED_MATURITY_DATE' (the credit's own contractually-specified
+   * Contractual Maturity Date; tenorDays must be null in that case, no Base Date + Tenor Days
+   * calculation is performed). Distinct from expiryDate (the LC's own UCP 600 Art. 6(d) presentation
+   * deadline) — this is the underlying trade-finance obligation's own due date.
+   */
+  fixedMaturityDate?: string | null;
   maturityDate?: string | null;
+  /**
+   * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §4/§5 (business-confirmed) — the Contractual
+   * Maturity Date candidate (Base Date + Tenor Days per tenorBasis, or fixedMaturityDate directly for
+   * FIXED_MATURITY_DATE) — never adjusted for holidays/weekends (that's operationalPaymentDate's own
+   * job). Lives on the Acceptance's own BalanceContract (IPLC_ACCEPTANCE/EPLC_ACCEPTANCE), never the
+   * parent LC/Confirmation — a single LC can have multiple independent Acceptances (partial shipments),
+   * each with its own, non-overwriting Maturity Date. Superset of/replaces the legacy plain
+   * `maturityDate` field above for new Acceptance CREATE requests — see routes/balanceMovements.ts.
+   */
+  contractualMaturityDate?: string | null;
+  /**
+   * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §4/§5 (business-confirmed) — the calendar-adjusted
+   * date payment/processing actually happens on (Standing's own `adjustedDate`). Same
+   * per-Acceptance-contract placement as contractualMaturityDate above.
+   */
+  operationalPaymentDate?: string | null;
+  /** v29 §5 (business-confirmed) — Standing's own calculationId for this Acceptance's operationalPaymentDate, for audit correlation. */
+  standingCalculationId?: string | null;
+  /** v29 §5 (business-confirmed) — Standing's own reproducible multi-calendar snapshot ID for this calculation; lets a historical recalculation pin the exact calendar version originally used. */
+  calendarSnapshotId?: string | null;
+  /** v29 §4 (business-confirmed) — see MaturityDateStatus's own doc comment; lives on the Acceptance's own BalanceContract, null/absent for a non-Acceptance contract. */
+  maturityDateStatus?: MaturityDateStatus | null;
   /**
    * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1/§3 — Business Date, required at root A1/B1
    * ISSUE (400 if missing on a root create — enforced in service/balanceService.ts's own

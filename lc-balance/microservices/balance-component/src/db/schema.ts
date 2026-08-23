@@ -50,6 +50,12 @@ export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCEL
 
 export const TENOR_TYPE_VALUES = ['SIGHT', 'BUYERS_USANCE', 'SELLERS_USANCE', 'DP', 'DA'] as const;
 
+// Maturity-Date-Tenor-Basis-Decision-Review.md v29 §2 — kept in sync with types.ts's own TenorBasis union.
+export const TENOR_BASIS_VALUES = ['AFTER_SIGHT', 'AFTER_BL_DATE', 'AFTER_INVOICE_DATE', 'AFTER_SHIPMENT_DATE', 'AFTER_ACCEPTANCE', 'FIXED_MATURITY_DATE'] as const;
+
+// v29 §4 — kept in sync with types.ts's own MaturityDateStatus union.
+export const MATURITY_DATE_STATUS_VALUES = ['PENDING_BASE_DATE', 'PENDING_APPROVAL', 'APPROVED'] as const;
+
 export const MOVEMENT_STATUS_VALUES = ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'] as const;
 
 export const EXPOSURE_NATURE_VALUES = ['CONTINGENT', 'ACTUAL', 'MEMO'] as const;
@@ -123,6 +129,22 @@ CREATE TABLE IF NOT EXISTS balance_contracts (
   maturity_date_calendars        TEXT,
   maturity_date_combination_rule TEXT,
   maturity_date_convention       TEXT,
+  -- Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1/§4/§5 (business-confirmed) — tenor_basis/
+  -- fixed_maturity_date live on the ROOT LC/Confirmation (captured at A1/B1 alongside tenor_type/
+  -- tenor_days); contractual_maturity_date/operational_payment_date/standing_calculation_id/
+  -- calendar_snapshot_id/maturity_date_status live on the ACCEPTANCE's own contract (never the parent —
+  -- one LC can have multiple independent Acceptances, e.g. partial shipments, each with its own
+  -- non-overwriting Maturity Date). No CHECK on tenor_basis/tenor_type combination here — that's an
+  -- application-layer rule (domain/tenorBasis.ts), not a schema constraint, since it depends on both
+  -- columns together and node:sqlite CHECK constraints can't reference sibling-column business rules
+  -- this specific (see the existing tenor_type/tenor_basis nullable pattern already used elsewhere).
+  tenor_basis                     TEXT CHECK (tenor_basis IS NULL OR tenor_basis IN (${sqlInList(TENOR_BASIS_VALUES)})),
+  fixed_maturity_date             TEXT,
+  contractual_maturity_date       TEXT,
+  operational_payment_date        TEXT,
+  standing_calculation_id         TEXT,
+  calendar_snapshot_id            TEXT,
+  maturity_date_status            TEXT CHECK (maturity_date_status IS NULL OR maturity_date_status IN (${sqlInList(MATURITY_DATE_STATUS_VALUES)})),
   opening_balance                TEXT NOT NULL,
   source_amendment_no            INTEGER,
   effective_from                 TEXT NOT NULL,

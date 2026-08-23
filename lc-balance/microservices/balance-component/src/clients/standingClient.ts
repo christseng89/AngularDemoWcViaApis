@@ -37,6 +37,21 @@ export interface AdjustBusinessDayRequest {
   convention: 'FOLLOWING' | 'PRECEDING' | 'MODIFIED_FOLLOWING' | 'MODIFIED_PRECEDING' | 'NEAREST';
 }
 
+/**
+ * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §5 — one calendar's own business-day assessment for
+ * the calculation. Loose/string-typed (same convention as MaturityDateCalendarRef in types.ts) — this
+ * service persists calendarSnapshotId only (see BalanceContract.calendarSnapshotId in types.ts), never
+ * this array; typed here purely so a caller who does want to inspect per-calendar detail gets real
+ * fields instead of `unknown`.
+ */
+export interface CalendarAssessment {
+  calendarType: string;
+  code: string;
+  role?: string;
+  businessDay: boolean;
+  [key: string]: unknown;
+}
+
 /** design doc §3.1 — only the fields this service actually reads out of `AdjustBusinessDayResponse`. */
 export interface AdjustBusinessDayResponse {
   calculationId: string;
@@ -44,8 +59,12 @@ export interface AdjustBusinessDayResponse {
   wasAdjusted: boolean;
   adjustmentDays: number;
   contractualDateChanged: false;
-  calendarAssessments: unknown[];
-  adjustedDateAssessments: unknown[];
+  /** v29 §5 — a single reproducible ID for this whole multi-calendar calculation; persisted so a historical recalculation can pin the exact calendar version originally used. */
+  calendarSnapshotId: string;
+  /** v29 §5 — each calendar's own version, informational; not persisted on the contract (only calendarSnapshotId is — see the entry above). */
+  calendarVersions: Array<{ calendarType: string; code: string; version: string }>;
+  calendarAssessments: CalendarAssessment[];
+  adjustedDateAssessments: CalendarAssessment[];
   skippedDates: unknown[];
 }
 
