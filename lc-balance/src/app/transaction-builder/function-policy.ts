@@ -5,6 +5,7 @@ import {
   InstrumentType,
   NATURAL_KEY_FIELDS_BY_INSTRUMENT,
   PARENT_INSTRUMENT_OPTIONS,
+  TenorBasis,
   TransactionFunction,
   isToleranceApplicable,
 } from './balance-component.model';
@@ -50,6 +51,14 @@ export interface BuilderModel {
   maturityDateProfile?: string;
   /** UI-only reference field (2026-08-23) — read-only display of the underlying LC/Confirmation's own currently-configured calendars (A3/A3S/B3, "供 Maker 參考，跟 A6/B4 最終會用到的一致"). Never submitted. */
   maturityDateCalendarsReference?: string;
+  /** Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (business-confirmed) — A1/B1 root ISSUE only. Required for BUYERS_USANCE/SELLERS_USANCE, left undefined for SIGHT. */
+  tenorBasis?: TenorBasis;
+  /** §3.1 — A1/B1 root ISSUE only, required exactly when tenorBasis === 'FIXED_MATURITY_DATE'. */
+  fixedMaturityDate?: string;
+  /** UI-only read-only reference (2026-08-24) — the picked/reconstructed Acceptance's own maturityDateStatus/contractualMaturityDate/operationalPaymentDate (A7/B5 live entry, Inquire Events). Never submitted; sourced straight from BalanceContract, not typed by the Maker. */
+  maturityDateStatusReference?: string;
+  contractualMaturityDateReference?: string;
+  operationalPaymentDateReference?: string;
 }
 
 /** The three natural-key components a Maker can type or have carried in — shared shape of `naturalKey` and `searchNaturalKey`. */

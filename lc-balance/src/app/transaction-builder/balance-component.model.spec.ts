@@ -34,6 +34,10 @@
   MATURITY_DATE_CALENDAR_PROFILES,
   maturityDateCalendarsSummary,
   findMaturityDateProfileValue,
+  TENOR_BASIS_OPTIONS,
+  tenorBasisHasWorkingCalculation,
+  maturityDateStatusLabel,
+  acceptanceMaturityReferenceFields,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -966,5 +970,88 @@ describe('balance-component.model data invariants', () => {
       expect(contractStatusLabel('ACTIVE', false)).toBe('ACTIVE');
       expect(contractStatusLabel('ACTIVE')).toBe('ACTIVE');
     });
+  });
+});
+
+// Maturity-Date-Tenor-Basis-Decision-Review.md v31 (2026-08-24, business-confirmed) — TenorBasis
+// options/labeling and the maturityDateStatus 3-stage lifecycle display helpers.
+describe('TENOR_BASIS_OPTIONS / tenorBasisHasWorkingCalculation', () => {
+  it('offers exactly the 6 business-confirmed TenorBasis values, matching the microservice\'s own TENOR_BASIS_VALUES', () => {
+    expect(TENOR_BASIS_OPTIONS.map((o) => o.value)).toEqual(['AFTER_SIGHT', 'AFTER_BL_DATE', 'AFTER_INVOICE_DATE', 'AFTER_SHIPMENT_DATE', 'AFTER_ACCEPTANCE', 'FIXED_MATURITY_DATE']);
+  });
+
+  it('every option has a non-empty label', () => {
+    for (const o of TENOR_BASIS_OPTIONS) {
+      expect(typeof o.label).toBe('string');
+      expect(o.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('only FIXED_MATURITY_DATE has a working calculation path today — every other basis (and null/undefined) does not', () => {
+    expect(tenorBasisHasWorkingCalculation('FIXED_MATURITY_DATE')).toBe(true);
+    for (const basis of ['AFTER_SIGHT', 'AFTER_BL_DATE', 'AFTER_INVOICE_DATE', 'AFTER_SHIPMENT_DATE', 'AFTER_ACCEPTANCE'] as const) {
+      expect(tenorBasisHasWorkingCalculation(basis)).toBe(false);
+    }
+    expect(tenorBasisHasWorkingCalculation(null)).toBe(false);
+    expect(tenorBasisHasWorkingCalculation(undefined)).toBe(false);
+  });
+});
+
+describe('maturityDateStatusLabel', () => {
+  it('maps each of the 3 real statuses to a distinct, non-empty label', () => {
+    const labels = new Set<string>();
+    for (const status of ['PENDING_BASE_DATE', 'PENDING_APPROVAL', 'APPROVED'] as const) {
+      const label = maturityDateStatusLabel(status);
+      expect(label.length).toBeGreaterThan(0);
+      labels.add(label);
+    }
+    expect(labels.size).toBe(3);
+  });
+
+  it('falls back to a dash for null/undefined (a non-Acceptance contract, or an Acceptance predating this field)', () => {
+    expect(maturityDateStatusLabel(null)).toBe('—');
+    expect(maturityDateStatusLabel(undefined)).toBe('—');
+  });
+});
+
+describe('acceptanceMaturityReferenceFields (shared by MakerPanelComponent live entry and InquireEventsService reconstruction)', () => {
+  it('populates all 3 reference fields for an IPLC_ACCEPTANCE contract', () => {
+    const result = acceptanceMaturityReferenceFields({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      maturityDateStatus: 'APPROVED',
+      contractualMaturityDate: '2026-12-25',
+      operationalPaymentDate: '2026-12-28',
+    });
+    expect(result).toEqual({
+      maturityDateStatusReference: 'Approved',
+      contractualMaturityDateReference: '2026-12-25',
+      operationalPaymentDateReference: '2026-12-28',
+    });
+  });
+
+  it('populates all 3 reference fields for an EPLC_ACCEPTANCE contract too', () => {
+    const result = acceptanceMaturityReferenceFields({
+      instrumentType: 'EPLC_ACCEPTANCE',
+      maturityDateStatus: 'PENDING_BASE_DATE',
+      contractualMaturityDate: null,
+      operationalPaymentDate: null,
+    });
+    expect(result.maturityDateStatusReference).toBe('Pending Base Date (not yet calculable — see Tenor Basis)');
+    expect(result.contractualMaturityDateReference).toBeUndefined();
+    expect(result.operationalPaymentDateReference).toBeUndefined();
+  });
+
+  it('leaves all 3 fields undefined for a non-Acceptance instrumentType (e.g. the picked parent LC, not the Acceptance itself)', () => {
+    const result = acceptanceMaturityReferenceFields({ instrumentType: 'IPLC_LC', maturityDateStatus: 'APPROVED', contractualMaturityDate: '2026-01-01', operationalPaymentDate: '2026-01-01' });
+    expect(result).toEqual({
+      maturityDateStatusReference: undefined,
+      contractualMaturityDateReference: undefined,
+      operationalPaymentDateReference: undefined,
+    });
+  });
+
+  it('degrades to all-undefined for null/undefined contract (nothing selected yet)', () => {
+    expect(acceptanceMaturityReferenceFields(null)).toEqual({ maturityDateStatusReference: undefined, contractualMaturityDateReference: undefined, operationalPaymentDateReference: undefined });
+    expect(acceptanceMaturityReferenceFields(undefined)).toEqual({ maturityDateStatusReference: undefined, contractualMaturityDateReference: undefined, operationalPaymentDateReference: undefined });
   });
 });

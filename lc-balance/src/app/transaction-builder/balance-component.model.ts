@@ -161,6 +161,75 @@ export const CURRENCY_OPTIONS: { value: string; label: string }[] = ['USD', 'EUR
   label: code,
 }));
 
+/**
+ * Maturity-Date-Tenor-Basis-Decision-Review.md v31 §2/§3.1 (business-confirmed routing matrix) — mirrors
+ * the microservice's own `TenorBasis` union (`types.ts`) exactly, same manual-sync convention this file
+ * already uses for `InstrumentType`/`BalanceMovement`. `null` for a SIGHT-tenor contract; required for
+ * BUYERS_USANCE/SELLERS_USANCE (`validateTenorBasisTypeCombination()` on the microservice side).
+ * AFTER_SIGHT is reserved for the Buyer's-Usance/UPAS pattern — never combine with SELLERS_USANCE (server
+ * rejects it, see `resolveOrCreateContract()`'s own soft-rollout validation block).
+ */
+export type TenorBasis = 'AFTER_SIGHT' | 'AFTER_BL_DATE' | 'AFTER_INVOICE_DATE' | 'AFTER_SHIPMENT_DATE' | 'AFTER_ACCEPTANCE' | 'FIXED_MATURITY_DATE';
+
+/**
+ * Only `FIXED_MATURITY_DATE` has a working Base Date → calculation path today (2026-08-24) — the other 5
+ * values each need a Base Date field (`sightDate`/`blDate`/`invoiceDate`/`shipmentDate`/Acceptance Date)
+ * that does not exist yet anywhere in this project's schema (Maturity-Date-Tenor-Basis-Decision-Review.md
+ * v31's own repeated verification). Still offered here (the routing matrix itself is business-confirmed,
+ * not the calculation for every basis) — `tenorBasisHasWorkingCalculation()` below drives an inline
+ * warning in builder-fields.ts rather than hiding the option outright.
+ */
+export const TENOR_BASIS_OPTIONS: { value: TenorBasis; label: string }[] = [
+  { value: 'AFTER_SIGHT', label: 'After Sight (Buyer\'s-Usance/UPAS pattern only)' },
+  { value: 'AFTER_BL_DATE', label: 'After B/L Date' },
+  { value: 'AFTER_INVOICE_DATE', label: 'After Invoice Date' },
+  { value: 'AFTER_SHIPMENT_DATE', label: 'After Shipment Date' },
+  { value: 'AFTER_ACCEPTANCE', label: 'After Acceptance' },
+  { value: 'FIXED_MATURITY_DATE', label: 'Fixed Maturity Date (LC-stated, calculated today)' },
+];
+
+/** See TENOR_BASIS_OPTIONS's own doc comment — only FIXED_MATURITY_DATE actually computes a Maturity Date today; every other basis leaves the eventual Acceptance at maturityDateStatus 'PENDING_BASE_DATE' indefinitely. */
+export function tenorBasisHasWorkingCalculation(tenorBasis: TenorBasis | null | undefined): boolean {
+  return tenorBasis === 'FIXED_MATURITY_DATE';
+}
+
+/** Mirrors the microservice's own `MaturityDateStatus` (`types.ts`) — the 3-stage lifecycle on an Acceptance's own BalanceContract (v29 §4, business-confirmed). */
+export type MaturityDateStatus = 'PENDING_BASE_DATE' | 'PENDING_APPROVAL' | 'APPROVED';
+
+/** Read-only display label for maturityDateStatus (A7/B5 live entry, Inquire Events reconstruction) — plain informational copy, no business-confirmed wording exists yet for this specific string. */
+export function maturityDateStatusLabel(status: MaturityDateStatus | null | undefined): string {
+  switch (status) {
+    case 'PENDING_BASE_DATE':
+      return 'Pending Base Date (not yet calculable — see Tenor Basis)';
+    case 'PENDING_APPROVAL':
+      return 'Calculated — Pending Checker Approval';
+    case 'APPROVED':
+      return 'Approved';
+    default:
+      return '—';
+  }
+}
+
+/**
+ * UI-only read-only reference fields (2026-08-24) — shared by MakerPanelComponent (live A7/B5 entry, via
+ * rebuildFields()) and InquireEventsService (event reconstruction, via selectEvent()) so the two screens
+ * can never disagree on this mapping, same convention secondaryReferenceForEvent()/toEventRows() already
+ * established. `contract` may be any BalanceContract — a non-Acceptance instrumentType degrades to all
+ * three fields undefined (the caller's own hide condition already keeps them off-screen in that case).
+ */
+export function acceptanceMaturityReferenceFields(contract: { instrumentType?: InstrumentType | string | null; maturityDateStatus?: MaturityDateStatus | null; contractualMaturityDate?: string | null; operationalPaymentDate?: string | null } | null | undefined): {
+  maturityDateStatusReference: string | undefined;
+  contractualMaturityDateReference: string | undefined;
+  operationalPaymentDateReference: string | undefined;
+} {
+  const isAcceptance = contract?.instrumentType === 'IPLC_ACCEPTANCE' || contract?.instrumentType === 'EPLC_ACCEPTANCE';
+  return {
+    maturityDateStatusReference: isAcceptance ? maturityDateStatusLabel(contract?.maturityDateStatus) : undefined,
+    contractualMaturityDateReference: isAcceptance ? (contract?.contractualMaturityDate ?? undefined) : undefined,
+    operationalPaymentDateReference: isAcceptance ? (contract?.operationalPaymentDate ?? undefined) : undefined,
+  };
+}
+
 /** A6/B4 Calculated Maturity Date's own Standing calendar reference shape (see standingClient.ts's own `StandingCalendarRef` on the microservice side — kept structurally compatible, this project has no direct dependency on that file). */
 export interface MaturityDateCalendarRef {
   calendarType: 'COUNTRY' | 'CURRENCY_CLEARING' | 'INSTITUTION' | 'FINANCIAL_CENTER';

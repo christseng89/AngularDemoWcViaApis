@@ -1,6 +1,14 @@
 import { FormlyFieldConfig } from '@ngx-formly/core';
 import { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { CURRENCY_OPTIONS, MATURITY_DATE_CALENDAR_PROFILES, TransactionFunction, decimalPlacesForCurrency } from './balance-component.model';
+import {
+  CURRENCY_OPTIONS,
+  MATURITY_DATE_CALENDAR_PROFILES,
+  TENOR_BASIS_OPTIONS,
+  TransactionFunction,
+  decimalPlacesForCurrency,
+  maturityDateStatusLabel,
+  tenorBasisHasWorkingCalculation,
+} from './balance-component.model';
 import { BuilderModel, carriedCurrency, hasParent, isCreatingMovement, toleranceApplicable } from './function-policy';
 import { deriveFunctionStrategy } from './function-strategy';
 
@@ -84,6 +92,20 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // by definition (a Sight LC's own Document Arrival routes to A4 instead, never reaches A6 at all).
   const isMaturityDateFunction =
     selectedFunction?.code === 'A6' || (selectedFunction?.code === 'B4' && !!ctx.selectedParent?.tenorType && ctx.selectedParent.tenorType !== 'SIGHT');
+  // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (business-confirmed) — A1/B1 root ISSUE only;
+  // tenorBasis/fixedMaturityDate are captured once here and inherited by every later Acceptance CREATE
+  // under this LC/Confirmation, same "father decides, child inherits" convention as
+  // maturityDateProfile/tenorType/currency above. Reactive to tenorType (not a static gate) since SIGHT
+  // must never carry a tenorBasis (validateTenorBasisTypeCombination() on the microservice rejects it).
+  const isTenorBasisFunction = isRootIssue;
+  // UI-only read-only reference (2026-08-24) — whenever the currently picked/reconstructed contract IS an
+  // Acceptance (A7/B5 live entry once the Maker has picked one to settle; Inquire Events reconstructing
+  // any A6/B4-CREATE or A7/B5 event, whose own `selectedContract` already equals the Acceptance's
+  // contract — see inquire-events.service.ts's own selectEvent()). Deliberately NOT gated to A7/B5's own
+  // function codes — this is a passive display of whatever selectedContract already resolved to, not a
+  // new lookup, so it degrades correctly (stays hidden) for A6/B4's own LIVE entry screen, where the
+  // Acceptance doesn't exist yet and selectedContract is still null/the parent LC.
+  const isAcceptanceContractSelected = ctx.selectedContract?.instrumentType === 'IPLC_ACCEPTANCE' || ctx.selectedContract?.instrumentType === 'EPLC_ACCEPTANCE';
   // Clearing Bank Calendar Profile (2026-08-23, user-directed — "這些欄位最好在A1/B1就輸入... A3 A3S B3
   // 就只顯示不用輸入") — A3/A3S/B3's own read-only reference to the underlying LC/Confirmation's
   // currently-configured calendar profile. Originally Usance-only, widened same day ("SIGHT也要有這欄位
@@ -278,6 +300,61 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
             },
           }
         : {}),
+    },
+    // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (business-confirmed routing matrix) — A1/B1
+    // root ISSUE only. Reactive `expressions` (not a static hide/required) mirror tenorDays' own Sight
+    // pattern just above: required for BUYERS_USANCE/SELLERS_USANCE, forced blank+disabled for SIGHT
+    // (validateTenorBasisTypeCombination() rejects a non-null tenorBasis on a Sight contract).
+    {
+      key: 'tenorBasis',
+      type: 'select',
+      props: { label: 'Tenor Basis (UCP 600 Art. 3 date-calculation basis)', options: TENOR_BASIS_OPTIONS },
+      hide: !isTenorBasisFunction,
+      expressions: {
+        'props.disabled': (f: any) => f.model?.tenorType === 'SIGHT',
+        'props.required': (f: any) => !!f.model?.tenorType && f.model.tenorType !== 'SIGHT',
+        'props.label': (f: any) =>
+          f.model?.tenorType === 'SIGHT'
+            ? 'Tenor Basis (Sight — not applicable, protected)'
+            : f.model?.tenorBasis && !tenorBasisHasWorkingCalculation(f.model.tenorBasis)
+              ? 'Tenor Basis (⚠ only Fixed Maturity Date is calculated today — any other basis leaves the eventual Acceptance Pending Base Date indefinitely)'
+              : 'Tenor Basis (UCP 600 Art. 3 date-calculation basis)',
+        'model.tenorBasis': (f: any) => (f.model?.tenorType === 'SIGHT' ? undefined : f.model?.tenorBasis),
+      },
+    },
+    // §3.1 — required exactly when tenorBasis === 'FIXED_MATURITY_DATE'; the LC-stated contractual
+    // Maturity Date itself (not a Base Date), so no computation runs on it beyond the passthrough to
+    // Standing for calendar adjustment (see the microservice's own routes/balanceMovements.ts).
+    {
+      key: 'fixedMaturityDate',
+      type: 'input',
+      props: { label: 'Fixed Maturity Date', type: 'date' },
+      hide: !isTenorBasisFunction,
+      expressions: {
+        'props.disabled': (f: any) => f.model?.tenorBasis !== 'FIXED_MATURITY_DATE',
+        'props.required': (f: any) => f.model?.tenorBasis === 'FIXED_MATURITY_DATE',
+        'model.fixedMaturityDate': (f: any) => (f.model?.tenorBasis === 'FIXED_MATURITY_DATE' ? f.model?.fixedMaturityDate : undefined),
+      },
+    },
+    // UI-only read-only reference (2026-08-24) — see isAcceptanceContractSelected's own doc comment above.
+    // Sourced directly from ctx.selectedContract, never typed/submitted.
+    {
+      key: 'maturityDateStatusReference',
+      type: 'input',
+      props: { label: 'Acceptance Maturity Date Status (reference only)', disabled: true },
+      hide: !isAcceptanceContractSelected,
+    },
+    {
+      key: 'contractualMaturityDateReference',
+      type: 'input',
+      props: { label: 'Contractual Maturity Date (reference only — never calendar-adjusted)', type: 'date', disabled: true },
+      hide: !isAcceptanceContractSelected,
+    },
+    {
+      key: 'operationalPaymentDateReference',
+      type: 'input',
+      props: { label: 'Operational Payment Date (reference only — Standing calendar-adjusted)', type: 'date', disabled: true },
+      hide: !isAcceptanceContractSelected,
     },
     // Event Seq and Created By are system-derived and read-only on every screen — already populated
     // onto `model` before buildFields() runs; `disabled: true` only blocks editing, not derivation.

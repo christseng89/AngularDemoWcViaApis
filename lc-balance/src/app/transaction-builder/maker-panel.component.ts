@@ -30,6 +30,7 @@ import {
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
+  acceptanceMaturityReferenceFields,
   displayStatus as displayStatusShared,
   groupThousands,
   maturityDateCalendarsSummary,
@@ -1118,7 +1119,19 @@ export class MakerPanelComponent implements OnChanges {
     this.emitCheckerAndLookupSync();
   }
 
+  /**
+   * UI-only read-only reference (2026-08-24) — see builder-fields.ts's own isAcceptanceContractSelected
+   * doc comment. Centralized here (rather than duplicated at every selectedContract-setting call site,
+   * the convention originalExpiryDateReference/maturityDateCalendarsReference use) since rebuildFields()
+   * already runs after every one of them — a single source of truth for a value that's purely derived
+   * from selectedContract, never independently typed.
+   */
+  private applyAcceptanceMaturityReferenceFields(): void {
+    Object.assign(this.model, acceptanceMaturityReferenceFields(this.selectedContract));
+  }
+
   private rebuildFields(): void {
+    this.applyAcceptanceMaturityReferenceFields();
     this.fields = buildFields({
       model: this.model,
       selectedFunction: this.selectedFunction,

@@ -898,6 +898,75 @@ describe('InquireEventsService', () => {
     });
   });
 
+  // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1/§4 (2026-08-24, business-confirmed) —
+  // tenorBasis/fixedMaturityDate reconstruction (A1/B1 only) and the shared acceptanceMaturityReferenceFields()
+  // reconstruction (any event whose own contract is an Acceptance).
+  describe('selectEvent — tenorBasis/fixedMaturityDate and Acceptance Maturity Date reference fields (2026-08-24)', () => {
+    it('A1 ISSUE: tenorBasis/fixedMaturityDate come straight from the contract, fields shown', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE', tenorBasis: 'FIXED_MATURITY_DATE', fixedMaturityDate: '2027-06-30' });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.tenorBasis).toBe('FIXED_MATURITY_DATE');
+      expect(svc.selectedEventModel.fixedMaturityDate).toBe('2027-06-30');
+      expect(svc.selectedEventFields.find((f) => f.key === 'tenorBasis')?.hide).toBe(false);
+      expect(svc.selectedEventFields.find((f) => f.key === 'fixedMaturityDate')?.hide).toBe(false);
+    });
+
+    it('a non-A1/B1 event (e.g. A3) never shows tenorBasis/fixedMaturityDate even when the contract carries them', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE', tenorBasis: 'FIXED_MATURITY_DATE', fixedMaturityDate: '2027-06-30' });
+      const movement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFields.find((f) => f.key === 'tenorBasis')?.hide).toBe(true);
+    });
+
+    it('an Acceptance CREATE event (A6): maturityDateStatusReference/contractualMaturityDateReference/operationalPaymentDateReference are reconstructed from the contract and shown', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({
+        instrumentType: 'IPLC_ACCEPTANCE',
+        maturityDateStatus: 'APPROVED',
+        contractualMaturityDate: '2026-12-25',
+        operationalPaymentDate: '2026-12-28',
+      });
+      const movement = makeMovement({ movementType: 'CREATE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateStatusReference).toBe('Approved');
+      expect(svc.selectedEventModel.contractualMaturityDateReference).toBe('2026-12-25');
+      expect(svc.selectedEventModel.operationalPaymentDateReference).toBe('2026-12-28');
+      expect(svc.selectedEventFields.find((f) => f.key === 'maturityDateStatusReference')?.hide).toBe(false);
+    });
+
+    it('a settlement event against an Acceptance (A7/B5-shaped) also reconstructs the same 3 reference fields', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'EPLC_ACCEPTANCE', maturityDateStatus: 'PENDING_APPROVAL', contractualMaturityDate: '2027-01-15', operationalPaymentDate: null });
+      const movement = makeMovement({ movementType: 'FULL_SETTLE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateStatusReference).toBe('Calculated — Pending Checker Approval');
+      expect(svc.selectedEventModel.contractualMaturityDateReference).toBe('2027-01-15');
+      expect(svc.selectedEventModel.operationalPaymentDateReference).toBeUndefined();
+    });
+
+    it('a non-Acceptance event never shows the 3 reference fields, even with stray values on the contract', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateStatusReference).toBeUndefined();
+      expect(svc.selectedEventFields.find((f) => f.key === 'maturityDateStatusReference')?.hide).toBe(true);
+    });
+  });
+
   /** Up to 3 tabs, gated by the root LC's own product type/tenor. */
   describe('selectEvent — Balance Tabs (tenor/side gating)', () => {
     it('Import Sight LC: exactly 2 tabs (LC, SG) — no Acceptance tab at all', () => {

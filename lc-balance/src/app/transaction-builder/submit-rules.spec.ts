@@ -236,6 +236,10 @@ describe('submit-rules', () => {
             // dedicated describe block below); this test is about tenorDays normalization, not that rule,
             // so it supplies a valid profile to isolate the assertion it actually cares about.
             maturityDateProfile: 'USD_FEDWIRE',
+            // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (2026-08-24) — same isolation
+            // reasoning as maturityDateProfile immediately above, now also required for Usance A1/B1.
+            tenorBasis: 'FIXED_MATURITY_DATE',
+            fixedMaturityDate: '2027-01-01',
           },
         }),
       );
@@ -867,6 +871,10 @@ describe('submit-rules', () => {
         tenorType: 'BUYERS_USANCE',
         tenorDays: 60,
         maturityDateProfile: 'TW',
+        // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (2026-08-24) — also required for a
+        // Usance A1/B1 now, same isolation reasoning as maturityDateProfile above.
+        tenorBasis: 'FIXED_MATURITY_DATE',
+        fixedMaturityDate: '2027-06-30',
       };
       const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model }));
       expect(result.error).toBeNull();
@@ -929,6 +937,109 @@ describe('submit-rules', () => {
       const model: Partial<BuilderModel> = { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '5000', maturityDateProfile: 'USD_FEDWIRE' };
       const { request } = buildSubmitRequest(ctx({ selectedFunction: fn('A2'), model, selectedContract: contract() }));
       expect(request?.maturityDateCalendars).toBeUndefined();
+    });
+  });
+
+  // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (2026-08-24, business-confirmed) — A1/B1 root
+  // ISSUE only client-side backstop, mirroring validateTenorBasisTypeCombination() on the microservice.
+  describe('validateSubmit/buildSubmitRequest — A1/B1 tenorBasis/fixedMaturityDate', () => {
+    function usanceModel(overrides: Partial<BuilderModel> = {}): Partial<BuilderModel> {
+      return {
+        instrumentType: 'IPLC_LC',
+        movementType: 'ISSUE',
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
+        expiryDate: '2030-12-31',
+        maturityDateProfile: 'USD_FEDWIRE',
+        ...overrides,
+      };
+    }
+
+    it('validateSubmit: Usance without tenorBasis fails', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model: usanceModel() }));
+      expect(result.error).toBe('Tenor Basis is mandatory for a SELLERS_USANCE A1.');
+    });
+
+    it('validateSubmit: Usance WITH tenorBasis (FIXED_MATURITY_DATE + fixedMaturityDate) passes', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model: usanceModel({ tenorBasis: 'FIXED_MATURITY_DATE', fixedMaturityDate: '2027-01-01' }) }));
+      expect(result.error).toBeNull();
+    });
+
+    it('validateSubmit: FIXED_MATURITY_DATE without fixedMaturityDate fails', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model: usanceModel({ tenorBasis: 'FIXED_MATURITY_DATE' }) }));
+      expect(result.error).toBe('Fixed Maturity Date is mandatory when Tenor Basis is Fixed Maturity Date.');
+    });
+
+    it('validateSubmit: a non-FIXED_MATURITY_DATE basis passes without fixedMaturityDate (only required for that one basis)', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model: usanceModel({ tenorBasis: 'AFTER_BL_DATE' }) }));
+      expect(result.error).toBeNull();
+    });
+
+    it('validateSubmit: AFTER_SIGHT + SELLERS_USANCE is rejected (reserved for the Buyer\'s-Usance/UPAS pattern)', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model: usanceModel({ tenorBasis: 'AFTER_SIGHT' }) }));
+      expect(result.error).toBe("AFTER_SIGHT cannot be combined with Seller's Usance — it is reserved for the Buyer's-Usance/UPAS settlement pattern.");
+    });
+
+    it('validateSubmit: AFTER_SIGHT + BUYERS_USANCE (Export Sight, Import financed) is allowed', () => {
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model: usanceModel({ tenorType: 'BUYERS_USANCE', tenorBasis: 'AFTER_SIGHT' }) }));
+      expect(result.error).toBeNull();
+    });
+
+    it('validateSubmit: Sight never requires tenorBasis, even when unset', () => {
+      const model = usanceModel({ tenorType: 'SIGHT', tenorDays: 0, tenorBasis: undefined });
+      const result = validateSubmit(ctx({ selectedFunction: fn('A1'), model }));
+      expect(result.error).toBeNull();
+    });
+
+    it('buildSubmitRequest: wires tenorBasis + fixedMaturityDate onto the request for FIXED_MATURITY_DATE', () => {
+      const model = usanceModel({ tenorBasis: 'FIXED_MATURITY_DATE', fixedMaturityDate: '2027-06-30' });
+      const { request, error } = buildSubmitRequest(ctx({ selectedFunction: fn('A1'), model }));
+      expect(error).toBeNull();
+      expect(request?.tenorBasis).toBe('FIXED_MATURITY_DATE');
+      expect(request?.fixedMaturityDate).toBe('2027-06-30');
+    });
+
+    it('buildSubmitRequest: wires tenorBasis but omits fixedMaturityDate for a non-FIXED_MATURITY_DATE basis', () => {
+      const model = usanceModel({ tenorBasis: 'AFTER_BL_DATE' });
+      const { request } = buildSubmitRequest(ctx({ selectedFunction: fn('A1'), model }));
+      expect(request?.tenorBasis).toBe('AFTER_BL_DATE');
+      expect(request?.fixedMaturityDate).toBeUndefined();
+    });
+
+    it('buildSubmitRequest: omits tenorBasis entirely when unset on a Sight A1 (matches the microservice\'s own soft-rollout — never sends a null/blank value)', () => {
+      const model = usanceModel({ tenorType: 'SIGHT', tenorDays: 0, tenorBasis: undefined });
+      const { request } = buildSubmitRequest(ctx({ selectedFunction: fn('A1'), model }));
+      expect(request?.tenorBasis).toBeUndefined();
+      expect(request?.fixedMaturityDate).toBeUndefined();
+    });
+
+    it('buildSubmitRequest: B1 (Confirm LC) wires the same fields as A1', () => {
+      const model: Partial<BuilderModel> = {
+        instrumentType: 'EPLC_CONFIRMATION',
+        movementType: 'ISSUE',
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 60,
+        expiryDate: '2030-12-31',
+        maturityDateProfile: 'GB',
+        tenorBasis: 'FIXED_MATURITY_DATE',
+        fixedMaturityDate: '2027-03-01',
+      };
+      const { request } = buildSubmitRequest(ctx({ selectedFunction: fn('B1'), model }));
+      expect(request?.tenorBasis).toBe('FIXED_MATURITY_DATE');
+      expect(request?.fixedMaturityDate).toBe('2027-03-01');
+    });
+
+    it('buildSubmitRequest: a non-A1/B1 function never carries tenorBasis/fixedMaturityDate even if present on the model', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '5000', tenorBasis: 'FIXED_MATURITY_DATE', fixedMaturityDate: '2027-01-01' };
+      const { request } = buildSubmitRequest(ctx({ selectedFunction: fn('A2'), model, selectedContract: contract() }));
+      expect(request?.tenorBasis).toBeUndefined();
+      expect(request?.fixedMaturityDate).toBeUndefined();
     });
   });
 

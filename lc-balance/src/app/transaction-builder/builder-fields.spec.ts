@@ -69,7 +69,7 @@ describe('builder-fields', () => {
   // (2026-08-23, user-directed A6/B4 Calculated Maturity Date) added right after parentExpiryDateReference
   // — so all five reference/config fields are still present in the field ARRAY for every function, just
   // hidden.
-  it('returns the 15 fixed field keys, in order, for a plain A1 submission', () => {
+  it('returns the 20 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
     expect(fields.map((f) => f.key)).toEqual([
       'secondaryRef',
@@ -85,6 +85,11 @@ describe('builder-fields', () => {
       'maturityDateCalendarsReference',
       'tenorType',
       'tenorDays',
+      'tenorBasis',
+      'fixedMaturityDate',
+      'maturityDateStatusReference',
+      'contractualMaturityDateReference',
+      'operationalPaymentDateReference',
       'eventSeq',
       'createdBy',
     ]);
@@ -334,6 +339,97 @@ describe('builder-fields', () => {
       const ctx = baseCtx({ selectedFunction: fn('A6'), model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' }, selectedParent: null });
       const tenorDays = fieldByKey(buildFields(ctx), 'tenorDays');
       expect(tenorDays.expressions).toBeUndefined();
+    });
+  });
+
+  // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (2026-08-24, business-confirmed) — A1/B1 root
+  // ISSUE only; tenorBasis/fixedMaturityDate mirror tenorDays' own reactive Sight/Usance shape.
+  describe('tenorBasis / fixedMaturityDate (A1/B1 only)', () => {
+    it('is hidden entirely for a non-A1/B1 function (e.g. A6)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A6'), model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' }, selectedParent: null });
+      const fields = buildFields(ctx);
+      expect(fieldByKey(fields, 'tenorBasis').hide).toBe(true);
+      expect(fieldByKey(fields, 'fixedMaturityDate').hide).toBe(true);
+    });
+
+    it('is present (not hidden) for A1/B1', () => {
+      const fields = buildFields(baseCtx());
+      expect(fieldByKey(fields, 'tenorBasis').hide).toBe(false);
+      expect(fieldByKey(fields, 'fixedMaturityDate').hide).toBe(false);
+    });
+
+    it('offers the 6 business-confirmed TenorBasis options', () => {
+      const tenorBasis = fieldByKey(buildFields(baseCtx()), 'tenorBasis');
+      expect((tenorBasis.props?.options as { value: string }[]).map((o) => o.value)).toEqual([
+        'AFTER_SIGHT',
+        'AFTER_BL_DATE',
+        'AFTER_INVOICE_DATE',
+        'AFTER_SHIPMENT_DATE',
+        'AFTER_ACCEPTANCE',
+        'FIXED_MATURITY_DATE',
+      ]);
+    });
+
+    it('tenorBasis: disabled+not-required for Sight, enabled+required for Usance, blanked back to undefined when Sight', () => {
+      const tenorBasis = fieldByKey(buildFields(baseCtx()), 'tenorBasis');
+      const disabledFn = tenorBasis.expressions?.['props.disabled'] as (f: any) => boolean;
+      const requiredFn = tenorBasis.expressions?.['props.required'] as (f: any) => boolean;
+      const modelFn = tenorBasis.expressions?.['model.tenorBasis'] as (f: any) => string | undefined;
+      expect(disabledFn({ model: { tenorType: 'SIGHT' } })).toBe(true);
+      expect(disabledFn({ model: { tenorType: 'SELLERS_USANCE' } })).toBe(false);
+      expect(requiredFn({ model: { tenorType: 'SIGHT' } })).toBe(false);
+      expect(requiredFn({ model: { tenorType: 'BUYERS_USANCE' } })).toBe(true);
+      expect(modelFn({ model: { tenorType: 'SIGHT', tenorBasis: 'AFTER_BL_DATE' } })).toBeUndefined();
+      expect(modelFn({ model: { tenorType: 'BUYERS_USANCE', tenorBasis: 'AFTER_BL_DATE' } })).toBe('AFTER_BL_DATE');
+    });
+
+    it('tenorBasis label warns when a non-FIXED_MATURITY_DATE basis is picked (only Fixed Maturity Date actually calculates today)', () => {
+      const tenorBasis = fieldByKey(buildFields(baseCtx()), 'tenorBasis');
+      const labelFn = tenorBasis.expressions?.['props.label'] as (f: any) => string;
+      expect(labelFn({ model: { tenorType: 'SIGHT' } })).toBe('Tenor Basis (Sight — not applicable, protected)');
+      expect(labelFn({ model: {} })).toBe('Tenor Basis (UCP 600 Art. 3 date-calculation basis)');
+      expect(labelFn({ model: { tenorBasis: 'FIXED_MATURITY_DATE' } })).toBe('Tenor Basis (UCP 600 Art. 3 date-calculation basis)');
+      expect(labelFn({ model: { tenorBasis: 'AFTER_BL_DATE' } })).toContain('⚠');
+    });
+
+    it('fixedMaturityDate: disabled+not-required unless tenorBasis is FIXED_MATURITY_DATE, blanked otherwise', () => {
+      const fixedMaturityDate = fieldByKey(buildFields(baseCtx()), 'fixedMaturityDate');
+      const disabledFn = fixedMaturityDate.expressions?.['props.disabled'] as (f: any) => boolean;
+      const requiredFn = fixedMaturityDate.expressions?.['props.required'] as (f: any) => boolean;
+      const modelFn = fixedMaturityDate.expressions?.['model.fixedMaturityDate'] as (f: any) => string | undefined;
+      expect(disabledFn({ model: { tenorBasis: 'AFTER_BL_DATE' } })).toBe(true);
+      expect(disabledFn({ model: { tenorBasis: 'FIXED_MATURITY_DATE' } })).toBe(false);
+      expect(requiredFn({ model: { tenorBasis: 'AFTER_BL_DATE' } })).toBe(false);
+      expect(requiredFn({ model: { tenorBasis: 'FIXED_MATURITY_DATE' } })).toBe(true);
+      expect(modelFn({ model: { tenorBasis: 'AFTER_BL_DATE', fixedMaturityDate: '2027-01-01' } })).toBeUndefined();
+      expect(modelFn({ model: { tenorBasis: 'FIXED_MATURITY_DATE', fixedMaturityDate: '2027-01-01' } })).toBe('2027-01-01');
+    });
+  });
+
+  // UI-only read-only reference fields (2026-08-24) — see isAcceptanceContractSelected's own doc comment
+  // in builder-fields.ts. Values themselves are populated onto `model` by the caller (MakerPanelComponent/
+  // InquireEventsService), not derived here — buildFields() only controls hide/disabled.
+  describe('maturityDateStatusReference / contractualMaturityDateReference / operationalPaymentDateReference', () => {
+    it('is hidden when nothing is selected', () => {
+      const fields = buildFields(baseCtx({ selectedContract: null }));
+      expect(fieldByKey(fields, 'maturityDateStatusReference').hide).toBe(true);
+      expect(fieldByKey(fields, 'contractualMaturityDateReference').hide).toBe(true);
+      expect(fieldByKey(fields, 'operationalPaymentDateReference').hide).toBe(true);
+    });
+
+    it('is hidden when the selected contract is not an Acceptance (e.g. the parent LC itself)', () => {
+      const fields = buildFields(baseCtx({ selectedContract: contract({ instrumentType: 'IPLC_LC' }) }));
+      expect(fieldByKey(fields, 'maturityDateStatusReference').hide).toBe(true);
+    });
+
+    it('is shown, disabled, for both Acceptance instrumentTypes', () => {
+      for (const instrumentType of ['IPLC_ACCEPTANCE', 'EPLC_ACCEPTANCE'] as const) {
+        const fields = buildFields(baseCtx({ selectedContract: contract({ instrumentType }) }));
+        expect(fieldByKey(fields, 'maturityDateStatusReference').hide).toBe(false);
+        expect(fieldByKey(fields, 'maturityDateStatusReference').props?.disabled).toBe(true);
+        expect(fieldByKey(fields, 'contractualMaturityDateReference').hide).toBe(false);
+        expect(fieldByKey(fields, 'operationalPaymentDateReference').hide).toBe(false);
+      }
     });
   });
 

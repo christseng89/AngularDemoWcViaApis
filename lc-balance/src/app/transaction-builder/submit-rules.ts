@@ -142,6 +142,21 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
     if (!model.maturityDateProfile) {
       return fail(`Clearing Bank Calendar Profile is mandatory for ${selectedFunction.code}.`);
     }
+    // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (business-confirmed) — client-side backstop
+    // mirroring validateTenorBasisTypeCombination() on the microservice (resolveOrCreateContract()).
+    // Sight itself is protected blank by builder-fields.ts's own reactive expression, so only the Usance
+    // branch needs a real check here.
+    if (model.tenorType && model.tenorType !== 'SIGHT') {
+      if (!model.tenorBasis) {
+        return fail(`Tenor Basis is mandatory for a ${model.tenorType} ${selectedFunction.code}.`);
+      }
+      if (model.tenorBasis === 'AFTER_SIGHT' && model.tenorType === 'SELLERS_USANCE') {
+        return fail("AFTER_SIGHT cannot be combined with Seller's Usance — it is reserved for the Buyer's-Usance/UPAS settlement pattern.");
+      }
+      if (model.tenorBasis === 'FIXED_MATURITY_DATE' && !model.fixedMaturityDate) {
+        return fail('Fixed Maturity Date is mandatory when Tenor Basis is Fixed Maturity Date.');
+      }
+    }
   }
   // A6/B4 must convert a SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
   if (strategy?.checkerRelease.settlesDocumentArrival && !ctx.selectedPayMovement) {
@@ -284,6 +299,13 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
     request.expiryDate = model.expiryDate;
     if (model.issueDate) request.issueDate = model.issueDate;
     applyMaturityDateProfile(request, model);
+    // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (business-confirmed) — omitted entirely for a
+    // Sight tenor (builder-fields.ts's own reactive expression already blanks model.tenorBasis there),
+    // matching the microservice's own soft-rollout (only validates when tenorBasis is actually supplied).
+    if (model.tenorBasis) {
+      request.tenorBasis = model.tenorBasis;
+      if (model.tenorBasis === 'FIXED_MATURITY_DATE' && model.fixedMaturityDate) request.fixedMaturityDate = model.fixedMaturityDate;
+    }
   }
   if (model.instrumentType === 'EPLC_ACCEPTANCE' && model.movementType === 'CREATE') {
     request.exposureNature = ctx.exposureNature;

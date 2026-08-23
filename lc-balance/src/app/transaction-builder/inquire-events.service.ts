@@ -8,6 +8,7 @@ import {
   BALANCE_SNAPSHOT_LABEL,
   InstrumentType,
   TransactionFunction,
+  acceptanceMaturityReferenceFields,
   childInstrumentTypesOf,
   defaultLcInstrumentTypeForSide,
   findMaturityDateProfileValue,
@@ -511,7 +512,17 @@ export class InquireEventsService {
       expiryDate: toDateOnly(movement.movementType === 'AMEND_EXPIRY' ? movement.expiryDate : contract.expiryDate),
       issueDate: toDateOnly(contract.issueDate),
       documentPresentationDate: toDateOnly(movement.documentPresentationDate),
+      // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 — A1/B1's own tenorBasis/fixedMaturityDate
+      // live on the contract only (no per-movement AMEND path exists yet, see this doc's own §3.1 "NOT
+      // CONFIRMED for A2/B2" scope note), so this reads straight from `contract`, no movement-vs-contract
+      // ternary needed (unlike expiryDate/maturityDateProfile above).
+      tenorBasis: contract.tenorBasis ?? undefined,
+      fixedMaturityDate: toDateOnly(contract.fixedMaturityDate),
     };
+    // UI-only read-only reference (2026-08-24) — see balance-component.model.ts's own
+    // acceptanceMaturityReferenceFields() doc comment; shared with MakerPanelComponent's live A7/B5 entry
+    // so the two screens can never disagree.
+    Object.assign(model, acceptanceMaturityReferenceFields(contract));
     // A6/B4 Calculated Maturity Date (2026-08-23) — same "movement carries the REQUESTED new value for
     // its own movementType, contract carries the current one otherwise" ternary as expiryDate/
     // AMEND_EXPIRY immediately above, just AMEND_MATURITY_CALENDARS instead. Feeds BOTH

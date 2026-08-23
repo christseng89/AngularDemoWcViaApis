@@ -1292,6 +1292,35 @@ describe('MakerPanelComponent', () => {
       expect(comp.model.maturityDateCalendarsReference).toBeUndefined();
     });
 
+    // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §4 (2026-08-24, business-confirmed) — A7's own
+    // two-field search resolves selectedContract to the Acceptance itself (see the "resolves via search"
+    // describe block below for that path); this covers the flat-Catalog shape via onSelectContract().
+    it("carries the picked Acceptance contract's own maturityDateStatus/contractualMaturityDate/operationalPaymentDate into the read-only reference fields", () => {
+      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
+      const comp = makeComponentB(getFn('A3'), api);
+      comp.catalogPicker.contracts = [
+        makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_ACCEPTANCE', maturityDateStatus: 'APPROVED', contractualMaturityDate: '2026-12-25', operationalPaymentDate: '2026-12-28' }),
+      ];
+
+      comp.onSelectContract('C1');
+
+      expect(comp.model.maturityDateStatusReference).toBe('Approved');
+      expect(comp.model.contractualMaturityDateReference).toBe('2026-12-25');
+      expect(comp.model.operationalPaymentDateReference).toBe('2026-12-28');
+    });
+
+    it('leaves the 3 Acceptance reference fields undefined for a non-Acceptance contract (e.g. a plain LC)', () => {
+      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
+      const comp = makeComponentB(getFn('A3'), api);
+      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' })];
+
+      comp.onSelectContract('C1');
+
+      expect(comp.model.maturityDateStatusReference).toBeUndefined();
+      expect(comp.model.contractualMaturityDateReference).toBeUndefined();
+      expect(comp.model.operationalPaymentDateReference).toBeUndefined();
+    });
+
     it('sets selectedContract to null and skips the snapshot fetch when the id is not in catalogPicker.contracts', () => {
       const api = makeApi();
       const comp = makeComponentB(getFn('A3'), api);
@@ -2850,6 +2879,8 @@ describe('MakerPanelComponent', () => {
       comp.model.tenorDays = 90;
       comp.model.expiryDate = '2030-12-31';
       comp.model.maturityDateProfile = 'USD_FEDWIRE'; // A6/B4 Calculated Maturity Date — required for Usance
+      comp.model.tenorBasis = 'FIXED_MATURITY_DATE'; // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 — required for Usance
+      comp.model.fixedMaturityDate = '2027-03-31';
       // tolerancePct left unset
 
       comp.submit();

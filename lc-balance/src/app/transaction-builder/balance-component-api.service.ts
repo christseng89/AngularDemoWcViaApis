@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import type { InstrumentType, MaturityDateCalendarRef } from './balance-component.model';
+import type { InstrumentType, MaturityDateCalendarRef, MaturityDateStatus, TenorBasis } from './balance-component.model';
 
 export interface NaturalKey {
   lcNumber: string;
@@ -49,6 +49,15 @@ export interface CreateMovementRequest {
   maturityDateCalendars?: MaturityDateCalendarRef[] | null;
   maturityDateCombinationRule?: string | null;
   maturityDateConvention?: string | null;
+  /**
+   * Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 (business-confirmed) — A1/B1 root ISSUE only.
+   * Required for BUYERS_USANCE/SELLERS_USANCE, must stay null/omitted for SIGHT. See
+   * balance-component.model.ts's own TenorBasis doc comment for which values actually compute a
+   * Maturity Date today.
+   */
+  tenorBasis?: TenorBasis | null;
+  /** §3.1 — A1/B1 root ISSUE only, required exactly when tenorBasis === 'FIXED_MATURITY_DATE'. The LC-stated contractual Maturity Date itself, not a Base Date. */
+  fixedMaturityDate?: string | null;
   createdBy: string;
 }
 
@@ -72,6 +81,20 @@ export interface BalanceContract {
   maturityDateCalendars?: MaturityDateCalendarRef[] | null;
   maturityDateCombinationRule?: string | null;
   maturityDateConvention?: string | null;
+  /** See CreateMovementRequest.tenorBasis's own doc comment — persisted on the LC/Confirmation contract, inherited by every Acceptance created under it. */
+  tenorBasis?: TenorBasis | null;
+  /** See CreateMovementRequest.fixedMaturityDate's own doc comment. */
+  fixedMaturityDate?: string | null;
+  /**
+   * IPLC_ACCEPTANCE/EPLC_ACCEPTANCE only — the pure Base Date + Tenor (or fixedMaturityDate) candidate,
+   * NEVER calendar-adjusted (v29 §4/§5, business-confirmed). Null until a working Base Date is available
+   * (see maturityDateStatus below).
+   */
+  contractualMaturityDate?: string | null;
+  /** IPLC_ACCEPTANCE/EPLC_ACCEPTANCE only — Standing's own calendar-adjusted actual processing date. Null until calculated. */
+  operationalPaymentDate?: string | null;
+  /** IPLC_ACCEPTANCE/EPLC_ACCEPTANCE only — the 3-stage lifecycle; see balance-component.model.ts's own MaturityDateStatus/maturityDateStatusLabel(). Null/absent for a non-Acceptance contract. */
+  maturityDateStatus?: MaturityDateStatus | null;
 }
 
 /** Items are ordered by lc_number ascending, page by page. */
