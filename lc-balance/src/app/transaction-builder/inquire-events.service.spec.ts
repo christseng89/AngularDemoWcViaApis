@@ -728,6 +728,176 @@ describe('InquireEventsService', () => {
     });
   });
 
+  describe('selectEvent — date fields (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1/§2/§3, 2026-08-23 — reported gap: Inquire Events never showed Expiry/Issue/Document Presentation Date at all)', () => {
+    it('A1 ISSUE: expiryDate/issueDate come from the CONTRACT, and the read-only field is actually shown, not hidden', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', expiryDate: '2030-12-31', issueDate: '2026-01-01T00:00:00.000Z' });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('A1');
+      expect(svc.selectedEventModel.expiryDate).toBe('2030-12-31');
+      // Bug fixed 2026-08-23 ("Inquire Event S101, there is no issue date... shown") — selectEvent()'s
+      // own toDateOnly() truncates a full ISO-8601 timestamp (as a legacy-persisted record, or any other
+      // caller, might still carry) down to its "YYYY-MM-DD" prefix, since `<input type="date">` silently
+      // renders blank for anything else. The fixture above deliberately supplies a full timestamp to
+      // prove this truncation actually runs, not just that a same-shaped value passes through.
+      expect(svc.selectedEventModel.issueDate).toBe('2026-01-01');
+      const expiryField = svc.selectedEventFields.find((f) => f.key === 'expiryDate');
+      expect(expiryField?.hide).toBe(false);
+      const issueField = svc.selectedEventFields.find((f) => f.key === 'issueDate');
+      expect(issueField?.hide).toBe(false);
+    });
+
+    it('B1 ISSUE (EPLC_CONFIRMATION): same as A1 — expiryDate/issueDate come from the contract and are shown', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.side = 'EXPORT';
+      const contract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', expiryDate: '2031-03-15', issueDate: '2026-02-01T00:00:00.000Z' });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('B1');
+      expect(svc.selectedEventModel.expiryDate).toBe('2031-03-15');
+      expect(svc.selectedEventModel.issueDate).toBe('2026-02-01');
+    });
+
+    it('A2 AMEND_EXPIRY: expiryDate comes from the MOVEMENT (the requested new value), not the contract — even when the contract has its own, different, original expiryDate', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', expiryDate: '2030-12-31' });
+      const movement = makeMovement({ movementType: 'AMEND_EXPIRY', amount: '0', expiryDate: '2032-06-30' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('A2');
+      expect(svc.selectedEventModel.expiryDate).toBe('2032-06-30');
+      const expiryField = svc.selectedEventFields.find((f) => f.key === 'expiryDate');
+      expect(expiryField?.hide).toBe(false);
+      expect(expiryField?.props?.label).toBe('New Expiry Date');
+    });
+
+    it('A3 UTILIZE: documentPresentationDate is shown, sourced from the movement', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01', documentPresentationDate: '2030-06-15' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('A3');
+      expect(svc.selectedEventModel.documentPresentationDate).toBe('2030-06-15');
+      const field = svc.selectedEventFields.find((f) => f.key === 'documentPresentationDate');
+      expect(field?.hide).toBe(false);
+    });
+
+    it('a non-A1/B1/A2/B2/A3/A3S/B3 event never shows expiryDate/issueDate/documentPresentationDate, even when the underlying data happens to be present', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', expiryDate: '2030-12-31', issueDate: '2026-01-01T00:00:00.000Z' });
+      const movement = makeMovement({ movementType: 'AMEND_INCREASE', documentPresentationDate: '2030-06-15' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('A2');
+      const expiryField = svc.selectedEventFields.find((f) => f.key === 'expiryDate');
+      expect(expiryField?.hide).toBe(true);
+      const issueField = svc.selectedEventFields.find((f) => f.key === 'issueDate');
+      expect(issueField?.hide).toBe(true);
+      const presentationField = svc.selectedEventFields.find((f) => f.key === 'documentPresentationDate');
+      expect(presentationField?.hide).toBe(true);
+    });
+  });
+
+  describe('selectEvent — maturityDateProfile/maturityDateCalendarsReference (2026-08-23, A6/B4 Calculated Maturity Date, user-directed)', () => {
+    it('A1 ISSUE: maturityDateProfile is reverse-matched from the CONTRACT\'s own configured calendars, field shown', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({
+        instrumentType: 'IPLC_LC',
+        maturityDateCalendars: [
+          { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
+          { calendarType: 'CURRENCY_CLEARING', code: 'USD_FEDWIRE', role: 'CURRENCY_CLEARING', required: true },
+        ],
+      });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateProfile).toBe('USD_FEDWIRE');
+      const field = svc.selectedEventFields.find((f) => f.key === 'maturityDateProfile');
+      expect(field?.hide).toBe(false);
+    });
+
+    it('A2 AMEND_MATURITY_CALENDARS: maturityDateProfile comes from the MOVEMENT (the requested new value), not the contract — even when the contract has its own, different, original config', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({
+        instrumentType: 'IPLC_LC',
+        maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'US', role: 'SETTLEMENT', required: true }],
+      });
+      const movement = makeMovement({
+        movementType: 'AMEND_MATURITY_CALENDARS',
+        amount: '0',
+        maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true }],
+      });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('A2');
+      expect(svc.selectedEventModel.maturityDateProfile).toBe('TW');
+    });
+
+    it('A3 UTILIZE with a Usance underlying LC: maturityDateCalendarsReference is shown, sourced from the contract', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({
+        instrumentType: 'IPLC_LC',
+        tenorType: 'SELLERS_USANCE',
+        maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'GB', role: 'SETTLEMENT', required: true }],
+      });
+      const movement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateCalendarsReference).toBe('GB (COUNTRY)');
+      const field = svc.selectedEventFields.find((f) => f.key === 'maturityDateCalendarsReference');
+      expect(field?.hide).toBe(false);
+    });
+
+    it('A3 UTILIZE with a Sight underlying LC: maturityDateCalendarsReference is also shown now (widened 2026-08-23 — a Sight LC still settles through a paying/collecting bank)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({
+        instrumentType: 'IPLC_LC',
+        tenorType: 'SIGHT',
+        maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'GB', role: 'SETTLEMENT', required: true }],
+      });
+      const movement = makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'IB01' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateCalendarsReference).toBe('GB (COUNTRY)');
+      const field = svc.selectedEventFields.find((f) => f.key === 'maturityDateCalendarsReference');
+      expect(field?.hide).toBe(false);
+    });
+
+    it('a legacy/no-match calendars config degrades to an undefined maturityDateProfile, no crash', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'ZZ', role: 'SETTLEMENT', required: true }] });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateProfile).toBeUndefined();
+    });
+
+    it('no calendars configured at all: both fields stay undefined', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.maturityDateProfile).toBeUndefined();
+      expect(svc.selectedEventModel.maturityDateCalendarsReference).toBeUndefined();
+    });
+  });
+
   /** Up to 3 tabs, gated by the root LC's own product type/tenor. */
   describe('selectEvent — Balance Tabs (tenor/side gating)', () => {
     it('Import Sight LC: exactly 2 tabs (LC, SG) — no Acceptance tab at all', () => {

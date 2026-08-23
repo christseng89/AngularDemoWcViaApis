@@ -58,9 +58,36 @@ function fieldByKey(fields: ReturnType<typeof buildFields>, key: string) {
 
 describe('builder-fields', () => {
   // secondaryRef must be the first input field on the entry screen.
-  it('returns the 8 fixed field keys, in order, for a plain A1 submission', () => {
+  // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 (2026-08-23) — expiryDate/issueDate added for
+  // A1/B1, between tolerancePct and tenorType (UI-only reorder, same date, per user request: Issue Date
+  // shown before Expiry Date — an LC is issued, THEN it has an expiry). §2/§3 — documentPresentationDate
+  // added right after (hidden for A1, only shown for A3/A3S/B3). originalExpiryDateReference (UI-only,
+  // 2026-08-23; widened same day to A3/A3S/B3, and reordered ahead of expiryDate — both user-requested)
+  // sits right after issueDate, BEFORE expiryDate — hidden for A1, shown for A2/B2 Extend Expiry and for
+  // A3/A3S/B3. parentExpiryDateReference (UI-only, 2026-08-23) added after documentPresentationDate —
+  // hidden for A1, only shown for A6/B4-Usance. maturityDateProfile/maturityDateCalendarsReference
+  // (2026-08-23, user-directed A6/B4 Calculated Maturity Date) added right after parentExpiryDateReference
+  // — so all five reference/config fields are still present in the field ARRAY for every function, just
+  // hidden.
+  it('returns the 15 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
-    expect(fields.map((f) => f.key)).toEqual(['secondaryRef', 'amount', 'currency', 'tolerancePct', 'tenorType', 'tenorDays', 'eventSeq', 'createdBy']);
+    expect(fields.map((f) => f.key)).toEqual([
+      'secondaryRef',
+      'amount',
+      'currency',
+      'tolerancePct',
+      'issueDate',
+      'originalExpiryDateReference',
+      'expiryDate',
+      'documentPresentationDate',
+      'parentExpiryDateReference',
+      'maturityDateProfile',
+      'maturityDateCalendarsReference',
+      'tenorType',
+      'tenorDays',
+      'eventSeq',
+      'createdBy',
+    ]);
   });
 
   describe('Amount field', () => {
@@ -392,6 +419,230 @@ describe('builder-fields', () => {
       expect(decorated.map((f) => f.key)).toEqual(original.map((f) => f.key));
       expect(fieldByKey(decorated, 'amount').props?.required).toBe(true);
       expect(fieldByKey(decorated, 'amount').className).toContain('tb-field--required');
+    });
+  });
+
+  describe('parentExpiryDateReference — UI-only reference field for A6/B4-Usance (2026-08-23, user-requested, ahead of Calculated Maturity Date itself)', () => {
+    it('A6: shown, regardless of the parent\'s own tenorType (A6 is Usance-only by definition)', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A6'),
+        model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' },
+        selectedParent: contract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE', expiryDate: '2030-06-30' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'parentExpiryDateReference');
+      expect(field.hide).toBe(false);
+      expect(field.props?.disabled).toBe(true);
+    });
+
+    it('B4 with a Usance parent Confirmation: shown', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B4'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ACCEPT' },
+        selectedParent: contract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE', expiryDate: '2031-01-15' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'parentExpiryDateReference');
+      expect(field.hide).toBe(false);
+    });
+
+    it('B4 with a Sight parent Confirmation: hidden — the Sight branch (HONOUR) produces no Acceptance at all', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B4'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR' },
+        selectedParent: contract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SIGHT', expiryDate: '2031-01-15' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'parentExpiryDateReference');
+      expect(field.hide).toBe(true);
+    });
+
+    it('B4 with no parent picked yet: hidden, no crash', () => {
+      const ctx = baseCtx({ selectedFunction: fn('B4'), model: { instrumentType: 'EPLC_CONFIRMATION' }, selectedParent: null });
+      const field = fieldByKey(buildFields(ctx), 'parentExpiryDateReference');
+      expect(field.hide).toBe(true);
+    });
+
+    it('a function outside A6/B4 (e.g. A2) never shows it, even with a parent-shaped contract present on selectedParent', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' },
+        selectedParent: contract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE', expiryDate: '2030-06-30' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'parentExpiryDateReference');
+      expect(field.hide).toBe(true);
+    });
+  });
+
+  describe('originalExpiryDateReference — UI-only reference field for A2/B2 Extend Expiry and A3/A3S/B3 Document Presentation (2026-08-23, user-requested; widened + reordered same day)', () => {
+    it('A2 with Extend Expiry chosen: shown, disabled, "before this amendment" label, and appears BEFORE expiryDate ("New Expiry Date") in the array', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', expiryDate: '2027-03-31' }),
+      });
+      const fields = buildFields(ctx);
+      const field = fieldByKey(fields, 'originalExpiryDateReference');
+      expect(field.hide).toBe(false);
+      expect(field.props?.disabled).toBe(true);
+      expect(field.props?.label).toBe('Current Expiry Date (reference — before this amendment)');
+      expect(fields.map((f) => f.key).indexOf('originalExpiryDateReference')).toBeLessThan(fields.map((f) => f.key).indexOf('expiryDate'));
+    });
+
+    it('B2 with Extend Expiry chosen: shown', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B2'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND_EXPIRY' },
+        selectedContract: contract({ instrumentType: 'EPLC_CONFIRMATION', expiryDate: '2027-09-30' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'originalExpiryDateReference');
+      expect(field.hide).toBe(false);
+    });
+
+    it('A2 with Increase/Decrease chosen instead: hidden', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', expiryDate: '2027-03-31' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'originalExpiryDateReference');
+      expect(field.hide).toBe(true);
+    });
+
+    it.each(['A3', 'A3S', 'B3'])('%s (Document Presentation): shown, disabled, UCP 6(d)/14(c) label', (code) => {
+      const ctx = baseCtx({
+        selectedFunction: fn(code),
+        model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', expiryDate: '2027-03-31' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'originalExpiryDateReference');
+      expect(field.hide).toBe(false);
+      expect(field.props?.disabled).toBe(true);
+      expect(field.props?.label).toBe('Current Expiry Date (reference — UCP 600 Art. 6(d)/14(c))');
+    });
+
+    it('a function outside A2/B2/A3/A3S/B3 (e.g. A4) never shows it', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A4'), model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' } });
+      const field = fieldByKey(buildFields(ctx), 'originalExpiryDateReference');
+      expect(field.hide).toBe(true);
+    });
+
+    it('visibility tracks amountFromAmendExpiry exactly the same as the expiryDate field\'s own "New Expiry Date" label — both keyed off model.movementType alone, no function-code check', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', expiryDate: '2027-03-31' }),
+      });
+      const fields = buildFields(ctx);
+      expect(fieldByKey(fields, 'originalExpiryDateReference').hide).toBe(fieldByKey(fields, 'expiryDate').props?.label === 'New Expiry Date' ? false : true);
+    });
+  });
+
+  describe('maturityDateProfile — Clearing Bank Calendar Profile, A1/B1 input + A2/B2 Update Clearing Bank Calendars (2026-08-23, user-directed, widened same day to apply regardless of tenor)', () => {
+    it('A1: always shown, with the full profile option list plus a blank option', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A1'), model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.hide).toBe(false);
+      expect(field.type).toBe('select');
+      expect((field.props?.options as { value: string }[]).map((o) => o.value)).toEqual(['', 'USD_FEDWIRE', 'US', 'GB', 'TW', 'HK', 'SG', 'JP', 'CN', 'AE']);
+      expect(field.props?.label).toBe('Clearing Bank Calendar Profile');
+    });
+
+    it('A1: statically required at build time, regardless of tenorType — no more reactive expressions (widened 2026-08-23, "SIGHT也要有這欄位")', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A1'), model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', tenorType: 'SIGHT' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.props?.required).toBe(true);
+      expect(field.expressions).toBeUndefined();
+    });
+
+    it('B1: same static required as A1 (isRootIssue covers both)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('B1'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.props?.required).toBe(true);
+      expect(field.expressions).toBeUndefined();
+    });
+
+    it('A2 with Update Clearing Bank Calendars chosen: shown, statically required, "New..." label, no reactive expressions (movementType alone already gates it)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_MATURITY_CALENDARS' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.hide).toBe(false);
+      expect(field.props?.required).toBe(true);
+      expect(field.props?.label).toBe('New Clearing Bank Calendar Profile');
+      expect(field.expressions).toBeUndefined();
+    });
+
+    it('B2 with Update Maturity Date Calendars chosen (movementType still converges on AMEND_MATURITY_CALENDARS): shown', () => {
+      const ctx = baseCtx({ selectedFunction: fn('B2'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND_MATURITY_CALENDARS' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.hide).toBe(false);
+    });
+
+    it('A2 with Increase/Decrease chosen instead: hidden', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.hide).toBe(true);
+    });
+
+    it('a function outside A1/B1/A2/B2 (e.g. A3): hidden', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A3'), model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' } });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateProfile');
+      expect(field.hide).toBe(true);
+    });
+  });
+
+  describe('maturityDateCalendarsReference — A3/A3S/B3 read-only reference (2026-08-23, user-directed — "A3 A35 B3 只顯示(PROTECTED)"), widened 2026-08-23 to apply regardless of tenor', () => {
+    it('A3 with a Usance underlying LC (selectedContract.tenorType): shown, disabled', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A3'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateCalendarsReference');
+      expect(field.hide).toBe(false);
+      expect(field.props?.disabled).toBe(true);
+    });
+
+    it('A3S: same as A3', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A3S'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateCalendarsReference');
+      expect(field.hide).toBe(false);
+    });
+
+    it('B3: shown when selectedContract (aliased from selectedParent, see onSelectParent()) is Usance', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B3'),
+        model: { instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE' },
+        selectedContract: contract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateCalendarsReference');
+      expect(field.hide).toBe(false);
+    });
+
+    it('A3 with a Sight underlying LC: also shown now (widened 2026-08-23 — a Sight LC still settles through a paying/collecting bank)', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A3'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateCalendarsReference');
+      expect(field.hide).toBe(false);
+    });
+
+    it('A3 with no selectedContract yet (nothing picked): still shown (function-gated only, not data-gated), no crash', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A3'), model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' }, selectedContract: null });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateCalendarsReference');
+      expect(field.hide).toBe(false);
+    });
+
+    it('a function outside A3/A3S/B3 (e.g. A2) never shows it, even with a Usance-shaped selectedContract present', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' }),
+      });
+      const field = fieldByKey(buildFields(ctx), 'maturityDateCalendarsReference');
+      expect(field.hide).toBe(true);
     });
   });
 });

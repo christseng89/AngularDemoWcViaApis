@@ -40,12 +40,17 @@ export const MOVEMENT_TYPES_BY_INSTRUMENT: Record<InstrumentType, string[]> = {
   // 'CLOSE' — A10/B6 (Import LC / Export Confirmed LC Close). Write-off + retire the root contract
   // (ContractStatus.CLOSED, reserved since the original design but never previously set anywhere) —
   // see microservices/balance-component/src/domain/closeEligibility.ts for the preconditions.
-  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
+  // 'AMEND_EXPIRY' — A2/B2 Extend Expiry (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3).
+  // Never touches Balance/ceilingAmount — only changes BalanceContract.expiryDate, at Release.
+  // 'AMEND_MATURITY_CALENDARS' — A2/B2 Update Maturity Date Calendars (2026-08-23, A6/B4 Calculated
+  // Maturity Date). Same never-touches-Balance shape — only changes BalanceContract.maturityDateCalendars
+  // (+ combinationRule/convention), at Release.
+  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS', 'UTILIZE', 'CLOSE'],
   EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
   IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
   EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
   SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
+  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS', 'HONOUR', 'ACCEPT', 'CLOSE'],
   EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
   EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
   EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -155,6 +160,97 @@ export const CURRENCY_OPTIONS: { value: string; label: string }[] = ['USD', 'EUR
   value: code,
   label: code,
 }));
+
+/** A6/B4 Calculated Maturity Date's own Standing calendar reference shape (see standingClient.ts's own `StandingCalendarRef` on the microservice side — kept structurally compatible, this project has no direct dependency on that file). */
+export interface MaturityDateCalendarRef {
+  calendarType: 'COUNTRY' | 'CURRENCY_CLEARING' | 'INSTITUTION' | 'FINANCIAL_CENTER';
+  code: string;
+  role: string;
+  required?: boolean;
+}
+
+/**
+ * A6/B4 Calculated Maturity Date (2026-08-23) — A1/B1's own Standing calendar config input is a single
+ * preset "Calendar Profile" dropdown, not a generic calendars[] array editor (user-confirmed direction,
+ * "簡單下拉選單，單一 Calendar Profile" — matches the existing Currency dropdown's own UX pattern and
+ * avoids building a full path-group/multi-calendar editor this project's own `standing-mock/` test data
+ * has no real use case for yet). Each profile expands into the real Standing request shape at Submit time
+ * (see `submit-rules.ts`'s own `buildSubmitRequest()`) — `combinationRule`/`convention` deliberately fixed
+ * per profile rather than separately selectable, since this project's `microservices/standing-mock/`
+ * `data/calendars.json` only has one sensible choice for each.
+ *
+ * Business rule confirmed 2026-08-23 (user-directed): cross-border Trade Finance settlement must check
+ * AT LEAST TWO calendars — the domestic bank (can it debit/credit the customer's own account) and the
+ * counterparty paying/receiving bank abroad (can it actually pay/receive) — never just one side. This
+ * demo's own bank is a Taiwan-based bank, so every profile except the bare `TW` one below fixes TW as the
+ * domestic leg (`role: 'ISSUING_BANK'`, a shared-list simplification — this preset list is used by both
+ * Import A1 and Export B1, and `CalendarReference.role` is audit-only per the Standing OAS, so it never
+ * affects the actual calculation) and adds the picked country as the counterparty `PAYING_BANK` leg,
+ * `combinationRule: 'ALL_REQUIRED_OPEN'` — a date is only a true Business Day once BOTH sides are open,
+ * matching the two-calendar principle exactly. The bare `TW` profile stays single-calendar (the
+ * counterparty bank IS the same domestic bank/country — nothing further to check). `USD_FEDWIRE` keeps
+ * being the profile that reproduces the Standing design doc's own canonical Dec-25 worked example, now
+ * with TW as its domestic leg instead of the synthetic `DEMOBANKXXX` institution calendar (TW has no
+ * December holiday in `standing-mock/data/calendars.json`, so `adjustedDate: 2026-12-28` is unchanged).
+ */
+export const MATURITY_DATE_CALENDAR_PROFILES: {
+  value: string;
+  label: string;
+  calendars: MaturityDateCalendarRef[];
+  combinationRule: 'ALL_REQUIRED_OPEN' | 'ANY_ELIGIBLE_OPEN';
+  convention: 'FOLLOWING' | 'PRECEDING' | 'MODIFIED_FOLLOWING' | 'MODIFIED_PRECEDING' | 'NEAREST';
+}[] = [
+  {
+    value: 'USD_FEDWIRE',
+    label: 'USD — TW Domestic Bank + Fedwire Clearing',
+    calendars: [
+      { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
+      { calendarType: 'CURRENCY_CLEARING', code: 'USD_FEDWIRE', role: 'CURRENCY_CLEARING', required: true },
+    ],
+    combinationRule: 'ALL_REQUIRED_OPEN',
+    convention: 'FOLLOWING',
+  },
+  ...(['US', 'GB', 'TW', 'HK', 'SG', 'JP', 'CN', 'AE'] as const).map((code) =>
+    code === 'TW'
+      ? {
+          value: 'TW',
+          label: 'TW — Domestic Bank Only (counterparty also TW)',
+          calendars: [{ calendarType: 'COUNTRY' as const, code: 'TW', role: 'ISSUING_BANK' as const, required: true }],
+          combinationRule: 'ALL_REQUIRED_OPEN' as const,
+          convention: 'FOLLOWING' as const,
+        }
+      : {
+          value: code,
+          label: `TW Domestic Bank + ${code} Paying Bank`,
+          calendars: [
+            { calendarType: 'COUNTRY' as const, code: 'TW', role: 'ISSUING_BANK' as const, required: true },
+            { calendarType: 'COUNTRY' as const, code, role: 'PAYING_BANK' as const, required: true },
+          ],
+          combinationRule: 'ALL_REQUIRED_OPEN' as const,
+          convention: 'FOLLOWING' as const,
+        },
+  ),
+];
+
+/** Read-only reference display (A3/A3S/B3, Inquire Events) — a short human string, not a re-derived profile lookup (an amended config might not exactly match any preset). Empty string, not a dash, when there's nothing configured — the field itself is hidden in that case (see builder-fields.ts). */
+export function maturityDateCalendarsSummary(calendars: MaturityDateCalendarRef[] | null | undefined): string {
+  if (!calendars?.length) return '';
+  return calendars.map((c) => `${c.code} (${c.calendarType})`).join(', ');
+}
+
+/**
+ * Inquire Events' own read-only reconstruction of A1/B1/A2/B2's `maturityDateProfile` select field —
+ * reverse-matches a persisted `calendars[]` array back to whichever preset produced it (exact-shape
+ * comparison; the live UI only ever writes a full preset, never a hand-edited partial one, so this
+ * matches for every value this app itself created). Returns `undefined` (renders as the blank "— none —"
+ * option) for a legacy/hand-edited config that doesn't match any current preset — same
+ * "Undefined for legacy data" degrade convention `inquire-events.service.ts` already documents elsewhere.
+ */
+export function findMaturityDateProfileValue(calendars: MaturityDateCalendarRef[] | null | undefined): string | undefined {
+  if (!calendars?.length) return undefined;
+  const serialized = JSON.stringify(calendars);
+  return MATURITY_DATE_CALENDAR_PROFILES.find((p) => JSON.stringify(p.calendars) === serialized)?.value;
+}
 
 /**
  * True if `amount`'s decimal places exceed what `currency` allows (Design doc §6.2). Coerces via
@@ -285,10 +381,19 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
       options: [
         { value: 'AMEND_INCREASE', label: 'Increase' },
         { value: 'AMEND_DECREASE', label: 'Decrease' },
+        // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2 (2026-08-23) — Extend Expiry never
+        // touches Balance/ceilingAmount (Amount is locked to 0, see builder-fields.ts's own
+        // amountFromAmendExpiry); it only changes BalanceContract.expiryDate, at Release.
+        { value: 'AMEND_EXPIRY', label: 'Extend Expiry' },
+        // Clearing Bank Calendar Profile (2026-08-23) — same "amount locked to 0, only mutates the
+        // contract at Release" shape as Extend Expiry immediately above. Applies regardless of tenor
+        // (originally Usance-only, widened same day — a Sight LC also settles through a paying/
+        // collecting bank; see builder-fields.ts's own doc comment on the maturityDateProfile field).
+        { value: 'AMEND_MATURITY_CALENDARS', label: 'Update Clearing Bank Calendars' },
       ],
     },
     secondaryRefLabel: 'Amendment No./Times',
-    help: 'Increase always succeeds; Decrease is checked against Tight Available Balance (Design doc §6.2) — only APPROVED amounts count, and outstanding off-balance-sheet exposure is netted out.',
+    help: 'Increase always succeeds; Decrease is checked against Tight Available Balance (Design doc §6.2) — only APPROVED amounts count, and outstanding off-balance-sheet exposure is netted out. Extend Expiry only changes the Expiry Date — Amount is locked to 0 and the Balance is unaffected. Update Clearing Bank Calendars changes the Standing calendar reference config used for Acceptance Maturity Date (Usance) or settlement (Sight) — also Amount-locked to 0.',
   },
   // Merged into one card, showing all ACTIVE IPLC_LC contracts regardless of tenor — no catalogTenorFilter.
   {
@@ -430,10 +535,21 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
       options: [
         { value: 'INCREASE', label: 'Increase' },
         { value: 'DECREASE', label: 'Decrease' },
+        // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §3 (2026-08-23) — unlike Increase/Decrease
+        // (both stay movementType 'AMEND', direction riding the signed Amount), Extend Expiry is a
+        // genuinely distinct movementType (AMEND_EXPIRY) — see maker-panel.component.ts's own
+        // onSubChoice() for where model.movementType is overridden away from fn.movementType for this
+        // one case. Amount is locked to 0.
+        { value: 'EXTEND_EXPIRY', label: 'Extend Expiry' },
+        // Clearing Bank Calendar Profile (2026-08-23) — same distinct-movementType shape as Extend Expiry
+        // immediately above (AMEND_MATURITY_CALENDARS instead of AMEND_EXPIRY); applies regardless of
+        // tenor (originally Usance only, widened same day — see balance-component.model.ts's own A2
+        // subChoice doc comment above).
+        { value: 'UPDATE_MATURITY_CALENDARS', label: 'Update Clearing Bank Calendars' },
       ],
     },
     secondaryRefLabel: 'Amendment No./Times',
-    help: "Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC's own face amount. This function only ever moves the Confirmation's own contingent. Amount stays a positive magnitude — Direction (above), not the amount's own sign, carries Increase vs. Decrease.",
+    help: "Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC's own face amount. This function only ever moves the Confirmation's own contingent. Amount stays a positive magnitude — Direction (above), not the amount's own sign, carries Increase vs. Decrease. Extend Expiry only changes the Expiry Date — Amount is locked to 0 and the Balance is unaffected.",
   },
   // B3 is a genuinely separate physical event (D3): it never auto-derives Sight/Usance or touches the
   // Confirmation, only creates a MEMO_ONLY EPLC_EXAMINATION earmark. B4 is the actual legal-event step.

@@ -1,5 +1,5 @@
 import { BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
-import { TransactionFunction, amountExceedsCurrencyDecimals, decimalPlacesForCurrency } from './balance-component.model';
+import { MATURITY_DATE_CALENDAR_PROFILES, TransactionFunction, amountExceedsCurrencyDecimals, decimalPlacesForCurrency } from './balance-component.model';
 import { deriveFunctionStrategy } from './function-strategy';
 import {
   BuilderModel,
@@ -38,7 +38,7 @@ export interface SubmitRulesContext {
    * stays a positive magnitude and expresses Increase/Decrease via this pick instead of a distinct
    * movementType. Today only B2 declares that key; `null` for every other function.
    */
-  amendDirection: 'INCREASE' | 'DECREASE' | null;
+  amendDirection: 'INCREASE' | 'DECREASE' | 'EXTEND_EXPIRY' | 'UPDATE_MATURITY_CALENDARS' | null;
 }
 
 export interface SubmitValidation {
@@ -70,10 +70,25 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   //
   // A10/B6 (Close) exempted — its own Amount is system-derived from the current Confirmed Balance
   // (never user-typed, see builder-fields.ts's own amountFromClose), and 0 is a legitimate, common write-
-  // off figure for an already fully-utilized LC (nothing left to reserve). Every OTHER function still
-  // means "0 isn't a real transaction" here.
-  if (model.movementType !== 'CLOSE' && Number(model.amount) <= 0) {
+  // off figure for an already fully-utilized LC (nothing left to reserve). A2/B2 Extend Expiry
+  // (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3) is also exempted — its own Amount is
+  // always exactly 0 (locked, see builder-fields.ts's own amountFromAmendExpiry), since it never touches
+  // Balance/ceilingAmount. A2/B2 Update Maturity Date Calendars (AMEND_MATURITY_CALENDARS, 2026-08-23)
+  // is the same shape as Extend Expiry — also always exactly 0 (amountFromAmendMaturityCalendars). Every
+  // OTHER function still means "0 isn't a real transaction" here.
+  if (model.movementType !== 'CLOSE' && model.movementType !== 'AMEND_EXPIRY' && model.movementType !== 'AMEND_MATURITY_CALENDARS' && Number(model.amount) <= 0) {
     return fail('Amount must be greater than 0.');
+  }
+  // §2/§3 — the new Expiry Date is mandatory for A2/B2 Extend Expiry (A2 sets model.movementType directly
+  // via its own subChoice; B2 sets it via maker-panel.component.ts's own onSubChoice() override for the
+  // EXTEND_EXPIRY direction — both converge on model.movementType === 'AMEND_EXPIRY' by the time this runs).
+  if (model.movementType === 'AMEND_EXPIRY' && !model.expiryDate) {
+    return fail('Expiry Date is mandatory for Extend Expiry.');
+  }
+  // A6/B4 Calculated Maturity Date (2026-08-23) — same shape as AMEND_EXPIRY's own check immediately
+  // above.
+  if (model.movementType === 'AMEND_MATURITY_CALENDARS' && !model.maturityDateProfile) {
+    return fail('Clearing Bank Calendar Profile is mandatory for Update Clearing Bank Calendars.');
   }
   if (ctx.dynamicSecondaryRefLabel && !model.secondaryRef) {
     return fail(`${ctx.dynamicSecondaryRefLabel} is mandatory for ${selectedFunction?.code}.`);
@@ -102,6 +117,30 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
       patch.tenorDays = 0;
     } else if (!model.tenorDays || Number(model.tenorDays) <= 0) {
       return fail("Tenor Days must be greater than 0 for Seller's/Buyer's Usance.");
+    }
+  }
+  // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — expiryDate is mandatory at A1/B1 root ISSUE
+  // (server-side 400 backstop in resolveOrCreateContract()); this is the client-side pre-check. Dates
+  // compare as plain 'YYYY-MM-DD' strings (the native HTML date input's own value format) rather than
+  // via `new Date(...)`, deliberately — a Date-object comparison against `new Date()` would compare
+  // against the CURRENT TIME OF DAY, not just today's date, so an expiryDate of exactly today would
+  // wrongly fail depending what time the Maker happens to submit.
+  if (selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') {
+    if (!model.expiryDate) {
+      return fail(`Expiry Date is mandatory for ${selectedFunction.code}.`);
+    }
+    const issueBasis = model.issueDate || new Date().toISOString().slice(0, 10);
+    if (model.expiryDate < issueBasis) {
+      return fail(
+        `Expiry Date (${model.expiryDate}) must not be earlier than ${model.issueDate ? 'Issue Date' : "today's date"} (${issueBasis}).`,
+      );
+    }
+    // Clearing Bank Calendar Profile (2026-08-23, user-directed — originally Usance-only, widened same
+    // day: "SIGHT也要有這欄位 因為也要跟收款行清算收錢與付錢" — a Sight LC still settles through a paying/
+    // collecting bank, so the calendar check applies regardless of tenor). Client-side backstop matching
+    // builder-fields.ts's own static `props.required: true` on this same field.
+    if (!model.maturityDateProfile) {
+      return fail(`Clearing Bank Calendar Profile is mandatory for ${selectedFunction.code}.`);
     }
   }
   // A6/B4 must convert a SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
@@ -152,7 +191,7 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // negative right after Submit. The sign transform happens in buildSubmitRequest() instead, purely for
   // the outgoing wire request — `model.amount` always stays what the Maker typed.
   if (selectedFunction?.subChoice?.key === 'amendDirection' && !ctx.amendDirection) {
-    return fail('Pick Increase or Decrease for this Amendment.');
+    return fail('Pick Increase, Decrease, or Extend Expiry for this Amendment.');
   }
   return { error: null, patch };
 }
@@ -165,14 +204,33 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
  * the signed wire value is derived here from `ctx.amendDirection` — `model.amount` itself stays
  * whatever the Maker typed (positive, never mutated), since it's rendered back into the form.
  */
+/**
+ * A6/B4 Calculated Maturity Date (2026-08-23, user-directed) — expands `model.maturityDateProfile`'s
+ * single preset-dropdown pick (see MATURITY_DATE_CALENDAR_PROFILES's own doc comment) into the real
+ * `maturityDateCalendars`/`maturityDateCombinationRule`/`maturityDateConvention` wire fields. A no-op
+ * (mutates nothing) when no profile was picked — the blank `''` option and Sight LCs both land here.
+ */
+function applyMaturityDateProfile(request: CreateMovementRequest, model: SubmitRulesContext['model']): void {
+  const profile = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === model.maturityDateProfile);
+  if (!profile) return;
+  request.maturityDateCalendars = profile.calendars;
+  request.maturityDateCombinationRule = profile.combinationRule;
+  request.maturityDateConvention = profile.convention;
+}
+
 export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
   const { model, selectedFunction } = ctx;
   const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — EXTEND_EXPIRY (B2) always wires amount
+  // "0" (matches A2's own AMEND_EXPIRY, model.amount is locked to 0 there too — see builder-fields.ts's
+  // own amountFromAmendExpiry) rather than deriving a signed figure from model.amount.
   const wireAmount =
     selectedFunction?.subChoice?.key === 'amendDirection'
-      ? ctx.amendDirection === 'DECREASE'
-        ? String(-Math.abs(Number(model.amount)))
-        : String(Math.abs(Number(model.amount)))
+      ? ctx.amendDirection === 'EXTEND_EXPIRY' || ctx.amendDirection === 'UPDATE_MATURITY_CALENDARS'
+        ? '0'
+        : ctx.amendDirection === 'DECREASE'
+          ? String(-Math.abs(Number(model.amount)))
+          : String(Math.abs(Number(model.amount)))
       : String(model.amount);
   const request: CreateMovementRequest = {
     instrumentType: model.instrumentType!,
@@ -182,6 +240,24 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
     currency: model.currency!,
     createdBy: model.createdBy!,
   };
+  // §2/§3 — A2 (direct subChoice pick) and B2 (via EXTEND_EXPIRY, see maker-panel.component.ts's own
+  // onSubChoice() override) both converge on model.movementType === 'AMEND_EXPIRY' by this point.
+  if (model.movementType === 'AMEND_EXPIRY') {
+    request.expiryDate = model.expiryDate;
+  }
+  // A6/B4 Calculated Maturity Date (2026-08-23) — A2 (direct subChoice pick) and B2 (via
+  // UPDATE_MATURITY_CALENDARS, see maker-panel.component.ts's own onSubChoice() override) both converge
+  // on model.movementType === 'AMEND_MATURITY_CALENDARS' by this point, same convention as AMEND_EXPIRY
+  // immediately above.
+  if (model.movementType === 'AMEND_MATURITY_CALENDARS') {
+    applyMaturityDateProfile(request, model);
+  }
+  // §2/§3 — A3/A3S/B3 only. Passthrough only when supplied — assertPresentationNotAfterExpiry() on the
+  // server is itself a no-op when either side is absent, so omitting this for every other function is
+  // harmless (matches builder-fields.ts's own hide condition scoping the input to A3/A3S/B3 only).
+  if (selectedFunction?.code === 'A3' || selectedFunction?.code === 'A3S' || selectedFunction?.code === 'B3') {
+    if (model.documentPresentationDate) request.documentPresentationDate = model.documentPresentationDate;
+  }
   if (toleranceApplicable(model) && model.tolerancePct) request.tolerancePct = String(model.tolerancePct);
   if (model.secondaryRef) request.sourceTransactionRef = model.secondaryRef;
   if (selectedFunction?.tenorTypeOptions?.length) {
@@ -203,6 +279,11 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
 
   if (hasParent(model) && ctx.selectedParent) {
     request.parentLogicalContractId = ctx.selectedParent.logicalContractId;
+  }
+  if (selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') {
+    request.expiryDate = model.expiryDate;
+    if (model.issueDate) request.issueDate = model.issueDate;
+    applyMaturityDateProfile(request, model);
   }
   if (model.instrumentType === 'EPLC_ACCEPTANCE' && model.movementType === 'CREATE') {
     request.exposureNature = ctx.exposureNature;

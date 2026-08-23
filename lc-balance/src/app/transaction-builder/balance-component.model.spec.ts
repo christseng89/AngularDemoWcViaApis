@@ -31,6 +31,9 @@
   displayStatus,
   contractStatusBadgeClass,
   contractStatusLabel,
+  MATURITY_DATE_CALENDAR_PROFILES,
+  maturityDateCalendarsSummary,
+  findMaturityDateProfileValue,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -85,12 +88,12 @@ describe('balance-component.model data invariants', () => {
 
   describe('MOVEMENT_TYPES_BY_INSTRUMENT — design doc §5, exact legal movementType sets', () => {
     const expected: Record<InstrumentType, string[]> = {
-      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
+      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS', 'UTILIZE', 'CLOSE'],
       EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
       IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
+      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS', 'HONOUR', 'ACCEPT', 'CLOSE'],
       EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
       EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
       EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -304,7 +307,7 @@ describe('balance-component.model data invariants', () => {
     it('A2 (LC Amendment) offers Increase/Decrease as a movementType subChoice, with a secondaryRefLabel', () => {
       const a2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2') as TransactionFunction;
       expect(a2.subChoice?.key).toBe('movementType');
-      expect(a2.subChoice?.options.map((o) => o.value)).toEqual(['AMEND_INCREASE', 'AMEND_DECREASE']);
+      expect(a2.subChoice?.options.map((o) => o.value)).toEqual(['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS']);
       expect(a2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
@@ -755,6 +758,77 @@ describe('balance-component.model data invariants', () => {
       const zeroDp = ['JPY', 'TWD', 'IDR'];
       for (const code of zeroDp) expect(decimalPlacesForCurrency(code)).toBe(0);
       for (const o of CURRENCY_OPTIONS.filter((c) => !zeroDp.includes(c.value))) expect(decimalPlacesForCurrency(o.value)).toBe(2);
+    });
+  });
+
+  // A6/B4 Calculated Maturity Date (2026-08-23, user-directed) — A1/B1's own single "Calendar Profile"
+  // dropdown, matching the standing-mock/data/calendars.json test data this project's own microservice
+  // integration is wired against.
+  describe('MATURITY_DATE_CALENDAR_PROFILES', () => {
+    it('has one two-calendar USD_FEDWIRE profile (paying bank + currency clearing) plus one single-COUNTRY profile per common market', () => {
+      expect(MATURITY_DATE_CALENDAR_PROFILES.map((p) => p.value)).toEqual(['USD_FEDWIRE', 'US', 'GB', 'TW', 'HK', 'SG', 'JP', 'CN', 'AE']);
+    });
+
+    it('USD_FEDWIRE reproduces the Standing design doc\'s own canonical calendars (TW domestic + CURRENCY_CLEARING USD_FEDWIRE, both required, ALL_REQUIRED_OPEN/FOLLOWING)', () => {
+      const profile = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'USD_FEDWIRE')!;
+      expect(profile.calendars).toEqual([
+        { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
+        { calendarType: 'CURRENCY_CLEARING', code: 'USD_FEDWIRE', role: 'CURRENCY_CLEARING', required: true },
+      ]);
+      expect(profile.combinationRule).toBe('ALL_REQUIRED_OPEN');
+      expect(profile.convention).toBe('FOLLOWING');
+    });
+
+    it('the bare TW profile is domestic-only (single calendar) — every other COUNTRY profile checks TW domestic + the picked counterparty country', () => {
+      const tw = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'TW')!;
+      expect(tw.calendars).toEqual([{ calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true }]);
+
+      for (const p of MATURITY_DATE_CALENDAR_PROFILES.filter((p) => p.value !== 'USD_FEDWIRE' && p.value !== 'TW')) {
+        expect(p.calendars).toEqual([
+          { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
+          { calendarType: 'COUNTRY', code: p.value, role: 'PAYING_BANK', required: true },
+        ]);
+      }
+    });
+  });
+
+  describe('maturityDateCalendarsSummary', () => {
+    it('joins code + calendarType for a display string', () => {
+      expect(maturityDateCalendarsSummary([{ calendarType: 'COUNTRY', code: 'TW', role: 'SETTLEMENT', required: true }])).toBe('TW (COUNTRY)');
+    });
+
+    it('joins multiple calendars with a comma', () => {
+      expect(
+        maturityDateCalendarsSummary([
+          { calendarType: 'INSTITUTION', code: 'DEMOBANKXXX', role: 'PAYING_BANK', required: true },
+          { calendarType: 'CURRENCY_CLEARING', code: 'USD_FEDWIRE', role: 'CURRENCY_CLEARING', required: true },
+        ]),
+      ).toBe('DEMOBANKXXX (INSTITUTION), USD_FEDWIRE (CURRENCY_CLEARING)');
+    });
+
+    it('returns an empty string (not a dash) for null/undefined/empty — the field itself is hidden in that case', () => {
+      expect(maturityDateCalendarsSummary(null)).toBe('');
+      expect(maturityDateCalendarsSummary(undefined)).toBe('');
+      expect(maturityDateCalendarsSummary([])).toBe('');
+    });
+  });
+
+  describe('findMaturityDateProfileValue', () => {
+    it('matches an exact preset shape back to its own profile value', () => {
+      const usdFedwire = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'USD_FEDWIRE')!;
+      expect(findMaturityDateProfileValue(usdFedwire.calendars)).toBe('USD_FEDWIRE');
+      const tw = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'TW')!;
+      expect(findMaturityDateProfileValue(tw.calendars)).toBe('TW');
+    });
+
+    it('returns undefined for null/undefined/empty', () => {
+      expect(findMaturityDateProfileValue(null)).toBeUndefined();
+      expect(findMaturityDateProfileValue(undefined)).toBeUndefined();
+      expect(findMaturityDateProfileValue([])).toBeUndefined();
+    });
+
+    it('returns undefined for a legacy/hand-edited config that matches no current preset (degrades gracefully, no throw)', () => {
+      expect(findMaturityDateProfileValue([{ calendarType: 'COUNTRY', code: 'ZZ', role: 'SETTLEMENT', required: true }])).toBeUndefined();
     });
   });
 

@@ -57,12 +57,30 @@ export interface SelectionFlowStrategy {
   usesSettleableBalanceIndex: boolean;
 }
 
+/**
+ * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §7 — which of the four date-control shapes this
+ * function's own Submit is subject to. Deliberately covers ALL functions explicitly, including the
+ * `'NONE'` ones (A1/A4/A9/A10/B1/B4 Sight branch) — spec's own rationale (mirroring desiger-comments.md
+ * F-09, the eligibility-rule.ts merge that silently swallowed A8's 0-balance exclusion): a function must
+ * never be exempt from a date check merely because "no rule happened to match it" — it has to be an
+ * explicit, visible `'NONE'`.
+ *
+ * A6 and B4's own Usance branch are DELIBERATELY `'NONE'` too, even though both have a real date-related
+ * behavior (Calculated Maturity Date, spec §2/§3) — per the spec's own §7 closing note, that behavior is
+ * NOT a dateControl-gated validation on A6/B4's own Submit (nothing here blocks/rejects A6/B4 based on a
+ * date comparison — the actual Expiry-vs-presentation gate already ran upstream, at A3/B3); it's an
+ * auto-fill DEFAULT-VALUE behavior (same shape as `amountAutoFilledFrom` above), tracked separately once
+ * implemented, not a 5th `DateControlKind`.
+ */
+export type DateControlKind = 'NEW_EXPOSURE' | 'EXISTING_LIABILITY' | 'MATURITY_SETTLEMENT' | 'NONE';
+
 export interface FunctionStrategy {
   code: string;
   movementDerivation: MovementDerivationStrategy;
   compoundSubmission: CompoundSubmissionStrategy;
   checkerRelease: CheckerReleaseStrategy;
   selectionFlow: SelectionFlowStrategy;
+  dateControl: DateControlKind;
 }
 
 const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
@@ -71,6 +89,7 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
   compoundSubmission: Object.freeze({ possibleShapes: Object.freeze(['plain']) as readonly SubmissionShape[] }),
   checkerRelease: Object.freeze({ releasesExistingMovementInPlace: false, settlesDocumentArrival: false, sourceAlreadyReleasedBeforePick: false, deferSettlement: false }),
   selectionFlow: Object.freeze({ usesSettleableBalanceIndex: false }),
+  dateControl: 'NONE',
 });
 
 /**
@@ -103,17 +122,19 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
  */
 const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> = {
   A1: { ...NO_SPECIAL_BEHAVIOR, code: 'A1' },
-  A2: { ...NO_SPECIAL_BEHAVIOR, code: 'A2' },
+  A2: { ...NO_SPECIAL_BEHAVIOR, code: 'A2', dateControl: 'NEW_EXPOSURE' },
   A3: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A3',
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, deferSettlement: true },
+    dateControl: 'EXISTING_LIABILITY',
   },
   A3S: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A3S',
     compoundSubmission: { possibleShapes: ['documentArrivalWithSg'] },
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, deferSettlement: true },
+    dateControl: 'EXISTING_LIABILITY',
   },
   A4: {
     ...NO_SPECIAL_BEHAVIOR,
@@ -125,8 +146,8 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     code: 'A6',
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, settlesDocumentArrival: true },
   },
-  A7: { ...NO_SPECIAL_BEHAVIOR, code: 'A7' },
-  A8: { ...NO_SPECIAL_BEHAVIOR, code: 'A8' },
+  A7: { ...NO_SPECIAL_BEHAVIOR, code: 'A7', dateControl: 'MATURITY_SETTLEMENT' },
+  A8: { ...NO_SPECIAL_BEHAVIOR, code: 'A8', dateControl: 'NEW_EXPOSURE' },
   A9: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A9',
@@ -138,8 +159,8 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
   },
   B1: { ...NO_SPECIAL_BEHAVIOR, code: 'B1' },
-  B2: { ...NO_SPECIAL_BEHAVIOR, code: 'B2' },
-  B3: { ...NO_SPECIAL_BEHAVIOR, code: 'B3' },
+  B2: { ...NO_SPECIAL_BEHAVIOR, code: 'B2', dateControl: 'NEW_EXPOSURE' },
+  B3: { ...NO_SPECIAL_BEHAVIOR, code: 'B3', dateControl: 'EXISTING_LIABILITY' },
   B4: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'B4',
@@ -153,6 +174,7 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'SETTLE' },
     compoundSubmission: { possibleShapes: ['acceptanceSettleWithReceivable'] },
     selectionFlow: { usesSettleableBalanceIndex: true },
+    dateControl: 'MATURITY_SETTLEMENT',
   },
   B6: {
     ...NO_SPECIAL_BEHAVIOR,
@@ -174,6 +196,7 @@ export function deriveFunctionStrategy(fn: TransactionFunction): FunctionStrateg
     compoundSubmission: { possibleShapes: [...strategy.compoundSubmission.possibleShapes] },
     checkerRelease: { ...strategy.checkerRelease },
     selectionFlow: { ...strategy.selectionFlow },
+    dateControl: strategy.dateControl,
   };
 }
 

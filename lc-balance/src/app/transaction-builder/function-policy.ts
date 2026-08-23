@@ -30,6 +30,26 @@ export interface BuilderModel {
   /** Design doc §7 Tenor Type Routing (v0.7) — mandatory on Acceptance (A6/B4). */
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE';
   tenorDays?: number;
+  /** A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — A1/B1 root ISSUE only. Required (400 server-side if missing). */
+  expiryDate?: string;
+  /** §1 — A1/B1 root ISSUE only. Optional; server defaults to today's Business Date when omitted. */
+  issueDate?: string;
+  /** §2/§3 — A3/A3S (Import) and B3 (Export) only. */
+  documentPresentationDate?: string;
+  /** UI-only reference field (2026-08-23) — the parent LC/Confirmation's own Expiry Date, shown read-only on A6/B4-Usance while Maturity Date entry is still gated on Maturity-Date-Business-Day-Convention-Decision-Request.md. Never submitted — buildSubmitRequest() never reads this key. */
+  parentExpiryDateReference?: string;
+  /** UI-only reference field (2026-08-23) — the picked LC/Confirmation's own CURRENT Expiry Date, shown read-only on A2/B2 Extend Expiry (the same record being amended, no parent involved). Never submitted — buildSubmitRequest() never reads this key. */
+  originalExpiryDateReference?: string;
+  /**
+   * A6/B4 Calculated Maturity Date (2026-08-23) — A1/B1's own single "Calendar Profile" dropdown pick
+   * (see MATURITY_DATE_CALENDAR_PROFILES), and A2/B2's own AMEND_MATURITY_CALENDARS pick. UI-only key —
+   * `buildSubmitRequest()` expands the selected profile's `value` into the real
+   * `maturityDateCalendars`/`maturityDateCombinationRule`/`maturityDateConvention` fields at Submit time,
+   * this raw string is never itself sent over the wire.
+   */
+  maturityDateProfile?: string;
+  /** UI-only reference field (2026-08-23) — read-only display of the underlying LC/Confirmation's own currently-configured calendars (A3/A3S/B3, "供 Maker 參考，跟 A6/B4 最終會用到的一致"). Never submitted. */
+  maturityDateCalendarsReference?: string;
 }
 
 /** The three natural-key components a Maker can type or have carried in — shared shape of `naturalKey` and `searchNaturalKey`. */

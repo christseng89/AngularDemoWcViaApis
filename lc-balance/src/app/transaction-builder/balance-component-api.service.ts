@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import type { InstrumentType } from './balance-component.model';
+import type { InstrumentType, MaturityDateCalendarRef } from './balance-component.model';
 
 export interface NaturalKey {
   lcNumber: string;
@@ -33,6 +33,22 @@ export interface CreateMovementRequest {
   /** Design doc §7 Tenor Type Routing (v0.7) — only for Acceptance (A6/B4). SELLERS_USANCE/BUYERS_USANCE share identical Balance mechanics; this is audit/reporting only. */
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
   tenorDays?: number | null;
+  /** A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — A1/B1 root ISSUE only; required there (400 server-side if missing). */
+  expiryDate?: string | null;
+  /** §1 — A1/B1 root ISSUE only; optional, server defaults to today's Business Date when omitted. */
+  issueDate?: string | null;
+  /** §2/§3 — A3/A3S (Import) and B3 (Export) document-presentation movements only. */
+  documentPresentationDate?: string | null;
+  /**
+   * A6/B4 Calculated Maturity Date (2026-08-23) — optional at A1/B1 root ISSUE (captured once, inherited
+   * automatically by every later Acceptance CREATE under this LC/Confirmation — see the microservice's
+   * own `getMaturityDateCalendarsFromParent()`); required for A2/B2's own `AMEND_MATURITY_CALENDARS`.
+   * Expanded from `builder-fields.ts`'s single "Calendar Profile" dropdown selection at Submit time (see
+   * `submit-rules.ts`'s own `buildSubmitRequest()`) — never edited as a raw array by the Maker.
+   */
+  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
+  maturityDateCombinationRule?: string | null;
+  maturityDateConvention?: string | null;
   createdBy: string;
 }
 
@@ -48,6 +64,14 @@ export interface BalanceContract {
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
   /** The parent LC's own declared Tenor Days, copied onto A6/B4's Acceptance instead of being freely typed. */
   tenorDays?: number | null;
+  /** A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION only; required at A1/B1 root ISSUE. */
+  expiryDate?: string | null;
+  /** §1 — optional at A1/B1 root ISSUE, server defaults to today's Business Date when omitted. */
+  issueDate?: string | null;
+  /** A6/B4 Calculated Maturity Date (2026-08-23) — see CreateMovementRequest.maturityDateCalendars's own doc comment for the full carry/inheritance rule. */
+  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
+  maturityDateCombinationRule?: string | null;
+  maturityDateConvention?: string | null;
 }
 
 /** Items are ordered by lc_number ascending, page by page. */
@@ -178,6 +202,16 @@ export interface BalanceMovement {
   finalizeAcceptanceEventSnapshot?: BalanceSnapshot | null;
   /** Same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only). */
   finalizeSgEventSnapshot?: BalanceSnapshot | null;
+  /** A3/A3S (Import) and B3 (Export) document-presentation movements only. */
+  documentPresentationDate?: string | null;
+  /** A2/B2 AMEND_EXPIRY only — the REQUESTED new expiryDate, distinct from BalanceContract.expiryDate. */
+  expiryDate?: string | null;
+  /** §0.1 — Layer 2/3 informational-only audit flag for the GAP-15 expiry-discovery design. A10/B6 CLOSE only. */
+  triggeredByExpiry?: boolean | null;
+  /** A2/B2 AMEND_MATURITY_CALENDARS only — the REQUESTED new calendar config, distinct from BalanceContract.maturityDateCalendars. See CreateMovementRequest.maturityDateCalendars's own doc comment. */
+  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
+  maturityDateCombinationRule?: string | null;
+  maturityDateConvention?: string | null;
 }
 
 /**
