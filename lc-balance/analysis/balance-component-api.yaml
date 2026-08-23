@@ -596,7 +596,75 @@ info:
       - VERIFIED: all three sub-project test suites re-run green before this version was cut — microservice
         432/432 (7 new tests added directly for this change), backend 34/34, Angular 1064/1064, each above
         its own coverage floor.
-  version: "1.19.0"
+
+    v1.20.0 (2026-08-23) — MINOR: `A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md` Phase 0, §0.1, §1,
+    and the already-implemented half of §2/§3 (LC/Confirmation Expiry Date + document-presentation
+    control) — genuinely new fields and one new movementType, all additive except where noted. Does NOT
+    yet cover that spec's §4 (A7/B5 Early Settlement authorization — `earlySettlementAuthorized`/
+    `earlySettlementReason`/`SETTLEMENT_BEFORE_MATURITY_NOT_AUTHORIZED`) or §7 (`FUNCTION_STRATEGIES`
+    `dateControl` — Angular-side classification only, never reaches this OAS contract); those land in a
+    later version once implemented.
+      - ADDED: `BalanceContract.expiryDate`/`issueDate` (nullable string, ISO date) — `expiryDate` is
+        REQUIRED (400 `REQUEST_VALIDATION_FAILED` if missing) when the corresponding
+        `BalanceMovementCreateRequest.movementType: 'ISSUE'` creates a genuinely new root
+        `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` (A1/B1) — the one point of entry for this field into the
+        whole system; every other creating movementType (SHGT ISSUE, Acceptance CREATE, EPLC_EXAMINATION
+        CREATE) inherits nothing and leaves it null unless separately amended (see `AMEND_EXPIRY` below).
+        `issueDate` stays optional there, defaulting server-side to today's Business Date when omitted.
+        Both are simply carried through, unvalidated, for every other creating movementType.
+      - ADDED: `movementType: 'AMEND_EXPIRY'` (A2 LC Amendment / B2 Confirm LC Amendment, "Extend Expiry")
+        — the 16th value in the `movementType` enum. Changes ONLY the target contract's own `expiryDate`,
+        never `Balance`/`ceilingAmount`: `amount` is REQUIRED to be exactly `"0"` (400 otherwise, a
+        stricter rule than every other movementType's own "must be > 0"), and the new requested
+        `expiryDate` is itself REQUIRED on the request (400 if missing). The new value is applied to
+        `BalanceContract.expiryDate` only once a Checker actually approves it
+        (`POST /balance-movements/{id}/release`) — same "mutate the contract at Release, not Submit"
+        posture `CLOSE`'s own contract-status mutation already uses — so a still-PENDING `AMEND_EXPIRY`
+        has no visible effect on the contract yet.
+      - ADDED: `BalanceMovement.expiryDate` (nullable string, ISO date) — **not the same concept** as
+        `BalanceContract.expiryDate` above, despite the identical name: on a `BalanceMovement` this is the
+        REQUESTED new value an `AMEND_EXPIRY` movement carries until Release applies it to the contract.
+        Null on every other movementType.
+      - ADDED: `BalanceMovement.documentPresentationDate` (nullable string, ISO date) — A3/A3S
+        (`IPLC_LC`/`EPLC_LC` `UTILIZE`) and B3 (`EPLC_EXAMINATION` `CREATE`) document-presentation
+        movements only, caller-supplied. When both this field and the relevant contract's own
+        `expiryDate` are present (A3/A3S: the resolved contract's own; B3: the PARENT LC/Confirmation's
+        own, since a newly-created `EPLC_EXAMINATION` has no `expiryDate` of its own), a
+        `documentPresentationDate` AFTER that `expiryDate` is rejected — `400 REQUEST_VALIDATION_FAILED`,
+        `details.reasonCode: PRESENTATION_AFTER_EXPIRY` (see `ErrorDetails.reasonCode` below). This is a
+        no-op, not a rejection, when either side is absent (a legacy contract with no recorded
+        `expiryDate`, or a caller that omits `documentPresentationDate` entirely) — supplying this field
+        is not itself mandatory, only its comparison against a present `expiryDate` is enforced.
+      - ADDED: `BalanceMovement.triggeredByExpiry` (nullable boolean) — `A10`/`B6` `CLOSE` only, purely
+        informational passthrough (same convention as `sourceModule`/`sourceFunction`) for an external
+        batch caller to mark "this Close was triggered by an expiryDate scan, not a human operator". Never
+        validated, never read by any eligibility or sufficiency check — see the `close-eligible`
+        `expiredBefore` entry below for why: the three-layer discovery design deliberately keeps
+        `expiryDate` as a filtering condition ONLY at Discovery (Layer 1); Submit and Release (Layers 2/3)
+        only ever carry this flag for audit purposes, never gate on it.
+      - ADDED: `GET /balance-contracts/close-eligible` gained an optional `expiredBefore` query parameter
+        (ISO date) — further narrows the existing eligible set to contracts whose own `expiryDate` is
+        before this date. Omitting it leaves every existing caller's behavior unchanged. This is
+        deliberately the ONLY place `expiryDate` is ever compared against "now"/a caller-supplied cutoff
+        anywhere in this contract — `evaluateCloseEligibility()` itself (both the Submit-time check and
+        this endpoint's own eligibility half) still never reads `expiryDate` at all, preserving the
+        existing "cancellation before expiry" design: A10/B6 Close remains legal before expiry, unchanged
+        by this release.
+      - ADDED: `ErrorDetails.reasonCode` gained `PRESENTATION_AFTER_EXPIRY` — see
+        `BalanceMovement.documentPresentationDate` above. Unlike every other `reasonCode` value so far
+        (all set on `409` `INSUFFICIENT_AVAILABLE_BALANCE`/`ILLEGAL_STATE_TRANSITION`), this one is set on
+        a `400` `REQUEST_VALIDATION_FAILED` — `ErrorDetails.reasonCode`'s own description is updated
+        accordingly, it is no longer scoped to 409-only cases.
+      - CHANGED: `movementType` enum (both `BalanceMovement` and `BalanceMovementCreateRequest`) — now 16
+        values (previously 15); the accompanying description's own count/wording corrected to match.
+      - VERIFIED: the microservice's own test suite re-run green before this version was cut — 443/443 (11
+        new tests added directly for this batch), coverage above its own 95% floor on all four metrics.
+        `backend/`'s own suite (34/34) is unaffected by this batch (its Business Case Registry fixtures
+        were updated separately, in the same working session, to supply the now-required `expiryDate`).
+        The Angular reference client's own suite was mid-edit elsewhere in this same session at the time
+        this version was cut (its own A2/B2 "Extend Expiry" UI wiring) — not re-verified as part of this
+        OAS-only documentation update; see that sub-project's own commit history for its current status.
+  version: "1.20.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -754,6 +822,16 @@ paths:
         - name: pageSize
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - name: expiredBefore
+          in: query
+          description: >
+            v1.20.0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0.1, GAP-15 discovery-query
+            fix) — optional; when supplied, further narrows the eligible set to contracts whose own
+            expiryDate is before this date. The ONE place expiryDate is ever used as a filtering
+            condition in this whole contract — Close eligibility itself (the rest of this endpoint, plus
+            the same check re-run at Submit/Release) never reads expiryDate. Omitting this parameter
+            leaves every existing caller's behavior unchanged.
+          schema: { type: string, format: date }
       responses:
         '200':
           description: One page of ACTIVE root contracts of this instrumentType currently eligible for Close.
@@ -1496,6 +1574,28 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.20.0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1) — REQUIRED (400
+            REQUEST_VALIDATION_FAILED if missing on the request) when the creating movementType is
+            `ISSUE` against a genuinely new root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION (A1/B1) — the one point
+            of entry for this field into the whole system. Null/unset for a child contract
+            (SHGT/Acceptance/EPLC_EXAMINATION) unless a caller happens to supply it anyway (ignored).
+            Changeable later only via a released `AMEND_EXPIRY` movement (A2/B2 "Extend Expiry" — see
+            `BalanceMovement.expiryDate`'s own description for the distinct, movement-level meaning of
+            that identically-named field). `GET /balance-contracts/close-eligible`'s own `expiredBefore`
+            parameter is the only place this field is ever compared against "now" — Close eligibility
+            itself never reads it (see that endpoint's own description).
+        issueDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.20.0 — optional at A1/B1 root ISSUE; defaults server-side to today's Business Date when
+            omitted there. Null/unset for a child contract, same scope as expiryDate above.
         openingBalance: { $ref: '#/components/schemas/MonetaryAmount' }
         sourceAmendmentNo: { type: integer, nullable: true }
         effectiveFrom: { type: string, format: date-time }
@@ -1514,8 +1614,8 @@ components:
         businessEventId: { type: string, format: uuid, nullable: true }
         movementType:
           type: string
-          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE]
-          description: "v1.17.0 — enumerated (previously a bare string): these 15 values are the service's own complete, authoritative registry (service/balanceService.ts's buildMovementTypeRegistry(), the same source STATUS-RULE-017 cites as authoritative over this schema). The enum catches a typo'd/made-up value; it does NOT enforce which of the 15 are legal for a GIVEN instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side, that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table, and `Error.details.reasonCode` for which bucket actually rejected a given request."
+          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE, AMEND_EXPIRY]
+          description: "v1.17.0 — enumerated (previously a bare string): these values are the service's own complete, authoritative registry (service/balanceService.ts's buildMovementTypeRegistry(), the same source STATUS-RULE-017 cites as authoritative over this schema) — 15 at v1.17.0, 16 since v1.20.0 (AMEND_EXPIRY — A2/B2 \"Extend Expiry\", see this document's top-level v1.20.0 changelog entry). The enum catches a typo'd/made-up value; it does NOT enforce which of the 16 are legal for a GIVEN instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side, that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table, and `Error.details.reasonCode` for which bucket actually rejected a given request."
         exposureNature: { $ref: '#/components/schemas/ExposureNature' }
         amount:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
@@ -1569,6 +1669,40 @@ components:
         transactionDate: { type: string, format: date, nullable: true }
         businessDate: { type: string, format: date, nullable: true }
         valueDate: { type: string, format: date, nullable: true }
+        documentPresentationDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.20.0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3) — A3/A3S
+            (IPLC_LC/EPLC_LC UTILIZE) and B3 (EPLC_EXAMINATION CREATE) document-presentation movements
+            only, caller-supplied. When both this field and the relevant contract's own expiryDate are
+            present (A3/A3S: the resolved contract's own; B3: the PARENT LC/Confirmation's own), a value
+            AFTER that expiryDate is rejected at creation — 400 REQUEST_VALIDATION_FAILED,
+            `details.reasonCode: PRESENTATION_AFTER_EXPIRY`. Supplying this field is not itself mandatory
+            — the check is a no-op whenever either side is absent. Null/unset for every other movementType.
+        triggeredByExpiry:
+          type: boolean
+          nullable: true
+          description: >
+            v1.20.0 (§0.1, GAP-15 expiry-discovery three-layer design) — A10/B6 CLOSE only, purely
+            informational (same convention as sourceModule/sourceFunction below): lets an external batch
+            caller mark "this Close was triggered by an expiryDate scan, not a human operator". Never
+            validated, never read by evaluateCloseEligibility() or any other business-logic check — see
+            `GET /balance-contracts/close-eligible`'s own `expiredBefore` parameter for the one place
+            expiryDate genuinely gates anything. Null/unset unless the caller explicitly sets it.
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.20.0 — **not the same concept** as `BalanceContract.expiryDate` despite the identical name:
+            here, on a BalanceMovement, this is meaningful ONLY for an AMEND_EXPIRY movement (A2/B2
+            "Extend Expiry") — the REQUESTED new expiryDate, carried on this immutable movement record
+            until `POST /balance-movements/{id}/release` copies it onto the target contract's own
+            `BalanceContract.expiryDate` (mirrors how CLOSE's own contract-status mutation happens at
+            Release, not Submit). REQUIRED on the request when movementType is AMEND_EXPIRY (400 if
+            missing). Null/unset for every other movementType.
         sourceModule: { type: string, nullable: true }
         sourceFunction: { type: string, nullable: true }
         sourceTransactionRef: { type: string, nullable: true, description: "Unique per balanceContractId (server-enforced, 400 on reuse against the same contract with a new eventSeq)." }
@@ -1734,8 +1868,8 @@ components:
             this new child contract's own currency.
         movementType:
           type: string
-          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE]
-          description: v1.17.0 — see BalanceMovement.movementType's own description for the full rule (enumerated for typo protection; per-instrumentType legality is still caller-owned, not schema-enforced).
+          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE, AMEND_EXPIRY]
+          description: v1.17.0 — see BalanceMovement.movementType's own description for the full rule (enumerated for typo protection; per-instrumentType legality is still caller-owned, not schema-enforced). 16 values since v1.20.0 (AMEND_EXPIRY added).
         eventSeq:
           type: integer
           description: >
@@ -1772,6 +1906,37 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.20.0 — conditionally required (OAS `required:` cannot express a per-movementType
+            condition, so this is enforced only in prose + server-side): REQUIRED (400 if missing) when
+            movementType is `ISSUE` against a genuinely new root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION (A1/B1)
+            — see `BalanceContract.expiryDate`'s own description. ALSO required (400 if missing), with a
+            completely different meaning, when movementType is `AMEND_EXPIRY` (A2/B2 "Extend Expiry") —
+            there it is the REQUESTED new value, applied to the contract only once this movement is
+            Released; see `BalanceMovement.expiryDate`'s own description. Optional/ignored for every other
+            movementType.
+        issueDate:
+          type: string
+          format: date
+          nullable: true
+          description: v1.20.0 — optional, A1/B1 root ISSUE only; server defaults to today's Business Date when omitted there. Ignored for every other movementType.
+        documentPresentationDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.20.0 — A3/A3S (IPLC_LC/EPLC_LC UTILIZE) and B3 (EPLC_EXAMINATION CREATE) only. See
+            `BalanceMovement.documentPresentationDate`'s own description for the presentation-vs-expiry
+            check this feeds (400, `details.reasonCode: PRESENTATION_AFTER_EXPIRY`) — supplying it is not
+            itself mandatory. Ignored for every other movementType.
+        triggeredByExpiry:
+          type: boolean
+          nullable: true
+          description: v1.20.0 — A10/B6 CLOSE only, purely informational (§0.1). See `BalanceMovement.triggeredByExpiry`'s own description. Ignored for every other movementType.
         legRef: { type: string, nullable: true }
         accountEntries:
           type: array
@@ -1957,10 +2122,12 @@ components:
             - EXCEEDS_RECORD_AVAILABLE_BALANCE
             - CLOSE_NOT_ELIGIBLE
             - CLOSE_AMOUNT_MISMATCH
+            - PRESENTATION_AFTER_EXPIRY
           description: >
-            Set only on `INSUFFICIENT_AVAILABLE_BALANCE` and the CLOSE-specific `ILLEGAL_STATE_TRANSITION`
-            cases; absent (or `null`) on every other error, including a plain not-PENDING
-            `ILLEGAL_STATE_TRANSITION`. `EXCEEDS_AVAILABLE_BALANCE` / `EXCEEDS_TIGHT_AVAILABLE_BALANCE` —
+            Set on `INSUFFICIENT_AVAILABLE_BALANCE`, the CLOSE-specific `ILLEGAL_STATE_TRANSITION` cases,
+            and (since v1.20.0) the presentation-vs-expiry `REQUEST_VALIDATION_FAILED` case below; absent
+            (or `null`) on every other error, including a plain not-PENDING `ILLEGAL_STATE_TRANSITION`.
+            `EXCEEDS_AVAILABLE_BALANCE` / `EXCEEDS_TIGHT_AVAILABLE_BALANCE` —
             UTILIZE/HONOUR/ACCEPT's own two-tier check (`checkUtilizeSufficiency`), first against plain
             Available Balance, then against Tight Available Balance (nets outstanding SHGT exposure) — A3,
             A3S, B4. `AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE` — the Tolerance-converted decrease
@@ -1979,4 +2146,7 @@ components:
             A10/B6 Close eligibility conditions (see `GET /balance-contracts/close-eligible`) is not met;
             `message` carries the specific reason(s) joined together, since more than one can fail at once.
             `CLOSE_AMOUNT_MISMATCH` — the submitted/frozen Close amount no longer exactly equals the
-            contract's current Confirmed Balance.
+            contract's current Confirmed Balance. `PRESENTATION_AFTER_EXPIRY` (v1.20.0, `400
+            REQUEST_VALIDATION_FAILED` — NOT a 409, unlike every other reasonCode above) — A3/A3S/B3's own
+            `documentPresentationDate` is after the relevant contract's own `expiryDate`; see
+            `BalanceMovement.documentPresentationDate`'s own description.
