@@ -20,7 +20,7 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'BAL115-AD-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -47,7 +47,7 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'BAL115-SG-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -77,7 +77,7 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
     const issue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
       naturalKey: { lcNumber: 'BAL115-PD-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -115,7 +115,7 @@ describe('BalanceService.findByBusinessEventId', () => {
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'BEID-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -191,7 +191,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'EVSNAP-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -213,7 +213,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'EVSNAP-002' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -236,7 +236,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'EVSNAP-003' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -268,7 +268,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'EVSNAP-004' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -317,7 +317,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'EVSNAP-007' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '50000',
       currency: 'USD',
@@ -333,7 +333,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const cnfIssue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
       naturalKey: { lcNumber: 'EVSNAP-005' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -385,7 +385,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const cnfIssue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
       naturalKey: { lcNumber: 'EVSNAP-B3ACC' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -439,7 +439,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'EVSNAP-006' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -491,7 +491,7 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S02' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -552,7 +552,7 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S05' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -597,7 +597,7 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S06' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -647,7 +647,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S10-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -675,7 +675,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S10-002' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -703,7 +703,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S10-003' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -731,7 +731,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S10-004' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -746,7 +746,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S10-005' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -797,7 +797,7 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
     const issue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
       naturalKey: { lcNumber },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -943,7 +943,7 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'RELB3-005' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
@@ -995,7 +995,7 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'CUR-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -1023,7 +1023,7 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'CUR-002' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -1051,7 +1051,7 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'CUR-003' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -1080,7 +1080,7 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'CUR-004' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -1110,7 +1110,7 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
       service.createMovement({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'CUR-005' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
         eventSeq: 1,
         amount: '10000',
         tenorType: 'SIGHT',
@@ -1125,7 +1125,7 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'CUR-006' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'JPY',
@@ -1146,5 +1146,291 @@ describe('BalanceService — CURRENCY DERIVATION (OAS-GAP-16 direction (a), 2026
         // currency intentionally omitted
       }),
     ).toThrow(RequestValidationError);
+  });
+});
+
+describe('BalanceService — A1/B1 root ISSUE requires expiryDate (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1, 2026-08-23)', () => {
+  test('a root IPLC_LC ISSUE with no expiryDate is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'EXP-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        // expiryDate intentionally omitted
+      }),
+    ).toThrow(RequestValidationError);
+  });
+
+  test('a root IPLC_LC ISSUE with expiryDate supplied succeeds and persists both expiryDate and a defaulted issueDate', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'EXP-002' },
+      movementType: 'ISSUE',
+      expiryDate: '2030-12-31T00:00:00Z',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+      // issueDate intentionally omitted — must default to today, not stay null
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'EXP-002', ibNumber: null, sgNumber: null, legSeq: null });
+    expect(contract?.expiryDate).toBe('2030-12-31T00:00:00Z');
+    // Bug fixed 2026-08-23 (user-reported, "Inquire Event S101, there is no issue date... shown") — the
+    // defaulted issueDate used to be the bare ISO-8601 TIMESTAMP (this.now(), e.g.
+    // "2026-08-23T02:25:31.804Z"), which silently fails to render in Angular's own `<input type="date">`
+    // (HTML doesn't error on the mismatch, it just shows blank) — a real correctness bug, not just a
+    // display gap: issueDate is a Business Date, not a technical timestamp. Must be exactly
+    // "YYYY-MM-DD", never a fuller ISO-8601 datetime.
+    expect(contract?.issueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('a child SHGT ISSUE under an already-issued parent is unaffected — no expiryDate required', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const parentIssue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'EXP-003' },
+      movementType: 'ISSUE',
+      expiryDate: '2030-12-31T00:00:00Z',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!parentIssue.created) throw new Error('expected a new movement');
+    service.release(parentIssue.movement.movementId, 'checker1');
+    const parentContract = service.resolveContract('IPLC_LC', { lcNumber: 'EXP-003', ibNumber: null, sgNumber: null, legSeq: null });
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'EXP-003', sgNumber: 'SG01' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '2000',
+        parentLogicalContractId: parentContract!.logicalContractId,
+        createdBy: 'maker1',
+        // expiryDate intentionally omitted — must not be required for a child contract
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('BalanceService — A2/B2 AMEND_EXPIRY (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3, 2026-08-23)', () => {
+  function issueLc(service: BalanceService, lcNumber: string, expiryDate = '2030-12-31T00:00:00Z') {
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      expiryDate,
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+    const contract = service.resolveContract('IPLC_LC', { lcNumber, ibNumber: null, sgNumber: null, legSeq: null });
+    if (!contract) throw new Error('expected the just-issued LC to resolve');
+    return contract;
+  }
+
+  test('AMEND_EXPIRY with a non-zero amount is rejected — it never touches Balance/ceilingAmount', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'AMDEXP-001');
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'AMEND_EXPIRY',
+        expiryDate: '2031-06-30T00:00:00Z',
+        eventSeq: 2,
+        amount: '1',
+        currency: 'USD',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(RequestValidationError);
+  });
+
+  test('AMEND_EXPIRY with no expiryDate is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'AMDEXP-002');
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'AMEND_EXPIRY',
+        eventSeq: 2,
+        amount: '0',
+        currency: 'USD',
+        createdBy: 'maker1',
+        // expiryDate intentionally omitted
+      }),
+    ).toThrow(RequestValidationError);
+  });
+
+  test('AMEND_EXPIRY submit leaves the contract expiryDate unchanged (PENDING) — release() is what actually applies it', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'AMDEXP-003');
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'AMEND_EXPIRY',
+      expiryDate: '2031-06-30T00:00:00Z',
+      eventSeq: 2,
+      amount: '0',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+    expect(amend.movement.expiryDate).toBe('2031-06-30T00:00:00Z');
+
+    const stillOriginal = service.resolveContract('IPLC_LC', { lcNumber: 'AMDEXP-003', ibNumber: null, sgNumber: null, legSeq: null });
+    expect(stillOriginal?.expiryDate).toBe('2030-12-31T00:00:00Z');
+
+    const released = service.release(amend.movement.movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+    const updated = service.resolveContract('IPLC_LC', { lcNumber: 'AMDEXP-003', ibNumber: null, sgNumber: null, legSeq: null });
+    expect(updated?.expiryDate).toBe('2031-06-30T00:00:00Z');
+  });
+
+  test('AMEND_EXPIRY never contributes to Confirmed/Ceiling Balance', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'AMDEXP-004');
+    const before = service.getBalanceSnapshot(lc.balanceContractId);
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'AMEND_EXPIRY',
+      expiryDate: '2031-06-30T00:00:00Z',
+      eventSeq: 2,
+      amount: '0',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+    service.release(amend.movement.movementId, 'checker1');
+    const after = service.getBalanceSnapshot(lc.balanceContractId);
+    expect(after.confirmedBalance).toBe(before.confirmedBalance);
+    expect(after.availableBalance).toBe(before.availableBalance);
+  });
+});
+
+describe('BalanceService — A3/A3S/B3 documentPresentationDate vs. expiryDate (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3, 2026-08-23)', () => {
+  function issueLc(service: BalanceService, lcNumber: string) {
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      expiryDate: '2030-06-30T00:00:00Z',
+      tenorType: 'SIGHT',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+    const contract = service.resolveContract('IPLC_LC', { lcNumber, ibNumber: null, sgNumber: null, legSeq: null });
+    if (!contract) throw new Error('expected the just-issued LC to resolve');
+    return contract;
+  }
+
+  test('A3 UTILIZE with documentPresentationDate AFTER the LC expiryDate is rejected, reasonCode PRESENTATION_AFTER_EXPIRY', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'PRES-001');
+    let caught: unknown;
+    try {
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'UTILIZE',
+        documentPresentationDate: '2030-07-01T00:00:00Z',
+        eventSeq: 2,
+        amount: '5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(RequestValidationError);
+    expect((caught as RequestValidationError).details).toEqual({ reasonCode: 'PRESENTATION_AFTER_EXPIRY' });
+  });
+
+  test('A3 UTILIZE with documentPresentationDate on or before the LC expiryDate is accepted', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'PRES-002');
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'UTILIZE',
+        documentPresentationDate: '2030-06-30T00:00:00Z',
+        eventSeq: 2,
+        amount: '5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      }),
+    ).not.toThrow();
+  });
+
+  test('A3 UTILIZE with no documentPresentationDate supplied is unaffected (no new rejection introduced)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueLc(service, 'PRES-003');
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '5000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      }),
+    ).not.toThrow();
+  });
+
+  test('B3 EPLC_EXAMINATION/CREATE with documentPresentationDate AFTER the parent Confirmation expiryDate is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const confirmationIssue = service.createMovement({
+      instrumentType: 'EPLC_CONFIRMATION',
+      naturalKey: { lcNumber: 'PRES-004' },
+      movementType: 'ISSUE',
+      expiryDate: '2030-06-30T00:00:00Z',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!confirmationIssue.created) throw new Error('expected a new movement');
+    service.release(confirmationIssue.movement.movementId, 'checker1');
+    const confirmation = service.resolveContract('EPLC_CONFIRMATION', { lcNumber: 'PRES-004', ibNumber: null, sgNumber: null, legSeq: null });
+    if (!confirmation) throw new Error('expected the just-issued Confirmation to resolve');
+
+    let caught: unknown;
+    try {
+      service.createMovement({
+        instrumentType: 'EPLC_EXAMINATION',
+        naturalKey: { lcNumber: 'PRES-004', ibNumber: 'E01' },
+        movementType: 'CREATE',
+        documentPresentationDate: '2030-07-15T00:00:00Z',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        parentLogicalContractId: confirmation.logicalContractId,
+        createdBy: 'maker1',
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(RequestValidationError);
+    expect((caught as RequestValidationError).details).toEqual({ reasonCode: 'PRESENTATION_AFTER_EXPIRY' });
   });
 });

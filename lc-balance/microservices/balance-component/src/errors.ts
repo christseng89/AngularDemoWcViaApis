@@ -83,3 +83,15 @@ export class CurrencyMismatchError extends ApiError {
   readonly httpStatus = 409;
   readonly code = 'CURRENCY_MISMATCH';
 }
+
+/**
+ * `clients/standingClient.ts` — thrown when the external Standing microservice (Calculated Maturity Date,
+ * see Maturity-Date-Business-Day-Convention-Decision-Request.md) is unreachable or rejects a request.
+ * 503, mirroring Standing's own `CALENDAR_SERVICE_TIMEOUT`/`CALENDAR_DATA_STALE` codes (design doc §3.8) —
+ * deliberately fail-closed: a caller that opted into a calculated Maturity Date must never silently fall
+ * back to an uncalculated one just because Standing was unreachable.
+ */
+export class CalendarServiceError extends ApiError {
+  readonly httpStatus = 503;
+  readonly code = 'CALENDAR_SERVICE_UNAVAILABLE';
+}

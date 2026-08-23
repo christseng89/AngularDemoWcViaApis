@@ -71,6 +71,21 @@ export interface AccountEntry {
 }
 
 /**
+ * A6/B4 Calculated Maturity Date — one entry in the `calendars[]` array Standing's own
+ * `POST /business-days/adjust` expects (design doc §3.1). Deliberately a loose local shape (plain
+ * `string` fields, not the union-typed `StandingCalendarRef` `clients/standingClient.ts` builds the
+ * actual request from) — this type describes what's PERSISTED on a BalanceContract/BalanceMovement, a
+ * different concern from what's valid to SEND to Standing; keeping them separate avoids types.ts (this
+ * project's OAS-schema mirror) taking a dependency on the Standing HTTP client module.
+ */
+export interface MaturityDateCalendarRef {
+  calendarType: string;
+  code: string;
+  role: string;
+  required?: boolean;
+}
+
+/**
  * analysis/contingent-liability-ledger.html — the Dr/Cr contingent-liability account-entry pair for
  * ONE event, server-derived once at movement-creation time (domain/contingentAccountEntry.ts) and
  * persisted immutably with the movement. Distinct from `AccountEntry`/`accountEntries` above: that
@@ -110,6 +125,32 @@ export interface BalanceContract {
   tenorType?: TenorType | null;
   tenorDays?: number | null;
   maturityDate?: string | null;
+  /**
+   * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1/§3 — Business Date, required at root A1/B1
+   * ISSUE (400 if missing on a root create — enforced in service/balanceService.ts's own
+   * resolveOrCreateContract(), not requestSchema.ts, since it's conditional on parentLogicalContractId
+   * being absent — the zod layer has no contract/parent to resolve at validation time). Inherited unmodified by child/derived
+   * contracts (SHGT/Acceptance/etc.) via the same resolveOrCreateContract() currency-derivation path.
+   * §2 GAP-15 discovery query (GET /balance-contracts/close-eligible?expiredBefore=...) filters on this.
+   */
+  expiryDate?: string | null;
+  /** §1/§3 — optional at root A1/B1 ISSUE, defaults to today's Business Date when omitted. */
+  issueDate?: string | null;
+  /**
+   * A6/B4 Calculated Maturity Date (2026-08-23, Maturity-Date-Business-Day-Convention-Decision-
+   * Request.md, resolved) — this LC/Confirmation's own Standing calendar reference config, captured
+   * once at A1/B1 root ISSUE, amendable via A2/B2's own AMEND_MATURITY_CALENDARS (see
+   * BalanceMovement.maturityDateCalendars's own doc comment for the Submit->Release carry). Read
+   * automatically by any Acceptance CREATE (A6, or B4's own Usance-branch compound-submission leg)
+   * under this LC/Confirmation — see BalanceService.getMaturityDateCalendarsFromParent() — so the Maker
+   * never re-types or re-selects it per Acceptance; A3/A3S/B3 show it read-only for context (the same
+   * config that will eventually drive A6/B4's own Standing call), never accept input for it.
+   */
+  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
+  /** design doc §3.1 `combinationRule` — `ALL_REQUIRED_OPEN`/`ANY_ELIGIBLE_OPEN`. Defaults applied server-side (see maturityDateCalculation.ts) when this LC has calendars but omits an explicit rule. */
+  maturityDateCombinationRule?: string | null;
+  /** design doc §3.1 `convention` — `FOLLOWING`/`PRECEDING`/`MODIFIED_FOLLOWING`/`MODIFIED_PRECEDING`/`NEAREST`. Same default-applied-server-side note as maturityDateCombinationRule above. */
+  maturityDateConvention?: string | null;
   openingBalance: string;
   sourceAmendmentNo?: number | null;
   effectiveFrom: string;
@@ -143,6 +184,36 @@ export interface BalanceMovement {
   transactionDate?: string | null;
   businessDate?: string | null;
   valueDate?: string | null;
+  /**
+   * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — A3/A3S (Import) and B3 (Export)
+   * document-presentation movements only. Checked against the parent contract's own expiryDate
+   * (reasonCode: PRESENTATION_AFTER_EXPIRY when documentPresentationDate > contract.expiryDate). Caller-
+   * supplied, not derived server-side — null/absent on every other movementType.
+   */
+  documentPresentationDate?: string | null;
+  /**
+   * §0.1 — Layer 2/3 (Maker Submit / Checker Release) informational-only audit flag for the GAP-15
+   * expiry-discovery three-layer design. A10/B6 CLOSE only; never read by evaluateCloseEligibility() or
+   * any other business-logic check — purely a "was this triggered by an expiry batch scan" audit marker
+   * a Checker can see on screen. null/absent for every movement not explicitly marked by the caller.
+   */
+  triggeredByExpiry?: boolean | null;
+  /**
+   * §2/§3 — A2/B2 AMEND_EXPIRY only: the REQUESTED new expiryDate, carried on this immutable movement
+   * record until release() copies it onto BalanceContract.expiryDate (mirrors how CLOSE's own contract
+   * mutation — markClosed() — happens at release(), not createMovement()). Null for every other
+   * movementType.
+   */
+  expiryDate?: string | null;
+  /**
+   * A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 AMEND_MATURITY_CALENDARS only: the REQUESTED
+   * new calendar config, carried on this immutable movement record until release() copies it onto
+   * BalanceContract's own three columns of the same name (same "mutate the contract at Release, not
+   * Submit" posture as expiryDate/AMEND_EXPIRY immediately above). Null for every other movementType.
+   */
+  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
+  maturityDateCombinationRule?: string | null;
+  maturityDateConvention?: string | null;
   sourceModule?: string | null;
   sourceFunction?: string | null;
   sourceTransactionRef?: string | null;

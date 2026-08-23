@@ -114,9 +114,20 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
 
       runMigrations(db);
 
-      const after = db.prepare('SELECT * FROM balance_contracts ORDER BY balance_contract_id').all();
+      // Migration 14 (2026-08-23, Date Control Phase 0) adds expiry_date/issue_date to this table — the
+      // first schema change balance_contracts has ever had (see this suite's own legacyDbFixture.ts doc
+      // comment). Compare only the day-one column set for equality, and separately assert the new columns
+      // exist and are NULL, same pattern already used below for balance_movements.
+      const after = db.prepare('SELECT * FROM balance_contracts ORDER BY balance_contract_id').all() as Record<string, unknown>[];
       expect(after).toHaveLength(3);
-      expect(after).toEqual(before);
+      const dayOneCols = cols;
+      const afterProjected = after.map((row) => Object.fromEntries(dayOneCols.map((c) => [c, row[c]])));
+      expect(afterProjected).toEqual(before);
+
+      for (const row of after) {
+        expect(row.expiry_date).toBeNull();
+        expect(row.issue_date).toBeNull();
+      }
     } finally {
       db.close();
     }
@@ -247,9 +258,10 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
 
       runMigrations(db);
 
-      // The 17 migration-1-11-added columns are now present too (NULL for every pre-existing row, since
-      // none of them ever wrote to those columns) — compare only the day-one column set for equality,
-      // and separately assert the new columns exist and are NULL.
+      // The 17 migration-1-11-added columns, plus migration 14's document_presentation_date (2026-08-23,
+      // Date Control Phase 0), are now present too (NULL for every pre-existing row, since none of them
+      // ever wrote to those columns) — compare only the day-one column set for equality, and separately
+      // assert the new columns exist and are NULL.
       const after = db.prepare('SELECT * FROM balance_movements ORDER BY movement_id').all() as Record<string, unknown>[];
       expect(after).toHaveLength(3);
       const dayOneCols = cols;
@@ -259,6 +271,7 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
       for (const row of after) {
         expect(row.acknowledged_by).toBeNull();
         expect(row.event_snapshot).toBeNull();
+        expect(row.document_presentation_date).toBeNull();
       }
     } finally {
       db.close();

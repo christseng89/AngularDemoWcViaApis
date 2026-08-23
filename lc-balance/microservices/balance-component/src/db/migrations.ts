@@ -304,6 +304,274 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 14,
+    description:
+      'Add expiry_date/issue_date to balance_contracts and document_presentation_date to balance_movements (2026-08-23, A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md Phase 0 — Business Date fields for GAP-15-adjacent date-control functions: A1/B1 root-ISSUE expiryDate capture, A3/B3 presentation-vs-expiry check, and the GAP-15 discovery-query expiredBefore filter). Plain nullable TEXT columns, no CHECK constraint involved — simple ALTER TABLE, not the migration-13 rebuild pattern.',
+    up: (db) => {
+      const contractColumns = (db.prepare('PRAGMA table_info(balance_contracts)').all() as { name: string }[]).map((c) => c.name);
+      if (!contractColumns.includes('expiry_date')) db.exec('ALTER TABLE balance_contracts ADD COLUMN expiry_date TEXT');
+      if (!contractColumns.includes('issue_date')) db.exec('ALTER TABLE balance_contracts ADD COLUMN issue_date TEXT');
+
+      const movementColumns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!movementColumns.includes('document_presentation_date')) db.exec('ALTER TABLE balance_movements ADD COLUMN document_presentation_date TEXT');
+    },
+  },
+  {
+    id: 15,
+    description:
+      'Add triggered_by_expiry to balance_movements (2026-08-23, A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0.1 — Layer 2/3 informational-only audit flag for the GAP-15 expiry-discovery design; A10/B6 CLOSE only, never validated or read by any eligibility check). INTEGER 0/1/NULL — this schema has no prior boolean-shaped column to follow a precedent from; node:sqlite has no native BOOLEAN affinity, so the store layer explicitly maps true/false/null to 1/0/null on write and back on read (see balanceMovementStore.ts).',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('triggered_by_expiry')) db.exec('ALTER TABLE balance_movements ADD COLUMN triggered_by_expiry INTEGER');
+    },
+  },
+  {
+    id: 16,
+    description:
+      'Add expiry_date to balance_movements (2026-08-23, A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — A2/B2 AMEND_EXPIRY carries its requested new expiryDate here until release() copies it onto BalanceContract.expiry_date). Plain nullable TEXT, no CHECK constraint — simple ALTER TABLE. Must run BEFORE migration 17 so that rebuild\'s own column list already includes it.',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('expiry_date')) db.exec('ALTER TABLE balance_movements ADD COLUMN expiry_date TEXT');
+    },
+  },
+  {
+    id: 17,
+    description:
+      'Add AMEND_EXPIRY to the movement_type CHECK constraint on balance_movements (2026-08-23, A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3, A2/B2 Extend Expiry). SQLite ALTER TABLE cannot modify an existing CHECK constraint, so this rebuilds balance_movements via the same official SQLite "12-step" procedure migration 13 already established (see that migration\'s own doc comment for the full rationale) — this time only balance_movements needs rebuilding, not balance_contracts (its own CHECK-constrained columns are untouched by this change). The column list here is deliberately the FULL current set (including migrations 14/15/16\'s own additions — document_presentation_date, triggered_by_expiry, expiry_date), copied explicitly by name rather than SELECT *, so a column-order mismatch fails loudly instead of silently misaligning data.',
+    up: (db) => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        db.exec(`
+          CREATE TABLE balance_movements_new (
+            movement_id             TEXT PRIMARY KEY,
+            balance_contract_id     TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+            event_seq               INTEGER NOT NULL,
+            business_event_id       TEXT,
+            movement_type           TEXT NOT NULL CHECK (movement_type IN (${sqlInList(MOVEMENT_TYPE_VALUES)})),
+            exposure_nature         TEXT NOT NULL CHECK (exposure_nature IN (${sqlInList(EXPOSURE_NATURE_VALUES)})),
+            amount                  TEXT NOT NULL,
+            ceiling_amount          TEXT NOT NULL,
+            currency                TEXT NOT NULL,
+            leg_ref                 TEXT,
+            account_entries         TEXT,
+            contingent_account_entry TEXT,
+            lmts_reservation_id     TEXT,
+            status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
+            superseded_movement_id  TEXT REFERENCES balance_movements_new(movement_id),
+            reversal_of_movement_id TEXT REFERENCES balance_movements_new(movement_id),
+            reason_code             TEXT,
+            remarks                 TEXT,
+            transaction_date        TEXT,
+            business_date           TEXT,
+            value_date              TEXT,
+            source_module           TEXT,
+            source_function         TEXT,
+            source_transaction_ref  TEXT,
+            referenced_transaction_id TEXT,
+            balance_before          TEXT,
+            balance_after           TEXT,
+            warnings                TEXT,
+            created_by              TEXT NOT NULL,
+            released_by             TEXT,
+            created_at              TEXT NOT NULL,
+            released_at             TEXT,
+            acknowledged_by         TEXT,
+            acknowledged_at         TEXT,
+            maker_submitted_by      TEXT,
+            maker_submitted_at      TEXT,
+            event_snapshot          TEXT,
+            root_event_snapshot     TEXT,
+            acceptance_event_snapshot TEXT,
+            sg_event_snapshot        TEXT,
+            finalize_event_snapshot TEXT,
+            finalize_acceptance_event_snapshot TEXT,
+            finalize_sg_event_snapshot TEXT,
+            present_docs_consumed_at TEXT,
+            present_docs_consumed_by TEXT,
+            cancelled_by             TEXT,
+            cancelled_at             TEXT,
+            document_presentation_date TEXT,
+            triggered_by_expiry     INTEGER,
+            expiry_date              TEXT
+          )
+        `);
+        db.exec(`
+          INSERT INTO balance_movements_new (
+            movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
+            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
+            source_module, source_function, source_transaction_ref, referenced_transaction_id,
+            balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
+            acknowledged_by, acknowledged_at, maker_submitted_by, maker_submitted_at, event_snapshot,
+            root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot, finalize_event_snapshot,
+            finalize_acceptance_event_snapshot, finalize_sg_event_snapshot, present_docs_consumed_at,
+            present_docs_consumed_by, cancelled_by, cancelled_at, document_presentation_date,
+            triggered_by_expiry, expiry_date
+          )
+          SELECT
+            movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
+            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
+            source_module, source_function, source_transaction_ref, referenced_transaction_id,
+            balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
+            acknowledged_by, acknowledged_at, maker_submitted_by, maker_submitted_at, event_snapshot,
+            root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot, finalize_event_snapshot,
+            finalize_acceptance_event_snapshot, finalize_sg_event_snapshot, present_docs_consumed_at,
+            present_docs_consumed_by, cancelled_by, cancelled_at, document_presentation_date,
+            triggered_by_expiry, expiry_date
+          FROM balance_movements
+        `);
+        db.exec('DROP TABLE balance_movements');
+        db.exec('ALTER TABLE balance_movements_new RENAME TO balance_movements');
+        db.exec(`
+          CREATE UNIQUE INDEX idx_movements_idempotency ON balance_movements(balance_contract_id, event_seq);
+          CREATE INDEX idx_movements_contract_status ON balance_movements(balance_contract_id, status);
+          CREATE INDEX idx_movements_business_event ON balance_movements(business_event_id);
+        `);
+
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+    },
+  },
+  {
+    id: 18,
+    description:
+      'Add maturity_date_calendars/maturity_date_combination_rule/maturity_date_convention to both balance_contracts and balance_movements (2026-08-23, A6/B4 Calculated Maturity Date — Maturity-Date-Business-Day-Convention-Decision-Request.md, resolved). Plain nullable columns, no CHECK constraint — simple ALTER TABLE, not a rebuild. Must run BEFORE migration 19 so that rebuild\'s own balance_movements column list already includes these three.',
+    up: (db) => {
+      const contractColumns = (db.prepare('PRAGMA table_info(balance_contracts)').all() as { name: string }[]).map((c) => c.name);
+      if (!contractColumns.includes('maturity_date_calendars')) db.exec('ALTER TABLE balance_contracts ADD COLUMN maturity_date_calendars TEXT');
+      if (!contractColumns.includes('maturity_date_combination_rule')) db.exec('ALTER TABLE balance_contracts ADD COLUMN maturity_date_combination_rule TEXT');
+      if (!contractColumns.includes('maturity_date_convention')) db.exec('ALTER TABLE balance_contracts ADD COLUMN maturity_date_convention TEXT');
+
+      const movementColumns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!movementColumns.includes('maturity_date_calendars')) db.exec('ALTER TABLE balance_movements ADD COLUMN maturity_date_calendars TEXT');
+      if (!movementColumns.includes('maturity_date_combination_rule')) db.exec('ALTER TABLE balance_movements ADD COLUMN maturity_date_combination_rule TEXT');
+      if (!movementColumns.includes('maturity_date_convention')) db.exec('ALTER TABLE balance_movements ADD COLUMN maturity_date_convention TEXT');
+    },
+  },
+  {
+    id: 19,
+    description:
+      'Add AMEND_MATURITY_CALENDARS to the movement_type CHECK constraint on balance_movements (2026-08-23, A6/B4 Calculated Maturity Date, A2/B2 amendment subtype). Same rebuild procedure as migration 17 (SQLite ALTER TABLE cannot modify an existing CHECK constraint) — this time only balance_movements needs rebuilding. The column list here is the FULL current set including migration 18\'s own three new maturity_date_* columns, copied explicitly by name rather than SELECT *.',
+    up: (db) => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        db.exec(`
+          CREATE TABLE balance_movements_new (
+            movement_id             TEXT PRIMARY KEY,
+            balance_contract_id     TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+            event_seq               INTEGER NOT NULL,
+            business_event_id       TEXT,
+            movement_type           TEXT NOT NULL CHECK (movement_type IN (${sqlInList(MOVEMENT_TYPE_VALUES)})),
+            exposure_nature         TEXT NOT NULL CHECK (exposure_nature IN (${sqlInList(EXPOSURE_NATURE_VALUES)})),
+            amount                  TEXT NOT NULL,
+            ceiling_amount          TEXT NOT NULL,
+            currency                TEXT NOT NULL,
+            leg_ref                 TEXT,
+            account_entries         TEXT,
+            contingent_account_entry TEXT,
+            lmts_reservation_id     TEXT,
+            status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
+            superseded_movement_id  TEXT REFERENCES balance_movements_new(movement_id),
+            reversal_of_movement_id TEXT REFERENCES balance_movements_new(movement_id),
+            reason_code             TEXT,
+            remarks                 TEXT,
+            transaction_date        TEXT,
+            business_date           TEXT,
+            value_date              TEXT,
+            source_module           TEXT,
+            source_function         TEXT,
+            source_transaction_ref  TEXT,
+            referenced_transaction_id TEXT,
+            balance_before          TEXT,
+            balance_after           TEXT,
+            warnings                TEXT,
+            created_by              TEXT NOT NULL,
+            released_by             TEXT,
+            created_at              TEXT NOT NULL,
+            released_at             TEXT,
+            acknowledged_by         TEXT,
+            acknowledged_at         TEXT,
+            maker_submitted_by      TEXT,
+            maker_submitted_at      TEXT,
+            event_snapshot          TEXT,
+            root_event_snapshot     TEXT,
+            acceptance_event_snapshot TEXT,
+            sg_event_snapshot        TEXT,
+            finalize_event_snapshot TEXT,
+            finalize_acceptance_event_snapshot TEXT,
+            finalize_sg_event_snapshot TEXT,
+            present_docs_consumed_at TEXT,
+            present_docs_consumed_by TEXT,
+            cancelled_by             TEXT,
+            cancelled_at             TEXT,
+            document_presentation_date TEXT,
+            triggered_by_expiry     INTEGER,
+            expiry_date              TEXT,
+            maturity_date_calendars        TEXT,
+            maturity_date_combination_rule TEXT,
+            maturity_date_convention       TEXT
+          )
+        `);
+        db.exec(`
+          INSERT INTO balance_movements_new (
+            movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
+            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
+            source_module, source_function, source_transaction_ref, referenced_transaction_id,
+            balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
+            acknowledged_by, acknowledged_at, maker_submitted_by, maker_submitted_at, event_snapshot,
+            root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot, finalize_event_snapshot,
+            finalize_acceptance_event_snapshot, finalize_sg_event_snapshot, present_docs_consumed_at,
+            present_docs_consumed_by, cancelled_by, cancelled_at, document_presentation_date,
+            triggered_by_expiry, expiry_date, maturity_date_calendars, maturity_date_combination_rule,
+            maturity_date_convention
+          )
+          SELECT
+            movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
+            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
+            source_module, source_function, source_transaction_ref, referenced_transaction_id,
+            balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
+            acknowledged_by, acknowledged_at, maker_submitted_by, maker_submitted_at, event_snapshot,
+            root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot, finalize_event_snapshot,
+            finalize_acceptance_event_snapshot, finalize_sg_event_snapshot, present_docs_consumed_at,
+            present_docs_consumed_by, cancelled_by, cancelled_at, document_presentation_date,
+            triggered_by_expiry, expiry_date, maturity_date_calendars, maturity_date_combination_rule,
+            maturity_date_convention
+          FROM balance_movements
+        `);
+        db.exec('DROP TABLE balance_movements');
+        db.exec('ALTER TABLE balance_movements_new RENAME TO balance_movements');
+        db.exec(`
+          CREATE UNIQUE INDEX idx_movements_idempotency ON balance_movements(balance_contract_id, event_seq);
+          CREATE INDEX idx_movements_contract_status ON balance_movements(balance_contract_id, status);
+          CREATE INDEX idx_movements_business_event ON balance_movements(business_event_id);
+        `);
+
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

@@ -14,7 +14,7 @@ function issueImportLc(service: BalanceService, lcNumber: string, amount = '1000
   const issue = service.createMovement({
     instrumentType: 'IPLC_LC',
     naturalKey: { lcNumber },
-    movementType: 'ISSUE',
+    movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
     eventSeq: 1,
     amount,
     currency: 'USD',
@@ -34,7 +34,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
       service.createMovement({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'AMT-ZERO-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
         eventSeq: 1,
         amount: '0',
         currency: 'USD',
@@ -49,7 +49,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
       service.createMovement({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'AMT-NEG-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
         eventSeq: 1,
         amount: '-5000',
         currency: 'USD',
@@ -64,7 +64,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
       service.createMovement({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'AMT-ORPHAN-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
         eventSeq: 1,
         amount: '0',
         currency: 'USD',
@@ -75,7 +75,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
     const retry = service.createMovement({
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'AMT-ORPHAN-001' },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
@@ -120,7 +120,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
     const issue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
       naturalKey: { lcNumber },
-      movementType: 'ISSUE',
+      movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
       eventSeq: 1,
       amount,
       currency: 'USD',

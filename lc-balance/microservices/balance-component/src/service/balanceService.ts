@@ -36,6 +36,8 @@ import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
+import { computeSourceDate, buildAdjustBusinessDayRequest } from '../domain/maturityDateCalculation';
+import { adjustBusinessDay, type StandingCalendarRef, type AdjustBusinessDayRequest } from '../clients/standingClient';
 import { CurrencyMismatchError, IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
@@ -44,6 +46,7 @@ import type {
   BalanceSnapshot,
   ExposureNature,
   InstrumentType,
+  MaturityDateCalendarRef,
   MovementWarning,
   NaturalKey,
   TenorType,
@@ -144,6 +147,31 @@ export interface CreateMovementRequest {
   tenorType?: TenorType | null;
   tenorDays?: number | null;
   maturityDate?: string | null;
+  /**
+   * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — required at A1/B1 root ISSUE (see
+   * resolveOrCreateContract()'s own check). §2/§3 — also required for A2/B2 AMEND_EXPIRY (see
+   * createMovement()'s own check), where it carries the REQUESTED new expiryDate instead of the initial
+   * one; release() copies it onto the contract at Checker-approval time. Ignored for every other
+   * movementType.
+   */
+  expiryDate?: string | null;
+  /** §1 — optional at A1/B1 root ISSUE, defaults to today's Business Date (see createContract()); ignored otherwise. */
+  issueDate?: string | null;
+  /**
+   * A6/B4 Calculated Maturity Date (2026-08-23, Maturity-Date-Business-Day-Convention-Decision-
+   * Request.md, resolved) — optional at A1/B1 root ISSUE (stored directly onto the new contract, see
+   * createContract()); required for A2/B2 AMEND_MATURITY_CALENDARS (see createMovement()'s own check),
+   * where it carries the REQUESTED new calendar config instead of the initial one — release() copies it
+   * onto the contract at Checker-approval time, same posture as expiryDate/AMEND_EXPIRY above. Ignored
+   * for every other movementType, including Acceptance CREATE itself (A6/B4) — that reads the PARENT
+   * contract's own stored config automatically (see getMaturityDateCalendarsFromParent()), never this
+   * per-call field, precisely so a Maker never re-types/re-selects it per Acceptance.
+   */
+  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
+  maturityDateCombinationRule?: string | null;
+  maturityDateConvention?: string | null;
+  /** §2/§3 — A3/A3S (Import) and B3 (Export) document-presentation movements only. See types.ts BalanceMovement.documentPresentationDate. */
+  documentPresentationDate?: string | null;
   transactionDate?: string | null;
   businessDate?: string | null;
   valueDate?: string | null;
@@ -152,6 +180,14 @@ export interface CreateMovementRequest {
   sourceTransactionRef?: string | null;
   /** See BalanceMovement.referencedTransactionId's own doc comment in types.ts for the full rule. */
   referencedTransactionId?: string | null;
+  /**
+   * §0.1 — Layer 2 (Maker Submit) of the three-layer expiry-discovery design. Purely informational audit
+   * passthrough, same convention as sourceModule/sourceFunction above — never validated, never gates
+   * anything. Set by an external batch caller to record that THIS submission was triggered by an
+   * expiryDate scan, not a human operator; a Checker-side equivalent lives on the release() request
+   * instead (see ReleaseMovementRequest, not this interface).
+   */
+  triggeredByExpiry?: boolean;
   createdBy: string;
 }
 
@@ -171,6 +207,14 @@ export class BalanceService {
     this.movements = new BalanceMovementStore(db);
     this.movementTypeRegistry = this.buildMovementTypeRegistry();
     this.newContractSufficiencyRegistry = this.buildNewContractSufficiencyRegistry();
+  }
+
+  /** Today's Business Date (`this.now()`'s own injected clock, sliced to the plain date) — exposed so
+   * `routes/balanceMovements.ts` can pass the same "acceptanceDate = today" `calculateAcceptanceMaturityDate()`
+   * itself expects, without reaching into this class's private clock or constructing its own `new Date()`
+   * (which would make route-level tests non-deterministic against a service built with a fixed test clock). */
+  getBusinessDate(): string {
+    return this.now().slice(0, 10);
   }
 
   /**
@@ -251,6 +295,14 @@ export class BalanceService {
       ISSUE: { isCreating: true, checkSufficiency: noCheck },
       CREATE: { isCreating: true, checkSufficiency: noCheck },
       AMEND_INCREASE: { isCreating: false, checkSufficiency: noCheck },
+      // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — A2/B2 Extend Expiry. noCheck, same
+      // treatment as AMEND_INCREASE above — it never touches Balance/ceilingAmount (assertValidAmount()
+      // already enforces amount === "0" before this is even reached).
+      AMEND_EXPIRY: { isCreating: false, checkSufficiency: noCheck },
+      // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 Update Maturity Date Calendars. Same
+      // treatment as AMEND_EXPIRY immediately above — never touches Balance/ceilingAmount
+      // (assertValidAmount() already enforces amount === "0" before this is even reached).
+      AMEND_MATURITY_CALENDARS: { isCreating: false, checkSufficiency: noCheck },
       AMEND: { isCreating: false, checkSufficiency: amendShaped },
       AMEND_DECREASE: { isCreating: false, checkSufficiency: decreaseShaped },
       UTILIZE: { isCreating: false, checkSufficiency: utilizeShaped },
@@ -497,7 +549,10 @@ export class BalanceService {
    * sliced per candidate from the resulting Maps — a constant ~5 queries total regardless of candidate
    * count, not 1 + 4N.
    */
-  listCloseEligibleContracts(instrumentType: InstrumentType, opts: { lcNumber?: string; page?: number; pageSize?: number } = {}): CatalogPage {
+  listCloseEligibleContracts(
+    instrumentType: InstrumentType,
+    opts: { lcNumber?: string; page?: number; pageSize?: number; expiredBefore?: string } = {},
+  ): CatalogPage {
     if (!ROOT_INSTRUMENT_TYPES.has(instrumentType)) {
       throw new RequestValidationError(`Close only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${instrumentType} is not eligible.`);
     }
@@ -521,10 +576,22 @@ export class BalanceService {
         }).eligible,
     );
 
+    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0.1, GAP-15 discovery-query fix (2026-08-23) —
+    // Layer 1 (the ONLY decision-making layer) of the three-layer expiry-discovery design: lets an
+    // external batch system ask "which Close-eligible contracts have also passed their expiryDate", so it
+    // doesn't have to page through the whole eligible set client-side to find candidates worth acting on.
+    // Deliberately a filter applied AFTER evaluateCloseEligibility() above, never folded into that
+    // function itself — evaluateCloseEligibility() must stay independent of expiryDate (the established
+    // "cancellation before expiry" design: A10/B6 Close is legitimately allowed before expiry too, so
+    // making eligibility itself expiry-gated would break that). A contract with no expiryDate recorded
+    // (legacy, pre-Phase-0 data) never matches an expiredBefore filter — same "absent means never trip a
+    // date-driven action" convention closeEligibility.ts's own design already uses for absent balances.
+    const filtered = opts.expiredBefore ? eligible.filter((c) => c.expiryDate != null && c.expiryDate < opts.expiredBefore!) : eligible;
+
     const page = opts.page && opts.page > 0 ? opts.page : 1;
     const pageSize = opts.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;
     const start = (page - 1) * pageSize;
-    return { items: eligible.slice(start, start + pageSize), total: eligible.length, page, pageSize };
+    return { items: filtered.slice(start, start + pageSize), total: filtered.length, page, pageSize };
   }
 
   /**
@@ -954,6 +1021,16 @@ export class BalanceService {
           );
         }
         derivedCurrency = parentForIssueCheck.currency;
+
+        // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — B3 Present Docs
+        // (EPLC_EXAMINATION/CREATE) presentation-vs-expiry check, run against the PARENT's own
+        // expiryDate (this new EPLC_EXAMINATION contract has no expiryDate of its own — it's a
+        // presentation record, not an LC). See createMovement()'s own A3/A3S UTILIZE check below for the
+        // sibling call site "before checkUtilizeSufficiency"/"before checkPresentDocsIssueSufficiency"
+        // the spec's own §2/§3 tables both describe.
+        if (req.instrumentType === 'EPLC_EXAMINATION' && req.movementType === 'CREATE') {
+          this.assertPresentationNotAfterExpiry(parentForIssueCheck.expiryDate, req.documentPresentationDate);
+        }
       }
     }
 
@@ -999,6 +1076,24 @@ export class BalanceService {
       derivedCurrency = req.currency;
     }
 
+    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 (2026-08-23) — A1/B1 root ISSUE requires
+    // expiryDate; every other creating movementType (SHGT ISSUE, Acceptance CREATE, EPLC_EXAMINATION
+    // CREATE — all reach this method via the parent-derivation branch above, never this "genuinely root"
+    // one) is unaffected. issueDate stays optional here (createContract() defaults it to today).
+    if (ROOT_INSTRUMENT_TYPES.has(req.instrumentType) && req.movementType === 'ISSUE' && !req.expiryDate) {
+      throw new RequestValidationError(`expiryDate is required when issuing a new root ${req.instrumentType} (A1/B1).`);
+    }
+
+    // A6/B4 Calculated Maturity Date (2026-08-23, user-directed) — "required for Usance, not for Sight" is
+    // enforced as an ANGULAR FORM validation rule (A1/B1's own required-field styling, gated on tenorType
+    // the same way tenorDays already is — see builder-fields.ts), deliberately NOT a server-side
+    // RequestValidationError here: a hard 400 at this layer would also reject the large, pre-existing
+    // corpus of Usance-tenor A1/B1 test fixtures that predate this feature and have nothing to do with
+    // it (every A6/B4/tenor-consistency test in app.test.ts/caseWalkthroughs.test.ts, none of which ever
+    // supply maturityDateCalendars). Optional here keeps this feature purely additive — see
+    // getMaturityDateCalendarsFromParent()'s own null-fallback for what happens when a Usance LC has none
+    // on file (gracefully unaffected, not an error).
+
     return this.createContract(req, derivedCurrency);
   }
 
@@ -1031,7 +1126,108 @@ export class BalanceService {
       if (amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must not be negative for CLOSE.`);
       return;
     }
+    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry only
+    // ever changes BalanceContract.expiryDate, never Balance/ceilingAmount (see this method's own doc
+    // comment for the general rule this is an exception to) — amount carries no meaning here at all, so
+    // it's required to be exactly 0 rather than merely "not negative" like CLOSE above.
+    if (movementType === 'AMEND_EXPIRY') {
+      if (!amt.isZero()) {
+        throw new RequestValidationError(`amount "${amount}" must be exactly 0 for AMEND_EXPIRY — this movement only changes expiryDate, never the Balance/ceilingAmount.`);
+      }
+      return;
+    }
+    // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2's own Update Maturity Date Calendars
+    // amendment, same "numerically inert, exactly 0" shape as AMEND_EXPIRY immediately above.
+    if (movementType === 'AMEND_MATURITY_CALENDARS') {
+      if (!amt.isZero()) {
+        throw new RequestValidationError(
+          `amount "${amount}" must be exactly 0 for AMEND_MATURITY_CALENDARS — this movement only changes the Standing calendar reference config, never the Balance/ceilingAmount.`,
+        );
+      }
+      return;
+    }
     if (amt.isZero() || amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must be greater than 0.`);
+  }
+
+  /**
+   * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — shared by A3/A3S's UTILIZE
+   * (createMovement()) and B3's EPLC_EXAMINATION/CREATE (resolveOrCreateContract(), checked against the
+   * PARENT's own expiryDate). Deliberately a no-op — not a "documentPresentationDate is required" gate —
+   * when either side is absent: a legacy contract with no recorded expiryDate has nothing to compare
+   * against, and a caller that omits documentPresentationDate entirely gets no NEW rejection from this
+   * check (matches the spec's own code sketch, which only ever compares two present values; making
+   * documentPresentationDate itself mandatory was not part of what was approved).
+   */
+  private assertPresentationNotAfterExpiry(expiryDate: string | null | undefined, documentPresentationDate: string | null | undefined): void {
+    if (!expiryDate || !documentPresentationDate) return;
+    if (documentPresentationDate > expiryDate) {
+      throw new RequestValidationError(
+        `documentPresentationDate (${documentPresentationDate}) must not be after this contract's own expiryDate (${expiryDate}).`,
+        { reasonCode: 'PRESENTATION_AFTER_EXPIRY' },
+      );
+    }
+  }
+
+  /**
+   * A6/B4 Calculated Maturity Date (`Maturity-Date-Business-Day-Convention-Decision-Request.md`, resolved
+   * 2026-08-23) — the ONE genuinely async, I/O-performing public method on this class (everything else is
+   * synchronous, matching `node:sqlite`'s own synchronous `DatabaseSync` — see `db/index.ts`'s doc
+   * comment). Deliberately NOT folded into `createMovement()` itself: that method, and every test that
+   * calls it directly, stays 100% synchronous and unchanged — this is called separately, and awaited,
+   * by `routes/balanceMovements.ts`'s own POST handler BEFORE it calls the (still-synchronous)
+   * `createMovement()`, passing the result through as a plain `maturityDate` on the request — exactly the
+   * same shape `maturityDate` has always had (see `CreateMovementRequest.maturityDate`'s own doc comment),
+   * just now sometimes server-computed instead of only ever caller-supplied. Opt-in only: a caller that
+   * doesn't supply `calendars` never reaches this method, and `createMovement()`'s own existing
+   * `req.maturityDate ?? null` passthrough is completely unaffected for every other caller.
+   *
+   * `acceptanceDate` is the Business Date this Acceptance is actually being created on (same "Business
+   * Date, not a technical timestamp" convention `issueDate`/`expiryDate` already use), not the parent
+   * LC/Confirmation's own dates — callers should pass `this.now().slice(0, 10)` (or their own equivalent)
+   * for "today", matching how `createContract()` itself derives `issueDate`'s own default.
+   */
+  async calculateAcceptanceMaturityDate(params: {
+    acceptanceDate: string;
+    tenorDays: number;
+    currency?: string;
+    calendars: StandingCalendarRef[];
+    combinationRule?: AdjustBusinessDayRequest['combinationRule'];
+    convention?: AdjustBusinessDayRequest['convention'];
+  }): Promise<{ maturityDate: string; standingCalculationId: string }> {
+    const sourceDate = computeSourceDate(params.acceptanceDate, params.tenorDays);
+    const request = buildAdjustBusinessDayRequest({
+      sourceDate,
+      currency: params.currency,
+      calendars: params.calendars,
+      combinationRule: params.combinationRule,
+      convention: params.convention,
+    });
+    const response = await adjustBusinessDay(request);
+    return { maturityDate: response.adjustedDate, standingCalculationId: response.calculationId };
+  }
+
+  /**
+   * A6/B4 Calculated Maturity Date (2026-08-23) — the LC/Confirmation's own Standing calendar config,
+   * captured once at A1/B1 root ISSUE and amendable via A2/B2's own AMEND_MATURITY_CALENDARS (see
+   * BalanceContract.maturityDateCalendars's own doc comment). Read by `routes/balanceMovements.ts`'s own
+   * POST handler, BEFORE it calls `calculateAcceptanceMaturityDate()`, so a Maker creating an Acceptance
+   * (A6, or B4's own Usance-branch compound-submission leg) never re-types/re-selects the calendar
+   * config per Acceptance — it's inherited automatically from the parent, same "father decides, child
+   * inherits" pattern `carriedCurrency`/`tenorType`/`tenorDays` already use elsewhere in this codebase.
+   * Returns `null` (not an error) when the parent has no calendars configured — the caller falls back to
+   * today's plain, uncalculated `maturityDate` passthrough in that case, exactly as if this feature
+   * didn't exist for that LC.
+   */
+  getMaturityDateCalendarsFromParent(
+    parentLogicalContractId: string,
+  ): { calendars: MaturityDateCalendarRef[]; combinationRule: string | null; convention: string | null } | null {
+    const parent = this.contracts.findActiveByLogicalContractId(parentLogicalContractId);
+    if (!parent?.maturityDateCalendars?.length) return null;
+    return {
+      calendars: parent.maturityDateCalendars,
+      combinationRule: parent.maturityDateCombinationRule ?? null,
+      convention: parent.maturityDateConvention ?? null,
+    };
   }
 
   createMovement(req: CreateMovementRequest): CreateMovementResult {
@@ -1040,7 +1236,29 @@ export class BalanceService {
     // Docs sufficiency checks already use, a few lines below in resolveOrCreateContract() itself).
     this.assertValidAmount(req.movementType, req.amount);
 
+    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry
+    // requires the new expiryDate up front, same "required, checked before touching the contract" posture
+    // as assertValidAmount() above and resolveOrCreateContract()'s own A1/B1 expiryDate check below.
+    if (req.movementType === 'AMEND_EXPIRY' && !req.expiryDate) {
+      throw new RequestValidationError('expiryDate is required for AMEND_EXPIRY.');
+    }
+    // A6/B4 Calculated Maturity Date (2026-08-23) — same "required, checked up front" posture as
+    // AMEND_EXPIRY immediately above.
+    if (req.movementType === 'AMEND_MATURITY_CALENDARS' && !req.maturityDateCalendars?.length) {
+      throw new RequestValidationError('maturityDateCalendars is required (and must be non-empty) for AMEND_MATURITY_CALENDARS.');
+    }
+
     const contract = this.resolveOrCreateContract(req);
+
+    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2 (2026-08-23) — A3/A3S Document Arrival
+    // (IPLC_LC/EPLC_LC UTILIZE) presentation-vs-expiry check. Scoped to movementType === 'UTILIZE'
+    // specifically, NOT the broader utilizeShaped sufficiency-check family it shares a dispatch entry
+    // with in buildMovementTypeRegistry() — HONOUR/ACCEPT (B4) route through that same entry but must
+    // NOT get this check (B4's own expiry-related behavior, per the spec's own §2/§3 tables, is the
+    // separate Calculated Maturity Date auto-fill, not this reject-if-late rule).
+    if (req.movementType === 'UTILIZE') {
+      this.assertPresentationNotAfterExpiry(contract.expiryDate, req.documentPresentationDate);
+    }
 
     // OAS-GAP-16 direction (a), 2026-08-22 — the request-layer currency-decimal-scale check
     // (validation/requestSchema.ts) only runs when the caller supplied `currency`, since that layer has
@@ -1136,6 +1354,18 @@ export class BalanceService {
       transactionDate: req.transactionDate ?? null,
       businessDate: req.businessDate ?? null,
       valueDate: req.valueDate ?? null,
+      documentPresentationDate: req.documentPresentationDate ?? null,
+      triggeredByExpiry: req.triggeredByExpiry ?? null,
+      // §2/§3 — AMEND_EXPIRY only (the required-if-AMEND_EXPIRY check above already ran); null passthrough
+      // for every other movementType, harmless if a caller supplies it anyway (never read back except by
+      // this movementType's own release() branch).
+      expiryDate: req.expiryDate ?? null,
+      // A6/B4 Calculated Maturity Date (2026-08-23) — AMEND_MATURITY_CALENDARS only (the required-if
+      // check above already ran); null passthrough otherwise, same posture as expiryDate immediately
+      // above.
+      maturityDateCalendars: req.maturityDateCalendars ?? null,
+      maturityDateCombinationRule: req.maturityDateCombinationRule ?? null,
+      maturityDateConvention: req.maturityDateConvention ?? null,
       sourceModule: req.sourceModule ?? null,
       sourceFunction: req.sourceFunction ?? null,
       sourceTransactionRef: req.sourceTransactionRef ?? null,
@@ -1333,6 +1563,29 @@ export class BalanceService {
       this.contracts.markClosed(contract.balanceContractId, releasedAt);
     }
 
+    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry: the
+    // requested new expiryDate (carried on the movement itself since Submit, createMovement()'s own
+    // check already guaranteed it's present for this movementType) becomes the contract's own authoritative
+    // expiryDate only once a Checker actually approves it — same "mutate the contract at Release, not
+    // Submit" posture as CLOSE's own markClosed() call immediately above.
+    if (movement.movementType === 'AMEND_EXPIRY') {
+      this.contracts.updateExpiryDate(contract.balanceContractId, movement.expiryDate!);
+    }
+
+    // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 Update Maturity Date Calendars: the requested
+    // new calendar config (carried on the movement since Submit, createMovement()'s own check already
+    // guaranteed it's present for this movementType) becomes the contract's own authoritative config
+    // only once a Checker actually approves it — same "mutate the contract at Release, not Submit"
+    // posture as AMEND_EXPIRY immediately above.
+    if (movement.movementType === 'AMEND_MATURITY_CALENDARS') {
+      this.contracts.updateMaturityDateCalendars(
+        contract.balanceContractId,
+        movement.maturityDateCalendars!,
+        movement.maturityDateCombinationRule ?? null,
+        movement.maturityDateConvention ?? null,
+      );
+    }
+
     return this.movements.findById(movementId)!;
   }
 
@@ -1498,6 +1751,37 @@ export class BalanceService {
       tenorType: req.tenorType ?? null,
       tenorDays: req.tenorDays ?? null,
       maturityDate: req.maturityDate ?? null,
+      // §1 — expiryDate is required (enforced in resolveOrCreateContract()) for A1/B1 root ISSUE, and
+      // simply carried through as-is for every other creating movementType (SHGT ISSUE, Acceptance
+      // CREATE, etc.), where it was never required and stays null unless a caller supplies one anyway.
+      // issueDate defaults to today's Business Date when the caller omits it — spec's own "optional at
+      // A1/B1, defaults to today" rule; ignored by every non-root creating movementType too.
+      //
+      // Bug fixed 2026-08-23 (user-reported, "Inquire Event S101, there is no issue date... shown" —
+      // traced to the ROOT cause, not just a display gap): this used to default to the bare `now`
+      // ISO-8601 TIMESTAMP (e.g. "2026-08-23T02:25:31.804Z"), not a plain date. That directly violates
+      // this whole feature's own "Business Date ≠ Technical Timestamp" architectural invariant
+      // (LC-Expiry-Acceptance-Maturity-Control-Review.md) — expiryDate/issueDate are Business Dates,
+      // always a plain "YYYY-MM-DD" (confirmed by every caller-supplied expiryDate in this codebase,
+      // which always IS plain — it round-trips through an HTML `<input type="date">` on the Angular
+      // side). A full timestamp default was the one place this service silently broke that invariant —
+      // and HTML's own `<input type="date">` doesn't error on the mismatch, it just renders blank,
+      // which is what actually surfaced this as an "Issue Date isn't shown" report rather than a
+      // visible format error at Submit time. `now.slice(0, 10)` takes the UTC calendar-date portion of
+      // the ISO-8601 timestamp (positions 0-9 are always exactly "YYYY-MM-DD" per the spec) — today's
+      // Business Date, not "the exact instant this ran".
+      expiryDate: req.expiryDate ?? null,
+      issueDate: req.issueDate ?? now.slice(0, 10),
+      // A6/B4 Calculated Maturity Date (2026-08-23) — optional at A1/B1 root ISSUE (the ONLY place a
+      // caller ever sets this directly; every Acceptance CREATE under it reads it back automatically
+      // via getMaturityDateCalendarsFromParent(), never supplies its own), same plain passthrough
+      // convention as maturityDate/tolerancePct above. Amendable later via A2/B2 AMEND_MATURITY_CALENDARS
+      // (see release()'s own branch) — harmless to also carry through here for a non-root creating
+      // movementType (SHGT ISSUE, Acceptance CREATE itself, EPLC_EXAMINATION CREATE), since none of
+      // those ever populate it in practice.
+      maturityDateCalendars: req.maturityDateCalendars ?? null,
+      maturityDateCombinationRule: req.maturityDateCombinationRule ?? null,
+      maturityDateConvention: req.maturityDateConvention ?? null,
       openingBalance: '0',
       effectiveFrom: now,
       createdBy: req.createdBy,

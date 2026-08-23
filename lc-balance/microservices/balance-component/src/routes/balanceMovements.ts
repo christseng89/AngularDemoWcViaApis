@@ -2,24 +2,69 @@ import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { RequestValidationError } from '../errors';
 import type { CreateMovementRequest } from '../service/balanceService';
+import type { StandingCalendarRef, AdjustBusinessDayRequest } from '../clients/standingClient';
 import { createMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 
 export function balanceMovementsRouter(service: BalanceService): Router {
   const router = Router();
 
   // POST /balance-movements
-  router.post('/balance-movements', (req, res) => {
-    // Quality-report-balance.md BAL-116: was a sequence of hand-rolled `if` checks (presence, the
-    // MONETARY_AMOUNT_PATTERN shape, the currency-decimal-scale rule) — now one declarative schema. See
-    // requestSchema.ts's own doc comment for exactly what's validated here vs. passed through untouched
-    // (`.passthrough()` — every other CreateMovementRequest field is unchanged from before this fix).
-    const parsed = createMovementRequestSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new RequestValidationError(firstValidationMessage(parsed.error));
+  //
+  // Async ONLY because of the A6/B4 Calculated Maturity Date pre-step below — every other route handler
+  // in this file stays synchronous, matching `node:sqlite`'s own synchronous DB layer (see
+  // `db/index.ts`'s doc comment) and `BalanceService.createMovement()`'s own doc comment on why that
+  // method itself was deliberately NOT made async. Express 4 does not auto-forward a rejected Promise
+  // from an async handler to the error middleware (unlike a synchronous `throw`, which it does catch
+  // automatically) — the try/catch + `next(err)` here exists specifically to preserve that same
+  // catch-all error handling for this one now-async handler.
+  router.post('/balance-movements', async (req, res, next) => {
+    try {
+      // Quality-report-balance.md BAL-116: was a sequence of hand-rolled `if` checks (presence, the
+      // MONETARY_AMOUNT_PATTERN shape, the currency-decimal-scale rule) — now one declarative schema. See
+      // requestSchema.ts's own doc comment for exactly what's validated here vs. passed through untouched
+      // (`.passthrough()` — every other CreateMovementRequest field is unchanged from before this fix).
+      const parsed = createMovementRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new RequestValidationError(firstValidationMessage(parsed.error));
+      }
+      const body = parsed.data as CreateMovementRequest;
+
+      // A6/B4 Calculated Maturity Date, 2026-08-23 (widened same day — the calendar config is no longer
+      // a per-call input; it's inherited automatically from the parent LC/Confirmation's own persisted
+      // config, see BalanceService.getMaturityDateCalendarsFromParent()'s own doc comment for why: a
+      // Maker sets it once at A1/B1, A2/B2 can amend it, and every downstream Acceptance CREATE — A6
+      // directly, or B4's own Usance-branch compound-submission leg, both `IPLC_ACCEPTANCE`/
+      // `EPLC_ACCEPTANCE` CREATE — just uses it, with zero per-Acceptance input). Only for the ONE
+      // genuinely async step this route ever performs; a caller-supplied `maturityDate` always wins
+      // (manual override, no Standing call at all, no parent lookup even attempted) — this never
+      // overwrites an explicit value; a parent with no calendars configured leaves `maturityDate`
+      // untouched, exactly today's pre-existing plain-passthrough behavior.
+      const isAcceptanceCreate = (body.instrumentType === 'IPLC_ACCEPTANCE' || body.instrumentType === 'EPLC_ACCEPTANCE') && body.movementType === 'CREATE';
+      if (isAcceptanceCreate && body.maturityDate == null && body.parentLogicalContractId) {
+        const parentCalendars = service.getMaturityDateCalendarsFromParent(body.parentLogicalContractId);
+        if (parentCalendars) {
+          if (body.tenorDays == null) {
+            throw new RequestValidationError(
+              'tenorDays is required to calculate Maturity Date via Standing (the parent LC/Confirmation has maturityDateCalendars configured).',
+            );
+          }
+          const { maturityDate } = await service.calculateAcceptanceMaturityDate({
+            acceptanceDate: service.getBusinessDate(),
+            tenorDays: body.tenorDays,
+            currency: body.currency,
+            calendars: parentCalendars.calendars as StandingCalendarRef[],
+            combinationRule: (parentCalendars.combinationRule ?? undefined) as AdjustBusinessDayRequest['combinationRule'] | undefined,
+            convention: (parentCalendars.convention ?? undefined) as AdjustBusinessDayRequest['convention'] | undefined,
+          });
+          body.maturityDate = maturityDate;
+        }
+      }
+
+      const result = service.createMovement(body);
+      res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
+    } catch (err) {
+      next(err);
     }
-    const body = parsed.data as CreateMovementRequest;
-    const result = service.createMovement(body);
-    res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
   });
 
   // POST /balance-movements/:movementId/release
