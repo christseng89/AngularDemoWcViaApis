@@ -1,5 +1,14 @@
 # 決策請求：TF Solutions 租戶拓撲
 
+> **✅ 已回覆（2026-08-22）**：業務側回覆——TF Solutions 需要對接**多家分行/多家銀行**（下方表格「需要
+> 對接多家分行/多家銀行」那一列）。OAS-GAP-09 維持 P0，跟 OAS-GAP-01 併同一輪決策，技術方案（欄位式 vs
+> Gateway 路由式）與認證機制選型（GAP-01）留給後續工程設計階段，尚未定案——承接這個決策的合併決策請求
+> 已備妥：`Auth-And-Tenant-Isolation-Decision-Request.md`，該份文件本身還沒有回覆記錄，是目前真正還開放
+> 的下一步。完整記錄見 `lc-balance/Balance Contract Integration Proposal.md`「OAS-GAP-09」小節的
+> 「✅ 拓撲已定案」callout，以及該文件版本歷程表 2026-08-22「業務/架構回覆落地」一列——這份決策請求文件
+> 先前一直沒有回寫這個結論，2026-08-24 補上，屬於文件同步，不是新的業務決策。以下原始問題與選項保留
+> 作為決策過程的歷史記錄。
+
 **發起依據**：`Balance Contract Integration Proposal.md` 建議落地順序第 0 步，決定 OAS-GAP-09（租戶/
 機構區隔）的真實優先度。
 **請求對象**：業務側

@@ -1,5 +1,15 @@
 # 決策請求：CURRENCY DERIVATION 規則——補實作，還是改文件？
 
+> **✅ 已回覆並已實作（2026-08-22，OAS v1.18.0 → v1.19.0）**：業務/架構側選擇下方**方向 (a) — 服務端補
+> 實作**，讓行為追上文件。落地內容：`errors.ts` 新增 `CurrencyMismatchError`（`409 CURRENCY_MISMATCH`）；
+> `resolveOrCreateContract()` 加上真正的推導/比對邏輯（解析到既有合約則比對其 currency；創建子合約且
+> parent 可解析則比對 parent 的 currency；沒有可推導來源的根創建則 currency 仍必填，成為新合約的權威
+> 值）；`validation/requestSchema.ts` 的 `currency` 改為選填。三個子專案測試套件全數重跑確認綠燈（微服務
+> 432/432、backend 34/34、Angular 1064/1064）。OAS 的「已確認矛盾」警告已移除，CURRENCY DERIVATION
+> 區塊改成「✅ RESOLVED」。完整記錄見 `lc-balance/Balance Contract Integration Proposal.md`「✅ OAS-GAP-16」
+> 小節（含「實作狀態」子節）——這份決策請求文件先前一直沒有回寫這個結論，2026-08-24 補上，屬於文件同步，
+> 不是新的業務決策。以下原始問題與選項保留作為決策過程的歷史記錄。
+
 **發起依據**：`Balance Contract Integration Proposal.md` 的 OAS-GAP-16——優先度高於 P0 的一項，
 外部覆核第三輪對照原始碼逐項核實後發現。
 **請求對象**：業務側 + 架構側
