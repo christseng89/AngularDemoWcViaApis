@@ -484,7 +484,7 @@ Tenor LC，大量分批事件）沒有任何文件化的回應大小上限。以
 | 順序 | 項目 | 決策負責單位 | 粗估工作量 | 狀態 |
 |---|---|---|---|---|
 | — | ~~OAS-GAP-16 — CURRENCY DERIVATION 該補實作還是改文件~~ | 業務 + 架構 → 後端 | 已完成 | ✅ 已完成（方向 (a)，OAS v1.19.0，見 ✅ OAS-GAP-16 小節「實作狀態」） |
-| 0 | 確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度 | 業務 | 小（1 次會議） | 🟢 決策請求文件已備妥（`TF-Solutions-Tenant-Topology-Decision-Request.md`），待轉發 |
+| — | ~~確認 TF Solutions 租戶拓撲（單一機構 vs 多機構）——決定 OAS-GAP-09 的真實優先度~~ | 業務 | 已完成 | ✅ 已解決（2026-08-22，多家分行/多家銀行，見上方「✅ 拓撲已定案」callout 與 `TF-Solutions-Tenant-Topology-Decision-Request.md`——2026-08-24 補上回寫，此前文件本身未同步這個結論） |
 | — | ~~OAS-GAP-15 — 自然到期是否屬於本合約範圍~~ | 業務 + 架構 | 已完成 | ✅ 已解決（2026-08-23，外部批次流程透過既有 A10/B6 API 觸發，不需新增 movementType，見 `Natural-Expiry-Scope-Decision-Request.md`） |
 | 1 | OAS-GAP-01 + OAS-GAP-09（`securitySchemes` + 租戶/機構區隔模型，含「落地衝擊：現有內部呼叫方」的遷移範圍） | 資安 + 架構 | 中～大（拓撲已定案為多機構，範圍不會再縮小；仍卡在 GAP-01 認證機制選型未決定） | 🟢 決策請求文件已備妥（`Auth-And-Tenant-Isolation-Decision-Request.md`），待轉發——未動程式碼 |
 | 2 | OAS-GAP-02（跨合約 Checker 待辦清單端點，設計時一併記錄 OAS-GAP-11 的長期方向） | 架構 + 前端 | 中 | ⬜ 未開始 |
