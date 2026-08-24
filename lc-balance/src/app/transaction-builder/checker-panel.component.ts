@@ -1,6 +1,8 @@
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
 import { IndexPickerComponent } from './index-picker.component';
 import { TbIconComponent } from '../tb-icon.component';
@@ -188,30 +190,54 @@ export class CheckerPanelComponent implements OnChanges {
    * exact secondary key. Zero candidates is a real error; exactly one auto-resolves (mirrors
    * `app-index-picker`'s own `autoPickedHint` "picked automatically" convention); more than one is
    * genuinely ambiguous and surfaces as a pick-one list (`checkerSecondaryCandidates`).
+   *
+   * Business-reported gap 2026-08-24 ("B3/A3/A3S 單獨使用 Checker，已經 earmarked 的交易不應該再被選出") —
+   * a candidate with `status: 'ACTIVE'` at the CONTRACT level (e.g. a B3 Present Docs presentation whose
+   * own CREATE is already Checker-Released — RELEASED, i.e. already earmarked) has nothing left for this
+   * Checker to review, but was being listed here anyway since this method only ever checked contract
+   * status, never movement status. Now fetches each candidate's own movements and keeps only the ones
+   * with at least one genuinely actionable (EARMARKING) item, via `isCheckerActionable()` — the SAME
+   * predicate `loadCheckerQueue()` itself uses, so this candidate list and the queue it leads into can
+   * never disagree about what counts as actionable.
    */
   private searchCheckerCandidatesByLcOnly(secondaryField: 'ibNumber' | 'sgNumber'): void {
     if (!this.selectedFunction) return;
+    const selectedFunction = this.selectedFunction;
     this.checkerSearching = true;
-    this.api.catalog(this.selectedFunction.instrumentType, 'ACTIVE', undefined, 1, 100, this.checkerLcNumber).subscribe({
-      next: (result) => {
-        this.checkerSearching = false;
-        const items = result.items;
-        if (items.length === 0) {
-          this.checkerSearchError = `No ${this.checkerSecondaryLabel} record found under this LC.`;
-          return;
-        }
-        if (items.length === 1) {
-          this.resolveCheckerContract(items[0]);
-          this.checkerAutoPickedHint = `Only one ${this.checkerSecondaryLabel} under this LC — picked automatically.`;
-          return;
-        }
-        this.checkerSecondaryCandidates = items;
-      },
-      error: (err) => {
-        this.checkerSearching = false;
-        this.checkerSearchError = describeApiErrorShared(err);
-      },
-    });
+    this.api
+      .catalog(selectedFunction.instrumentType, 'ACTIVE', undefined, 1, 100, this.checkerLcNumber)
+      .pipe(
+        switchMap((result) => {
+          if (!result.items.length) return of([] as BalanceContract[]);
+          return forkJoin(
+            result.items.map((c) =>
+              this.api.listMovements(c.balanceContractId).pipe(
+                map((movements) => (movements.some((m) => this.isCheckerActionable(m, selectedFunction)) ? c : null)),
+                catchError(() => of(null)),
+              ),
+            ),
+          ).pipe(map((results) => results.filter((c): c is BalanceContract => c !== null)));
+        }),
+      )
+      .subscribe({
+        next: (items) => {
+          this.checkerSearching = false;
+          if (items.length === 0) {
+            this.checkerSearchError = `No ${this.checkerSecondaryLabel} record with an actionable PENDING item found under this LC.`;
+            return;
+          }
+          if (items.length === 1) {
+            this.resolveCheckerContract(items[0]);
+            this.checkerAutoPickedHint = `Only one ${this.checkerSecondaryLabel} under this LC — picked automatically.`;
+            return;
+          }
+          this.checkerSecondaryCandidates = items;
+        },
+        error: (err) => {
+          this.checkerSearching = false;
+          this.checkerSearchError = describeApiErrorShared(err);
+        },
+      });
   }
 
   /** A row click from the `checkerSecondaryCandidates` picker — `app-index-picker`'s `pick` emits the row's own `balanceContractId`, same convention as `onSelectCheckerMovement()` below. The contract itself is already in hand from `catalog()`, no extra `resolveContract()` round trip needed. */
@@ -230,9 +256,10 @@ export class CheckerPanelComponent implements OnChanges {
   }
 
   /**
-   * Every still-actionable PENDING movement on `checkerContractId`. Re-run after anything that could
-   * change what's PENDING on this contract (a Maker Submit, or a Checker Release/Reject/acknowledge from
-   * this same queue). Two opposite, function-scoped filters share the same EARMARKING(PENDING+no
+   * Every still-actionable PENDING movement on `checkerContractId`, per `isCheckerActionable()` below —
+   * this method just re-fetches and applies it. Re-run after anything that could change what's PENDING
+   * on this contract (a Maker Submit, or a Checker Release/Reject/acknowledge from this same queue). Two
+   * opposite, function-scoped rules within `isCheckerActionable()` share the same EARMARKING(PENDING+no
    * acknowledgedAt)/EARMARKED(PENDING+acknowledgedAt) split (business instruction 2026-08-20):
    *
    * - A3/A3S (deferSettlement) — excludes an already-`acknowledgedAt` UTILIZE ("A3 A3S 交易 Approve 過後
@@ -269,20 +296,11 @@ export class CheckerPanelComponent implements OnChanges {
     const contractId = this.checkerContractId;
     if (!contractId) return;
     this.checkerLoading = true;
-    const strategy = this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
-    const deferMovementType = strategy?.checkerRelease.deferSettlement ? (this.selectedFunction?.deferSettlementMovementType ?? 'UTILIZE') : null;
-    const requiresEarmarked = !!strategy?.checkerRelease.releasesExistingMovementInPlace;
     const selectedFunction = this.selectedFunction;
     this.api.listMovements(contractId).subscribe({
       next: (list: BalanceMovement[]) => {
         this.checkerLoading = false;
-        this.checkerItems = list.filter((m) => {
-          if (m.status !== 'PENDING') return false;
-          if (selectedFunction && !movementTypeMatchesFunction(selectedFunction, m.movementType)) return false;
-          if (deferMovementType && m.movementType === deferMovementType && m.acknowledgedAt) return false;
-          if (requiresEarmarked && m.movementType === 'UTILIZE' && (!m.acknowledgedAt || !m.makerSubmittedAt)) return false;
-          return true;
-        });
+        this.checkerItems = list.filter((m) => this.isCheckerActionable(m, selectedFunction));
         this.queueLoadSucceeded.emit();
       },
       error: () => {
@@ -290,6 +308,26 @@ export class CheckerPanelComponent implements OnChanges {
         this.checkerItems = [];
       },
     });
+  }
+
+  /**
+   * Whether `m` is a genuinely actionable (EARMARKING) item for `selectedFunction`'s own Checker screen
+   * — the single source of truth `loadCheckerQueue()` and `searchCheckerCandidatesByLcOnly()` both defer
+   * to, so a candidate that this method excludes can never lead into a queue that shows something for it
+   * anyway (or vice versa). See `loadCheckerQueue()`'s own original doc comment (moved here) for the
+   * EARMARKING(PENDING+no acknowledgedAt)/EARMARKED(PENDING+acknowledgedAt) split business instruction.
+   * `selectedFunction` is nullable — every function-scoped rule below is skipped (not the whole check)
+   * when it's null, same as this logic's original inline form only ever guarded with `selectedFunction &&`.
+   */
+  private isCheckerActionable(m: BalanceMovement, selectedFunction: TransactionFunction | null): boolean {
+    if (m.status !== 'PENDING') return false;
+    if (selectedFunction && !movementTypeMatchesFunction(selectedFunction, m.movementType)) return false;
+    const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+    const deferMovementType = strategy?.checkerRelease.deferSettlement ? (selectedFunction?.deferSettlementMovementType ?? 'UTILIZE') : null;
+    if (deferMovementType && m.movementType === deferMovementType && m.acknowledgedAt) return false;
+    const requiresEarmarked = !!strategy?.checkerRelease.releasesExistingMovementInPlace;
+    if (requiresEarmarked && m.movementType === 'UTILIZE' && (!m.acknowledgedAt || !m.makerSubmittedAt)) return false;
+    return true;
   }
 
   onSelectCheckerMovement(movementId: string): void {

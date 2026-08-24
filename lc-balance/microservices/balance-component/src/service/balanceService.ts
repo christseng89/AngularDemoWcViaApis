@@ -18,7 +18,7 @@ import { parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
-import { applyStatusTransition } from '../domain/statusTransition';
+import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
 import { computeAvailableBalance, computeConfirmedBalance, computePendingDecreaseTotal } from '../domain/balanceDerivation';
@@ -36,7 +36,7 @@ import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
-import { IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
+import { CurrencyMismatchError, IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
   BalanceContract,
@@ -899,6 +899,18 @@ export class BalanceService {
       this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
     }
 
+    // A contract's currency is fixed at ISSUE and never changes — currency stays a required
+    // request field (see CurrencyMismatchError's own doc comment for why this is validation-only,
+    // not the derive/omit design that was proposed and reverted), but a caller-supplied value that
+    // disagrees with the resolved contract's own stored currency is rejected outright rather than
+    // silently recorded on the new movement.
+    if (contract && req.currency !== contract.currency) {
+      throw new CurrencyMismatchError(
+        `Supplied currency "${req.currency}" does not match this contract's own currency "${contract.currency}" ` +
+          `(balanceContractId ${contract.balanceContractId}).`,
+      );
+    }
+
     if (contract) return contract;
 
     if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
@@ -913,7 +925,19 @@ export class BalanceService {
     // through to that block's own, more specific error instead of a generic one here.
     if (req.parentLogicalContractId) {
       const parentForIssueCheck = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-      if (parentForIssueCheck) this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
+      if (parentForIssueCheck) {
+        this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
+        // Same currency-consistency guard as the existing-contract case above — a new child contract
+        // (Acceptance/SG/Present Docs) always carries its parent LC/Confirmation's own currency; a
+        // caller-supplied value that disagrees is rejected rather than silently creating a child
+        // contract with a currency its own parent doesn't share.
+        if (req.currency !== parentForIssueCheck.currency) {
+          throw new CurrencyMismatchError(
+            `Supplied currency "${req.currency}" does not match the parent contract's own currency ` +
+              `"${parentForIssueCheck.currency}" (parentLogicalContractId ${req.parentLogicalContractId}).`,
+          );
+        }
+      }
     }
 
     // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
@@ -1334,6 +1358,10 @@ export class BalanceService {
               `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
           );
         }
+        // Business-confirmed 2026-08-24 — genuine 4-eyes separation, same rule release()/reject() enforce
+        // via applyStatusTransition(); acknowledgeArrival() bypasses that function entirely (it never
+        // changes status), so it needs its own explicit call to the same shared check.
+        assertMakerCheckerSeparation(movement.createdBy, acknowledgedBy, 'ACKNOWLEDGE');
       },
       alreadyDoneAt: (movement) => movement.acknowledgedAt,
       alreadyDoneBy: (movement) => movement.acknowledgedBy,

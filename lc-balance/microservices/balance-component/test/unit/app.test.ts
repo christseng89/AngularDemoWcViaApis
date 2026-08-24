@@ -1983,6 +1983,47 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
     await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({ cancelledBy: 'maker1' }).expect(200);
   });
 
+  test('POST /balance-movements/:id/reject with releasedBy === the movement\'s own createdBy -> 409 MAKER_CHECKER_CONFLICT (business-confirmed 2026-08-24, genuine 4-eyes separation)', async () => {
+    const amend = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lcId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: 100,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${amend.body.movementId}/reject`).send({ releasedBy: 'maker1', reasonCode: 'DOC_MISMATCH' }).expect(409);
+    expect(res.body.code).toBe('MAKER_CHECKER_CONFLICT');
+
+    // Clean up so it doesn't linger PENDING and pollute later tests' balance assertions on this same LC.
+    await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({ cancelledBy: 'maker1' }).expect(200);
+  });
+
+  test('POST /balance-movements/:id/release with releasedBy === the movement\'s own createdBy -> 409 MAKER_CHECKER_CONFLICT (business-confirmed 2026-08-24, genuine 4-eyes separation — CANCEL by the same Maker is unaffected, see the standalone cancel() describe block)', async () => {
+    const amend = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lcId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: 101,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const res = await request(app).post(`/balance-movements/${amend.body.movementId}/release`).send({ releasedBy: 'maker1' }).expect(409);
+    expect(res.body.code).toBe('MAKER_CHECKER_CONFLICT');
+    expect(res.body.message).toMatch(/Maker \(maker1\) and Checker cannot be the same user/);
+
+    // Clean up so it doesn't linger PENDING and pollute later tests' balance assertions on this same LC.
+    await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({ cancelledBy: 'maker1' }).expect(200);
+  });
+
   test('POST /balance-movements/:id/reject with both fields -> 200, REJECTED, and the rejected movement never contributes to Confirmed/Available Balance', async () => {
     const amend = await request(app)
       .post('/balance-movements')
@@ -2695,6 +2736,38 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .expect(201);
     const res = await request(app).post(`/balance-movements/${cnf.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(400);
     expect(res.body.message).toMatch(/acknowledgeArrival\(\) only applies to an IPLC_LC UTILIZE movement/);
+  });
+
+  test('POST /balance-movements/:id/acknowledge with acknowledgedBy === the movement\'s own createdBy -> 409 MAKER_CHECKER_CONFLICT (business-confirmed 2026-08-24)', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-ACK-MC' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.body.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'maker1' }).expect(409);
+    expect(res.body.code).toBe('MAKER_CHECKER_CONFLICT');
+    expect(res.body.message).toMatch(/Maker \(maker1\) and Checker cannot be the same user/);
   });
 
   test('POST /balance-movements/:movementId/acknowledge without acknowledgedBy -> 400', async () => {

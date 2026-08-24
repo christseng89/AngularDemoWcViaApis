@@ -49,36 +49,44 @@ info:
     every existing linked-movement business function already documents).
 
 
-    CURRENCY DERIVATION (NEW, v1.0.0, business-requested 2026-08-16): the
-    server now derives and validates `currency` server-side instead of
-    trusting the caller for any movement that is not the very first,
-    root-level creation of a new Logical Contract. Precisely:
+    CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
+    scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
+    field on every request (see `BalanceMovementCreateRequest.required`),
+    but the server now also validates it server-side rather than trusting
+    the caller blindly:
       1. If the request resolves (via `balanceContractId`, or via
          `naturalKey` matching an existing ACTIVE `BalanceContract`) to an
-         EXISTING contract, `currency` is derived from that contract's own
-         stored `currency` — a caller-supplied `currency` that does not
-         match is rejected (`409 CURRENCY_MISMATCH`); omitting it entirely
-         is fine and recommended.
+         EXISTING contract, the supplied `currency` must match that
+         contract's own stored `currency` exactly — a mismatch is rejected
+         (`409 CURRENCY_MISMATCH`).
       2. Else, if the request is creating a brand-new child Logical
          Contract (a creating movementType — ISSUE/CREATE — with no
          existing resolution) AND `parentLogicalContractId` is supplied,
-         `currency` is derived the same way from the PARENT's own current
-         `currency` (same match-or-omit rule). This covers every "carried
-         from the parent LC/Confirmation" function — a new Acceptance,
-         Shipping Guarantee, or Present Docs earmark always takes its
-         Currency from the LC/Confirmation it is created under, never
-         freely typed.
-      3. Only when creating a genuinely ROOT new Logical Contract — a
-         creating movementType with no existing resolution AND no
+         the supplied `currency` must match the PARENT's own current
+         `currency` exactly (same rejection rule). This covers every
+         "carried from the parent LC/Confirmation" function — a new
+         Acceptance, Shipping Guarantee, or Present Docs earmark must
+         declare the same Currency as the LC/Confirmation it is created
+         under.
+      3. When creating a genuinely ROOT new Logical Contract — a creating
+         movementType with no existing resolution AND no
          `parentLogicalContractId` (i.e. `IPLC_LC`/`EPLC_CONFIRMATION`
-         `ISSUE`) — is `currency` caller-supplied and REQUIRED; it becomes
-         this new Logical Contract's own authoritative Currency Code for
-         every future movement against it or anything created under it.
+         `ISSUE`) — the supplied `currency` becomes this new Logical
+         Contract's own authoritative Currency Code for every future
+         movement against it or anything created under it; there is
+         nothing to validate it against.
     This mirrors, at the data-model level, the channel-facing business
     rule ("A1/B1 Currency Code = User Input; every other function = Carried
     forward + Protected") without this service needing to know about named
     business-function codes at all — it only needs to know whether a
     request resolves to an existing contract, or a parent, or neither.
+
+    Note (2026-08-24): an earlier design additionally made `currency`
+    OPTIONAL for cases 1/2 above (server-derived when omitted, not just
+    validated when supplied) — that broader change was reverted along with
+    unrelated work and is not part of this contract. `currency` remains
+    required on every request; only the consistency check described above
+    is currently implemented.
 
 
     v0.1.0 (draft, 2026-08-14): initial extraction from the design
@@ -486,7 +494,25 @@ info:
         transaction-creating caller omits it, unchanged ACTIVE-only behavior). `GET /balance-contracts/catalog`
         gains `requireIssueReleased` (opt-in; excludes a candidate whose own root ISSUE is still PENDING —
         used by every Maker-ACTION picker, omitted by inquiry-only contexts and B4's own Present Docs search).
-  version: "1.16.0"
+
+    v1.17.0 (2026-08-24, two same-day fixes found during a post-revert audit — see the top-level revert
+    note this session's own decision log carries):
+      - CHANGED: CURRENCY CONSISTENCY (formerly CURRENCY DERIVATION) — `currency` is now genuinely
+        REQUIRED on every request again (added back to `BalanceMovementCreateRequest.required`), not
+        optional/server-derived. A broader "omit it, the server derives it" design was proposed once and
+        reverted along with unrelated work; only the missing consistency VALIDATION was re-added — a
+        supplied `currency` that disagrees with the resolved contract's (or, for a new child contract,
+        its parent's) own stored currency is still rejected (`409 CURRENCY_MISMATCH`), but omitting it
+        is no longer accepted anywhere.
+      - ADDED: `MAKER_CHECKER_CONFLICT` (409) — business-confirmed genuine 4-eyes separation. The same
+        user who created a movement (`createdBy`) can no longer also Release (`POST
+        /balance-movements/{id}/release`), Reject (`.../reject`), or acknowledge (`.../acknowledge`, A3/
+        A3S's own Checker step) it. Checked before the legal-transition check, so a same-user attempt on
+        an already-RELEASED movement still reports the conflict, not a misleading illegal-transition
+        error. `POST /balance-movements/{id}/cancel` is deliberately UNCHANGED — a Maker's own Error
+        Correction on their own still-PENDING entry is the expected, correct case (`createdBy ===
+        cancelledBy` there is normal), not a Maker/Checker conflict.
+  version: "1.17.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -745,12 +771,12 @@ paths:
         exists for that natural key.
 
 
-        See CURRENCY DERIVATION in this document's top-level description
-        for the full rule — in short, `currency` is required only for a
-        genuinely root new Logical Contract (no existing resolution, no
-        `parentLogicalContractId`); every other case derives it server-side
-        and rejects a mismatching caller-supplied value with
-        `409 CURRENCY_MISMATCH`.
+        See CURRENCY CONSISTENCY in this document's top-level description
+        for the full rule — in short, `currency` is always required, and
+        for every case other than a genuinely root new Logical Contract
+        (no existing resolution, no `parentLogicalContractId`) the
+        supplied value must match the resolved contract's or parent's own
+        currency, rejecting a mismatch with `409 CURRENCY_MISMATCH`.
 
 
         Idempotent on (balanceContractId, eventSeq) — Design doc §8:
@@ -1326,11 +1352,11 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: SHGT/Acceptance/Examination's underlying LC-or-Confirmation's logicalContractId. Set at creation via BalanceMovementCreateRequest.parentLogicalContractId — required for SHGT ISSUE and EPLC_EXAMINATION CREATE, and used both for the parent-sufficiency check at creation time AND as the CURRENCY DERIVATION source (see this document's top-level description).
+          description: SHGT/Acceptance/Examination's underlying LC-or-Confirmation's logicalContractId. Set at creation via BalanceMovementCreateRequest.parentLogicalContractId — required for SHGT ISSUE and EPLC_EXAMINATION CREATE, and used both for the parent-sufficiency check at creation time AND for the CURRENCY CONSISTENCY check (see this document's top-level description).
         status: { $ref: '#/components/schemas/ContractStatus' }
         currency:
           type: string
-          description: This contract version's own authoritative Currency Code — set once, either caller-supplied (root ISSUE/CREATE with no parent) or derived from the parent at creation time (see CURRENCY DERIVATION). Every subsequent movement against this contract, and every child contract created under it, derives its own currency from this field; it is never re-typed.
+          description: This contract version's own authoritative Currency Code — always caller-supplied at creation time, validated against the parent's own currency for a new child contract (see CURRENCY CONSISTENCY). Every subsequent movement against this contract must supply this same value; it is never re-typed.
         tolerancePct:
           type: string
           nullable: true
@@ -1381,7 +1407,7 @@ components:
             amount.
         currency:
           type: string
-          description: Always equal to the resolved/derived contract's own currency at the time this movement was created — see CURRENCY DERIVATION.
+          description: Always equal to the resolved contract's own currency at the time this movement was created (validated, not derived — see CURRENCY CONSISTENCY).
         legRef: { type: string, nullable: true, description: "Mixed Tenor LC leg's logicalContractId — Design doc §7.1. Reserved for future leg-level LC support; not currently populated by any implemented flow." }
         accountEntries:
           type: array
@@ -1557,10 +1583,9 @@ components:
         Body for POST /balance-movements. Either `naturalKey` (resolves or,
         for a creating movementType, creates the Logical Contract) or an
         explicit `balanceContractId` must be supplied — not both. See
-        CURRENCY DERIVATION (this document's top-level description) for
-        exactly when `currency` is required vs. derived/validated
-        server-side.
-      required: [instrumentType, movementType, eventSeq, amount, createdBy]
+        CURRENCY CONSISTENCY (this document's top-level description) for
+        how `currency` is validated server-side once resolved.
+      required: [instrumentType, movementType, eventSeq, amount, currency, createdBy]
       properties:
         instrumentType: { $ref: '#/components/schemas/InstrumentType' }
         naturalKey: { $ref: '#/components/schemas/NaturalKey' }
@@ -1573,8 +1598,8 @@ components:
             Required for SHGT ISSUE and EPLC_EXAMINATION CREATE (400 if
             missing) — the parent LC/Confirmation this new child contract
             hangs off of. Used both for the parent-sufficiency check at
-            creation time and, per CURRENCY DERIVATION, as the source of
-            this new child contract's own currency.
+            creation time and, per CURRENCY CONSISTENCY, to validate this
+            new child contract's own supplied currency against it.
         movementType: { type: string }
         eventSeq:
           type: integer
@@ -1582,16 +1607,15 @@ components:
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
         currency:
           type: string
-          nullable: true
           description: >
-            REQUIRED only when creating a genuinely root new Logical
-            Contract (a creating movementType with no existing resolution
-            and no parentLogicalContractId — e.g. IPLC_LC/EPLC_CONFIRMATION
-            ISSUE). Omit it in every other case — the server derives it
-            from the resolved existing contract or from the parent, and
-            rejects a caller-supplied value that conflicts with the
-            derived one (409 CURRENCY_MISMATCH). See CURRENCY DERIVATION
-            above for the full rule.
+            Always required. When the request resolves to an existing
+            contract, or creates a new child contract under a supplied
+            parentLogicalContractId, the value must match that contract's
+            (or parent's) own stored currency exactly — a mismatch is
+            rejected (409 CURRENCY_MISMATCH). For a genuinely root new
+            Logical Contract there is nothing to validate against, and this
+            value becomes that contract's own authoritative Currency Code.
+            See CURRENCY CONSISTENCY above for the full rule.
         exposureNature:
           allOf: [{ $ref: '#/components/schemas/ExposureNature' }]
           nullable: true
@@ -1739,7 +1763,11 @@ components:
         `code` is one of: `REQUEST_VALIDATION_FAILED` (400),
         `INSUFFICIENT_AVAILABLE_BALANCE` (409),
         `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0),
-        `CURRENCY_MISMATCH` (409, v1.0.0 — new, see CURRENCY DERIVATION),
+        `CURRENCY_MISMATCH` (409, v1.0.0 — see CURRENCY CONSISTENCY),
+        `MAKER_CHECKER_CONFLICT` (409, business-confirmed 2026-08-24 — the
+        same user who created a movement cannot also Release/Reject/
+        acknowledge it; CANCEL is unaffected, a Maker's own Error Correction
+        on their own still-PENDING entry),
         `ILLEGAL_STATE_TRANSITION` (409),
         `NOT_FOUND` (404),
         `INTERNAL_ERROR` (500 — the response body always carries a fixed,

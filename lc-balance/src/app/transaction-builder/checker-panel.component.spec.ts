@@ -357,7 +357,7 @@ describe('CheckerPanelComponent', () => {
 
       c.searchCheckerLc();
 
-      expect(c.checkerSearchError).toBe('No SG Number record found under this LC.');
+      expect(c.checkerSearchError).toBe('No SG Number record with an actionable PENDING item found under this LC.');
       expect(c.checkerContract).toBeNull();
       expect(c.checkerSecondaryCandidates).toEqual([]);
     });
@@ -385,7 +385,12 @@ describe('CheckerPanelComponent', () => {
     it('more than one candidate: surfaces checkerSecondaryCandidates for the user to pick, without resolving a contract yet', () => {
       const g01 = contract({ balanceContractId: 'sg-1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G01' } });
       const g02 = contract({ balanceContractId: 'sg-2', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G02' } });
-      const api = mockApi({ catalog: jest.fn(() => of(catalogPage([g01, g02]))) });
+      const api = mockApi({
+        catalog: jest.fn(() => of(catalogPage([g01, g02]))),
+        listMovements: jest.fn((balanceContractId: string) =>
+          of([movement({ movementId: `redeem-${balanceContractId}`, status: 'PENDING', movementType: 'FULL_REDEEM', balanceContractId })]),
+        ),
+      });
       const c = new CheckerPanelComponent(api);
       c.selectedFunction = fn('A9');
       c.checkerLcNumber = 'LC1';
@@ -395,7 +400,58 @@ describe('CheckerPanelComponent', () => {
       expect(c.checkerSecondaryCandidates).toEqual([g01, g02]);
       expect(c.checkerContract).toBeNull();
       expect(c.checkerAutoPickedHint).toBeNull();
-      expect(api.listMovements).not.toHaveBeenCalled();
+      expect(api.listMovements).toHaveBeenCalledWith('sg-1');
+      expect(api.listMovements).toHaveBeenCalledWith('sg-2');
+    });
+
+    it('a candidate with nothing actionable (already earmarked/RELEASED) is excluded — business-reported gap 2026-08-24 ("B3/A3/A3S 單獨使用 Checker，已經 earmarked 的交易不應該再被選出")', () => {
+      const eb01 = contract({ balanceContractId: 'exam-1', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S01', ibNumber: 'EB01', sgNumber: null } });
+      const eb02 = contract({ balanceContractId: 'exam-2', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S01', ibNumber: 'EB02', sgNumber: null } });
+      const api = mockApi({
+        catalog: jest.fn(() => of(catalogPage([eb01, eb02]))),
+        listMovements: jest.fn((balanceContractId: string) =>
+          of([
+            movement({
+              movementId: `create-${balanceContractId}`,
+              movementType: 'CREATE',
+              balanceContractId,
+              // eb01's own presentation is already Checker-Released (earmarked) — nothing left to approve.
+              // eb02's is still genuinely PENDING (EARMARKING) — the only one that should survive.
+              status: balanceContractId === 'exam-1' ? 'RELEASED' : 'PENDING',
+            }),
+          ]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('B3');
+      c.checkerLcNumber = 'S01';
+
+      c.searchCheckerLc();
+
+      expect(api.listMovements).toHaveBeenCalledWith('exam-1');
+      expect(api.listMovements).toHaveBeenCalledWith('exam-2');
+      // Only one actionable candidate survives -> auto-resolves instead of surfacing a pick-one list.
+      expect(c.checkerContract?.balanceContractId).toBe('exam-2');
+      expect(c.checkerSecondaryCandidates).toEqual([]);
+      expect(c.checkerAutoPickedHint).toBe('Only one IB Number under this LC — picked automatically.');
+    });
+
+    it('every candidate already earmarked/RELEASED: the same "no actionable record" error as zero candidates, not a misleading pick-one list', () => {
+      const eb01 = contract({ balanceContractId: 'exam-1', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S01', ibNumber: 'EB01', sgNumber: null } });
+      const eb02 = contract({ balanceContractId: 'exam-2', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S01', ibNumber: 'EB02', sgNumber: null } });
+      const api = mockApi({
+        catalog: jest.fn(() => of(catalogPage([eb01, eb02]))),
+        listMovements: jest.fn((balanceContractId: string) => of([movement({ movementType: 'CREATE', balanceContractId, status: 'RELEASED' })])),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('B3');
+      c.checkerLcNumber = 'S01';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSearchError).toBe('No IB Number record with an actionable PENDING item found under this LC.');
+      expect(c.checkerContract).toBeNull();
+      expect(c.checkerSecondaryCandidates).toEqual([]);
     });
 
     it('a catalog() failure sets checkerSearchError from the server message', () => {
@@ -408,6 +464,27 @@ describe('CheckerPanelComponent', () => {
 
       expect(c.checkerSearchError).toBe('boom');
       expect(c.checkerSearching).toBe(false);
+    });
+
+    it("a listMovements() failure for one candidate treats that candidate as not-actionable rather than failing the whole search", () => {
+      const g01 = contract({ balanceContractId: 'sg-1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G01' } });
+      const g02 = contract({ balanceContractId: 'sg-2', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: 'G02' } });
+      const api = mockApi({
+        catalog: jest.fn(() => of(catalogPage([g01, g02]))),
+        listMovements: jest.fn((balanceContractId: string) =>
+          balanceContractId === 'sg-1'
+            ? throwError(() => ({ error: { message: 'boom' } }))
+            : of([movement({ movementId: 'redeem-2', status: 'PENDING', movementType: 'FULL_REDEEM', balanceContractId })]),
+        ),
+      });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A9');
+      c.checkerLcNumber = 'LC1';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerContract?.balanceContractId).toBe('sg-2');
+      expect(c.checkerAutoPickedHint).toBe('Only one SG Number under this LC — picked automatically.');
     });
 
     it('a fresh search clears a previous round\'s leftover checkerSecondaryCandidates/checkerAutoPickedHint', () => {

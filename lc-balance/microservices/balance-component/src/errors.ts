@@ -59,3 +59,28 @@ export class NaturalKeyAlreadyExistsError extends ApiError {
   readonly httpStatus = 409;
   readonly code = 'NATURAL_KEY_ALREADY_EXISTS';
 }
+
+/**
+ * A logical contract's currency is fixed at ISSUE and never changes for the life of that
+ * contract or anything created under it — a caller-supplied `currency` that disagrees with
+ * the resolved contract's (or, for a new child contract, its parent's) own stored currency is
+ * rejected rather than silently recorded on the movement. `currency` itself stays a required
+ * request field (unlike the OAS-GAP-16 "derive/omit" design that was proposed and reverted) —
+ * this only adds the missing consistency check on the value the caller must still supply.
+ */
+export class CurrencyMismatchError extends ApiError {
+  readonly httpStatus = 409;
+  readonly code = 'CURRENCY_MISMATCH';
+}
+
+/**
+ * Business-confirmed 2026-08-24 (genuine 4-eyes Maker/Checker separation) — supersedes
+ * `domain/statusTransition.ts`'s own earlier 2026-08-14 posture of leaving this to a bank's own
+ * role/entitlement policy. The same user who created a movement (`createdBy`) can no longer also
+ * Release/Reject/acknowledge it — see `applyStatusTransition()`'s own doc comment for where this
+ * is actually checked.
+ */
+export class MakerCheckerConflictError extends ApiError {
+  readonly httpStatus = 409;
+  readonly code = 'MAKER_CHECKER_CONFLICT';
+}

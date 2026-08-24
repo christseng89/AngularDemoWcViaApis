@@ -1,5 +1,5 @@
-import { applyStatusTransition } from '../../../src/domain/statusTransition';
-import { IllegalStateTransitionError } from '../../../src/errors';
+import { applyStatusTransition, assertMakerCheckerSeparation } from '../../../src/domain/statusTransition';
+import { IllegalStateTransitionError, MakerCheckerConflictError } from '../../../src/errors';
 
 describe('applyStatusTransition (Design doc §4/§8)', () => {
   test.each([
@@ -13,8 +13,20 @@ describe('applyStatusTransition (Design doc §4/§8)', () => {
     expect(applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' })).toBe(expected);
   });
 
-  test("Maker and Checker being the same user is allowed — not this service's concern (business instruction 2026-08-14)", () => {
-    expect(applyStatusTransition({ currentStatus: 'PENDING', action: 'RELEASE', createdBy: 'alice', actingUser: 'alice' })).toBe('RELEASED');
+  test('Maker and Checker being the same user is REJECTED for RELEASE (business-confirmed 2026-08-24, genuine 4-eyes separation — supersedes the earlier 2026-08-14 posture)', () => {
+    expect(() => applyStatusTransition({ currentStatus: 'PENDING', action: 'RELEASE', createdBy: 'alice', actingUser: 'alice' })).toThrow(
+      MakerCheckerConflictError,
+    );
+  });
+
+  test('Maker and Checker being the same user is REJECTED for REJECT too', () => {
+    expect(() => applyStatusTransition({ currentStatus: 'PENDING', action: 'REJECT', createdBy: 'alice', actingUser: 'alice' })).toThrow(
+      MakerCheckerConflictError,
+    );
+  });
+
+  test('CANCEL is untouched by the 4-eyes rule — a Maker cancelling their OWN still-PENDING entry is the expected, correct case, not a conflict', () => {
+    expect(applyStatusTransition({ currentStatus: 'PENDING', action: 'CANCEL', createdBy: 'alice', actingUser: 'alice' })).toBe('CANCELLED');
   });
 
   test.each([
@@ -25,5 +37,21 @@ describe('applyStatusTransition (Design doc §4/§8)', () => {
     ['SUPERSEDED', 'EDIT'],
   ] as const)('illegal: %s -> %s throws, never silently succeeds', (currentStatus, action) => {
     expect(() => applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' })).toThrow(IllegalStateTransitionError);
+  });
+
+  test('the Maker/Checker conflict is checked BEFORE the legal-transition check — a same-user RELEASE on an already-RELEASED movement still reports the conflict, not a misleading "illegal transition"', () => {
+    expect(() => applyStatusTransition({ currentStatus: 'RELEASED', action: 'RELEASE', createdBy: 'alice', actingUser: 'alice' })).toThrow(
+      MakerCheckerConflictError,
+    );
+  });
+});
+
+describe('assertMakerCheckerSeparation() — the standalone export acknowledgeArrival() uses (bypasses applyStatusTransition() entirely, never changes status)', () => {
+  test('same user throws MakerCheckerConflictError', () => {
+    expect(() => assertMakerCheckerSeparation('alice', 'alice', 'ACKNOWLEDGE')).toThrow(MakerCheckerConflictError);
+  });
+
+  test('different users: no-op', () => {
+    expect(() => assertMakerCheckerSeparation('maker1', 'checker1', 'ACKNOWLEDGE')).not.toThrow();
   });
 });

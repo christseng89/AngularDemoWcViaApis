@@ -1262,3 +1262,94 @@ microservice via `POST /balance-movements` (Submit) + `/release` (Approve) +
 for the full trace-by-trace result (7/7 pass, both negative cases fail exactly as designed). Action items
 2/3 from the Business Rule Decisions memo (backend `businessEventId` enforcement, `BUYERS_USANCE`
 rejection/normalization) remain deliberately out of scope for this pass, by explicit user direction.
+
+## `CurrencyMismatchError` — currency consistency enforced server-side, narrower than the reverted OAS-GAP-16 design
+
+Found during a post-revert OAS-vs-code audit (2026-08-24, after `lc-balance/` was reverted to this file's
+own `LC-Balance-Component-Completed`/block-1 state — see `TODO.md`'s own revert record): the OAS's
+CURRENCY DERIVATION description had been carried since v1.0.0 claiming the server derives/validates
+`currency`, but `balanceService.ts` had zero such logic and `requestSchema.ts` kept `currency`
+unconditionally required — a caller could submit a movement with a `currency` that disagreed with its own
+contract's stored value and the server would silently record it on that movement, no rejection, no
+inconsistency detected anywhere. This is the same failure shape the OAS's own CURRENCY DERIVATION note
+already named (documented in detail, unreachable in practice) — a currency-optional/auto-derive version of
+this had in fact already been implemented once (`ca8472e`, OAS-GAP-16) but was reverted along with ~60
+unrelated commits in the 2026-08-24 revert.
+
+**User-confirmed scope, narrower than `ca8472e`**: `currency` stays a REQUIRED request field (unlike
+`ca8472e`'s "omit it and the server derives it" design) — only the missing consistency check is added.
+`resolveOrCreateContract()` gains two guards: (1) when the request resolves to an EXISTING contract
+(`balanceContractId` or `naturalKey` match), a supplied `currency` that disagrees with `contract.currency`
+throws the new `CurrencyMismatchError` (409 `CURRENCY_MISMATCH`); (2) when creating a new CHILD contract
+under a `parentLogicalContractId`, a supplied `currency` that disagrees with the parent's own currency
+throws the same error. A genuinely root new Logical Contract (no existing resolution, no parent) is
+unaffected — nothing to validate against, `currency` becomes that contract's own authoritative value same
+as before. `errors.ts` gains `CurrencyMismatchError` (409, `CURRENCY_MISMATCH` — already present in the
+OAS's `Error.code` enum, so no enum change needed there); `app.ts`'s existing generic `instanceof ApiError`
+handler picks it up automatically, no route-level wiring needed.
+
+OAS re-grounded to match this narrower scope rather than restoring the old aspirational text: the
+top-level description renamed CURRENCY DERIVATION → **CURRENCY CONSISTENCY**, `currency` added back to
+`BalanceMovementCreateRequest.required` (was absent, matching the old "omit it" design), the field's own
+`nullable: true` removed, and every "derives/omits" phrasing across the file (top-level description,
+`BalanceMovementCreateRequest.currency`/`parentLogicalContractId` descriptions, `BalanceContract.currency`,
+`BalanceMovement.currency`) reworded to "validates a caller-supplied value" — plus an explicit dated note
+recording that the broader optional/derive design was proposed once and reverted, so a future reader
+doesn't rediscover the same history by re-reading `ca8472e`.
+
+4 new unit tests in `balanceService.test.ts` (existing-contract mismatch/match, new-child-contract
+mismatch/match against the parent). Full suite re-run and green: microservice 429/429 (99.23%/96.68%/
+100%/99.49% coverage), Angular 1064/1064, `backend/` 34/34 — no client-side change needed since the
+reference Angular app already always supplies a currency matching its own contract.
+
+## B3/A6/A7/A8/A9/B4/B5's independent Checker candidate search listed already-earmarked (RELEASED) candidates alongside genuinely actionable ones
+
+Business-reported gap 2026-08-24 ("B3、A3、A3S 單獨使用 checker 已經earmarked 的交易 不應該再被選出" —
+live-reproduced with S01/EB01/EB02 before fixing): `checker-panel.component.ts`'s
+`searchCheckerCandidatesByLcOnly()` — the "LC typed, SG/IB Number left blank" ambiguous-pick path any
+function with a `checkerSecondaryField` reaches (A6/A7/A8/A9/B3/B4/B5; A3/A3S never reach it, their own
+natural key is LC Number alone) — only ever checked `catalog()`'s own `status: 'ACTIVE'` (a CONTRACT-level
+field), never whether the candidate had anything genuinely PENDING for this Checker. A B3 presentation
+already Checker-Released (RELEASED, i.e. already earmarked) still surfaced in the "pick one" list exactly
+like a still-PENDING one — selecting it led into an empty Checker Queue, a dead end, live-confirmed with
+S01's own EB01/EB02 (both RELEASED) both listed.
+
+Fixed by extracting `loadCheckerQueue()`'s own inline EARMARKING/EARMARKED filter logic into a shared
+`isCheckerActionable(movement, selectedFunction)` predicate (nullable `selectedFunction`, matching the
+original inline guards exactly) — `searchCheckerCandidatesByLcOnly()` now fetches each candidate's own
+movements and keeps only those with at least one actionable item, via the SAME predicate `loadCheckerQueue()`
+itself uses, so the candidate list and the queue it leads into can never disagree about what counts as
+actionable. A `listMovements()` failure for one candidate is treated as "not actionable" rather than
+failing the whole search (`catchError(() => of(null))`). 4 new tests (candidate excluded, every candidate
+excluded gets the same "no actionable record" message as zero candidates — not a misleading pick-one list,
+a `listMovements()` failure isolated to one candidate). Full suite green: Angular 1067/1067, `ng build
+--configuration production` clean (only the two pre-existing SCSS budget warnings, unrelated). Live-verified
+in-browser: S01 B3 search now correctly reports "No IB Number record with an actionable PENDING item found
+under this LC." instead of listing EB01/EB02.
+
+## `MakerCheckerConflictError` — genuine 4-eyes Maker/Checker separation now enforced, business-confirmed 2026-08-24
+
+Supersedes `domain/statusTransition.ts`'s own original 2026-08-14 posture ("Maker and Checker being the
+same person is NOT enforced here — a bank's own role/entitlement policy, out of scope for this service's
+own state machine"). User-confirmed reversal: the same user who created a movement (`createdBy`) can no
+longer also Release, Reject, or acknowledge (A3/A3S's own Checker step) it.
+
+Checked out via a new exported `assertMakerCheckerSeparation(createdBy, actingUser, action)` in
+`domain/statusTransition.ts` — `applyStatusTransition()` calls it for RELEASE/REJECT only (CANCEL/EDIT
+untouched: CANCEL is a Maker's own Error Correction on their OWN still-PENDING entry, where
+`createdBy === actingUser` is the expected, correct case, not a conflict); `acknowledgeArrival()` in
+`service/balanceService.ts` calls the same exported function directly, since it deliberately bypasses
+`applyStatusTransition()` entirely (never touches `status`). New `MakerCheckerConflictError` (409
+`MAKER_CHECKER_CONFLICT`), picked up automatically by `app.ts`'s existing generic `instanceof ApiError`
+handler. Checked BEFORE the legal-transition check, so a same-user attempt on an already-RELEASED movement
+still reports the conflict, not a misleading illegal-transition error.
+
+Confirmed non-breaking against `backend/data/businessCases.js`'s own orchestrated Business Case Registry
+before shipping — `MAKER`/`CHECKER` constants (`'maker1'`/`'checker1'`) are distinct everywhere `createdBy`/
+`releasedBy` are set, so this genuinely never fires for any registered case. OAS bumped to v1.17.0, `Error.code`
+enum and description both updated (see the CURRENCY CONSISTENCY entry above for that same release's other
+change). 6 new tests (2 in `statusTransition.test.ts` for `applyStatusTransition()` itself, 2 for the
+standalone `assertMakerCheckerSeparation()` export, 3 HTTP-integration in `app.test.ts` covering release/
+reject/acknowledge each independently) — full suite green: microservice 437/437, Angular 1067/1067,
+`backend/` 34/34, no client-side change needed (the reference Angular app already always uses distinct
+maker1/checker1 actors).

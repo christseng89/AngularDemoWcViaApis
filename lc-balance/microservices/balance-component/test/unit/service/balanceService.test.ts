@@ -12,7 +12,7 @@
 import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { InvalidMonetaryAmountError } from '../../../src/money';
-import { IllegalStateTransitionError } from '../../../src/errors';
+import { CurrencyMismatchError, IllegalStateTransitionError } from '../../../src/errors';
 
 describe('BalanceService.createMovement — parseMonetaryAmount enforcement at the service layer (BAL-115)', () => {
   test('AMEND_DECREASE with a malformed amount throws InvalidMonetaryAmountError, not a silent NaN comparison', () => {
@@ -100,6 +100,127 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
         createdBy: 'maker1',
       }),
     ).toThrow(InvalidMonetaryAmountError);
+  });
+});
+
+/**
+ * CurrencyMismatchError (2026-08-24) — currency stays a required request field (unlike the
+ * OAS-GAP-16 "derive/omit" design that was proposed and reverted along with unrelated work), but a
+ * caller-supplied value that disagrees with the resolved contract's — or, for a new child contract,
+ * its parent's — own stored currency must be rejected rather than silently recorded on the new
+ * movement. See resolveOrCreateContract()'s own doc comment for where each check lives.
+ */
+describe('BalanceService.createMovement — currency consistency (CurrencyMismatchError)', () => {
+  test('existing contract: a mismatching currency on a follow-up movement is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CCY-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.movement.balanceContractId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: 2,
+        amount: '5000',
+        currency: 'EUR',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(CurrencyMismatchError);
+  });
+
+  test('existing contract: a matching currency on a follow-up movement still succeeds', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CCY-002' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_INCREASE',
+      eventSeq: 2,
+      amount: '5000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    expect(amend.created).toBe(true);
+  });
+
+  test('new child contract (SHGT ISSUE): a currency that disagrees with the parent LC is rejected', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CCY-003' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber: 'CCY-003' });
+    if (!lc) throw new Error('expected the just-issued LC to resolve');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'CCY-003', sgNumber: 'SG01' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'GBP',
+        parentLogicalContractId: lc.logicalContractId,
+        createdBy: 'maker1',
+      }),
+    ).toThrow(CurrencyMismatchError);
+  });
+
+  test('new child contract (SHGT ISSUE): a currency matching the parent LC still succeeds', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CCY-004' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber: 'CCY-004' });
+    if (!lc) throw new Error('expected the just-issued LC to resolve');
+
+    const sgIssue = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'CCY-004', sgNumber: 'SG01' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      parentLogicalContractId: lc.logicalContractId,
+      createdBy: 'maker1',
+    });
+    expect(sgIssue.created).toBe(true);
   });
 });
 
