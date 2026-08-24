@@ -14,6 +14,7 @@ relevant project before running any command.
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
 | `lc-balance/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`. |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
+| `lc-balance-new/` | **no (gitignored)** | A full, independent parallel copy of `lc-balance/` — own `package.json`/`angular.json`/`backend/`/`microservices/balance-component/` and its own nested `CLAUDE.md`. Not the tracked project; don't assume work done here is reflected in (or should be ported to) `lc-balance/` without checking with the user first. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
 Everything here revolves around **trade finance back-office domain logic**: LC issuance charge/commission
