@@ -1,5 +1,13 @@
 # 決策請求：A6/B4 Calculated Maturity Date 的 UI 唯讀顯示與手動覆寫怎麼做
 
+> **✅ 正式簽核已完成（2026-08-24，Chris Tseng，對話中直接具名下達，非文件協作過程中的 BA 角色代答）**：
+> 問題一～五的「業務已核定」不再只是本文件協作層級的確認——`Maturity-Date-UI-Override-Business-Confirmation-Summary.md`
+> 文末「確認記錄」表格已由具名業務人員填寫完成，`lc-balance/CLAUDE.md`「Tenor Basis / Risk Containment
+> Gate」段落記錄的實作擱置正式解除。工程可以開始實作問題一～五涵蓋的全部範圍（`sightDate` 定義、Mode A
+> vs B、`AFTER_ACCEPTANCE`、`FIXED_MATURITY_DATE` Date Source、以及本文件問題二～五的「不允許覆寫」結論），
+> 不需要再等另一次實體會議簽名。**問題六不在此次解除範圍內**——UI 是否顯示算出的日期本身是實質設計問題，
+> 不是簽核形式問題，維持開放待答，見下方問題六。
+>
 > **✅ v18（2026-08-24，業務回覆，問題二～五全部結案）**：業務正式回覆——**Contractual Maturity Date
 > 與 Operational Payment Date 都不允許直接 Override**，不是問題二原本徵詢的「(a) 允許但受控」方向。
 > 完整規則表與處理流程見下方「✅ 問題二～五 已回覆」區塊。這代表問題二（Operational Payment Date 能否

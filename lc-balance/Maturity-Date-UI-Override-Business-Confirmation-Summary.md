@@ -64,10 +64,10 @@
 
 | 項目 | 內容 |
 |---|---|
-| 確認人（業務） | |
-| 確認日期 | |
-| 問題一至六最終決定 | 見上方各題勾選 |
-| 尚待確認／有爭議的題目 | |
-| 備註 | |
+| 確認人（業務） | Chris Tseng |
+| 確認日期 | 2026-08-24 |
+| 問題一至六最終決定 | 問題一至五：同意上方各題「業務已核定」內容，正式解除 `CLAUDE.md`「Tenor Basis / Risk Containment Gate」對這些項目的擱置（Sight Date 定義、Mode A vs B、DP/DA routing、Import A6 會計分類、Calendar Snapshot 保留、§4.4 Base Date 修正機制、UI 覆寫問題一～五）。**問題六不在此次解除範圍內**——它是「算出來的日期要不要顯示在畫面上」這個獨立的實質設計問題，不是簽核形式問題，維持開放待答。 |
+| 尚待確認／有爭議的題目 | 問題六（Contractual Maturity Date／Operational Payment Date 算出後要不要顯示在 UI） |
+| 備註 | 此確認由 Chris Tseng 在對話中直接、具名下達，非文件協作過程中的 BA 角色代答——依 `CLAUDE.md` 第 1310 行原文「業務已核定」與「具名的實際業務人員完成正式簽核」的區分標準，此次屬於後者。 |
 
 拿到業務簽字或口頭確認後，把這張表帶回來，我會把答案正式寫進 `Maturity-Date-UI-Display-Override-Decision-Request.md`，把「建議預設方向」改成「業務已核定」，並同步更新主文件的相關引用。
