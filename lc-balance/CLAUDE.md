@@ -1325,23 +1325,49 @@ full spec in `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`, decisio
 `Natural-Expiry-Batch-Trigger-Operational-Decision-Request.md`). All of it is external-batch-system-side
 configuration except one item that lands in this microservice: **Maker ≠ Checker is confirmed as a
 system-wide requirement, not scoped to the natural-expiry batch trigger** — an earlier decision-request
-draft had suggested scoping it narrower (batch-only); business explicitly withdrew that framing. `release()`
-needs a new backend check (`if (createdBy === releasedBy) throw ...`) — currently `createdBy`/`releasedBy`
-are unvalidated free strings, same-person Maker/Checker is possible and not rejected anywhere.
+draft had suggested scoping it narrower (batch-only); business explicitly withdrew that framing. Both
+`release()` and `reject()` need the new backend check (`if (createdBy === releasedBy/rejectedBy) throw
+...`) — business confirmed (2026-08-24) `reject()` is in scope too ("`reject()` 是 Checker 的事，所以套用
+Maker≠Checker"): `release()` and `reject()` are both a Checker acting on a Maker-submitted movement, same
+Checker role, same rule. Currently `createdBy`/`releasedBy` (and `reject()`'s own equivalent) are
+unvalidated free strings, same-person Maker/Checker is possible and not rejected anywhere on either path.
 
-**Nothing has been coded yet** — three things to check/do in the same pass whoever implements this:
+**Nothing has been coded yet** — two things to check/do in the same pass whoever implements this:
 1. `domain/statusTransition.ts`'s own doc comment ("Maker and Checker being the same person is NOT enforced
    here...a bank's own role/entitlement policy, out of scope for this service's own state machine") will be
    **factually wrong** once this lands — update it in the same change, don't leave it describing the old
    unenforced behavior.
-2. Whether `reject()` needs the identical check is **not yet confirmed with business** — `release()` and
-   `reject()` are both a Checker acting on a Maker-submitted movement, so it's the likely-same rule, but
-   business flagged this explicitly as still open, not decided by the 2026-08-24 confirmation.
-3. Run `import_lc_test.sh`/`export_lc_test.sh` after implementing — existing fixtures may reuse the same
-   account as both Maker and Checker, which would start failing once the check lands; business flagged this
-   as a probable test-data update, not just a code change.
+2. Run `import_lc_test.sh`/`export_lc_test.sh` after implementing — existing fixtures may reuse the same
+   account as both Maker and Checker on either the `release()` or `reject()` path, which would start failing
+   once the check lands; business flagged this as a probable test-data update, not just a code change.
 
 Also flagged as engineering technical debt in the same review (unrelated to the Maker≠Checker decision):
 `balanceService.ts`'s own `triggeredByExpiry` doc comment cites a `ReleaseMovementRequest` type that does
 not exist anywhere in `types.ts` — `release()` only ever took `(movementId, releasedBy: string)` — fix the
 comment, no behavior change needed.
+
+## Maturity Date / Operational Payment Date override — business confirmed **no override mechanism at all**, questions 2-5 of the UI-Override decision request closed
+
+Business replied (2026-08-24) to `Maturity-Date-UI-Display-Override-Decision-Request.md`'s still-open
+questions 2-5 (Operational Payment Date override: allowed?, permission model, reason-code requirement,
+timing) with a single ruling that closes all four at once, **not** by picking (a)/(b)/(c) on each: neither
+Contractual Maturity Date nor Operational Payment Date may ever be directly overwritten. The only path to a
+different date is correcting the underlying source — Base Date (needs a reason + audit trail, Maker/Checker
+approval) or `fixedMaturityDate` (same, since it's itself the contract-specified date, corrected via formal
+Amendment/Contractual Date Correction per question 1's own already-settled rule, not a new mechanism) —
+which triggers the full recompute chain: source correction → recompute Contractual Maturity Date → call
+Standing → recompute Operational Payment Date → Maker Submit → Checker Approve → new date takes effect.
+This supersedes question 2's own "(a) allow but controlled" suggested-default direction.
+
+**Practical effect — nothing to build**: the `MaturityDateOverride` entity, `overrideOperationalPaymentDate`/
+`effectiveOperationalPaymentDate` fields, and any reason-code enum design proposed in that decision request
+are now moot — Operational Payment Date only ever needs `calculatedOperationalPaymentDate` (Standing's own
+output, never overwritten), which becomes the downstream-referenced value directly once
+`maturityDateStatus === 'APPROVED'`. Question 1 (Contractual Maturity Date can't be overwritten — correct
+the Base Date instead) was already settled this way in an earlier round; this decision extends the identical
+principle to Operational Payment Date and formally retires the whole "independent override" design the
+document had been carrying since v2. Full record and the business reply's own table/flow diagram: see the
+decision request document itself (now closed) and `Maturity-Date-A6-Review.md`'s forward-pointing note under
+its round-16 "問題四" entry. Nothing implemented yet — Angular UI wiring for A6/B4 read-only display remains
+a separate, not-yet-started item per the existing decision log entries above, now simplified since there is
+no override UI to build alongside it.

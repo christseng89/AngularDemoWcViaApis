@@ -152,9 +152,11 @@ Component 完全不管，也不會幫忙重試，需要業務／Ops 自己定義
 > **✅ 已回覆並核定（2026-08-24）**：Maker ≠ Checker 業務已核定為**全系統要求**，不是只限自然到期批次
 > 觸發——下面這段原始背景把它框成「批次觸發要用什麼帳號」的局部問題，這個框架已被業務明確撤回。詳見
 > `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md` 第 4 節與文末「業務／BA 回覆記錄」。範圍
-> 變大後另外衍生兩項工程提醒（`domain/statusTransition.ts` doc comment 需同步更新、`reject()` 是否
-> 一併適用待工程師向業務確認）與一項測試提醒（`import_lc_test.sh`／`export_lc_test.sh` 可能有既有測試
-> 共用 Maker/Checker 帳號），同樣記在該文件裡，不重複列在此處。
+> 變大後另外衍生的工程提醒：`domain/statusTransition.ts` doc comment 需同步更新；`reject()` 是否一併
+> 適用——**已回覆並核定（2026-08-24）：適用**，`release()`／`reject()` 都是 Checker 對 Maker 建立的交易
+> 做的動作，屬於同一個 Checker 角色，Maker≠Checker 同樣套用，工程實作時兩條路徑都要補後端驗證；以及
+> 一項測試提醒（`import_lc_test.sh`／`export_lc_test.sh` 可能有既有測試共用 Maker/Checker 帳號，現在
+> `release()`／`reject()` 兩條路徑都要查），同樣記在該文件裡，不重複列在此處。
 
 `createdBy`／`releasedBy` 在程式碼裡是完全自由的字串，沒有任何格式或身分驗證，同一個字串理論上可以同時
 當這筆交易的 Maker 又當 Checker（`domain/statusTransition.ts` 本身的 doc comment 明講：「Maker and
@@ -210,8 +212,9 @@ scope for this service's own state machine」——這句話本身也已經因�
 - `balanceService.ts` 第 216 行 doc comment 指向不存在的 `ReleaseMovementRequest` 型別、以及
   `domain/statusTransition.ts` 「Maker≠Checker 不強制」那句 doc comment——都已標記為工程技術債／需同步
   更新項目，見 `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`，不需要在這裡進一步決定。
-- `reject()` 是否也要套用 Maker≠Checker 驗證——業務已提醒工程師需要另外確認，尚未在本次核定範圍內拍板，
-  見上述工程需求文件文末「業務／BA 回覆記錄」。
+- ~~`reject()` 是否也要套用 Maker≠Checker 驗證~~——**已回覆並核定（2026-08-24）：適用**，不再是排除項，
+  見上方 B2 小節與 `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`「工程修改範圍」表格下方
+  的補充列。
 
 ---
 

@@ -356,6 +356,16 @@ is subsequently released.
 
 **結論：主要修改由外部批次系統負責；Balance Component 僅需補上 Maker／Checker 不得為同一帳號的後端驗證，並修正現有程式註解。**
 
+> **2026-08-24 補充**：上表「Release 時檢查 Maker ≠ Checker」原本只涵蓋 `release()`；業務已核定
+> `reject()` 比照辦理（見下方「業務／BA 回覆記錄」第 2 點），等於新增一列：
+>
+> | 項目 | 外部批次系統 | Balance Component |
+> |---|---|---|
+> | Reject 時檢查 Maker ≠ Checker | 不適用 | 修改 |
+>
+> 結論同步更新為：Balance Component 需要補上的後端驗證是 `release()` **與** `reject()` 兩條路徑，
+> 不是只有 `release()` 一條。
+
 ---
 
 ## 業務／BA 回覆記錄（2026-08-24）
@@ -368,14 +378,16 @@ is subsequently released.
 1. **`domain/statusTransition.ts` 自己的 doc comment 現在跟業務決策矛盾了**——那句「Maker 和 Checker
    是否同一人，這個狀態機不強制，是銀行自己的政策」是舊的設計說明，業務核定後這句話已經不成立——系統
    現在**要**強制。這句註解需要跟著改，不然以後有人看程式碼還是會以為這是不強制的。
-2. **`reject()` 要不要一併適用**——`release()`（核准）跟 `reject()`（退回）目前都是 Checker 對 Maker
-   建立的交易做動作，如果 Maker≠Checker 是系統性原則，`reject()` 大概率也要同一條規則，不只是
-   `release()`。這點建議工程師順便向業務確認是不是兩個都要管，避免做完 `release()` 才發現 `reject()`
-   漏掉。
+2. ~~**`reject()` 要不要一併適用**~~——**已回覆並核定（2026-08-24）：適用。** 業務回覆：「`reject()`
+   是 Checker 的事，所以套用 Maker≠Checker」——`release()`（核准）跟 `reject()`（退回）都是 Checker 對
+   Maker 建立的交易做的動作，屬於同一個 Checker 角色，Maker≠Checker 這條全系統規則同樣適用，不是只管
+   `release()`。工程實作時 `reject()` 須比照 `release()` 補上同一條後端驗證
+   （`if (createdBy === rejectedBy) throw ...`，欄位名稱依 `reject()` 實際簽章調整）。
 
 另外因為範圍變成全系統，業務建議改完之後順手跑一次既有的 `import_lc_test.sh`／`export_lc_test.sh`，看
 有沒有既有測試流程本來就用同一個帳號當 Maker 又當 Checker——如果有，這次改動會讓那些測試直接跑不過，
-需要一併更新測試資料，不是只改一支程式就結束。
+需要一併更新測試資料，不是只改一支程式就結束。這個提醒現在同時涵蓋 `release()` 跟 `reject()` 兩條路徑，
+測試盤點時兩個都要查。
 
 **BA 回覆**：其餘沒問題，可以交給工程師動手了；如果沒問題，請一併修正相關文檔。
 

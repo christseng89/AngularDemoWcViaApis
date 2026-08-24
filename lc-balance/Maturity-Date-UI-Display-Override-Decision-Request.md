@@ -1,5 +1,17 @@
 # 決策請求：A6/B4 Calculated Maturity Date 的 UI 唯讀顯示與手動覆寫怎麼做
 
+> **✅ v18（2026-08-24，業務回覆，問題二～五全部結案）**：業務正式回覆——**Contractual Maturity Date
+> 與 Operational Payment Date 都不允許直接 Override**，不是問題二原本徵詢的「(a) 允許但受控」方向。
+> 完整規則表與處理流程見下方「✅ 問題二～五 已回覆」區塊。這代表問題二（Operational Payment Date 能否
+> 覆寫）、問題三（覆寫權限模型）、問題四（覆寫原因記錄要求）、問題五（覆寫發生時機）四題**一次性結案**
+> ——不是各自選了 (a)/(b)/(c)，而是業務否決了整個「Operational Payment Date 獨立覆寫機制」的前提：
+> 需要不同日期時一律回頭修正 Base Date 或 `fixedMaturityDate`，觸發「重新計算 Contractual Maturity
+> Date → 呼叫 Standing 重新計算 Operational Payment Date → Maker Submit → Checker Approve」這條完整
+> 鏈路，不建立平行的 `MaturityDateOverride` 覆寫機制/schema。下方「建議資料模型」整段（`overrideOperationalPaymentDate`／
+> `effectiveOperationalPaymentDate`／`MaturityDateOverride` interface）、問題二～五本身、以及「這個答案
+> 會決定什麼」「建議預設方向總覽」兩張表格裡對應的行，均保留原文作為歷史記錄，並在各自位置加註本次結案
+> 結果——不代表這些內容仍是待決選項。
+>
 > **v17（修正第四輪業務覆核指出的兩個小問題，純本文件內部修正，主文件無需同步改版）**：第四輪覆核肯定 v16 已解決前三輪的主要問題（整體評 9.8／10），指出兩個型別／用詞層級的小問題：(1) 「建議資料模型」的 TypeScript 宣告把 `calculatedOperationalPaymentDate`／`effectiveOperationalPaymentDate` 寫成必填的 `string`，但下面的計算公式明確允許回傳 `undefined`——型別與公式互相矛盾，本版改為 `?: string`（optional）；(2) 日期欄位對照表把 `contractualMaturityDate` 描述成「正式合約到期日」，但 `PENDING_APPROVAL` 階段這個值其實還沒正式生效，只有 `APPROVED` 後才算——本版修正描述用詞，並新增一份依 `maturityDateStatus` 三種狀態對應不同 UI 標籤的建議表（`PENDING_BASE_DATE` → Estimated；`PENDING_APPROVAL` → Calculated...Pending Approval；`APPROVED` → Approved），同步更新「建議 UI 顯示欄位」裡 Contractual Maturity Date 那一列的說明。
 >
 > **v16（修正第三輪業務覆核指出的兩處新舊敘述不一致）**：第三輪覆核肯定 v15 已正確納入 UI 顯示需求並區分預估／正式日期，但指出兩處未同步更新的舊敘述：(1) 「三層顯示與驗算控制標準」Layer 1 那一列沿用了新增 Estimated 概念之前的舊講法「不能顯示一個可能是錯的日期」，跟後面新增的「`PENDING_BASE_DATE` 期間可顯示 Estimated 日期」字面矛盾——本版改成依「有沒有可用的 Estimated Base Date」分兩種情況描述；(2) 「建議資料模型」與「這個答案會決定什麼」仍殘留「若問題一選 (b)」的假設性描述，問題一已核定選 (a)，本版移除或標註為「業務已不採納，僅供對照」。另外新增一份 Estimated／Confirmed／Calculated／Override／Effective 完整欄位對照表，統一日期欄位命名與業務意義，並把 `effectiveOperationalPaymentDate` 的計算式明確加上 `maturityDateStatus = APPROVED` 前提。主文件同步改版至 v33，版本號交叉引用一併更新。
@@ -32,7 +44,53 @@
 >
 > **v2**：把原本混在同一個問題底下的「覆寫權限」「原因記錄」「發生時機」拆成三個獨立問題；新增「Contractual Maturity Date 能不能被直接覆寫」這個更根本、應該優先回答的問題；修正一個容易誤導的例子（「提前撥款」不是 Operational Payment Date 的覆寫，是另一筆獨立業務事件）；新增覆寫功能若核准後的建議資料模型（原值／覆寫值／生效值三欄，不得直接覆蓋原始運算結果）與建議 UI 顯示欄位，供業務判斷時參考影響範圍，也供前端後續設計參考。
 >
-> **以下所有問題仍然是開放問題，本文件不代替業務/工程做最終決定**——凡標「建議預設方向」的地方，都是本文件認為風險較低、若業務暫時沒有明確偏好可以先採用的暫定答案，不是既定結論。
+> **以下所有問題仍然是開放問題，本文件不代替業務/工程做最終決定**——凡標「建議預設方向」的地方，都是本文件認為風險較低、若業務暫時沒有明確偏好可以先採用的暫定答案，不是既定結論。**（v18 更新：問題二～五四題已在 2026-08-24 由業務正式回覆結案，不再是開放問題，見文件開頭 v18 說明與下方「✅ 問題二～五 已回覆」區塊；問題一維持原本 v14 起的「業務已核定」狀態不變。）**
+
+## ✅ 問題二～五 已回覆（2026-08-24，業務正式回覆）
+
+**業務回覆原文**：「上次已決定：**Maturity Date 與 Operational Payment Date 都不允許直接 Override。**」
+
+| 日期欄位 | 是否可直接修改／Override | 處理方式 |
+|---|---:|---|
+| Base Date | 可以修正 | 須有理由、Audit Trail，並經 Maker／Checker 核准 |
+| Contractual Maturity Date | 不可以 | 系統依 `Base Date + Tenor Days` 重新計算 |
+| Operational Payment Date | 不可以 | Standing 依 Contractual Maturity Date 及適用行事曆重新計算 |
+| Fixed Maturity Date | 可以輸入或修正 | 因為它本身就是信用狀條款指定的 Contractual Maturity Date，仍須 Maker／Checker |
+
+處理流程：
+
+```text
+修正 Base Date／Fixed Maturity Date
+        ↓
+重新計算 Contractual Maturity Date
+        ↓
+呼叫 Standing
+        ↓
+重新計算 Operational Payment Date
+        ↓
+Maker Submit
+        ↓
+Checker Approve
+        ↓
+新日期正式生效
+```
+
+需特別區分：
+
+* `FIXED_MATURITY_DATE` 是依信用狀條款輸入的合約日期，不屬於直接覆寫系統計算結果。
+* 如日期錯誤，應修正原始 `Base Date` 或 `fixedMaturityDate`，不得直接修改計算產生的 Maturity Date。
+* 已核准資料修正時，新版本尚未經 Checker 核准前，原已生效日期應繼續有效。
+
+**這對下方問題二～五分別代表什麼**：
+
+- **問題二（Operational Payment Date 能否覆寫）**：答案不是原本徵詢的 (a)「允許但受控」或 (b)「不允許、走人工離線處理」，而是第三種——**不允許獨立覆寫，但也不是丟給人工離線處理**：任何需要不同 Operational Payment Date 的情境（含「Standing 行事曆判定本身有誤」這類原本設想的覆寫理由），一律回頭修正 Base Date／`fixedMaturityDate`，由系統重新計算並重新呼叫 Standing，不建立平行的覆寫欄位。
+- **問題三（覆寫權限模型）**：MOOT，沒有獨立的覆寫功能需要設計權限——Base Date／`fixedMaturityDate` 修正本來就走一般 Maker Submit → Checker Release 流程（問題一「Base Date 在不同階段的修改控制」表已經定案），不需要另立專屬角色。
+- **問題四（覆寫的原因記錄要求）**：MOOT，沒有獨立的 `maturityDateOverrideReasonCode` 需要設計——Base Date／`fixedMaturityDate` 修正沿用一般 Amendment／Correction 既有的「須有理由、Audit Trail」慣例（原值／新值／理由／Maker／Checker／核准時間，問題一已定案），不需要另立 (a)/(b)/(c) 三選一的覆寫專屬理由欄位。
+- **問題五（覆寫發生時機）**：MOOT，沒有獨立的 `MaturityDateOverride` 狀態機需要設計——時機規則沿用問題一「Base Date 在不同階段的修改控制」表（Maker 未 Submit／已 Submit 未核准／已 `APPROVED`／Settlement 已完成），這次業務回覆的「新版本尚未經 Checker 核准前，原已生效日期應繼續有效」與問題一原有的「核准前原已生效日期繼續有效，不得先撥回 `PENDING_*`」規則完全一致，是同一條規則的重申，不是新規則。
+
+**對下方「建議資料模型」的影響**：`overrideOperationalPaymentDate`／`effectiveOperationalPaymentDate` 兩個獨立欄位與整個 `MaturityDateOverride` interface **不需要建置**——Operational Payment Date 只有 `calculatedOperationalPaymentDate` 一個值（Standing 算出來的，不被覆蓋、也不需要被覆蓋，因為沒有覆寫路徑），`maturityDateStatus = APPROVED` 後這個值直接就是下游引用的生效值，不需要再疊一層 `effective`/`override` 區分。詳見下方「建議資料模型」段落開頭的更新註記。
+
+---
 
 **發起依據**：`Maturity-Date-Tenor-Basis-Decision-Review.md`（v33）查證
 `analysis/A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md` §2/§3 A6/B4 兩列「✅ 決策已定案，待實作」這個狀態標記時發現：**Base Date＋Tenor Days 的純運算邏輯、以及呼叫 Standing 做假日調整這兩段程式碼本身已經完成並 live 驗證，但用來驗證的 Base Date 輸入是寫死的「建檔當天」，不是依 `tenorBasis` 從正確來源讀來的**（`routes/balanceMovements.ts` 第 51 行目前不論 `tenorBasis` 一律傳入 `service.getBusinessDate()`；本次以 Business Case Runner 驗證的 90 天案例算出 2026-11-23、60 天案例算出 2026-10-22，用的都是「今天」，與 `CLAUDE.md` 既有記錄一致）。**這不代表「Base Date＝建檔當天」是一個已確認可信任的情境，只是目前唯一被拿去測試過的輸入**——`sightDate`／`blDate`／`invoiceDate`／`shipmentDate` 這幾個欄位目前都不存在於 `types.ts`，`AFTER_ACCEPTANCE` 的操作定義也還沒確認，六種 `tenorBasis` 現階段沒有一種的 Base Date 來源被正式驗證過——**含 `FIXED_MATURITY_DATE` 在內**：這個 `tenorBasis` 概念上不需要 Base Date＋Tenor Days 運算，原本以為可以當唯一例外，但主文件本輪查證發現它所需的 `fixedMaturityDate` 欄位本身也完全不存在於資料模型（跟 `tenorBasis` 一樣需要新增），所以現階段一樣沒有可用的例外路徑，詳見主文件 v33 第四、八節新增的 P0。但**UI 唯讀顯示與手動覆寫完全未開始**（依 `CLAUDE.md` 記錄，Angular UI wiring——含 A6/B4 唯讀顯示與 `maturityDateOverrideReason` 覆寫欄位——仍是尚未開始的獨立工作項目；本次查證範圍不含 Angular 原始碼，無法直接核對 `BalanceContract`／`BalanceMovement` interface 宣告，`maturityDateOverrideReason` 全專案零筆存在，只出現在規劃文件裡）。這不是已確認的缺陷，是開始實作這半段時會撞到的開放問題——Revision-Spec §6.1 原規劃只寫了「UI 唯讀顯示，Maker 勾選『手動調整』+ 填寫理由才可覆寫」一句話，覆寫涉及哪個欄位、權限、流程、生效時機都還沒有具體定案。
@@ -112,6 +170,9 @@ Tenor：90 days after acceptance
 
 ### 問題二：Operational Payment Date 覆寫的正確使用情境是什麼？
 
+> **✅ 已回覆（2026-08-24）：不允許獨立覆寫**，見文件開頭「✅ 問題二～五 已回覆」區塊。以下原始問題與選項
+> 保留作為決策過程的歷史記錄。
+
 **需要先排除一個容易混淆的情境**：受益人／出口商要求提前拿到款項（押匯、貼現、預付），這是一筆**獨立的業務事件**（Discount／Negotiation／Prepayment），不是把 Operational Payment Date 改成提早的那一天——原到期日（不論 Contractual 或 Operational）應該維持不變，提前撥付的是另一筆融資款項，不是把「到期日」本身往前搬。這兩者若在系統或文件裡混為一談，會讓「到期日」這個概念失去意義。
 
 真正可能需要 Operational Payment Date 覆寫的情境（供參考，非本文件窮舉）：Standing 回傳的行事曆判定本身有誤（例如遺漏了某個臨時公告的休市日）；某個清算系統臨時停止作業；銀行依既有授權書面指示採用某個例外的處理日期。
@@ -127,12 +188,20 @@ Tenor：90 days after acceptance
 
 ### 問題三：覆寫的權限模型？
 
+> **✅ 已回覆（2026-08-24）：MOOT，沒有獨立覆寫功能**，沿用問題一已定案的 Base Date／`fixedMaturityDate`
+> 修正流程（一般 Maker Submit → Checker Release），不需要另立專屬角色，見文件開頭「✅ 問題二～五 已回覆」
+> 區塊。以下原始問題與選項保留作為決策過程的歷史記錄。
+
 | 選項 | 說明 |
 |---|---|
 | **(a) 沿用一般 Maker Submit → Checker Release 流程** | 提出覆寫的 Maker／核准覆寫的 Checker 跟一般交易的 Maker／Checker 是同一組人、同一套權限 |
 | **(b) 限定具備 Maturity Override 專屬權限的角色** | 只有特定授權的 Maker／Checker 可以提出或核准覆寫，需要新增角色／權限判斷 |
 
 ### 問題四：覆寫的原因記錄要求？（與問題三的答案可以任意組合，不是互斥選項）
+
+> **✅ 已回覆（2026-08-24）：MOOT，沒有獨立的覆寫原因欄位**，沿用問題一 Base Date／`fixedMaturityDate`
+> 修正既有的「須有理由、Audit Trail」慣例，不需要另立 (a)/(b)/(c) 三選一的覆寫專屬 reasonCode，見文件
+> 開頭「✅ 問題二～五 已回覆」區塊。以下原始問題與選項保留作為決策過程的歷史記錄。
 
 | 選項 | 說明 |
 |---|---|
@@ -141,6 +210,11 @@ Tenor：90 days after acceptance
 | **(c) 理由分類與自由文字都必填** | 兩者都要，兼顧統計與個案說明 |
 
 ### 問題五：覆寫的發生時機，跟第四節已定案的 `MaturityDateStatus` 生命週期怎麼接？
+
+> **✅ 已回覆（2026-08-24）：MOOT，沒有獨立的覆寫狀態機**，時機規則沿用問題一「Base Date 在不同階段的
+> 修改控制」表；業務這次回覆的「新版本尚未經 Checker 核准前，原已生效日期應繼續有效」與問題一原有規則
+> 完全一致，是重申不是新規則，見文件開頭「✅ 問題二～五 已回覆」區塊。以下原始問題與選項保留作為決策
+> 過程的歷史記錄。
 
 | 選項 | 說明 |
 |---|---|
@@ -183,6 +257,13 @@ Tenor：90 days after acceptance
 **必須明確禁止**：Estimated 值不得供 Settlement、報表正式到期日、逾期判斷或任何正式客戶通知使用，僅能作為畫面上「先讓 Maker／Checker 有個概念」的參考值，且畫面上要用跟 Layer 1 一致的標示方式呈現，不能讓使用者誤認成正式答案。詳細範例與資料模型建議見主文件 4.4 節。
 
 ## 建議資料模型（若核准 Operational Payment Date 允許覆寫，供工程參考，非本次業務決策範圍）
+
+> **✅ 已回覆（2026-08-24）：不需要建置**——業務已核定 Operational Payment Date 不允許獨立覆寫（見文件
+> 開頭「✅ 問題二～五 已回覆」區塊），下方 `overrideOperationalPaymentDate`／`effectiveOperationalPaymentDate`
+> 兩個欄位與整個 `MaturityDateOverride` interface 都不需要實作。Operational Payment Date 只需要
+> `calculatedOperationalPaymentDate` 一個值（Standing 算出來的，永遠不被覆蓋），`maturityDateStatus =
+> APPROVED` 後這個值直接就是下游引用的生效值，不需要再疊一層 `effective`/`override` 區分。以下內容保留
+> 作為決策過程的歷史記錄。
 
 **日期欄位命名統一對照表（v16 新增，回應第三輪業務覆核：主文件 4.4 節的 Estimated／Confirmed 欄位，跟這裡的 Calculated／Override／Effective 欄位分別回答兩個不同階段的問題——前者是「Base Date 還沒確認時可以顯示什麼」，後者是「Base Date 確認、系統算出結果之後，覆寫機制怎麼運作」——這裡統一整理成一張表，避免兩組欄位名稱看起來像是互相獨立、彼此矛盾）**：
 
@@ -242,7 +323,9 @@ interface MaturityDateOverride {
 
 ## 建議 UI 顯示欄位（供前端設計參考，非本次業務決策範圍）
 
-A6／B4 Acceptance 畫面建議至少顯示：Tenor Basis／Tenor Days／Base Date／Base Date Source／Contractual Maturity Date／Calculated Operational Payment Date／Effective Operational Payment Date／Business-Day Convention／`Maturity Date Status`（建議明顯標示，不要只顯示日期不顯示狀態，避免使用者把 `PENDING_BASE_DATE`／`PENDING_APPROVAL` 的預覽值誤認成正式到期日）／Override Indicator（是否有覆寫）／Override Reason（有覆寫時顯示）／Calendar Snapshot／Calculation ID（可放在詳細資料或稽核畫面）。
+**（v18 更新：Operational Payment Date 不允許覆寫已結案，下方欄位清單原本的 Effective Operational Payment Date／Override Indicator／Override Reason 三項不需要——Operational Payment Date 只有 `calculatedOperationalPaymentDate` 一個值，見「✅ 問題二～五 已回覆」區塊；以下維持原文，供對照歷史規劃範圍）**：
+
+A6／B4 Acceptance 畫面建議至少顯示：Tenor Basis／Tenor Days／Base Date／Base Date Source／Contractual Maturity Date／Calculated Operational Payment Date／~~Effective Operational Payment Date~~／Business-Day Convention／`Maturity Date Status`（建議明顯標示，不要只顯示日期不顯示狀態，避免使用者把 `PENDING_BASE_DATE`／`PENDING_APPROVAL` 的預覽值誤認成正式到期日）／~~Override Indicator（是否有覆寫）／Override Reason（有覆寫時顯示）~~／Calendar Snapshot／Calculation ID（可放在詳細資料或稽核畫面）。
 
 **核心欄位是否可修改（依問題一的業務已核定方向，主文件 4.4 節）**：
 
@@ -251,7 +334,7 @@ A6／B4 Acceptance 畫面建議至少顯示：Tenor Basis／Tenor Days／Base Da
 | Base Date | 例如 Acceptance Date、Sight Date、BL Date、Invoice Date、Shipment Date | 可以依正確業務日期修正，須走 Maker／Checker 核准並保留異動紀錄 |
 | `fixedMaturityDate`（`FIXED_MATURITY_DATE` 專屬，不屬於 Base Date） | 條款直接指定的合約到期日 | 可以修正，但須走正式 LC Amendment／Contractual Date Correction，不是 Base Date Correction |
 | Contractual Maturity Date | 依 Base Date 與 Tenor 計算的合約到期日 | 唯讀，由系統計算，不接受直接輸入；依 `maturityDateStatus` 顯示不同標籤（v17 統一：`PENDING_BASE_DATE` → Estimated Contractual Maturity Date；`PENDING_APPROVAL` → Calculated Contractual Maturity Date — Pending Approval；`APPROVED` → Contractual Maturity Date — Approved，見上方「日期欄位命名統一對照表」下方的標籤建議） |
-| Operational Payment Date | 經 Standing 檢查週末及假日後的實際作業日 | 原則上由系統計算；如允許人工調整（問題二），須經理由及 Maker／Checker 核准；`PENDING_BASE_DATE` 期間若有 Estimated Operational Payment Date，僅供顯示，不得作為正式撥款日 |
+| Operational Payment Date | 經 Standing 檢查週末及假日後的實際作業日 | **唯讀，由系統計算，不接受直接覆寫（v18 已結案）**——需要不同日期時回頭修正 Base Date／`fixedMaturityDate`，由系統重新計算；`PENDING_BASE_DATE` 期間若有 Estimated Operational Payment Date，僅供顯示，不得作為正式撥款日 |
 
 範例：
 
@@ -277,9 +360,8 @@ Operational Payment Date：Standing 重新檢查行事曆並計算
 
 | 回答 | 對落地的影響 |
 |---|---|
-| 問題一（**業務已核定選 (a)**） | Contractual Maturity Date 完全不進入覆寫功能的設計範圍，覆寫功能只需要處理 Operational Payment Date 一個欄位，範圍最小 |
-| 問題三選 (a)＋問題五選 (a) | 覆寫可以直接套用本文件已定案的 `MaturityDateStatus` 生命週期與既有 Maker/Checker 流程，不需要新狀態機或新角色，工程範圍最小 |
-| 問題三選 (b)，或問題五選 (b)／(c) | 需要新增角色／權限判斷，或新增獨立的 `MaturityDateOverride` 狀態機，前端與後端範圍都會擴大，需要重新評估交付時程 |
+| 問題一（**業務已核定選 (a)**） | Contractual Maturity Date 完全不進入覆寫功能的設計範圍 |
+| ~~問題三選 (a)＋問題五選 (a)~~／~~問題三選 (b)，或問題五選 (b)／(c)~~ | **v18 已結案，MOOT**——問題二～五確認不建立任何覆寫功能（見「✅ 問題二～五 已回覆」區塊），沒有覆寫機制就沒有權限模型／狀態機分支需要選，這兩列的分支比較本身不再適用；工程範圍是「Base Date／`fixedMaturityDate` 修正 → 全鏈重算」這一條既有的問題一流程，不需要另外評估交付時程 |
 | UI 唯讀顯示（不受上述問題影響） | **開發**可以立刻排入下一輪、不必等覆寫規則定案；但**正式上線**必須先完成主文件 v33 第八節的 Production Readiness Gate（Base Date 依 `tenorBasis` 差異化讀取、Contractual／Operational 分欄持久化、Calendar Snapshot），不能因為畫面做完了就繞過這些後端 Release Blocker——開發跟上線是兩件事，見下方問題六 |
 
 ## 建議預設方向總覽（若業務暫時沒有明確偏好，可先採用；仍須正式確認，不是既定結論）
@@ -287,10 +369,10 @@ Operational Payment Date：Standing 重新檢查行事曆並計算
 | 問題 | 建議預設方向 |
 |---|---|
 | 問題一：Contractual Maturity Date 能否直接覆寫 | **不允許（業務已核定）**——錯了回頭修正 Base Date（Acceptance Date／Sight Date／BL Date／Invoice Date／Shipment Date），系統重新計算；`fixedMaturityDate` 不是 Base Date，修正須走正式 Amendment（見上方問題一與主文件 4.4 節） |
-| 問題二：Operational Payment Date 能否覆寫 | 允許，但受控，且仍須通過行事曆／營業日檢查，例外需要特殊授權標記 |
-| 問題三：覆寫的權限模型 | 沿用一般 Maker Submit → Checker Release 流程，不另設專屬角色 |
-| 問題四：覆寫的原因記錄要求 | Reason Code 必填＋自由文字必填，兩者都要 |
-| 問題五：覆寫的發生時機 | Acceptance CREATE Submit 階段可提出，沿用既有 `MaturityDateStatus` 生命週期；若業務另外需要 Approved 之後才覆寫，走獨立 `MaturityDateOverride` Event，不撥回 `maturityDateStatus` |
+| 問題二：Operational Payment Date 能否覆寫 | ~~允許，但受控，且仍須通過行事曆／營業日檢查，例外需要特殊授權標記~~ → **✅ 已回覆（v18）：不允許**，回頭修正 Base Date／`fixedMaturityDate`，由系統與 Standing 重新計算 |
+| 問題三：覆寫的權限模型 | ~~沿用一般 Maker Submit → Checker Release 流程，不另設專屬角色~~ → **✅ 已回覆（v18）：MOOT**，沒有獨立覆寫功能，權限沿用問題一 Base Date／`fixedMaturityDate` 修正既有的 Maker/Checker 流程 |
+| 問題四：覆寫的原因記錄要求 | ~~Reason Code 必填＋自由文字必填，兩者都要~~ → **✅ 已回覆（v18）：MOOT**，沒有獨立覆寫原因欄位，沿用問題一 Base Date／`fixedMaturityDate` 修正既有的「須有理由、Audit Trail」慣例 |
+| 問題五：覆寫的發生時機 | ~~Acceptance CREATE Submit 階段可提出，沿用既有 `MaturityDateStatus` 生命週期；若業務另外需要 Approved 之後才覆寫，走獨立 `MaturityDateOverride` Event，不撥回 `maturityDateStatus`~~ → **✅ 已回覆（v18）：MOOT**，沒有獨立覆寫狀態機，時機沿用問題一「Base Date 在不同階段的修改控制」表 |
 | 問題六：UI 唯讀顯示是否可獨立先上線 | **開發**可以獨立先做，不受覆寫規則影響；**正式上線**不能繞過主文件的 Production Readiness Gate（Base Date 差異化讀取等 P0 未解決前，即使畫面做完了也不能正式開放給使用者看，因為顯示的日期本身可能是錯的）；若業務要求提前部署 UI 做內部驗證，建議用 Feature Flag 限制在已完成後端驗證的範圍內，不對一般使用者開放 |
 
 ## 不在這次決策範圍內的事
