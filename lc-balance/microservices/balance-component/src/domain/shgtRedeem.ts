@@ -26,7 +26,7 @@
 import Decimal from 'decimal.js';
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
-export type RedeemCheckResult = { ok: true } | { ok: false; error: string; reasonCode: 'EXCEEDS_RECORD_AVAILABLE_BALANCE' };
+export type RedeemCheckResult = { ok: true } | { ok: false; error: string };
 
 export function checkRedeemSufficiency(params: { redeemAmount: Decimal; sgAvailableBalance: Decimal }): RedeemCheckResult {
   const { redeemAmount, sgAvailableBalance } = params;
@@ -34,7 +34,6 @@ export function checkRedeemSufficiency(params: { redeemAmount: Decimal; sgAvaila
     return {
       ok: false,
       error: `Amount ${redeemAmount.toFixed()} exceeds this record's Available Balance ${sgAvailableBalance.toFixed()} (Confirmed Balance minus any other still-PENDING settlement already reserved against it).`,
-      reasonCode: 'EXCEEDS_RECORD_AVAILABLE_BALANCE',
     };
   }
   return { ok: true };

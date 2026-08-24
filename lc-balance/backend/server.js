@@ -24,76 +24,13 @@ app.use(express.json());
 
 const BALANCE_SERVICE_URL = process.env.BALANCE_SERVICE_URL || 'http://localhost:4100';
 
-// 2026-08-23, follow-up to the load-testing investigation above — transient connection-level failures
-// (fetch() itself throwing before any Response ever comes back: ECONNRESET/ECONNREFUSED/ETIMEDOUT/EPIPE/
-// undici's own UND_ERR_CONNECT_TIMEOUT/UND_ERR_SOCKET) are retried a bounded number of times with a short
-// backoff. Deliberately NOT applied to a received-but-rejected HTTP response (a 429/409/500 etc. is not a
-// connection failure — retrying INTO an active rate limit would make it worse, not better; that case is
-// handled entirely by the JSON-parse-failure branch below instead, which throws immediately, no retry).
-const RETRYABLE_ERROR_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET']);
-const RETRY_DELAYS_MS = [100, 200]; // 2 retries (3 attempts total) — first retry after 100ms, second after 200ms.
-
-/**
- * Whether a transient connection failure on this call is safe to retry — i.e. whether the call itself is
- * idempotent. GET is always safe (read-only). The ONE mutating call that's also safe is
- * `POST /balance-movements` (createMovement): Design doc §8's own (balanceContractId, eventSeq) key is
- * enforced server-side via a UNIQUE constraint, so a resubmission after a lost response returns the
- * EXISTING record (200), never a duplicate — see routes/balanceMovements.ts's own `result.created ? 201 :
- * 200` branch. Every OTHER mutating call this orchestrator makes (release/reject/cancel/maker-submit/
- * acknowledge, all POST .../{movementId}/...) acts on an EXISTING movement through a status-transition
- * guard that explicitly fails loudly on a repeat call (statusTransition.ts's own "never a silent no-op
- * success on an illegal transition" design, e.g. RELEASE on an already-RELEASED movement) — retrying one
- * of those after the ORIGINAL call actually succeeded server-side but its response was lost in transit
- * would turn a real success into a spurious 409 the caller has no way to tell apart from a genuine
- * illegal-transition rejection. None of those are idempotent by this service's own design, so none of
- * them are retried here.
- */
-function isRetryableCall(method, path) {
-  if (method === 'GET') return true;
-  return method === 'POST' && path === '/balance-movements';
-}
-
-async function fetchWithRetry(method, path, init) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await fetch(`${BALANCE_SERVICE_URL}${path}`, init);
-    } catch (err) {
-      const code = err.cause?.code ?? err.code;
-      if (!isRetryableCall(method, path) || !RETRYABLE_ERROR_CODES.has(code) || attempt >= RETRY_DELAYS_MS.length) {
-        throw err;
-      }
-      const delayMs = RETRY_DELAYS_MS[attempt];
-      console.warn(`[callMicroservice] ${method} ${path} failed (${code}); retry ${attempt + 1}/${RETRY_DELAYS_MS.length} in ${delayMs}ms.`);
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-}
-
 async function callMicroservice(method, path, body) {
-  const res = await fetchWithRetry(method, path, {
+  const res = await fetch(`${BALANCE_SERVICE_URL}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = await res.json().catch((err) => {
-    // 2026-08-23, diagnosed via manual "Run All 10 Cases" load testing — a non-2xx response whose body
-    // isn't JSON never came from this microservice's own API (every one of its own routes, success or
-    // ApiError, always answers with a JSON body — see errors.ts's own toBody()); it came from something
-    // IN FRONT of the API instead, e.g. its express-rate-limit default 429 handler, which answers
-    // "Too many requests, please try again later." as text/html, not JSON. Silently falling back to
-    // `body: null` here used to let some LATER step crash several calls downstream with a useless
-    // "Cannot read properties of null (reading 'balanceContractId')" once it dereferenced this response
-    // (see resolveLogicalContractId()'s own doc comment) — reproduced by running enough business cases
-    // back-to-back to exceed the microservice's 120-req/60s limit on /balance-movements. Throwing here
-    // immediately, naming the real status, turns that into an error that actually says what happened.
-    // A genuinely OK (2xx) response with an unparseable body is left as the existing lenient `null`
-    // fallback below — rare, and (so far) only ever hit by a trailing `snapshot` step whose own result
-    // is never dereferenced by anything downstream, so failing the whole run over it would be overkill.
-    if (!res.ok) {
-      throw new Error(`Non-JSON response from microservice (${method} ${path} -> ${res.status} ${res.statusText}): ${err.message}`);
-    }
-    return null;
-  });
+  const json = await res.json().catch(() => null);
   return { status: res.status, ok: res.ok, body: json };
 }
 
@@ -221,7 +158,7 @@ app.post('/api/business-cases/:id/run', runLimiter, async (req, res) => {
     const trace = await runCase(businessCase);
     res.json({ id: businessCase.id, title: businessCase.title, description: businessCase.description, trace });
   } catch (err) {
-    const detail = err instanceof Error ? `${err.message}${err.cause ? ` (cause: ${err.cause})` : ''}` : String(err);
+    const detail = err instanceof Error ? err.message : String(err);
     // Quality-report-balance.md BAL-117: was echoing `detail` straight into the response body — any
     // caller (this endpoint has no authentication) could read back internal error detail (e.g. a
     // downstream microservice's own raw error body, re-serialized into this message by
@@ -248,4 +185,4 @@ if (require.main === module) {
 // handler's own public surface (`app`) separate from the test-only seam (`runCase`/
 // `resolveLogicalContractId`/`callMicroservice`, exported purely so runCase.test.js can unit-test them
 // directly — see that file's own doc comment for why).
-module.exports = { app, runCase, resolveLogicalContractId, callMicroservice, isRetryableCall };
+module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };

@@ -11,12 +11,8 @@
  *     make every one of those migrations' own `if (!columns.includes(...))` ALTER TABLE branches
  *     permanently unreachable, silently erasing this file's own coverage of the ADD-COLUMN code paths
  *     migrations.test.ts exists to test in the first place.
- *   - balance_contracts, by contrast, had its FULL column set from day one through migration 13 — no
- *     migration before 14 ever added a column to that table (migrations 12/13 changed its indexes/
- *     constraints, not its columns). Migration 14 (2026-08-23, Date Control Phase 0) is the first to add
- *     columns here too (expiry_date/issue_date) — migration13DataPreservation.test.ts's own
- *     balance_contracts case now projects onto the day-one column set before comparing, same as the
- *     balance_movements case already did.
+ *   - balance_contracts, by contrast, has its FULL column set from day one — no migration has ever added a
+ *     column to that table (migrations 12/13 change its indexes/constraints, not its columns).
  *   - Running the real migration sequence (1 through 13, in order, exactly like runMigrations() always
  *     does) still ends with every column present before migration 13's own rebuild needs them — 1-11 add
  *     the missing 17 first, so this fixture works for migration-13-focused tests too, not only 1-11's own.

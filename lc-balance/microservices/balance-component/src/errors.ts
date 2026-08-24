@@ -8,19 +8,8 @@ export abstract class ApiError extends Error {
   abstract readonly httpStatus: number;
   abstract readonly code: string;
 
-  /**
-   * v1.17.0 — was previously accepted by nothing: every subclass relied on the implicit no-arg
-   * constructor chain up to `Error(message)`, so `details` had no way to reach `toBody()` even though
-   * `ApiErrorBody.details` had been declared in `types.ts` since v1.1.0. See OAS-GAP-06's own
-   * `reasonCode` design (`Balance Contract Integration Proposal.md`) — undocumented-but-live vs.
-   * documented-but-unreachable are both real bugs; this fixes the latter.
-   */
-  constructor(message: string, readonly details?: Record<string, unknown>) {
-    super(message);
-  }
-
   toBody(): ApiErrorBody {
-    return this.details ? { code: this.code, message: this.message, details: this.details } : { code: this.code, message: this.message };
+    return { code: this.code, message: this.message };
   }
 }
 
@@ -69,29 +58,4 @@ export class ContractVersionConflictError extends ApiError {
 export class NaturalKeyAlreadyExistsError extends ApiError {
   readonly httpStatus = 409;
   readonly code = 'NATURAL_KEY_ALREADY_EXISTS';
-}
-
-/**
- * OAS-GAP-16 (Balance Contract Integration Proposal.md), business/architecture-decided 2026-08-22,
- * direction (a) — CURRENCY DERIVATION (documented in balance-component-api.yaml since v1.0.0) is now
- * genuinely enforced server-side: a caller-supplied `currency` that does not match the resolved
- * contract's own (existing contract, or its parent for a new child contract) is rejected outright.
- * Previously documented but never implemented — `currency` was silently stored verbatim with no
- * comparison at all; this class, and the throw sites in `resolveOrCreateContract()`, are the fix.
- */
-export class CurrencyMismatchError extends ApiError {
-  readonly httpStatus = 409;
-  readonly code = 'CURRENCY_MISMATCH';
-}
-
-/**
- * `clients/standingClient.ts` — thrown when the external Standing microservice (Calculated Maturity Date,
- * see Maturity-Date-Business-Day-Convention-Decision-Request.md) is unreachable or rejects a request.
- * 503, mirroring Standing's own `CALENDAR_SERVICE_TIMEOUT`/`CALENDAR_DATA_STALE` codes (design doc §3.8) —
- * deliberately fail-closed: a caller that opted into a calculated Maturity Date must never silently fall
- * back to an uncalculated one just because Standing was unreachable.
- */
-export class CalendarServiceError extends ApiError {
-  readonly httpStatus = 503;
-  readonly code = 'CALENDAR_SERVICE_UNAVAILABLE';
 }

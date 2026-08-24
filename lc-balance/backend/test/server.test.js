@@ -64,13 +64,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('GET /api/business-cases', () => {
-    it('lists all 25 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
+    it('lists all 23 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
       global.fetch = jest.fn();
 
       const res = await request(app).get('/api/business-cases');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(25);
+      expect(res.body).toHaveLength(23);
 
       const registry = buildRegistry();
       res.body.forEach((c, i) => {
@@ -393,18 +393,6 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(res.status).toBe(500);
       expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('import-case-1'), 'boom');
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("appends the underlying err.cause to the server-side log line when present (2026-08-23, load-testing follow-up — Node's own \"fetch failed\" TypeError wraps the real reason, e.g. ECONNRESET, in .cause; the bare err.message alone is just the unhelpful literal string \"fetch failed\")", async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      global.fetch = jest.fn(() => Promise.reject(new TypeError('fetch failed', { cause: new Error('ECONNRESET') })));
-
-      const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
-
-      expect(res.status).toBe(500);
-      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
-      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('import-case-1'), 'fetch failed (cause: Error: ECONNRESET)');
       consoleErrorSpy.mockRestore();
     });
   });

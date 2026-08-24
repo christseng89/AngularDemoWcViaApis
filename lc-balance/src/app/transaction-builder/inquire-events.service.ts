@@ -8,11 +8,8 @@ import {
   BALANCE_SNAPSHOT_LABEL,
   InstrumentType,
   TransactionFunction,
-  acceptanceMaturityReferenceFields,
   childInstrumentTypesOf,
   defaultLcInstrumentTypeForSide,
-  findMaturityDateProfileValue,
-  maturityDateCalendarsSummary,
   tenorTypeLabel,
 } from './balance-component.model';
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
@@ -80,21 +77,6 @@ export function secondaryReferenceForEvent(event: InquiredEvent): string {
   if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
   if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
   return '—';
-}
-
-/**
- * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1/§2/§3 — defensive read-back truncation for
- * selectEvent()'s own model. Bug fixed 2026-08-23 (user-reported, "Inquire Event S101, there is no issue
- * date... shown"): the root cause was BalanceService.createContract()'s own defaulted `issueDate` being a
- * full ISO-8601 TIMESTAMP rather than a plain "YYYY-MM-DD" Business Date — HTML's `<input type="date">`
- * doesn't error on that mismatch, it just silently renders blank. That's fixed at the source now (see the
- * microservice's own createContract()), but this truncation stays as defense-in-depth: it makes any
- * ALREADY-PERSISTED legacy record (written before that fix) still display correctly here, and protects
- * against the same class of bug recurring from any other future caller. A no-op for an already-clean
- * "YYYY-MM-DD" value (slicing its first 10 characters returns itself).
- */
-function toDateOnly(value: string | null | undefined): string | undefined {
-  return value ? value.slice(0, 10) : undefined;
 }
 
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
@@ -502,39 +484,7 @@ export class InquireEventsService {
       secondaryRef: movement.sourceTransactionRef ?? undefined,
       tenorType: contract.tenorType ?? undefined,
       tenorDays: contract.tenorDays ?? undefined,
-      // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1/§2/§3 — the reconstructed read-only
-      // screen must carry the same date fields the live form does, sourced from wherever they're
-      // actually persisted: A1/B1's own expiryDate/issueDate live on the CONTRACT (set once at root
-      // ISSUE); A2/B2 Extend Expiry's own "New Expiry Date" is a genuinely different value living on
-      // the MOVEMENT itself (the requested new value, see BalanceMovement.expiryDate's own doc comment
-      // for why it's distinct from BalanceContract.expiryDate despite the same field name) — the two
-      // are mutually exclusive by movementType, so one ternary correctly picks the right source.
-      expiryDate: toDateOnly(movement.movementType === 'AMEND_EXPIRY' ? movement.expiryDate : contract.expiryDate),
-      issueDate: toDateOnly(contract.issueDate),
-      documentPresentationDate: toDateOnly(movement.documentPresentationDate),
-      // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 — A1/B1's own tenorBasis/fixedMaturityDate
-      // live on the contract only (no per-movement AMEND path exists yet, see this doc's own §3.1 "NOT
-      // CONFIRMED for A2/B2" scope note), so this reads straight from `contract`, no movement-vs-contract
-      // ternary needed (unlike expiryDate/maturityDateProfile above).
-      tenorBasis: contract.tenorBasis ?? undefined,
-      fixedMaturityDate: toDateOnly(contract.fixedMaturityDate),
     };
-    // UI-only read-only reference (2026-08-24) — see balance-component.model.ts's own
-    // acceptanceMaturityReferenceFields() doc comment; shared with MakerPanelComponent's live A7/B5 entry
-    // so the two screens can never disagree.
-    Object.assign(model, acceptanceMaturityReferenceFields(contract));
-    // A6/B4 Calculated Maturity Date (2026-08-23) — same "movement carries the REQUESTED new value for
-    // its own movementType, contract carries the current one otherwise" ternary as expiryDate/
-    // AMEND_EXPIRY immediately above, just AMEND_MATURITY_CALENDARS instead. Feeds BOTH
-    // maturityDateProfile (A1/B1/A2/B2's own reconstructed select) and maturityDateCalendarsReference
-    // (A3/A3S's own read-only reference) from the one resolved value — B3's own EPLC_EXAMINATION
-    // `contract` has no calendars/tenorType of its own (that lives on the parent Confirmation, not
-    // fetched here), so this intentionally stays blank for B3 events rather than an extra lookup for a
-    // reference-only field; builder-fields.ts's own tenorType-gated hide condition already keeps it
-    // hidden in that case too, so nothing incorrect is ever shown.
-    const maturityDateCalendarsForDisplay = movement.movementType === 'AMEND_MATURITY_CALENDARS' ? movement.maturityDateCalendars : contract.maturityDateCalendars;
-    model.maturityDateProfile = findMaturityDateProfileValue(maturityDateCalendarsForDisplay);
-    model.maturityDateCalendarsReference = maturityDateCalendarsSummary(maturityDateCalendarsForDisplay) || undefined;
     this.selectedEventModel = model;
 
     const ctx: BuilderFieldsContext = {

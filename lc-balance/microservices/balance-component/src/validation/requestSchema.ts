@@ -24,14 +24,7 @@ export const createMovementRequestSchema = z
     movementType: z.string({ required_error: 'movementType is required.' }).min(1, 'movementType is required.'),
     eventSeq: z.number({ required_error: 'eventSeq is required.', invalid_type_error: 'eventSeq must be a number.' }),
     amount: z.string({ required_error: 'amount is required.' }).min(1, 'amount is required.'),
-    /**
-     * OAS-GAP-16 direction (a), 2026-08-22 — CURRENCY DERIVATION (balance-component-api.yaml, documented
-     * since v1.0.0, now genuinely enforced): required only for a genuinely root new Logical Contract; the
-     * service layer (resolveOrCreateContract()) is what actually enforces "required when there's nothing
-     * to derive it from" — this schema can't know at validation time whether a contract/parent will
-     * resolve, so it only rejects a present-but-empty string here, never absence itself.
-     */
-    currency: z.string().min(1, 'currency, if supplied, must not be empty.').optional(),
+    currency: z.string({ required_error: 'currency is required.' }).min(1, 'currency is required.'),
     createdBy: z.string({ required_error: 'createdBy is required.' }).min(1, 'createdBy is required.'),
   })
   .passthrough()
@@ -47,14 +40,9 @@ export const createMovementRequestSchema = z
       });
       return;
     }
-    // currency is now optional (OAS-GAP-16 direction (a)) — when omitted, this layer has no contract to
-    // derive one from, so the scale check is skipped here and re-run server-side in
-    // BalanceService.createMovement() against the resolved contract's own currency instead.
-    if (data.currency) {
-      const scaleViolation = describeAmountScaleViolation(data.amount, data.currency);
-      if (scaleViolation) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: scaleViolation });
-      }
+    const scaleViolation = describeAmountScaleViolation(data.amount, data.currency);
+    if (scaleViolation) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: scaleViolation });
     }
   });
 

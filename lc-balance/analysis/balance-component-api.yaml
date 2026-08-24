@@ -80,27 +80,6 @@ info:
     business-function codes at all — it only needs to know whether a
     request resolves to an existing contract, or a parent, or neither.
 
-    ✅ RESOLVED, v1.19.0 (2026-08-22) — this section was, from v1.0.0 through v1.18.0, documented in
-    detail but never actually implemented (`createContract()` stored `currency: req.currency` verbatim
-    with zero comparison; `validation/requestSchema.ts` made `currency` REQUIRED on every call, not
-    omit-and-derive; no `CurrencyMismatchError`/`CURRENCY_MISMATCH` was ever thrown) — see OAS-GAP-16 in
-    `lc-balance/Balance Contract Integration Proposal.md` for the full history. Business/architecture
-    decision, 2026-08-22: direction (a), server-side implementation. The three numbered rules above are
-    now genuinely enforced — `errors.ts` gained `CurrencyMismatchError` (`409 CURRENCY_MISMATCH`);
-    `resolveOrCreateContract()` derives/validates against the resolved contract or its parent at every
-    call site; `validation/requestSchema.ts`'s `currency` field is now optional (only rejects a
-    present-but-empty string — the service layer is what actually enforces "required only when there's
-    nothing to derive it from," since the request-validation layer has no contract to resolve). The
-    currency-decimal-scale check (previously always run at the request-validation layer against the
-    caller-supplied currency) now runs there only when `currency` is supplied, and unconditionally again
-    server-side against the resolved currency — covers the omitted case without weakening the
-    supplied-and-matching case. Purely additive from a wire-contract standpoint (an existing caller that
-    always supplies a matching `currency`, as the reference Angular client does, sees no behavior change);
-    genuinely new behavior only for a caller that (a) omits `currency` where the rules above allow it, or
-    (b) supplies a `currency` that disagrees with the resolved one. All three sub-project test suites
-    (microservice 432/432 — 7 new tests added for this change, backend 34/34, Angular 1064/1064) re-run
-    green, each above its own coverage floor, before this version was cut.
-
 
     v0.1.0 (draft, 2026-08-14): initial extraction from the design
     documents.
@@ -126,16 +105,6 @@ info:
     amount is NEVER auto-derived from a UTILIZE/Document-Arrival amount,
     even when they happen to match — the caller must submit the redemption
     explicitly.
-
-    KNOWN DEVIATION, added 2026-08-22 (does not change this endpoint's own accepted values — see
-    v0.4.0 immediately above, still current at the API layer): a 2026-08-21 BA decision restricts a
-    STANDALONE SG redemption (i.e. one not tied to a specific matched Document Arrival via
-    `businessEventId` — see the compound-submission note elsewhere in this document) to `FULL_REDEEM`
-    only. This restriction is enforced **only by the reference Angular client**, not by this service —
-    `PARTIAL_REDEEM` remains a fully legal, accepted value for any other direct caller of this endpoint.
-    A caller integrating directly against this contract should confirm current bank policy before relying
-    on a standalone `PARTIAL_REDEEM` — this API will not reject one. See
-    `lc-balance/Balance Contract Integration Proposal.md` OAS-GAP-03 for the full analysis.
 
 
     v0.5.0 / v0.6.0 (draft, 2026-08-14): SG `ISSUE` is hard-capped at its
@@ -517,154 +486,7 @@ info:
         transaction-creating caller omits it, unchanged ACTIVE-only behavior). `GET /balance-contracts/catalog`
         gains `requireIssueReleased` (opt-in; excludes a candidate whose own root ISSUE is still PENDING —
         used by every Maker-ACTION picker, omitted by inquiry-only contexts and B4's own Present Docs search).
-
-    v1.17.0 (2026-08-22) — MINOR, non-breaking documentation-only release closing structural-contract gaps
-    flagged by `lc-balance/Balance Contract Integration Proposal.md` (OAS-GAP-06, OAS-GAP-10) and, in a
-    same-day follow-up pass reviewing the raw contract directly (rather than the proposal about it), several
-    further findings folded into this same MINOR release rather than fragmented into 1.17.1+: no
-    request/response field, status code, or business rule changed anywhere in this release — every item
-    below tightens what was already true at runtime, never redefines it. First real-world precedent for the
-    version-policy question OAS-GAP-12 raises: a documentation-only tightening of an already-true runtime
-    behavior is MINOR, not PATCH — it changes what a strict/enum-validating client can rely on, even though
-    the server's actual behavior is unchanged.
-      - ADDED: `Error.code` is now a real `enum` (previously a bare `string`, with the seven legal values
-        only ever documented in this schema's own free-text `description`) — no new codes, purely a type
-        tightening of the already-documented set.
-      - ADDED: `Error.details.reasonCode` — an optional, structured sub-classification for the two codes
-        that previously collapsed several genuinely distinct business reasons into one string a caller had
-        to pattern-match out of `message` (see the `Error` schema below for the full enum and which
-        endpoint/movementType each value corresponds to). Additive and optional: an existing caller that
-        never reads `details` is unaffected.
-      - ADDED: `429` response + `RateLimit-Limit`/`RateLimit-Remaining`/`RateLimit-Reset` response headers,
-        documented on every `/balance-movements*` endpoint (`POST /balance-movements` and all seven
-        `POST`/`GET /balance-movements/{movementId}/*` sub-endpoints — `express-rate-limit` is mounted once
-        on the shared `/balance-movements` path prefix in `src/app.ts`, so it has always applied to all
-        eight; only the documentation was missing, not the behavior). Limit is 120 requests/60s per the
-        current server configuration — see the response description for the caveat that this figure is
-        operational configuration, not a contractual guarantee, and may change without a version bump.
-      - ADDED: `movementType` (`BalanceMovement.movementType` and `BalanceMovementCreateRequest.movementType`)
-        is now a real `enum` of all 15 legal values (previously a bare `string`, with the values only ever
-        documented across the changelog/individual endpoint prose) — the exhaustive list is taken verbatim
-        from `service/balanceService.ts`'s own `buildMovementTypeRegistry()`, the authoritative source per
-        `STATUS-RULE-017`. Catches a typo'd/made-up value; does NOT enforce per-instrumentType legality
-        (still caller-owned — see the field's own description).
-      - ADDED caveat to `BalanceMovementCreateRequest.eventSeq`'s own description: idempotent replay
-        (same `(balanceContractId, eventSeq)`, same payload) was already documented as safe; now explicitly
-        states that a resubmission with a DIFFERENT payload under the same key still silently returns the
-        original record rather than erroring — a previously undocumented, disclosed-elsewhere-but-not-here
-        limitation (see `MAKER-CHECKER-RULE-050` in the Obsidian KB).
-      - ADDED caveat to the v0.4.0 `PARTIAL_REDEEM`/`FULL_REDEEM` changelog entry: a standalone SG
-        redemption is restricted to `FULL_REDEEM`-only by a 2026-08-21 BA decision, but ONLY at the
-        reference Angular client — this endpoint itself still accepts a standalone `PARTIAL_REDEEM` from
-        any other caller. Previously undocumented in this file; see OAS-GAP-03 in the Proposal.
-      - ADDED `required:` arrays to `BalanceContract`, `BalanceMovement`, `BalanceSnapshot` — response
-        schemas that, unlike the request schemas, had never declared which of their fields the server
-        always populates (every field NOT already marked `nullable: true` is now listed `required`, derived
-        directly from each field's own existing nullability, not a new judgment call).
-    v1.18.0 (2026-08-22) — MINOR: `Error.details.reasonCode` (added in v1.17.0's own schema) is now
-    genuinely producible by the running server — v1.17.0 shipped the schema/enum but never wired it
-    through to an actual HTTP response, an external review caught this the same day (same category of bug
-    as the CURRENCY DERIVATION contradiction above: documented in detail, unreachable in practice). Fixed
-    at the source, not just re-worded: `ApiError` gained a `details` constructor param (previously
-    silently dropped by `toBody()`, which only ever returned `{code, message}`); every sufficiency-check
-    domain function (`checkUtilizeSufficiency`, `checkAmendDecreaseSufficiency`, `checkRedeemSufficiency`,
-    `checkShgtIssueSufficiency`, `checkPresentDocsIssueSufficiency`) and the CLOSE eligibility/exact-amount
-    checks now populate `reasonCode` on their `{ok: false}` result, threaded through to the thrown error at
-    every call site (Submit AND, for CLOSE specifically, the Release-time re-check too). Purely additive —
-    no existing field, status code, or error message text changed; all three sub-project test suites
-    (microservice 425/425, backend 34/34, Angular 1064/1064) re-run green, each above its own coverage
-    floor, before this version was cut.
-
-    v1.19.0 (2026-08-22) — MINOR: CURRENCY DERIVATION (documented since v1.0.0, confirmed unimplemented by
-    v1.18.0's own review — see this document's top-level description) is now genuinely enforced. This IS a
-    behavior change, unlike v1.17.0/v1.18.0's purely-additive documentation fixes — an existing caller that
-    always supplies a `currency` matching the resolved contract's own (as the reference Angular client
-    does) sees no difference; a caller that previously relied on `currency` being silently accepted
-    verbatim with no comparison, or that omitted it expecting the (until now, false) documented
-    derivation, will see new behavior. Business/architecture decision, 2026-08-22 (OAS-GAP-16, direction
-    (a)): server-side implementation, not a documentation rewrite.
-      - CHANGED: `BalanceMovementCreateRequest.currency` is now genuinely optional at the request-
-        validation layer (previously required by `validation/requestSchema.ts` despite this schema always
-        having documented it as omittable) — required only when the three CURRENCY DERIVATION rules
-        determine there's nothing to derive it from (a genuinely root new Logical Contract).
-      - ADDED: `errors.ts` gained `CurrencyMismatchError` (`409 CURRENCY_MISMATCH`) — previously declared
-        in this OAS's `Error.code` enum but never thrown by any code path.
-      - ADDED: the currency-decimal-scale check (`money.ts`'s `describeAmountScaleViolation`) now also
-        runs server-side against the resolved contract's own currency, covering the now-legal omitted-
-        currency case — the request-validation-layer check still runs first whenever `currency` IS
-        supplied, unchanged.
-      - VERIFIED: all three sub-project test suites re-run green before this version was cut — microservice
-        432/432 (7 new tests added directly for this change), backend 34/34, Angular 1064/1064, each above
-        its own coverage floor.
-
-    v1.20.0 (2026-08-23) — MINOR: `A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md` Phase 0, §0.1, §1,
-    and the already-implemented half of §2/§3 (LC/Confirmation Expiry Date + document-presentation
-    control) — genuinely new fields and one new movementType, all additive except where noted. Does NOT
-    yet cover that spec's §4 (A7/B5 Early Settlement authorization — `earlySettlementAuthorized`/
-    `earlySettlementReason`/`SETTLEMENT_BEFORE_MATURITY_NOT_AUTHORIZED`) or §7 (`FUNCTION_STRATEGIES`
-    `dateControl` — Angular-side classification only, never reaches this OAS contract); those land in a
-    later version once implemented.
-      - ADDED: `BalanceContract.expiryDate`/`issueDate` (nullable string, ISO date) — `expiryDate` is
-        REQUIRED (400 `REQUEST_VALIDATION_FAILED` if missing) when the corresponding
-        `BalanceMovementCreateRequest.movementType: 'ISSUE'` creates a genuinely new root
-        `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` (A1/B1) — the one point of entry for this field into the
-        whole system; every other creating movementType (SHGT ISSUE, Acceptance CREATE, EPLC_EXAMINATION
-        CREATE) inherits nothing and leaves it null unless separately amended (see `AMEND_EXPIRY` below).
-        `issueDate` stays optional there, defaulting server-side to today's Business Date when omitted.
-        Both are simply carried through, unvalidated, for every other creating movementType.
-      - ADDED: `movementType: 'AMEND_EXPIRY'` (A2 LC Amendment / B2 Confirm LC Amendment, "Extend Expiry")
-        — the 16th value in the `movementType` enum. Changes ONLY the target contract's own `expiryDate`,
-        never `Balance`/`ceilingAmount`: `amount` is REQUIRED to be exactly `"0"` (400 otherwise, a
-        stricter rule than every other movementType's own "must be > 0"), and the new requested
-        `expiryDate` is itself REQUIRED on the request (400 if missing). The new value is applied to
-        `BalanceContract.expiryDate` only once a Checker actually approves it
-        (`POST /balance-movements/{id}/release`) — same "mutate the contract at Release, not Submit"
-        posture `CLOSE`'s own contract-status mutation already uses — so a still-PENDING `AMEND_EXPIRY`
-        has no visible effect on the contract yet.
-      - ADDED: `BalanceMovement.expiryDate` (nullable string, ISO date) — **not the same concept** as
-        `BalanceContract.expiryDate` above, despite the identical name: on a `BalanceMovement` this is the
-        REQUESTED new value an `AMEND_EXPIRY` movement carries until Release applies it to the contract.
-        Null on every other movementType.
-      - ADDED: `BalanceMovement.documentPresentationDate` (nullable string, ISO date) — A3/A3S
-        (`IPLC_LC`/`EPLC_LC` `UTILIZE`) and B3 (`EPLC_EXAMINATION` `CREATE`) document-presentation
-        movements only, caller-supplied. When both this field and the relevant contract's own
-        `expiryDate` are present (A3/A3S: the resolved contract's own; B3: the PARENT LC/Confirmation's
-        own, since a newly-created `EPLC_EXAMINATION` has no `expiryDate` of its own), a
-        `documentPresentationDate` AFTER that `expiryDate` is rejected — `400 REQUEST_VALIDATION_FAILED`,
-        `details.reasonCode: PRESENTATION_AFTER_EXPIRY` (see `ErrorDetails.reasonCode` below). This is a
-        no-op, not a rejection, when either side is absent (a legacy contract with no recorded
-        `expiryDate`, or a caller that omits `documentPresentationDate` entirely) — supplying this field
-        is not itself mandatory, only its comparison against a present `expiryDate` is enforced.
-      - ADDED: `BalanceMovement.triggeredByExpiry` (nullable boolean) — `A10`/`B6` `CLOSE` only, purely
-        informational passthrough (same convention as `sourceModule`/`sourceFunction`) for an external
-        batch caller to mark "this Close was triggered by an expiryDate scan, not a human operator". Never
-        validated, never read by any eligibility or sufficiency check — see the `close-eligible`
-        `expiredBefore` entry below for why: the three-layer discovery design deliberately keeps
-        `expiryDate` as a filtering condition ONLY at Discovery (Layer 1); Submit and Release (Layers 2/3)
-        only ever carry this flag for audit purposes, never gate on it.
-      - ADDED: `GET /balance-contracts/close-eligible` gained an optional `expiredBefore` query parameter
-        (ISO date) — further narrows the existing eligible set to contracts whose own `expiryDate` is
-        before this date. Omitting it leaves every existing caller's behavior unchanged. This is
-        deliberately the ONLY place `expiryDate` is ever compared against "now"/a caller-supplied cutoff
-        anywhere in this contract — `evaluateCloseEligibility()` itself (both the Submit-time check and
-        this endpoint's own eligibility half) still never reads `expiryDate` at all, preserving the
-        existing "cancellation before expiry" design: A10/B6 Close remains legal before expiry, unchanged
-        by this release.
-      - ADDED: `ErrorDetails.reasonCode` gained `PRESENTATION_AFTER_EXPIRY` — see
-        `BalanceMovement.documentPresentationDate` above. Unlike every other `reasonCode` value so far
-        (all set on `409` `INSUFFICIENT_AVAILABLE_BALANCE`/`ILLEGAL_STATE_TRANSITION`), this one is set on
-        a `400` `REQUEST_VALIDATION_FAILED` — `ErrorDetails.reasonCode`'s own description is updated
-        accordingly, it is no longer scoped to 409-only cases.
-      - CHANGED: `movementType` enum (both `BalanceMovement` and `BalanceMovementCreateRequest`) — now 16
-        values (previously 15); the accompanying description's own count/wording corrected to match.
-      - VERIFIED: the microservice's own test suite re-run green before this version was cut — 443/443 (11
-        new tests added directly for this batch), coverage above its own 95% floor on all four metrics.
-        `backend/`'s own suite (34/34) is unaffected by this batch (its Business Case Registry fixtures
-        were updated separately, in the same working session, to supply the now-required `expiryDate`).
-        The Angular reference client's own suite was mid-edit elsewhere in this same session at the time
-        this version was cut (its own A2/B2 "Extend Expiry" UI wiring) — not re-verified as part of this
-        OAS-only documentation update; see that sub-project's own commit history for its current status.
-  version: "1.20.0"
+  version: "1.16.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -822,16 +644,6 @@ paths:
         - name: pageSize
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
-        - name: expiredBefore
-          in: query
-          description: >
-            v1.20.0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0.1, GAP-15 discovery-query
-            fix) — optional; when supplied, further narrows the eligible set to contracts whose own
-            expiryDate is before this date. The ONE place expiryDate is ever used as a filtering
-            condition in this whole contract — Close eligibility itself (the rest of this endpoint, plus
-            the same check re-run at Submit/Release) never reads expiryDate. Omitting this parameter
-            leaves every existing caller's behavior unchanged.
-          schema: { type: string, format: date }
       responses:
         '200':
           description: One page of ACTIVE root contracts of this instrumentType currently eligible for Close.
@@ -1021,11 +833,10 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
-          description: Available Balance insufficient for this movementType (INSUFFICIENT_AVAILABLE_BALANCE — see `Error.details.reasonCode`), the natural key already resolves to an ACTIVE contract for a creating movementType (NATURAL_KEY_ALREADY_EXISTS), or the caller-supplied currency does not match the derived one (CURRENCY_MISMATCH). No record is created in any case.
+          description: Available Balance insufficient for this movementType (INSUFFICIENT_AVAILABLE_BALANCE), the natural key already resolves to an ACTIVE contract for a creating movementType (NATURAL_KEY_ALREADY_EXISTS), or the caller-supplied currency does not match the derived one (CURRENCY_MISMATCH). No record is created in any case.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
     get:
       tags: [BalanceMovements]
@@ -1058,7 +869,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/balance-as-of:
     get:
@@ -1086,7 +896,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/release:
     post:
@@ -1182,14 +991,10 @@ paths:
             `POST /balance-movements/{id}/maker-submit`, and (v1.16.0) for a
             `CLOSE` movement whose eligibility no longer holds or whose own
             frozen amount no longer matches the contract's current Confirmed
-            Balance — see this endpoint's own description above. The two
-            CLOSE-specific cases set `Error.details.reasonCode` to
-            `CLOSE_NOT_ELIGIBLE`/`CLOSE_AMOUNT_MISMATCH` (v1.17.0); every
-            other rejection under this status code leaves `reasonCode` unset.
+            Balance — see this endpoint's own description above.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/maker-submit:
     post:
@@ -1245,7 +1050,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/acknowledge:
     post:
@@ -1304,7 +1108,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/reject:
     post:
@@ -1348,7 +1151,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /balance-movements/{movementId}/cancel:
     post:
@@ -1390,40 +1192,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
 
 components:
-  headers:
-    RateLimitLimit:
-      description: v1.17.0 — the request-count ceiling for the current 60-second window (currently 120; see `TooManyRequests` response for the operational-vs-contractual caveat).
-      schema: { type: integer }
-    RateLimitRemaining:
-      description: v1.17.0 — requests remaining in the current 60-second window.
-      schema: { type: integer }
-    RateLimitReset:
-      description: v1.17.0 — seconds until the current window resets.
-      schema: { type: integer }
-
-  responses:
-    TooManyRequests:
-      description: >
-        v1.17.0 — documents an always-live behavior, not a new restriction: `express-rate-limit` has been
-        mounted on the shared `/balance-movements` path prefix (`src/app.ts`) since BAL-104, applying
-        identically to all eight `/balance-movements*` endpoints (the create/release/reject/cancel/
-        maker-submit/acknowledge Maker/Checker write surface, plus the two GET query endpoints under the
-        same prefix) — only the OAS documentation was previously missing. Current configuration: 120
-        requests per 60-second window per server instance (not per caller/IP — see the source comment this
-        references). This figure is **operational configuration, not a contractual ceiling** — it may be
-        tuned without a version bump; a caller should read `RateLimit-Remaining`/`RateLimit-Reset` at
-        runtime rather than hardcoding 120.
-      headers:
-        RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
-        RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
-        RateLimit-Reset: { $ref: '#/components/headers/RateLimitReset' }
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-
   schemas:
 
     InstrumentType:
@@ -1546,7 +1316,6 @@ components:
     BalanceContract:
       type: object
       description: Design doc §3.1 — one immutable version snapshot of a Logical Contract.
-      required: [balanceContractId, logicalContractId, contractVersion, instrumentType, naturalKey, status, currency, openingBalance, effectiveFrom, createdBy, createdAt]
       properties:
         balanceContractId: { type: string, format: uuid }
         logicalContractId: { type: string, format: uuid }
@@ -1574,28 +1343,6 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
-        expiryDate:
-          type: string
-          format: date
-          nullable: true
-          description: >
-            v1.20.0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1) — REQUIRED (400
-            REQUEST_VALIDATION_FAILED if missing on the request) when the creating movementType is
-            `ISSUE` against a genuinely new root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION (A1/B1) — the one point
-            of entry for this field into the whole system. Null/unset for a child contract
-            (SHGT/Acceptance/EPLC_EXAMINATION) unless a caller happens to supply it anyway (ignored).
-            Changeable later only via a released `AMEND_EXPIRY` movement (A2/B2 "Extend Expiry" — see
-            `BalanceMovement.expiryDate`'s own description for the distinct, movement-level meaning of
-            that identically-named field). `GET /balance-contracts/close-eligible`'s own `expiredBefore`
-            parameter is the only place this field is ever compared against "now" — Close eligibility
-            itself never reads it (see that endpoint's own description).
-        issueDate:
-          type: string
-          format: date
-          nullable: true
-          description: >
-            v1.20.0 — optional at A1/B1 root ISSUE; defaults server-side to today's Business Date when
-            omitted there. Null/unset for a child contract, same scope as expiryDate above.
         openingBalance: { $ref: '#/components/schemas/MonetaryAmount' }
         sourceAmendmentNo: { type: integer, nullable: true }
         effectiveFrom: { type: string, format: date-time }
@@ -1606,16 +1353,12 @@ components:
     BalanceMovement:
       type: object
       description: Design doc §3.2/§3.3 — append-only, never physically deleted.
-      required: [movementId, balanceContractId, eventSeq, movementType, exposureNature, amount, currency, status, createdBy, createdAt]
       properties:
         movementId: { type: string, format: uuid }
         balanceContractId: { type: string, format: uuid }
         eventSeq: { type: integer }
         businessEventId: { type: string, format: uuid, nullable: true }
-        movementType:
-          type: string
-          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE, AMEND_EXPIRY]
-          description: "v1.17.0 — enumerated (previously a bare string): these values are the service's own complete, authoritative registry (service/balanceService.ts's buildMovementTypeRegistry(), the same source STATUS-RULE-017 cites as authoritative over this schema) — 15 at v1.17.0, 16 since v1.20.0 (AMEND_EXPIRY — A2/B2 \"Extend Expiry\", see this document's top-level v1.20.0 changelog entry). The enum catches a typo'd/made-up value; it does NOT enforce which of the 16 are legal for a GIVEN instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side, that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table, and `Error.details.reasonCode` for which bucket actually rejected a given request."
+        movementType: { type: string, description: "Legal values depend on instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side; that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table." }
         exposureNature: { $ref: '#/components/schemas/ExposureNature' }
         amount:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
@@ -1669,40 +1412,6 @@ components:
         transactionDate: { type: string, format: date, nullable: true }
         businessDate: { type: string, format: date, nullable: true }
         valueDate: { type: string, format: date, nullable: true }
-        documentPresentationDate:
-          type: string
-          format: date
-          nullable: true
-          description: >
-            v1.20.0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3) — A3/A3S
-            (IPLC_LC/EPLC_LC UTILIZE) and B3 (EPLC_EXAMINATION CREATE) document-presentation movements
-            only, caller-supplied. When both this field and the relevant contract's own expiryDate are
-            present (A3/A3S: the resolved contract's own; B3: the PARENT LC/Confirmation's own), a value
-            AFTER that expiryDate is rejected at creation — 400 REQUEST_VALIDATION_FAILED,
-            `details.reasonCode: PRESENTATION_AFTER_EXPIRY`. Supplying this field is not itself mandatory
-            — the check is a no-op whenever either side is absent. Null/unset for every other movementType.
-        triggeredByExpiry:
-          type: boolean
-          nullable: true
-          description: >
-            v1.20.0 (§0.1, GAP-15 expiry-discovery three-layer design) — A10/B6 CLOSE only, purely
-            informational (same convention as sourceModule/sourceFunction below): lets an external batch
-            caller mark "this Close was triggered by an expiryDate scan, not a human operator". Never
-            validated, never read by evaluateCloseEligibility() or any other business-logic check — see
-            `GET /balance-contracts/close-eligible`'s own `expiredBefore` parameter for the one place
-            expiryDate genuinely gates anything. Null/unset unless the caller explicitly sets it.
-        expiryDate:
-          type: string
-          format: date
-          nullable: true
-          description: >
-            v1.20.0 — **not the same concept** as `BalanceContract.expiryDate` despite the identical name:
-            here, on a BalanceMovement, this is meaningful ONLY for an AMEND_EXPIRY movement (A2/B2
-            "Extend Expiry") — the REQUESTED new expiryDate, carried on this immutable movement record
-            until `POST /balance-movements/{id}/release` copies it onto the target contract's own
-            `BalanceContract.expiryDate` (mirrors how CLOSE's own contract-status mutation happens at
-            Release, not Submit). REQUIRED on the request when movementType is AMEND_EXPIRY (400 if
-            missing). Null/unset for every other movementType.
         sourceModule: { type: string, nullable: true }
         sourceFunction: { type: string, nullable: true }
         sourceTransactionRef: { type: string, nullable: true, description: "Unique per balanceContractId (server-enforced, 400 on reuse against the same contract with a new eventSeq)." }
@@ -1866,22 +1575,10 @@ components:
             hangs off of. Used both for the parent-sufficiency check at
             creation time and, per CURRENCY DERIVATION, as the source of
             this new child contract's own currency.
-        movementType:
-          type: string
-          enum: [ISSUE, CREATE, AMEND_INCREASE, AMEND, AMEND_DECREASE, UTILIZE, HONOUR, ACCEPT, PARTIAL_REDEEM, FULL_REDEEM, REIMBURSE, RECLASSIFY_OUT, PARTIAL_SETTLE, FULL_SETTLE, CLOSE, AMEND_EXPIRY]
-          description: v1.17.0 — see BalanceMovement.movementType's own description for the full rule (enumerated for typo protection; per-instrumentType legality is still caller-owned, not schema-enforced). 16 values since v1.20.0 (AMEND_EXPIRY added).
+        movementType: { type: string }
         eventSeq:
           type: integer
-          description: >
-            Caller-supplied, scoped to the resolved balanceContractId. Design doc §8 — the idempotency key
-            is (balanceContractId, eventSeq); resubmitting the same pair with the SAME payload is safe
-            (returns the original record unchanged, 200). v1.17.0 caveat, previously undocumented: this
-            service does **not** compare the resubmitted payload against the original — a resubmission with
-            a genuinely DIFFERENT payload under the same (balanceContractId, eventSeq) still returns the
-            original record, silently discarding the new payload, rather than erroring
-            (`DUPLICATE_REF_PAYLOAD_MISMATCH`-style rejection was proposed in an earlier design pass but
-            never implemented). A caller must guarantee its own eventSeq→payload mapping never actually
-            changes across a real retry — this endpoint will not catch a violation of that assumption.
+          description: Caller-supplied, scoped to the resolved balanceContractId. Design doc §8 — the idempotency key is (balanceContractId, eventSeq); resubmitting the same pair is safe.
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
         currency:
           type: string
@@ -1906,37 +1603,6 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
-        expiryDate:
-          type: string
-          format: date
-          nullable: true
-          description: >
-            v1.20.0 — conditionally required (OAS `required:` cannot express a per-movementType
-            condition, so this is enforced only in prose + server-side): REQUIRED (400 if missing) when
-            movementType is `ISSUE` against a genuinely new root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION (A1/B1)
-            — see `BalanceContract.expiryDate`'s own description. ALSO required (400 if missing), with a
-            completely different meaning, when movementType is `AMEND_EXPIRY` (A2/B2 "Extend Expiry") —
-            there it is the REQUESTED new value, applied to the contract only once this movement is
-            Released; see `BalanceMovement.expiryDate`'s own description. Optional/ignored for every other
-            movementType.
-        issueDate:
-          type: string
-          format: date
-          nullable: true
-          description: v1.20.0 — optional, A1/B1 root ISSUE only; server defaults to today's Business Date when omitted there. Ignored for every other movementType.
-        documentPresentationDate:
-          type: string
-          format: date
-          nullable: true
-          description: >
-            v1.20.0 — A3/A3S (IPLC_LC/EPLC_LC UTILIZE) and B3 (EPLC_EXAMINATION CREATE) only. See
-            `BalanceMovement.documentPresentationDate`'s own description for the presentation-vs-expiry
-            check this feeds (400, `details.reasonCode: PRESENTATION_AFTER_EXPIRY`) — supplying it is not
-            itself mandatory. Ignored for every other movementType.
-        triggeredByExpiry:
-          type: boolean
-          nullable: true
-          description: v1.20.0 — A10/B6 CLOSE only, purely informational (§0.1). See `BalanceMovement.triggeredByExpiry`'s own description. Ignored for every other movementType.
         legRef: { type: string, nullable: true }
         accountEntries:
           type: array
@@ -1974,7 +1640,6 @@ components:
         own field description); null for every other instrumentType.
         presentDocsEarmarkPending/presentDocsEarmarkApproved (v0.8.0,
         EPLC_CONFIRMATION only) are null for any other instrumentType.
-      required: [balanceContractId, logicalContractId, currency, confirmedBalance, availableBalance, pendingEarmarkTotal]
       properties:
         balanceContractId: { type: string, format: uuid }
         logicalContractId: { type: string, format: uuid }
@@ -2071,82 +1736,16 @@ components:
       type: object
       required: [code, message]
       description: >
-        v1.17.0 — `code` is now a real enum (previously a bare string with the same seven values only
-        documented here in prose); `details.reasonCode`, on the two codes broad enough to cover several
-        genuinely distinct business reasons, is new and optional (see `ErrorDetails` below). v1.18.0 — the
-        `reasonCode` schema shipped in v1.17.0 is now genuinely producible end-to-end; it shipped that
-        version documented-but-unwired (`ApiError.toBody()` silently dropped `details` entirely) — see the
-        v1.18.0 changelog entry above for the fix. Both `code` and `details.reasonCode` remain
-        additive/non-breaking.
+        `code` is one of: `REQUEST_VALIDATION_FAILED` (400),
+        `INSUFFICIENT_AVAILABLE_BALANCE` (409),
+        `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0),
+        `CURRENCY_MISMATCH` (409, v1.0.0 — new, see CURRENCY DERIVATION),
+        `ILLEGAL_STATE_TRANSITION` (409),
+        `NOT_FOUND` (404),
+        `INTERNAL_ERROR` (500 — the response body always carries a fixed,
+        generic message; the real error detail is logged server-side only,
+        never echoed to the client).
       properties:
-        code:
-          type: string
-          enum:
-            - REQUEST_VALIDATION_FAILED
-            - INSUFFICIENT_AVAILABLE_BALANCE
-            - NATURAL_KEY_ALREADY_EXISTS
-            - CURRENCY_MISMATCH
-            - ILLEGAL_STATE_TRANSITION
-            - NOT_FOUND
-            - INTERNAL_ERROR
-          description: >
-            `REQUEST_VALIDATION_FAILED` (400); `INSUFFICIENT_AVAILABLE_BALANCE` (409 — see
-            `details.reasonCode` for which of several distinct sufficiency checks actually failed);
-            `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0); `CURRENCY_MISMATCH` (409, v1.0.0 spec / v1.19.0
-            genuinely implemented — see CURRENCY DERIVATION); `ILLEGAL_STATE_TRANSITION` (409 — a
-            movement/contract not in the required state
-            for this action; `details.reasonCode` is set for the CLOSE-specific cases, unset for a plain
-            not-PENDING/already-submitted rejection); `NOT_FOUND` (404); `INTERNAL_ERROR` (500 — the
-            response body always carries a fixed, generic message; the real error detail is logged
-            server-side only, never echoed to the client).
+        code: { type: string }
         message: { type: string }
-        details: { $ref: '#/components/schemas/ErrorDetails' }
-
-    ErrorDetails:
-      type: object
-      additionalProperties: true
-      description: >
-        v1.17.0 — freeform (`additionalProperties: true` preserved for backward compatibility with any
-        existing caller reading arbitrary keys), with one now-structured field. Every other key a caller
-        may have previously seen here is unchanged and still untyped.
-      properties:
-        reasonCode:
-          type: string
-          nullable: true
-          enum:
-            - EXCEEDS_AVAILABLE_BALANCE
-            - EXCEEDS_TIGHT_AVAILABLE_BALANCE
-            - AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE
-            - SG_ISSUE_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE
-            - PRESENT_DOCS_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE
-            - EXCEEDS_RECORD_AVAILABLE_BALANCE
-            - CLOSE_NOT_ELIGIBLE
-            - CLOSE_AMOUNT_MISMATCH
-            - PRESENTATION_AFTER_EXPIRY
-          description: >
-            Set on `INSUFFICIENT_AVAILABLE_BALANCE`, the CLOSE-specific `ILLEGAL_STATE_TRANSITION` cases,
-            and (since v1.20.0) the presentation-vs-expiry `REQUEST_VALIDATION_FAILED` case below; absent
-            (or `null`) on every other error, including a plain not-PENDING `ILLEGAL_STATE_TRANSITION`.
-            `EXCEEDS_AVAILABLE_BALANCE` / `EXCEEDS_TIGHT_AVAILABLE_BALANCE` —
-            UTILIZE/HONOUR/ACCEPT's own two-tier check (`checkUtilizeSufficiency`), first against plain
-            Available Balance, then against Tight Available Balance (nets outstanding SHGT exposure) — A3,
-            A3S, B4. `AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE` — the Tolerance-converted decrease
-            amount exceeds Tight Available Balance (`checkAmendDecreaseSufficiency`) — A2's own
-            AMEND_DECREASE, and B2's AMEND in its decrease direction (negative `ceilingAmount`).
-            `SG_ISSUE_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE` — a new Shipping Guarantee ISSUE exceeds the
-            parent LC's own Tight Available Balance, net of the LC's other outstanding SG exposure
-            (`checkShgtIssueSufficiency`) — A8, checked before the child contract is created.
-            `PRESENT_DOCS_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE` — a new Present Docs presentation exceeds
-            the parent Confirmation's own Present-Earmark-adjusted Tight Available Balance
-            (`checkPresentDocsIssueSufficiency`) — B3's own `EPLC_EXAMINATION` CREATE, checked before the
-            child contract is created. `EXCEEDS_RECORD_AVAILABLE_BALANCE` — a redemption/settlement amount
-            exceeds that specific record's own Available Balance (`checkRedeemSufficiency`) — A7
-            (Acceptance Settlement), A9 (SG Redemption), B5 (Acceptance Settlement/Reimburse), and the
-            asset-side REIMBURSE/RECLASSIFY_OUT movementTypes. `CLOSE_NOT_ELIGIBLE` — one or more of the
-            A10/B6 Close eligibility conditions (see `GET /balance-contracts/close-eligible`) is not met;
-            `message` carries the specific reason(s) joined together, since more than one can fail at once.
-            `CLOSE_AMOUNT_MISMATCH` — the submitted/frozen Close amount no longer exactly equals the
-            contract's current Confirmed Balance. `PRESENTATION_AFTER_EXPIRY` (v1.20.0, `400
-            REQUEST_VALIDATION_FAILED` — NOT a 409, unlike every other reasonCode above) — A3/A3S/B3's own
-            `documentPresentationDate` is after the relevant contract's own `expiryDate`; see
-            `BalanceMovement.documentPresentationDate`'s own description.
+        details: { type: object, additionalProperties: true }

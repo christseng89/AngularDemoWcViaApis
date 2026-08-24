@@ -31,22 +31,10 @@ describe('createMovementRequestSchema', () => {
     }
   });
 
-  test.each(['instrumentType', 'movementType', 'amount', 'createdBy'])('rejects a missing %s', (field) => {
+  test.each(['instrumentType', 'movementType', 'amount', 'currency', 'createdBy'])('rejects a missing %s', (field) => {
     const body: Record<string, unknown> = { ...VALID_BODY };
     delete body[field];
     const result = createMovementRequestSchema.safeParse(body);
-    expect(result.success).toBe(false);
-  });
-
-  test('accepts a missing currency — OAS-GAP-16 direction (a): optional at this layer, required only when BalanceService.resolveOrCreateContract() has nothing to derive it from', () => {
-    const body: Record<string, unknown> = { ...VALID_BODY };
-    delete body.currency;
-    const result = createMovementRequestSchema.safeParse(body);
-    expect(result.success).toBe(true);
-  });
-
-  test('rejects an empty-string currency (present but blank is still invalid, unlike genuinely absent)', () => {
-    const result = createMovementRequestSchema.safeParse({ ...VALID_BODY, currency: '' });
     expect(result.success).toBe(false);
   });
 

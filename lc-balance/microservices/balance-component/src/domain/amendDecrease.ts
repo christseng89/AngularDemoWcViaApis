@@ -34,7 +34,7 @@
 import Decimal from 'decimal.js';
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
-export type AmendDecreaseCheckResult = { ok: true } | { ok: false; error: string; reasonCode: 'AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE' };
+export type AmendDecreaseCheckResult = { ok: true } | { ok: false; error: string };
 
 export function checkAmendDecreaseSufficiency(params: {
   /** The caller's raw, face-level decrease amount (never itself compared against tightAvailableBalance — shown in the error purely for disambiguation). */
@@ -56,7 +56,6 @@ export function checkAmendDecreaseSufficiency(params: {
         `APPROVED amounts count as usable capacity, and outstanding off-balance-sheet exposure is ` +
         `netted out). This would drive the LC's face amount negative, below what is already ` +
         `utilized, or below its own outstanding off-balance-sheet exposure.`,
-      reasonCode: 'AMEND_DECREASE_EXCEEDS_TIGHT_AVAILABLE_BALANCE',
     };
   }
   return { ok: true };

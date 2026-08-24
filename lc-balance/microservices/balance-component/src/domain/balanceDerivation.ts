@@ -46,16 +46,6 @@ export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1>> = {
   // before expiry" analog: writes off whatever Confirmed Balance remains, same direction as AMEND_DECREASE/
   // UTILIZE). domain/closeEligibility.ts's own doc comment covers the preconditions gating this movement.
   CLOSE: -1,
-  // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry.
-  // Numerically inert: amount is always exactly "0" for this movementType (see BalanceService's own
-  // assertValidAmount() AMEND_EXPIRY branch), so ceilingAmount is always "0" and this direction sign
-  // never actually moves any balance — present only so signedAmount() below doesn't throw for it.
-  AMEND_EXPIRY: 1,
-  // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 Update Maturity Date Calendars. Same
-  // numerically-inert reasoning as AMEND_EXPIRY immediately above — amount is always exactly "0" for
-  // this movementType too (see BalanceService's own assertValidAmount() AMEND_MATURITY_CALENDARS
-  // branch).
-  AMEND_MATURITY_CALENDARS: 1,
 };
 
 /** movementTypes whose `amount` field represents a face-level delta needing §6.2 Tolerance conversion before it contributes to Confirmed Balance — see domain/tolerance.ts. Confirmed/Available Balance derivation always uses ceilingAmount (already converted), never amount, so this list is informational/for callers assembling movements. */

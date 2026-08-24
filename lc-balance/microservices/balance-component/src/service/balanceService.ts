@@ -14,7 +14,7 @@
  */
 import { randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
-import { describeAmountScaleViolation, parseMonetaryAmount } from '../money';
+import { parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
@@ -35,11 +35,8 @@ import {
 import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
-import { validateTenorBasisTypeCombination, resolveExportSettlementRoute } from '../domain/tenorBasis';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
-import { buildAdjustBusinessDayRequest } from '../domain/maturityDateCalculation';
-import { adjustBusinessDay, type StandingCalendarRef, type AdjustBusinessDayRequest } from '../clients/standingClient';
-import { CurrencyMismatchError, IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
+import { IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
   BalanceContract,
@@ -47,10 +44,8 @@ import type {
   BalanceSnapshot,
   ExposureNature,
   InstrumentType,
-  MaturityDateCalendarRef,
   MovementWarning,
   NaturalKey,
-  TenorBasis,
   TenorType,
 } from '../types';
 
@@ -79,7 +74,7 @@ interface MovementSufficiencyContext {
 }
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see domain/tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
-type MovementSufficiencyOutcome = { ok: true; warning?: MovementWarning } | { ok: false; error: string; reasonCode?: string };
+type MovementSufficiencyOutcome = { ok: true; warning?: MovementWarning } | { ok: false; error: string };
 
 type MovementSufficiencyCheck = (ctx: MovementSufficiencyContext) => MovementSufficiencyOutcome | null;
 
@@ -122,14 +117,7 @@ export interface CreateMovementRequest {
   movementType: string;
   eventSeq: number;
   amount: string;
-  /**
-   * OAS-GAP-16 direction (a), 2026-08-22 — optional per CURRENCY DERIVATION (balance-component-api.yaml,
-   * documented since v1.0.0, now genuinely enforced): required only for a genuinely root new Logical
-   * Contract (no existing resolution, no parentLogicalContractId); every other case may omit it and the
-   * server derives + validates from the resolved contract or its parent — see
-   * resolveOrCreateContract()'s own doc comment.
-   */
-  currency?: string;
+  currency: string;
   legRef?: string | null;
   accountEntries?: AccountEntry[] | null;
   businessEventId?: string | null;
@@ -148,58 +136,7 @@ export interface CreateMovementRequest {
    */
   tenorType?: TenorType | null;
   tenorDays?: number | null;
-  /**
-   * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1 — required at A1/B1 root ISSUE (and A2/B2
-   * AMEND_TENOR_BASIS) whenever tenorType is BUYERS_USANCE/SELLERS_USANCE; must be omitted/null for
-   * SIGHT. See domain/tenorBasis.ts's own validateTenorBasisTypeCombination().
-   */
-  tenorBasis?: TenorBasis | null;
-  /** v29 §3.1/§4 — required (and only meaningful) when tenorBasis === 'FIXED_MATURITY_DATE'; tenorDays must be null in that case. */
-  fixedMaturityDate?: string | null;
-  /**
-   * Risk Containment Gate stopgap (Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8, P0) — a
-   * caller-supplied value on an Acceptance CREATE (IPLC_ACCEPTANCE/EPLC_ACCEPTANCE) is no longer
-   * accepted at all; see routes/balanceMovements.ts's own doc comment on why the old "caller-supplied
-   * maturityDate always wins" passthrough was unsafe (no way to verify it against tenorBasis/baseDate).
-   * Kept only for A1/B1 root ISSUE manual passthrough (rare, e.g. data migration) — ignored everywhere
-   * else, including Acceptance CREATE.
-   */
   maturityDate?: string | null;
-  /**
-   * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §4/§5 (Risk Containment Gate) — resolved by
-   * routes/balanceMovements.ts BEFORE calling createMovement() (currently only for the
-   * tenorBasis==='FIXED_MATURITY_DATE' path); createContract() only persists these, never computes them.
-   * Not exposed as a general caller-supplied passthrough — see the route's own doc comment.
-   */
-  contractualMaturityDate?: string | null;
-  operationalPaymentDate?: string | null;
-  standingCalculationId?: string | null;
-  calendarSnapshotId?: string | null;
-  /**
-   * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — required at A1/B1 root ISSUE (see
-   * resolveOrCreateContract()'s own check). §2/§3 — also required for A2/B2 AMEND_EXPIRY (see
-   * createMovement()'s own check), where it carries the REQUESTED new expiryDate instead of the initial
-   * one; release() copies it onto the contract at Checker-approval time. Ignored for every other
-   * movementType.
-   */
-  expiryDate?: string | null;
-  /** §1 — optional at A1/B1 root ISSUE, defaults to today's Business Date (see createContract()); ignored otherwise. */
-  issueDate?: string | null;
-  /**
-   * A6/B4 Calculated Maturity Date (2026-08-23, Maturity-Date-Business-Day-Convention-Decision-
-   * Request.md, resolved) — optional at A1/B1 root ISSUE (stored directly onto the new contract, see
-   * createContract()); required for A2/B2 AMEND_MATURITY_CALENDARS (see createMovement()'s own check),
-   * where it carries the REQUESTED new calendar config instead of the initial one — release() copies it
-   * onto the contract at Checker-approval time, same posture as expiryDate/AMEND_EXPIRY above. Ignored
-   * for every other movementType, including Acceptance CREATE itself (A6/B4) — that reads the PARENT
-   * contract's own stored config automatically (see getMaturityDateCalendarsFromParent()), never this
-   * per-call field, precisely so a Maker never re-types/re-selects it per Acceptance.
-   */
-  maturityDateCalendars?: MaturityDateCalendarRef[] | null;
-  maturityDateCombinationRule?: string | null;
-  maturityDateConvention?: string | null;
-  /** §2/§3 — A3/A3S (Import) and B3 (Export) document-presentation movements only. See types.ts BalanceMovement.documentPresentationDate. */
-  documentPresentationDate?: string | null;
   transactionDate?: string | null;
   businessDate?: string | null;
   valueDate?: string | null;
@@ -208,14 +145,6 @@ export interface CreateMovementRequest {
   sourceTransactionRef?: string | null;
   /** See BalanceMovement.referencedTransactionId's own doc comment in types.ts for the full rule. */
   referencedTransactionId?: string | null;
-  /**
-   * §0.1 — Layer 2 (Maker Submit) of the three-layer expiry-discovery design. Purely informational audit
-   * passthrough, same convention as sourceModule/sourceFunction above — never validated, never gates
-   * anything. Set by an external batch caller to record that THIS submission was triggered by an
-   * expiryDate scan, not a human operator; a Checker-side equivalent lives on the release() request
-   * instead (see ReleaseMovementRequest, not this interface).
-   */
-  triggeredByExpiry?: boolean;
   createdBy: string;
 }
 
@@ -269,75 +198,6 @@ export class BalanceService {
       checkRedeemSufficiency({ redeemAmount: ctx.ceilingAmount, sgAvailableBalance: ctx.availableBalance });
 
     /**
-     * Maturity-Date-Tenor-Basis-Decision-Review.md v29 §4.1/§8 (business-confirmed, P0) — Import A7 and
-     * Export B5-到期結算 共通 (PARTIAL_SETTLE/FULL_SETTLE against an Acceptance's own contract) — replaces
-     * plain outstandingCapped for these two movementTypes only (REIMBURSE/RECLASSIFY_OUT keep
-     * outstandingCapped unchanged; whether they need the same precondition is unresolved, v29 §4.2/§9).
-     * Two independent preconditions, both required: (1) the Acceptance itself must be genuinely
-     * established (confirmedBalance > 0) and its own Maturity Date must have actually been approved
-     * (maturityDateStatus === 'APPROVED', not merely Preview); (2) the source UTILIZE/ACCEPT this
-     * Acceptance was created from must itself already be RELEASED — fail-closed: missing
-     * referencedTransactionId, an unresolvable reference, a not-yet-RELEASED source, a currency/root-
-     * contract mismatch, or a movementType outside the eligible whitelist are all rejected, never
-     * silently treated as "no reference to check". Falls through to the same outstandingCapped amount
-     * check (availableBalance, never confirmedBalance — see that check's own doc comment for why
-     * confirmedBalance would reintroduce the 2026-08-15 double-settlement bug).
-     */
-    const ACCEPTANCE_SETTLEMENT_SOURCE_MOVEMENT_TYPES: Readonly<Record<string, readonly string[]>> = {
-      IPLC_ACCEPTANCE: ['UTILIZE'],
-      EPLC_ACCEPTANCE: ['ACCEPT'],
-    };
-    const acceptanceSettlementShaped: MovementSufficiencyCheck = (ctx) => {
-      if (ctx.confirmedBalance.lte(0) || ctx.contract.maturityDateStatus !== 'APPROVED') {
-        return {
-          ok: false,
-          error: 'Cannot settle a Preview/un-Released/invalid Acceptance — confirmedBalance must be positive AND maturityDateStatus must be APPROVED.',
-          reasonCode: 'ACCEPTANCE_NOT_SETTLEABLE',
-        };
-      }
-      const createMovement = ctx.existingMovements.find((m) => m.movementType === 'CREATE');
-      const sourceMovementId = createMovement?.referencedTransactionId;
-      if (!sourceMovementId) {
-        return {
-          ok: false,
-          error: "Acceptance CREATE has no referencedTransactionId — cannot verify its source UTILIZE/ACCEPT movement has been Released.",
-          reasonCode: 'ACCEPTANCE_SOURCE_MOVEMENT_MISSING',
-        };
-      }
-      const sourceMovement = this.movements.findById(sourceMovementId);
-      if (!sourceMovement) {
-        return { ok: false, error: 'Acceptance CREATE references a source movement that cannot be found.', reasonCode: 'ACCEPTANCE_SOURCE_MOVEMENT_MISSING' };
-      }
-      if (sourceMovement.status !== 'RELEASED') {
-        return {
-          ok: false,
-          error: 'The source UTILIZE/ACCEPT movement this Acceptance was created from has not been Released yet.',
-          reasonCode: 'ACCEPTANCE_SOURCE_MOVEMENT_NOT_RELEASED',
-        };
-      }
-      const rootContract = this.resolveParentContract(ctx.contract);
-      if (sourceMovement.currency !== ctx.contract.currency) {
-        return { ok: false, error: 'Source movement currency does not match this Acceptance.', reasonCode: 'ACCEPTANCE_SOURCE_MOVEMENT_MISMATCH' };
-      }
-      if (!rootContract || sourceMovement.balanceContractId !== rootContract.balanceContractId) {
-        return {
-          ok: false,
-          error: "Source movement does not belong to this Acceptance's own root LC/Confirmation.",
-          reasonCode: 'ACCEPTANCE_SOURCE_MOVEMENT_MISMATCH',
-        };
-      }
-      const allowedTypes = ACCEPTANCE_SETTLEMENT_SOURCE_MOVEMENT_TYPES[ctx.contract.instrumentType] ?? [];
-      if (!allowedTypes.includes(sourceMovement.movementType)) {
-        return {
-          ok: false,
-          error: `Referenced movement type "${sourceMovement.movementType}" is not an eligible Acceptance source for ${ctx.contract.instrumentType} (expected one of: ${allowedTypes.join(', ')}).`,
-          reasonCode: 'ACCEPTANCE_SOURCE_MOVEMENT_TYPE_INVALID',
-        };
-      }
-      return outstandingCapped(ctx);
-    };
-
-    /**
      * A10/B6 Close — unlike every other entry in this table, "sufficiency" here isn't affordability, it's
      * eligibility (see domain/closeEligibility.ts) PLUS an exact-amount check: the caller's own amount
      * (auto-derived client-side from the current Confirmed Balance, never user-typed — see
@@ -356,11 +216,7 @@ export class BalanceService {
       }
       const eligibility = this.evaluateContractCloseEligibility(ctx.contract);
       if (!eligibility.eligible) {
-        return {
-          ok: false,
-          error: `Cannot Close ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}`,
-          reasonCode: 'CLOSE_NOT_ELIGIBLE',
-        };
+        return { ok: false, error: `Cannot Close ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}` };
       }
       if (!ctx.ceilingAmount.equals(ctx.confirmedBalance)) {
         return {
@@ -368,7 +224,6 @@ export class BalanceService {
           error:
             `Close amount must exactly equal the current Confirmed Balance (${ctx.confirmedBalance.toFixed()}) — ` +
             `submitted ${ctx.ceilingAmount.toFixed()}. Re-derive the amount from the current balance and resubmit.`,
-          reasonCode: 'CLOSE_AMOUNT_MISMATCH',
         };
       }
       return { ok: true };
@@ -384,14 +239,6 @@ export class BalanceService {
       ISSUE: { isCreating: true, checkSufficiency: noCheck },
       CREATE: { isCreating: true, checkSufficiency: noCheck },
       AMEND_INCREASE: { isCreating: false, checkSufficiency: noCheck },
-      // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — A2/B2 Extend Expiry. noCheck, same
-      // treatment as AMEND_INCREASE above — it never touches Balance/ceilingAmount (assertValidAmount()
-      // already enforces amount === "0" before this is even reached).
-      AMEND_EXPIRY: { isCreating: false, checkSufficiency: noCheck },
-      // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 Update Maturity Date Calendars. Same
-      // treatment as AMEND_EXPIRY immediately above — never touches Balance/ceilingAmount
-      // (assertValidAmount() already enforces amount === "0" before this is even reached).
-      AMEND_MATURITY_CALENDARS: { isCreating: false, checkSufficiency: noCheck },
       AMEND: { isCreating: false, checkSufficiency: amendShaped },
       AMEND_DECREASE: { isCreating: false, checkSufficiency: decreaseShaped },
       UTILIZE: { isCreating: false, checkSufficiency: utilizeShaped },
@@ -401,8 +248,8 @@ export class BalanceService {
       FULL_REDEEM: { isCreating: false, checkSufficiency: outstandingCapped },
       REIMBURSE: { isCreating: false, checkSufficiency: outstandingCapped },
       RECLASSIFY_OUT: { isCreating: false, checkSufficiency: outstandingCapped },
-      PARTIAL_SETTLE: { isCreating: false, checkSufficiency: acceptanceSettlementShaped },
-      FULL_SETTLE: { isCreating: false, checkSufficiency: acceptanceSettlementShaped },
+      PARTIAL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
+      FULL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
       CLOSE: { isCreating: false, checkSufficiency: closeShaped },
     };
   }
@@ -508,7 +355,7 @@ export class BalanceService {
     // called directly from tests/other callers that bypass the route.
     const requestedAmount = parseMonetaryAmount(req.amount);
     const sgCheck = checkShgtIssueSufficiency({ requestedAmount, parentConfirmedBalance: parentConfirmed, parentPendingDecreaseTotal, existingShgtExposure });
-    if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error, { reasonCode: sgCheck.reasonCode });
+    if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error);
   }
 
   /**
@@ -545,7 +392,7 @@ export class BalanceService {
       presentDocsEarmark,
       parentConfirmationBalanceContractId: parentConfirmation.balanceContractId,
     });
-    if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error, { reasonCode: presentDocsCheck.reasonCode });
+    if (!presentDocsCheck.ok) throw new InsufficientBalanceError(presentDocsCheck.error);
   }
 
   /**
@@ -638,10 +485,7 @@ export class BalanceService {
    * sliced per candidate from the resulting Maps — a constant ~5 queries total regardless of candidate
    * count, not 1 + 4N.
    */
-  listCloseEligibleContracts(
-    instrumentType: InstrumentType,
-    opts: { lcNumber?: string; page?: number; pageSize?: number; expiredBefore?: string } = {},
-  ): CatalogPage {
+  listCloseEligibleContracts(instrumentType: InstrumentType, opts: { lcNumber?: string; page?: number; pageSize?: number } = {}): CatalogPage {
     if (!ROOT_INSTRUMENT_TYPES.has(instrumentType)) {
       throw new RequestValidationError(`Close only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${instrumentType} is not eligible.`);
     }
@@ -665,22 +509,10 @@ export class BalanceService {
         }).eligible,
     );
 
-    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0.1, GAP-15 discovery-query fix (2026-08-23) —
-    // Layer 1 (the ONLY decision-making layer) of the three-layer expiry-discovery design: lets an
-    // external batch system ask "which Close-eligible contracts have also passed their expiryDate", so it
-    // doesn't have to page through the whole eligible set client-side to find candidates worth acting on.
-    // Deliberately a filter applied AFTER evaluateCloseEligibility() above, never folded into that
-    // function itself — evaluateCloseEligibility() must stay independent of expiryDate (the established
-    // "cancellation before expiry" design: A10/B6 Close is legitimately allowed before expiry too, so
-    // making eligibility itself expiry-gated would break that). A contract with no expiryDate recorded
-    // (legacy, pre-Phase-0 data) never matches an expiredBefore filter — same "absent means never trip a
-    // date-driven action" convention closeEligibility.ts's own design already uses for absent balances.
-    const filtered = opts.expiredBefore ? eligible.filter((c) => c.expiryDate != null && c.expiryDate < opts.expiredBefore!) : eligible;
-
     const page = opts.page && opts.page > 0 ? opts.page : 1;
     const pageSize = opts.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;
     const start = (page - 1) * pageSize;
-    return { items: filtered.slice(start, start + pageSize), total: filtered.length, page, pageSize };
+    return { items: eligible.slice(start, start + pageSize), total: eligible.length, page, pageSize };
   }
 
   /**
@@ -1067,19 +899,7 @@ export class BalanceService {
       this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
     }
 
-    if (contract) {
-      // OAS-GAP-16 direction (a), 2026-08-22 — CURRENCY DERIVATION rule 1 (balance-component-api.yaml,
-      // documented since v1.0.0, now genuinely enforced): an existing contract's own currency is
-      // authoritative; a caller-supplied value that disagrees is rejected, omitting it entirely is fine.
-      if (req.currency && req.currency !== contract.currency) {
-        throw new CurrencyMismatchError(
-          `Supplied currency "${req.currency}" does not match this contract's own currency "${contract.currency}" ` +
-            `(balanceContractId ${contract.balanceContractId}) — omit currency entirely; it is derived automatically ` +
-            `from the resolved contract.`,
-        );
-      }
-      return contract;
-    }
+    if (contract) return contract;
 
     if (!req.naturalKey) throw new RequestValidationError('naturalKey or balanceContractId is required.');
     if (!this.movementTypeRegistry[req.movementType]?.isCreating) {
@@ -1091,36 +911,9 @@ export class BalanceService {
     // already be Checker-Released. Resolved defensively here (each instrument-specific block below
     // re-resolves the same parent for its own sufficiency check) — a not-found/inactive parent falls
     // through to that block's own, more specific error instead of a generic one here.
-    //
-    // OAS-GAP-16 direction (a) — CURRENCY DERIVATION rule 2, same 2026-08-22 change: a new child
-    // contract takes its currency from THIS parent, never freely typed. A not-found parent leaves
-    // `derivedCurrency` undefined, falling through to rule 3's "genuinely root" branch below — same
-    // lenient "not-found parent is someone else's more specific error to raise" posture the
-    // assertRootIssueReleased check right above already uses.
-    let derivedCurrency: string | undefined;
     if (req.parentLogicalContractId) {
       const parentForIssueCheck = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-      if (parentForIssueCheck) {
-        this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
-        if (req.currency && req.currency !== parentForIssueCheck.currency) {
-          throw new CurrencyMismatchError(
-            `Supplied currency "${req.currency}" does not match the parent contract's own currency ` +
-              `"${parentForIssueCheck.currency}" (parentLogicalContractId ${req.parentLogicalContractId}) — omit ` +
-              `currency entirely; it is derived automatically from the parent.`,
-          );
-        }
-        derivedCurrency = parentForIssueCheck.currency;
-
-        // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — B3 Present Docs
-        // (EPLC_EXAMINATION/CREATE) presentation-vs-expiry check, run against the PARENT's own
-        // expiryDate (this new EPLC_EXAMINATION contract has no expiryDate of its own — it's a
-        // presentation record, not an LC). See createMovement()'s own A3/A3S UTILIZE check below for the
-        // sibling call site "before checkUtilizeSufficiency"/"before checkPresentDocsIssueSufficiency"
-        // the spec's own §2/§3 tables both describe.
-        if (req.instrumentType === 'EPLC_EXAMINATION' && req.movementType === 'CREATE') {
-          this.assertPresentationNotAfterExpiry(parentForIssueCheck.expiryDate, req.documentPresentationDate);
-        }
-      }
+      if (parentForIssueCheck) this.assertRootIssueReleased(parentForIssueCheck, `create a new ${req.instrumentType} under it`);
     }
 
     // Business instruction 2026-08-14: "不然流程控制無法處理 這也是BALANCE
@@ -1153,53 +946,7 @@ export class BalanceService {
     const newContractCheck = this.newContractSufficiencyRegistry[`${req.instrumentType}:${req.movementType}`];
     if (newContractCheck) newContractCheck(req);
 
-    // OAS-GAP-16 direction (a) — CURRENCY DERIVATION rule 3: a genuinely root new Logical Contract (no
-    // parent resolved above) requires currency to be caller-supplied; it becomes this new contract's own
-    // authoritative value for every future movement against it or anything created under it.
-    if (!derivedCurrency) {
-      if (!req.currency) {
-        throw new RequestValidationError(
-          'currency is required when creating a new root Logical Contract (no existing resolution and no resolvable parentLogicalContractId).',
-        );
-      }
-      derivedCurrency = req.currency;
-    }
-
-    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 (2026-08-23) — A1/B1 root ISSUE requires
-    // expiryDate; every other creating movementType (SHGT ISSUE, Acceptance CREATE, EPLC_EXAMINATION
-    // CREATE — all reach this method via the parent-derivation branch above, never this "genuinely root"
-    // one) is unaffected. issueDate stays optional here (createContract() defaults it to today).
-    if (ROOT_INSTRUMENT_TYPES.has(req.instrumentType) && req.movementType === 'ISSUE' && !req.expiryDate) {
-      throw new RequestValidationError(`expiryDate is required when issuing a new root ${req.instrumentType} (A1/B1).`);
-    }
-
-    // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1 (business-confirmed) — AFTER_SIGHT/
-    // SELLERS_USANCE and tenorBasis-on-a-SIGHT-contract are always rejected when the caller actually
-    // supplies a tenorBasis. Deliberately NOT enforced as "tenorBasis is required for Usance" at this
-    // layer (same reasoning as the Clearing Bank Calendar Profile note just below — a hard 400 for a
-    // missing tenorBasis would reject the large pre-existing corpus of Usance-tenor A1/B1 test fixtures
-    // that predate this field). Guarding the call itself on `req.tenorBasis != null` means
-    // validateTenorBasisTypeCombination()'s own "tenorBasis is required" branch is never reached here —
-    // only fires for a caller who actually opts in by supplying one.
-    if (req.tenorBasis != null) {
-      const tenorBasisCheck = validateTenorBasisTypeCombination(req.tenorBasis, req.tenorType);
-      if (!tenorBasisCheck.ok) throw new RequestValidationError(tenorBasisCheck.error);
-    }
-    if (req.tenorBasis === 'FIXED_MATURITY_DATE' && !req.fixedMaturityDate) {
-      throw new RequestValidationError('fixedMaturityDate is required when tenorBasis is FIXED_MATURITY_DATE.');
-    }
-
-    // A6/B4 Calculated Maturity Date (2026-08-23, user-directed) — "required for Usance, not for Sight" is
-    // enforced as an ANGULAR FORM validation rule (A1/B1's own required-field styling, gated on tenorType
-    // the same way tenorDays already is — see builder-fields.ts), deliberately NOT a server-side
-    // RequestValidationError here: a hard 400 at this layer would also reject the large, pre-existing
-    // corpus of Usance-tenor A1/B1 test fixtures that predate this feature and have nothing to do with
-    // it (every A6/B4/tenor-consistency test in app.test.ts/caseWalkthroughs.test.ts, none of which ever
-    // supply maturityDateCalendars). Optional here keeps this feature purely additive — see
-    // getMaturityDateCalendarsFromParent()'s own null-fallback for what happens when a Usance LC has none
-    // on file (gracefully unaffected, not an error).
-
-    return this.createContract(req, derivedCurrency);
+    return this.createContract(req);
   }
 
   /**
@@ -1231,114 +978,7 @@ export class BalanceService {
       if (amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must not be negative for CLOSE.`);
       return;
     }
-    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry only
-    // ever changes BalanceContract.expiryDate, never Balance/ceilingAmount (see this method's own doc
-    // comment for the general rule this is an exception to) — amount carries no meaning here at all, so
-    // it's required to be exactly 0 rather than merely "not negative" like CLOSE above.
-    if (movementType === 'AMEND_EXPIRY') {
-      if (!amt.isZero()) {
-        throw new RequestValidationError(`amount "${amount}" must be exactly 0 for AMEND_EXPIRY — this movement only changes expiryDate, never the Balance/ceilingAmount.`);
-      }
-      return;
-    }
-    // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2's own Update Maturity Date Calendars
-    // amendment, same "numerically inert, exactly 0" shape as AMEND_EXPIRY immediately above.
-    if (movementType === 'AMEND_MATURITY_CALENDARS') {
-      if (!amt.isZero()) {
-        throw new RequestValidationError(
-          `amount "${amount}" must be exactly 0 for AMEND_MATURITY_CALENDARS — this movement only changes the Standing calendar reference config, never the Balance/ceilingAmount.`,
-        );
-      }
-      return;
-    }
     if (amt.isZero() || amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must be greater than 0.`);
-  }
-
-  /**
-   * A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 — shared by A3/A3S's UTILIZE
-   * (createMovement()) and B3's EPLC_EXAMINATION/CREATE (resolveOrCreateContract(), checked against the
-   * PARENT's own expiryDate). Deliberately a no-op — not a "documentPresentationDate is required" gate —
-   * when either side is absent: a legacy contract with no recorded expiryDate has nothing to compare
-   * against, and a caller that omits documentPresentationDate entirely gets no NEW rejection from this
-   * check (matches the spec's own code sketch, which only ever compares two present values; making
-   * documentPresentationDate itself mandatory was not part of what was approved).
-   */
-  private assertPresentationNotAfterExpiry(expiryDate: string | null | undefined, documentPresentationDate: string | null | undefined): void {
-    if (!expiryDate || !documentPresentationDate) return;
-    if (documentPresentationDate > expiryDate) {
-      throw new RequestValidationError(
-        `documentPresentationDate (${documentPresentationDate}) must not be after this contract's own expiryDate (${expiryDate}).`,
-        { reasonCode: 'PRESENTATION_AFTER_EXPIRY' },
-      );
-    }
-  }
-
-  /**
-   * A6/B4 Calculated Maturity Date (`Maturity-Date-Business-Day-Convention-Decision-Request.md`, resolved
-   * 2026-08-23) — the ONE genuinely async, I/O-performing public method on this class (everything else is
-   * synchronous, matching `node:sqlite`'s own synchronous `DatabaseSync` — see `db/index.ts`'s doc
-   * comment). Deliberately NOT folded into `createMovement()` itself: that method, and every test that
-   * calls it directly, stays 100% synchronous and unchanged — this is called separately, and awaited,
-   * by `routes/balanceMovements.ts`'s own POST handler BEFORE it calls the (still-synchronous)
-   * `createMovement()`, passing the result through as a plain `maturityDate` on the request — exactly the
-   * same shape `maturityDate` has always had (see `CreateMovementRequest.maturityDate`'s own doc comment),
-   * just now sometimes server-computed instead of only ever caller-supplied. Opt-in only: a caller that
-   * doesn't supply `calendars` never reaches this method, and `createMovement()`'s own existing
-   * `req.maturityDate ?? null` passthrough is completely unaffected for every other caller.
-   *
-   * `sourceDate` is the already-resolved Contractual Maturity Date candidate — Maturity-Date-Tenor-Basis-
-   * Decision-Review.md v29 §8: `tenorBasis === 'FIXED_MATURITY_DATE'` uses `fixedMaturityDate` directly
-   * (no Tenor Days arithmetic); every other supported path uses `domain/maturityDateCalculation.ts`'s own
-   * `computeSourceDate(baseDate, tenorDays)`. The caller (routes/balanceMovements.ts) resolves which one
-   * applies — this method performs no Base Date resolution of its own, only the Standing holiday/weekend
-   * adjustment step.
-   */
-  async calculateAcceptanceMaturityDate(params: {
-    sourceDate: string;
-    currency?: string;
-    calendars: StandingCalendarRef[];
-    combinationRule?: AdjustBusinessDayRequest['combinationRule'];
-    convention?: AdjustBusinessDayRequest['convention'];
-  }): Promise<{ operationalPaymentDate: string; standingCalculationId: string; calendarSnapshotId: string }> {
-    const request = buildAdjustBusinessDayRequest({
-      sourceDate: params.sourceDate,
-      currency: params.currency,
-      calendars: params.calendars,
-      combinationRule: params.combinationRule,
-      convention: params.convention,
-    });
-    const response = await adjustBusinessDay(request);
-    return { operationalPaymentDate: response.adjustedDate, standingCalculationId: response.calculationId, calendarSnapshotId: response.calendarSnapshotId };
-  }
-
-  /**
-   * A6/B4 Calculated Maturity Date (2026-08-23) — the LC/Confirmation's own Standing calendar config,
-   * captured once at A1/B1 root ISSUE and amendable via A2/B2's own AMEND_MATURITY_CALENDARS (see
-   * BalanceContract.maturityDateCalendars's own doc comment). Read by `routes/balanceMovements.ts`'s own
-   * POST handler, BEFORE it calls `calculateAcceptanceMaturityDate()`, so a Maker creating an Acceptance
-   * (A6, or B4's own Usance-branch compound-submission leg) never re-types/re-selects the calendar
-   * config per Acceptance — it's inherited automatically from the parent, same "father decides, child
-   * inherits" pattern `carriedCurrency`/`tenorType`/`tenorDays` already use elsewhere in this codebase.
-   * Returns `null` (not an error) when the parent has no calendars configured — the caller falls back to
-   * today's plain, uncalculated `maturityDate` passthrough in that case, exactly as if this feature
-   * didn't exist for that LC.
-   */
-  getMaturityDateCalendarsFromParent(
-    parentLogicalContractId: string,
-  ): { calendars: MaturityDateCalendarRef[]; combinationRule: string | null; convention: string | null; tenorBasis: TenorBasis | null; fixedMaturityDate: string | null } | null {
-    const parent = this.contracts.findActiveByLogicalContractId(parentLogicalContractId);
-    if (!parent?.maturityDateCalendars?.length) return null;
-    return {
-      calendars: parent.maturityDateCalendars,
-      combinationRule: parent.maturityDateCombinationRule ?? null,
-      convention: parent.maturityDateConvention ?? null,
-      // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1/§4/§8 — added alongside the pre-existing
-      // calendar fields above so routes/balanceMovements.ts's Risk Containment Gate can resolve the
-      // Contractual Maturity Date candidate (currently only the FIXED_MATURITY_DATE path) from the SAME
-      // parent lookup, without a second round trip to the contract store.
-      tenorBasis: parent.tenorBasis ?? null,
-      fixedMaturityDate: parent.fixedMaturityDate ?? null,
-    };
   }
 
   createMovement(req: CreateMovementRequest): CreateMovementResult {
@@ -1347,58 +987,7 @@ export class BalanceService {
     // Docs sufficiency checks already use, a few lines below in resolveOrCreateContract() itself).
     this.assertValidAmount(req.movementType, req.amount);
 
-    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry
-    // requires the new expiryDate up front, same "required, checked before touching the contract" posture
-    // as assertValidAmount() above and resolveOrCreateContract()'s own A1/B1 expiryDate check below.
-    if (req.movementType === 'AMEND_EXPIRY' && !req.expiryDate) {
-      throw new RequestValidationError('expiryDate is required for AMEND_EXPIRY.');
-    }
-    // A6/B4 Calculated Maturity Date (2026-08-23) — same "required, checked up front" posture as
-    // AMEND_EXPIRY immediately above.
-    if (req.movementType === 'AMEND_MATURITY_CALENDARS' && !req.maturityDateCalendars?.length) {
-      throw new RequestValidationError('maturityDateCalendars is required (and must be non-empty) for AMEND_MATURITY_CALENDARS.');
-    }
-
     const contract = this.resolveOrCreateContract(req);
-
-    // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.2/§8 (business-confirmed) — B4's own routing
-    // (HONOUR vs. ACCEPT) is decided client-side today with no server-side check at all; this adds one,
-    // but ONLY when the contract actually has a tenorBasis on file (guarded, same soft-rollout posture as
-    // resolveOrCreateContract()'s own tenorBasis validation above) — a legacy EPLC_CONFIRMATION with no
-    // tenorBasis would otherwise resolve to MANUAL_REVIEW_REQUIRED (missing tenorBasis) and break every
-    // pre-existing B4 flow that predates this field. Only fires for a contract that opted in.
-    if (contract.instrumentType === 'EPLC_CONFIRMATION' && (req.movementType === 'HONOUR' || req.movementType === 'ACCEPT') && contract.tenorBasis != null) {
-      const routeResolution = resolveExportSettlementRoute({ tenorBasis: contract.tenorBasis, tenorType: contract.tenorType ?? 'SIGHT' });
-      if (routeResolution.status === 'MANUAL_REVIEW_REQUIRED') {
-        throw new RequestValidationError(`Cannot resolve Export settlement route for ${contract.naturalKey.lcNumber} — ${routeResolution.reason}`);
-      }
-      const expectedMovementType = routeResolution.route === 'HONOUR' ? 'HONOUR' : 'ACCEPT';
-      if (req.movementType !== expectedMovementType) {
-        throw new RequestValidationError(
-          `Requested movementType "${req.movementType}" does not match this Confirmation's own resolved settlement route ` +
-            `("${routeResolution.route}", derived from tenorBasis=${contract.tenorBasis}/tenorType=${contract.tenorType}) — expected "${expectedMovementType}".`,
-        );
-      }
-    }
-
-    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2 (2026-08-23) — A3/A3S Document Arrival
-    // (IPLC_LC/EPLC_LC UTILIZE) presentation-vs-expiry check. Scoped to movementType === 'UTILIZE'
-    // specifically, NOT the broader utilizeShaped sufficiency-check family it shares a dispatch entry
-    // with in buildMovementTypeRegistry() — HONOUR/ACCEPT (B4) route through that same entry but must
-    // NOT get this check (B4's own expiry-related behavior, per the spec's own §2/§3 tables, is the
-    // separate Calculated Maturity Date auto-fill, not this reject-if-late rule).
-    if (req.movementType === 'UTILIZE') {
-      this.assertPresentationNotAfterExpiry(contract.expiryDate, req.documentPresentationDate);
-    }
-
-    // OAS-GAP-16 direction (a), 2026-08-22 — the request-layer currency-decimal-scale check
-    // (validation/requestSchema.ts) only runs when the caller supplied `currency`, since that layer has
-    // no contract to resolve one from. Now that `currency` is optional on every non-root call, re-run the
-    // same check here against the RESOLVED contract's own currency — covers both the omitted case (only
-    // checked here) and the supplied-and-matching case (re-checked defensively; the two can never
-    // disagree by this point, resolveOrCreateContract() already rejected a mismatch).
-    const scaleViolation = describeAmountScaleViolation(req.amount, contract.currency);
-    if (scaleViolation) throw new RequestValidationError(scaleViolation);
 
     const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
     if (existing) return { created: false, existing };
@@ -1448,23 +1037,19 @@ export class BalanceService {
       ceilingAmount,
       req,
     });
-    if (sufficiency && !sufficiency.ok) {
-      throw new InsufficientBalanceError(sufficiency.error, sufficiency.reasonCode ? { reasonCode: sufficiency.reasonCode } : undefined);
-    }
+    if (sufficiency && !sufficiency.ok) throw new InsufficientBalanceError(sufficiency.error);
     const warnings: MovementWarning[] | null = sufficiency?.warning ? [sufficiency.warning] : null;
 
     // analysis/contingent-liability-ledger.html — server-derived once, here, at creation time; never
     // recomputed later (Event-Level Relationship requirement). Uses the RESOLVED contract's own
-    // tenorType (its declared Sight/Buyer's Usance/Seller's Usance, set at Issue) and, since 2026-08-22
-    // (OAS-GAP-16 direction (a)), its own resolved currency too — not req.tenorType/req.currency, which
-    // are only ever (optionally) supplied when THIS call is itself the one creating that contract; for
-    // every other movement against an already-existing contract, contract.tenorType/currency are the
-    // only source, and req.currency may be omitted entirely.
+    // tenorType (its declared Sight/Buyer's Usance/Seller's Usance, set at Issue) — not req.tenorType,
+    // which is only ever supplied when THIS call is itself the one creating that contract; for every
+    // other movement against an already-existing contract, contract.tenorType is the only source.
     const contingentAccountEntry = deriveContingentAccountEntry({
       instrumentType: req.instrumentType,
       movementType: req.movementType,
       amount: req.amount,
-      currency: contract.currency,
+      currency: req.currency,
       tenorType: contract.tenorType,
     });
 
@@ -1477,7 +1062,7 @@ export class BalanceService {
       exposureNature: req.exposureNature ?? 'CONTINGENT',
       amount: req.amount,
       ceilingAmount: ceilingAmount.toFixed(),
-      currency: contract.currency,
+      currency: req.currency,
       legRef: req.legRef ?? null,
       accountEntries: req.exposureNature === 'MEMO' ? null : (req.accountEntries ?? null),
       contingentAccountEntry,
@@ -1485,18 +1070,6 @@ export class BalanceService {
       transactionDate: req.transactionDate ?? null,
       businessDate: req.businessDate ?? null,
       valueDate: req.valueDate ?? null,
-      documentPresentationDate: req.documentPresentationDate ?? null,
-      triggeredByExpiry: req.triggeredByExpiry ?? null,
-      // §2/§3 — AMEND_EXPIRY only (the required-if-AMEND_EXPIRY check above already ran); null passthrough
-      // for every other movementType, harmless if a caller supplies it anyway (never read back except by
-      // this movementType's own release() branch).
-      expiryDate: req.expiryDate ?? null,
-      // A6/B4 Calculated Maturity Date (2026-08-23) — AMEND_MATURITY_CALENDARS only (the required-if
-      // check above already ran); null passthrough otherwise, same posture as expiryDate immediately
-      // above.
-      maturityDateCalendars: req.maturityDateCalendars ?? null,
-      maturityDateCombinationRule: req.maturityDateCombinationRule ?? null,
-      maturityDateConvention: req.maturityDateConvention ?? null,
       sourceModule: req.sourceModule ?? null,
       sourceFunction: req.sourceFunction ?? null,
       sourceTransactionRef: req.sourceTransactionRef ?? null,
@@ -1598,14 +1171,12 @@ export class BalanceService {
       if (!eligibility.eligible) {
         throw new IllegalStateTransitionError(
           `Cannot release CLOSE movement ${movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this CLOSE request and re-submit.`,
-          { reasonCode: 'CLOSE_NOT_ELIGIBLE' },
         );
       }
       if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
         throw new IllegalStateTransitionError(
           `Cannot release CLOSE movement ${movementId} — Confirmed Balance has changed since Submit ` +
             `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this CLOSE request and re-submit with the current figure.`,
-          { reasonCode: 'CLOSE_AMOUNT_MISMATCH' },
         );
       }
     }
@@ -1692,39 +1263,6 @@ export class BalanceService {
     // previously set anywhere — this is the one place it now is.
     if (movement.movementType === 'CLOSE') {
       this.contracts.markClosed(contract.balanceContractId, releasedAt);
-    }
-
-    // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry: the
-    // requested new expiryDate (carried on the movement itself since Submit, createMovement()'s own
-    // check already guaranteed it's present for this movementType) becomes the contract's own authoritative
-    // expiryDate only once a Checker actually approves it — same "mutate the contract at Release, not
-    // Submit" posture as CLOSE's own markClosed() call immediately above.
-    if (movement.movementType === 'AMEND_EXPIRY') {
-      this.contracts.updateExpiryDate(contract.balanceContractId, movement.expiryDate!);
-    }
-
-    // A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 Update Maturity Date Calendars: the requested
-    // new calendar config (carried on the movement since Submit, createMovement()'s own check already
-    // guaranteed it's present for this movementType) becomes the contract's own authoritative config
-    // only once a Checker actually approves it — same "mutate the contract at Release, not Submit"
-    // posture as AMEND_EXPIRY immediately above.
-    if (movement.movementType === 'AMEND_MATURITY_CALENDARS') {
-      this.contracts.updateMaturityDateCalendars(
-        contract.balanceContractId,
-        movement.maturityDateCalendars!,
-        movement.maturityDateCombinationRule ?? null,
-        movement.maturityDateConvention ?? null,
-      );
-    }
-
-    // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §4/§8 (business-confirmed) — an Acceptance CREATE
-    // whose Maturity Date was already computed (contract.maturityDateStatus === 'PENDING_APPROVAL', i.e.
-    // it has a verified Base Date, currently only via the FIXED_MATURITY_DATE path) becomes formally
-    // APPROVED — the only status downstream consumers (A7/B5 settlement) may reference — at THIS Checker
-    // Release, not at Submit. A contract still at 'PENDING_BASE_DATE' (no verified Base Date source) is
-    // untouched; releasing the movement itself is still legal (it just can't reach Settlement yet).
-    if (movement.movementType === 'CREATE' && (contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE') && contract.maturityDateStatus === 'PENDING_APPROVAL') {
-      this.contracts.markMaturityDateApproved(contract.balanceContractId);
     }
 
     return this.movements.findById(movementId)!;
@@ -1874,10 +1412,7 @@ export class BalanceService {
     return this.movements.findById(movementId)!;
   }
 
-  /** `currency` is the caller's own OAS-GAP-16-derived value (resolveOrCreateContract()'s own three
-   * CURRENCY DERIVATION rules) — never read from `req.currency` directly here, since for a new CHILD
-   * contract it comes from the parent, not necessarily from what the caller typed (or omitted). */
-  private createContract(req: CreateMovementRequest, currency: string): BalanceContract {
+  private createContract(req: CreateMovementRequest): BalanceContract {
     const now = this.now();
     const contract: BalanceContract = {
       balanceContractId: randomUUID(),
@@ -1887,64 +1422,11 @@ export class BalanceService {
       naturalKey: req.naturalKey!,
       parentLogicalContractId: req.parentLogicalContractId ?? null,
       status: 'ACTIVE',
-      currency,
+      currency: req.currency,
       tolerancePct: req.tolerancePct ?? null,
       tenorType: req.tenorType ?? null,
       tenorDays: req.tenorDays ?? null,
       maturityDate: req.maturityDate ?? null,
-      // §1 — expiryDate is required (enforced in resolveOrCreateContract()) for A1/B1 root ISSUE, and
-      // simply carried through as-is for every other creating movementType (SHGT ISSUE, Acceptance
-      // CREATE, etc.), where it was never required and stays null unless a caller supplies one anyway.
-      // issueDate defaults to today's Business Date when the caller omits it — spec's own "optional at
-      // A1/B1, defaults to today" rule; ignored by every non-root creating movementType too.
-      //
-      // Bug fixed 2026-08-23 (user-reported, "Inquire Event S101, there is no issue date... shown" —
-      // traced to the ROOT cause, not just a display gap): this used to default to the bare `now`
-      // ISO-8601 TIMESTAMP (e.g. "2026-08-23T02:25:31.804Z"), not a plain date. That directly violates
-      // this whole feature's own "Business Date ≠ Technical Timestamp" architectural invariant
-      // (LC-Expiry-Acceptance-Maturity-Control-Review.md) — expiryDate/issueDate are Business Dates,
-      // always a plain "YYYY-MM-DD" (confirmed by every caller-supplied expiryDate in this codebase,
-      // which always IS plain — it round-trips through an HTML `<input type="date">` on the Angular
-      // side). A full timestamp default was the one place this service silently broke that invariant —
-      // and HTML's own `<input type="date">` doesn't error on the mismatch, it just renders blank,
-      // which is what actually surfaced this as an "Issue Date isn't shown" report rather than a
-      // visible format error at Submit time. `now.slice(0, 10)` takes the UTC calendar-date portion of
-      // the ISO-8601 timestamp (positions 0-9 are always exactly "YYYY-MM-DD" per the spec) — today's
-      // Business Date, not "the exact instant this ran".
-      expiryDate: req.expiryDate ?? null,
-      issueDate: req.issueDate ?? now.slice(0, 10),
-      // A6/B4 Calculated Maturity Date (2026-08-23) — optional at A1/B1 root ISSUE (the ONLY place a
-      // caller ever sets this directly; every Acceptance CREATE under it reads it back automatically
-      // via getMaturityDateCalendarsFromParent(), never supplies its own), same plain passthrough
-      // convention as maturityDate/tolerancePct above. Amendable later via A2/B2 AMEND_MATURITY_CALENDARS
-      // (see release()'s own branch) — harmless to also carry through here for a non-root creating
-      // movementType (SHGT ISSUE, Acceptance CREATE itself, EPLC_EXAMINATION CREATE), since none of
-      // those ever populate it in practice.
-      maturityDateCalendars: req.maturityDateCalendars ?? null,
-      maturityDateCombinationRule: req.maturityDateCombinationRule ?? null,
-      maturityDateConvention: req.maturityDateConvention ?? null,
-      // Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1 — set on the root LC/Confirmation at A1/B1
-      // (harmless passthrough for every other creating movementType, same posture as maturityDateCalendars
-      // above; a non-root creating movementType never actually populates these in practice).
-      tenorBasis: req.tenorBasis ?? null,
-      fixedMaturityDate: req.fixedMaturityDate ?? null,
-      // v29 §4/§5/§8 (Risk Containment Gate) — only ever set for a genuinely computed value (see
-      // routes/balanceMovements.ts's own Risk Containment Gate logic, which resolves these BEFORE
-      // calling createMovement() — this method itself performs no calculation, only persistence).
-      // contractualMaturityDate present -> the caller already resolved a verified Base Date (currently
-      // only the FIXED_MATURITY_DATE path) -> PENDING_APPROVAL; absent -> PENDING_BASE_DATE, the safe
-      // default for every tenorBasis this service cannot yet verify a Base Date for. Only meaningful for
-      // an Acceptance contract (IPLC_ACCEPTANCE/EPLC_ACCEPTANCE) — null for every other instrumentType.
-      contractualMaturityDate: req.contractualMaturityDate ?? null,
-      operationalPaymentDate: req.operationalPaymentDate ?? null,
-      standingCalculationId: req.standingCalculationId ?? null,
-      calendarSnapshotId: req.calendarSnapshotId ?? null,
-      maturityDateStatus:
-        req.instrumentType === 'IPLC_ACCEPTANCE' || req.instrumentType === 'EPLC_ACCEPTANCE'
-          ? req.contractualMaturityDate
-            ? 'PENDING_APPROVAL'
-            : 'PENDING_BASE_DATE'
-          : null,
       openingBalance: '0',
       effectiveFrom: now,
       createdBy: req.createdBy,

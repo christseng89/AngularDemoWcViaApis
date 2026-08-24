@@ -74,7 +74,7 @@ export function computeOffBalanceExposure(
 }
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see AcceptanceTenorCheckResult's own doc comment for why. */
-export type ShgtIssueSufficiencyResult = { ok: true } | { ok: false; error: string; reasonCode: 'SG_ISSUE_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE' };
+export type ShgtIssueSufficiencyResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Business instruction 2026-08-14 ("SG issue amount should be less than the LC Current Balance" — "For
@@ -101,7 +101,6 @@ export function checkShgtIssueSufficiency(params: {
         `(Confirmed Balance ${parentConfirmedBalance.toFixed()} minus ${parentPendingDecreaseTotal.toFixed()} still-PENDING decrease(s) ` +
         `minus ${existingShgtExposure.toFixed()} already-outstanding Shipping Guarantee exposure on this same LC — only APPROVED amounts ` +
         `count as usable capacity).`,
-      reasonCode: 'SG_ISSUE_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE',
     };
   }
   return { ok: true };
@@ -187,7 +186,7 @@ export function computePresentDocsEarmark(
 }
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see AcceptanceTenorCheckResult's own doc comment for why. */
-export type PresentDocsIssueSufficiencyResult = { ok: true } | { ok: false; error: string; reasonCode: 'PRESENT_DOCS_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE' };
+export type PresentDocsIssueSufficiencyResult = { ok: true } | { ok: false; error: string };
 
 /**
  * B3's own sufficiency check at CREATE time (business-reported gap 2026-08-15, "B3 沒檢查到單金額超過
@@ -213,7 +212,6 @@ export function checkPresentDocsIssueSufficiency(params: {
         `still-PENDING decrease(s) minus ${presentDocsEarmark.toFixed()} already-outstanding Present Docs earmark on this same Confirmation, ` +
         `balanceContractId ${parentConfirmationBalanceContractId}) — this presentation could never be Honoured/Accepted in full alongside the ` +
         `other still-open presentations on this LC.`,
-      reasonCode: 'PRESENT_DOCS_EXCEEDS_PARENT_TIGHT_AVAILABLE_BALANCE',
     };
   }
   return { ok: true };
@@ -258,9 +256,7 @@ export function computePresentDocsEarmarkApproved(
  * adjusted threshold was still exceeded — non-blocking); current code never actually populates it (see
  * `checkUtilizeSufficiency`'s own body below), kept only because the OAS/DB schema still carry the field.
  */
-export type UtilizeSufficiencyResult =
-  | { ok: true; warning?: MovementWarning }
-  | { ok: false; error: string; reasonCode: 'EXCEEDS_AVAILABLE_BALANCE' | 'EXCEEDS_TIGHT_AVAILABLE_BALANCE' };
+export type UtilizeSufficiencyResult = { ok: true; warning?: MovementWarning } | { ok: false; error: string };
 
 /**
  * Design doc §6.1, hardened v0.12 (business-confirmed 2026-08-14, off a live
@@ -296,7 +292,6 @@ export function checkUtilizeSufficiency(params: {
     return {
       ok: false,
       error: `Requested amount ${requestedAmount.toFixed()} exceeds Available Balance ${availableBalance.toFixed()}.`,
-      reasonCode: 'EXCEEDS_AVAILABLE_BALANCE',
     };
   }
 
@@ -310,7 +305,6 @@ export function checkUtilizeSufficiency(params: {
         `off-balance-sheet (SHGT) exposure ${offBalanceExposure.toFixed()} — only APPROVED amounts count as usable capacity). ` +
         `If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use ` +
         `"Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.`,
-      reasonCode: 'EXCEEDS_TIGHT_AVAILABLE_BALANCE',
     };
   }
 

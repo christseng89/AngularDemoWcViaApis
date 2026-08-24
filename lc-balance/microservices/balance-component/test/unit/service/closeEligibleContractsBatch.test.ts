@@ -24,7 +24,7 @@ function issueImportLc(service: BalanceService, lcNumber: string, tenorType?: 'B
   const issue = service.createMovement({
     instrumentType: 'IPLC_LC',
     naturalKey: { lcNumber },
-    movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
+    movementType: 'ISSUE',
     eventSeq: 1,
     amount: '10000',
     currency: 'USD',
@@ -42,7 +42,7 @@ function issueConfirmation(service: BalanceService, lcNumber: string): BalanceCo
   const issue = service.createMovement({
     instrumentType: 'EPLC_CONFIRMATION',
     naturalKey: { lcNumber },
-    movementType: 'ISSUE', expiryDate: '2030-12-31T00:00:00Z',
+    movementType: 'ISSUE',
     eventSeq: 1,
     amount: '10000',
     currency: 'USD',

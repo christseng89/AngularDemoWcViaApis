@@ -57,26 +57,20 @@ export function balanceContractsRouter(service: BalanceService): Router {
     );
   });
 
-  // GET /balance-contracts/close-eligible?instrumentType=&lcNumber=&page=&pageSize=&expiredBefore=
+  // GET /balance-contracts/close-eligible?instrumentType=&lcNumber=&page=&pageSize=
   // A10/B6 Close, Step-1 picker hint (domain/closeEligibility.ts) — every ACTIVE root LC/Confirmation
   // currently eligible to Close (SG Balance = 0, Acceptance Balance = 0, no open Events anywhere in the
   // tree, not already Closed). Deliberately its own route, not a CatalogFilter flag on /catalog — the
   // check spans multiple tables/instrument types per candidate, unlike requireIssueReleased's single
   // EXISTS subquery.
-  // expiredBefore — A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0.1, GAP-15 discovery-query fix
-  // (2026-08-23). Optional; when supplied, further narrows the eligible set to contracts whose own
-  // expiryDate is before this date — the ONE decision-making layer of the three-layer expiry-discovery
-  // design (Maker Submit/Checker Release only carry an informational triggeredByExpiry flag, they never
-  // filter on expiryDate themselves — see service.listCloseEligibleContracts()'s own doc comment for why).
   router.get('/balance-contracts/close-eligible', (req, res) => {
-    const { instrumentType, lcNumber, page, pageSize, expiredBefore } = req.query;
+    const { instrumentType, lcNumber, page, pageSize } = req.query;
     if (!instrumentType) throw new RequestValidationError('instrumentType is required.');
     res.json(
       service.listCloseEligibleContracts(instrumentType as InstrumentType, {
         lcNumber: lcNumber as string | undefined,
         page: page ? Number(page) : undefined,
         pageSize: pageSize ? Number(pageSize) : undefined,
-        expiredBefore: expiredBefore as string | undefined,
       }),
     );
   });

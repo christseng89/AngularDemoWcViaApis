@@ -50,12 +50,6 @@ export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCEL
 
 export const TENOR_TYPE_VALUES = ['SIGHT', 'BUYERS_USANCE', 'SELLERS_USANCE', 'DP', 'DA'] as const;
 
-// Maturity-Date-Tenor-Basis-Decision-Review.md v29 §2 — kept in sync with types.ts's own TenorBasis union.
-export const TENOR_BASIS_VALUES = ['AFTER_SIGHT', 'AFTER_BL_DATE', 'AFTER_INVOICE_DATE', 'AFTER_SHIPMENT_DATE', 'AFTER_ACCEPTANCE', 'FIXED_MATURITY_DATE'] as const;
-
-// v29 §4 — kept in sync with types.ts's own MaturityDateStatus union.
-export const MATURITY_DATE_STATUS_VALUES = ['PENDING_BASE_DATE', 'PENDING_APPROVAL', 'APPROVED'] as const;
-
 export const MOVEMENT_STATUS_VALUES = ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'] as const;
 
 export const EXPOSURE_NATURE_VALUES = ['CONTINGENT', 'ACTUAL', 'MEMO'] as const;
@@ -77,18 +71,6 @@ export const MOVEMENT_TYPE_VALUES = [
   'PARTIAL_SETTLE',
   'FULL_SETTLE',
   'CLOSE',
-  // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A2/B2 Extend Expiry
-  // amendment subtype. Changes ONLY BalanceContract.expiryDate (at release, see BalanceService.release()'s
-  // own AMEND_EXPIRY branch) — never Balance/ceilingAmount; amount is always exactly "0" (see
-  // assertValidAmount()'s own AMEND_EXPIRY branch), and MOVEMENT_DIRECTION's own AMEND_EXPIRY: 1 entry is
-  // therefore numerically inert (0 * 1 = 0), present only so signedAmount() doesn't throw.
-  'AMEND_EXPIRY',
-  // A6/B4 Calculated Maturity Date (2026-08-23, Maturity-Date-Business-Day-Convention-Decision-
-  // Request.md, resolved) — A2/B2 amendment subtype letting the Maker update the LC/Confirmation's own
-  // Standing calendar reference config (maturity_date_calendars/_combination_rule/_convention on
-  // balance_contracts, see BalanceService.release()'s own branch). Same "amount always 0, numerically
-  // inert" shape as AMEND_EXPIRY above — never touches Balance/ceilingAmount.
-  'AMEND_MATURITY_CALENDARS',
 ] as const;
 
 function sqlInList(values: readonly string[]): string {
@@ -114,37 +96,6 @@ CREATE TABLE IF NOT EXISTS balance_contracts (
   tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
   tenor_days                     INTEGER,
   maturity_date                  TEXT,
-  -- A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §0/§1 (2026-08-23) — root-ISSUE Business Date
-  -- fields. expiry_date is required at root A1/B1 ISSUE (enforced in requestSchema.ts, not here);
-  -- issue_date is optional there, defaulting to today. Both plain nullable TEXT — same convention as
-  -- maturity_date above (ISO date string, no CHECK constraint).
-  expiry_date                    TEXT,
-  issue_date                     TEXT,
-  -- A6/B4 Calculated Maturity Date (2026-08-23) — captured once at A1/B1 root ISSUE (this LC/
-  -- Confirmation's own Standing calendar references for the eventual /business-days/adjust call),
-  -- amendable via A2/B2's own AMEND_MATURITY_CALENDARS (see balance_movements' own copy of these three
-  -- columns below, and BalanceService.release()'s own branch that copies them across at Checker
-  -- approval). maturity_date_calendars is JSON (MaturityDateCalendarRef[]); the other two are plain
-  -- enum-shaped TEXT, no CHECK constraint (small, non-authoritative set — see standingClient.ts).
-  maturity_date_calendars        TEXT,
-  maturity_date_combination_rule TEXT,
-  maturity_date_convention       TEXT,
-  -- Maturity-Date-Tenor-Basis-Decision-Review.md v29 §3.1/§4/§5 (business-confirmed) — tenor_basis/
-  -- fixed_maturity_date live on the ROOT LC/Confirmation (captured at A1/B1 alongside tenor_type/
-  -- tenor_days); contractual_maturity_date/operational_payment_date/standing_calculation_id/
-  -- calendar_snapshot_id/maturity_date_status live on the ACCEPTANCE's own contract (never the parent —
-  -- one LC can have multiple independent Acceptances, e.g. partial shipments, each with its own
-  -- non-overwriting Maturity Date). No CHECK on tenor_basis/tenor_type combination here — that's an
-  -- application-layer rule (domain/tenorBasis.ts), not a schema constraint, since it depends on both
-  -- columns together and node:sqlite CHECK constraints can't reference sibling-column business rules
-  -- this specific (see the existing tenor_type/tenor_basis nullable pattern already used elsewhere).
-  tenor_basis                     TEXT CHECK (tenor_basis IS NULL OR tenor_basis IN (${sqlInList(TENOR_BASIS_VALUES)})),
-  fixed_maturity_date             TEXT,
-  contractual_maturity_date       TEXT,
-  operational_payment_date        TEXT,
-  standing_calculation_id         TEXT,
-  calendar_snapshot_id            TEXT,
-  maturity_date_status            TEXT CHECK (maturity_date_status IS NULL OR maturity_date_status IN (${sqlInList(MATURITY_DATE_STATUS_VALUES)})),
   opening_balance                TEXT NOT NULL,
   source_amendment_no            INTEGER,
   effective_from                 TEXT NOT NULL,
@@ -279,24 +230,7 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- 2026-08-20 ("SUBMIT/EC/APPROVE DATETIME/USER") — cancel()'s own actor/time, split out from
   -- released_by/released_at (see types.ts BalanceMovement.cancelledAt for why).
   cancelled_by             TEXT,
-  cancelled_at             TEXT,
-  -- A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3 (2026-08-23) — A3/A3S/B3 presentation-vs-
-  -- expiry check (reasonCode: PRESENTATION_AFTER_EXPIRY). Plain nullable TEXT (ISO date string), caller-
-  -- supplied on the presentation movement itself, not derived server-side.
-  document_presentation_date TEXT,
-  -- §0.1 (2026-08-23) — Layer 2/3 informational-only audit flag, A10/B6 CLOSE only. INTEGER 0/1/NULL; see
-  -- migrations.ts migration 15's own description for why (no boolean affinity in node:sqlite).
-  triggered_by_expiry     INTEGER,
-  -- §2/§3 (2026-08-23) — A2/B2 AMEND_EXPIRY only: the REQUESTED new expiryDate, carried on the movement
-  -- (immutable audit record) until release() copies it onto BalanceContract.expiry_date. Null for every
-  -- other movementType.
-  expiry_date              TEXT,
-  -- A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 AMEND_MATURITY_CALENDARS only: the REQUESTED new
-  -- calendar config, carried here (immutable audit record) until release() copies it onto
-  -- BalanceContract's own three columns of the same name. Null for every other movementType.
-  maturity_date_calendars        TEXT,
-  maturity_date_combination_rule TEXT,
-  maturity_date_convention       TEXT
+  cancelled_at             TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

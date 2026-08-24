@@ -64,7 +64,6 @@ const A6 = findFn(IMPORT_FUNCTIONS, 'A6'); // Acceptance (Usance) — defaultPar
 const A3S = findFn(IMPORT_FUNCTIONS, 'A3S'); // Document Arrival w/ Shipping Gtee — flat Catalog picker, documentArrivalWithSg
 const A9 = findFn(IMPORT_FUNCTIONS, 'A9'); // Shipping Gtee (Redemption) — defaultParentInstrumentType, amountVsAvailableDerivation REDEEM
 const B1 = findFn(EXPORT_FUNCTIONS, 'B1'); // Confirm LC — export side, fixed movementType
-const B2 = findFn(EXPORT_FUNCTIONS, 'B2'); // Confirm LC Amendment — subChoice.key 'amendDirection', fixed movementType 'AMEND' (except EXTEND_EXPIRY, see onSubChoice() tests)
 const B4a = findFn(EXPORT_FUNCTIONS, 'B4'); // Honour / Acceptance — payableMovementInstrumentType EPLC_EXAMINATION, flat Catalog picker
 
 function mkContract(id: string, lcNumber: string, overrides: Partial<BalanceContract> = {}): BalanceContract {
@@ -334,86 +333,6 @@ describe('MakerPanelComponent', () => {
       comp.onSubChoice();
 
       expect(comp.model.movementType).toBe('AMEND_DECREASE');
-    });
-
-    it('A2 Extend Expiry: sets movementType AMEND_EXPIRY and locks amount to 0 (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2, 2026-08-23)', () => {
-      const { comp, mockApi } = makeComponentA();
-      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
-      comp.selectedFunction = A2;
-      comp.subChoiceValue = 'AMEND_EXPIRY';
-
-      comp.onSubChoice();
-
-      expect(comp.model.movementType).toBe('AMEND_EXPIRY');
-      expect(comp.model.amount).toBe('0');
-    });
-
-    it('A2 Update Maturity Date Calendars: sets movementType AMEND_MATURITY_CALENDARS and locks amount to 0 (2026-08-23, A6/B4 Calculated Maturity Date, user-directed)', () => {
-      const { comp, mockApi } = makeComponentA();
-      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
-      comp.selectedFunction = A2;
-      comp.subChoiceValue = 'AMEND_MATURITY_CALENDARS';
-
-      comp.onSubChoice();
-
-      expect(comp.model.movementType).toBe('AMEND_MATURITY_CALENDARS');
-      expect(comp.model.amount).toBe('0');
-    });
-
-    describe('B2 (amendDirection subChoice — Increase/Decrease stay movementType "AMEND"; Extend Expiry overrides it, §3)', () => {
-      it('Increase: sets amendDirection only, model.movementType stays the function-fixed "AMEND"', () => {
-        const { comp } = makeComponentA();
-        comp.selectedFunction = B2;
-        comp.model.movementType = 'AMEND'; // resetForFunction()'s own `if (fn?.movementType)` branch, simulated
-        comp.subChoiceValue = 'INCREASE';
-
-        comp.onSubChoice();
-
-        expect(comp.amendDirection).toBe('INCREASE');
-        expect(comp.model.movementType).toBe('AMEND');
-        expect(comp.model.amount).toBeUndefined();
-      });
-
-      it('Extend Expiry: overrides model.movementType to AMEND_EXPIRY and locks amount to 0', () => {
-        const { comp } = makeComponentA();
-        comp.selectedFunction = B2;
-        comp.model.movementType = 'AMEND';
-        comp.subChoiceValue = 'EXTEND_EXPIRY';
-
-        comp.onSubChoice();
-
-        expect(comp.amendDirection).toBe('EXTEND_EXPIRY');
-        expect(comp.model.movementType).toBe('AMEND_EXPIRY');
-        expect(comp.model.amount).toBe('0');
-      });
-
-      it('switching back from Extend Expiry to Decrease restores model.movementType to "AMEND"', () => {
-        const { comp } = makeComponentA();
-        comp.selectedFunction = B2;
-        comp.model.movementType = 'AMEND';
-        comp.subChoiceValue = 'EXTEND_EXPIRY';
-        comp.onSubChoice();
-        expect(comp.model.movementType).toBe('AMEND_EXPIRY');
-
-        comp.subChoiceValue = 'DECREASE';
-        comp.onSubChoice();
-
-        expect(comp.amendDirection).toBe('DECREASE');
-        expect(comp.model.movementType).toBe('AMEND');
-      });
-
-      it('Update Maturity Date Calendars: overrides model.movementType to AMEND_MATURITY_CALENDARS and locks amount to 0 (2026-08-23, A6/B4 Calculated Maturity Date, user-directed)', () => {
-        const { comp } = makeComponentA();
-        comp.selectedFunction = B2;
-        comp.model.movementType = 'AMEND';
-        comp.subChoiceValue = 'UPDATE_MATURITY_CALENDARS';
-
-        comp.onSubChoice();
-
-        expect(comp.amendDirection).toBe('UPDATE_MATURITY_CALENDARS');
-        expect(comp.model.movementType).toBe('AMEND_MATURITY_CALENDARS');
-        expect(comp.model.amount).toBe('0');
-      });
     });
   });
 
@@ -1244,83 +1163,6 @@ describe('MakerPanelComponent', () => {
       expect(comp.selectedContractSnapshot?.availableBalance).toBe('5000');
     });
 
-    // 2026-08-23, user-requested ("A2 and B2 修改Expiry date也將原來的Expiry Date顯示出來供參考") — see
-    // builder-fields.ts's own originalExpiryDateReference field (scoped to A2/B2 Extend Expiry only via
-    // amountFromAmendExpiry; setting the model value here unconditionally on every flat-Catalog pick is
-    // harmless for every other function, same design as parentExpiryDateReference's onSelectParent()).
-    it("carries the picked contract's own expiryDate into model.originalExpiryDateReference (A2 shape)", () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('A2'), api);
-      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', expiryDate: '2027-03-31' })];
-
-      comp.onSelectContract('C1');
-
-      expect(comp.model.originalExpiryDateReference).toBe('2027-03-31');
-    });
-
-    it('yields originalExpiryDateReference as undefined (not stale/null) when the picked contract has no expiryDate', () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('A2'), api);
-      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', expiryDate: null })];
-
-      comp.onSelectContract('C1');
-
-      expect(comp.model.originalExpiryDateReference).toBeUndefined();
-    });
-
-    // 2026-08-23, user-directed ("A3 A35 B3 只顯示(PROTECTED)") — A3/A3S reach this handler directly
-    // (flat Catalog), unlike B3 which goes through onSelectParent() instead (see that method's own tests).
-    it("carries the picked contract's own configured calendars into model.maturityDateCalendarsReference (A3 shape)", () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('A3'), api);
-      comp.catalogPicker.contracts = [
-        makeContract({ balanceContractId: 'C1', maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'US', role: 'SETTLEMENT', required: true }] }),
-      ];
-
-      comp.onSelectContract('C1');
-
-      expect(comp.model.maturityDateCalendarsReference).toBe('US (COUNTRY)');
-    });
-
-    it('yields maturityDateCalendarsReference as undefined when the picked contract has no maturityDateCalendars configured', () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('A3'), api);
-      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', maturityDateCalendars: null })];
-
-      comp.onSelectContract('C1');
-
-      expect(comp.model.maturityDateCalendarsReference).toBeUndefined();
-    });
-
-    // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §4 (2026-08-24, business-confirmed) — A7's own
-    // two-field search resolves selectedContract to the Acceptance itself (see the "resolves via search"
-    // describe block below for that path); this covers the flat-Catalog shape via onSelectContract().
-    it("carries the picked Acceptance contract's own maturityDateStatus/contractualMaturityDate/operationalPaymentDate into the read-only reference fields", () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('A3'), api);
-      comp.catalogPicker.contracts = [
-        makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_ACCEPTANCE', maturityDateStatus: 'APPROVED', contractualMaturityDate: '2026-12-25', operationalPaymentDate: '2026-12-28' }),
-      ];
-
-      comp.onSelectContract('C1');
-
-      expect(comp.model.maturityDateStatusReference).toBe('Approved');
-      expect(comp.model.contractualMaturityDateReference).toBe('2026-12-25');
-      expect(comp.model.operationalPaymentDateReference).toBe('2026-12-28');
-    });
-
-    it('leaves the 3 Acceptance reference fields undefined for a non-Acceptance contract (e.g. a plain LC)', () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('A3'), api);
-      comp.catalogPicker.contracts = [makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' })];
-
-      comp.onSelectContract('C1');
-
-      expect(comp.model.maturityDateStatusReference).toBeUndefined();
-      expect(comp.model.contractualMaturityDateReference).toBeUndefined();
-      expect(comp.model.operationalPaymentDateReference).toBeUndefined();
-    });
-
     it('sets selectedContract to null and skips the snapshot fetch when the id is not in catalogPicker.contracts', () => {
       const api = makeApi();
       const comp = makeComponentB(getFn('A3'), api);
@@ -2037,13 +1879,7 @@ describe('MakerPanelComponent', () => {
       const api = makeApi({ listMovements: jest.fn(() => of([pendingArrival])) });
       const comp = makeComponentB(getFn('A6'), api);
       comp.parentPicker.contracts = [
-        makeContract({
-          balanceContractId: 'P1',
-          naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null },
-          tenorType: 'SELLERS_USANCE',
-          tenorDays: 90,
-          expiryDate: '2030-09-01',
-        }),
+        makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, tenorType: 'SELLERS_USANCE', tenorDays: 90 }),
       ];
 
       comp.onSelectParent('P1');
@@ -2052,89 +1888,9 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.payableMovements).toEqual([pendingArrival]);
       expect(comp.model.tenorType).toBe('SELLERS_USANCE');
       expect(comp.model.tenorDays).toBe(90);
-      // UI-only reference field (2026-08-23, user-requested) — carried the same way tenorType/tenorDays
-      // are, straight off the freshly-picked parent.
-      expect(comp.model.parentExpiryDateReference).toBe('2030-09-01');
       // A6 is settlesDocumentArrival — excluded from the A8/B3-only selectedContract alias above (A6 has
       // its own Step-2 payable-movement picker, a different meaning for "the target of this submission").
       expect(comp.selectedContract).toBeNull();
-    });
-
-    it("A8 (no tenorTypeOptions of its own): parentExpiryDateReference is STILL carried from the picked Parent — set unconditionally, unlike tenorType/tenorDays which need tenorTypeOptions", () => {
-      const api = makeApi();
-      const comp = makeComponentB(getFn('A8'), api);
-      comp.parentPicker.contracts = [
-        makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, expiryDate: '2029-12-25' }),
-      ];
-
-      comp.onSelectParent('P1');
-
-      expect(comp.model.parentExpiryDateReference).toBe('2029-12-25');
-      // builder-fields.ts's own isMaturityDateFunction hides the FIELD for A8 regardless — this only
-      // proves the underlying model value itself is harmlessly populated, per that field's own doc comment.
-    });
-
-    it('a parent with no expiryDate of its own: parentExpiryDateReference is undefined, not null or a stale previous value', () => {
-      const api = makeApi();
-      const comp = makeComponentB(getFn('A6'), api);
-      comp.parentPicker.contracts = [
-        makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, expiryDate: null }),
-      ];
-
-      comp.onSelectParent('P1');
-
-      expect(comp.model.parentExpiryDateReference).toBeUndefined();
-    });
-
-    // 2026-08-23, user-requested ("Current Expiry Date A3 A3S & B3 都要顯示") — B3's own instrumentType
-    // (EPLC_EXAMINATION) is in HAS_PARENT, so unlike A3/A3S (flat Catalog, onSelectContract()), B3 reaches
-    // the parent picker instead — this is the one function that needs originalExpiryDateReference set here.
-    it("B3: originalExpiryDateReference is carried from the picked parent Confirmation's own Expiry Date", () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('B3'), api);
-      comp.parentPicker.contracts = [
-        makeContract({
-          balanceContractId: 'P1',
-          instrumentType: 'EPLC_CONFIRMATION',
-          naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null },
-          expiryDate: '2028-06-30',
-        }),
-      ];
-
-      comp.onSelectParent('P1');
-
-      expect(comp.model.originalExpiryDateReference).toBe('2028-06-30');
-    });
-
-    // 2026-08-23, user-directed ("A3 A35 B3 只顯示(PROTECTED)") — same B3-only rationale as
-    // originalExpiryDateReference immediately above: B3 reaches the parent picker, never onSelectContract().
-    it("B3: maturityDateCalendarsReference is carried from the picked parent Confirmation's own configured calendars", () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('B3'), api);
-      comp.parentPicker.contracts = [
-        makeContract({
-          balanceContractId: 'P1',
-          instrumentType: 'EPLC_CONFIRMATION',
-          naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null },
-          maturityDateCalendars: [{ calendarType: 'COUNTRY', code: 'TW', role: 'SETTLEMENT', required: true }],
-        }),
-      ];
-
-      comp.onSelectParent('P1');
-
-      expect(comp.model.maturityDateCalendarsReference).toBe('TW (COUNTRY)');
-    });
-
-    it('a parent with no maturityDateCalendars configured: maturityDateCalendarsReference is undefined, not an empty string or stale previous value', () => {
-      const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot())) });
-      const comp = makeComponentB(getFn('B3'), api);
-      comp.parentPicker.contracts = [
-        makeContract({ balanceContractId: 'P1', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'LC1', ibNumber: null, sgNumber: null } }),
-      ];
-
-      comp.onSelectParent('P1');
-
-      expect(comp.model.maturityDateCalendarsReference).toBeUndefined();
     });
 
     it("B5 (settleableBalanceIndex): merges settleable candidates for the picked Confirmation's own LC Number", () => {
@@ -2788,10 +2544,6 @@ describe('MakerPanelComponent', () => {
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.amount = '100000';
       // model.currency/createdBy already default 'USD'/'maker1'; tenorType defaults to SIGHT via resetForFunction()
-      // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §1 — expiryDate is now also mandatory.
-      comp.model.expiryDate = '2030-12-31';
-      // Clearing Bank Calendar Profile (2026-08-23, widened to apply regardless of tenor) — now mandatory even on Sight.
-      comp.model.maturityDateProfile = 'TW';
       expect(comp.isSubmitReady).toBe(true);
     });
 
@@ -2841,9 +2593,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '100000';
       comp.model.tolerancePct = '10';
       comp.model.eventSeq = 42;
-      comp.model.expiryDate = '2030-12-31';
       // tenorType defaults to SIGHT via resetForFunction()
-      comp.model.maturityDateProfile = 'TW'; // Clearing Bank Calendar Profile — mandatory regardless of tenor
 
       comp.submit();
 
@@ -2877,10 +2627,6 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '50000';
       comp.model.tenorType = 'BUYERS_USANCE';
       comp.model.tenorDays = 90;
-      comp.model.expiryDate = '2030-12-31';
-      comp.model.maturityDateProfile = 'USD_FEDWIRE'; // A6/B4 Calculated Maturity Date — required for Usance
-      comp.model.tenorBasis = 'FIXED_MATURITY_DATE'; // Maturity-Date-Tenor-Basis-Decision-Review.md v31 §3.1 — required for Usance
-      comp.model.fixedMaturityDate = '2027-03-31';
       // tolerancePct left unset
 
       comp.submit();
@@ -2897,8 +2643,6 @@ describe('MakerPanelComponent', () => {
       triggerSelectFunction(comp, A1);
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.amount = '100000';
-      comp.model.expiryDate = '2030-12-31';
-      comp.model.maturityDateProfile = 'TW'; // Clearing Bank Calendar Profile — mandatory regardless of tenor
 
       comp.submit();
 

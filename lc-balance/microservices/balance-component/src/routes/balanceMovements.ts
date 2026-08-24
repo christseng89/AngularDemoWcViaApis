@@ -2,83 +2,24 @@ import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { RequestValidationError } from '../errors';
 import type { CreateMovementRequest } from '../service/balanceService';
-import type { StandingCalendarRef, AdjustBusinessDayRequest } from '../clients/standingClient';
 import { createMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 
 export function balanceMovementsRouter(service: BalanceService): Router {
   const router = Router();
 
   // POST /balance-movements
-  //
-  // Async ONLY because of the A6/B4 Calculated Maturity Date pre-step below — every other route handler
-  // in this file stays synchronous, matching `node:sqlite`'s own synchronous DB layer (see
-  // `db/index.ts`'s doc comment) and `BalanceService.createMovement()`'s own doc comment on why that
-  // method itself was deliberately NOT made async. Express 4 does not auto-forward a rejected Promise
-  // from an async handler to the error middleware (unlike a synchronous `throw`, which it does catch
-  // automatically) — the try/catch + `next(err)` here exists specifically to preserve that same
-  // catch-all error handling for this one now-async handler.
-  router.post('/balance-movements', async (req, res, next) => {
-    try {
-      // Quality-report-balance.md BAL-116: was a sequence of hand-rolled `if` checks (presence, the
-      // MONETARY_AMOUNT_PATTERN shape, the currency-decimal-scale rule) — now one declarative schema. See
-      // requestSchema.ts's own doc comment for exactly what's validated here vs. passed through untouched
-      // (`.passthrough()` — every other CreateMovementRequest field is unchanged from before this fix).
-      const parsed = createMovementRequestSchema.safeParse(req.body);
-      if (!parsed.success) {
-        throw new RequestValidationError(firstValidationMessage(parsed.error));
-      }
-      const body = parsed.data as CreateMovementRequest;
-
-      // Risk Containment Gate (Maturity-Date-Tenor-Basis-Decision-Review.md v29 §8, P0) — REPLACES the
-      // former "unconditionally use today as Base Date, regardless of tenorBasis" auto-calc (a real,
-      // confirmed bug: it silently produced a wrong Contractual Maturity Date for any tenorBasis whose
-      // Base Date isn't coincidentally "today", with no warning — see CLAUDE.md's own decision log for
-      // the full incident writeup). A caller-supplied `maturityDate` on an Acceptance CREATE is no longer
-      // trusted at all — there is no way to verify it against a tenorBasis/Base Date, so it is REJECTED
-      // outright rather than silently accepted (v29's own repeated finding: "PENDING_APPROVAL" requires a
-      // basis that's actually been verified, and an unverified passthrough value does not qualify).
-      // Today's ONLY verified Base Date source is `tenorBasis === 'FIXED_MATURITY_DATE'` (uses
-      // `fixedMaturityDate` directly, no Tenor Days arithmetic) — every other tenorBasis (AFTER_SIGHT/
-      // AFTER_BL_DATE/AFTER_INVOICE_DATE/AFTER_SHIPMENT_DATE/AFTER_ACCEPTANCE) has no Base Date source
-      // wired yet (sightDate/blDate/invoiceDate/shipmentDate/Acceptance-Date-operational-definition are
-      // all still pending business confirmation) and is left at the safe default: `maturityDateStatus:
-      // 'PENDING_BASE_DATE'`, no Contractual/Operational Maturity Date computed. This is an ACCEPTED
-      // interim consequence, not a bug — see v29 §8's own "Risk Containment Gate ≠ Business Go-Live Gate"
-      // framing: no wrong date is ever produced, but most Usance Acceptances cannot reach A7/B5
-      // Settlement until a real Base Date source is wired for their own tenorBasis.
-      const isAcceptanceCreate = (body.instrumentType === 'IPLC_ACCEPTANCE' || body.instrumentType === 'EPLC_ACCEPTANCE') && body.movementType === 'CREATE';
-      if (isAcceptanceCreate && body.maturityDate != null) {
-        throw new RequestValidationError(
-          'A caller-supplied maturityDate is no longer accepted on an Acceptance CREATE — there is no way to verify it against a tenorBasis/Base Date. ' +
-            "Omit it entirely; the contract stays at maturityDateStatus='PENDING_BASE_DATE' until a verified Base Date source (currently only tenorBasis='FIXED_MATURITY_DATE') is available.",
-        );
-      }
-      if (isAcceptanceCreate && body.parentLogicalContractId) {
-        const parentCalendars = service.getMaturityDateCalendarsFromParent(body.parentLogicalContractId);
-        if (parentCalendars?.tenorBasis === 'FIXED_MATURITY_DATE' && parentCalendars.fixedMaturityDate) {
-          const sourceDate = parentCalendars.fixedMaturityDate;
-          const { operationalPaymentDate, standingCalculationId, calendarSnapshotId } = await service.calculateAcceptanceMaturityDate({
-            sourceDate,
-            currency: body.currency,
-            calendars: parentCalendars.calendars as StandingCalendarRef[],
-            combinationRule: (parentCalendars.combinationRule ?? undefined) as AdjustBusinessDayRequest['combinationRule'] | undefined,
-            convention: (parentCalendars.convention ?? undefined) as AdjustBusinessDayRequest['convention'] | undefined,
-          });
-          body.contractualMaturityDate = sourceDate;
-          body.operationalPaymentDate = operationalPaymentDate;
-          body.standingCalculationId = standingCalculationId;
-          body.calendarSnapshotId = calendarSnapshotId;
-        }
-        // Every other tenorBasis (including none on file) is deliberately left uncalculated here —
-        // createMovement()/createContract() default a new Acceptance to maturityDateStatus:
-        // 'PENDING_BASE_DATE' whenever contractualMaturityDate is absent from the request.
-      }
-
-      const result = service.createMovement(body);
-      res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
-    } catch (err) {
-      next(err);
+  router.post('/balance-movements', (req, res) => {
+    // Quality-report-balance.md BAL-116: was a sequence of hand-rolled `if` checks (presence, the
+    // MONETARY_AMOUNT_PATTERN shape, the currency-decimal-scale rule) — now one declarative schema. See
+    // requestSchema.ts's own doc comment for exactly what's validated here vs. passed through untouched
+    // (`.passthrough()` — every other CreateMovementRequest field is unchanged from before this fix).
+    const parsed = createMovementRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new RequestValidationError(firstValidationMessage(parsed.error));
     }
+    const body = parsed.data as CreateMovementRequest;
+    const result = service.createMovement(body);
+    res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
   });
 
   // POST /balance-movements/:movementId/release

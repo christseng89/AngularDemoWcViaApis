@@ -30,10 +30,8 @@ import {
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
-  acceptanceMaturityReferenceFields,
   displayStatus as displayStatusShared,
   groupThousands,
-  maturityDateCalendarsSummary,
 } from './balance-component.model';
 import { buildFields, toReadOnlyFields } from './builder-fields';
 import {
@@ -183,7 +181,7 @@ export class MakerPanelComponent implements OnChanges {
   parentInstrumentType: InstrumentType | '' = '';
   exposureNature: 'ACTUAL' | 'MEMO' = 'ACTUAL';
   subChoiceValue = '';
-  amendDirection: 'INCREASE' | 'DECREASE' | 'EXTEND_EXPIRY' | 'UPDATE_MATURITY_CALENDARS' | null = null;
+  amendDirection: 'INCREASE' | 'DECREASE' | null = null;
   dynamicSecondaryRefLabel: string | null = null;
 
   submitting = false;
@@ -475,16 +473,7 @@ export class MakerPanelComponent implements OnChanges {
     if (!this.selectedFunction || !this.subChoiceValue) return;
     const fn = this.selectedFunction;
     if (fn.subChoice?.key === 'amendDirection') {
-      this.amendDirection = this.subChoiceValue as 'INCREASE' | 'DECREASE' | 'EXTEND_EXPIRY' | 'UPDATE_MATURITY_CALENDARS';
-      // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §3 — Extend Expiry is a genuinely distinct
-      // movementType (AMEND_EXPIRY), unlike Increase/Decrease which both stay fn.movementType ('AMEND',
-      // direction riding the signed Amount instead) — model.movementType must reflect the real wire
-      // value here even though this function's own registry entry declares a single fixed movementType.
-      // A6/B4 Calculated Maturity Date (2026-08-23) — Update Maturity Date Calendars is the same shape,
-      // AMEND_MATURITY_CALENDARS instead of AMEND_EXPIRY.
-      this.model.movementType =
-        this.amendDirection === 'EXTEND_EXPIRY' ? 'AMEND_EXPIRY' : this.amendDirection === 'UPDATE_MATURITY_CALENDARS' ? 'AMEND_MATURITY_CALENDARS' : fn.movementType;
-      if (this.amendDirection === 'EXTEND_EXPIRY' || this.amendDirection === 'UPDATE_MATURITY_CALENDARS') this.model.amount = '0';
+      this.amendDirection = this.subChoiceValue as 'INCREASE' | 'DECREASE';
       return;
     }
     this.model.instrumentType = fn.instrumentType;
@@ -503,12 +492,6 @@ export class MakerPanelComponent implements OnChanges {
       this.selectedContractSnapshot
     ) {
       this.model.amount = this.selectedContractSnapshot.availableBalance;
-    } else if (this.model.movementType === 'AMEND_EXPIRY' || this.model.movementType === 'AMEND_MATURITY_CALENDARS') {
-      // A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2 — A2's own Extend Expiry pick (B2's
-      // EXTEND_EXPIRY direction is set inline in onSubChoice() instead, which never calls this method).
-      // A6/B4 Calculated Maturity Date (2026-08-23) — A2's own Update Maturity Date Calendars pick, same
-      // shape (B2's own UPDATE_MATURITY_CALENDARS direction is likewise set inline in onSubChoice()).
-      this.model.amount = '0';
     }
     this.rebuildFields();
     if (!this.isCreatingMovement && !this.usesTwoFieldSearch) this.reloadCatalog();
@@ -737,16 +720,6 @@ export class MakerPanelComponent implements OnChanges {
 
   onSelectContract(contractId: string): void {
     this.selectedContract = this.catalogPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
-    // UI-only reference field (2026-08-23, user-requested) — builder-fields.ts's own `amountFromAmendExpiry`
-    // already scopes the FIELD's own visibility to A2/B2 Extend Expiry only, so setting the underlying
-    // model value unconditionally whenever a flat-Catalog record is picked is harmless for every other
-    // function that reaches this same handler (never rendered, never read by submit-rules.ts). Mirrors
-    // onSelectParent()'s own parentExpiryDateReference pattern below.
-    this.model.originalExpiryDateReference = this.selectedContract?.expiryDate ?? undefined;
-    // Clearing Bank Calendar Profile (2026-08-23, user-directed) — same unconditional-population
-    // reasoning: builder-fields.ts's own isDocumentPresentationFunction already scopes the FIELD's
-    // own visibility to A3/A3S/B3.
-    this.model.maturityDateCalendarsReference = maturityDateCalendarsSummary(this.selectedContract?.maturityDateCalendars) || undefined;
     if (this.selectedFunctionStrategy?.movementDerivation.derivesMovementTypeFromTenor && this.selectedContract) {
       this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT';
     }
@@ -1022,27 +995,6 @@ export class MakerPanelComponent implements OnChanges {
       this.model.tenorDays = this.selectedParent.tenorDays ?? undefined;
       this.rebuildFields();
     }
-    // UI-only reference field (2026-08-23, user-requested) — builder-fields.ts's own
-    // isMaturityDateFunction already scopes the FIELD's own visibility to A6/B4-Usance only, so setting
-    // the underlying model value unconditionally whenever a parent is picked is harmless for every other
-    // function (never rendered, never read by submit-rules.ts). Deliberately NOT nested inside the
-    // `tenorTypeOptions?.length` block above — B4 has no `tenorTypeOptions` of its own (see
-    // isMaturityDateFunction's own doc comment), so that block never runs for B4 at all.
-    // Same unconditional-population reasoning covers `originalExpiryDateReference` here too (2026-08-23,
-    // user-requested — "Current Expiry Date A3 A3S & B3 都要顯示") — B3 is the one Document Presentation
-    // function that reaches the *parent* picker rather than onSelectContract()'s own flat Catalog (its
-    // own instrumentType, EPLC_EXAMINATION, is in HAS_PARENT — see the B3/A8 selectedContract-aliasing
-    // comment above), so onSelectContract() alone never sees B3's pick; A3/A3S DO go through
-    // onSelectContract() and are already covered there.
-    if (this.selectedParent) {
-      this.model.parentExpiryDateReference = this.selectedParent.expiryDate ?? undefined;
-      this.model.originalExpiryDateReference = this.selectedParent.expiryDate ?? undefined;
-      // Clearing Bank Calendar Profile (2026-08-23, user-directed) — B3's own read-only reference (see
-      // isDocumentPresentationFunction's own doc comment in builder-fields.ts); A3/A3S are covered in
-      // onSelectContract() instead, same split as originalExpiryDateReference immediately above.
-      this.model.maturityDateCalendarsReference = maturityDateCalendarsSummary(this.selectedParent.maturityDateCalendars) || undefined;
-      this.rebuildFields();
-    }
     // Business instruction 2026-08-20 ("除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current Balance
     // 自動輸入選取到的LC NUMBER 做 LOOKUP處理") — onSelectParent() (A6/A7/A8/B3/B4/B5's own Parent LC pick)
     // never synced anything at all before this fix, a real gap even the prior selection-only
@@ -1119,19 +1071,7 @@ export class MakerPanelComponent implements OnChanges {
     this.emitCheckerAndLookupSync();
   }
 
-  /**
-   * UI-only read-only reference (2026-08-24) — see builder-fields.ts's own isAcceptanceContractSelected
-   * doc comment. Centralized here (rather than duplicated at every selectedContract-setting call site,
-   * the convention originalExpiryDateReference/maturityDateCalendarsReference use) since rebuildFields()
-   * already runs after every one of them — a single source of truth for a value that's purely derived
-   * from selectedContract, never independently typed.
-   */
-  private applyAcceptanceMaturityReferenceFields(): void {
-    Object.assign(this.model, acceptanceMaturityReferenceFields(this.selectedContract));
-  }
-
   private rebuildFields(): void {
-    this.applyAcceptanceMaturityReferenceFields();
     this.fields = buildFields({
       model: this.model,
       selectedFunction: this.selectedFunction,

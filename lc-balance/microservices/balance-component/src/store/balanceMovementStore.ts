@@ -12,7 +12,7 @@
  * audit pair — see updateStatus() below).
  */
 import type { Db } from '../db';
-import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MaturityDateCalendarRef, MovementStatus, MovementWarning } from '../types';
+import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
 
 interface MovementRow {
   movement_id: string;
@@ -36,12 +36,6 @@ interface MovementRow {
   transaction_date: string | null;
   business_date: string | null;
   value_date: string | null;
-  document_presentation_date: string | null;
-  triggered_by_expiry: number | null;
-  expiry_date: string | null;
-  maturity_date_calendars: string | null;
-  maturity_date_combination_rule: string | null;
-  maturity_date_convention: string | null;
   source_module: string | null;
   source_function: string | null;
   source_transaction_ref: string | null;
@@ -93,12 +87,6 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     transactionDate: row.transaction_date,
     businessDate: row.business_date,
     valueDate: row.value_date,
-    documentPresentationDate: row.document_presentation_date,
-    triggeredByExpiry: row.triggered_by_expiry === null ? null : row.triggered_by_expiry === 1,
-    expiryDate: row.expiry_date,
-    maturityDateCalendars: row.maturity_date_calendars ? (JSON.parse(row.maturity_date_calendars) as MaturityDateCalendarRef[]) : null,
-    maturityDateCombinationRule: row.maturity_date_combination_rule,
-    maturityDateConvention: row.maturity_date_convention,
     sourceModule: row.source_module,
     sourceFunction: row.source_function,
     sourceTransactionRef: row.source_transaction_ref,
@@ -146,9 +134,7 @@ export class BalanceMovementStore {
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
             contingent_account_entry,
             lmts_reservation_id, status, superseded_movement_id, reversal_of_movement_id,
-            reason_code, remarks, transaction_date, business_date, value_date, document_presentation_date,
-            triggered_by_expiry, expiry_date,
-            maturity_date_calendars, maturity_date_combination_rule, maturity_date_convention,
+            reason_code, remarks, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before,
             balance_after, warnings, created_by, released_by, created_at, released_at,
@@ -158,9 +144,7 @@ export class BalanceMovementStore {
             @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
             @contingentAccountEntry,
             @lmtsReservationId, @status, @supersededMovementId, @reversalOfMovementId,
-            @reasonCode, @remarks, @transactionDate, @businessDate, @valueDate, @documentPresentationDate,
-            @triggeredByExpiry, @expiryDate,
-            @maturityDateCalendars, @maturityDateCombinationRule, @maturityDateConvention,
+            @reasonCode, @remarks, @transactionDate, @businessDate, @valueDate,
             @sourceModule, @sourceFunction, @sourceTransactionRef, @referencedTransactionId,
             @balanceBefore,
             @balanceAfter, @warnings, @createdBy, @releasedBy, @createdAt, @releasedAt,
@@ -189,12 +173,6 @@ export class BalanceMovementStore {
           transactionDate: movement.transactionDate ?? null,
           businessDate: movement.businessDate ?? null,
           valueDate: movement.valueDate ?? null,
-          documentPresentationDate: movement.documentPresentationDate ?? null,
-          triggeredByExpiry: movement.triggeredByExpiry == null ? null : movement.triggeredByExpiry ? 1 : 0,
-          expiryDate: movement.expiryDate ?? null,
-          maturityDateCalendars: movement.maturityDateCalendars ? JSON.stringify(movement.maturityDateCalendars) : null,
-          maturityDateCombinationRule: movement.maturityDateCombinationRule ?? null,
-          maturityDateConvention: movement.maturityDateConvention ?? null,
           sourceModule: movement.sourceModule ?? null,
           sourceFunction: movement.sourceFunction ?? null,
           sourceTransactionRef: movement.sourceTransactionRef ?? null,

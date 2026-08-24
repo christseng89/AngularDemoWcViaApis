@@ -31,13 +31,6 @@
   displayStatus,
   contractStatusBadgeClass,
   contractStatusLabel,
-  MATURITY_DATE_CALENDAR_PROFILES,
-  maturityDateCalendarsSummary,
-  findMaturityDateProfileValue,
-  TENOR_BASIS_OPTIONS,
-  tenorBasisHasWorkingCalculation,
-  maturityDateStatusLabel,
-  acceptanceMaturityReferenceFields,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -92,12 +85,12 @@ describe('balance-component.model data invariants', () => {
 
   describe('MOVEMENT_TYPES_BY_INSTRUMENT — design doc §5, exact legal movementType sets', () => {
     const expected: Record<InstrumentType, string[]> = {
-      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS', 'UTILIZE', 'CLOSE'],
+      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
       EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
       IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS', 'HONOUR', 'ACCEPT', 'CLOSE'],
+      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
       EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
       EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
       EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -311,7 +304,7 @@ describe('balance-component.model data invariants', () => {
     it('A2 (LC Amendment) offers Increase/Decrease as a movementType subChoice, with a secondaryRefLabel', () => {
       const a2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2') as TransactionFunction;
       expect(a2.subChoice?.key).toBe('movementType');
-      expect(a2.subChoice?.options.map((o) => o.value)).toEqual(['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND_EXPIRY', 'AMEND_MATURITY_CALENDARS']);
+      expect(a2.subChoice?.options.map((o) => o.value)).toEqual(['AMEND_INCREASE', 'AMEND_DECREASE']);
       expect(a2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
@@ -765,77 +758,6 @@ describe('balance-component.model data invariants', () => {
     });
   });
 
-  // A6/B4 Calculated Maturity Date (2026-08-23, user-directed) — A1/B1's own single "Calendar Profile"
-  // dropdown, matching the standing-mock/data/calendars.json test data this project's own microservice
-  // integration is wired against.
-  describe('MATURITY_DATE_CALENDAR_PROFILES', () => {
-    it('has one two-calendar USD_FEDWIRE profile (paying bank + currency clearing) plus one single-COUNTRY profile per common market', () => {
-      expect(MATURITY_DATE_CALENDAR_PROFILES.map((p) => p.value)).toEqual(['USD_FEDWIRE', 'US', 'GB', 'TW', 'HK', 'SG', 'JP', 'CN', 'AE']);
-    });
-
-    it('USD_FEDWIRE reproduces the Standing design doc\'s own canonical calendars (TW domestic + CURRENCY_CLEARING USD_FEDWIRE, both required, ALL_REQUIRED_OPEN/FOLLOWING)', () => {
-      const profile = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'USD_FEDWIRE')!;
-      expect(profile.calendars).toEqual([
-        { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
-        { calendarType: 'CURRENCY_CLEARING', code: 'USD_FEDWIRE', role: 'CURRENCY_CLEARING', required: true },
-      ]);
-      expect(profile.combinationRule).toBe('ALL_REQUIRED_OPEN');
-      expect(profile.convention).toBe('FOLLOWING');
-    });
-
-    it('the bare TW profile is domestic-only (single calendar) — every other COUNTRY profile checks TW domestic + the picked counterparty country', () => {
-      const tw = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'TW')!;
-      expect(tw.calendars).toEqual([{ calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true }]);
-
-      for (const p of MATURITY_DATE_CALENDAR_PROFILES.filter((p) => p.value !== 'USD_FEDWIRE' && p.value !== 'TW')) {
-        expect(p.calendars).toEqual([
-          { calendarType: 'COUNTRY', code: 'TW', role: 'ISSUING_BANK', required: true },
-          { calendarType: 'COUNTRY', code: p.value, role: 'PAYING_BANK', required: true },
-        ]);
-      }
-    });
-  });
-
-  describe('maturityDateCalendarsSummary', () => {
-    it('joins code + calendarType for a display string', () => {
-      expect(maturityDateCalendarsSummary([{ calendarType: 'COUNTRY', code: 'TW', role: 'SETTLEMENT', required: true }])).toBe('TW (COUNTRY)');
-    });
-
-    it('joins multiple calendars with a comma', () => {
-      expect(
-        maturityDateCalendarsSummary([
-          { calendarType: 'INSTITUTION', code: 'DEMOBANKXXX', role: 'PAYING_BANK', required: true },
-          { calendarType: 'CURRENCY_CLEARING', code: 'USD_FEDWIRE', role: 'CURRENCY_CLEARING', required: true },
-        ]),
-      ).toBe('DEMOBANKXXX (INSTITUTION), USD_FEDWIRE (CURRENCY_CLEARING)');
-    });
-
-    it('returns an empty string (not a dash) for null/undefined/empty — the field itself is hidden in that case', () => {
-      expect(maturityDateCalendarsSummary(null)).toBe('');
-      expect(maturityDateCalendarsSummary(undefined)).toBe('');
-      expect(maturityDateCalendarsSummary([])).toBe('');
-    });
-  });
-
-  describe('findMaturityDateProfileValue', () => {
-    it('matches an exact preset shape back to its own profile value', () => {
-      const usdFedwire = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'USD_FEDWIRE')!;
-      expect(findMaturityDateProfileValue(usdFedwire.calendars)).toBe('USD_FEDWIRE');
-      const tw = MATURITY_DATE_CALENDAR_PROFILES.find((p) => p.value === 'TW')!;
-      expect(findMaturityDateProfileValue(tw.calendars)).toBe('TW');
-    });
-
-    it('returns undefined for null/undefined/empty', () => {
-      expect(findMaturityDateProfileValue(null)).toBeUndefined();
-      expect(findMaturityDateProfileValue(undefined)).toBeUndefined();
-      expect(findMaturityDateProfileValue([])).toBeUndefined();
-    });
-
-    it('returns undefined for a legacy/hand-edited config that matches no current preset (degrades gracefully, no throw)', () => {
-      expect(findMaturityDateProfileValue([{ calendarType: 'COUNTRY', code: 'ZZ', role: 'SETTLEMENT', required: true }])).toBeUndefined();
-    });
-  });
-
   // Reuses A1's/B1's own tenorType Formly select option labels rather than a third copy.
   describe('tenorTypeLabel', () => {
     it("Import side spells out Seller's/Buyer's Usance (matches A1's own tenorTypeOptions exactly)", () => {
@@ -970,88 +892,5 @@ describe('balance-component.model data invariants', () => {
       expect(contractStatusLabel('ACTIVE', false)).toBe('ACTIVE');
       expect(contractStatusLabel('ACTIVE')).toBe('ACTIVE');
     });
-  });
-});
-
-// Maturity-Date-Tenor-Basis-Decision-Review.md v31 (2026-08-24, business-confirmed) — TenorBasis
-// options/labeling and the maturityDateStatus 3-stage lifecycle display helpers.
-describe('TENOR_BASIS_OPTIONS / tenorBasisHasWorkingCalculation', () => {
-  it('offers exactly the 6 business-confirmed TenorBasis values, matching the microservice\'s own TENOR_BASIS_VALUES', () => {
-    expect(TENOR_BASIS_OPTIONS.map((o) => o.value)).toEqual(['AFTER_SIGHT', 'AFTER_BL_DATE', 'AFTER_INVOICE_DATE', 'AFTER_SHIPMENT_DATE', 'AFTER_ACCEPTANCE', 'FIXED_MATURITY_DATE']);
-  });
-
-  it('every option has a non-empty label', () => {
-    for (const o of TENOR_BASIS_OPTIONS) {
-      expect(typeof o.label).toBe('string');
-      expect(o.label.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('only FIXED_MATURITY_DATE has a working calculation path today — every other basis (and null/undefined) does not', () => {
-    expect(tenorBasisHasWorkingCalculation('FIXED_MATURITY_DATE')).toBe(true);
-    for (const basis of ['AFTER_SIGHT', 'AFTER_BL_DATE', 'AFTER_INVOICE_DATE', 'AFTER_SHIPMENT_DATE', 'AFTER_ACCEPTANCE'] as const) {
-      expect(tenorBasisHasWorkingCalculation(basis)).toBe(false);
-    }
-    expect(tenorBasisHasWorkingCalculation(null)).toBe(false);
-    expect(tenorBasisHasWorkingCalculation(undefined)).toBe(false);
-  });
-});
-
-describe('maturityDateStatusLabel', () => {
-  it('maps each of the 3 real statuses to a distinct, non-empty label', () => {
-    const labels = new Set<string>();
-    for (const status of ['PENDING_BASE_DATE', 'PENDING_APPROVAL', 'APPROVED'] as const) {
-      const label = maturityDateStatusLabel(status);
-      expect(label.length).toBeGreaterThan(0);
-      labels.add(label);
-    }
-    expect(labels.size).toBe(3);
-  });
-
-  it('falls back to a dash for null/undefined (a non-Acceptance contract, or an Acceptance predating this field)', () => {
-    expect(maturityDateStatusLabel(null)).toBe('—');
-    expect(maturityDateStatusLabel(undefined)).toBe('—');
-  });
-});
-
-describe('acceptanceMaturityReferenceFields (shared by MakerPanelComponent live entry and InquireEventsService reconstruction)', () => {
-  it('populates all 3 reference fields for an IPLC_ACCEPTANCE contract', () => {
-    const result = acceptanceMaturityReferenceFields({
-      instrumentType: 'IPLC_ACCEPTANCE',
-      maturityDateStatus: 'APPROVED',
-      contractualMaturityDate: '2026-12-25',
-      operationalPaymentDate: '2026-12-28',
-    });
-    expect(result).toEqual({
-      maturityDateStatusReference: 'Approved',
-      contractualMaturityDateReference: '2026-12-25',
-      operationalPaymentDateReference: '2026-12-28',
-    });
-  });
-
-  it('populates all 3 reference fields for an EPLC_ACCEPTANCE contract too', () => {
-    const result = acceptanceMaturityReferenceFields({
-      instrumentType: 'EPLC_ACCEPTANCE',
-      maturityDateStatus: 'PENDING_BASE_DATE',
-      contractualMaturityDate: null,
-      operationalPaymentDate: null,
-    });
-    expect(result.maturityDateStatusReference).toBe('Pending Base Date (not yet calculable — see Tenor Basis)');
-    expect(result.contractualMaturityDateReference).toBeUndefined();
-    expect(result.operationalPaymentDateReference).toBeUndefined();
-  });
-
-  it('leaves all 3 fields undefined for a non-Acceptance instrumentType (e.g. the picked parent LC, not the Acceptance itself)', () => {
-    const result = acceptanceMaturityReferenceFields({ instrumentType: 'IPLC_LC', maturityDateStatus: 'APPROVED', contractualMaturityDate: '2026-01-01', operationalPaymentDate: '2026-01-01' });
-    expect(result).toEqual({
-      maturityDateStatusReference: undefined,
-      contractualMaturityDateReference: undefined,
-      operationalPaymentDateReference: undefined,
-    });
-  });
-
-  it('degrades to all-undefined for null/undefined contract (nothing selected yet)', () => {
-    expect(acceptanceMaturityReferenceFields(null)).toEqual({ maturityDateStatusReference: undefined, contractualMaturityDateReference: undefined, operationalPaymentDateReference: undefined });
-    expect(acceptanceMaturityReferenceFields(undefined)).toEqual({ maturityDateStatusReference: undefined, contractualMaturityDateReference: undefined, operationalPaymentDateReference: undefined });
   });
 });

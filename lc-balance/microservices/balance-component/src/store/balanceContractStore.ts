@@ -5,7 +5,7 @@
  * from Design doc §3.1/§8.
  */
 import type { Db } from '../db';
-import type { BalanceContract, ContractStatus, InstrumentType, MaturityDateCalendarRef, NaturalKey } from '../types';
+import type { BalanceContract, ContractStatus, InstrumentType, NaturalKey } from '../types';
 
 interface ContractRow {
   balance_contract_id: string;
@@ -25,18 +25,6 @@ interface ContractRow {
   tenor_type: string | null;
   tenor_days: number | null;
   maturity_date: string | null;
-  expiry_date: string | null;
-  issue_date: string | null;
-  maturity_date_calendars: string | null;
-  maturity_date_combination_rule: string | null;
-  maturity_date_convention: string | null;
-  tenor_basis: string | null;
-  fixed_maturity_date: string | null;
-  contractual_maturity_date: string | null;
-  operational_payment_date: string | null;
-  standing_calculation_id: string | null;
-  calendar_snapshot_id: string | null;
-  maturity_date_status: string | null;
   opening_balance: string;
   source_amendment_no: number | null;
   effective_from: string;
@@ -67,18 +55,6 @@ function rowToContract(row: ContractRow): BalanceContract {
     tenorType: row.tenor_type as BalanceContract['tenorType'],
     tenorDays: row.tenor_days,
     maturityDate: row.maturity_date,
-    expiryDate: row.expiry_date,
-    issueDate: row.issue_date,
-    maturityDateCalendars: row.maturity_date_calendars ? JSON.parse(row.maturity_date_calendars) : null,
-    maturityDateCombinationRule: row.maturity_date_combination_rule,
-    maturityDateConvention: row.maturity_date_convention,
-    tenorBasis: row.tenor_basis as BalanceContract['tenorBasis'],
-    fixedMaturityDate: row.fixed_maturity_date,
-    contractualMaturityDate: row.contractual_maturity_date,
-    operationalPaymentDate: row.operational_payment_date,
-    standingCalculationId: row.standing_calculation_id,
-    calendarSnapshotId: row.calendar_snapshot_id,
-    maturityDateStatus: row.maturity_date_status as BalanceContract['maturityDateStatus'],
     openingBalance: row.opening_balance,
     sourceAmendmentNo: row.source_amendment_no,
     effectiveFrom: row.effective_from,
@@ -153,21 +129,13 @@ export class BalanceContractStore {
           balance_contract_id, logical_contract_id, contract_version, instrument_type,
           lc_number, ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
           supersedes_balance_contract_id, superseded_by_balance_contract_id, currency,
-          tolerance_pct, tenor_type, tenor_days, maturity_date, expiry_date, issue_date,
-          maturity_date_calendars, maturity_date_combination_rule, maturity_date_convention,
-          tenor_basis, fixed_maturity_date, contractual_maturity_date, operational_payment_date,
-          standing_calculation_id, calendar_snapshot_id, maturity_date_status,
-          opening_balance,
+          tolerance_pct, tenor_type, tenor_days, maturity_date, opening_balance,
           source_amendment_no, effective_from, effective_to, created_by, created_at
         ) VALUES (
           @balanceContractId, @logicalContractId, @contractVersion, @instrumentType,
           @lcNumber, @ibNumber, @sgNumber, @legSeq, @parentLogicalContractId, @status,
           @supersedesBalanceContractId, @supersededByBalanceContractId, @currency,
-          @tolerancePct, @tenorType, @tenorDays, @maturityDate, @expiryDate, @issueDate,
-          @maturityDateCalendars, @maturityDateCombinationRule, @maturityDateConvention,
-          @tenorBasis, @fixedMaturityDate, @contractualMaturityDate, @operationalPaymentDate,
-          @standingCalculationId, @calendarSnapshotId, @maturityDateStatus,
-          @openingBalance,
+          @tolerancePct, @tenorType, @tenorDays, @maturityDate, @openingBalance,
           @sourceAmendmentNo, @effectiveFrom, @effectiveTo, @createdBy, @createdAt
         )`,
       )
@@ -189,18 +157,6 @@ export class BalanceContractStore {
         tenorType: contract.tenorType ?? null,
         tenorDays: contract.tenorDays ?? null,
         maturityDate: contract.maturityDate ?? null,
-        expiryDate: contract.expiryDate ?? null,
-        issueDate: contract.issueDate ?? null,
-        maturityDateCalendars: contract.maturityDateCalendars ? JSON.stringify(contract.maturityDateCalendars) : null,
-        maturityDateCombinationRule: contract.maturityDateCombinationRule ?? null,
-        maturityDateConvention: contract.maturityDateConvention ?? null,
-        tenorBasis: contract.tenorBasis ?? null,
-        fixedMaturityDate: contract.fixedMaturityDate ?? null,
-        contractualMaturityDate: contract.contractualMaturityDate ?? null,
-        operationalPaymentDate: contract.operationalPaymentDate ?? null,
-        standingCalculationId: contract.standingCalculationId ?? null,
-        calendarSnapshotId: contract.calendarSnapshotId ?? null,
-        maturityDateStatus: contract.maturityDateStatus ?? null,
         openingBalance: contract.openingBalance,
         sourceAmendmentNo: contract.sourceAmendmentNo ?? null,
         effectiveFrom: contract.effectiveFrom,
@@ -344,45 +300,5 @@ export class BalanceContractStore {
       balanceContractId,
       effectiveTo,
     });
-  }
-
-  /**
-   * A2/B2 Extend Expiry (A1-A10-B1-B5-Date-Control-Function-Revision-Spec.md §2/§3) — release() side
-   * effect once an AMEND_EXPIRY movement is Checker-Released, mirroring markClosed() above's shape.
-   */
-  updateExpiryDate(balanceContractId: string, expiryDate: string): void {
-    this.db.prepare(`UPDATE balance_contracts SET expiry_date = @expiryDate WHERE balance_contract_id = @balanceContractId`).run({
-      balanceContractId,
-      expiryDate,
-    });
-  }
-
-  /**
-   * A6/B4 Calculated Maturity Date (2026-08-23) — A2/B2 AMEND_MATURITY_CALENDARS's own release() side
-   * effect, mirroring updateExpiryDate() above's exact shape/posture.
-   */
-  updateMaturityDateCalendars(balanceContractId: string, calendars: MaturityDateCalendarRef[] | null, combinationRule: string | null, convention: string | null): void {
-    this.db
-      .prepare(
-        `UPDATE balance_contracts SET maturity_date_calendars = @calendars, maturity_date_combination_rule = @combinationRule, maturity_date_convention = @convention WHERE balance_contract_id = @balanceContractId`,
-      )
-      .run({
-        balanceContractId,
-        calendars: calendars ? JSON.stringify(calendars) : null,
-        combinationRule,
-        convention,
-      });
-  }
-
-  /**
-   * v29 §4 (business-confirmed) — release() side effect for an Acceptance CREATE whose maturityDateStatus
-   * is currently 'PENDING_APPROVAL': flips it to 'APPROVED', the only status downstream consumers
-   * (A7/B5 settlement, reports, overdue judgment) may reference. A contract still at 'PENDING_BASE_DATE'
-   * (no verified Base Date source yet — see the Risk Containment Gate) is untouched by this call; see
-   * BalanceService.release()'s own guard for why it's only invoked when the pre-Release status is
-   * genuinely PENDING_APPROVAL.
-   */
-  markMaturityDateApproved(balanceContractId: string): void {
-    this.db.prepare(`UPDATE balance_contracts SET maturity_date_status = 'APPROVED' WHERE balance_contract_id = @balanceContractId`).run({ balanceContractId });
   }
 }
