@@ -1258,8 +1258,10 @@ standalone case. `backend/data/businessCases.js`'s registry grew from 14 to 21 c
 `businessCases.test.js`/`server.test.js` updated to match (`EXPECTED_IDS`, registry-size assertions, the
 `lcNumber` pattern regex widened for two-digit case numbers). All 7 driven live against the real
 microservice via `POST /balance-movements` (Submit) + `/release` (Approve) +
-`import-case-10`'s own real `/maker-submit` — see `analysis/Balance-Component-New-Test-Cases-Verification-2026-08-21.md`
-for the full trace-by-trace result (7/7 pass, both negative cases fail exactly as designed). Action items
+`import-case-10`'s own real `/maker-submit` — see `analysis/Balance-Component-A10-B6-Close-Verification-
+Summary-zh-2026-08-25.md` §1 (this Chinese-language file merges what was originally 4 separate
+2026-08-21/22 dated verification reports, per user instruction 2026-08-25) for the full trace-by-trace
+result (7/7 pass, both negative cases fail exactly as designed). Action items
 2/3 from the Business Rule Decisions memo (backend `businessEventId` enforcement, `BUYERS_USANCE`
 rejection/normalization) remain deliberately out of scope for this pass, by explicit user direction.
 
@@ -1353,3 +1355,126 @@ standalone `assertMakerCheckerSeparation()` export, 3 HTTP-integration in `app.t
 reject/acknowledge each independently) — full suite green: microservice 437/437, Angular 1067/1067,
 `backend/` 34/34, no client-side change needed (the reference Angular app already always uses distinct
 maker1/checker1 actors).
+
+## Business Case Runner (23-case registry) inventoried against the current feature set — found in good shape, not stale
+
+Business-reported concern 2026-08-24 ("Business Case Runner 這功能早就不符合現在的設計") — a case-by-case
+audit (tenorType declaration, A4 Sight maker-submit gate, CLOSE, Partial Redeem, other drift vs. the
+chronological OAS changelog) found **0 of 23 cases genuinely stale** (would be rejected or behave
+differently against the current microservice), 21 current, and only 2 (`import-case-4`, `import-case-6`)
+with a real but already-disclosed-as-correct drift: both exercise SHGT `PARTIAL_REDEEM`, which the
+microservice API still fully supports but the Angular A9 screen no longer lets a human trigger (locked
+Full-Redeem-only, 2026-08-21). `import_lc_test.sh` (the standalone curl script transcribing the SAME S01
+live-data sequence directly against the microservice) has the identical status. Annotated all three call
+sites (both `businessCases.js` functions' own top comments, `import_lc_test.sh`'s own file header) so this
+reads as disclosed API-vs-UI scope, not a bug — `export_lc_test.sh` confirmed clean (0 `PARTIAL_REDEEM`
+occurrences, Export has no SHGT at all). Recommendation given and accepted: do NOT remove or redesign the
+registry — continue the 2026-08-21 test-case-proposal-driven incremental-addition convention if/when new
+scenarios are needed, since a from-scratch rewrite would trade away a working, well-maintained integration
+test surface (`backend/test/businessCases.test.js`/`server.test.js`, 34 tests, 100% coverage) for no
+demonstrated benefit. Also synced `businessCases.js`'s own top-of-file doc comment off the 2026-08-14
+"Maker=Checker out of scope" posture the entry above superseded — `createdBy`/`releasedBy` were already
+genuinely distinct throughout (`MAKER`='maker1'/`CHECKER`='checker1'), the comment just hadn't caught up.
+
+## Maker-side "existing contract" picker (A7/A9/B5) — index pickers reordered ahead of the free-text search fallback
+
+Business-reported UX gap 2026-08-24 ("順序應該是 index LC NUMBER, index 2ndary reference, THEN the related
+transaction LC Number and 2ndary reference") — `maker-panel.component.html`'s shared `usesTwoFieldSearch`
+block (every non-creating function whose instrumentType needs an ibNumber/sgNumber natural-key field: A7
+IPLC_ACCEPTANCE, A9 SHGT, B5 EPLC_ACCEPTANCE) rendered the free-text "Search Existing Contract — LC Number
++ IB/SG Number" fallback BEFORE the "2ndary Index"/"EB Index" picker below it — contradicting that very
+picker's own 2026-08-14 doc comment ("Step 1 / LC Index... Step 2... pick the specific IB/SG Number here
+instead of typing it... the free-text fields above remain as a manual fallback") and this project's own
+established "index pickers first, free text is the fallback" convention every other picker on this screen
+already follows. Live-reproduced with A9/U01/G01 before fixing (browser extension available at the time).
+Fixed by moving BOTH the shared 2ndary Index block AND B5's own separate `usesSettleableBalanceIndex`-gated
+"EB Index" variant to render before the free-text label/grid/button/hints — pure DOM-order change, neither
+block's own `*ngIf` condition touched. A2/A3/A3S/A4/A10/B2/B6 (IPLC_LC/EPLC_CONFIRMATION, no secondary
+natural-key field) and A6/A8/B3/B4 (creating, or the `settlesDocumentArrival` payable-movement picker
+already correctly ordered inside the `hasParent` block) confirmed unaffected — different template branches
+entirely. Angular 1067/1067, `ng build --configuration production` clean.
+
+## A7 (Acceptance Settlement) — LC Index now gated on outstanding Acceptance Balance, not just Usance tenor
+
+Business-reported UX gap 2026-08-25 ("A07 交易選擇是 LC number 有Acceptance balance 再顯示2ndary ref"). A7's
+own Parent LC ("LC Index", Step 1) picker used `catalogTenorFilter: 'USANCE'` as its ONLY eligibility
+signal (`resolveParentEligibilityRule()`'s `unconditional` branch) — every Usance LC was offered
+regardless of whether it actually had an outstanding IPLC_ACCEPTANCE to settle; only after picking one did
+Step 2 (IB Index) reveal "0 candidates" via its own already-correct 0-balance filter. Live-reproduced via
+`GET .../balance-contracts/close-eligible`-adjacent inspection of the running dev DB (U01 has a child SG
+still outstanding but its own Acceptance CREATE is still PENDING — 0 eligible; U02's own Acceptance is
+RELEASED with Confirmed Balance 2,000, i.e. genuinely settleable — both cases the old unconditional LC
+Index would have shown identically). Fixed the same way A3S/A9's own SG-balance gate already works: added
+`requiresEligibleParentAcceptance: true` to A7's own registry entry (`balance-component.model.ts`), a new
+`parentAcceptanceEligible` hint-set + `loadParentAcceptanceEligibility()` on `DocumentArrivalHintsService`
+(generalized the former SG-only `loadSgBalanceEligibility()` into `loadChildBalanceEligibility()`,
+parameterized by `childInstrumentType` — `'SHGT'` for A3S/A9, `'IPLC_ACCEPTANCE'` for A7), and a new
+`resolveParentEligibilityRule()` branch checked BEFORE the generic `catalogTenorFilter === 'USANCE'`
+unconditional fallback. B5 (also `catalogTenorFilter: 'USANCE'` on its own Parent picker) deliberately left
+unaffected — not part of this report, and its own Step 2 already uses the separate
+`usesSettleableBalanceIndex` flow. One pre-existing test (`filteredParentCatalog: catalogTenorFilter
+USANCE (A7)...`) had used A7 to demonstrate the generic unconditional branch — reassigned to B5 (still
+demonstrates the same generic fallback, unaffected by this change) rather than deleted, plus a new A7-
+specific hintSet test alongside it. Angular 1072/1072, `tsc --noEmit` clean, `ng build --configuration
+production` clean.
+
+## `maker-panel.component.scss` — 473 lines of dead CSS removed, clears the 8kB `anyComponentStyle` warning
+
+TODO.md-tracked known gap, root-caused and fixed 2026-08-24. The file's own top comment already disclosed
+the cause: it was copied WHOLE from `transaction-builder.component.scss` during a past extraction ("a
+hand-picked subset risked silently missing a rule under time pressure — copied whole instead") — but that
+copy included every shared design-system atom, not just the ones `maker-panel.component.html` actually
+renders. Every top-level selector in the file was grep-checked against this component's own template (view
+encapsulation guarantees zero matches = provably dead, not merely "maybe unused elsewhere") — confirmed
+dead: the page shell (`.tb-page`/`.tb-header`/`.tb-title`/`.tb-subtitle`), the function-chip picker
+(`.tb-function-picker`/`.tb-function-chip*`/`.tb-function-help`), the workspace grid
+(`.tb-workspace`/`.tb-main`/`.tb-side`), Look Up's own tabs/Event Timeline table
+(`.tb-tabs*`/`.tb-subheading`/`.tb-table*`/`.tb-type-tag`/`.tb-status-badge*`), and a handful of one-off
+variants (`.tb-select--inline`, `.tb-grid-lookup`, `.tb-btn--success`/`--tiny` as nested modifiers of the
+still-live `.tb-btn`, `.tb-pagination`, `.tb-checker-actions`) — all of them live in
+`transaction-builder.component.html`/`checker-panel.component.html` instead, never this component's own.
+`.tb-muted` (zero matches, not flagged by the initial audit) found and removed too during the actual
+edit-time re-verification. Same grep-verified technique this project already used for
+`.tb-quick-pick*`/`.tb-result*`/`.tb-row-sub`'s own past dead-code find in `transaction-builder.component.
+scss`'s own history — each removed selector confirmed zero matches before deletion, not guessed. File
+dropped from 997 to 511 lines; two now-dangling "see `.tb-function-chip` above" comment references (the
+class itself removed) reworded to point at the sibling file instead. Confirmed via `ng build --configuration
+production`: the `maker-panel.component.scss` budget warning is gone entirely (only the pre-existing,
+unrelated `transaction-builder.component.scss` warning remains). Angular 1067/1067 green.
+
+## A9 Full-Redeem-only now enforced server-side too — TODO.md-tracked gap closed (was UI-only)
+
+Business-directed 2026-08-24 ("A9 Full-Redeem-only 目前只在 Angular UI 層鎖定 API MAKER & CHECKER也要") —
+this is action item 2 from `Balance-Component-Business-Rule-Decisions-2026-08-21.md` (backend
+`businessEventId` enforcement), previously recorded as deliberately out of scope for an earlier pass; user
+now explicitly requested it. The BA-confirmed rule ("SG discharge is instrument-based, not amount-based")
+was only ever enforced client-side — `submit-rules.ts` hardcodes `movementType: 'FULL_REDEEM'` and locks
+Amount to the SG's own Available Balance — while the microservice's own `PARTIAL_REDEEM` and
+`domain/shgtRedeem.ts`'s `checkRedeemSufficiency()` were completely unchanged, so any caller bypassing the
+Angular client (curl, a future second UI, an integration test) could still Partial Redeem a standalone SG.
+
+Fixed in `buildMovementTypeRegistry()`'s own `outstandingCapped` sufficiency check (Maker/Submit) and
+mirrored in `release()` (Checker/Release, pure defense-in-depth — `businessEventId` is immutable once set,
+so this can't actually fire for a movement `createMovement()` itself created, only for one that reached
+PENDING some other way, same posture `assertValidAmount()`'s own doc comment already established): a SHGT
+`PARTIAL_REDEEM` request with no `businessEventId` is rejected (`409 INSUFFICIENT_AVAILABLE_BALANCE`
+Maker-side / `IllegalStateTransitionError` Checker-side). The distinguishing signal is deliberately
+`businessEventId`, not the `PARTIAL_REDEEM`/`FULL_REDEEM` movementType string — A3S's own matched SG
+redemption leg (`SG Redemption Amount = MIN(Bill Amount, SG Outstanding)`) always carries a
+`businessEventId` linking it to its paired Document Arrival, but that match can legitimately equal the
+SG's full outstanding balance too, so movementType alone can't tell A3S apart from a genuine standalone A9
+call. A standalone `FULL_REDEEM` (no `businessEventId`) is unaffected either way — A9's own real flow.
+
+5 new tests: 3 HTTP-integration in `app.test.ts` (Maker rejects a standalone Partial Redeem, Maker still
+accepts a standalone Full Redeem, Maker still accepts a matched/businessEventId-carrying Partial Redeem)
+plus 1 covering the Checker-side re-check (direct `BalanceService` instantiation + a raw SQL `UPDATE` to
+strip `business_event_id`, simulating a movement that reached PENDING outside `createMovement()`'s own
+guarded path — same "bypass the Maker-side gate directly" technique this codebase already uses to test
+other defense-in-depth backstops). 3 pre-existing tests in `app.test.ts`'s own "SG redemption commitment
+control" describe block (testing `checkRedeemSufficiency()`'s own logic via a standalone Partial Redeem,
+now correctly rejected before that logic even runs) updated to carry a `businessEventId`, preserving their
+original intent (the commitment-control math itself, which still applies identically to an A3S-shaped
+matched call) without being blocked by the new guard. OAS bumped to v1.18.0. Full suite green: microservice
+442/442, Angular 1067/1067, `backend/` 34/34 (`businessCases.js`'s own A3S-shaped Partial Redeem steps
+already carry `businessEventId`, confirmed unaffected). TODO.md's own item now closed; action item 3 from
+the same memo (`BUYERS_USANCE` rejection/normalization) remains the only one still out of scope.

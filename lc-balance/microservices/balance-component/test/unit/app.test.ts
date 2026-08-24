@@ -7,6 +7,7 @@
 import request from 'supertest';
 import { createDb } from '../../src/db';
 import { createApp } from '../../src/app';
+import { BalanceService } from '../../src/service/balanceService';
 
 describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
   const app = createApp(createDb(':memory:'));
@@ -646,6 +647,10 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
   });
 
   test('first redemption: PARTIAL_REDEEM 7,000, left PENDING (not released) — SG Available drops to 3,000', async () => {
+    // businessEventId (2026-08-24, A9 Full-Redeem-only server-side guard) — this describe block tests
+    // checkRedeemSufficiency()'s own commitment-control logic, which applies identically to A3S's own
+    // matched Partial Redeem leg; a standalone (no businessEventId) Partial Redeem is now rejected
+    // outright before this logic ever runs, so these fixtures represent an A3S-shaped matched call.
     await request(app)
       .post('/balance-movements')
       .send({
@@ -655,6 +660,7 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
         eventSeq: 2,
         amount: '7000',
         currency: 'USD',
+        businessEventId: 'LC0004-arrival',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -674,6 +680,7 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
         eventSeq: 3,
         amount: '5000',
         currency: 'USD',
+        businessEventId: 'LC0004-arrival-2',
         createdBy: 'maker1',
       })
       .expect(409);
@@ -695,6 +702,7 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
         eventSeq: 4,
         amount: '3000',
         currency: 'USD',
+        businessEventId: 'LC0004-arrival-3',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -702,6 +710,128 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
     const sgSnapshot = await request(app).get(`/balance-contracts/${sgId}/balance`).expect(200);
     expect(sgSnapshot.body.availableBalance).toBe('0');
     expect(sgSnapshot.body.pendingEarmarkTotal).toBe('-10000');
+  });
+});
+
+describe('HTTP integration — A9 Full-Redeem-only server-side guard (business-confirmed 2026-08-24, "A9 Full-Redeem-only 目前只在 Angular UI 層鎖定, API MAKER & CHECKER也要")', () => {
+  const app = createApp(createDb(':memory:'));
+  let lcId: string;
+  let lcLogicalId: string;
+  let sgId: string;
+
+  test('setup: Issue LC-A9G for 100,000, then SG-A9G for 10,000, both released', async () => {
+    const lc = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-A9G' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    lcId = lc.body.balanceContractId;
+    await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-A9G' }).expect(200);
+    lcLogicalId = lcContract.body.logicalContractId;
+
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'LC-A9G', sgNumber: 'SG-A9G' },
+        parentLogicalContractId: lcLogicalId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    sgId = sg.body.balanceContractId;
+    await request(app).post(`/balance-movements/${sg.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+  });
+
+  test('Maker: a standalone Partial Redeem (no businessEventId) is rejected at Submit -> 409', async () => {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'SHGT', balanceContractId: sgId, movementType: 'PARTIAL_REDEEM', eventSeq: 2, amount: '4000', currency: 'USD', createdBy: 'maker1' })
+      .expect(409);
+    expect(res.body.code).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
+    expect(res.body.message).toMatch(/A9 \(Shipping Guarantee Redemption\) must be Full Redeem only/);
+
+    // Confirms the rejection actually prevented the DB write.
+    const sgSnapshot = await request(app).get(`/balance-contracts/${sgId}/balance`).expect(200);
+    expect(sgSnapshot.body.availableBalance).toBe('10000');
+  });
+
+  test('Maker: a standalone Full Redeem (no businessEventId) is still accepted -> 201', async () => {
+    const full = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'SHGT', balanceContractId: sgId, movementType: 'FULL_REDEEM', eventSeq: 3, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+
+    // Clean up so it doesn't linger PENDING and affect the next test's own snapshot assertions.
+    await request(app).post(`/balance-movements/${full.body.movementId}/reject`).send({ releasedBy: 'checker1', reasonCode: 'TEST_CLEANUP' }).expect(200);
+  });
+
+  test('Maker: a matched Partial Redeem (businessEventId set, A3S-shaped) is still accepted -> 201', async () => {
+    const matched = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        balanceContractId: sgId,
+        movementType: 'PARTIAL_REDEEM',
+        eventSeq: 4,
+        amount: '4000',
+        currency: 'USD',
+        businessEventId: `${lcId}-arrival`,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    // Clean up.
+    await request(app).post(`/balance-movements/${matched.body.movementId}/reject`).send({ releasedBy: 'checker1', reasonCode: 'TEST_CLEANUP' }).expect(200);
+  });
+
+  test('Checker: release() re-checks the same rule for a standalone Partial Redeem that reached PENDING some other way -> 409', async () => {
+    // Directly instantiate a second BalanceService against the SAME db to create a movement bypassing
+    // createMovement()'s own Maker-side gate — same "reached PENDING some other way" scenario
+    // assertValidAmount()'s own doc comment already establishes a precedent for testing this way.
+    const db = createDb(':memory:');
+    const service = new BalanceService(db);
+    const lc = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-A9G2' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const lcContract = service.resolveContract('IPLC_LC', { lcNumber: 'LC-A9G2' });
+    if (!lcContract) throw new Error('expected the just-issued LC to resolve');
+    const sg = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'LC-A9G2', sgNumber: 'SG-A9G2' },
+      parentLogicalContractId: lcContract.logicalContractId,
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!sg.created) throw new Error('expected a new movement');
+    service.release(sg.movement.movementId, 'checker1');
+
+    // Bypass the Maker-side gate directly via the store, simulating a movement that reached PENDING
+    // some other way (a future second caller, a migration, a seeded fixture) rather than through
+    // createMovement()'s own guarded path.
+    const bypassed = service.createMovement({
+      instrumentType: 'SHGT',
+      balanceContractId: sg.movement.balanceContractId,
+      movementType: 'PARTIAL_REDEEM',
+      eventSeq: 2,
+      amount: '4000',
+      currency: 'USD',
+      businessEventId: 'bypass-be',
+      createdBy: 'maker1',
+    });
+    if (!bypassed.created) throw new Error('expected a new movement');
+    // Strip the businessEventId directly via the store to simulate a movement that reached PENDING
+    // without one, bypassing the Maker-side gate that would otherwise have blocked it.
+    db.exec(`UPDATE balance_movements SET business_event_id = NULL WHERE movement_id = '${bypassed.movement.movementId}'`);
+
+    expect(() => service.release(bypassed.movement.movementId, 'checker1')).toThrow(/A9 \(Shipping Guarantee Redemption\) must be Full Redeem only/);
   });
 });
 

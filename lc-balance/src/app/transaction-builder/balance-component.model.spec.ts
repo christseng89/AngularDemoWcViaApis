@@ -335,6 +335,11 @@ describe('balance-component.model data invariants', () => {
       expect(a7.instrumentType).toBe('IPLC_ACCEPTANCE');
     });
 
+    it('A7 requires an eligible parent Acceptance balance (2026-08-25) — its LC Index only offers LCs with an outstanding Acceptance', () => {
+      const a7 = IMPORT_FUNCTIONS.find((f) => f.code === 'A7') as TransactionFunction;
+      expect(a7.requiresEligibleParentAcceptance).toBe(true);
+    });
+
     it('A9 targets SHGT', () => {
       const a9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9') as TransactionFunction;
       expect(a9.instrumentType).toBe('SHGT');

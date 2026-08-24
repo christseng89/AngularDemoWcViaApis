@@ -62,6 +62,7 @@ const A2 = findFn(IMPORT_FUNCTIONS, 'A2'); // LC Amendment — subChoice, no fix
 const A4 = findFn(IMPORT_FUNCTIONS, 'A4'); // Sight Settlement — payExistingUtilize, catalogTenorFilter SIGHT
 const A6 = findFn(IMPORT_FUNCTIONS, 'A6'); // Acceptance (Usance) — defaultParentInstrumentType, tenorTypeOptions, settlesDocumentArrival
 const A3S = findFn(IMPORT_FUNCTIONS, 'A3S'); // Document Arrival w/ Shipping Gtee — flat Catalog picker, documentArrivalWithSg
+const A7 = findFn(IMPORT_FUNCTIONS, 'A7'); // Acceptance Settlement — defaultParentInstrumentType, requiresEligibleParentAcceptance
 const A9 = findFn(IMPORT_FUNCTIONS, 'A9'); // Shipping Gtee (Redemption) — defaultParentInstrumentType, amountVsAvailableDerivation REDEEM
 const B1 = findFn(EXPORT_FUNCTIONS, 'B1'); // Confirm LC — export side, fixed movementType
 const B4a = findFn(EXPORT_FUNCTIONS, 'B4'); // Honour / Acceptance — payableMovementInstrumentType EPLC_EXAMINATION, flat Catalog picker
@@ -675,6 +676,61 @@ describe('MakerPanelComponent', () => {
       comp.onParentInstrumentTypeChange();
 
       expect(comp.documentArrivalHints.parentSgEligible.has('p1')).toBe(false);
+      expect(comp.filteredParentCatalog).toEqual([]);
+    });
+  });
+
+  // A7's LC Index only shows LC Numbers with an outstanding Acceptance Balance — user-reported 2026-08-25
+  // ("A07 交易選擇是 LC number 有Acceptance balance 再顯示2ndary ref"). Same shape as A9's own SG-balance
+  // gate above, just a child IPLC_ACCEPTANCE instead of a child SHGT.
+  describe('loadParent (via onParentInstrumentTypeChange) — A7 LC Index Acceptance Balance eligibility (loadParentAcceptanceEligibility)', () => {
+    function setup(mockApi: ReturnType<typeof makeApiMock>, acceptanceSnapshotOverrides: Partial<BalanceSnapshot>) {
+      const p1 = mkContract('p1', 'U01');
+      const acc1 = mkContract('acc1', 'U01', { instrumentType: 'IPLC_ACCEPTANCE' });
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'IPLC_LC' ? of(mkCatalogPage([p1], 1)) : of(mkCatalogPage([acc1], 1)),
+      );
+      mockApi.getSnapshot.mockImplementation((id: string) => (id === 'acc1' ? of(mkSnapshot('acc1', acceptanceSnapshotOverrides)) : of(mkSnapshot(id))));
+      return { p1, acc1 };
+    }
+
+    it("keeps an LC with an outstanding child Acceptance, regardless of the LC's own balance", () => {
+      const { comp, mockApi } = makeComponentA();
+      comp.selectedFunction = A7;
+      comp.parentInstrumentType = 'IPLC_LC';
+      setup(mockApi, { availableBalance: '2000' });
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.documentArrivalHints.parentAcceptanceEligible.has('p1')).toBe(true);
+      expect(comp.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['p1']);
+    });
+
+    it('excludes an LC whose only child Acceptance is fully settled (availableBalance 0)', () => {
+      const { comp, mockApi } = makeComponentA();
+      comp.selectedFunction = A7;
+      comp.parentInstrumentType = 'IPLC_LC';
+      setup(mockApi, { availableBalance: '0' });
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.documentArrivalHints.parentAcceptanceEligible.has('p1')).toBe(false);
+      expect(comp.filteredParentCatalog).toEqual([]);
+    });
+
+    it('excludes an LC with no child Acceptance contracts at all', () => {
+      const { comp, mockApi } = makeComponentA();
+      comp.selectedFunction = A7;
+      comp.parentInstrumentType = 'IPLC_LC';
+      const p1 = mkContract('p1', 'U01');
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) =>
+        instrumentType === 'IPLC_LC' ? of(mkCatalogPage([p1], 1)) : of(mkCatalogPage([])),
+      );
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('p1')));
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.documentArrivalHints.parentAcceptanceEligible.has('p1')).toBe(false);
       expect(comp.filteredParentCatalog).toEqual([]);
     });
   });
@@ -3506,9 +3562,12 @@ describe('MakerPanelComponent', () => {
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['sg-eligible']);
     });
 
-    it('filteredParentCatalog: catalogTenorFilter USANCE (A7) excludes only Sight, keeps legacy, and skips the 0-balance filter', () => {
+    it('filteredParentCatalog: catalogTenorFilter USANCE (B5) excludes only Sight, keeps legacy, and skips the 0-balance filter', () => {
+      // B5 shares A7's own catalogTenorFilter: 'USANCE', but (unlike A7 since 2026-08-25) has no
+      // requiresEligibleParentAcceptance gate of its own, so it still demonstrates the plain
+      // catalogTenorFilter-driven unconditional pass-through this getter falls back to.
       const c = new MakerPanelComponent(mockApiD());
-      triggerSelectFunction(c, fn('A7'));
+      triggerSelectFunction(c, fn('B5'));
       c.parentPicker.contracts = [
         contract({ balanceContractId: 'usance', tenorType: 'BUYERS_USANCE' }),
         contract({ balanceContractId: 'sight', tenorType: 'SIGHT' }),
@@ -3516,6 +3575,18 @@ describe('MakerPanelComponent', () => {
       ];
       (c as any).parentPicker.snapshots.set('usance', snapshot({ availableBalance: '0' }));
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'usance'].sort());
+    });
+
+    it('filteredParentCatalog: requiresEligibleParentAcceptance (A7, 2026-08-25) is Acceptance-Balance-eligibility-driven — keeps a candidate WITH an outstanding Acceptance Balance, excludes one without, regardless of the LC\'s own Available Balance', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A7'));
+      c.parentPicker.contracts = [
+        contract({ balanceContractId: 'acceptance-eligible', tenorType: 'BUYERS_USANCE' }),
+        contract({ balanceContractId: 'acceptance-exhausted', tenorType: 'BUYERS_USANCE' }),
+      ];
+      (c as any).parentPicker.snapshots.set('acceptance-eligible', snapshot({ availableBalance: '0' }));
+      c.documentArrivalHints.parentAcceptanceEligible.add('acceptance-eligible');
+      expect(c.filteredParentCatalog.map((x) => x.balanceContractId)).toEqual(['acceptance-eligible']);
     });
 
     it('filteredParentCatalog: no tenor flags at all (A8) applies only the 0-balance filter', () => {

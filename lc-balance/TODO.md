@@ -1,11 +1,7 @@
 # Balance Component — 未完成事項清單（TODO）
 
 **整理日期**：2026-08-24（更新版，基於 `lc-balance/` 還原到 `LC-Balance-Component-Completed` 區塊1狀態
-`e6ee8e7` 之後的內容——2026-08-24 稍早的 `main` 上曾多出約 60 個 commit，含
-Tenor Basis/Fixed Maturity Date + `standing-mock` 微服務、Natural-Expiry batch-trigger
-業務簽核文件，經 user 審視後判定其中新功能改壞了東西，已於 commit `115f9cd` 整批還原掉，只保留區塊1的
-A9 SG Redemption 鎖定、A10/B6 Close 相關收尾——那批被還原的內容仍完整保留在 git 歷史中，未來要找回
-隨時可以）
+`e6ee8e7` 之後的內容，只保留區塊1的 A9 SG Redemption 鎖定、A10/B6 Close 相關收尾）
 **依據**：`CLAUDE.md` 決策日誌（截至區塊1最後一筆 `Balance-Component-Test-Case-Proposal.md §4` 條目）、
 `Quality-report-balance.md`（截至 2026-08-21 重審）、`analysis/Balance-Component-DB-Optimization-Analysis.md`（2026-08-21）
 
@@ -50,15 +46,25 @@ A9 SG Redemption 鎖定、A10/B6 Close 相關收尾——那批被還原的內�
 
 區塊1新引入的功能，非疏漏但**尚未收尾**，記錄於此供未來評估：
 
-- [ ] **A9 Full-Redeem-only 目前只在 Angular UI 層鎖定**（`submit-rules.ts` 硬編碼 `FULL_REDEEM` +
-  金額鎖定為 SG Available Balance），微服務自己的 `PARTIAL_REDEEM` movementType 與
-  `domain/shgtRedeem.ts` 的 `checkRedeemSufficiency()` 完全沒變——`checkRedeemSufficiency()` 只檢查
-  `amount <= availableBalance`，沒有 `businessEventId`/A3S 配對檢查。任何繞過這個 Angular 前端、
-  直接呼叫 `POST /balance-movements` 的呼叫者，仍然可以對同一張 SG 做 Partial Redeem。
+- [x] ~~A9 Full-Redeem-only 只在 Angular UI 層鎖定~~ — **已修復（2026-08-24）**。
+  `buildMovementTypeRegistry()`（Maker/Submit）跟 `release()`（Checker/Release，防禦性複查）現在都會
+  擋下「standalone（無 `businessEventId`）的 SHGT `PARTIAL_REDEEM`」，回 409。判斷依據是
+  `businessEventId` 是否存在（A3S 配對贖回一定會帶，且其 MIN(Bill, SG Outstanding) 配對本來就可能剛好
+  等於全額，不能只看 movementType 字串），不是 movementType 本身——A3S 自己的配對贖回、standalone
+  `FULL_REDEEM` 都不受影響。OAS 已 bump 到 v1.18.0。新增 5 個測試（Maker 拒絕/接受、Checker 複查），
+  三套測試全綠（微服務 442/442、Angular 1067/1067、backend 34/34）。
 
-- [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 2、3** —
-  後端 `businessEventId` 強制檢查（把上面那條 UI-only 落差補成伺服器端真正的控制）、
-  `BUYERS_USANCE` 的拒絕/正規化——**user 明確指示這兩項本次範圍不做**，尚未實作。
+- [x] ~~`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 2（後端
+  `businessEventId` 強制檢查）~~ — **已完成（2026-08-24）**，就是上面那項 A9 Full-Redeem-only
+  伺服器端修復本身；先前記錄「本次範圍不做」是指更早一次 pass，這次 user 明確要求後已補上。
+
+- [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3**
+  （`BUYERS_USANCE` 的拒絕/正規化）——仍然尚未實作，範圍外。
+
+- [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 5**
+  （Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭）——
+  純文件性質，屬於 BA 待辦（`analysis/TF_Balance_Component_Mapping-en.xlsx`／`-zh.xlsx`），不是程式碼
+  改動，不在這個 repo 的動手範圍內；記錄於此避免被遺忘。詳見該決策文件本身的說明與舉例。
 
 ---
 
@@ -90,10 +96,14 @@ A9 SG Redemption 鎖定、A10/B6 Close 相關收尾——那批被還原的內�
 
 ## 6. 其他已知小殘留（不影響測試門檻）
 
-- [ ] `maker-panel.component.scss` 仍超出 Angular `anyComponentStyle` 的 **8kB 警告**門檻
-  （目前 11.92kB，超出 3.92kB；未達 12kB 硬錯誤門檻，不會讓 `npm run build` 失敗）。
-  2026-08-21 的 Part B 抽離只處理了當時真正卡 build 的 `transaction-builder.component.scss`，
-  這個 warning-level 的檔案尚未一併處理。
+- [x] ~~`maker-panel.component.scss` 超出 Angular `anyComponentStyle` 的 8kB 警告門檻~~ —
+  **已修復（2026-08-24）**。根因：2026-08-21 從 `transaction-builder.component.scss` 整份複製
+  過來時，複製了全部規則而非只複製這個元件真正用到的子集，導致約一半（997 行中的 473 行）是
+  死碼——`.tb-page`/`.tb-workspace`/`.tb-function-chip*`（頁面外殼/功能選擇 chips）、
+  `.tb-tabs`/`.tb-table--lookup-timeline`/`.tb-status-badge*`（Look Up 分頁跟 Event Timeline
+  表格，屬於其他元件）等，逐一 grep 驗證零使用後刪除（同一套之前清 `.tb-quick-pick*`/
+  `.tb-result*`/`.tb-row-sub` 死碼用的技法），檔案從 997 行降到 511 行。`ng build --configuration
+  production` 確認警告完全消失，Angular 1067/1067 測試全綠。
 
 ---
 
@@ -105,12 +115,6 @@ A9 SG Redemption 鎖定、A10/B6 Close 相關收尾——那批被還原的內�
   再次確認才會啟動實際工程，動手前請先與使用者對齊排期與範圍。
 - 若之後有新的重審 pass 更新了 `Quality-report-balance.md`/`CLAUDE.md`，應同步回來更新本清單，
   避免與來源文件的「單一事實來源」狀態脫節。
-- **2026-08-24 還原記錄**：`main` 上曾出現的 Tenor
-  Basis/Fixed Maturity Date + `standing-mock` 微服務、Natural-Expiry batch-trigger 業務簽核文件
-  （commit `115f9cd` 之前、`e6ee8e7` 之後的約 60 個 commit）已整批從 `lc-balance/` 還原掉，因為其中
-  新功能被判定改壞了東西。這些內容並未從 git 歷史中刪除，仍可透過 `git show <commit>` 或
-  `git log e6ee8e7..115f9cd~1` 查閱/挑選回來；若未來要重新評估是否要撿回其中部分功能，
-  建議逐項討論，不要整批復原。
 - **2026-08-24 發現並修復**：還原後 OAS 全面稽核發現 `currency` 欄位存在一致性驗證缺口——既有合約/父合約
   已存的幣別跟呼叫端傳入的新交易幣別完全沒有比對，錯的值會被原封不動存進交易紀錄。已補上
   `CurrencyMismatchError`（409 `CURRENCY_MISMATCH`），範圍刻意比原本被還原掉的 `ca8472e` 窄——`currency`

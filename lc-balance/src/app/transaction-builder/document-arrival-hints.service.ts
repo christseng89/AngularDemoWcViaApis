@@ -36,6 +36,8 @@ export class DocumentArrivalHintsService {
   readonly parentSgEligible = new Set<string>();
   /** A10/B6 (Close) only — see loadCloseEligibility()'s own doc comment for why this is populated by ONE aggregate server call, unlike every other Set/Map above. */
   readonly catalogCloseEligible = new Set<string>();
+  /** A7 (Acceptance Settlement) only — its own Parent LC picker. Set of balanceContractId whose LC has at least one child IPLC_ACCEPTANCE contract with a non-zero Available Balance — see loadChildBalanceEligibility()'s own doc comment. User-reported 2026-08-25 ("A07 交易選擇是 LC number 有Acceptance balance 再顯示2ndary ref"). */
+  readonly parentAcceptanceEligible = new Set<string>();
 
   constructor(private readonly api: BalanceComponentApiService) {}
 
@@ -128,9 +130,9 @@ export class DocumentArrivalHintsService {
     });
   }
 
-  /** A3S's own hint fetch — see loadSgBalanceEligibility()'s own doc comment. */
+  /** A3S's own hint fetch — see loadChildBalanceEligibility()'s own doc comment. */
   loadCatalogSgEligibility(list: BalanceContract[], onDone: () => void): void {
-    this.loadSgBalanceEligibility(list, this.catalogSgEligible, onDone);
+    this.loadChildBalanceEligibility(list, 'SHGT', this.catalogSgEligible, onDone);
   }
 
   /**
@@ -153,19 +155,26 @@ export class DocumentArrivalHintsService {
     });
   }
 
-  /** A9's own hint fetch — see loadSgBalanceEligibility()'s own doc comment. */
+  /** A9's own hint fetch — see loadChildBalanceEligibility()'s own doc comment. */
   loadParentSgEligibility(list: BalanceContract[], onDone: () => void): void {
-    this.loadSgBalanceEligibility(list, this.parentSgEligible, onDone);
+    this.loadChildBalanceEligibility(list, 'SHGT', this.parentSgEligible, onDone);
+  }
+
+  /** A7's own hint fetch — see loadChildBalanceEligibility()'s own doc comment. Same shape as A9's SG
+   * eligibility, just gated on a child IPLC_ACCEPTANCE instead of a child SHGT. */
+  loadParentAcceptanceEligibility(list: BalanceContract[], onDone: () => void): void {
+    this.loadChildBalanceEligibility(list, 'IPLC_ACCEPTANCE', this.parentAcceptanceEligible, onDone);
   }
 
   /**
-   * Shared by A3S and A9 — only LC Numbers with an outstanding SG Balance are eligible. For each LC
-   * Index candidate, catalog-searches its own child SHGT contracts by lcNumber, then fetches each
-   * child's own live snapshot — mirrors `loadSgsForArrival()`'s own "outstanding SG" filter
-   * (`availableBalance !== '0'`), run once per Step-1 candidate. An LC with no SHGT children, or whose
-   * every SHGT child is fully redeemed, is not eligible.
+   * Shared by A3S/A9 (childInstrumentType 'SHGT') and A7 (childInstrumentType 'IPLC_ACCEPTANCE') —
+   * only LC Numbers with an outstanding child balance of the given instrumentType are eligible. For
+   * each LC Index candidate, catalog-searches its own children of that instrumentType by lcNumber, then
+   * fetches each child's own live snapshot — mirrors `loadSgsForArrival()`'s own "outstanding SG" filter
+   * (`availableBalance !== '0'`), run once per Step-1 candidate. An LC with no children of that
+   * instrumentType, or whose every child is fully redeemed/settled, is not eligible.
    */
-  private loadSgBalanceEligibility(list: BalanceContract[], eligible: Set<string>, onDone: () => void): void {
+  private loadChildBalanceEligibility(list: BalanceContract[], childInstrumentType: InstrumentType, eligible: Set<string>, onDone: () => void): void {
     eligible.clear();
     if (!list.length) {
       onDone();
@@ -173,7 +182,7 @@ export class DocumentArrivalHintsService {
     }
     forkJoin(
       list.map((c) =>
-        this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
+        this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
           switchMap((result) => {
             if (!result.items.length) return of(false);
             return forkJoin(result.items.map((child) => this.api.getSnapshot(child.balanceContractId).pipe(catchError(() => of(null))))).pipe(

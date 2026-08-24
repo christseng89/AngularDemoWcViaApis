@@ -235,6 +235,8 @@ export interface TransactionFunction {
   deferSettlementNextStepHint?: string;
   /** A10/B6 (Close) only — its own flat Catalog picker filters to `documentArrivalHints.catalogCloseEligible` (a server-computed hint-set, not a client-side per-candidate check) instead of the generic 0-Available-Balance fallback every other flat-Catalog function uses. */
   requiresCloseEligibility?: boolean;
+  /** A7 (Acceptance Settlement) only, user-reported 2026-08-25 ("A07 交易選擇是 LC number 有Acceptance balance 再顯示2ndary ref") — its own LC Index (Parent) picker filters to `documentArrivalHints.parentAcceptanceEligible` (does this LC have at least one child IPLC_ACCEPTANCE with a non-zero Available Balance) rather than falling into the unconditional pass-through every other `catalogTenorFilter: 'USANCE'` parent picker uses. Without this, Step 1 offered every Usance LC regardless of whether it actually had an outstanding Acceptance to settle, and Step 2 (IB Index) would only reveal the empty result after the fact. Mirrors A3S/A9's own `catalogSgEligible`/`parentSgEligible` SG-balance gate — same shape, different child instrumentType. */
+  requiresEligibleParentAcceptance?: boolean;
 }
 
 const ALL_TENOR_OPTIONS = [
@@ -359,7 +361,9 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     // An Acceptance can only exist under a Usance LC (Design doc §7) — a Sight LC would always have zero
     // IBs to pick in Step 2, so this piggybacks on A4's own catalogTenorFilter.
     catalogTenorFilter: 'USANCE',
-    help: 'Settlement Due Date — never touches the LC Balance itself (Cross-Reference Finding 1). Pick the LC below (LC Index, Usance only — a Sight LC never has an Acceptance), then the IB Number (IB Index) — a single LC can have multiple Document Arrivals.',
+    // User-reported 2026-08-25 — see this field's own doc comment on TransactionFunction above.
+    requiresEligibleParentAcceptance: true,
+    help: 'Settlement Due Date — never touches the LC Balance itself (Cross-Reference Finding 1). Pick the LC below (LC Index — only LCs with an outstanding Acceptance Balance are shown), then the IB Number (IB Index) — a single LC can have multiple Document Arrivals.',
   },
   {
     code: 'A8',

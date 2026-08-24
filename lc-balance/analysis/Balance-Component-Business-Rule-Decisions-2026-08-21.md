@@ -76,15 +76,22 @@ BA 直接確認：「出口所有的 B1–B6 都是針對保兌處理，EBL 不�
 
 ## 行動項目彙總
 
-| # | 項目 | 檔案 | 優先級 | 狀態 |
+> **狀態更新（2026-08-24，代碼檢查後附加，不覆寫原文）**：本表下方「狀態」欄位維持 2026-08-21 決策當下原文不動；以下用附加註記的方式記錄後續進度，同一份文件內「事後不修改本檔內容」的慣例僅適用於決策本文，狀態欄位本來就設計為可追蹤——比照本文件開頭「同日訂正」段落已經建立的「附加、不刪除」模式。項目 2、4、6 已於 2026-08-21～2026-08-24 陸續完成，逐一核對程式碼確認：
+> - **項目 2**（後端 businessEventId 配對檢查）：**已完成（2026-08-24）**——`service/balanceService.ts` 的 `outstandingCapped` sufficiency check（Maker/Submit）與 `release()`（Checker/Release 複查）都已補上；判斷依據正是本文件決策 1 講的「Matched Amount ≠ Redeemed Amount」區分（有無 `businessEventId`，不是看 movementType 字串）。5 個新測試，三套測試全綠。詳見 `CLAUDE.md` 決策日誌對應條目、OAS v1.18.0 changelog。
+> - **項目 4**（`export-case-2`／`export-case-4` `tenorType` 修正）：**已完成**——`backend/data/businessCases.js` 兩案的 `tenorType` 已改為 `SELLERS_USANCE`（1466、1648 行核對確認）。
+> - **項目 6**（新增測試案例）：**已完成（2026-08-21）**——見 `Balance-Component-Test-Case-Proposal.md` §4，import-case-8～12、export-case-8～11 共 7 案新增，7/7 live-verified。
+>
+> 項目 3（`BUYERS_USANCE` 拒絕/正規化）、項目 5（Mapping workbook Rule #1 文字補強，BA 待辦）**仍維持原狀未完成**，核對程式碼與 workbook 皆確認尚未動手。
+
+| # | 項目 | 檔案 | 優先級 | 狀態（2026-08-21 決策當下原文） |
 |---|---|---|---|---|
 | 1 | A9 Amount 欄位改為鎖定帶入 SG **Available Balance**（同日訂正，原文誤寫 Confirmed Balance），只產生 FULL_REDEEM | `src/app/transaction-builder/function-strategy.ts` | VERY HIGH | ✅ 程式員已實作（同日發現並訂正上述欄位選擇） |
-| 2 | 後端補 SHGT PARTIAL_REDEEM 必須配對 businessEventId／UTILIZE 的檢查，否則拒絕 | `microservices/balance-component/src/domain/shgtRedeem.ts` 或 `service/balanceService.ts` | VERY HIGH | **暫緩**——2026-08-21 拍板先只做測試案例，此項與行動項目 3 一起延後 |
-| 3 | `EPLC_CONFIRMATION` 拒絕或正規化 `tenorType: 'BUYERS_USANCE'` | `microservices/balance-component/src/domain/tenorRouting.ts`、`service/balanceService.ts` | VERY HIGH | **暫緩**——同上 |
-| 4 | `export-case-2`／`export-case-4` 重新檢視測試意圖並修正 `tenorType` | `backend/data/businessCases.js` | HIGH | 待程式員與 BA 共同確認修正方向 |
-| 5 | Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭 | `analysis/TF_Balance_Component_Mapping-en.xlsx`／`-zh.xlsx`（README、L1_Event_Catalogue） | MEDIUM | 待 BA 更新 workbook |
-| 6 | 新增 Import/Export 測試案例（A10／B6 Close、B2 獨立案例等） | `backend/data/businessCases.js` | MEDIUM | 見 `Balance-Component-Test-Case-Proposal.md` |
+| 2 | 後端補 SHGT PARTIAL_REDEEM 必須配對 businessEventId／UTILIZE 的檢查，否則拒絕 | `microservices/balance-component/src/domain/shgtRedeem.ts` 或 `service/balanceService.ts` | VERY HIGH | ~~暫緩~~——2026-08-21 拍板先只做測試案例，此項與行動項目 3 一起延後 → **見上方 2026-08-24 狀態更新：已完成** |
+| 3 | `EPLC_CONFIRMATION` 拒絕或正規化 `tenorType: 'BUYERS_USANCE'` | `microservices/balance-component/src/domain/tenorRouting.ts`、`service/balanceService.ts` | VERY HIGH | **暫緩**——同上（仍未完成） |
+| 4 | `export-case-2`／`export-case-4` 重新檢視測試意圖並修正 `tenorType` | `backend/data/businessCases.js` | HIGH | ~~待程式員與 BA 共同確認修正方向~~ → **見上方 2026-08-24 狀態更新：已完成** |
+| 5 | Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭 | `analysis/TF_Balance_Component_Mapping-en.xlsx`／`-zh.xlsx`（README、L1_Event_Catalogue） | MEDIUM | 待 BA 更新 workbook（仍未完成） |
+| 6 | 新增 Import/Export 測試案例（A10／B6 Close、B2 獨立案例等） | `backend/data/businessCases.js` | MEDIUM | ~~見 `Balance-Component-Test-Case-Proposal.md`~~ → **見上方 2026-08-24 狀態更新：已完成** |
 
 ---
 
-*本文件為決策當下的定案紀錄。若日後規則有變動，另立新的日期戳記文件，不回頭修改本檔。*
+*本文件為決策當下的定案紀錄。若日後規則有變動，另立新的日期戳記文件，不回頭修改本檔——本次僅以附加註記方式記錄行動項目狀態進度，決策本文（規則文字、依據、定案處理方式）逐字未動。*

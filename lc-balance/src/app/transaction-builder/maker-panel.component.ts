@@ -641,6 +641,12 @@ export class MakerPanelComponent implements OnChanges {
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
+        // A7 only — user-reported 2026-08-25; see requiresEligibleParentAcceptance's own doc comment.
+        if (this.selectedFunction?.requiresEligibleParentAcceptance) {
+          this.documentArrivalHints.loadParentAcceptanceEligibility(items, () => {
+            this.parentPicker.total = this.filteredParentCatalog.length;
+          });
+        }
       },
     });
   }
@@ -671,6 +677,9 @@ export class MakerPanelComponent implements OnChanges {
     }
     if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
       return { kind: 'hintSet', ids: this.documentArrivalHints.parentSgEligible };
+    }
+    if (this.selectedFunction?.requiresEligibleParentAcceptance) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.parentAcceptanceEligible };
     }
     if (
       this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||

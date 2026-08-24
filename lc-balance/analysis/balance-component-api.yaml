@@ -512,7 +512,22 @@ info:
         error. `POST /balance-movements/{id}/cancel` is deliberately UNCHANGED — a Maker's own Error
         Correction on their own still-PENDING entry is the expected, correct case (`createdBy ===
         cancelledBy` there is normal), not a Maker/Checker conflict.
-  version: "1.17.0"
+
+    v1.18.0 (2026-08-24, same day — "A9 Full-Redeem-only 目前只在 Angular UI 層鎖定, API MAKER & CHECKER也要"):
+      - CHANGED: A9 (standalone Shipping Guarantee Redemption, `SHGT` `PARTIAL_REDEEM` with no
+        `businessEventId`) is now rejected server-side (`409 INSUFFICIENT_AVAILABLE_BALANCE`) at BOTH
+        `POST /balance-movements` (Maker Submit) and `POST /balance-movements/{id}/release` (Checker
+        Release, defense-in-depth for a movement that reached PENDING some other way) — BA-confirmed
+        2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is instrument-based, not
+        amount-based") was previously enforced ONLY client-side (the Angular A9 screen locks the Amount
+        field and hardcodes `movementType: 'FULL_REDEEM'`); any other caller could still submit a
+        standalone Partial Redeem directly. A3S's own matched SG redemption leg is UNCHANGED and still
+        accepts Partial Redeem — the distinguishing signal is `businessEventId` (set on every A3S-shaped
+        call, linking it to the paired Document Arrival), not the `PARTIAL_REDEEM`/`FULL_REDEEM`
+        movementType string alone, since A3S's own MIN(Bill, SG Outstanding) match can legitimately equal
+        the SG's full outstanding balance too. A standalone `FULL_REDEEM` (no `businessEventId`) is
+        unaffected either way.
+  version: "1.18.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.

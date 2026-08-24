@@ -7,11 +7,17 @@
 
 ## 1. 三份文件的關係與閱讀順序
 
+> **檔名更新（2026-08-25，附加註記，原文不動）**：第 3 份文件已依 user 指示，連同後續另外三份
+> 2026-08-22 驗證文件（`Import-Case-12`、`Export-Case-11`、`Export-Case-2-4-Tenor-Fix`）合併改寫成一份
+> 中文彙整文件，檔名為 `Balance-Component-A10-B6-Close-Verification-Summary-zh-2026-08-25.md`，原
+> 4 份英文檔案已刪除。下表第 3 列的檔名指向已不存在的檔案，內容本身（7 個新案例、7/7 PASS）仍然
+> 準確——請改讀新檔名的第 1 節。
+
 | 順序 | 文件 | 性質 |
 |---|---|---|
 | 1 | `Balance-Component-Business-Rule-Decisions-2026-08-21.md` | **先讀這份**——決策備忘錄，記錄三項業務規則決議的依據與定案內容，後面兩份都是依這份決議延伸出來的工作 |
 | 2 | `Balance-Component-Test-Case-Proposal.md` | 依決議定案後的測試矩陣提案：現有 14 案覆蓋盤點、缺口分析、新增 7 案的設計 |
-| 3 | `Balance-Component-New-Test-Cases-Verification-2026-08-21.md` | 上述 7 個新案例（import-case-8～11、export-case-8～10）的實跑驗證紀錄，7/7 PASS——**這份是完成紀錄，不是待辦** |
+| 3 | ~~`Balance-Component-New-Test-Cases-Verification-2026-08-21.md`~~ → `Balance-Component-A10-B6-Close-Verification-Summary-zh-2026-08-25.md` §1 | 上述 7 個新案例（import-case-8～11、export-case-8～10）的實跑驗證紀錄，7/7 PASS——**這份是完成紀錄，不是待辦** |
 
 ## 2. 決策備忘錄內容摘要
 
@@ -36,7 +42,7 @@
 
 ## 4. 過程中產生但已捨棄的檔案
 
-`analysis/businessCases-new-cases-draft.js` 是本輪工作過程中 AI 助理端產出的一份新案例草稿，設計金額（如 import-case-10 的 Document Arrival 70,000／SG 30,000）跟實際整合進 `backend/data/businessCases.js` 並已實跑驗證的版本（見第 3 份文件的 import-case-10：SG 60,000 相關設計）不同、也從未實際跑過 API 驗證。已確認非採用版本，已從 `analysis/` 移除——若在版本歷史或本機殘留檔案中看到，不需要參考，以 `backend/data/businessCases.js` 裡實際的程式碼與《Balance-Component-New-Test-Cases-Verification-2026-08-21.md》記錄的版本為準。
+`analysis/businessCases-new-cases-draft.js` 是本輪工作過程中 AI 助理端產出的一份新案例草稿，設計金額（如 import-case-10 的 Document Arrival 70,000／SG 30,000）跟實際整合進 `backend/data/businessCases.js` 並已實跑驗證的版本（見第 3 份文件的 import-case-10：SG 60,000 相關設計）不同、也從未實際跑過 API 驗證。已確認非採用版本，已從 `analysis/` 移除——若在版本歷史或本機殘留檔案中看到，不需要參考，以 `backend/data/businessCases.js` 裡實際的程式碼與《Balance-Component-A10-B6-Close-Verification-Summary-zh-2026-08-25.md》（原《Balance-Component-New-Test-Cases-Verification-2026-08-21.md》，2026-08-25 已合併改名，見上方附加註記）記錄的版本為準。
 
 ---
 

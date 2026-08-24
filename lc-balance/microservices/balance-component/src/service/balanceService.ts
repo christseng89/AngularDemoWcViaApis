@@ -194,8 +194,30 @@ export class BalanceService {
      * relabels the same claim on the issuing bank as EPLC_EXPORT_BILLS_DISCOUNTED via a linked CREATE
      * on the new contract) share the same "can't clear more than what's actually outstanding" shape.
      */
-    const outstandingCapped: MovementSufficiencyCheck = (ctx) =>
-      checkRedeemSufficiency({ redeemAmount: ctx.ceilingAmount, sgAvailableBalance: ctx.availableBalance });
+    // BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is instrument-based,
+    // not amount-based") — A9 (standalone Shipping Guarantee Redemption) must be Full Redeem only. This
+    // was previously enforced ONLY client-side (Angular's A9 screen locks the Amount field and hardcodes
+    // movementType: 'FULL_REDEEM') — any other caller (curl, a future second UI, an integration test)
+    // could still submit a Partial Redeem directly against the API. Business-confirmed 2026-08-24: enforce
+    // it server-side too, at both Maker Submit (here) and Checker Release (release()'s own re-check
+    // below) — same defense-in-depth posture as every other client-side-only gate this codebase has
+    // since closed (BAL-123's A4 gate, the Amount > 0 backstop). A3S's own matched SG redemption leg is
+    // NOT affected: it is genuinely tied to a real Document Arrival via a shared `businessEventId` (see
+    // this file's own doc comment history for the A3S/documentArrivalWithSg leg) — that link, not the
+    // movementType string alone, is what distinguishes "A9 standalone" from "A3S matched" at the API
+    // level, since A3S's own MIN(Bill, SG Outstanding) match can also legitimately equal the full
+    // outstanding balance.
+    const outstandingCapped: MovementSufficiencyCheck = (ctx) => {
+      if (ctx.contract.instrumentType === 'SHGT' && ctx.req.movementType === 'PARTIAL_REDEEM' && !ctx.req.businessEventId) {
+        return {
+          ok: false,
+          error:
+            'A9 (Shipping Guarantee Redemption) must be Full Redeem only — Partial Redeem is rejected unless ' +
+            'matched to a Document Arrival (A3S), linked via businessEventId.',
+        };
+      }
+      return checkRedeemSufficiency({ redeemAmount: ctx.ceilingAmount, sgAvailableBalance: ctx.availableBalance });
+    };
 
     /**
      * A10/B6 Close — unlike every other entry in this table, "sufficiency" here isn't affordability, it's
@@ -1203,6 +1225,19 @@ export class BalanceService {
             `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this CLOSE request and re-submit with the current figure.`,
         );
       }
+    }
+
+    // A9 Full-Redeem-only re-check (business-confirmed 2026-08-24) — mirrors the Maker-side guard in
+    // buildMovementTypeRegistry()'s own outstandingCapped check above. Not expected to ever actually fire
+    // for a movement createMovement() itself created (businessEventId is immutable once set, so a
+    // movement that passed the Maker-side gate can't later lose it) — pure defense-in-depth for a
+    // movement that reached PENDING some other way, same posture assertValidAmount()'s own doc comment
+    // already established for this codebase.
+    if (contract.instrumentType === 'SHGT' && movement.movementType === 'PARTIAL_REDEEM' && !movement.businessEventId) {
+      throw new IllegalStateTransitionError(
+        `Cannot release movement ${movementId} — A9 (Shipping Guarantee Redemption) must be Full Redeem only; ` +
+          `a standalone Partial Redeem (no businessEventId) is not a legal release target.`,
+      );
     }
 
     const releasedAt = this.now();
