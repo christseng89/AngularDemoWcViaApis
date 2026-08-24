@@ -110,6 +110,13 @@ LC Expiry Date + Mail Float Grace（不是 Expiry Date 當天——見第 1.1 �
 
 ### 1.1 `mail_float_grace` 必須是可配置政策，不可寫成固定常數（第二輪覆核要求，本版新增）
 
+> **✅ GAP-15 已解決（2026-08-23），本節整套 `ExpiryReleasePolicy` 設計確認不需要落地**：`Natural-Expiry-Scope-Decision-Request.md`
+> 業務已正式回覆——自然到期由外部系統批次判斷、透過既有 A10/B6 API 觸發，Balance Component **不需要**任何政策設定 schema
+> （`ExpiryReleasePolicy`／`mail_float_grace`／`floatDayCountConvention`／`holidayCalendar` 全部不用做，原文引用見
+> `Natural-Expiry-Scope-Decision-Request.md`「✅ 已回覆」章節）。以下設計保留作為第二／三輪覆核當時的分析記錄，不代表待落地項目。
+> 附帶一提：即使未來 GAP-15 重新開放討論，本節的 `holidayCalendar` 自建方案也不會是正確方向——見下方 §6.1 的更新註記，
+> 曆法/假日邏輯已確定委外給 Standing 微服務，不會是 Balance Component 自己維護的欄位。
+
 第一輪版本只給了「要加 Grace Period」的概念，沒有講清楚這個 Grace 該怎麼落地——第二輪覆核指出的問題是對的：一個全域寫死的天數，禁不起真實業務情境（到期地點在海外、遞交管道是紙本快遞 vs. 電子交單、不同銀行的內部政策）。修正如下：
 
 ```typescript
@@ -282,6 +289,15 @@ Settlement Date < Maturity Date
 
 ### 6.1 Acceptance Maturity Date 的 Source of Truth：Calculated First，Maker Override 需授權（第三輪覆核要求，本版新增）
 
+> **⚠️ 實際落地與本節設計不同（2026-08-23 Business Day Convention 決策，已實作）**：Business Day Convention／假日曆邏輯
+> 最終**不是**「比照 §1.1 的 `holidayCalendar`、Balance Component 自建複用」，而是委外給獨立的 **Standing 微服務**——
+> Balance Component 只計算 `sourceDate`（Base Date + Tenor），再呼叫 Standing 的 `POST /business-days/adjust` 取得曆法
+> 調整後的日期；Balance Component 本身**不**內嵌假日曆（見 `lc-balance/CLAUDE.md`「A6/B4 Calculated Maturity Date」段落）。
+> 另外，Base Date 也不是本節假設的「一律等於 Acceptance Date」——實際依 `tenorBasis` 而定，目前只有 `FIXED_MATURITY_DATE`
+> 這個 basis 真正會計算（以 `fixedMaturityDate` 作為 `sourceDate`），其餘 basis 停在 `PENDING_BASE_DATE`，等待未來 Base
+> Date 來源補齊（見 CLAUDE.md「Tenor Basis / Risk Containment Gate」段落）。以下設計保留作為原始覆核記錄，實際規則以
+> CLAUDE.md 決策日誌與 `microservices/balance-component/src/domain/maturityDateCalculation.ts` 為準。
+
 第 3 節 A6/B4 那一格原本把「Maturity Date 由 Maker 手動輸入，還是由 `tenorDays` + Acceptance Date 系統自動推算」列成一個待決策的開放選項。第三輪覆核指出這樣留白不夠——如果放任兩種方式並存、且沒有明確何者是主要依據，**同一個 tenor 很容易因為人工計算方式不同而算出不一致的 Maturity Date**（例如遇到假日該不該順延，不同 Maker 可能算法不同）。正式規則應該定義成：
 
 ```text
@@ -368,6 +384,13 @@ A10/B6 Close 刻意不畫進這張圖——如第 5 節所述，它與 Expiry Da
 
 ## 9. 與 `Natural-Expiry-Scope-Decision-Request.md`（OAS-GAP-15）的關係
 
+> **✅ 已回覆（2026-08-23）**：以下內容寫於 GAP-15 決策請求尚未回覆的時間點，現已過時。業務正式回覆：自然到期由外部系統
+> 依交易條件批次判斷，透過既有的 A10/B6 API（Maker Submit + Checker Release）觸發，跟人工在 UI 上操作走同一條路徑；
+> Balance Component **不需要**新增 `movementType` 或事件（不需要 `LC_EXPIRE`/`CNF_EXPIRE`），也不需要 `ExpiryReleasePolicy`
+> 這類設定 schema（呼應上方 §1.1 的更新註記）。完整結論見 `Natural-Expiry-Scope-Decision-Request.md`「✅ 已回覆（2026-08-23）」
+> 章節，以及 `lc-balance/CLAUDE.md`「GAP-15 resolved 2026-08-23」條目。以下原文保留作為決策前的分析記錄——本節當時指出
+> `cs-tf-balance-knowhow` 權威依據「不支持完全是外部流程」的判斷，方向與最終結論一致（呼叫既有 A10/B6 API，而非完全繞過）。
+
 本專案目前有一份**尚未拿到答案**的決策請求，問的正是「LC/Confirmation 的自然到期是不是 Balance Component 該管的事」。這份文件的討論（尤其第 1、5、6、8 節）跟這份決策請求問的是同一件事，兩者應該併同討論，而不是各自獨立存在。
 
 本文件立場是：不代替業務/架構側做決定，但**指出這個決策請求本身引用的權威依據（`cs-tf-balance-knowhow` §3.9/§7.7，同時也是 `closeEligibility.ts` A10/B6 設計時引用的同一份依據），已經對這個問題給出了明確立場**——`rationale-en.md` §14「Implementation checklist」把 `LC_EXPIRE`/`CNF_EXPIRE` 列在「**Must fix before go-live**」，不是「視情況而定」的選配項；`impl-spec-en.md` §14「Build sequence」的 Phase 2（Import）scope 欄位也把「expiry batch」列為 Import 建置範圍的一部分，兩份獨立文件方向一致（`impl-spec-en.md` §13「Deployment validation gates」的 G1–G14 沒有專門針對 `LC_EXPIRE`/`CNF_EXPIRE` 命名的部署 gate，這一點不影響上述結論——建置排程與部署 gate 是兩個不同層次的問題，前者已經明講要做，後者沒有專屬 gate 只代表這個事件目前沒有被獨立列為上線關卡，不代表它不屬於建置範圍）。這不等於 GAP-15 就該直接結案定調成「要做」——租戶拓撲、SLA、跟外部批次系統的分工都還沒釐清，是合理的、需要另外討論的落地考量——但「這件事在概念上屬不屬於 Balance Component 的職責範圍」這個較窄的問題，手上已有的同一份設計依據並不支持「完全是外部批次流程的職責、跟本合約無關」這個答案。
@@ -382,11 +405,18 @@ A10/B6 Close 刻意不畫進這張圖——如第 5 節所述，它與 Expiry Da
 
 | 順序 | 項目 | 依賴 | 粗估工作量 |
 |---|---|---|---|
-| Phase 0 | `BalanceContract` 新增 `expiryDate`/`issueDate`，`BalanceMovement` 新增 `documentPresentationDate`（優先級隨第 2 節提升至 High）；`ExpiryReleasePolicy`（第 1.1 節，含 `floatDayCountConvention`/`holidayCalendar`/`placeOfExpiryTimezone`）與第 6.1 節的 Calculated Maturity Date 計日基礎設施一併設計，兩者共用同一套曆法/假日邏輯；DB migration | 無 | 小～中 |
+| Phase 0 | `BalanceContract` 新增 `expiryDate`/`issueDate`，`BalanceMovement` 新增 `documentPresentationDate`（優先級隨第 2 節提升至 High）；~~`ExpiryReleasePolicy`（第 1.1 節，含 `floatDayCountConvention`/`holidayCalendar`/`placeOfExpiryTimezone`）與第 6.1 節的 Calculated Maturity Date 計日基礎設施一併設計，兩者共用同一套曆法/假日邏輯~~（見表格下方 2026-08-23 更新註記）；DB migration | 無 | 小～中 |
 | **Phase 1（原 Phase 2，提前）** | **A7/B5 的 Maturity Control + Early Settlement 分類/授權邏輯（第 6 節，Critical）**；A6/B4 UI 補上 Maturity Date 輸入點，落地第 6.1 節「Calculated First、Maker Override 需授權」規則 | Phase 0 | 中 |
 | **Phase 2（原 Phase 1，順延）** | A2–A10/B2–B6 的①NEW EXPOSURE 控制 | Phase 0 | 中 |
 | Phase 3 | A2/B2 新增「只改 Expiry、不動金額」的 Amendment 子類型（對應知識庫 `LC_AMD_TENOR`） | Phase 0、Phase 2 | 小～中 |
-| — | 解決 GAP-15（自然到期範圍界定，含④EXPIRY RESIDUAL RELEASE 與 `mail_float_grace` 政策模型），若拍板要做才排入 | 與上述各 Phase 平行、不阻塞 | 待定 |
+| — | ~~解決 GAP-15（自然到期範圍界定，含④EXPIRY RESIDUAL RELEASE 與 `mail_float_grace` 政策模型），若拍板要做才排入~~ | 與上述各 Phase 平行、不阻塞 | ✅ 已解決，見下方註記 |
+
+> **2026-08-23 更新註記**：GAP-15 已回覆結案——自然到期透過既有 A10/B6 API 由外部系統觸發，**不需要** `ExpiryReleasePolicy`／
+> `mail_float_grace` 政策 schema，Phase 0 不需要包含這塊。Business Day Convention 決策同日確認：即使是 §6.1 的 Calculated
+> Maturity Date，計日/假日邏輯也不是 Balance Component 自建的 `holidayCalendar`，而是委外給 Standing 微服務
+> （`POST /business-days/adjust`）——已經實作並在 CLAUDE.md「A6/B4 Calculated Maturity Date」段落記錄。Phase 0 的
+> `expiryDate`/`issueDate`/`documentPresentationDate`/DB migration 部分不受影響，仍照原計畫進行；只有這一格劃掉的
+> 曆法基礎設施範圍不再需要。詳見上方 §1.1、§6.1 的更新註記，以及 `lc-balance/CLAUDE.md`「GAP-15 resolved」條目。
 
 **理由**：A7/B5 目前不只是「沒有控制」，而是「連提早/正常都無法分類」，是本文件唯一被評為 Critical 的功能性落差（Presentation Date、`expiryDate` 兩項 Critical 屬於 Phase 0 的欄位前置工作，不是功能落差本身）；NEW EXPOSURE 控制雖然範圍較廣（A2/A8/B2 等），但其中多個 Function 本來就標記 `dateControl: 'NONE'`，真正需要落地的判斷邏輯反而比 A7/B5 單一但更關鍵的 Maturity 判斷更分散、風險密度更低，適合排在 Critical 項目之後。
 
