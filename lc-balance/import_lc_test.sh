@@ -44,6 +44,14 @@
 #                DB never had a matching A7 Settlement submitted against
 #                it, so this script doesn't invent one either.
 #
+# Note (2026-08-24, post-Business-Case-Runner-inventory): S02's own SG2 PARTIAL_REDEEM step above is
+# still fully valid at the microservice/API level (this script talks to the API directly, as noted below),
+# but A9 (Shipping Guarantee Redemption) was locked to Full-Redeem-only in the Angular Transaction Builder
+# on 2026-08-21 — a human clicking through the CURRENT interactive UI can no longer reach a Partial Redeem
+# the way this step does. Kept as-is: a correct demonstration of the API's own broader contract, not a bug.
+# Same status as import-case-4/import-case-6 in backend/data/businessCases.js, which transcribe the same
+# underlying live data.
+#
 # Requires: curl, jq.
 #
 # Talks directly to the microservice — default http://localhost:4100, no

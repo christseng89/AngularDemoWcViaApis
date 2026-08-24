@@ -36,10 +36,15 @@
  *     funding, which is Loan Component's domain, never a Balance Component
  *     call — see Design doc §1).
  *
- * createdBy/releasedBy are fixed demo users ('maker1'/'checker1') — this
- * prototype does not model real user auth (business instruction 2026-08-14:
- * Maker=Checker segregation is a system-authorization concern, out of
- * Balance Component's own scope).
+ * createdBy/releasedBy are fixed demo users ('maker1'/'checker1') — kept
+ * genuinely distinct throughout this registry, not just as a naming
+ * convention: the microservice now enforces real Maker/Checker separation
+ * server-side (MakerCheckerConflictError, business-confirmed 2026-08-24,
+ * superseding the original 2026-08-14 "out of scope, a bank's own
+ * permission concern" posture — see domain/statusTransition.ts's own doc
+ * comment) — a case that ever reused the same actor for both createdBy and
+ * releasedBy/acknowledgedBy would now be rejected outright by RELEASE/
+ * REJECT/acknowledge.
  */
 
 const MAKER = 'maker1';
@@ -340,6 +345,15 @@ function importCase3(lc, sg) {
 // (LC 71,000, SG 50,000 outstanding) are UNCHANGED from the original case — only the ordering/mechanism
 // that gets there is fixed, since those numbers were never wrong, just reached via a call sequence the
 // current design no longer permits.
+//
+// Note (2026-08-24, post-Business-Case-Runner-inventory): this case's own `PARTIAL_REDEEM` on the SG is
+// still fully valid at the microservice/API level, but A9 (Shipping Guarantee Redemption) was locked to
+// Full-Redeem-only in the Angular Transaction Builder on 2026-08-21 (amount PROTECTED, equal to the SG's
+// own Available Balance) — a human clicking through the CURRENT interactive UI can no longer reach a
+// Partial Redeem the way this case's own direct API call does. Kept as-is: it remains a correct,
+// disclosed demonstration of the API's own broader contract (any non-UI caller can still Partial Redeem),
+// not a bug or something this registry needs to "fix" — see importCase6() below for the other case with
+// the same note.
 function importCase4(lc, sg) {
   return {
     id: 'import-case-4',
@@ -499,6 +513,13 @@ function importCase5(lc) {
 // SERVICE layer, but A6's own referencedTransactionId-based compound release (not a maker-submit gate)
 // is what actually finalizes a Usance Document Arrival, matching the live data exactly (no
 // makerSubmittedBy on either UTILIZE under U01).
+//
+// Note (2026-08-24, post-Business-Case-Runner-inventory): same PARTIAL_REDEEM/UI-lock caveat as
+// importCase4() above — this case's own partial-match SG redemption is still correct at the API level,
+// but is no longer reachable through A9's own Angular screen since the 2026-08-21 Full-Redeem-only lock.
+// Also true of `import_lc_test.sh` (the standalone curl script transcribing this SAME S01 live-data
+// sequence directly against the microservice) — its own SG2 PARTIAL_REDEEM step has the identical
+// API-correct/UI-unreachable status.
 
 function importCase6(lc) {
   return {

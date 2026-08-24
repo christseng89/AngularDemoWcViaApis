@@ -253,7 +253,79 @@
         </ng-container>
         <ng-template #existingContract>
           <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
-            <label class="tb-field__label"
+            <!-- Reordered 2026-08-24 (business-reported UX gap, "index LC NUMBER, index 2ndary reference,
+                       THEN the related transaction LC Number and 2ndary reference") — this block (Step 2 per
+                       the doc comment below: "search LC Index, then the IB Index... to pick up the LC Number
+                       and IB Number") used to render BELOW the free-text "Search Existing Contract" fallback,
+                       contradicting its own "Step 2" framing and this project's own "index pickers first, free
+                       text is the fallback" convention every other picker on this screen already follows (see
+                       the LC Index/Parent LC section above). Purely a DOM-order move — neither block's own
+                       *ngIf condition changed, so this has zero effect on when either renders or what it does. -->
+            <!-- Business instruction 2026-08-14 "search LC Index, then the IB Index (page by page for both)
+                       to pick up the LC Number and IB Number" — Step 2. Once an LC is picked in the Parent LC
+                       section above (Step 1 / "LC Index"), pick the specific IB/SG Number here instead of typing
+                       it; selecting a row sets the contract directly, no Search click needed. The free-text
+                       fields below (+ Search) remain as a manual fallback. B5 excluded — single-instrumentType
+                       (model.instrumentType only), would silently miss the Usance/EPLC_ACCEPTANCE half; B5 gets
+                       its own cross-instrumentType "EB Index" below instead. -->
+            <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
+              <app-index-picker
+                label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{
+                  searchNaturalKey.lcNumber
+                }}"
+                [items]="pagedFilteredIbIndexCatalog"
+                [selectedId]="selectedContract?.balanceContractId ?? null"
+                emptyText="{{
+                  ibIndexPicker.contracts.length
+                    ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).'
+                    : 'No ' + model.instrumentType + ' records yet under this LC.'
+                }}"
+                [page]="ibIndexPicker.page"
+                [totalPages]="ibIndexPicker.totalPages"
+                [total]="ibIndexPicker.total"
+                (pick)="!formLocked && onSelectIbIndex($event)"
+                (prevPage)="ibIndexPrevPage()"
+                (nextPage)="ibIndexNextPage()"
+              >
+                <ng-template let-c>
+                  <span class="tb-row-primary">{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
+                  <span class="tb-row-badge">{{ c.status }}</span>
+                </ng-template>
+              </app-index-picker>
+            </div>
+
+            <!-- Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB
+                       Index — Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5
+                       only. Same Step 1/Step 2 shape as above, but merges candidates across BOTH of B5's own
+                       possible instrumentTypes (Sight EPLC_DUE_FROM_ISSUING_BANK, Usance EPLC_ACCEPTANCE) since
+                       the Maker doesn't know in advance which tenor a given EB Number was. Reordered 2026-08-24
+                       alongside the shared 2ndary Index block above — same "index pickers before the free-text
+                       fallback" fix, same zero-effect-on-*ngIf-conditions caveat. -->
+            <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
+              <app-index-picker
+                label="EB Index — Existing Contract (from B3)"
+                [items]="pickerSelection.pagedSettleableBalances"
+                [loading]="pickerSelection.settleableBalancesLoading"
+                [selectedId]="selectedContract?.balanceContractId ?? null"
+                emptyText="No outstanding balance under this LC — nothing left to settle."
+                [page]="pickerSelection.settleableBalancesPaging.page"
+                [totalPages]="pickerSelection.settleableBalancesPaging.totalPages"
+                [total]="pickerSelection.settleableBalancesPaging.total"
+                (pick)="!formLocked && onSelectSettleableBalance($event)"
+                (prevPage)="settleableBalancesPrevPage()"
+                (nextPage)="settleableBalancesNextPage()"
+              >
+                <ng-template let-s>
+                  <span class="tb-row-primary">{{ s.ibNumber || '(no EB Number recorded)' }}</span>
+                  <span class="tb-row-sub"
+                    >{{ s.availableBalance }} {{ s.currency }} —
+                    {{ s.instrumentType === 'EPLC_ACCEPTANCE' ? 'Acceptance Balance' : 'Due from Issuing Bank' }}</span
+                  >
+                </ng-template>
+              </app-index-picker>
+            </div>
+
+            <label class="tb-field__label mt-2"
               >Search Existing Contract — LC Number + {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} (both mandatory — a
               single LC can have multiple {{ ibNumberLabel }}s)</label
             >
@@ -293,68 +365,6 @@
             <div class="tb-error mt-2" role="alert" *ngIf="searchError">{{ searchError }}</div>
             <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">
               Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}
-            </div>
-
-            <!-- Business instruction 2026-08-14 "search LC Index, then the IB Index (page by page for both)
-                       to pick up the LC Number and IB Number" — Step 2. Once an LC is picked in the Parent LC
-                       section above (Step 1 / "LC Index"), pick the specific IB/SG Number here instead of typing
-                       it; selecting a row sets the contract directly, no Search click needed. The free-text
-                       fields above (+ Search) remain as a manual fallback. B5 excluded — single-instrumentType
-                       (model.instrumentType only), would silently miss the Usance/EPLC_ACCEPTANCE half; B5 gets
-                       its own cross-instrumentType "EB Index" below instead. -->
-            <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && !selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
-              <app-index-picker
-                label="2ndary Index — {{ requiredNaturalKeyFields.includes('sgNumber') ? 'SG Number' : ibNumberLabel }} under LC {{
-                  searchNaturalKey.lcNumber
-                }}"
-                [items]="pagedFilteredIbIndexCatalog"
-                [selectedId]="selectedContract?.balanceContractId ?? null"
-                emptyText="{{
-                  ibIndexPicker.contracts.length
-                    ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).'
-                    : 'No ' + model.instrumentType + ' records yet under this LC.'
-                }}"
-                [page]="ibIndexPicker.page"
-                [totalPages]="ibIndexPicker.totalPages"
-                [total]="ibIndexPicker.total"
-                (pick)="!formLocked && onSelectIbIndex($event)"
-                (prevPage)="ibIndexPrevPage()"
-                (nextPage)="ibIndexNextPage()"
-              >
-                <ng-template let-c>
-                  <span class="tb-row-primary">{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
-                  <span class="tb-row-badge">{{ c.status }}</span>
-                </ng-template>
-              </app-index-picker>
-            </div>
-
-            <!-- Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB
-                       Index — Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5
-                       only. Same Step 1/Step 2 shape as above, but merges candidates across BOTH of B5's own
-                       possible instrumentTypes (Sight EPLC_DUE_FROM_ISSUING_BANK, Usance EPLC_ACCEPTANCE) since
-                       the Maker doesn't know in advance which tenor a given EB Number was. -->
-            <div class="mt-2" *ngIf="searchNaturalKey.lcNumber && selectedFunctionStrategy?.selectionFlow?.usesSettleableBalanceIndex">
-              <app-index-picker
-                label="EB Index — Existing Contract (from B3)"
-                [items]="pickerSelection.pagedSettleableBalances"
-                [loading]="pickerSelection.settleableBalancesLoading"
-                [selectedId]="selectedContract?.balanceContractId ?? null"
-                emptyText="No outstanding balance under this LC — nothing left to settle."
-                [page]="pickerSelection.settleableBalancesPaging.page"
-                [totalPages]="pickerSelection.settleableBalancesPaging.totalPages"
-                [total]="pickerSelection.settleableBalancesPaging.total"
-                (pick)="!formLocked && onSelectSettleableBalance($event)"
-                (prevPage)="settleableBalancesPrevPage()"
-                (nextPage)="settleableBalancesNextPage()"
-              >
-                <ng-template let-s>
-                  <span class="tb-row-primary">{{ s.ibNumber || '(no EB Number recorded)' }}</span>
-                  <span class="tb-row-sub"
-                    >{{ s.availableBalance }} {{ s.currency }} —
-                    {{ s.instrumentType === 'EPLC_ACCEPTANCE' ? 'Acceptance Balance' : 'Due from Issuing Bank' }}</span
-                  >
-                </ng-template>
-              </app-index-picker>
             </div>
           </ng-container>
         </ng-template>
