@@ -11,6 +11,14 @@
 > 確認不需要問業務的項目」一節），不需要拿去問業務。真正還需要業務決定的，收斂為以下三題，範圍比初稿窄
 > 很多。
 
+> **✅ 已回覆（2026-08-24）**：問題 A、B1、B2 三題都已回覆並核定，完整工程規格與業務／BA 回覆原文見
+> `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`。摘要：A——寬限期由外部批次系統依自訂
+> 配置（`gracePeriodDays`/`dayType`/`calendar`，A10／B6 可分別設定）計算後代入 `expiredBefore`，Balance
+> Component 不變。B1——技術性瞬時錯誤（連線失敗/逾時/5xx）與 `409` 業務拒絕分開處理，前者依配置重試，
+> 後者不立即重試、留給下一輪批次重新評估。B2——**Maker ≠ Checker 業務已核定為全系統要求，不是只限自然
+> 到期批次**，`release()` 須新增後端驗證；本文件下方 B2 小節原本「這件事可以先限縮在批次範圍內回答」的
+> 框架已被業務撤回，範圍以此回覆為準。以下原始問題與選項保留作為決策過程的歷史記錄。
+
 **請求對象**：業務側（問題 B2 可能也需要 IT 安全政策側一起確認）
 **預期產出**：三個各自獨立的明確答案（見下方「請回答的問題」A/B/C），可與其他決策請求併同一次會議討論，
 不需要事先準備簡報或文件。
@@ -89,6 +97,9 @@ API，不需要新機制」。這份文件要問的是**下一層、操作面的
 
 ## 問題 A：自然到期的寬限期（Grace Period）怎麼算
 
+> **✅ 已回覆（2026-08-24）**：外部批次系統依自訂配置計算，見
+> `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md` 第 1、2 節。
+
 ### 背景
 
 `GET /balance-contracts/close-eligible` 的 `expiredBefore` 參數，本身只是單純的日期比較
@@ -129,19 +140,30 @@ Calculated Maturity Date」段落）。
 
 ### B1．不合格時的容錯策略
 
+> **✅ 已回覆（2026-08-24）**：技術性瞬時錯誤與 `409` 業務拒絕分開處理，見
+> `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md` 第 5 節。
+
 一筆合約到期了，但呼叫 A10/B6 被 `409` 擋下（SG／Acceptance 還沒清、或還有未結 Event）——外部系統要
 重試幾次、間隔多久、多久之後轉人工處理（例如提示 Ops 先用 A9/A7 手動結清）、誰要收到告警？這些 Balance
 Component 完全不管，也不會幫忙重試，需要業務／Ops 自己定義。
 
 ### B2．Maker/Checker 帳號身份政策
 
+> **✅ 已回覆並核定（2026-08-24）**：Maker ≠ Checker 業務已核定為**全系統要求**，不是只限自然到期批次
+> 觸發——下面這段原始背景把它框成「批次觸發要用什麼帳號」的局部問題，這個框架已被業務明確撤回。詳見
+> `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md` 第 4 節與文末「業務／BA 回覆記錄」。範圍
+> 變大後另外衍生兩項工程提醒（`domain/statusTransition.ts` doc comment 需同步更新、`reject()` 是否
+> 一併適用待工程師向業務確認）與一項測試提醒（`import_lc_test.sh`／`export_lc_test.sh` 可能有既有測試
+> 共用 Maker/Checker 帳號），同樣記在該文件裡，不重複列在此處。
+
 `createdBy`／`releasedBy` 在程式碼裡是完全自由的字串，沒有任何格式或身分驗證，同一個字串理論上可以同時
 當這筆交易的 Maker 又當 Checker（`domain/statusTransition.ts` 本身的 doc comment 明講：「Maker and
 Checker being the same person is NOT enforced here...a bank's own role/entitlement policy, out of
-scope for this service's own state machine」）。批次觸發要用什麼帳號送出 Maker Submit／Checker Release、
-要不要規定兩次呼叫必須是不同帳號以維持 4-eyes 分離，純屬業務／IT 安全政策，程式碼端不提供任何技術強制力
-（這個問題不需要等 `Auth-And-Tenant-Isolation-Decision-Request.md`／OAS-GAP-01 的整體認證機制定案才能
-回答——帳號身份「政策」本身可以先確定，實際怎麼技術落地才需要等那份決策）。
+scope for this service's own state machine」——這句話本身也已經因為這次核定而過時，見上方提醒）。批次
+觸發要用什麼帳號送出 Maker Submit／Checker Release、要不要規定兩次呼叫必須是不同帳號以維持 4-eyes
+分離，純屬業務／IT 安全政策，程式碼端不提供任何技術強制力（這個問題不需要等
+`Auth-And-Tenant-Isolation-Decision-Request.md`／OAS-GAP-01 的整體認證機制定案才能回答——帳號身份
+「政策」本身可以先確定，實際怎麼技術落地才需要等那份決策）。
 
 ### 請回答的問題
 
@@ -181,13 +203,18 @@ scope for this service's own state machine」）。批次觸發要用什麼帳�
 - OAS-GAP-09 租戶拓撲問題本身——見上方問題 C，屬於 `TF-Solutions-Tenant-Topology-Decision-Request.md`
   自己的範圍。
 - 外部批次系統掃描/輪詢的頻率——純屬外部系統自己的排程設計，不涉及 Balance Component，不需要在這裡決定。
-- 問題 B2 若確認需要不同帳號分離 Maker/Checker，實際的帳號憑證管理／技術落地方式——這件事會跟
-  `Auth-And-Tenant-Isolation-Decision-Request.md`（OAS-GAP-01）的認證機制決策連動，這次只需要業務確認
-  「政策上要不要分離」，技術怎麼做留到那份決策定案後再處理。
-- `balanceService.ts` 第 216 行 doc comment 指向不存在的 `ReleaseMovementRequest` 型別——純工程技術債，
-  請工程師直接修掉，不需要業務決定。
+- B2 已核定為全系統要求後，實際的帳號憑證管理／認證技術落地方式——這件事會跟
+  `Auth-And-Tenant-Isolation-Decision-Request.md`（OAS-GAP-01）的認證機制決策連動，本次核定只確認了
+  「Maker≠Checker 這條政策本身、且範圍是全系統」，技術怎麼做（憑證管理、Session/Token 綁定帳號等）留到
+  那份決策定案後再處理。
+- `balanceService.ts` 第 216 行 doc comment 指向不存在的 `ReleaseMovementRequest` 型別、以及
+  `domain/statusTransition.ts` 「Maker≠Checker 不強制」那句 doc comment——都已標記為工程技術債／需同步
+  更新項目，見 `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`，不需要在這裡進一步決定。
+- `reject()` 是否也要套用 Maker≠Checker 驗證——業務已提醒工程師需要另外確認，尚未在本次核定範圍內拍板，
+  見上述工程需求文件文末「業務／BA 回覆記錄」。
 
 ---
 
 *對應背景分析：`lc-balance/analysis/LC-Expiry-Acceptance-Maturity-Control-Review.md` §9／§10（2026-08-23
-更新註記）；`Natural-Expiry-Scope-Decision-Request.md`「不在這次決策範圍內的事」一節列出的三項後續問題。*
+更新註記）；`Natural-Expiry-Scope-Decision-Request.md`「不在這次決策範圍內的事」一節列出的三項後續問題。
+對應回覆與完整工程規格：`Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`（2026-08-24）。*

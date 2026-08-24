@@ -1316,3 +1316,32 @@ Implements exactly the "已核定" (business-confirmed) items from the decision-
 Live-verified end-to-end via browser (not just unit tests): A1 Buyer's/Seller's Usance ISSUE with `tenorBasis: FIXED_MATURITY_DATE` + a `fixedMaturityDate` → A3 Document Arrival → A6 Acceptance CREATE with no caller-supplied `maturityDate` (live Standing call, no error) → Checker Release (`maturityDateStatus` flips to `APPROVED`) → A7's own live entry screen correctly showed `Approved` / the exact `fixedMaturityDate` / the Standing-adjusted `operationalPaymentDate` for the picked Acceptance → Inquire Events' reconstruction of the A1 event correctly showed the persisted `tenorBasis`/`fixedMaturityDate`. Also confirmed live that the earlier 429s seen while replaying all 25 Business Case Runner cases back-to-back were purely a rate-limiter artifact of the zero-delay test loop (BAL-118's own 120 req/60s cap on `/balance-movements`), not a regression — every case (including the two Clearing-Bank-Calendar-Profile cases) passes once paced, and `import-case-13`/`export-case-12`'s own Acceptance contracts show correctly Standing-calculated dates.
 
 `backend/test/businessCases.test.js` (`EXPECTED_IDS`, registry-length assertion 23→25, two new title assertions) and `backend/test/server.test.js` (`GET /api/business-cases` length assertion 23→25) updated to match; full backend suite re-verified green (46/46). Per explicit user request, `microservices/balance-component/balance-component.sqlite` (+ WAL/SHM) was cleared and the microservice restarted with a fresh schema before and after this work, so the shipped dev DB carries none of this session's manual/live-verification test data — gitignored local runtime state, not a schema or data-model change.
+
+## Natural-Expiry batch-trigger operational follow-ups (GAP-15's own operational layer) — business/BA confirmed, **not yet implemented**
+
+Business/BA reviewed and confirmed (2026-08-24) the engineering requirements for the GAP-15 natural-expiry
+batch trigger (grace-period calculation, technical-retry-vs-409 handling, `triggeredByExpiry` audit usage —
+full spec in `Natural-Expiry-Batch-Trigger-Engineering-Requirements.md`, decision request in
+`Natural-Expiry-Batch-Trigger-Operational-Decision-Request.md`). All of it is external-batch-system-side
+configuration except one item that lands in this microservice: **Maker ≠ Checker is confirmed as a
+system-wide requirement, not scoped to the natural-expiry batch trigger** — an earlier decision-request
+draft had suggested scoping it narrower (batch-only); business explicitly withdrew that framing. `release()`
+needs a new backend check (`if (createdBy === releasedBy) throw ...`) — currently `createdBy`/`releasedBy`
+are unvalidated free strings, same-person Maker/Checker is possible and not rejected anywhere.
+
+**Nothing has been coded yet** — three things to check/do in the same pass whoever implements this:
+1. `domain/statusTransition.ts`'s own doc comment ("Maker and Checker being the same person is NOT enforced
+   here...a bank's own role/entitlement policy, out of scope for this service's own state machine") will be
+   **factually wrong** once this lands — update it in the same change, don't leave it describing the old
+   unenforced behavior.
+2. Whether `reject()` needs the identical check is **not yet confirmed with business** — `release()` and
+   `reject()` are both a Checker acting on a Maker-submitted movement, so it's the likely-same rule, but
+   business flagged this explicitly as still open, not decided by the 2026-08-24 confirmation.
+3. Run `import_lc_test.sh`/`export_lc_test.sh` after implementing — existing fixtures may reuse the same
+   account as both Maker and Checker, which would start failing once the check lands; business flagged this
+   as a probable test-data update, not just a code change.
+
+Also flagged as engineering technical debt in the same review (unrelated to the Maker≠Checker decision):
+`balanceService.ts`'s own `triggeredByExpiry` doc comment cites a `ReleaseMovementRequest` type that does
+not exist anywhere in `types.ts` — `release()` only ever took `(movementId, releasedBy: string)` — fix the
+comment, no behavior change needed.
