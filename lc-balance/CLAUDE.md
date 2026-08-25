@@ -1478,3 +1478,31 @@ matched call) without being blocked by the new guard. OAS bumped to v1.18.0. Ful
 442/442, Angular 1067/1067, `backend/` 34/34 (`businessCases.js`'s own A3S-shaped Partial Redeem steps
 already carry `businessEventId`, confirmed unaffected). TODO.md's own item now closed; action item 3 from
 the same memo (`BUYERS_USANCE` rejection/normalization) remains the only one still out of scope.
+
+## RESOLVED (BA-confirmed 2026-08-25, external BA review withdrew its own F2) — Acceptance/DPU's `(memo)`-suffixed Folio 3/5 pair is correct; real on-balance booking is deliberately out of this component's scope
+
+Standing rule: treat this as settled, do not re-litigate without new information from the user — same
+convention as every other "reviewer-confirmed"/"business-confirmed" entry in this log.
+
+This one flip-flopped twice in one day before landing here, so the final, authoritative reasoning is
+recorded in full to prevent re-litigating it: the external BA review originally flagged Folio 3/5's
+`(memo)`-suffixed Acceptance/DPU pair as contradicting `TF_Balance_Component_Mapping-{en,zh}.xlsx`'s own
+`Balance_Taxonomy` sheet, which does classify `ACCEPTANCE_DPU_OUTSTANDING` as `ON_BALANCE_LIABILITY`
+("THE accounting liability — not a contingent", §3.7) — that classification is real and was correctly
+found in the workbook (an EBL/IBL-scope explanation for it was tried first and did not hold: EBL/IBL are
+separate rows — `IMPORT_USANCE_FINANCING`/`DUE_TO_REFINANCING_BANK`/`TRUST_RECEIPT_LOAN`). The resolution
+is neither "F2 is wrong" nor "EBL/IBL explains it" — it's that the workbook's `ACCEPTANCE_DPU_OUTSTANDING`/
+`RECOGNISE_ONBS` step describes a DIFFERENT component's job in the SAME transaction chain, not this one:
+`analysis/contingent-liability-ledger.html`'s own Folio 3 "Classification note" states the memo pair
+"never constitutes an accounting record", and this microservice's own domain model already performs the
+IFRS 9 contingent→actual reclassification correctly at Accept (`exposureNature: 'ACTUAL'`, not
+`CONTINGENT`) — the real on-balance liability posting and its matching receivable are, by design, this
+component's caller's job via the passthrough `accountEntries` field (never `contingentAccountEntry`,
+which `deriveContingentAccountEntry()` returns `null` for on every ON_BALANCE_ASSET instrumentType), the
+same boundary already drawn for EBL/IBL's own booking. See
+`docs/obsidian-balance-kb-v3.2/04-Exposure-Accounting/ifrs-9-contingent-to-actual-reclassification-boundary.md`,
+`.../exposurenature-actual-tagging-for-acceptance-dpu.md`, and
+`.../on-balance-sheet-asset-instruments-are-out-of-balance-component-s-cont.md` for the knowledge-base
+notes the BA review's own withdrawal cites. No code change needed. `TODO.md`'s own F2 entry closed
+accordingly (Buyer's Usance renumbered up to F2 in both files, matching the review's own post-withdrawal
+renumbering).
