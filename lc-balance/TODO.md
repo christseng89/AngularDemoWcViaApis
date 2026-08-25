@@ -145,9 +145,12 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   `markSuperseded()` 那組維持原狀不動（OAS 文件記錄的保留基礎設施，跟這次死碼清理是兩件事）。微服務
   三套測試全綠（546/546，`errors.ts` 仍 100%/100%/100%/100%）。
 
-- [ ] **F1 §11.4（原三項「維持待決」，已於 2026-08-25 由 BA 透過
-  `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13〈§11.4 四項待決事項正式拍板〉正式拍板——
-  四項全部轉為「已決定、尚未實作」，不再是懸而未決；以下逐項列出拍板後的具體工程需求，仍未動手，記錄於此）**：
+- [x] ~~**F1 §11.4（原三項「維持待決」，2026-08-25 由 BA 透過
+  `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13〈§11.4 四項待決事項正式拍板〉正式拍板）**~~
+  — **2026-08-25 全部完成**。四項拍板決議（Grace Period Phase 1、`effective_to` 修復、CLOSE/REOPEN
+  強制 `reasonCode`、consent 欄位透傳）逐項落地，加上同日 BA 兩輪 code review（§14、§16）額外發現並
+  關閉的 Checker Account Entries 缺口、§12.2 REVERSAL 收合、A11/B7 角色/權限 (c)(d)(e) 三項，
+  **此區塊已無剩餘工程待辦**，以下保留各子項的完整實作/關閉紀錄：
 
   - [x] ~~**Sweep 分輪保護 — REOPEN 這一段**~~ — **2026-08-25 已修復**（`analysis/balance-component-api.yaml`
     v1.21.0）。原問題：`DISPLAY-TEST-01` 實測重現「EXPIRE → 同一輪 AUTO CLOSE → 手動 A11 Reopen 後又立刻被
@@ -168,8 +171,15 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
     `Business Date > effectiveTo + N 個營業日`（新 config 常數 `AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2`），
     與既有 `isRecentlyReopened()` 並存（不是取代——見下方 §13.8 調和說明）。原始 §8.5 落差（一般 EXPIRE→
     同輪 AUTO CLOSE，非 REOPEN 情境）現已一併關閉，`runExpirySweepCycle` 的測試已改為驗證「同輪
-    `close: []`，晚一輪才會真的 CLOSE」。**Phase 2（真接 Standing 微服務）仍未做**——目前 Phase 1 mock
-    是唯一實作,`standing-mock` 的 `/business-days/add` 端點仍不存在，尚待該微服務真正建置。
+    `close: []`，晚一輪才會真的 CLOSE」。**Phase 2（真接 Standing 微服務）仍未做,更正說明如下**：目前
+    Phase 1 mock 是這個 repo（`lc-balance/`）唯一實作,本身沒有任何 Standing client 接線。**2026-08-25
+    複查發現**：獨立、gitignored 的平行專案 `lc-balance-new/microservices/standing-mock` 確實有一個
+    Standing 微服務 mock,但形狀不同——它做的是 `POST /business-days/adjust`（給日期+多國家/銀行
+    calendar,回傳「調整後」日期,服務 A6/B4 Maturity Date 假日調整這個完全不同的功能），不是
+    `lc-balance/` 這裡 Grace Period 需要的 `/business-days/add`（給日期+N天,回傳往後推 N 個營業日）。
+    要真正做 Phase 2,選項是：(a) 在 `standing-mock` 上新增 `/business-days/add` 端點並在 `lc-balance/`
+    寫 client 去接，或 (b) `lc-balance/` 自己另建。**兩者都還沒做**，且 (a) 涉及跨到另一個平行專案動工，
+    依 `lc-balance/CLAUDE.md` 自己的既有規定，需要先跟使用者確認才能動 `lc-balance-new/` 裡的東西。
 
   - [x] ~~**`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7）**~~ — **已於 2026-08-25 修復**。
     `balanceContractStore.ts` 的 `reactivate()` 新增必填的 `releasedAt` 參數；REOPEN 把合約恢復到
@@ -194,24 +204,36 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
     到位。**刻意不做 Angular UI 輸入欄位**——BA 原意是「Balance Component 不判斷,只接收＋驗證」,這些欄位
     的語意屬於上游 Channel API 的職責,這個 Angular demo 的 Maker Panel 本身就是在扮演那個上游角色,但跟
     `sourceModule`/`sourceFunction` 等既有純 passthrough 稽核欄位一樣沒有對應輸入框——之後如果需要示範
-    用途的輸入欄位,可以再補。**A11/B7 自己的角色/權限把關（§13.1 第3項 (b)-(e)）維持未做**，見下方。
+    用途的輸入欄位,可以再補。**A11/B7 自己的角色/權限把關（§13.1 第3項）五個子項至此全部處理完畢**，見下方。
 
-  - [ ] **A11/B7 Reopen 本身的角色/權限把關（§13.1 第3項 (b)-(e)，已拍板，部分不在本組件範圍——
-    reasonCode 部分已如上完成，此處剩餘子項）** — (b) Maker≠Checker——**已存在**，走既有
-    `assertMakerCheckerSeparation()`，不需另外處理；(c) 特殊角色/權限管控——BA 明確決定屬於上游
-    Channel API／IAM 的職責，**不在 Balance Component 內建**（§13.5 子決策B 同時指出這個前提目前並不
-    成立：`app.ts` 完全沒有呼叫端身份驗證 middleware，只有 `helmet()`＋rate-limiting——跟既有
-    BAL-001/F4 是同一個根因缺口，不是新問題，只是這裡再次被點名為「B 方案能不能真的成立」的前提條件）；
-    (d) 信用覆核——跨系統前置條件，本組件無法實作，非本組件範疇；(e)「法律義務已終止時應該開新 LC 而非
-    Reopen」——屬程序/教育訓練層面，不是系統需求，不需要程式碼變動。
+  - [x] ~~**A11/B7 Reopen 本身的角色/權限把關（§13.1 第3項 (b)-(e)）**~~ — **2026-08-25 正式關閉**
+    （`analysis/Balance-Component-F1-Expire-Proposal-zh.md` §十六）。(a) `reasonCode` 已如上完成；
+    (b) Maker≠Checker——**已存在**，走既有 `assertMakerCheckerSeparation()`，不需另外處理；
+    (c) 特殊角色/權限管控——正式關閉，職責歸屬上游 Channel API／IAM／Entitlement 系統，Balance
+    Component 不內建角色欄位或權限檢查，`domain/statusTransition.ts` 自己的 doc comment 本來就記載這是
+    刻意的設計邊界。**注意區隔**：這項只關閉「權限管控邏輯該放在哪裡」的架構歸屬問題，**不代表**「上游
+    真的已經做好身份驗證」這件事本身已解決——`app.ts` 目前完全沒有呼叫端身份驗證 middleware（只有
+    `helmet()`＋rate-limiting），這是 BAL-001／F4 記錄的獨立缺口，維持「已決策延後」狀態，是上線前
+    Gate Conditions 之一，**不因本項 (c) 關閉而一併解決或變動**；(d) 信用覆核——正式關閉，跨系統前置
+    條件，本組件無法實作，非本組件範疇；(e)「法律義務已終止時應該開新 LC 而非 Reopen」——正式關閉，屬
+    程序/教育訓練層面，不是系統需求，不需要程式碼變動。**§13.1 第3項五個子項至此全部處理完畢，無剩餘
+    工程待辦**——唯一仍獨立存在、不受本次關閉影響的是 (c) 背後的身份驗證前提（BAL-001/F4），繼續掛在
+    第1節 Gate Conditions 清單上。
 
-  - [ ] **Inquire Events／Look Up 未收合同一 `businessEventId` 底下多筆 `REVERSAL` 列（§12.2，BA code
-    review 發現，多數已隨 REOPEN 重新設計而失效）** — 原始發現是針對「REOPEN 舊設計（金額固定0＋Release
-    時另外產生連動 REVERSAL）」寫的；REOPEN 已於 2026-08-25 UAT 後重新設計為 Submit 當下直接帶入真實金額、
-    不再產生 REVERSAL，該情境已不存在。**唯一可能仍相關的殘留**：Expiry Extension Amendment
-    （`AMEND_EXPIRY_DATE`）本身仍會在 Release 時對其中一筆 `REVERSAL` 動作，但每個 `businessEventId`
-    下永遠只有這一筆，不構成「多筆需要收合」的情境——實務上很可能整項已經是 moot，暫不列入實作範圍，
-    僅記錄避免遺漏，未來若真的出現多筆 REVERSAL 的案例再重新評估。
+  - [x] ~~**Inquire Events／Look Up 未收合同一 `businessEventId` 底下多筆 `REVERSAL` 列（§12.2，BA code
+    review 發現）**~~ — **2026-08-25 正式關閉**（`analysis/Balance-Component-F1-Expire-Proposal-zh.md`
+    §15.6）。BA 重新追查 `AMEND_EXPIRY_DATE`／`REOPEN` 兩條 `release()` 路徑的實際程式碼後更正：不是
+    「多數情境已失效」這種機率性判斷，而是**觸發情境已被結構性移除**——
+    (1) **REOPEN**：全檔案唯一呼叫 `createAndReleaseReversal()` 的地方（`balanceService.ts` 第1884行）
+    完全在 `AMEND_EXPIRY_DATE` 分支內，REOPEN 自己的分支只做 `reactivate()`，不會建立任何額外
+    movement——§12.2 原始發現引用的「REOPEN 路徑B、Approve 後產生1筆REOPEN+2筆REVERSAL、顯示3列」
+    這個情境，在目前程式碼下已經**不可能發生**，不是測試剛好沒踩到。
+    (2) **Extension（`AMEND_EXPIRY_DATE`）**：`createAndReleaseReversal()` 只在「trailing movement 是
+    RELEASED 的 EXPIRE」這個條件成立時觸發一次，不是迴圈；EXPIRE 不能自我串接（要求 ACTIVE 狀態，
+    release 後立刻清掉）、CLOSE 不可能出現在 EXPIRED 合約之前（CLOSE 只會晚於 EXPIRED）——所以 Extension
+    最多是「1筆 AMEND_EXPIRY_DATE ＋1筆 REVERSAL」＝2列，從未達到§12.2 原始發現的「3列以上」情境，也
+    不是使用者原始「REOPEN 在 Inquire Events/Lookup 只要一筆」需求鎖定的對象。**結論：不需要前端新增
+    收合邏輯。**
 
 ---
 
@@ -235,10 +257,14 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   （`BUYERS_USANCE` 的拒絕/正規化）~~ — **2026-08-25 業務端確認不需要處理，關閉**：實務上出口／保兌
   不存在 Buyer's Usance 案例，這個防護對應的是一個不會發生的輸入。詳見上方第2節 F2 條目的完整說明。
 
-- [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 5**
-  （Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭）——
-  純文件性質，屬於 BA 待辦（`analysis/TF_Balance_Component_Mapping-en.xlsx`／`-zh.xlsx`），不是程式碼
-  改動，不在這個 repo 的動手範圍內；記錄於此避免被遺忘。詳見該決策文件本身的說明與舉例。
+- [x] ~~**`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 5**
+  （Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭）~~ —
+  **2026-08-25 正式關閉**（`analysis/Balance-Component-F1-Expire-Proposal-zh.md` §十七）。純文件性質,
+  BA 直接補齊,不是這個 repo 的程式碼改動：README 先前已補齊,這輪 BA 發現 `L1_Event_Catalogue` 分頁
+  `SG_RELEASE` 列（`TF_Balance_Component_Mapping-en.xlsx`／`-zh.xlsx` 的 `L1_Event_Catalogue!F31`）
+  仍是舊文字,未提及 A3S 例外,已直接程式化（`openpyxl`）追加一句英文說明,兩份 workbook 同步完成,原始
+  檔案改動前已備份（`.bak-2026-08-25`）。連同該決策備忘錄其餘五項行動項目（1-4、6，均已分別確認完成）,
+  `Balance-Component-Business-Rule-Decisions-2026-08-21.md` 六項行動項目至此**全數處理完畢,無剩餘待辦**。
 
 ---
 

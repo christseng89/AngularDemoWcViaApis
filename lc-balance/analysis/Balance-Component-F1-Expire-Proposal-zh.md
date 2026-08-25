@@ -618,6 +618,8 @@ AUTO EXPIRY／AUTO CLOSE 兩機制與其資格判斷（§7）、EXPIRED 後 A2/B
 的需求）。建議工程team在前端新增收合邏輯：預設清單過濾掉 `movementType==='REVERSAL'` 的列，改為併入
 其對應的 REOPEN／Extension 主列（可展開查看沖銷明細）。
 
+**2026-08-25 更新（BA複查，詳見§十五〈15.6〉）**：本項已確認正式關閉——REOPEN重新設計後已無任何程式碼路徑會產生REVERSAL，本節描述的「3列」情境是結構性不可能再發生，不是機率變低；Extension固定最多2列，也從未是本項鎖定的對象。
+
 ### 12.3　尚未驗證項目
 
 透過裝置橋接嘗試執行 `microservices/balance-component` 的 `npm test`（尤其 `autoExpirySweep.test.ts`
@@ -652,8 +654,11 @@ symlink 解析不友善所致，非程式碼本身問題。**建議工程team／
 - **強制 `reasonCode`**：可行，同第4項做法。
 - **不同 Maker／Checker**：**已存在，無需新開發**。2026-08-24 業務決策已將「Maker≠Checker」做成程式碼強制檢查（`statusTransition.ts` 的 `assertMakerCheckerSeparation()`），適用於所有 RELEASE 動作，REOPEN 自動繼承。
 - **特別操作權限（角色/權限限制誰能做REOPEN）**：**現有系統做不到，且屬於刻意的設計邊界**——`statusTransition.ts` 明確記載「leaving this to a bank's own role/entitlement policy, out of scope for this service」。兩種可行路徑，工作量差異大，**尚待澄清（見13.3）——已於 §13.5 確定採 (b)：由上游 Channel API／銀行 IAM／Entitlement 系統控制**：(a) 在 balance-component 內新增角色欄位＋權限檢查，屬於新範圍；(b) 明訂由上游 Channel API／IAM 層控管，balance-component 不管，與第2項 Consent 的切分邏輯一致，工作量小很多。
+  **2026-08-25更新：本項已於§十六正式關閉（Balance Component自身職責範圍內不需程式碼變動），但§16的重要區隔提醒——上游身份驗證本身（BAL-001）仍是獨立、未解決的Gate Condition。**
 - **重新檢查授信**：屬跨系統依賴，balance-component 拿不到信用額度資料，**非本 microservice 可實作項目**，記為上游前置條件。
+  **2026-08-25更新：已於§十六正式關閉。**
 - **法律義務已終止應開新LC，不能只REOPEN**：屬人工判斷／作業程序，系統無對應欄位可據以自動判斷，**定位為作業程序／教育訓練規範，不列入工程team技術需求**。
+  **2026-08-25更新：已於§十六正式關閉。**
 
 ### 13.3　尚待澄清的兩個子決策（不影響四項政策本身已定案，但影響實作細節）
 
@@ -963,7 +968,108 @@ BAL-129測試、reasonCode）逐一對照原始碼複查，**全部屬實，沒�
 
 - §12.2（Inquire Events/Look Up收合REVERSAL列）——TODO.md自己也判斷REOPEN重新設計後多數情境已
   失效，暫不列入實作範圍，僅記錄避免遺漏。
+  **2026-08-25更新：已於§15.6正式關閉，不再是「尚未解決」項目，見該節理由。**
 - Auto Close Grace Period Phase 2（真接Standing微服務）——待該微服務建置後才能進行。
 - 第1節三項Gate Conditions（BAL-001零身份驗證／BAL-002 Angular CVE／BAL-102 SQLite全檔案鎖）——
   正確維持「已決策延後」狀態，非本輪範圍，上線前仍須使用者/業務端確認排期。
+
+### 15.6　§12.2 正式關閉（2026-08-25，BA 複查通過）
+
+使用者詢問「§12.2（REVERSAL收合）可以關閉嗎？」，BA重新追查`AMEND_EXPIRY_DATE`／`REOPEN`兩條
+`release()`路徑的實際程式碼，確認可以關閉，且關閉理由比15.5原本的判斷更紮實：**不是「多數情境
+已失效」，而是觸發情境已被結構性移除。**
+
+**REOPEN——已無任何程式碼路徑會產生REVERSAL。** `balanceService.ts`第1891-1899行REOPEN的
+release區塊，doc comment明確寫「the movement itself already carries its own real restoration
+amount... no separate REVERSAL leg(s) to generate any more」；全檔案唯一呼叫
+`createAndReleaseReversal()`的地方（第1884行）完全在`AMEND_EXPIRY_DATE`分支內，REOPEN自己的
+分支（第1897-1900行）只做`reactivate()`，不會建立任何額外movement。§12.2原始發現引用的情境
+（「REOPEN走路徑B，Approve後產甞1筆REOPEN＋2筆REVERSAL，顯示3列」）在目前程式碼下已經不可能
+發生——不是這次測試剛好沒踩到，是產生REVERSAL的程式碼本身已經不存在了。
+
+**Extension（`AMEND_EXPIRY_DATE`）——最多2列，且有邏輯保證不會鏈式擴大。**
+`createAndReleaseReversal()`（第1884行）是全檔案唯一呼叫點，只在「trailing movement是RELEASED
+的EXPIRE」這個條件成立時觸發一次，不是迴圈；程式碼註解也給出不會鏈式擴大的理由：EXPIRE不能自我
+串接（要求ACTIVE狀態，release後立刻清掉）、CLOSE不可能出現在EXPIRED合約之前（CLOSE只會晚於
+EXPIRED）。所以Extension最多是「1筆AMEND_EXPIRY_DATE＋1筆REVERSAL」＝2列，從未是§12.2原始
+發現的「3列以上」情境，也從來不是使用者當初「REOPEN在Inquire Events and Lookup只要一筆」需求
+（2026-08-25對話）鎖定的對象。
+
+**結論：§12.2正式關閉，不需要前端新增收合邏輯。** REOPEN的1列已經是程式碼結構保證的結果，
+Extension固定最多2列也非使用者原始需求範圍。§15.5原本把本項列在「尚未解決、維持原狀」，在此
+更正——本項應改列為「已確認關閉」，見上方理由。
+
+---
+
+## 十六、A11/B7 REOPEN 角色/權限 (c)(d)(e) 正式關閉（2026-08-25，BA 複查通過）
+
+使用者確認「(c)(d)(e)三項都是明確劃定不在Balance Component職責範圍」，要求正式關閉。BA複查
+§13.2／§13.5既有結論，確認三項均可正式關閉（(a)強制`reasonCode`、(b)Maker≠Checker 已如
+§13.2/§14.3所述完成／由既有機制涵蓋，不在本次關閉範圍內，維持原結論）。
+
+**(c) 特別操作權限（角色/權限管控誰能執行REOPEN）——正式關閉，職責歸屬上游Channel API/IAM。**
+§13.2／§13.3原列為「尚待澄清」的子決策B，已於§13.5正式選定：由上游Channel API／銀行IAM／
+Entitlement系統控管，Balance Component不內建角色欄位或權限檢查，與第2項Consent的切分邕輯一致。
+`domain/statusTransition.ts`本身的doc comment也明確記載這是刻意的設計邊界（"leaving this to a
+bank's own role/entitlement policy, out of scope for this service"）。**本項在Balance
+Component自己的職責範圍內視為已關閉，不需要任何程式碼變動。**
+
+> 金要區隔（不可與本次關閉混淆）：這項決議只關閉「權限管控邕輯該放在哪裡」的架構歸屬問題，不代表
+> 「上游真的已經做好身份驗證」這件事本身已解決。§13.5／TODO.md已另外指出：目前`app.ts`完全沒有
+> 呼叫端身份驗證middleware（只有`helmet()`＋rate-limiting），這是BAL-001／F4記錄的獨立缺口，
+> 維持「已決策延後」狀態，屬於上線前三項Gate Conditions之一，**不因本次(c)關閉而一併解決或變動**。
+
+**(d) 金新檢查授信（Credit Re-check）——正式關閉，非本組件職責範圍。** 客戶信用額度／授信資料
+存在獨立的授信／額度管理系統，Balance Component本身沒有任何介面可查詢或驗證這項資訊，結構上不
+可能在本組件內實作。定位為上游前置條件，記錄於此供未來若有整合需求時參考，**不列入本組件工程
+待辦**。
+
+**(e) 法律義務已終止應開新LC而非REOPEN——正式關閉，屬作業程序／教育訓練規範，非系統技術需求。**
+「原LC法律義務是否已經終止」這件事，系統沒有對應欄位或資料來源可自動判斷，只能靠分行經辦／RM的
+專業判斷。**不是程式碼可以解決的問題**，定位為作業規範，教育訓練層面，**不列入工程team技術
+需求**。
+
+**結論：(c)(d)(e)三項正式關閉。** 連同已完成的(a)`reasonCode`與既有機制涵蓋的(b)Maker≠Checker，
+§13.1第3項「A11/B7 REOPEN Consent」底下五個子項至此全部處理完畢——四項決議中的第3項不再有剩餘
+工程待辦；唯一仍獨立存在、不受本次關閉影響的，是(c)背後的身份驗證前提（BAL-001／F4），繼續掛在
+第1節Gate Conditions清單上，上線前仍須另外解決。
+
+---
+
+## 十七、Business-Rule-Decisions action item 5 正式關閉（2026-08-25，BA 已直接補齊 workbook 措辭）
+
+`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 5（Mapping workbook
+Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭，位置：README、
+`L1_Event_Catalogue`）此前核對為**部分完成**——README 已補齊（見上一輪核對），但
+`L1_Event_Catalogue` 分頁 `SG_RELEASE` 列（`TF_Balance_Component_Mapping-en.xlsx`／`-zh.xlsx`
+的 `L1_Event_Catalogue!F31`）仍是舊文字「FULL amount, no residual. Test T4.」，未提及 A3S 例外。
+
+**BA 已直接補齊，兩份 workbook 同步完成：**
+
+`L1_Event_Catalogue!F31` 原文字後方追加一句（英文，與 README 措辭風格一致，en/zh 兩份 workbook
+內容相同——`-zh.xlsx` 這批技術性儲存格本來就沿用英文，不在本次變動範圍）：
+
+> FULL amount, no residual. Test T4. **Exception: A3S's document-matched partial redeem
+> (businessEventId-linked) is not amount-based — see README Rule #1; standalone (A9) remains
+> full-only.**
+
+**變更方式**：直接以程式化方式（`zipfile`／`openpyxl`）在 xlsx 檔案內做純文字追加，叫動了目標
+儲存格所在的 `xl/worksheets/sheet4.xml` 這一個內部檔案，逐一核對過壓縮檔完整性
+（`unzip -t` 通過）、以 `openpyxl` 重新開啟兩份檔案確認可正常解析且目標儲存格
+（`L1_Event_Catalogue!F31`）文字正確、並逐一比對封存檔內其餘每一個內部檔案與原始檔案位元組
+完全相同（僅有這一個儲存格文字被改動）。原始檔案改動前已另存備份
+（`TF_Balance_Component_Mapping-en.xlsx.bak-2026-08-25`／`-zh.xlsx.bak-2026-08-25`，與本專案
+一貫「先備份、可回溯」的謹慎原則一致，等同 markdown 文件的 append-only 精神）。
+
+**結論：action item 5 正式關閉。** README 與 `L1_Event_Catalogue` 兩處措辭現已一致、都涵蓋
+「Matched Amount ≠ SG Redemption Amount，A3S 為唯一例外」的說明。連同該備忘錄「行動項目彙總」
+已分別確認完成的其餘五項——項目1（A9 Amount 欄位鎖定 SG Available Balance，同日訂正後已實作）、
+項目2（businessEventId 強制檢查，2026-08-24 已完成）、項目3（`BUYERS_USANCE`，業務端
+2026-08-25 已確認出口／保兌行不存在此案例，不需程式碼變動，關閉）、項目4
+（`export-case-2`／`export-case-4` `tenorType` 修正，已完成）、項目6（新增測試案例，2026-08-21
+已完成）——`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 六項行動項目（1-6）至此
+全數處理完畢，無剩餘待辦。
+
+
+
 
