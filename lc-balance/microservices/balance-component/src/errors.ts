@@ -39,12 +39,6 @@ export class NotFoundError extends ApiError {
   readonly code = 'NOT_FOUND';
 }
 
-/** Design doc §8 — duplicate (logicalContractId, contractVersion). */
-export class ContractVersionConflictError extends ApiError {
-  readonly httpStatus = 409;
-  readonly code = 'CONTRACT_VERSION_CONFLICT';
-}
-
 /**
  * Design doc §3.3 "呼叫端的實際使用方式" — a creating movementType
  * (ISSUE/CREATE) submitted against a natural key that ALREADY resolves to

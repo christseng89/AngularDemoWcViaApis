@@ -195,7 +195,7 @@ assessment. See [Gate Conditions](#gate-conditions-before-any-production-conside
 | [BAL-125](#bal-125) | 🔵 Minor | Code Smell | `checker-actions.service.ts` (extracted AFTER BAL-108 closed) has its own un-swept `any` typing — 6 occurrences — **Fixed** |
 | [BAL-126](#bal-126) | 🔵 Minor | Code Smell | `checker-actions.service.ts` has ~12 duplicated `catchError` → `{kind:'failed'}` blocks — **Fixed** |
 | [BAL-128](#bal-128) | 🔵 Minor | Code Smell | 3 stale `eslint-disable` comments in `backend/` suppress rules that aren't even configured — **Fixed** |
-| [BAL-129](#bal-129) | 🔵 Minor | Test Gap | The microservice's generic 500 handler — BAL-117's own fix — is itself untested; a regression re-opening BAL-117 would not be caught — **Open, found this pass** |
+| [BAL-129](#bal-129) | 🔵 Minor | Test Gap | The microservice's generic 500 handler — BAL-117's own fix — is itself untested; a regression re-opening BAL-117 would not be caught — **Fixed** |
 | [BAL-120](#bal-120) | ⚪ Info | Reliability | Idempotency detection relies on string-matching the SQLite driver's error text — deferred, user-confirmed |
 | [BAL-109](#bal-109) | ⚪ Info | Reliability | A handful of provably-dead defensive branches, left uncovered on purpose (2 more instances found and correctly left alone this pass) |
 | [BAL-110](#bal-110) | ⚪ Info | Design Risk | Two independently-maintained domain-enum sources of truth — **Fixed** (contract test added) |
@@ -1638,7 +1638,7 @@ gate condition and remains a non-blocking finding either way.
 ---
 
 ### BAL-129
-**The microservice's generic 500 handler — BAL-117's own fix — is itself untested** — 🔵 Minor (Test Gap) — Open, found this pass
+**The microservice's generic 500 handler — BAL-117's own fix — is itself untested** — 🔵 Minor (Test Gap) — **Fixed (2026-08-25)**
 
 **Evidence:** `microservices/balance-component/src/app.ts:38-40` — the BAL-117 fix (log the real error
 server-side via `console.error`, return only a generic `{code:'INTERNAL_ERROR', message:'An internal
@@ -1654,6 +1654,14 @@ the test suite — the exact kind of gap a security fix without a regression tes
 **Recommended remediation:** one test that makes a downstream call throw a plain `Error` with a
 distinctive message, asserting the response body is the fixed generic message and never contains the
 thrown message text.
+
+**Outcome (2026-08-25): Fixed.** New test in `test/unit/app.test.ts` (`jest.spyOn(service,
+'resolveContract')` throwing a plain `Error` with a distinctive message, exercised via `GET
+/balance-contracts`) asserts all three properties: the response body is exactly the fixed generic message,
+the distinctive message text never appears anywhere in the response body, and `console.error` was still
+called with the real error (server-side visibility preserved). `app.ts` coverage rose from
+91.3%/66.66%/90.9% to 100%/100%/100% (statements/branches/lines); microservice suite stays green
+(547/547, all four coverage metrics ≥95%).
 
 ---
 

@@ -893,3 +893,77 @@ actions.spec.ts`等相關測試檔未同步更新），建議工程team正式上
 **結論：§14.4確認修復完成，通過複查。** 至此，§十二／§十四兩輪程式碼審閱找到的兩個實質缺口
 （Inquire Events收合顯示——§12.2，仍待處理；Checker Account Entries——§14.4，已修復）中，一項
 已解決。§13.7（`effective_to`）維持原本待辦狀態，等§13.5 Auto Close Grace Period真正實作時一併處理。
+
+---
+
+## 十五、TODO.md 變更核對（2026-08-25，BA 複查通過）
+
+工程team在`TODO.md`（repo根目錄）記錄了一批新完成的項目，使用者要求「改了一部分 在TODO上，檢查一下
+代碼」。BA逐項對照實際原始碼核實如下，全部確認為真、與TODO.md描述一致，沒有發現誇大或遺漏之處。
+
+### 15.1　§13.7 `effective_to`修復（確認完成）
+
+`store/balanceContractStore.ts`的`reactivate()`函式簽名已改為要求傳入`releasedAt: string`（原本
+沒有），函式邏輯：
+
+- 恢復到`EXPIRED`時，`effective_to`寫入`releasedAt`（不再是`NULL`）。
+- 恢復到`ACTIVE`時，`effective_to`維持`NULL`（同既有「目前有效」慣例，未變）。
+
+`balanceService.ts`第1886／1889／1903行三處呼叫點均已正確傳入`releasedAt`。§13.7先前遺留的缺口
+確認已補齊。
+
+### 15.2　Auto Close Grace Period Phase 1（§13.5，確認完成、邏輯正確）
+
+新增`domain/autoCloseGracePeriod.ts`：`addBusinessDays()`（跳過六日的簡化版營業日運算，Phase 1
+mock，doc comment明確註明未來要換成真正的Standing微服務呼叫）、`isPastAutoCloseGrace(effectiveTo,
+graceBusinessDays, asOf)`。`config.ts`新增`AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2`。
+
+`runAutoCloseSweep()`（`balanceService.ts`第802-807行）現在對`listExpiredContracts()`結果串連
+兩層過濾：`!isRecentlyReopened(...)`（既有）與`isPastAutoCloseGrace(...)`（新增），兩者並存、不互相
+取代。BA推演過兩種情境確認邏輯正確：
+
+- 一般EXPIRE→同輪AUTO CLOSE情境：`effectiveTo`剛好等於`asOf`，`isPastAutoCloseGrace`回傳
+  `false`，同輪不會被CLOSE——正是§8.5原始缺口要解決的問題。
+- REOPEN恢復EXPIRED情境：`effective_to`在reopen當下被重新蓋章（15.1的修復），與
+  `isRecentlyReopened`的短時間窗保護疊加，形成雙層防護，兩者互不衝突。
+
+`test/unit/service/autoExpirySweep.test.ts`、`test/unit/service/expiryExtensionAndReopen.test.ts`
+（含`GRACE-CLOSE-001`案例）均存在，符合TODO.md描述。**Phase 2（真接Standing微服務）仍未做**，
+`standing-mock`的`/business-days/add`端點依然不存在，TODO.md本身也如實標註為未完成，沒有誇大。
+
+### 15.3　Consent Passthrough欄位（§13.1第2項，確認完成、範圍正確）
+
+`amendmentApproved`／`amendmentEffective`／`consentStatus`三個選填欄位已在`types.ts`、
+`service/balanceService.ts`、`store/balanceMovementStore.ts`、`validation/requestSchema.ts`、
+`db/schema.ts`全線貫通。
+
+驗證範圍符合原決議「Balance Component只接收＋驗證，不判斷語意」的定位：`consentStatus`在zod層有
+真正的enum限制（`NOT_REQUIRED`/`OBTAINED`），`amendmentApproved`／`amendmentEffective`則只做型別
+檢查，沒有過度驗證。DB migration 17（`db/migrations.ts`第485-492行）是標準的冪等
+`ALTER TABLE ADD COLUMN`（先檢查欄位是否已存在），沒有加`CHECK` constraint，跟既有`reason_code`
+欄位的處理方式一致。確認未做Angular UI輸入欄位（原意本來就是這個demo的Maker Panel本身在扮演上游
+Channel API角色），與TODO.md描述相符。
+
+### 15.4　其他小項核對（均確認屬實）
+
+- **`ContractVersionConflictError`死碼移除**：全`src/`搜尋`ContractVersionConflictError`／
+  `CONTRACT_VERSION_CONFLICT`均為零筆命中，確認已徹底移除。
+- **BAL-129測試補齊**：`test/unit/app.test.ts`新增測試（約第3776-3788行）驗證泛用500 handler
+  固定回傳`{code:'INTERNAL_ERROR', message:'An internal error occurred.'}`，不外洩內部錯誤字串。
+- **reasonCode強制要求**：`assertReasonCodeRequired()`（`balanceService.ts`第1438行）與Submit
+  流程呼叫點（第1455行）維持存在，與§14.3先前核對結果一致，未回退。
+
+### 15.5　本輪結論
+
+TODO.md本次記錄的六項變更（§13.7修復、Auto Close Grace Period Phase 1、Consent欄位、死碼移除、
+BAL-129測試、reasonCode）逐一對照原始碼複查，**全部屬實，沒有發現與程式碼不符之處**。連同§十四
+確認的Checker Account Entries修復，本次review未發現新的實質缺口。
+
+尚未解決、維持原狀的項目：
+
+- §12.2（Inquire Events/Look Up收合REVERSAL列）——TODO.md自己也判斷REOPEN重新設計後多數情境已
+  失效，暫不列入實作範圍，僅記錄避免遺漏。
+- Auto Close Grace Period Phase 2（真接Standing微服務）——待該微服務建置後才能進行。
+- 第1節三項Gate Conditions（BAL-001零身份驗證／BAL-002 Angular CVE／BAL-102 SQLite全檔案鎖）——
+  正確維持「已決策延後」狀態，非本輪範圍，上線前仍須使用者/業務端確認排期。
+

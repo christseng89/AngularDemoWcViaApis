@@ -118,16 +118,32 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 
 ## 3. 次要但仍開著的項目
 
-- [ ] **BAL-129**（🔵 Minor，Test Gap）— BAL-117 修的「泛用 500 handler 不外洩內部錯誤訊息」本身沒有測試覆蓋
-  若未來不小心讓這個行為 regress，目前的測試套件不會抓到。
+- [x] ~~**BAL-129**（🔵 Minor，Test Gap）— BAL-117 修的「泛用 500 handler 不外洩內部錯誤訊息」本身沒有測試覆蓋~~
+  — **2026-08-25 已修復**。`test/unit/app.test.ts` 新增一則測試：`jest.spyOn` 讓 `service.resolveContract()`
+  拋出一個帶有特徵字串的普通 `Error`（不是 `ApiError` 子類別，故意走 `app.ts` 錯誤 middleware 的
+  fallback 分支），驗證 (1) response body 固定是 `{code:'INTERNAL_ERROR', message:'An internal error
+  occurred.'}`、(2) response body 完全不含那個特徵字串、(3) `console.error` 確實有收到真正的錯誤內容
+  （server 端仍看得到細節，只是不回給呼叫端）。`app.ts` 覆蓋率從 91.3%/66.66% 補到 100%/100%
+  （statements/branches），微服務三套測試全綠（547/547）。
 
 - [ ] **BAL-120**（⚪ Info，已確認延後）— 冪等性衝突偵測仍靠字串比對 SQLite driver 的錯誤文字
   卡在 `node:sqlite`（Node 內建 `DatabaseSync`）目前沒有穩定的 constraint-violation 錯誤碼可用，
   非擱置不做，而是等上游能力補齊。
 
-- [ ] **`ContractVersionConflictError`（⚪ Info，單向落差，2026-08-24 稽核發現）** — `errors.ts` 定義了這個
-  409 `CONTRACT_VERSION_CONFLICT` 錯誤類別，但整個 `src/` 沒有任何地方真的拋出它（死碼），OAS 的
-  `Error.code` enum 也完全沒列這個代碼。影響很小（目前用不到），但屬於 OAS 全面稽核時發現、尚未處理的項目。
+- [x] ~~**`ContractVersionConflictError`（⚪ Info，單向落差，2026-08-24 稽核發現）** — `errors.ts` 定義了這個
+  409 `CONTRACT_VERSION_CONFLICT` 錯誤類別，但整個 `src/` 沒有任何地方真的拋出它（死碼）~~ —
+  **2026-08-25 已刪除，確認為真死碼**。核查後發現：`contractVersion` 全 `src/` 只有一處賦值
+  （`balanceService.ts` 的 `createContract()`），且永遠寫死 `1`；`markSuperseded()`／
+  `supersedesBalanceContractId`／`supersededByBalanceContractId`／`listVersions()` 這整組「新版本」
+  基礎設施從未被任何呼叫端使用——這個錯誤類別要真正觸發，唯一路徑是同一個 `logicalContractId`（每次新建
+  合約都是新產生的 UUID）撞出重複的 `(logicalContractId, contractVersion)`，等同 UUID 碰撞，不是有意義的
+  業務情境。跟同樣「未使用」的 `ContractStatus.SUPERSEDED`／`markSuperseded()` **不同**——那組在 OAS 裡有
+  明確文件記錄為「刻意保留給未來 edit-in-place 流程，目前版本不可達」；`CONTRACT_VERSION_CONFLICT`
+  在 OAS 的 `Error.code` enum 裡完全沒被列過，沒有類似的「刻意保留」文件佐證，判定為單純的死碼（可能是
+  從 `lc-payment-wc` 的 `errors.ts` 範本複製過來時一併帶進來、從未真正接上）。已從 `errors.ts` 移除該
+  類別，`errorsAndMoney.test.ts` 對應的 test.each 一列與 import 一併移除；`SUPERSEDED`／
+  `markSuperseded()` 那組維持原狀不動（OAS 文件記錄的保留基礎設施，跟這次死碼清理是兩件事）。微服務
+  三套測試全綠（546/546，`errors.ts` 仍 100%/100%/100%/100%）。
 
 - [ ] **F1 §11.4（原三項「維持待決」，已於 2026-08-25 由 BA 透過
   `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13〈§11.4 四項待決事項正式拍板〉正式拍板——

@@ -1664,3 +1664,23 @@ files are all "no-TestBed direct instantiation" — template bindings are never 
 by an actual Angular-compiler build) — first pass had a real NG8107 warning (`selectedFunction?.` should be
 `selectedFunction.`, narrowed non-null by the enclosing `*ngIf`), fixed before landing. Pure template change,
 no `.ts` coverage impact; Angular 1133/1133 stays green.
+
+## Two small backlog cleanups: BAL-129 fixed, `ContractVersionConflictError` deleted as confirmed dead code
+
+- **BAL-129 (Quality-report-balance.md)** — the microservice's generic 500 handler (`app.ts`'s BAL-117
+  fallback branch) had zero test coverage. New test in `app.test.ts`: `jest.spyOn(service,
+  'resolveContract')` throws a plain `Error` with a distinctive message; asserts the response is exactly
+  the fixed generic body, the distinctive text never appears in it, and `console.error` still received the
+  real error. `app.ts` coverage: 91.3%/66.66%/90.9% → 100%/100%/100%.
+- **`ContractVersionConflictError` deleted** — `errors.ts` defined this 409 with zero throw sites anywhere
+  in `src/`. Traced why: `contractVersion` has exactly one assignment in the whole codebase
+  (`createContract()`), hardcoded to `1` — the "new contract version" flow this error was meant to guard
+  (Design doc §8, duplicate `(logicalContractId, contractVersion)`) doesn't exist; the only way to trigger
+  it would be a `logicalContractId` UUID collision, not a real business scenario. Deliberately NOT the same
+  situation as `ContractStatus.SUPERSEDED`/`markSuperseded()` (also unused) — those ARE documented in the
+  OAS as a reserved-for-future edit-in-place flow; `CONTRACT_VERSION_CONFLICT` was never listed in the
+  OAS's own `Error.code` enum at all, no similar "reserved" paper trail — genuine dead code, likely a
+  leftover from copying `lc-payment-wc/microservices/payment-component/src/errors.ts`'s own convention
+  (this file's own top doc comment says as much) without ever wiring it up. Removed the class and its one
+  `errorsAndMoney.test.ts` row; left `SUPERSEDED`/`markSuperseded()` untouched (different situation, not
+  this cleanup's scope). Microservice suite: 546/546, `errors.ts` still 100%/100%/100%/100%.

@@ -1,4 +1,4 @@
-import { ContractVersionConflictError, IllegalStateTransitionError, InsufficientBalanceError, NotFoundError, RequestValidationError } from '../../src/errors';
+import { IllegalStateTransitionError, InsufficientBalanceError, NotFoundError, RequestValidationError } from '../../src/errors';
 import {
   decimalPlaces,
   describeAmountScaleViolation,
@@ -16,7 +16,6 @@ describe('errors.ts', () => {
     [new InsufficientBalanceError('not enough'), 409, 'INSUFFICIENT_AVAILABLE_BALANCE'],
     [new IllegalStateTransitionError('bad transition'), 409, 'ILLEGAL_STATE_TRANSITION'],
     [new NotFoundError('missing'), 404, 'NOT_FOUND'],
-    [new ContractVersionConflictError('conflict'), 409, 'CONTRACT_VERSION_CONFLICT'],
   ])('%p has the right httpStatus/code/toBody', (err, httpStatus, code) => {
     expect(err.httpStatus).toBe(httpStatus);
     expect(err.code).toBe(code);

@@ -3767,3 +3767,28 @@ describe('HTTP integration — sibling Acceptance/SG snapshots (2026-08-17, "就
     expect(utilizeInTimeline.sgEventSnapshot).toEqual(utilize.body.sgEventSnapshot);
   });
 });
+
+describe('Generic 500 handler (Quality-report-balance.md BAL-117/BAL-129) — a plain, non-ApiError throw never leaks its own message to the caller', () => {
+  // Every other error-path test in this file throws a typed ApiError subclass, which takes the adjacent
+  // `if (err instanceof ApiError)` branch in app.ts's own error-handling middleware instead — this is the
+  // one test exercising the plain-Error fallback branch itself (BAL-129: previously completely untested,
+  // so a regression re-opening BAL-117's own information-disclosure fix would not have been caught).
+  test('a plain Error thrown deep in the service layer -> 500 INTERNAL_ERROR with the fixed generic message, never the thrown message text; the real detail is still logged server-side', async () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const distinctiveDetail = 'BAL-129-DISTINCTIVE-INTERNAL-DETAIL-a1b2c3';
+    jest.spyOn(service, 'resolveContract').mockImplementation(() => {
+      throw new Error(distinctiveDetail);
+    });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const app = createApp(createDb(':memory:'), service);
+
+    const res = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'ANY' });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ code: 'INTERNAL_ERROR', message: 'An internal error occurred.' });
+    expect(JSON.stringify(res.body)).not.toContain(distinctiveDetail);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.objectContaining({ message: distinctiveDetail }));
+
+    consoleErrorSpy.mockRestore();
+  });
+});
