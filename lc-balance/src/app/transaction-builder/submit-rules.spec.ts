@@ -551,6 +551,48 @@ describe('submit-rules', () => {
       expect(request?.tenorType).toBe('SIGHT');
       expect(request?.tenorDays).toBeUndefined();
     });
+
+    it('F1: AMEND_EXPIRY_DATE always sends wireAmount "0" regardless of whatever stale value model.amount currently holds, plus newExpiryDate', () => {
+      const { request, error } = buildSubmitRequest(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', amount: '9999', currency: 'USD', createdBy: 'maker1', newExpiryDate: '2027-06-30' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(error).toBeNull();
+      expect(request?.amount).toBe('0');
+      expect(request?.newExpiryDate).toBe('2027-06-30');
+    });
+
+    it('F1: AMEND_EXPIRY_DATE omits newExpiryDate from the request when unset, rather than sending an empty string', () => {
+      const { request } = buildSubmitRequest(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', amount: '0', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(request?.newExpiryDate).toBeUndefined();
+    });
+
+    it('F1: a typed A1 expiryDate is included on the request', () => {
+      const { request } = buildSubmitRequest(
+        ctx({ model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', expiryDate: '2028-12-31' } }),
+      );
+      expect(request?.expiryDate).toBe('2028-12-31');
+    });
+
+    it('F1: expiryDate is omitted for a non-A1/B1 function even if somehow present on the model', () => {
+      const { request } = buildSubmitRequest(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '1000', currency: 'USD', createdBy: 'maker1', expiryDate: '2028-12-31' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(request?.expiryDate).toBeUndefined();
+    });
   });
 
   describe('validateSubmit — Amount must be > 0 (business requirement 2026-08-19, "A1-A9, B1-B5 Amount figure should > 0")', () => {
@@ -602,6 +644,39 @@ describe('submit-rules', () => {
         }),
       );
       expect(result.error).not.toBe('Amount must be greater than 0.');
+    });
+
+    it('F1: A11/B7 (Reopen) are exempted too — Amount is always 0 by construction (a fixed literal, see builder-fields.ts\'s own amountFixed)', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A11'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN', amount: '0', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract({ status: 'CLOSED' }),
+        }),
+      );
+      expect(result.error).not.toBe('Amount must be greater than 0.');
+    });
+
+    it('F1: AMEND_EXPIRY_DATE (A2/B2\'s third subChoice option) is exempted from both the blank-amount and >0 guards — Amount has no meaning here, newExpiryDate is required instead', () => {
+      const passes = validateSubmit(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', currency: 'USD', createdBy: 'maker1', newExpiryDate: '2027-01-01' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(passes.error).toBeNull();
+    });
+
+    it('F1: AMEND_EXPIRY_DATE still requires newExpiryDate itself', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBe('New Expiry Date is mandatory.');
     });
   });
 

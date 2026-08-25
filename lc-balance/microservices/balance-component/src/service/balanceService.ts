@@ -21,7 +21,7 @@ import { BalanceMovementStore } from '../store/balanceMovementStore';
 import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
-import { computeAvailableBalance, computeConfirmedBalance, computePendingDecreaseTotal } from '../domain/balanceDerivation';
+import { computeAvailableBalance, computeConfirmedBalance, computePendingDecreaseTotal, MOVEMENT_DIRECTION } from '../domain/balanceDerivation';
 import {
   checkPresentDocsIssueSufficiency,
   checkShgtIssueSufficiency,
@@ -36,6 +36,9 @@ import { checkAmendDecreaseSufficiency } from '../domain/amendDecrease';
 import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
+import { evaluateExpiryEligibility, isPastExpiryGrace, type ExpiryEligibilityResult } from '../domain/expiryEligibility';
+import { computeReopenRestoreAmount } from '../domain/reopenRestoration';
+import { AUTO_CLOSE_ENABLED, AUTO_EXPIRY_ENABLED, BATCH_CHECKER_ACTOR, BATCH_MAKER_ACTOR, EXPIRY_SWEEP_INTERVAL, MAIL_FLOAT_GRACE_DAYS, toIntervalMs } from '../config';
 import { CurrencyMismatchError, IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
@@ -137,6 +140,31 @@ export interface CreateMovementRequest {
   tenorType?: TenorType | null;
   tenorDays?: number | null;
   maturityDate?: string | null;
+  /**
+   * F1 (external BA review) — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only (A1/B1). See types.ts's
+   * BalanceContract.expiryDate doc comment for the UCP 600 Art. 6(d) rationale.
+   */
+  expiryDate?: string | null;
+  /**
+   * F1 (external BA review) — optional override of the per-side config default
+   * (MAIL_FLOAT_GRACE_DAYS.IMPORT/EXPORT); when omitted, createContract() below fills in the config
+   * default for this instrumentType's side, frozen on the contract from then on — see config.ts's own
+   * top doc comment.
+   */
+  mailFloatGraceDays?: number | null;
+  /**
+   * F1 (external BA review) — `AMEND_EXPIRY_DATE` only (A2/B2's third amendment option, also the
+   * Expiry Extension Amendment entry point once EXPIRED). The new expiryDate value this amendment sets
+   * on Checker Release; validated against businessDate (must be strictly later) at both Submit and
+   * Release. Ignored for every other movementType.
+   */
+  newExpiryDate?: string | null;
+  /**
+   * F1 (external BA review) — `REVERSAL` only. The movementId being reversed — internal-only (never set
+   * by an external client; Extension Amendment/Reopen's own release()-time handling is the sole caller
+   * that ever passes this when internally invoking createMovement() to build a REVERSAL leg).
+   */
+  reversalOfMovementId?: string | null;
   transactionDate?: string | null;
   businessDate?: string | null;
   valueDate?: string | null;
@@ -251,6 +279,111 @@ export class BalanceService {
       return { ok: true };
     };
 
+    /**
+     * F1 (external BA review) — AUTO EXPIRY. Same overall shape as closeShaped above (eligibility +
+     * exact-amount check, since this movement's whole purpose is also to write the balance down to
+     * precisely 0) but uses evaluateContractExpiryEligibility() — deliberately NOT
+     * evaluateContractCloseEligibility() (see domain/expiryEligibility.ts's own top doc comment for
+     * why the SG/Acceptance-balance-zero conditions must NOT apply to EXPIRE).
+     */
+    const expireShaped: MovementSufficiencyCheck = (ctx) => {
+      if (!ROOT_INSTRUMENT_TYPES.has(ctx.contract.instrumentType)) {
+        return {
+          ok: false,
+          error: `EXPIRE only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${ctx.contract.instrumentType} is not eligible.`,
+        };
+      }
+      const eligibility = this.evaluateContractExpiryEligibility(ctx.contract);
+      if (!eligibility.eligible) {
+        return { ok: false, error: `Cannot EXPIRE ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}` };
+      }
+      if (!ctx.ceilingAmount.equals(ctx.confirmedBalance)) {
+        return {
+          ok: false,
+          error:
+            `EXPIRE amount must exactly equal the current Confirmed Balance (${ctx.confirmedBalance.toFixed()}) — ` +
+            `submitted ${ctx.ceilingAmount.toFixed()}. Re-derive the amount from the current balance and resubmit.`,
+        };
+      }
+      return { ok: true };
+    };
+
+    /**
+     * F1 (external BA review) §8 — `AMEND_EXPIRY_DATE` (A2/B2's third amendment option). Two modes,
+     * branched on the CONTRACT's own current status (not a caller-supplied flag — the request shape is
+     * identical either way, only the target contract's state distinguishes them):
+     *  - ACTIVE: a plain amendment, no special eligibility beyond the usual root-issue-released guard
+     *    already enforced upstream in resolveOrCreateContract().
+     *  - EXPIRED: the Expiry Extension Amendment entry point (§8) — additionally requires
+     *    hasOpenEvents === false (§8.8, explicit — this is a brand-new code path, it does not inherit
+     *    evaluateContractCloseEligibility()'s own protection).
+     * Any other status (CLOSED/CANCELLED/SUPERSEDED) is rejected outright — §7.8 confirms EXPIRED is
+     * the only non-ACTIVE state this amendment may act on.
+     */
+    const amendExpiryDateShaped: MovementSufficiencyCheck = (ctx) => {
+      if (!ctx.req.newExpiryDate) {
+        return { ok: false, error: 'newExpiryDate is required for AMEND_EXPIRY_DATE.' };
+      }
+      if (ctx.contract.status !== 'ACTIVE' && ctx.contract.status !== 'EXPIRED') {
+        return { ok: false, error: `Cannot amend the Expiry Date of a ${ctx.contract.status} contract — only ACTIVE or EXPIRED contracts are eligible.` };
+      }
+      if (ctx.contract.status === 'EXPIRED') {
+        const { hasOpenEvents } = this.gatherEventTree(ctx.contract);
+        if (hasOpenEvents) {
+          return { ok: false, error: 'Cannot submit an Expiry Extension Amendment — one or more Events under this LC (including child ledgers) are not yet fully resolved.' };
+        }
+      }
+      const businessDate = ctx.req.businessDate ?? this.now();
+      if (ctx.req.newExpiryDate <= businessDate) {
+        return { ok: false, error: `newExpiryDate (${ctx.req.newExpiryDate}) must be strictly later than the Business Date (${businessDate}).` };
+      }
+      return { ok: true };
+    };
+
+    /**
+     * F1 (external BA review) — `REVERSAL`. Never submitted directly by an external client — only ever
+     * created internally (Extension Amendment's/Reopen's own release()-time handling, see those
+     * branches in release() below). Validates reversalOfMovementId resolves to a real, RELEASED
+     * movement on THIS SAME contract with no existing REVERSAL of its own yet, and forces the amount to
+     * exactly match what's being reversed (never a caller-supplied figure).
+     */
+    const reversalShaped: MovementSufficiencyCheck = (ctx) => {
+      const targetId = ctx.req.reversalOfMovementId;
+      if (!targetId) return { ok: false, error: 'reversalOfMovementId is required for REVERSAL.' };
+      const target = ctx.existingMovements.find((m) => m.movementId === targetId);
+      if (!target) return { ok: false, error: `REVERSAL target movement "${targetId}" was not found on this contract.` };
+      if (target.status !== 'RELEASED') return { ok: false, error: `Cannot REVERSAL movement "${targetId}" — it is ${target.status}, not RELEASED.` };
+      if (ctx.existingMovements.some((m) => m.movementType === 'REVERSAL' && m.reversalOfMovementId === targetId)) {
+        return { ok: false, error: `Movement "${targetId}" has already been reversed.` };
+      }
+      if (!ctx.ceilingAmount.equals(parseMonetaryAmount(target.ceilingAmount))) {
+        return { ok: false, error: `REVERSAL amount must exactly equal the reversed movement's own ceilingAmount (${target.ceilingAmount}).` };
+      }
+      return { ok: true };
+    };
+
+    /**
+     * F1 (external BA review) §9 — A11/B7 Reopen. Only a CLOSED contract is eligible; `hasOpenEvents`
+     * required false (§9.8, explicit — same "brand-new resolution path, no inherited protection"
+     * rationale as Extension Amendment's own §8.8). Redesigned 2026-08-25: no separate amount check
+     * needed here — createMovement()'s own REOPEN branch already overwrites req.amount with the
+     * server-computed restore-chain total (domain/reopenRestoration.ts) before this check ever runs, and
+     * assertValidAmount() already rejects a negative result of that computation (should never occur).
+     */
+    const reopenShaped: MovementSufficiencyCheck = (ctx) => {
+      if (!ROOT_INSTRUMENT_TYPES.has(ctx.contract.instrumentType)) {
+        return { ok: false, error: `Reopen only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${ctx.contract.instrumentType} is not eligible.` };
+      }
+      if (ctx.contract.status !== 'CLOSED') {
+        return { ok: false, error: `Cannot Reopen ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — current status is ${ctx.contract.status}, not CLOSED.` };
+      }
+      const { hasOpenEvents } = this.gatherEventTree(ctx.contract);
+      if (hasOpenEvents) {
+        return { ok: false, error: 'Cannot Reopen — one or more Events under this LC (including child ledgers) are not yet fully resolved.' };
+      }
+      return { ok: true };
+    };
+
     return {
       // Design doc §5 — no sufficiency check at all (ISSUE/AMEND_INCREASE on LC; CREATE on
       // Acceptance/EPLC_EXAMINATION; ISSUE on SHGT). SHGT's own ISSUE and EPLC_EXAMINATION's own
@@ -273,6 +406,14 @@ export class BalanceService {
       PARTIAL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
       FULL_SETTLE: { isCreating: false, checkSufficiency: outstandingCapped },
       CLOSE: { isCreating: false, checkSufficiency: closeShaped },
+      // F1 (external BA review) — AUTO EXPIRY.
+      EXPIRE: { isCreating: false, checkSufficiency: expireShaped },
+      // F1 (external BA review) — Expiry Extension Amendment entry point (A2/B2 third option).
+      AMEND_EXPIRY_DATE: { isCreating: false, checkSufficiency: amendExpiryDateShaped },
+      // F1 (external BA review) — internal-only, see reversalShaped's own doc comment.
+      REVERSAL: { isCreating: false, checkSufficiency: reversalShaped },
+      // F1 (external BA review) — A11/B7 Reopen.
+      REOPEN: { isCreating: false, checkSufficiency: reopenShaped },
     };
   }
 
@@ -450,11 +591,17 @@ export class BalanceService {
    *   contract call sites omit this (undefined), unchanged from before this fix — they still query
    *   directly, exactly as this method always has.
    */
-  private evaluateContractCloseEligibility(
+  /**
+   * F1 (external BA review) — the `hasOpenEvents` tree-walk extracted out of
+   * evaluateContractCloseEligibility() below so evaluateContractExpiryEligibility() (AUTO EXPIRY) can
+   * share it without duplicating the walk. Same parameters/semantics as before this extraction — see
+   * evaluateContractCloseEligibility()'s own remaining doc comment for `excludeMovementId`/`preFetched`.
+   */
+  private gatherEventTree(
     contract: BalanceContract,
     excludeMovementId?: string,
     preFetched?: { ownMovements: BalanceMovement[]; sgMovements: BalanceMovement[]; acceptanceMovements: BalanceMovement[]; examinationMovements: BalanceMovement[] },
-  ): CloseEligibilityResult {
+  ): { ownMovements: BalanceMovement[]; sgMovements: BalanceMovement[]; acceptanceMovements: BalanceMovement[]; hasOpenEvents: boolean } {
     const ownMovements = (preFetched?.ownMovements ?? this.movements.listByContract(contract.balanceContractId)).filter(
       (m) => m.movementId !== excludeMovementId,
     );
@@ -479,6 +626,16 @@ export class BalanceService {
       }
     }
 
+    return { ownMovements, sgMovements, acceptanceMovements, hasOpenEvents };
+  }
+
+  private evaluateContractCloseEligibility(
+    contract: BalanceContract,
+    excludeMovementId?: string,
+    preFetched?: { ownMovements: BalanceMovement[]; sgMovements: BalanceMovement[]; acceptanceMovements: BalanceMovement[]; examinationMovements: BalanceMovement[] },
+  ): CloseEligibilityResult {
+    const { ownMovements, sgMovements, acceptanceMovements, hasOpenEvents } = this.gatherEventTree(contract, excludeMovementId, preFetched);
+
     return evaluateCloseEligibility({
       alreadyClosed: contract.status === 'CLOSED',
       rootConfirmedBalance: computeConfirmedBalance(ownMovements),
@@ -486,6 +643,136 @@ export class BalanceService {
       acceptanceConfirmedBalance: computeConfirmedBalance(acceptanceMovements),
       hasOpenEvents,
     });
+  }
+
+  /**
+   * F1 (external BA review) §7.2 — AUTO EXPIRY's own eligibility, sharing gatherEventTree()'s
+   * `hasOpenEvents` walk with evaluateContractCloseEligibility() above but deliberately NOT its SG/
+   * Acceptance-balance-zero conditions (see domain/expiryEligibility.ts's own top doc comment for why).
+   */
+  private evaluateContractExpiryEligibility(contract: BalanceContract, excludeMovementId?: string): ExpiryEligibilityResult {
+    const { hasOpenEvents } = this.gatherEventTree(contract, excludeMovementId);
+    return evaluateExpiryEligibility({ contractStatus: contract.status, hasOpenEvents });
+  }
+
+  /**
+   * F1, user-reported live-testing gap (2026-08-25, "Auto Close 時必須把REOPEN狀態交易排除 不然才REOPEN
+   * 下一秒就被AUTO CLOSE掉了" / "還有AUTO EXPIRE 也把REOPEN狀態交易排除") — a contract whose own MOST
+   * RECENT movement is a still-fresh REOPEN gets one full sweep interval of grace from BOTH background
+   * batches before either is allowed to act on it again, giving a human a genuine window to follow up
+   * (Extension Amendment, settle SG/Acceptance, etc.) — not a permanent exclusion (that would silently
+   * reintroduce F1's own original gap: an ACTIVE contract REOPEN reactivated with its expiryDate
+   * genuinely still in the future must still auto-expire once that date for-real arrives; a "latest
+   * movement is REOPEN" check with no time bound would block that forever). Deliberately keyed on the
+   * LATEST movement, not merely "was ever Reopened" — once any other movement lands on the contract
+   * (Extension Amendment, a settlement, a later genuine EXPIRE), this grace window no longer applies.
+   *
+   * Covers both directions REOPEN can reactivate into: ACTIVE (AUTO EXPIRY's own candidate pool) and
+   * EXPIRED (AUTO CLOSE's own candidate pool, reached via §9.2 Option A when the original expiryDate had
+   * already passed) — same helper, called from both sweeps.
+   */
+  private isRecentlyReopened(contract: BalanceContract, asOf: Date): boolean {
+    const sorted = [...this.movements.listByContract(contract.balanceContractId)].sort((a, b) => a.eventSeq - b.eventSeq);
+    const latest = sorted[sorted.length - 1];
+    if (!latest || latest.movementType !== 'REOPEN' || latest.status !== 'RELEASED' || !latest.releasedAt) return false;
+    return asOf.getTime() - new Date(latest.releasedAt).getTime() < toIntervalMs(EXPIRY_SWEEP_INTERVAL);
+  }
+
+  /**
+   * F1 (external BA review) — one batch-processed contract's outcome, returned by
+   * runAutoExpirySweep()/runAutoCloseSweep() for logging/testing (never thrown — a single ineligible-
+   * by-the-time-we-got-to-it or already-changed-since-listing candidate must not abort the rest of the
+   * sweep, same "one candidate's failure doesn't sink the batch" posture the backend 中台's own
+   * runCase() interpreter already uses for Business Case replay).
+   */
+  private processSweepCandidate(contract: BalanceContract, movementType: 'EXPIRE' | 'CLOSE', createdBy: string, releasedBy: string): { balanceContractId: string; ok: boolean; error?: string } {
+    const ownMovements = this.movements.listByContract(contract.balanceContractId);
+    const confirmedBalance = computeConfirmedBalance(ownMovements);
+    try {
+      const result = this.createMovement({
+        instrumentType: contract.instrumentType,
+        balanceContractId: contract.balanceContractId,
+        movementType,
+        eventSeq: Date.now(),
+        amount: confirmedBalance.toFixed(),
+        currency: contract.currency,
+        createdBy,
+      });
+      if (!result.created) {
+        return { balanceContractId: contract.balanceContractId, ok: false, error: `idempotency conflict — a movement already exists at this eventSeq (unexpected for a fresh Date.now() eventSeq).` };
+      }
+      this.release(result.movement.movementId, releasedBy);
+      return { balanceContractId: contract.balanceContractId, ok: true };
+    } catch (err) {
+      return { balanceContractId: contract.balanceContractId, ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /**
+   * F1 (external BA review) — AUTO EXPIRY. Scans every ACTIVE root LC/Confirmation with a recorded
+   * expiryDate, past expiryDate + mailFloatGraceDays, and — for each one still actually eligible right
+   * now (a candidate can stop qualifying between being listed and being processed, e.g. a concurrent
+   * request creating a new PENDING event on it) — creates and releases an EXPIRE movement for the
+   * current Confirmed Balance, using BATCH_MAKER_ACTOR/BATCH_CHECKER_ACTOR as createdBy/releasedBy so
+   * the existing, unmodified assertMakerCheckerSeparation() check is satisfied by two distinct actor
+   * strings rather than any "system bypass" — see config.ts's own top doc comment. No-ops entirely
+   * (returns an empty array without touching the DB) when AUTO_EXPIRY_ENABLED is false.
+   *
+   * F1, user-reported 2026-08-25 ("AUTO EXPIRE 也把REOPEN狀態交易排除") — also skips a contract still
+   * within one sweep interval of its own most recent REOPEN (isRecentlyReopened() above); see that
+   * method's own doc comment for why this is a time-bounded grace window, not a permanent exclusion.
+   */
+  runAutoExpirySweep(asOf: Date = new Date()): { balanceContractId: string; ok: boolean; error?: string }[] {
+    if (!AUTO_EXPIRY_ENABLED) return [];
+    const results: { balanceContractId: string; ok: boolean; error?: string }[] = [];
+    for (const contract of this.contracts.listActiveExpirable()) {
+      const graceDays = contract.mailFloatGraceDays ?? (contract.instrumentType === 'EPLC_CONFIRMATION' ? MAIL_FLOAT_GRACE_DAYS.EXPORT : MAIL_FLOAT_GRACE_DAYS.IMPORT);
+      if (!isPastExpiryGrace(contract.expiryDate, graceDays, asOf)) continue;
+      if (this.isRecentlyReopened(contract, asOf)) continue;
+      results.push(this.processSweepCandidate(contract, 'EXPIRE', BATCH_MAKER_ACTOR, BATCH_CHECKER_ACTOR));
+    }
+    return results;
+  }
+
+  /**
+   * F1 (external BA review) §7.3 — AUTO CLOSE. Independent second batch: scans every EXPIRED root LC/
+   * Confirmation and, for each one that passes the SAME evaluateContractCloseEligibility() check A10/B6
+   * themselves use (SG/Acceptance balance both zero, no open Events — deliberately the CLOSE-shaped
+   * conditions, not EXPIRE's own), creates and releases a CLOSE movement — the exact same movementType/
+   * code path a human A10/B6 submission would produce, just with BATCH_MAKER_ACTOR/BATCH_CHECKER_ACTOR
+   * as the actor identities. No-ops entirely when AUTO_CLOSE_ENABLED is false.
+   *
+   * F1, user-reported 2026-08-25 ("Auto Close 時必須把REOPEN狀態交易排除 不然才REOPEN 下一秒就被AUTO
+   * CLOSE掉了") — skips a contract still within one sweep interval of its own most recent REOPEN
+   * (isRecentlyReopened() above), giving a human genuine time to act after Reopening an already-expired
+   * contract (§9.2 Option A) before AUTO CLOSE would otherwise immediately re-close it.
+   *
+   * Known, accepted gap (§8.5, not yet implemented — see this repo's own
+   * analysis/Balance-Component-F1-Expire-Proposal-zh.md §11.4 item 1), narrower now than before the fix
+   * above: does NOT exclude a contract that transitioned to EXPIRED via a genuine EXPIRE in the SAME
+   * sweep cycle (runExpirySweepCycle() below runs this immediately after runAutoExpirySweep(), so a
+   * freshly-EXPIRED, already-fully-settled contract can still go straight to CLOSED with no Expiry
+   * Extension Amendment window) — only the REOPEN-originated case above is now protected. BA-recommended
+   * broader fix (AUTO CLOSE only contracts EXPIRED as of a PRIOR sweep cycle, regardless of how they got
+   * there) is deliberately still deferred for the plain-EXPIRE case — this comment is that record.
+   */
+  runAutoCloseSweep(asOf: Date = new Date()): { balanceContractId: string; ok: boolean; error?: string }[] {
+    if (!AUTO_CLOSE_ENABLED) return [];
+    return this.contracts
+      .listExpiredContracts()
+      .filter((contract) => !this.isRecentlyReopened(contract, asOf))
+      .map((contract) => this.processSweepCandidate(contract, 'CLOSE', BATCH_MAKER_ACTOR, BATCH_CHECKER_ACTOR));
+  }
+
+  /**
+   * F1 (external BA review) — the one entry point server.ts's own background interval calls: AUTO
+   * EXPIRY then, in the SAME cycle, AUTO CLOSE (see runAutoCloseSweep()'s own doc comment for the known
+   * §8.5 gap this ordering implies). Each sweep independently no-ops per its own feature flag.
+   */
+  runExpirySweepCycle(asOf: Date = new Date()): { expiry: { balanceContractId: string; ok: boolean; error?: string }[]; close: { balanceContractId: string; ok: boolean; error?: string }[] } {
+    const expiry = this.runAutoExpirySweep(asOf);
+    const close = this.runAutoCloseSweep(asOf);
+    return { expiry, close };
   }
 
   /**
@@ -529,6 +816,42 @@ export class BalanceService {
           acceptanceMovements: acceptanceMovementsByParent.get(c.logicalContractId) ?? [],
           examinationMovements: examinationMovementsByParent.get(c.logicalContractId) ?? [],
         }).eligible,
+    );
+
+    const page = opts.page && opts.page > 0 ? opts.page : 1;
+    const pageSize = opts.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;
+    const start = (page - 1) * pageSize;
+    return { items: eligible.slice(start, start + pageSize), total: eligible.length, page, pageSize };
+  }
+
+  /**
+   * F1 (external BA review) §9.6/§11 — A11/B7 Reopen's own Step-1 picker hint, mirroring
+   * listCloseEligibleContracts() above exactly (same batched-per-instrumentType N+1 fix) but filtered to
+   * CLOSED contracts and checked against gatherEventTree()'s own `hasOpenEvents` walk only — REOPEN has
+   * no SG/Acceptance-balance-zero condition of its own (§9.8), unlike Close.
+   */
+  listReopenEligibleContracts(instrumentType: InstrumentType, opts: { lcNumber?: string; page?: number; pageSize?: number } = {}): CatalogPage {
+    if (!ROOT_INSTRUMENT_TYPES.has(instrumentType)) {
+      throw new RequestValidationError(`Reopen only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${instrumentType} is not eligible.`);
+    }
+    const rawBatch = this.contracts.listCatalog({ instrumentType, status: 'CLOSED', lcNumber: opts.lcNumber, pageSize: 200 }).items;
+
+    const balanceContractIds = rawBatch.map((c) => c.balanceContractId);
+    const logicalContractIds = rawBatch.map((c) => c.logicalContractId);
+    const ownMovementsByContract = this.movements.listByContractIds(balanceContractIds);
+    const sgMovementsByParent = instrumentType === 'IPLC_LC' ? this.movements.listShgtMovementsForParents(logicalContractIds) : new Map<string, BalanceMovement[]>();
+    const acceptanceMovementsByParent = this.movements.listAcceptanceMovementsForParents(logicalContractIds);
+    const examinationMovementsByParent =
+      instrumentType === 'EPLC_CONFIRMATION' ? this.movements.listExaminationMovementsForParents(logicalContractIds) : new Map<string, BalanceMovement[]>();
+
+    const eligible = rawBatch.filter(
+      (c) =>
+        !this.gatherEventTree(c, undefined, {
+          ownMovements: ownMovementsByContract.get(c.balanceContractId) ?? [],
+          sgMovements: sgMovementsByParent.get(c.logicalContractId) ?? [],
+          acceptanceMovements: acceptanceMovementsByParent.get(c.logicalContractId) ?? [],
+          examinationMovements: examinationMovementsByParent.get(c.logicalContractId) ?? [],
+        }).hasOpenEvents,
     );
 
     const page = opts.page && opts.page > 0 ? opts.page : 1;
@@ -896,6 +1219,16 @@ export class BalanceService {
       contract = this.contracts.findById(req.balanceContractId);
     } else if (req.naturalKey) {
       contract = this.contracts.findActiveByNaturalKey(req.instrumentType, req.naturalKey);
+      // F1 (external BA review) §8.6/§9.6 — AMEND_EXPIRY_DATE/REOPEN are the only two movementTypes
+      // that may legitimately target a non-ACTIVE contract (EXPIRED/CLOSED respectively). A Maker
+      // typing the natural key directly (rather than picking from a catalog/hint-set that already
+      // resolves to a balanceContractId) needs a fallback resolver for exactly those two — dedicated,
+      // narrow, never consulted for any other movementType.
+      if (!contract && req.movementType === 'AMEND_EXPIRY_DATE') {
+        contract = this.contracts.findExpiredByNaturalKey(req.instrumentType, req.naturalKey);
+      } else if (!contract && req.movementType === 'REOPEN') {
+        contract = this.contracts.findClosedByNaturalKey(req.instrumentType, req.naturalKey);
+      }
     }
 
     // Business-reported gap 2026-08-14: "Issue LC Number 後不能再 Issue 同一筆 LC
@@ -1020,8 +1353,29 @@ export class BalanceService {
       if (amt.isZero()) throw new RequestValidationError(`amount "${amount}" must not be zero for AMEND — Direction is carried by its own sign.`);
       return;
     }
-    if (movementType === 'CLOSE') {
-      if (amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must not be negative for CLOSE.`);
+    // F1 (external BA review) — EXPIRE shares CLOSE's own zero-amount exemption: an already-fully-
+    // utilized LC that has since expired has 0 left to write off, which is a legitimate figure. REOPEN
+    // (redesigned 2026-08-25 — see domain/reopenRestoration.ts) shares the same shape: by the time
+    // createMovement() calls this, req.amount has already been overwritten with the server-computed
+    // restore-chain total (never a caller-typed value — there is nothing for a human to type), which is
+    // always a non-negative sum of prior ceilingAmounts; 0 is a legitimate figure (reopening a CLOSE
+    // whose own write-off amount was already 0 — an EXPIRE→CLOSE chain where AUTO CLOSE ran with nothing
+    // left, before this Reopen even starts restoring it).
+    if (movementType === 'CLOSE' || movementType === 'EXPIRE' || movementType === 'REOPEN') {
+      if (amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must not be negative for ${movementType}.`);
+      return;
+    }
+    // F1 (external BA review) — AMEND_EXPIRY_DATE has no balance effect of its own — it only ever
+    // carries newExpiryDate, amount is always '0' by construction.
+    if (movementType === 'AMEND_EXPIRY_DATE') {
+      if (!amt.isZero()) throw new RequestValidationError(`amount "${amount}" must be exactly 0 for ${movementType}.`);
+      return;
+    }
+    // F1 (external BA review) — REVERSAL's own amount must exactly equal the movement it reverses
+    // (validated in reversalShaped, which has access to that movement's own ceilingAmount); this only
+    // rules out a negative figure here, same posture as CLOSE/EXPIRE above.
+    if (movementType === 'REVERSAL') {
+      if (amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must not be negative for REVERSAL.`);
       return;
     }
     if (amt.isZero() || amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must be greater than 0.`);
@@ -1031,12 +1385,29 @@ export class BalanceService {
     // Checked BEFORE resolveOrCreateContract() — a rejected ISSUE/CREATE must never leave an orphaned,
     // empty BalanceContract row behind (same "checked before createContract()" posture the SG/Present-
     // Docs sufficiency checks already use, a few lines below in resolveOrCreateContract() itself).
-    this.assertValidAmount(req.movementType, req.amount);
+    // REOPEN is the one exception, checked further below instead — its real amount isn't known (or
+    // meaningful to validate) until AFTER the contract is resolved (see the REOPEN branch just below);
+    // REOPEN is never a creating movementType, so skipping this early call carries no orphaned-contract
+    // risk the way it would for ISSUE/CREATE.
+    if (req.movementType !== 'REOPEN') {
+      this.assertValidAmount(req.movementType, req.amount);
+    }
 
     const contract = this.resolveOrCreateContract(req);
 
     const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
     if (existing) return { created: false, existing };
+
+    // F1, redesigned 2026-08-25 (see domain/reopenRestoration.ts's own top doc comment) — REOPEN's own
+    // amount is never caller-typed (the UI sends no Amount field for A11/B7 at all); it's the trailing
+    // not-yet-reversed EXPIRE/CLOSE write-off chain on THIS contract, computed fresh here so the
+    // movement carries a real amount + a real contingentAccountEntry (below) for the Checker to review
+    // BEFORE approving — whatever req.amount originally held (if anything) is discarded.
+    if (req.movementType === 'REOPEN') {
+      const restoreAmount = computeReopenRestoreAmount(this.movements.listByContract(contract.balanceContractId));
+      req = { ...req, amount: restoreAmount.toFixed() };
+      this.assertValidAmount(req.movementType, req.amount);
+    }
 
     const ceilingAmount = computeCeilingAmount(req.amount, contract.tolerancePct, req.movementType, contract.instrumentType);
 
@@ -1091,12 +1462,24 @@ export class BalanceService {
     // tenorType (its declared Sight/Buyer's Usance/Seller's Usance, set at Issue) — not req.tenorType,
     // which is only ever supplied when THIS call is itself the one creating that contract; for every
     // other movement against an already-existing contract, contract.tenorType is the only source.
+    // F1 (external BA review) — REVERSAL has no fixed MOVEMENT_DIRECTION entry of its own; resolve the
+    // movement it reverses (already fetched as part of assembling this REVERSAL's own amount — see the
+    // REVERSAL-shaped sufficiency handling above) so deriveContingentAccountEntry() can derive the
+    // flipped Dr/Cr pair. undefined for every other movementType (the param is simply ignored).
+    let reversedDirection: 1 | -1 | undefined;
+    if (req.movementType === 'REVERSAL' && req.reversalOfMovementId) {
+      const original = this.movements.findById(req.reversalOfMovementId);
+      const originalDirection = original ? MOVEMENT_DIRECTION[original.movementType] : undefined;
+      if (originalDirection === 1 || originalDirection === -1) reversedDirection = originalDirection;
+    }
+
     const contingentAccountEntry = deriveContingentAccountEntry({
       instrumentType: req.instrumentType,
       movementType: req.movementType,
       amount: req.amount,
       currency: req.currency,
       tenorType: contract.tenorType,
+      reversedDirection,
     });
 
     const movement: BalanceMovement = {
@@ -1113,6 +1496,8 @@ export class BalanceService {
       accountEntries: req.exposureNature === 'MEMO' ? null : (req.accountEntries ?? null),
       contingentAccountEntry,
       status: 'PENDING',
+      reversalOfMovementId: req.reversalOfMovementId ?? null,
+      newExpiryDate: req.newExpiryDate ?? null,
       transactionDate: req.transactionDate ?? null,
       businessDate: req.businessDate ?? null,
       valueDate: req.valueDate ?? null,
@@ -1227,6 +1612,53 @@ export class BalanceService {
       }
     }
 
+    // F1 (external BA review) — AUTO EXPIRY's own Release-time re-check, same shape/rationale as
+    // CLOSE's above (re-run eligibility + exact-amount check against the THEN-current state).
+    if (movement.movementType === 'EXPIRE') {
+      const eligibility = this.evaluateContractExpiryEligibility(contract, movement.movementId);
+      if (!eligibility.eligible) {
+        throw new IllegalStateTransitionError(
+          `Cannot release EXPIRE movement ${movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this EXPIRE request and re-submit.`,
+        );
+      }
+      if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
+        throw new IllegalStateTransitionError(
+          `Cannot release EXPIRE movement ${movementId} — Confirmed Balance has changed since Submit ` +
+            `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this EXPIRE request and re-submit with the current figure.`,
+        );
+      }
+    }
+
+    // F1, redesigned 2026-08-25 — REOPEN's own Release-time re-check, same shape/rationale as CLOSE/
+    // EXPIRE above: re-run eligibility, and re-verify the amount frozen at Submit still matches what
+    // domain/reopenRestoration.ts would compute fresh right now — a movement's own ceilingAmount is
+    // fixed forever at Submit time (never recomputed here), so if the restore-chain total shifted in
+    // the Submit-to-Release window (e.g. a second, racing Reopen attempt), forcing a re-submit is safer
+    // than silently restoring a stale figure.
+    if (movement.movementType === 'REOPEN') {
+      if (contract.status !== 'CLOSED') {
+        throw new IllegalStateTransitionError(`Cannot release REOPEN movement ${movementId} — contract status is now ${contract.status}, no longer CLOSED.`);
+      }
+      const { hasOpenEvents } = this.gatherEventTree(contract, movement.movementId);
+      if (hasOpenEvents) {
+        throw new IllegalStateTransitionError(`Cannot release REOPEN movement ${movementId} — one or more Events under this LC are not yet fully resolved.`);
+      }
+      // Excludes THIS movement itself — by Release time it already exists in the DB (created at Submit,
+      // still PENDING), and since it's the contract's own most RECENT movement by eventSeq, an
+      // un-filtered walk would hit it FIRST (movementType REOPEN, not EXPIRE/CLOSE) and immediately
+      // stop, always computing 0 — the exact same excludeMovementId shape gatherEventTree() already
+      // needs for its own re-check just above.
+      const currentRestoreAmount = computeReopenRestoreAmount(
+        this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== movement.movementId),
+      );
+      if (!parseMonetaryAmount(movement.ceilingAmount).equals(currentRestoreAmount)) {
+        throw new IllegalStateTransitionError(
+          `Cannot release REOPEN movement ${movementId} — the amount to restore has changed since Submit ` +
+            `(was ${movement.ceilingAmount}, now ${currentRestoreAmount.toFixed()}). Cancel this Reopen request and re-submit with the current figure.`,
+        );
+      }
+    }
+
     // A9 Full-Redeem-only re-check (business-confirmed 2026-08-24) — mirrors the Maker-side guard in
     // buildMovementTypeRegistry()'s own outstandingCapped check above. Not expected to ever actually fire
     // for a movement createMovement() itself created (businessEventId is immutable once set, so a
@@ -1243,7 +1675,18 @@ export class BalanceService {
     const releasedAt = this.now();
     // Compute the after-figure by simulating this one movement flipping to RELEASED,
     // rather than a second DB round-trip — cheaper and avoids a two-write window.
-    const after = before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
+    // F1 (external BA review) — REVERSAL is the one exception: its own signedAmount resolution needs
+    // the movement it reverses to be present in the SAME array passed to computeConfirmedBalance() (see
+    // domain/balanceDerivation.ts's own doc comment) — a single-row array can never satisfy that, so
+    // REVERSAL recomputes over the FULL movement list with this one row's status flipped instead of the
+    // single-row delta trick every other (fixed-direction) movementType uses here. Mathematically
+    // equivalent result, just computed differently.
+    const after =
+      movement.movementType === 'REVERSAL'
+        ? computeConfirmedBalance(
+            this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movement.movementId ? { ...m, status: 'RELEASED' as const } : m)),
+          )
+        : before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
 
     // 2026-08-17 ("...SAVED TO DB == EVENT BALANCE SNAPSHOT") — this movement's own contract's own plain
     // balance AS OF THIS RELEASE, plus root/sibling snapshots (see captureSnapshotBundle()'s own doc
@@ -1324,7 +1767,109 @@ export class BalanceService {
       this.contracts.markClosed(contract.balanceContractId, releasedAt);
     }
 
+    // F1 (external BA review) — AUTO EXPIRY's own release() side effect, same shape as CLOSE's above.
+    if (movement.movementType === 'EXPIRE') {
+      this.contracts.markExpired(contract.balanceContractId, releasedAt);
+    }
+
+    // F1 (external BA review) §8 — Expiry Extension Amendment / plain expiry-date amendment, both
+    // carried by AMEND_EXPIRY_DATE. Re-validates the SAME conditions createMovement() checked at
+    // Submit, against the THEN-current state (same "Submit-to-Release window" posture CLOSE/EXPIRE
+    // above already establish), before applying the side effect.
+    if (movement.movementType === 'AMEND_EXPIRY_DATE') {
+      if (contract.status !== 'ACTIVE' && contract.status !== 'EXPIRED') {
+        throw new IllegalStateTransitionError(
+          `Cannot release AMEND_EXPIRY_DATE movement ${movementId} — contract status is now ${contract.status}, no longer ACTIVE or EXPIRED.`,
+        );
+      }
+      const newExpiryDate = movement.newExpiryDate;
+      if (!newExpiryDate) throw new IllegalStateTransitionError(`AMEND_EXPIRY_DATE movement ${movementId} has no newExpiryDate recorded.`);
+      if (newExpiryDate <= releasedAt) {
+        throw new IllegalStateTransitionError(
+          `Cannot release AMEND_EXPIRY_DATE movement ${movementId} — newExpiryDate (${newExpiryDate}) is no longer strictly later than the Business Date (${releasedAt}).`,
+        );
+      }
+      if (contract.status === 'EXPIRED') {
+        // Expiry Extension Amendment (§8) — re-check hasOpenEvents, restore whatever is still genuinely
+        // outstanding, reactivate to ACTIVE.
+        const { hasOpenEvents } = this.gatherEventTree(contract, movement.movementId);
+        if (hasOpenEvents) {
+          throw new IllegalStateTransitionError(
+            `Cannot release Expiry Extension Amendment ${movementId} — one or more Events under this LC are not yet fully resolved.`,
+          );
+        }
+        // F1, user-reported live-testing bug (2026-08-25, "IMPORT S01 EXTEND後 無法做後續作業" — traced to
+        // a real double-restoration): this contract can reach EXPIRED via a genuine EXPIRE, OR via A11/B7
+        // Reopen reactivating it back to EXPIRED (§9.2 Option A, when the original expiryDate had already
+        // passed) — and since the 2026-08-25 REOPEN redesign, REOPEN restores the balance DIRECTLY on its
+        // own signed amount, leaving no REVERSAL trace behind. The OLD "find the most recent EXPIRE with
+        // no REVERSAL pointed at it, always reverse it" logic couldn't tell the two paths apart — it kept
+        // finding that same already-restored EXPIRE (no REVERSAL row existed for it) and reversed it a
+        // SECOND time, double-crediting the balance. EXPIRE can never chain with itself (it requires
+        // status ACTIVE, which its own release side effect immediately clears), and CLOSE can never
+        // precede an EXPIRED contract (CLOSE only follows EXPIRED, never the reverse) — so the ONLY
+        // movement that could ever need reversing here is a RELEASED EXPIRE sitting as this contract's
+        // own most recent movement (excluding this AMEND_EXPIRY_DATE itself); if the most recent movement
+        // is anything else (a REOPEN, most commonly), a prior action already restored the balance and
+        // there is genuinely nothing left to reverse.
+        const ownMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== movement.movementId);
+        const trailing = [...ownMovements].sort((a, b) => a.eventSeq - b.eventSeq).pop();
+        const expireMovement = trailing && trailing.status === 'RELEASED' && trailing.movementType === 'EXPIRE' ? trailing : undefined;
+        if (expireMovement) {
+          this.createAndReleaseReversal(expireMovement, releasedBy, movement.businessEventId ?? movement.movementId);
+        }
+        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', newExpiryDate);
+      } else {
+        // Plain amendment against an ACTIVE contract — just persist the new expiry date, no status change, no REVERSAL.
+        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', newExpiryDate);
+      }
+    }
+
+    // F1 (external BA review) §9, redesigned 2026-08-25 — A11/B7 Reopen. The movement itself already
+    // carries its own real restoration amount (computed at Submit, re-verified above) and has just gone
+    // through the SAME generic RELEASED-status/balance-update write every other movementType uses — no
+    // separate REVERSAL leg(s) to generate any more (see domain/reopenRestoration.ts's own top doc
+    // comment for why). All that's left is the contract-level side effect: reactivate to ACTIVE if the
+    // contract's own recorded expiryDate is still in the future, else back to EXPIRED (§9.2 Option A — a
+    // separate Expiry Extension Amendment is then required to reach ACTIVE; this implementation does not
+    // yet offer §9.2 Option B's single-transaction "REOPEN WITH EXTENSION" compound).
+    if (movement.movementType === 'REOPEN') {
+      const targetStatus = contract.expiryDate && contract.expiryDate > releasedAt ? 'ACTIVE' : 'EXPIRED';
+      this.contracts.reactivate(contract.balanceContractId, targetStatus);
+    }
+
     return this.movements.findById(movementId)!;
+  }
+
+  /**
+   * F1 (external BA review) §8.3 — shared helper: creates and immediately releases one REVERSAL leg
+   * against `original`, linked via reversalOfMovementId (the real correlation, checked by
+   * reversalShaped above) and businessEventId (grouping, so Inquire Events reads the compound event as
+   * one unit — same convention A3S/B4's own linked legs already use). Uses BATCH_MAKER_ACTOR as the
+   * REVERSAL's own createdBy — this leg is a mechanical consequence of the human Checker's own approval
+   * (`releasedBy`) of the OUTER Expiry Extension Amendment, not a separate human decision of its own,
+   * but createdBy/releasedBy must still be two distinct actor strings to satisfy the existing,
+   * unmodified assertMakerCheckerSeparation() check (same posture as AUTO EXPIRY/AUTO CLOSE's own
+   * BATCH_MAKER_ACTOR/BATCH_CHECKER_ACTOR pairing) — releasedBy here is the REAL Checker, so a system
+   * actor is needed on the createdBy side specifically to keep the two distinct. REOPEN (§9) no longer
+   * uses this helper — redesigned 2026-08-25 to carry its own real restoration amount directly, see
+   * domain/reopenRestoration.ts.
+   */
+  private createAndReleaseReversal(original: BalanceMovement, releasedBy: string, businessEventId: string): void {
+    const originalContract = this.contracts.findById(original.balanceContractId)!;
+    const result = this.createMovement({
+      instrumentType: originalContract.instrumentType,
+      balanceContractId: original.balanceContractId,
+      movementType: 'REVERSAL',
+      eventSeq: Date.now(),
+      amount: original.ceilingAmount,
+      currency: original.currency,
+      reversalOfMovementId: original.movementId,
+      businessEventId,
+      createdBy: BATCH_MAKER_ACTOR,
+    });
+    if (!result.created) throw new Error(`Unexpected idempotency conflict creating a REVERSAL for movement "${original.movementId}".`);
+    this.release(result.movement.movementId, releasedBy);
   }
 
   reject(movementId: string, releasedBy: string, reasonCode: string, remarks?: string): BalanceMovement {
@@ -1477,6 +2022,14 @@ export class BalanceService {
 
   private createContract(req: CreateMovementRequest): BalanceContract {
     const now = this.now();
+    // F1 (external BA review) — expiryDate only meaningful for the 3 root instrumentTypes (mirrors
+    // maturityDate/tolerancePct's own "structurally inert for anything else" posture); a caller-supplied
+    // mailFloatGraceDays overrides the per-side config default, otherwise the default is captured here
+    // and frozen on the contract from then on (see config.ts's own top doc comment for why).
+    const isRoot = ROOT_INSTRUMENT_TYPES.has(req.instrumentType);
+    const mailFloatGraceDays = isRoot
+      ? (req.mailFloatGraceDays ?? (req.instrumentType === 'EPLC_CONFIRMATION' ? MAIL_FLOAT_GRACE_DAYS.EXPORT : MAIL_FLOAT_GRACE_DAYS.IMPORT))
+      : null;
     const contract: BalanceContract = {
       balanceContractId: randomUUID(),
       logicalContractId: randomUUID(),
@@ -1490,6 +2043,8 @@ export class BalanceService {
       tenorType: req.tenorType ?? null,
       tenorDays: req.tenorDays ?? null,
       maturityDate: req.maturityDate ?? null,
+      expiryDate: isRoot ? (req.expiryDate ?? null) : null,
+      mailFloatGraceDays,
       openingBalance: '0',
       effectiveFrom: now,
       createdBy: req.createdBy,

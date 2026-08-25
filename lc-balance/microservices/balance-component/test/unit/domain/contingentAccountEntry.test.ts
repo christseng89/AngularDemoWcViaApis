@@ -171,6 +171,18 @@ describe('deriveContingentAccountEntry (analysis/contingent-liability-ledger.htm
     });
   });
 
+  describe('AMEND_EXPIRY_DATE (A2/B2 third subChoice option) — never posts a real account-entry pair (F1, user-reported 2026-08-25 "不牽涉金額 不需要出ACCOUNT ENTRIES")', () => {
+    test('-> null for a plain amendment against an ACTIVE contract (amount is always 0 by construction, no balance effect of its own)', () => {
+      const entry = deriveContingentAccountEntry({ instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', amount: '0', currency: 'USD' });
+      expect(entry).toBeNull();
+    });
+
+    test('-> null on the Export side too (EPLC_CONFIRMATION) — same rule regardless of which of the two modes (plain amendment vs. the Expiry Extension Amendment path, EXPIRED -> ACTIVE) is in play; the CONTRACT\'s current status distinguishes them, not this pure function, and neither ever has a real balance effect of its own (Extension\'s own restoration is the linked REVERSAL leg\'s own separate entry)', () => {
+      const entry = deriveContingentAccountEntry({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND_EXPIRY_DATE', amount: '0', currency: 'USD' });
+      expect(entry).toBeNull();
+    });
+  });
+
   describe("out of contingent scope — ledger's own Scope boundary (on-balance-sheet never generated here)", () => {
     test.each(['EPLC_DUE_FROM_ISSUING_BANK', 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', 'EPLC_EXPORT_BILLS_DISCOUNTED'])(
       '%s -> null, regardless of movementType',

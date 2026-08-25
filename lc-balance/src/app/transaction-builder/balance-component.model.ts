@@ -35,17 +35,33 @@ export const INSTRUMENT_TYPE_OPTIONS: { value: InstrumentType; label: string }[]
   { value: 'EPLC_EXAMINATION', label: 'EPLC_EXAMINATION — Present Docs MEMO_ONLY earmark (no Confirmation impact)' },
 ];
 
-/** Design doc §5 — the only legal movementType values per instrumentType, as actually implemented. */
+/**
+ * Design doc §5 — the only legal movementType values per instrumentType, as actually implemented.
+ * Reference/documentation only — this table does NOT gate what a human can select through the UI;
+ * `IMPORT_FUNCTIONS`/`EXPORT_FUNCTIONS` below (one named business function per selectable movementType)
+ * is the sole live gate on that. F1 (external BA review, v1.19.0) added `EXPIRE` to this table for
+ * completeness (system/internal-only — see that movementType's own doc comment just below the table), and
+ * `AMEND_EXPIRY_DATE`/`REOPEN`, which ARE human-selectable (via A2/B2's third subChoice option, and the
+ * new A11/B7 respectively). Deliberately does NOT list `REVERSAL` — the microservice's own
+ * `MOVEMENT_DIRECTION` table (this table's server-side counterpart) omits it too, for the same reason:
+ * `REVERSAL`'s direction is dynamically resolved, not looked up from a static per-movementType table (see
+ * that table's own doc comment on the microservice side) — this table exists to mirror THAT table's own
+ * keys, not the full set of movementTypes a caller could ever see on the wire.
+ */
 export const MOVEMENT_TYPES_BY_INSTRUMENT: Record<InstrumentType, string[]> = {
-  // 'CLOSE' — A10/B6 (Import LC / Export Confirmed LC Close). Write-off + retire the root contract
+  // CLOSE — A10/B6 (Import LC / Export Confirmed LC Close). Write-off + retire the root contract
   // (ContractStatus.CLOSED, reserved since the original design but never previously set anywhere) —
   // see microservices/balance-component/src/domain/closeEligibility.ts for the preconditions.
-  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
+  // F1 (external BA review, v1.19.0) — EXPIRE (AUTO EXPIRY) is NEVER submitted by a human/UI caller — a
+  // system-triggered batch. Listed here purely for documentation completeness/parity with the
+  // microservice’s own MOVEMENT_DIRECTION table; no TransactionFunction ever sets it as its movementType.
+  // AMEND_EXPIRY_DATE (A2/B2’s third subChoice option) and REOPEN (A11/B7) ARE human-selectable.
+  IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE', 'EXPIRE', 'AMEND_EXPIRY_DATE', 'REOPEN'],
   EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
   IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
   EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
   SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
+  EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE', 'EXPIRE', 'AMEND_EXPIRY_DATE', 'REOPEN'],
   EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
   EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
   EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -197,7 +213,19 @@ export interface SubChoice {
   /** Which field the picked value is written into (`onSubChoice()`). `'movementType'` (A2/A7) writes into `model.movementType`; `'amendDirection'` (B2) writes into a separate component field instead, since EPLC_CONFIRMATION/AMEND has no distinct Increase/Decrease movementType — direction travels via the signed Amount instead. */
   key: 'movementType' | 'amendDirection';
   label: string;
-  options: { value: string; label: string }[];
+  options: {
+    value: string;
+    label: string;
+    /**
+     * F1 (external BA review, v1.19.0) — B2's own third option (Expiry Date) only. `AMEND_EXPIRY_DATE`
+     * is a genuinely distinct movementType, not an amendDirection variant (there is no Increase/Decrease
+     * for it) — when present, `onSubChoice()` sets `model.movementType` to THIS value directly and skips
+     * the `key`-based write entirely, bypassing the `amendDirection` indirection B2's other two options
+     * still use. A2's own third option needs no override (its `key` is already `'movementType'`, which
+     * already writes `model.movementType` directly via the picked value itself).
+     */
+    movementTypeOverride?: string;
+  }[];
 }
 
 export interface TransactionFunction {
@@ -235,6 +263,8 @@ export interface TransactionFunction {
   deferSettlementNextStepHint?: string;
   /** A10/B6 (Close) only — its own flat Catalog picker filters to `documentArrivalHints.catalogCloseEligible` (a server-computed hint-set, not a client-side per-candidate check) instead of the generic 0-Available-Balance fallback every other flat-Catalog function uses. */
   requiresCloseEligibility?: boolean;
+  /** A11/B7 (Reopen, F1) only — same "server-computed hint-set" shape as requiresCloseEligibility above, but backed by `documentArrivalHints.catalogReopenEligible`/`GET .../reopen-eligible` (CLOSED status, no open Events — a structurally different eligibility rule from Close's own, see that endpoint's own doc comment on the microservice side) and a CLOSED (not ACTIVE) catalog status filter — see `MakerPanelComponent.reloadCatalog()`'s own status override for A11/B7. */
+  requiresReopenEligibility?: boolean;
   /** A7 (Acceptance Settlement) only, user-reported 2026-08-25 ("A07 交易選擇是 LC number 有Acceptance balance 再顯示2ndary ref") — its own LC Index (Parent) picker filters to `documentArrivalHints.parentAcceptanceEligible` (does this LC have at least one child IPLC_ACCEPTANCE with a non-zero Available Balance) rather than falling into the unconditional pass-through every other `catalogTenorFilter: 'USANCE'` parent picker uses. Without this, Step 1 offered every Usance LC regardless of whether it actually had an outstanding Acceptance to settle, and Step 2 (IB Index) would only reveal the empty result after the fact. Mirrors A3S/A9's own `catalogSgEligible`/`parentSgEligible` SG-balance gate — same shape, different child instrumentType. */
   requiresEligibleParentAcceptance?: boolean;
 }
@@ -287,10 +317,14 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
       options: [
         { value: 'AMEND_INCREASE', label: 'Increase' },
         { value: 'AMEND_DECREASE', label: 'Decrease' },
+        // F1 (external BA review, v1.19.0) — also the Expiry Extension Amendment entry point once the
+        // resolved contract is EXPIRED (the UI never distinguishes the two, the server does). Swaps
+        // Amount for a New Expiry Date field — see builder-fields.ts's own isAmendExpiryDate.
+        { value: 'AMEND_EXPIRY_DATE', label: 'Expiry Date' },
       ],
     },
     secondaryRefLabel: 'Amendment No./Times',
-    help: 'Increase always succeeds; Decrease is checked against Tight Available Balance (Design doc §6.2) — only APPROVED amounts count, and outstanding off-balance-sheet exposure is netted out.',
+    help: 'Increase always succeeds; Decrease is checked against Tight Available Balance (Design doc §6.2) — only APPROVED amounts count, and outstanding off-balance-sheet exposure is netted out. Expiry Date (F1) amends the LC\'s own expiry date — against an EXPIRED LC, Checker Release also restores it to ACTIVE and reverses the AUTO EXPIRY write-off (a new Expiry Date in the future is required).',
   },
   // Merged into one card, showing all ACTIVE IPLC_LC contracts regardless of tenor — no catalogTenorFilter.
   {
@@ -404,6 +438,20 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     requiresCloseEligibility: true,
     help: 'Writes off whatever Confirmed Balance remains and retires the LC. Only LCs with Shipping Guarantee Balance = 0, Acceptance Balance = 0, and no open Events anywhere in the tree (including SG/Acceptance children) are shown below — redeem the SG (A9) and settle the Acceptance (A7) first if either is still outstanding. Amount is never typed — it is carried from the current Confirmed Balance and locked; 0 is a normal figure for an already fully-utilized LC. Once Released, this LC can no longer be selected by any other function.',
   },
+  // F1 (external BA review, v1.19.0) §10 — a genuinely independent, specially-entitled function (not
+  // folded into A2), same flat Catalog picker shape as A10 above but targeting CLOSED contracts instead
+  // of ACTIVE ones. Redesigned 2026-08-25 after live UAT — REOPEN itself now carries the real restoration
+  // amount, computed server-side from the LC's own write-off history at Submit (never a Maker-typed
+  // value; the Amount field is hidden outright — see function-strategy.ts's own amountFixed doc comment).
+  {
+    code: 'A11',
+    label: 'LC Reopen',
+    side: 'IMPORT',
+    instrumentType: 'IPLC_LC',
+    movementType: 'REOPEN',
+    requiresReopenEligibility: true,
+    help: 'Reopens a CLOSED LC — restores whatever Confirmed Balance the LC had immediately before its EXPIRE/CLOSE write-off chain (sums every not-yet-reversed EXPIRE/CLOSE movement in its history, not only the last one). Only CLOSED LCs with no open Events anywhere in the tree are shown below. Status returns to ACTIVE, or to EXPIRED if the original Expiry Date has since passed (use A2\'s "Expiry Date" option afterward to extend it). No Amount to type — the server derives it from the LC\'s own balance history at Submit and generates a real Account Entries pair immediately, so the Checker reviews the actual restoration BEFORE approving it.',
+  },
 ];
 
 /** Export Confirmed side ONLY models Confirmed Export LC — per rationale-en.md §6/§7.4b, plain advising creates no contingent and Unconfirmed negotiation (EBL) belongs to a separate Loan Component. `EPLC_LC` stays valid but no function here creates one. */
@@ -434,10 +482,15 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
       options: [
         { value: 'INCREASE', label: 'Increase' },
         { value: 'DECREASE', label: 'Decrease' },
+        // F1 (external BA review, v1.19.0) — movementTypeOverride bypasses the amendDirection indirection
+        // entirely (see SubChoice.options[].movementTypeOverride's own doc comment): AMEND_EXPIRY_DATE is
+        // a genuinely distinct movementType, not an Increase/Decrease variant. Also the Expiry Extension
+        // Amendment entry point once the resolved Confirmation is EXPIRED — same as A2's own third option.
+        { value: 'EXPIRY_DATE', label: 'Expiry Date', movementTypeOverride: 'AMEND_EXPIRY_DATE' },
       ],
     },
     secondaryRefLabel: 'Amendment No./Times',
-    help: "Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC's own face amount. This function only ever moves the Confirmation's own contingent. Amount stays a positive magnitude — Direction (above), not the amount's own sign, carries Increase vs. Decrease.",
+    help: "Adjusts confirmed_amount — rationale §7.2: a confirming bank may advise an amendment WITHOUT extending its confirmation (Art. 10(b)), so confirmed_amount can genuinely diverge from the LC's own face amount. This function only ever moves the Confirmation's own contingent. Amount stays a positive magnitude — Direction (above), not the amount's own sign, carries Increase vs. Decrease. Expiry Date (F1) amends the Confirmation's own expiry date — against an EXPIRED Confirmation, Checker Release also restores it to ACTIVE and reverses the AUTO EXPIRY write-off (a new Expiry Date in the future is required).",
   },
   // B3 is a genuinely separate physical event (D3): it never auto-derives Sight/Usance or touches the
   // Confirmation, only creates a MEMO_ONLY EPLC_EXAMINATION earmark. B4 is the actual legal-event step.
@@ -501,6 +554,16 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     requiresCloseEligibility: true,
     help: 'Writes off whatever Confirmed Balance remains and retires the Confirmation. Only Confirmations with Acceptance Balance = 0 and no open Events anywhere in the tree — including a RELEASED-but-not-yet-consumed B3 Present Docs presentation (B4 has not Honoured/Accepted it yet) — are shown below; settle the Acceptance (B5) or complete B4 first if either is still outstanding. Amount is never typed — it is carried from the current Confirmed Balance and locked; 0 is a normal figure once every presentation has been fully honoured/accepted. Once Released, this Confirmation can no longer be selected by any other function.',
   },
+  // Export analog of A11 — see A11's own help text/doc comment above for the shared rationale.
+  {
+    code: 'B7',
+    label: 'Confirmed LC Reopen',
+    side: 'EXPORT',
+    instrumentType: 'EPLC_CONFIRMATION',
+    movementType: 'REOPEN',
+    requiresReopenEligibility: true,
+    help: 'Reopens a CLOSED Confirmation — restores whatever Confirmed Balance it had immediately before its EXPIRE/CLOSE write-off chain (sums every not-yet-reversed EXPIRE/CLOSE movement in its history, not only the last one). Only CLOSED Confirmations with no open Events anywhere in the tree are shown below. Status returns to ACTIVE, or to EXPIRED if the original Expiry Date has since passed (use B2\'s "Expiry Date" option afterward to extend it). No Amount to type — the server derives it from the Confirmation\'s own balance history at Submit and generates a real Account Entries pair immediately, so the Checker reviews the actual restoration BEFORE approving it.',
+  },
 ];
 
 // movementTypeMatchesFunction() / resolveFunctionForMovement() relocated to function-strategy.ts —
@@ -557,6 +620,11 @@ export function displayStatus(
   // CLOSED/CLOSING make the row self-explanatory without relying on color alone. See statusBadgeClass()'s
   // own doc comment just below for the full rationale — this mirrors that same PENDING/RELEASED split.
   if (isCloseMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return status === 'PENDING' ? 'CLOSING' : 'CLOSED';
+  // F1 (external BA review, v1.19.0) — AUTO EXPIRY's own EXPIRE movementType. A genuinely separate legal
+  // event from CLOSE (date-triggered vs. human/Maker-Checker-triggered) — same red/negative warning
+  // treatment (see statusBadgeClass() below) but its own EXPIRING/EXPIRED label text so the two are never
+  // visually confused, even though both retire the contract's own remaining Confirmed Balance.
+  if (isExpireMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return status === 'PENDING' ? 'EXPIRING' : 'EXPIRED';
   const earmark = isEarmarkFunction(instrumentType, movementType, phase);
   if (status === 'PENDING') return earmark ? (acknowledgedAt ? 'EARMARKED' : 'EARMARKING') : 'PENDING';
   if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
@@ -577,7 +645,10 @@ export function displayStatus(
  * A4/B4 are all effectively UTILIZE-shaped) but land in the same group anyway, so re-deriving from
  * movementType would be no simpler.
  */
-const ISSUE_GROUP_CODES: ReadonlySet<string> = new Set(['A1', 'A6', 'A8', 'B1']);
+// F1 (external BA review, v1.19.0) — A11/B7 (Reopen) joins the issue group: no dedicated "restore/undo"
+// icon exists in TbIconComponent's own set, and Reopen re-establishes an ACTIVE contract, the same
+// underlying idea as issuing one — closer to that group than amend/utilize/redeem/cross.
+const ISSUE_GROUP_CODES: ReadonlySet<string> = new Set(['A1', 'A6', 'A8', 'B1', 'A11', 'B7']);
 const AMEND_GROUP_CODES: ReadonlySet<string> = new Set(['A2', 'B2']);
 const UTILIZE_GROUP_CODES: ReadonlySet<string> = new Set(['A3', 'A3S', 'A4', 'B3', 'B4']);
 const CLOSE_GROUP_CODES: ReadonlySet<string> = new Set(['A10', 'B6']);
@@ -618,6 +689,61 @@ function isCloseMovement(movementType?: string | null): boolean {
   return movementType === 'CLOSE';
 }
 
+/** F1 (external BA review, v1.19.0) — AUTO EXPIRY's own EXPIRE movementType. See displayStatus()'s own EXPIRING/EXPIRED special-case doc comment above. */
+function isExpireMovement(movementType?: string | null): boolean {
+  return movementType === 'EXPIRE';
+}
+
+/**
+ * F1 — REVERSAL (Extension Amendment's/Reopen's own internal restoration leg) and REOPEN (A11/B7) are
+ * both restorative, undoing a prior EXPIRE/CLOSE write-off — deliberately NOT given a red/negative
+ * special-case the way isCloseMovement/isExpireMovement above are: their ordinary PENDING/RELEASED
+ * display already reads amber/green (`tb-status-badge--pending`/`--approved`) once genuinely Released,
+ * which already carries the right "positive, undoing a problem" signal — no override needed. Exported so
+ * display-layer callers (Inquire Events' Event Timeline) can label these two movementTypes distinctly
+ * without re-deriving the F1 movementType set themselves.
+ */
+export function isReversalMovement(movementType?: string | null): boolean {
+  return movementType === 'REVERSAL';
+}
+export function isReopenMovement(movementType?: string | null): boolean {
+  return movementType === 'REOPEN';
+}
+
+/**
+ * F1, user-reported live-testing gap (2026-08-25, "REOPEN Submit 出 Account entries... 不應該有兩筆") — a
+ * REOPEN's real balance restoration is deliberately a SEPARATE linked `REVERSAL` movement (same
+ * compound-leg audit-trail pattern A3S/B4 already use: SG redemption + LC UTILIZE, or HONOUR/ACCEPT +
+ * asset/liability legs — always more than one row for a genuinely compound business action), not a
+ * design defect. But `REVERSAL` (and `EXPIRE`, AUTO EXPIRY's own movementType) have no `TransactionFunction`
+ * of their own — neither is ever human-selectable — so `resolveFunctionForMovement()` returns `undefined`
+ * for both, and the Look Up/Inquire Events Function column rendered a bare, orphan-looking "—" for them
+ * (worse since the raw movementType "Type" column was already removed 2026-08-21 as redundant — this was
+ * the only remaining place a REVERSAL/EXPIRE row's own nature showed at all). This plain-text label is the
+ * fix — deliberately NOT a fabricated `TransactionFunction` (that type backs real field-reconstruction
+ * elsewhere, e.g. the read-only "View" screen; synthesizing one risks misrepresenting an unselectable
+ * system event as if a Maker had picked it from the function chip list).
+ */
+export function systemMovementLabel(movementType?: string | null): string | null {
+  if (movementType === 'EXPIRE') return 'AUTO EXPIRY';
+  if (movementType === 'REVERSAL') return 'REVERSAL (system, linked)';
+  return null;
+}
+
+/**
+ * F1 — the two system-actor identifiers `config.ts` (microservice) uses as `createdBy`/`releasedBy` for
+ * AUTO EXPIRY/AUTO CLOSE. Hand-mirrored string literals, same convention this file already uses for every
+ * other cross-project constant (there is no shared import between the Angular app and the microservice) —
+ * see BalanceComponentApiService's own header comment for the general "hand-mirrors the microservice"
+ * posture. Used to visually distinguish a batch-triggered movement from a human-triggered one in Inquire
+ * Events (e.g. a small "system/batch" indicator near the audit trail).
+ */
+const BATCH_ACTORS: ReadonlySet<string> = new Set(['BATCH_MAKER', 'BATCH_CHECKER']);
+
+export function isBatchActor(actor: string | null | undefined): boolean {
+  return !!actor && BATCH_ACTORS.has(actor);
+}
+
 /** Status badge CSS class — shares `displayStatus()`'s own mapping. */
 export function statusBadgeClass(
   status: string,
@@ -626,7 +752,7 @@ export function statusBadgeClass(
   phase?: 'primary' | 'create' | 'finalize' | null,
   acknowledgedAt?: string | null,
 ): string {
-  if (isCloseMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return 'tb-status-badge--negative';
+  if ((isCloseMovement(movementType) || isExpireMovement(movementType)) && (status === 'PENDING' || status === 'RELEASED')) return 'tb-status-badge--negative';
   if (status === 'PENDING') return isEarmarkFunction(instrumentType, movementType, phase) && acknowledgedAt ? 'tb-status-badge--earmark' : 'tb-status-badge--pending';
   if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
   if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
@@ -654,6 +780,11 @@ export function statusBadgeClass(
 export function contractStatusBadgeClass(status: string, closingPending?: boolean): string {
   if (status === 'ACTIVE' && closingPending) return 'tb-status-badge--negative';
   if (status === 'ACTIVE') return 'tb-status-badge--approved';
+  // F1 (external BA review, v1.19.0) — EXPIRED is a genuinely separate, intermediate state from CLOSED
+  // (date-triggered, not yet human-finalized by AUTO CLOSE or reversed by Extension Amendment) — amber,
+  // not CLOSED's own red, matching this file's own established "amber = in-progress/awaiting-action"
+  // language (the same token PENDING movements already use).
+  if (status === 'EXPIRED') return 'tb-status-badge--pending';
   if (status === 'CLOSED') return 'tb-status-badge--negative';
   if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
   if (status === 'CANCELLED') return 'tb-status-badge--negative';

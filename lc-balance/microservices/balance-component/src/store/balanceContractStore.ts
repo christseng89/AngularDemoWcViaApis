@@ -25,6 +25,8 @@ interface ContractRow {
   tenor_type: string | null;
   tenor_days: number | null;
   maturity_date: string | null;
+  expiry_date: string | null;
+  mail_float_grace_days: number | null;
   opening_balance: string;
   source_amendment_no: number | null;
   effective_from: string;
@@ -55,6 +57,8 @@ function rowToContract(row: ContractRow): BalanceContract {
     tenorType: row.tenor_type as BalanceContract['tenorType'],
     tenorDays: row.tenor_days,
     maturityDate: row.maturity_date,
+    expiryDate: row.expiry_date,
+    mailFloatGraceDays: row.mail_float_grace_days,
     openingBalance: row.opening_balance,
     sourceAmendmentNo: row.source_amendment_no,
     effectiveFrom: row.effective_from,
@@ -129,14 +133,14 @@ export class BalanceContractStore {
           balance_contract_id, logical_contract_id, contract_version, instrument_type,
           lc_number, ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
           supersedes_balance_contract_id, superseded_by_balance_contract_id, currency,
-          tolerance_pct, tenor_type, tenor_days, maturity_date, opening_balance,
-          source_amendment_no, effective_from, effective_to, created_by, created_at
+          tolerance_pct, tenor_type, tenor_days, maturity_date, expiry_date, mail_float_grace_days,
+          opening_balance, source_amendment_no, effective_from, effective_to, created_by, created_at
         ) VALUES (
           @balanceContractId, @logicalContractId, @contractVersion, @instrumentType,
           @lcNumber, @ibNumber, @sgNumber, @legSeq, @parentLogicalContractId, @status,
           @supersedesBalanceContractId, @supersededByBalanceContractId, @currency,
-          @tolerancePct, @tenorType, @tenorDays, @maturityDate, @openingBalance,
-          @sourceAmendmentNo, @effectiveFrom, @effectiveTo, @createdBy, @createdAt
+          @tolerancePct, @tenorType, @tenorDays, @maturityDate, @expiryDate, @mailFloatGraceDays,
+          @openingBalance, @sourceAmendmentNo, @effectiveFrom, @effectiveTo, @createdBy, @createdAt
         )`,
       )
       .run({
@@ -157,6 +161,8 @@ export class BalanceContractStore {
         tenorType: contract.tenorType ?? null,
         tenorDays: contract.tenorDays ?? null,
         maturityDate: contract.maturityDate ?? null,
+        expiryDate: contract.expiryDate ?? null,
+        mailFloatGraceDays: contract.mailFloatGraceDays ?? null,
         openingBalance: contract.openingBalance,
         sourceAmendmentNo: contract.sourceAmendmentNo ?? null,
         effectiveFrom: contract.effectiveFrom,
@@ -192,6 +198,42 @@ export class BalanceContractStore {
   }
 
   /**
+   * F1 (external BA review) §8.6 — `AMEND_EXPIRY_DATE`'s own Expiry Extension Amendment entry point
+   * needs a dedicated resolver for an `EXPIRED` contract; `findActiveByNaturalKey()` above cannot find
+   * one (ACTIVE-only WHERE clause, by design — every OTHER function must keep failing to resolve an
+   * EXPIRED contract, that's the mechanism §7.8 relies on to block A2/A3/A3S/A8/B3 automatically).
+   * Deliberately narrow — only Extension Amendment's own resolution path should call this.
+   */
+  findExpiredByNaturalKey(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM balance_contracts
+         WHERE instrument_type = ? AND status = 'EXPIRED'
+           AND lc_number = ?
+           AND ib_number IS ? AND sg_number IS ? AND leg_seq IS ?`,
+      )
+      .get(instrumentType, naturalKey.lcNumber, naturalKey.ibNumber ?? null, naturalKey.sgNumber ?? null, naturalKey.legSeq ?? null) as ContractRow | undefined;
+    return row ? rowToContract(row) : undefined;
+  }
+
+  /**
+   * F1 (external BA review) §9.6 — A11/B7 Reopen's own resolver for a `CLOSED` contract, same shape and
+   * same rationale as findExpiredByNaturalKey() above (deliberately narrow, only Reopen's own resolution
+   * path should call this).
+   */
+  findClosedByNaturalKey(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM balance_contracts
+         WHERE instrument_type = ? AND status = 'CLOSED'
+           AND lc_number = ?
+           AND ib_number IS ? AND sg_number IS ? AND leg_seq IS ?`,
+      )
+      .get(instrumentType, naturalKey.lcNumber, naturalKey.ibNumber ?? null, naturalKey.sgNumber ?? null, naturalKey.legSeq ?? null) as ContractRow | undefined;
+    return row ? rowToContract(row) : undefined;
+  }
+
+  /**
    * A10/B6 Close — Look Up Current Balance / Inquire Events must still be able to resolve a CLOSED
    * contract by natural key (user-reported gap, 2026-08-21: "CLOSE LC => Release 後出現 'No Logical
    * Contract exists yet for this natural key.' 這是不對的... LOOKUP也應該看到此LC 項下所有的交易包括CLOSE
@@ -214,6 +256,32 @@ export class BalanceContractStore {
       )
       .get(instrumentType, naturalKey.lcNumber, naturalKey.ibNumber ?? null, naturalKey.sgNumber ?? null, naturalKey.legSeq ?? null) as ContractRow | undefined;
     return row ? rowToContract(row) : undefined;
+  }
+
+  /**
+   * F1 (external BA review) — AUTO EXPIRY's own candidate list: every ACTIVE root LC/Confirmation with
+   * a recorded expiry_date, across all 3 root instrumentTypes in one query (spares
+   * BalanceService.runAutoExpirySweep() from issuing 3 separate listCatalog() calls, one per
+   * instrumentType). Date filtering (expiry_date + mail_float_grace_days vs. now) happens in the
+   * service layer via domain/expiryEligibility.ts's isPastExpiryGrace() — this method only narrows to
+   * "has a recorded expiry date at all", not "past it yet".
+   */
+  listActiveExpirable(): BalanceContract[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM balance_contracts WHERE status = 'ACTIVE' AND expiry_date IS NOT NULL AND instrument_type IN ('IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION')`)
+      .all() as unknown as ContractRow[];
+    return rows.map(rowToContract);
+  }
+
+  /**
+   * F1 (external BA review) §7.3 — AUTO CLOSE's own candidate list: every EXPIRED root LC/Confirmation,
+   * same "one query across all 3 root instrumentTypes" shape as listActiveExpirable() above.
+   */
+  listExpiredContracts(): BalanceContract[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM balance_contracts WHERE status = 'EXPIRED' AND instrument_type IN ('IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION')`)
+      .all() as unknown as ContractRow[];
+    return rows.map(rowToContract);
   }
 
   /** Design doc §7.3 — full version history of a Logical Contract, ordered by contractVersion ascending. */
@@ -300,5 +368,37 @@ export class BalanceContractStore {
       balanceContractId,
       effectiveTo,
     });
+  }
+
+  /**
+   * F1 (external BA review) — AUTO EXPIRY's own release() side effect, same shape as markClosed()
+   * above. Mirrors it exactly (status + effective_to only) rather than sharing one parameterized
+   * function — two one-line methods are simpler to read than a status-parameter indirection for a
+   * two-member set.
+   */
+  markExpired(balanceContractId: string, effectiveTo: string): void {
+    this.db.prepare(`UPDATE balance_contracts SET status = 'EXPIRED', effective_to = @effectiveTo WHERE balance_contract_id = @balanceContractId`).run({
+      balanceContractId,
+      effectiveTo,
+    });
+  }
+
+  /**
+   * F1 (external BA review) §8/§9 — Expiry Extension Amendment (EXPIRED -> ACTIVE) and A11/B7 Reopen
+   * (CLOSED -> ACTIVE or EXPIRED, see §9.1/§9.2) both reactivate a contract's own row: clear
+   * `effective_to` (the contract is current again), and — only for Extension — persist the new
+   * `expiry_date` the Checker just approved. `newExpiryDate` is omitted for a plain Reopen-without-
+   * extension (§9.1, original expiry date still in the future, nothing to change).
+   */
+  reactivate(balanceContractId: string, newStatus: 'ACTIVE' | 'EXPIRED', newExpiryDate?: string | null): void {
+    if (newExpiryDate !== undefined) {
+      this.db
+        .prepare(`UPDATE balance_contracts SET status = @newStatus, effective_to = NULL, expiry_date = @newExpiryDate WHERE balance_contract_id = @balanceContractId`)
+        .run({ balanceContractId, newStatus, newExpiryDate });
+    } else {
+      this.db
+        .prepare(`UPDATE balance_contracts SET status = @newStatus, effective_to = NULL WHERE balance_contract_id = @balanceContractId`)
+        .run({ balanceContractId, newStatus });
+    }
   }
 }

@@ -202,6 +202,29 @@ describe('BalanceComponentApiService', () => {
     });
   });
 
+  describe('reopenEligible() — A11/B7 (Reopen, F1)', () => {
+    it('GETs the reopen-eligible endpoint with instrumentType and the default pageSize=200 when lcNumber is omitted', () => {
+      service.reopenEligible('IPLC_LC');
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/reopen-eligible', {
+        params: { instrumentType: 'IPLC_LC', pageSize: 200 },
+      });
+    });
+
+    it('adds lcNumber when present', () => {
+      service.reopenEligible('EPLC_CONFIRMATION', 'S001');
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/reopen-eligible', {
+        params: { instrumentType: 'EPLC_CONFIRMATION', pageSize: 200, lcNumber: 'S001' },
+      });
+    });
+
+    it('respects an explicit pageSize override', () => {
+      service.reopenEligible('IPLC_LC', undefined, 50);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/reopen-eligible', {
+        params: { instrumentType: 'IPLC_LC', pageSize: 50 },
+      });
+    });
+  });
+
   it('getSnapshot() GETs the /balance sub-path for the given contract id', () => {
     service.getSnapshot('BC-1');
     expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/BC-1/balance');

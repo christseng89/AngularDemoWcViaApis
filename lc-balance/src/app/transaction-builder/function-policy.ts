@@ -30,6 +30,10 @@ export interface BuilderModel {
   /** Design doc §7 Tenor Type Routing (v0.7) — mandatory on Acceptance (A6/B4). */
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE';
   tenorDays?: number;
+  /** F1 (external BA review, v1.19.0) — A1/B1 (ISSUE) only, optional. UCP 600 Art.6(d) expiry/validity date. */
+  expiryDate?: string;
+  /** F1 — A2/B2's third subChoice option (AMEND_EXPIRY_DATE) only. */
+  newExpiryDate?: string;
 }
 
 /** The three natural-key components a Maker can type or have carried in — shared shape of `naturalKey` and `searchNaturalKey`. */

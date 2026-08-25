@@ -1382,6 +1382,208 @@ function importCase12(lc, ib) {
   };
 }
 
+// F1 (external BA review, 2026-08-25) — AUTO EXPIRY + AUTO CLOSE background sweep, REVERSAL movementType,
+// Expiry Extension Amendment (A2/B2's third subChoice option), and A11/B7 Reopen — see
+// lc-balance-wc/CLAUDE.md's own F1 decision-log entry and analysis/balance-component-api.yaml's own
+// v1.19.0 changelog for the full mechanism. Case 13/14/15 below exercise the two REOPEN paths §9.7 of
+// that spec distinguishes (A: a single direct human A10 Close; B: AUTO EXPIRY then AUTO CLOSE, whose own
+// write-off amount is already 0 by the time it runs) plus the eligibility gate and the plain (non-
+// Extension) use of AMEND_EXPIRY_DATE — Export gets one mirrored case (#12) for the core A11/B7 mechanism
+// itself, same "not every Import variant needs an Export twin" precedent this file already follows.
+
+function importCase13(lc) {
+  return {
+    id: 'import-case-13',
+    title: 'Import Case 13 — A10 Close -> A11 Reopen (carries its own restoration amount, server-computed at Submit) -> A2 Expiry Date Amendment (plain)',
+    description:
+      "LC Issue 50,000 with an Expiry Date set -> A10 Close writes off the full 50,000 -> A11 Reopen restores it (the server computes the restoration amount from the LC's own write-off history at Submit and sets it directly as REOPEN's own amount — no separate REVERSAL leg, no caller-typed Amount) -> a plain A2 Expiry Date Amendment on the now-ACTIVE-again contract (ordinary use, not the Extension path — that only applies when the target is EXPIRED, see Import Case 15).",
+    steps: [
+      ...createAndRelease(
+        'LC Issue 50,000 (Sight, Expiry Date 2030-12-31)',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '50000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2030-12-31',
+          createdBy: MAKER,
+        },
+        'Checker releases LC Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'A10 Close — writes off the full 50,000 Confirmed Balance',
+        captureAs: 'close',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'CLOSE',
+          eventSeq: 2,
+          amount: '50000',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Close — LC retires to CLOSED', movementRef: 'close', releasedBy: CHECKER },
+      { type: 'snapshot', label: 'LC Balance after Close (expect Confirmed 0, status CLOSED)', contractRef: 'lc' },
+      {
+        type: 'createMovement',
+        label: "A11 Reopen — amount is server-computed at Submit from the LC's own write-off history, never caller-typed",
+        captureAs: 'reopen',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'REOPEN',
+          eventSeq: 3,
+          amount: '0',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Reopen — balance updates directly (REOPEN carries its own amount), status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
+      { type: 'snapshot', label: "LC Balance after Reopen (expect Confirmed 50,000 restored — REOPEN's own computed amount)", contractRef: 'lc' },
+      {
+        type: 'createMovement',
+        label: 'A2 Expiry Date Amendment (plain — the contract is ACTIVE, not EXPIRED, so this is ordinary use, not an Extension)',
+        captureAs: 'amendExpiry',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'AMEND_EXPIRY_DATE',
+          eventSeq: 4,
+          amount: '0',
+          currency: 'USD',
+          newExpiryDate: '2031-06-30',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases the Expiry Date Amendment', movementRef: 'amendExpiry', releasedBy: CHECKER },
+      { type: 'snapshot', label: 'LC Balance unaffected by the Expiry Date Amendment (expect still Confirmed 50,000)', contractRef: 'lc' },
+    ],
+  };
+}
+
+function importCase14(lc) {
+  return {
+    id: 'import-case-14',
+    title: 'Import Case 14 — A11 Reopen eligibility gate, negative path (ACTIVE contract, expect ERROR)',
+    description:
+      'LC Issue 30,000, left ACTIVE (never Closed) -> A11 Reopen attempted directly against it — reopenShaped() must reject it (contract status is ACTIVE, not CLOSED), not silently allow it.',
+    steps: [
+      ...createAndRelease(
+        'LC Issue 30,000 (Sight)',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '30000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          createdBy: MAKER,
+        },
+        'Checker releases LC Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'A11 Reopen attempted while the LC is still ACTIVE — expect 409 eligibility ERROR',
+        captureAs: 'reopen',
+        expectError: true,
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'REOPEN',
+          eventSeq: 2,
+          amount: '0',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'snapshot', label: 'LC Balance unchanged (expect still Confirmed 30,000, status still ACTIVE — the rejected Reopen never applied)', contractRef: 'lc' },
+    ],
+  };
+}
+
+function importCase15(lc) {
+  return {
+    id: 'import-case-15',
+    title: 'Import Case 15 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> A11 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
+    description:
+      "LC Issue 30,000 with an Expiry Date already in the past -> EXPIRE (date-triggered write-off, same -1 direction as Close but with its own narrower eligibility — no SG/Acceptance-zero condition) writes off the full 30,000 -> the contract is now EXPIRED, so AUTO CLOSE's own write-off amount is already 0 (nothing left) -> A11 Reopen must reverse BOTH not-yet-reversed write-offs in the chain to restore the real historic balance (30,000), not just the last one (which would incorrectly restore 0). createdBy/releasedBy on the Expire/Close steps use the same BATCH_MAKER/BATCH_CHECKER system-actor identifiers the real background sweep (server.ts's own setInterval) uses — this case calls the microservice directly with those same movementTypes/actors rather than waiting on the real sweep interval, since this registry's step model has no \"wait N seconds\" step type.",
+    steps: [
+      ...createAndRelease(
+        'LC Issue 30,000 (Sight, Expiry Date already in the past)',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '30000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2020-01-01',
+          createdBy: MAKER,
+        },
+        'Checker releases LC Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'EXPIRE — date-triggered write-off of the full 30,000 (expiryDate + mailFloatGraceDays already elapsed)',
+        captureAs: 'expire',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'EXPIRE',
+          eventSeq: 2,
+          amount: '30000',
+          currency: 'USD',
+          createdBy: 'BATCH_MAKER',
+        },
+      },
+      { type: 'release', label: 'BATCH_CHECKER releases Expire — status becomes EXPIRED', movementRef: 'expire', releasedBy: 'BATCH_CHECKER' },
+      { type: 'snapshot', label: 'LC Balance after Expire (expect Confirmed 0, status EXPIRED)', contractRef: 'lc' },
+      {
+        type: 'createMovement',
+        label: "AUTO CLOSE's own Close — amount is already 0, nothing left to write off (this is exactly the §9.7 path-B case: reversing only THIS movement would restore 0, not the real 30,000)",
+        captureAs: 'close',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'CLOSE',
+          eventSeq: 3,
+          amount: '0',
+          currency: 'USD',
+          createdBy: 'BATCH_MAKER',
+        },
+      },
+      { type: 'release', label: 'BATCH_CHECKER releases Close — status becomes CLOSED', movementRef: 'close', releasedBy: 'BATCH_CHECKER' },
+      { type: 'snapshot', label: 'LC Balance after (Expire then) Close (expect Confirmed 0, status CLOSED)', contractRef: 'lc' },
+      {
+        type: 'createMovement',
+        label: 'A11 Reopen (human-triggered, not batch) — must reverse BOTH the Expire and the Close in the chain',
+        captureAs: 'reopen',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'REOPEN',
+          eventSeq: 4,
+          amount: '0',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Reopen — status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
+      { type: 'snapshot', label: 'LC Balance after Reopen (expect Confirmed 30,000 — the ORIGINAL Expire amount, proving the chain was fully reversed, not just the follow-on Close’s own 0)', contractRef: 'lc' },
+    ],
+  };
+}
+
 // ── Export LC ────────────────────────────────────────────────────────────
 // Business-confirmed 2026-08-14: CONF_LIAB only exists once Confirmed
 // (Case #1-#3); Case #4/#5 (Unconfirmed) never create Export Bank's own
@@ -2432,6 +2634,67 @@ function exportCase11(lc, ib) {
   };
 }
 
+// F1 — Export analog of Import Case 13's own §9.7 path-A Reopen (see that case's own doc comment above
+// for the shared rationale). Kept simpler than Case 13 (no Expiry Date Amendment tacked on) — not every
+// Import variant needs an exhaustive Export twin, same precedent Export Case #8-#11 already follow.
+function exportCase12(lc) {
+  return {
+    id: 'export-case-12',
+    title: 'Export Case #12 — B6 Close -> B7 Reopen (carries its own restoration amount, server-computed at Submit)',
+    description:
+      "Confirm LC 60,000 (Sight) -> B6 Close writes off the full 60,000 -> B7 Reopen restores it (the server computes the restoration amount from the Confirmation's own write-off history at Submit and sets it directly as REOPEN's own amount — no separate REVERSAL leg, no caller-typed Amount).",
+    steps: [
+      ...createAndRelease(
+        'Confirm LC 60,000 (Sight)',
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '60000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          createdBy: MAKER,
+        },
+        'Checker releases Confirmation Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'B6 Close — writes off the full 60,000 Confirmed Balance',
+        captureAs: 'close',
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'CLOSE',
+          eventSeq: 2,
+          amount: '60000',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Close — Confirmation retires to CLOSED', movementRef: 'close', releasedBy: CHECKER },
+      { type: 'snapshot', label: 'CONF LIAB after Close (expect Confirmed 0, status CLOSED)', contractRef: 'conf' },
+      {
+        type: 'createMovement',
+        label: "B7 Reopen — amount is server-computed at Submit from the Confirmation's own write-off history, never caller-typed",
+        captureAs: 'reopen',
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'REOPEN',
+          eventSeq: 3,
+          amount: '0',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Reopen — balance updates directly (REOPEN carries its own amount), status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
+      { type: 'snapshot', label: "CONF LIAB after Reopen (expect Confirmed 60,000 restored — REOPEN's own computed amount)", contractRef: 'conf' },
+    ],
+  };
+}
+
 /** Fresh natural keys per run so the same case can be re-run repeatedly against the same DB without idempotency-key/one-ACTIVE-per-logicalContractId collisions. */
 function buildRegistry() {
   return [
@@ -2447,6 +2710,9 @@ function buildRegistry() {
     importCase10(lcNumberFor('IMP-C10'), 'G01'),
     importCase11(lcNumberFor('IMP-C11'), 'G01'),
     importCase12(lcNumberFor('IMP-C12'), 'IB0001'),
+    importCase13(lcNumberFor('IMP-C13')),
+    importCase14(lcNumberFor('IMP-C14')),
+    importCase15(lcNumberFor('IMP-C15')),
     exportCase1(lcNumberFor('EXP-C1')),
     exportCase2(lcNumberFor('EXP-C2'), 'IB0001'),
     exportCase3(lcNumberFor('EXP-C3'), 'IB0001'),
@@ -2458,6 +2724,7 @@ function buildRegistry() {
     exportCase9(lcNumberFor('EXP-C9'), 'IB0001'),
     exportCase10(lcNumberFor('EXP-C10')),
     exportCase11(lcNumberFor('EXP-C11'), 'IB0001'),
+    exportCase12(lcNumberFor('EXP-C12')),
   ];
 }
 

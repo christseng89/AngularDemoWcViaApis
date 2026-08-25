@@ -47,13 +47,22 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 底下只剩 `-zh.docx`／`-en.docx` 兩份，符合本專案命名慣例，且兩份都已同步最新修訂（15項發現，高3／中8／
 低4，含撤回原F2、改寫F2買方遠期的兩段 Revision note）——不必再另外核對。
 
-- [ ] **F1**（🔴 High）— 完全缺失到期 / UCP 600 第16(f)條自動釋放觸發機制
-  知識庫 Knowledge-Gaps GAP-005/GAP-006——原始碼檢查確認：不存在任何 timer/cron，也不存在第16(f)條拒付推定
-  （preclusion）邏輯；目前只有單一 `CLOSE` movement 類型，完全依賴經辦/複核的人工操作觸發。
-  *影響：一筆從未被合法釋放的或有負債，除非有人記得手動關閉，否則會無限期停留在表外賬簿上——「導致表外賬簿
-  虛增」最常見的缺陷模式；同時也把主動關閉與到期觸發這兩個法律性質不同的事件混為一談。*
-  建議：新增獨立的 `EXPIRE` movement 類型，在 `expiry_date + mail_float_grace`（不是固定的 +21 天）時自動
-  觸發，與人工 `CLOSE` 路徑相互獨立，再依賴這套賬本用於真實的或有負債報告。
+- [x] ~~**F1**（🔴 High）— 完全缺失到期 / UCP 600 第16(f)條自動釋放觸發機制~~ — **2026-08-25 已完成**
+  （`analysis/balance-component-api.yaml` v1.19.0/v1.20.0、`analysis/Balance-Component-F1-Expire-Proposal-zh.md`）。
+  知識庫 Knowledge-Gaps GAP-005/GAP-006 的原始問題（不存在 timer/cron，僅靠人工 `CLOSE`）已解決：新增
+  `EXPIRE`（`domain/expiryEligibility.ts`，資格判斷刻意不看 SG/Acceptance 餘額）與獨立的 `AUTO CLOSE` 批次
+  （沿用既有 `evaluateCloseEligibility()`），兩者各自獨立 feature flag（`AUTO_EXPIRY_ENABLED`/
+  `AUTO_CLOSE_ENABLED`），走現有、未修改的 Maker/Checker 兩段式流程（`BATCH_MAKER`/`BATCH_CHECKER` 系統
+  角色），`mail_float_grace_days` 依進口/出口分開設定、於 ISSUE 當下記錄到合約上（不隨後續 config 調整回頭
+  改變舊信用證的到期時點，本欄位當初提出的疑慮已解決）。同時交付：Expiry Extension Amendment（A2/B2 第三
+  選項 `AMEND_EXPIRY_DATE`，EXPIRED 狀態下可延展效期恢復 `ACTIVE`）、A11/B7 LC/Confirmation Reopen（CLOSED
+  狀態下可重新開啟，§9.7 正確處理 EXPIRE→AUTO CLOSE 鏈式沖銷）。**2026-08-25 同日 UAT 後重新設計**：REOPEN
+  最初設計（金額固定 0、Release 時另外產生連動 `REVERSAL` movement）在使用者實測後發現 Checker 在核准前看不到
+  真實分錄與金額——已改為 REOPEN 自己在 Submit 當下就帶入伺服器算出的真實金額（沖銷鏈加總）並產生真實
+  `contingentAccountEntry`，Checker Approve 前即可審核；Inquire Events/Look Up 現在每筆 Reopen 只顯示一筆
+  記錄，不再是兩筆。`REVERSAL` movementType 本身保留（Expiry Extension Amendment 仍在使用），只是 REOPEN
+  不再用它。三套測試套件（microservice/Angular/backend）全綠，27 筆 Business Case Registry 案例（含新增的
+  Import Case 13-15、Export Case #12）實測通過。
 
 - [x] ~~承兑/遲期付款承諾被列為影子備查科目，與分類體系規範相矛盾（原編號 F2）~~ — **BA 已於
   2026-08-25 撤回此項發現，確認並非缺陷**。本項曾在同一天內反覆核查三次：(1) 對照原始碼確認
@@ -104,6 +113,23 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 - [ ] **`ContractVersionConflictError`（⚪ Info，單向落差，2026-08-24 稽核發現）** — `errors.ts` 定義了這個
   409 `CONTRACT_VERSION_CONFLICT` 錯誤類別，但整個 `src/` 沒有任何地方真的拋出它（死碼），OAS 的
   `Error.code` enum 也完全沒列這個代碼。影響很小（目前用不到），但屬於 OAS 全面稽核時發現、尚未處理的項目。
+
+- [ ] **F1 §11.4（原三項，2026-08-25 使用者確認維持待決，不阻礙已核准部分動工；第一項已於同日縮小範圍）**
+  — AUTO EXPIRY/AUTO CLOSE 背景批次上線後，以下項目刻意不做，記錄於此供未來重新評估：
+  - [x] ~~**Sweep 分輪保護 — REOPEN 這一段**~~ — **2026-08-25 已修復**（`analysis/balance-component-api.yaml`
+    v1.21.0）。原問題：`DISPLAY-TEST-01` 實測重現「EXPIRE → 同一輪 AUTO CLOSE → 手動 A11 Reopen 後又立刻被
+    下一輪 AUTO CLOSE 掃回關閉」，完全沒有 Expiry Extension Amendment 的重啟窗口。已加上
+    `isRecentlyReopened()`：一筆合約的最新交易若是 RELEASED 的 `REOPEN`，AUTO EXPIRY／AUTO CLOSE 兩個批次
+    都會在**一個完整 sweep 間隔**內跳過它不處理（不是永久排除——用意是給人為操作留出時間，不是讓合約卡死；
+    間隔一過，或有其他交易落在這筆合約上，正常掃描行為即恢復，真正到期的 ACTIVE 合約仍會準時被 AUTO EXPIRY
+    處理）。
+  - [ ] **Sweep 分輪保護 — EXPIRE→同輪 AUTO CLOSE 這一段（仍待決）** — 上面修的是「REOPEN 之後」的分輪落差；
+    「一筆從未動用過的乾淨 LC，AUTO EXPIRY 剛把它轉 EXPIRED，同一輪 AUTO CLOSE 立刻把它關閉」這個原始
+    §8.5 落差本身**仍未修**（BA 建議修法：AUTO CLOSE 只處理「上一輪或更早」轉 EXPIRED 的合約）。
+  - **Expiry Extension Amendment／A11-B7 Reopen 的 consent 把關** — 是否需要受益人/相關方同意佐證才能
+    延展效期或重新開啟，串既有 F4（生產級身份驗證/授權）缺口一併處理。
+  - **CLOSE（含既有 A10/B6）強制要求 `reasonCode`** — 目前維持選填；REOPEN 自己的資格判斷已能容忍
+    原 CLOSE 的 `reasonCode` 為空（視為原因不明，不阻擋）。
 
 ---
 

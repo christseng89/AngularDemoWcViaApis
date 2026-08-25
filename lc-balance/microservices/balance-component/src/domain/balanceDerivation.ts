@@ -2,19 +2,19 @@
  * Design doc §3.3 — the derived query-time balance numbers. All of these are
  * computed from a list of BalanceMovement rows, never stored directly.
  *
- * MOVEMENT_DIRECTION covers exactly the movementTypes this prototype's Case
- * 1-5 test vectors exercise (Cross-Reference/Design-doc §5). CANCEL/EXPIRE/
- * REVERSAL are deliberately NOT included yet — REVERSAL needs special
- * handling (its effect is the flipped sign of the ORIGINAL movement, per
- * §4.5, not a fixed direction of its own) and CANCEL/EXPIRE are not
- * exercised by any of the walked-through cases. Extend this table before
- * relying on it for those movementTypes.
+ * MOVEMENT_DIRECTION covers every movementType with a FIXED direction of its own. CANCEL is still not
+ * included (not exercised by any walked-through case — extend before relying on it). `REVERSAL` is
+ * deliberately NOT in this table — per §4.5 its effect is the FLIPPED sign of the movement it reverses,
+ * not a fixed direction of its own; `signedAmount()` below special-cases it, resolving the pointed-to
+ * original movement's own direction (via `reversalOfMovementId`) from the SAME movements list every
+ * caller here already passes in, and flips it. F1 (external BA review, 2026-08-25) added `EXPIRE`
+ * (fixed, like CLOSE) and this REVERSAL dynamic-direction handling.
  */
 import Decimal from 'decimal.js';
 import { parseMonetaryAmount, ZERO } from '../money';
 import type { BalanceMovement } from '../types';
 
-export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1>> = {
+export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1 | 0>> = {
   // IPLC_LC / EPLC_LC
   ISSUE: 1,
   AMEND_INCREASE: 1,
@@ -46,6 +46,19 @@ export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1>> = {
   // before expiry" analog: writes off whatever Confirmed Balance remains, same direction as AMEND_DECREASE/
   // UTILIZE). domain/closeEligibility.ts's own doc comment covers the preconditions gating this movement.
   CLOSE: -1,
+  // F1 (external BA review, 2026-08-25) — AUTO EXPIRY. Same write-off direction as CLOSE (the date-
+  // triggered analog of it) — see domain/expiryEligibility.ts's own doc comment for the preconditions.
+  EXPIRE: -1,
+  // A11/B7 Reopen — redesigned 2026-08-25 after live UAT (see domain/reopenRestoration.ts's own top doc
+  // comment for the full rationale): REOPEN now carries its OWN real, positive restoration amount
+  // (computed by computeReopenRestoreAmount(), never typed by the Maker) directly, same "establish/
+  // increase" direction as ISSUE/AMEND_INCREASE — no longer a 0-effect movement paired with a separate
+  // linked REVERSAL leg.
+  REOPEN: 1,
+  // AMEND_EXPIRY_DATE (A2/B2's third amendment option, also the Expiry Extension Amendment entry
+  // point) — same "0, not absent" rationale as REOPEN above: it only ever updates the expiryDate
+  // column, amount is always '0' by construction, no balance effect of its own.
+  AMEND_EXPIRY_DATE: 0,
 };
 
 /** movementTypes whose `amount` field represents a face-level delta needing §6.2 Tolerance conversion before it contributes to Confirmed Balance — see domain/tolerance.ts. Confirmed/Available Balance derivation always uses ceilingAmount (already converted), never amount, so this list is informational/for callers assembling movements. */
@@ -54,7 +67,23 @@ export const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set(
 /** Face-amount-affecting movementTypes — see computeFaceAmount. */
 const FACE_AMOUNT_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE']);
 
-function signedAmount(m: Pick<BalanceMovement, 'movementType' | 'ceilingAmount'>): Decimal {
+type ReversibleMovement = Pick<BalanceMovement, 'movementId' | 'movementType' | 'ceilingAmount' | 'reversalOfMovementId'>;
+
+/**
+ * F1 (external BA review) §11.2 — `REVERSAL`'s direction is dynamic: the flipped sign of the movement
+ * it reverses (found via `reversalOfMovementId` within the SAME movements list `byId` was built from —
+ * a REVERSAL always lives on the same contract's own movement history as the movement it reverses).
+ * Resolving through `signedAmount` itself (not a fixed lookup) means a REVERSAL-of-a-REVERSAL would
+ * also resolve correctly if one were ever created, though nothing in this codebase does that today.
+ */
+function signedAmount(m: ReversibleMovement, byId: ReadonlyMap<string, ReversibleMovement>): Decimal {
+  if (m.movementType === 'REVERSAL') {
+    const original = m.reversalOfMovementId ? byId.get(m.reversalOfMovementId) : undefined;
+    if (!original) {
+      throw new Error(`REVERSAL movement "${m.movementId}" has no resolvable reversalOfMovementId within the supplied movements list.`);
+    }
+    return signedAmount(original, byId).negated();
+  }
   const direction = MOVEMENT_DIRECTION[m.movementType];
   if (direction === undefined) {
     throw new Error(`MOVEMENT_DIRECTION has no entry for movementType "${m.movementType}" — extend balanceDerivation.ts before using it here.`);
@@ -62,17 +91,23 @@ function signedAmount(m: Pick<BalanceMovement, 'movementType' | 'ceilingAmount'>
   return parseMonetaryAmount(m.ceilingAmount).times(direction);
 }
 
+function byMovementId(movements: readonly ReversibleMovement[]): ReadonlyMap<string, ReversibleMovement> {
+  return new Map(movements.map((m) => [m.movementId, m]));
+}
+
 /** Design doc §3.3 — Confirmed Balance = Σ RELEASED movements (Ceiling-level, i.e. ceilingAmount not amount). */
-export function computeConfirmedBalance(movements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[]): Decimal {
-  return movements.filter((m) => m.status === 'RELEASED').reduce((acc, m) => acc.plus(signedAmount(m)), ZERO);
+export function computeConfirmedBalance(movements: readonly (ReversibleMovement & Pick<BalanceMovement, 'status'>)[]): Decimal {
+  const byId = byMovementId(movements);
+  return movements.filter((m) => m.status === 'RELEASED').reduce((acc, m) => acc.plus(signedAmount(m, byId)), ZERO);
 }
 
 /** Design doc §3.3 — Available Balance = Confirmed Balance ± Σ PENDING movements. */
 export function computeAvailableBalance(
   confirmedBalance: Decimal,
-  movements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[],
+  movements: readonly (ReversibleMovement & Pick<BalanceMovement, 'status'>)[],
 ): Decimal {
-  const pendingDelta = movements.filter((m) => m.status === 'PENDING').reduce((acc, m) => acc.plus(signedAmount(m)), ZERO);
+  const byId = byMovementId(movements);
+  const pendingDelta = movements.filter((m) => m.status === 'PENDING').reduce((acc, m) => acc.plus(signedAmount(m, byId)), ZERO);
   return confirmedBalance.plus(pendingDelta);
 }
 
@@ -89,11 +124,12 @@ export function computeAvailableBalance(
  * `domain/offBalanceExposure.ts`'s three sufficiency checks for where this feeds into Tight Available
  * Balance.
  */
-export function computePendingDecreaseTotal(movements: readonly Pick<BalanceMovement, 'movementType' | 'ceilingAmount' | 'status'>[]): Decimal {
+export function computePendingDecreaseTotal(movements: readonly (ReversibleMovement & Pick<BalanceMovement, 'status'>)[]): Decimal {
+  const byId = byMovementId(movements);
   return movements
     .filter((m) => m.status === 'PENDING')
     .reduce((acc, m) => {
-      const signed = signedAmount(m);
+      const signed = signedAmount(m, byId);
       return signed.isNegative() ? acc.plus(signed.abs()) : acc;
     }, ZERO);
 }

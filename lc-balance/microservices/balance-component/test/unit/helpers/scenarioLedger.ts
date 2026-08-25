@@ -13,7 +13,7 @@ import { checkAmendDecreaseSufficiency } from '../../../src/domain/amendDecrease
 import { checkRedeemSufficiency, RedeemCheckResult } from '../../../src/domain/shgtRedeem';
 import type { BalanceMovement, InstrumentType } from '../../../src/types';
 
-type LedgerMovement = Pick<BalanceMovement, 'movementType' | 'amount' | 'ceilingAmount' | 'status'>;
+type LedgerMovement = Pick<BalanceMovement, 'movementId' | 'movementType' | 'amount' | 'ceilingAmount' | 'status' | 'reversalOfMovementId'>;
 
 export class ScenarioLedger {
   private movements: LedgerMovement[] = [];
@@ -52,6 +52,11 @@ export class ScenarioLedger {
     return computeCeilingAmount(amount, this.tolerancePct, movementType, this.instrumentType);
   }
 
+  /** F1 (external BA review) — computeConfirmedBalance()/computeAvailableBalance()/computePendingDecreaseTotal() now need movementId/reversalOfMovementId (REVERSAL's own dynamic-direction resolution) — auto-assigns a synthetic movementId per push, reversalOfMovementId always null (this test helper never constructs a REVERSAL). */
+  private push(m: Pick<LedgerMovement, 'movementType' | 'amount' | 'ceilingAmount' | 'status'>): void {
+    this.movements.push({ ...m, movementId: `m${this.movements.length}`, reversalOfMovementId: null });
+  }
+
   /**
    * A movementType with no sufficiency check (Design doc §5: ISSUE/
    * AMEND_INCREASE on IPLC_LC/EPLC_LC; CREATE on Acceptance; ISSUE on SHGT
@@ -60,14 +65,14 @@ export class ScenarioLedger {
    */
   credit(movementType: string, amount: string): Decimal {
     const ceiling = this.ceilingFor(movementType, amount);
-    this.movements.push({ movementType, amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
+    this.push({ movementType, amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
     return ceiling;
   }
 
   /** Symmetric to credit() — a decreasing movementType with no Available-Balance sufficiency check (e.g. PARTIAL_SETTLE/FULL_SETTLE on Acceptance). */
   debit(movementType: string, amount: string): Decimal {
     const ceiling = this.ceilingFor(movementType, amount);
-    this.movements.push({ movementType, amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
+    this.push({ movementType, amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
     return ceiling;
   }
 
@@ -84,7 +89,7 @@ export class ScenarioLedger {
       tightAvailableBalance: this.confirmed().minus(computePendingDecreaseTotal(this.movements)).minus(offBalanceExposure),
     });
     if (result.ok) {
-      this.movements.push({ movementType: 'AMEND_DECREASE', amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
+      this.push({ movementType: 'AMEND_DECREASE', amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
     }
     return { ...result, ceilingAmount: ceiling };
   }
@@ -100,7 +105,7 @@ export class ScenarioLedger {
       offBalanceExposure,
     });
     if (result.ok) {
-      this.movements.push({ movementType: 'UTILIZE', amount, ceilingAmount: amount, status: 'PENDING' });
+      this.push({ movementType: 'UTILIZE', amount, ceilingAmount: amount, status: 'PENDING' });
     }
     return result;
   }
@@ -110,7 +115,7 @@ export class ScenarioLedger {
     const ceiling = this.ceilingFor(movementType, amount);
     const result = checkRedeemSufficiency({ redeemAmount: ceiling, sgAvailableBalance: this.available() });
     if (result.ok) {
-      this.movements.push({ movementType, amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
+      this.push({ movementType, amount, ceilingAmount: ceiling.toFixed(), status: 'RELEASED' });
     }
     return result;
   }

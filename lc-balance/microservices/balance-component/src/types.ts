@@ -36,7 +36,14 @@ export type InstrumentType =
   | 'EPLC_EXPORT_BILLS_DISCOUNTED'
   | 'EPLC_EXAMINATION';
 
-export type ContractStatus = 'ACTIVE' | 'SUPERSEDED' | 'CLOSED' | 'CANCELLED';
+/**
+ * F1 (external BA review) — `EXPIRED` is a distinct terminal state from `CLOSED`: date-triggered
+ * auto-release (AUTO EXPIRY, `movementType: 'EXPIRE'`) vs. human-initiated closure (A10/B6/AUTO CLOSE,
+ * `movementType: 'CLOSE'`) are legally distinct events, kept separately reportable. `EXPIRED` can
+ * transition back to `ACTIVE` via an Expiry Extension Amendment; `CLOSED` can transition back via
+ * Reopen (A11/B7) — see domain/expiryEligibility.ts and service/balanceService.ts's own doc comments.
+ */
+export type ContractStatus = 'ACTIVE' | 'SUPERSEDED' | 'CLOSED' | 'CANCELLED' | 'EXPIRED';
 
 /**
  * §4 Maker/Checker lifecycle. PENDING is created by a maker (createdBy);
@@ -110,6 +117,24 @@ export interface BalanceContract {
   tenorType?: TenorType | null;
   tenorDays?: number | null;
   maturityDate?: string | null;
+  /**
+   * F1 (external BA review) — the LC/Confirmation's own validity/expiry date (UCP 600 Art. 6(d)),
+   * distinct from maturityDate above (a Usance/Acceptance's own settlement date — a different trade-
+   * finance concept, never conflated). `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only. Drives AUTO
+   * EXPIRY together with mailFloatGraceDays below. Captured at ISSUE (A1/B1); amendable afterward via
+   * A2/B2's `AMEND_EXPIRY_DATE` (also the Expiry Extension Amendment entry point once EXPIRED).
+   */
+  expiryDate?: string | null;
+  /**
+   * F1 (external BA review) — the mail-float grace period (days) added to expiryDate before AUTO
+   * EXPIRY may trigger; NOT UCP 600 Art. 14(c)'s 21-day presentation period (a different rule for a
+   * different event). Captured server-side from the per-side config default
+   * (MAIL_FLOAT_GRACE_DAYS.IMPORT/EXPORT in config.ts) at ISSUE time and frozen on the contract from
+   * then on — same "caller may override, otherwise the config default at creation time, immutable
+   * after" convention as tolerancePct — so a later config change never retroactively shifts an
+   * already-booked LC's own expiry-release timing.
+   */
+  mailFloatGraceDays?: number | null;
   openingBalance: string;
   sourceAmendmentNo?: number | null;
   effectiveFrom: string;
@@ -140,6 +165,11 @@ export interface BalanceMovement {
   reversalOfMovementId?: string | null;
   reasonCode?: string | null;
   remarks?: string | null;
+  /**
+   * F1 (external BA review) — `AMEND_EXPIRY_DATE` only. See db/schema.ts's own `new_expiry_date`
+   * column comment.
+   */
+  newExpiryDate?: string | null;
   transactionDate?: string | null;
   businessDate?: string | null;
   valueDate?: string | null;

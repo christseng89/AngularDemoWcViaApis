@@ -75,6 +75,22 @@ export function balanceContractsRouter(service: BalanceService): Router {
     );
   });
 
+  // GET /balance-contracts/reopen-eligible?instrumentType=&lcNumber=&page=&pageSize=
+  // F1 (external BA review) — A11/B7 Reopen, Step-1 picker hint (service.listReopenEligibleContracts()).
+  // Every CLOSED root LC/Confirmation with no open Events anywhere in the tree — no SG/Acceptance-
+  // balance-zero condition, unlike close-eligible above (see that method's own doc comment).
+  router.get('/balance-contracts/reopen-eligible', (req, res) => {
+    const { instrumentType, lcNumber, page, pageSize } = req.query;
+    if (!instrumentType) throw new RequestValidationError('instrumentType is required.');
+    res.json(
+      service.listReopenEligibleContracts(instrumentType as InstrumentType, {
+        lcNumber: lcNumber as string | undefined,
+        page: page ? Number(page) : undefined,
+        pageSize: pageSize ? Number(pageSize) : undefined,
+      }),
+    );
+  });
+
   // GET /balance-contracts/:balanceContractId/balance
   router.get('/balance-contracts/:balanceContractId/balance', (req, res) => {
     res.json(service.getBalanceSnapshot(req.params.balanceContractId));

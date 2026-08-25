@@ -10,6 +10,7 @@ import {
   TransactionFunction,
   childInstrumentTypesOf,
   defaultLcInstrumentTypeForSide,
+  systemMovementLabel,
   tenorTypeLabel,
 } from './balance-component.model';
 import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
@@ -60,6 +61,16 @@ export function functionForEvent(event: InquiredEvent): TransactionFunction | un
     (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ??
     resolveFunctionForMovement(contract.instrumentType, movement.movementType)
   );
+}
+
+/**
+ * F1 — plain-text Function-column fallback for `EXPIRE`/`REVERSAL`, which `functionForEvent()` above can
+ * never resolve to a real `TransactionFunction` (neither is ever human-selectable — see
+ * `systemMovementLabel()`'s own doc comment). Callers check this ONLY when `functionForEvent()` itself
+ * returns `undefined` — a real function match always wins.
+ */
+export function systemLabelForEvent(event: InquiredEvent): string | null {
+  return systemMovementLabel(event.movement.movementType);
 }
 
 /**
@@ -465,6 +476,11 @@ export class InquireEventsService {
   /** Same per-phase resolution selectEvent() uses, extracted so the merged Events table can show it per row without clicking through to "View". Undefined for legacy data with no matching function. */
   functionFor(event: InquiredEvent): TransactionFunction | undefined {
     return functionForEvent(event);
+  }
+
+  /** F1 — plain-text Function-column fallback for a row functionFor() can't resolve (EXPIRE/REVERSAL) — see systemLabelForEvent()'s own doc comment. Null for every other unresolved case (e.g. legacy data), same as before. */
+  systemLabelFor(event: InquiredEvent): string | null {
+    return systemLabelForEvent(event);
   }
 
   selectEvent(event: InquiredEvent): void {

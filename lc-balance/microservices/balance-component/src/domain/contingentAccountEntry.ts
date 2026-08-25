@@ -122,11 +122,33 @@ export function deriveContingentAccountEntry(params: {
   amount: string;
   currency: string;
   tenorType?: TenorType | null;
+  /**
+   * F1 (external BA review) — `REVERSAL` only. `REVERSAL` has no fixed MOVEMENT_DIRECTION entry of its
+   * own (dynamic, per domain/balanceDerivation.ts's own doc comment) — the caller (service/
+   * balanceService.ts, which has already resolved the movement being reversed in order to compute the
+   * REVERSAL's own amount) passes that original movement's fixed direction here so this function can
+   * derive the flipped pair. Ignored for every other movementType.
+   */
+  reversedDirection?: 1 | -1;
 }): ContingentAccountEntry | null {
   const family = accountFamilyFor(params.instrumentType);
   if (!family) return null;
 
-  const baseDirection = MOVEMENT_DIRECTION[params.movementType];
+  // F1, user-reported 2026-08-25 ("A2 B2 extension不牽涉金額 不需要出ACCOUNT ENTRIES") — AMEND_EXPIRY_DATE
+  // never has a real balance/GL effect of its own (plain amendment, or the Expiry Extension Amendment
+  // entry point — either way it only ever updates the expiryDate column; the actual restoration on the
+  // Extension path is Checker Release's own linked REVERSAL, which generates its own separate real entry).
+  // Explicitly null, same treatment as EPLC_EXAMINATION (B3) above — not a zero-amount placeholder pair.
+  if (params.movementType === 'AMEND_EXPIRY_DATE') return null;
+
+  // Now MOVEMENT_DIRECTION's every remaining entry is genuinely fixed at 1 or -1 — AMEND_EXPIRY_DATE (the
+  // one other 0-mapped entry) already returned null above, so this cast is exact, not an approximation.
+  const baseDirection =
+    params.movementType === 'REVERSAL'
+      ? params.reversedDirection === undefined
+        ? undefined
+        : ((-params.reversedDirection) as 1 | -1)
+      : (MOVEMENT_DIRECTION[params.movementType] as 1 | -1 | undefined);
   if (baseDirection === undefined) return null;
 
   const signedAmount = parseMonetaryAmount(params.amount);

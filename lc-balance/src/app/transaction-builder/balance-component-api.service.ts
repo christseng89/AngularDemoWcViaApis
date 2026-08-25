@@ -33,6 +33,10 @@ export interface CreateMovementRequest {
   /** Design doc §7 Tenor Type Routing (v0.7) — only for Acceptance (A6/B4). SELLERS_USANCE/BUYERS_USANCE share identical Balance mechanics; this is audit/reporting only. */
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
   tenorDays?: number | null;
+  /** F1 (external BA review, v1.19.0) — A1/B1 (ISSUE) only, optional. The LC's own UCP 600 Art.6(d) expiry/validity date; the microservice captures mailFloatGraceDays onto the contract server-side from config, never client-supplied. */
+  expiryDate?: string | null;
+  /** F1 — AMEND_EXPIRY_DATE only (A2/B2's third subChoice option). The new expiry date, either a plain amendment (contract ACTIVE) or an Expiry Extension Amendment (contract EXPIRED) depending on the resolved contract's own current status — the UI never distinguishes the two, the server does. */
+  newExpiryDate?: string | null;
   createdBy: string;
 }
 
@@ -48,6 +52,10 @@ export interface BalanceContract {
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
   /** The parent LC's own declared Tenor Days, copied onto A6/B4's Acceptance instead of being freely typed. */
   tenorDays?: number | null;
+  /** F1 (external BA review, v1.19.0) — the LC's own UCP 600 Art.6(d) expiry/validity date, IPLC_LC/EPLC_LC/EPLC_CONFIRMATION only. Independent of maturityDate (Usance/Acceptance's own due date, unrelated concept; not modeled client-side). Amendable via A2/B2's third subChoice option (movementType 'AMEND_EXPIRY_DATE'). */
+  expiryDate?: string | null;
+  /** F1 — captured server-side from config at ISSUE time, fixed thereafter (same convention as tolerancePct). Never client-supplied; surfaced here only for display. */
+  mailFloatGraceDays?: number | null;
 }
 
 /** Items are ordered by lc_number ascending, page by page. */
@@ -117,6 +125,10 @@ export interface BalanceMovement {
   sourceTransactionRef?: string | null;
   /** See CreateMovementRequest.referencedTransactionId's own doc comment for the full rule. */
   referencedTransactionId?: string | null;
+  /** F1 (external BA review, v1.19.0) — REVERSAL only, the movementId of the EXPIRE/CLOSE movement this negates. Server-generated internally (Extension Amendment/Reopen); never caller-supplied. */
+  reversalOfMovementId?: string | null;
+  /** F1 — AMEND_EXPIRY_DATE only. See CreateMovementRequest.newExpiryDate's own doc comment. */
+  newExpiryDate?: string | null;
   warnings?: MovementWarning[] | null;
   contingentAccountEntry?: ContingentAccountEntry | null;
   createdBy: string;
@@ -277,6 +289,19 @@ export class BalanceComponentApiService {
     const params: Record<string, string | number> = { instrumentType, pageSize };
     if (lcNumber) params['lcNumber'] = lcNumber;
     return this.http.get<CatalogPage>(`${this.base}/balance-contracts/close-eligible`, { params });
+  }
+
+  /**
+   * F1 (external BA review, v1.19.0) — A11/B7 (Reopen) only, the Step-1 picker hint, backed by the
+   * microservice's own `listReopenEligibleContracts()` (CLOSED status, no open Events anywhere in the
+   * tree — deliberately NOT closeEligible()'s own SG/Acceptance-balance-zero condition, see that
+   * method's own doc comment on the microservice side). Same "one aggregate call, pageSize 200" shape as
+   * closeEligible() above.
+   */
+  reopenEligible(instrumentType: InstrumentType, lcNumber?: string, pageSize = 200): Observable<CatalogPage> {
+    const params: Record<string, string | number> = { instrumentType, pageSize };
+    if (lcNumber) params['lcNumber'] = lcNumber;
+    return this.http.get<CatalogPage>(`${this.base}/balance-contracts/reopen-eligible`, { params });
   }
 
   getSnapshot(balanceContractId: string): Observable<BalanceSnapshot> {

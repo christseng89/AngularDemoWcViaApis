@@ -57,11 +57,18 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   const patch: Partial<BuilderModel> = {};
   const fail = (error: string): SubmitValidation => ({ error, patch });
   const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  // F1 — AMEND_EXPIRY_DATE (A2/B2's third subChoice option) never has a real Amount at all (the field is
+  // hidden — see builder-fields.ts's own isAmendExpiryDate) — buildSubmitRequest() below sends a fixed
+  // '0' regardless of what model.amount currently holds, so the blank-amount guard below must not fire.
+  const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
 
-  if (!model.instrumentType || !model.movementType || !model.amount || !model.currency || !model.createdBy) {
+  if (!model.instrumentType || !model.movementType || (!isAmendExpiryDate && !model.amount) || !model.currency || !model.createdBy) {
     return fail('Fill in amount, currency, createdBy.');
   }
-  if (amountExceedsCurrencyDecimals(model.amount, model.currency)) {
+  if (isAmendExpiryDate && !model.newExpiryDate) {
+    return fail('New Expiry Date is mandatory.');
+  }
+  if (!isAmendExpiryDate && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
     return fail(`Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`);
   }
   // Applies uniformly, including B2 (which used to accept a negative Amount to express Decrease — now
@@ -70,9 +77,11 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   //
   // A10/B6 (Close) exempted — its own Amount is system-derived from the current Confirmed Balance
   // (never user-typed, see builder-fields.ts's own amountFromClose), and 0 is a legitimate, common write-
-  // off figure for an already fully-utilized LC (nothing left to reserve). Every OTHER function still
-  // means "0 isn't a real transaction" here.
-  if (model.movementType !== 'CLOSE' && Number(model.amount) <= 0) {
+  // off figure for an already fully-utilized LC (nothing left to reserve). A11/B7 (Reopen, F1) and
+  // AMEND_EXPIRY_DATE (F1) exempted too — both are always exactly 0 by construction (see
+  // builder-fields.ts's own amountFromFixed/isAmendExpiryDate). Every OTHER function still means "0 isn't
+  // a real transaction" here.
+  if (model.movementType !== 'CLOSE' && model.movementType !== 'REOPEN' && !isAmendExpiryDate && Number(model.amount) <= 0) {
     return fail('Amount must be greater than 0.');
   }
   if (ctx.dynamicSecondaryRefLabel && !model.secondaryRef) {
@@ -168,12 +177,16 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
 export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
   const { model, selectedFunction } = ctx;
   const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  // F1 — AMEND_EXPIRY_DATE's own Amount is always '0' by construction, regardless of whatever
+  // model.amount currently holds (the field is hidden — see builder-fields.ts's own isAmendExpiryDate).
   const wireAmount =
-    selectedFunction?.subChoice?.key === 'amendDirection'
-      ? ctx.amendDirection === 'DECREASE'
-        ? String(-Math.abs(Number(model.amount)))
-        : String(Math.abs(Number(model.amount)))
-      : String(model.amount);
+    model.movementType === 'AMEND_EXPIRY_DATE'
+      ? '0'
+      : selectedFunction?.subChoice?.key === 'amendDirection'
+        ? ctx.amendDirection === 'DECREASE'
+          ? String(-Math.abs(Number(model.amount)))
+          : String(Math.abs(Number(model.amount)))
+        : String(model.amount);
   const request: CreateMovementRequest = {
     instrumentType: model.instrumentType!,
     movementType: model.movementType!,
@@ -187,6 +200,14 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
   if (selectedFunction?.tenorTypeOptions?.length) {
     request.tenorType = model.tenorType;
     if (model.tenorDays) request.tenorDays = Number(model.tenorDays);
+  }
+  // F1 — A1/B1 (ISSUE) only, optional.
+  if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && model.expiryDate) {
+    request.expiryDate = model.expiryDate;
+  }
+  // F1 — AMEND_EXPIRY_DATE only (A2/B2's third subChoice option).
+  if (model.movementType === 'AMEND_EXPIRY_DATE' && model.newExpiryDate) {
+    request.newExpiryDate = model.newExpiryDate;
   }
 
   if (isCreatingMovement(model)) {

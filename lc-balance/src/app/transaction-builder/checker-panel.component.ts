@@ -170,7 +170,13 @@ export class CheckerPanelComponent implements OnChanges {
       ibNumber: secondaryField === 'ibNumber' ? this.checkerSecondaryRef : null,
       sgNumber: secondaryField === 'sgNumber' ? this.checkerSecondaryRef : null,
     };
-    this.api.resolveContract(this.selectedFunction.instrumentType, naturalKey).subscribe({
+    // F1 (external BA review, v1.19.0) — A11/B7 (Reopen) only. Every other function's own Checker search
+    // target is still ACTIVE while its movement is PENDING (a CLOSE/EXPIRE hasn't taken effect until
+    // Release) — but A11/B7's whole point is a movement PENDING against an ALREADY-CLOSED contract, so
+    // the default ACTIVE-only resolveContract() would 404 here (real bug found via live testing:
+    // "No Logical Contract exists yet for this natural key" even though a genuine PENDING REOPEN existed).
+    const includeAnyStatus = !!this.selectedFunction.requiresReopenEligibility;
+    this.api.resolveContract(this.selectedFunction.instrumentType, naturalKey, includeAnyStatus).subscribe({
       next: (contract) => {
         this.checkerSearching = false;
         this.checkerContract = contract;

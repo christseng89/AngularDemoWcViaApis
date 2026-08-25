@@ -52,7 +52,24 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // current Confirmed Balance exactly (see submit-rules.ts's own closeShaped exact-amount comment on the
   // microservice side).
   const amountFromClose = strategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance' && !!selectedContractSnapshot;
-  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose || amountFromSgRedeem;
+  // A11/B7 (Reopen, F1) only — redesigned 2026-08-25 after live UAT ("REOPEN ui不用輸入金額 但是會用lc
+  // balance出帳 account entries, 給checker review"): the real restoration amount is entirely server-
+  // computed at Submit time from the LC's own write-off history (domain/reopenRestoration.ts on the
+  // microservice side) — there is nothing for a Maker to see or type, so the Amount field is hidden
+  // outright (same treatment as isAmendExpiryDate below), not merely locked/disabled-but-visible like
+  // amountFromClose. `model.amount` still carries a harmless '0' placeholder (see
+  // FunctionStrategy.movementDerivation.amountFixed's own doc comment) purely because the wire schema
+  // requires SOME valid MonetaryAmount string — the server discards it and substitutes its own computed
+  // figure regardless of what's sent.
+  const amountFromFixed = strategy?.movementDerivation.amountFixed != null;
+  // F1 — A2/B2's third subChoice option (AMEND_EXPIRY_DATE). Amount has no meaning here (always '0' by
+  // construction, same reasoning as amountFromFixed above) — the Amount field is swapped out entirely for
+  // the new newExpiryDate date field below, not merely locked in place like amountFromClose/amountFromFixed.
+  const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
+  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose || amountFromSgRedeem || amountFromFixed;
+  // A1/B1 only — F1's own new optional Expiry Date input (UCP 600 Art.6(d)); mailFloatGraceDays is
+  // captured server-side from config, never a client-side field.
+  const showsExpiryDateInput = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
   const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
   // A1/B1 = Input; every other function = carry from A1/B1 + protected — see carriedCurrency (function-policy.ts).
   const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
@@ -85,7 +102,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
                   : amountLocked
                     ? 'Amount (carried from the Document Arrival, protected)'
                     : 'Amount (face-level, per Design doc §6.2)',
-        required: true,
+        required: !isAmendExpiryDate && !amountFromFixed,
         type: 'number',
         disabled: amountLocked,
         max: amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
@@ -95,11 +112,32 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
         // Keeps the spinner/step granularity in sync with the typed Currency (e.g. JPY -> step 1).
         step: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
       },
+      // Hidden outright for A2/B2's third subChoice option (AMEND_EXPIRY_DATE — swapped for newExpiryDate
+      // below) and for A11/B7 (amountFromFixed — see that flag's own doc comment above: nothing for a
+      // Maker to see or type, the real amount is entirely server-computed at Submit).
+      hide: isAmendExpiryDate || amountFromFixed,
       // Uses Formly's expressions to keep props.step live as Currency changes, rather than a full field
       // rebuild (which would reassign `fields` on every keystroke and risk input-focus loss).
       expressions: {
         'props.step': (f: any) => Math.pow(10, -decimalPlacesForCurrency(f.model?.currency)),
       },
+    },
+    {
+      // F1 — A2/B2's third subChoice option (AMEND_EXPIRY_DATE), also the Expiry Extension Amendment entry
+      // point once the resolved contract is EXPIRED — the UI never distinguishes the two, the server does
+      // (see BalanceComponentApiService.CreateMovementRequest.newExpiryDate's own doc comment).
+      key: 'newExpiryDate',
+      type: 'input',
+      props: { label: 'New Expiry Date', type: 'date', required: isAmendExpiryDate },
+      hide: !isAmendExpiryDate,
+    },
+    // F1 — A1/B1 only, optional. The LC's own UCP 600 Art.6(d) expiry/validity date; mailFloatGraceDays
+    // itself is captured server-side from config at ISSUE time, never a client-side field.
+    {
+      key: 'expiryDate',
+      type: 'input',
+      props: { label: 'Expiry Date (UCP 600 Art.6(d), optional)', type: 'date' },
+      hide: !showsExpiryDateInput,
     },
     {
       key: 'currency',

@@ -527,7 +527,144 @@ info:
         movementType string alone, since A3S's own MIN(Bill, SG Outstanding) match can legitimately equal
         the SG's full outstanding balance too. A standalone `FULL_REDEEM` (no `businessEventId`) is
         unaffected either way.
-  version: "1.18.0"
+
+    v1.19.0 (2026-08-25, F1 — external BA review, UCP 600 Art.16(f) auto-release mechanism, full scope
+    per `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §7–§11): AUTO EXPIRY + AUTO CLOSE background
+    sweep, a new `REVERSAL` movementType, Expiry Extension Amendment, and A11/B7 Reopen. Every balance-
+    changing addition below is reached through the existing generic `POST /balance-movements` /
+    `POST /balance-movements/{id}/release` pair, same "one movement, one leg, one call" principle as the
+    rest of this contract — the one new endpoint is `GET /balance-contracts/reopen-eligible` (see below),
+    a Step-1 picker hint mirroring the existing `close-eligible` endpoint's own shape, not a new mutation.
+      - ADDED: `movementType: 'EXPIRE'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — a date-triggered
+        analog of CLOSE (same `-1` write-off direction), but with its own, DELIBERATELY NARROWER
+        eligibility: contract status ACTIVE, `expiryDate + mailFloatGraceDays` already elapsed, and no
+        open Event anywhere in the contract's own event tree. Unlike CLOSE, EXPIRE does NOT require SG/
+        Acceptance Confirmed Balance to be zero — a still-utilized LC/Confirmation must still expire on its
+        own contractual date. Triggered only by a background sweep (`AUTO_EXPIRY_ENABLED` feature flag),
+        never by a human caller, via two configured system-actor identifiers acting as Maker/Checker
+        (genuine 4-eyes preserved, `assertMakerCheckerSeparation()` unmodified) — sets
+        `ContractStatus.EXPIRED` (new, below) as its own Release side effect.
+      - ADDED: `ContractStatus.EXPIRED` — see the `ContractStatus` schema entry below.
+      - ADDED: two new `BalanceContract` fields — `expiryDate` (LC's own UCP 600 Art.6(d) expiry/validity
+        date; independent of the pre-existing, business-logic-inert `maturityDate`, which is the Usance/
+        Acceptance's own due date, a different concept) and `mailFloatGraceDays` (captured once, from
+        config, at ISSUE time — see the `BalanceContract` schema entries below).
+      - ADDED: `movementType: 'CLOSE'` reused, unmodified, as the AUTO CLOSE batch's own mechanism — a
+        second, independent background sweep (`AUTO_CLOSE_ENABLED` feature flag) scans `EXPIRED` contracts
+        and calls the exact same `evaluateCloseEligibility()`/`createMovement()`/`release()` path a human
+        A10/B6 Close already uses, via the same two system-actor identifiers as AUTO EXPIRY. Both flags are
+        independently toggleable — AUTO EXPIRY carries real accounting/exposure impact and is intended to
+        roll out first and be observed before AUTO CLOSE (pure status finalization, no amount impact) is
+        enabled.
+      - ADDED: `movementType: 'REVERSAL'` — genuinely new infrastructure (the `reversalOfMovementId` field
+        existed on the schema since v1.0.0 but was never populated by any endpoint; it now is). Its
+        direction is NOT a fixed value in the movementType direction table — it is the negation of
+        whatever movement it points at via `reversalOfMovementId`, resolved dynamically. Always created
+        already-linked via `businessEventId` to the compound action that produced it (Extension Amendment
+        or Reopen, below) and released together with it in one Checker action, same compound-leg convention
+        as A3S/B4.
+      - ADDED: `movementType: 'AMEND_EXPIRY_DATE'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` — a
+        zero-balance-effect movement (like REOPEN, below) that updates `expiryDate`. Two behaviors depending
+        on the contract's current status at Release time: against an `ACTIVE` contract it is a plain expiry
+        date amendment; against an `EXPIRED` contract (resolved via a dedicated EXPIRED-only natural-key
+        lookup, since the normal ACTIVE-only resolution can no longer find it) it is the Expiry Extension
+        Amendment — Checker Release additionally requires the new `expiryDate` to be in the future, restores
+        `ContractStatus.ACTIVE`, and generates+releases one linked `REVERSAL` of the contract's own EXPIRE
+        movement, restoring the Confirmed Balance EXPIRE had written off. Carries a new `newExpiryDate`
+        request/response field (see the `BalanceMovement` schema entry below).
+      - ADDED: `movementType: 'REOPEN'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — a zero-balance-
+        effect movement resolved via a dedicated CLOSED-only natural-key lookup (mirrors
+        AMEND_EXPIRY_DATE's own EXPIRED-only lookup). Eligibility: contract status CLOSED, no open Event
+        anywhere in the tree. Checker Release generates+releases one linked `REVERSAL` PER not-yet-reversed
+        EXPIRE/CLOSE movement in the contract's own history (a contract can reach CLOSED via a single human
+        CLOSE, or via AUTO EXPIRY followed by AUTO CLOSE — the latter path's own CLOSE amount is already
+        zero, so reversing only the last movement would restore zero instead of the real historic balance;
+        every not-yet-reversed write-off in the chain is reversed). Not reachable through A2/B2 — a
+        dedicated named business function (A11 for `IPLC_LC`, B7 for `EPLC_CONFIRMATION`) at the Channel
+        API layer (see `balance-component-channel-api.yaml`'s own changelog), reflecting its own higher
+        risk/entitlement tier versus routine Increase/Decrease/Extend.
+      - ADDED `GET /balance-contracts/reopen-eligible` — A11/B7's own Step-1 picker hint, mirroring
+        `GET /balance-contracts/close-eligible`'s own shape (see that endpoint's own description) but
+        filtered to CLOSED contracts with no open Event, deliberately WITHOUT close-eligible's SG/
+        Acceptance-zero condition — see the endpoint's own description below for the full rule. The one
+        genuinely new REST surface this release adds; every other addition reuses the existing generic
+        movement endpoints.
+      - Amount handling: `assertValidAmount()`'s existing CLOSE zero-amount exception now also covers
+        EXPIRE (an already fully-utilized LC's own remaining Confirmed Balance at expiry may legitimately
+        be zero); REOPEN and AMEND_EXPIRY_DATE are both fixed at `'0'` by construction (their own balance
+        effect, if any, comes entirely from a linked REVERSAL leg, never their own signed amount).
+      - Deliberately NOT done this pass, recorded here rather than silently omitted (see `TODO.md`): no
+        sweep "round-splitting" (AUTO CLOSE may process a contract within the SAME sweep cycle it just
+        turned EXPIRED in, leaving zero Extension-Amendment reopen window for a never-utilized LC); no
+        consent-gating on Expiry Extension Amendment or Reopen; existing CLOSE (incl. A10/B6) `reasonCode`
+        stays optional, unchanged — REOPEN's own eligibility check tolerates a null `reasonCode` on the
+        CLOSE(s) it reverses rather than requiring one.
+
+    v1.20.0 (2026-08-25, same day, live UAT on A11/B7 — "REOPEN Submit 出 Account Entries (Pending)...
+    不應該有兩筆" / "Checker要看交易出的帳 再決定 APPROVE 或 REJECT"): REOPEN redesigned. The v1.19.0
+    shape above (a zero-amount REOPEN plus one or more separately-generated, separately-visible `REVERSAL`
+    legs as a Release-time side effect) meant a Checker approving REOPEN saw an empty, zero-entry movement
+    — the real restoration only became visible AFTER approval, with no chance to review the actual Dr/Cr
+    impact first, and Inquire Events/Look Up showed two rows for what is conceptually one business event.
+      - CHANGED: `movementType: 'REOPEN'` now carries its OWN real, positive restoration amount directly —
+        computed server-side at Maker Submit (never caller-typed; the Channel client sends no Amount field
+        for A11/B7 at all) as the sum of the contract's own trailing run of not-yet-reversed RELEASED
+        `EXPIRE`/`CLOSE` movements, walking backward from the most recent movement until the first one
+        that is neither (still correctly handles the §9.7 two-movement EXPIRE→CLOSE chain, restoring their
+        SUM). A real `contingentAccountEntry` is generated at the SAME Submit call, so the Checker reviews
+        the actual account entries and amount BEFORE approving — same "PENDING with a real entry, RELEASED
+        updates the balance" shape every other movementType already has. `MOVEMENT_DIRECTION.REOPEN`
+        changed from `0` to `1` (same "establish/increase" direction as ISSUE/AMEND_INCREASE) accordingly.
+      - REMOVED: REOPEN no longer generates any linked `REVERSAL` movement(s) as a Release-time side
+        effect — Inquire Events/Look Up now show exactly ONE row per Reopen. `movementType: 'REVERSAL'`
+        itself is UNCHANGED and still exists — Expiry Extension Amendment (`AMEND_EXPIRY_DATE` against an
+        `EXPIRED` contract) still uses it exactly as documented under v1.19.0 above; only REOPEN's own use
+        of it was removed.
+      - Amount handling: REOPEN's exact rule updated from "fixed at `'0'`" (v1.19.0 above, `assertValidAmount()`)
+        to "server-computed, non-negative" — grouped with CLOSE/EXPIRE's own zero-exception rule (0 is a
+        legitimate figure, e.g. reopening a CLOSE whose own write-off amount was already 0). Whatever
+        `amount` value a caller submits is silently discarded and overwritten. `AMEND_EXPIRY_DATE` is
+        UNCHANGED — still fixed at exactly `'0'` by construction, this section applied to REOPEN only.
+
+    v1.21.0 (2026-08-25, same day, live UAT — "Auto Close 時必須把REOPEN狀態交易排除 不然才REOPEN 下一秒就被
+    AUTO CLOSE掉了" / "還有AUTO EXPIRE 也把REOPEN狀態交易排除"): AUTO EXPIRY/AUTO CLOSE now each skip a
+    contract still within one sweep interval of its own most recent RELEASED `REOPEN` — narrows the §8.5
+    "no sweep round-splitting" gap recorded under v1.19.0 above: that gap remains for a contract that
+    transitions to `EXPIRED` via a genuine `EXPIRE` (AUTO EXPIRY still immediately hands an already-
+    zero-exposure contract to AUTO CLOSE in the SAME cycle — unchanged, still deliberately deferred), but a
+    contract a human just Reopened (§9.2 Option A, reactivating to `EXPIRED` when the original `expiryDate`
+    had already passed) is no longer immediately swept back to `CLOSED` before there's any chance to follow
+    up (e.g. an Extension Amendment). Time-bounded, not a permanent exclusion: once the grace interval
+    elapses — or any other movement lands on the contract first — normal sweep eligibility resumes, so a
+    REOPEN-to-`ACTIVE` contract whose (still-future-at-the-time) `expiryDate` genuinely arrives later is
+    unaffected and still auto-expires on schedule.
+
+    v1.22.0 (2026-08-25, same day, user-reported — "A2 B2 extension不牽涉金額 不需要出ACCOUNT ENTRIES"):
+    `movementType: 'AMEND_EXPIRY_DATE'` no longer generates a `contingentAccountEntry` — previously
+    returned a spurious zero-amount Dr/Cr pair (an artifact of `MOVEMENT_DIRECTION`'s generic derivation
+    logic, not a deliberate design choice) instead of `null`. Now explicitly `null`, same treatment as
+    `EPLC_EXAMINATION`/`CREATE` (B3 Present Docs) — neither the plain-amendment mode nor the Expiry
+    Extension Amendment mode ever has a real balance/GL effect of its own; Extension's own restoration
+    remains its separately-generated linked `REVERSAL` movement's own real entry, unaffected by this fix.
+
+    v1.23.0 (2026-08-25, same day, user-reported live-testing bug — "IMPORT S01 EXTEND後 無法做後續作業" /
+    "這整個有問題 CLOSE時 餘額10000 REOPEN回復10000 為什麼REVERSAL又回復一次 變成20000餘額?"): FIXED a real
+    double-restoration in the Expiry Extension Amendment path, introduced by the v1.20.0 REOPEN redesign
+    above. A contract can reach `EXPIRED` two ways: a genuine `EXPIRE`, or A11/B7 Reopen reactivating it
+    back to `EXPIRED` (§9.2 Option A, when the original `expiryDate` had already passed) — the latter
+    restores the balance DIRECTLY on REOPEN's own signed amount (v1.20.0), leaving no `REVERSAL` trace.
+    Extension Amendment's own Checker-Release restoration logic still assumed the OLD "REOPEN always
+    leaves a REVERSAL behind" invariant — it kept finding that same already-restored `EXPIRE` (no
+    `REVERSAL` row ever pointed at it) and reversed it a SECOND time, silently double-crediting the
+    balance (a live-reproduced 10,000 → 20,000). Fixed: Extension's own restoration check now looks at
+    whether the contract's own MOST RECENT movement (excluding this Amendment itself) is a RELEASED
+    `EXPIRE` — if so, that is the one genuine thing left to reverse; if it's anything else (most commonly
+    a prior REOPEN), a prior action already restored the balance and Extension generates no `REVERSAL` at
+    all. (Sound by construction: `EXPIRE` can never chain with itself — its own Release side effect
+    immediately clears the `ACTIVE` status AUTO EXPIRY requires — and `CLOSE` can never precede an
+    `EXPIRED` contract, so the trailing run relevant to Extension is always exactly 0 or 1 movement, never
+    a multi-item chain the way REOPEN's own §9.7 case can be.)
+  version: "1.23.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -688,6 +825,56 @@ paths:
       responses:
         '200':
           description: One page of ACTIVE root contracts of this instrumentType currently eligible for Close.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '400':
+          description: instrumentType is missing, or is not one of IPLC_LC/EPLC_LC/EPLC_CONFIRMATION.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/reopen-eligible:
+    get:
+      tags: [BalanceContracts]
+      summary: A11 (Import LC Reopen) / B7 (Export Confirmed LC Reopen) — Step-1 picker hint
+      description: >
+        v1.19.0, F1 §9.6/§11 — mirrors `GET /balance-contracts/close-eligible` above exactly (same
+        batched-per-instrumentType query shape, same aggregate-not-per-candidate approach), but the
+        eligibility rule is deliberately NARROWER, not the same one: every CLOSED root contract of one
+        instrumentType (`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — `400` for any other instrumentType)
+        with no open Event anywhere in its whole event tree. Unlike close-eligible, this endpoint does
+        NOT require SG/Acceptance Confirmed Balance to be zero — REOPEN has no such condition of its own
+        (§9.8), only a genuinely CLOSED status plus no open Event. The SAME eligibility rule
+        `POST /balance-movements` re-checks at Maker Submit (`movementType: 'REOPEN'`) and
+        `POST /balance-movements/{id}/release` re-checks at Checker Approve.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          description: Exact lcNumber filter, same convention as GET /balance-contracts/catalog.
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of CLOSED root contracts of this instrumentType currently eligible for Reopen.
           content:
             application/json:
               schema:
@@ -1270,8 +1457,19 @@ components:
         transitions into it as a side effect of
         POST /balance-movements/{movementId}/release on that contract's own
         CLOSE movement — see A10/B6 Close in the top-level changelog and
-        that endpoint's own description.
-      enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED]
+        that endpoint's own description. EXPIRED (v1.19.0) is a genuinely
+        separate terminal-ish state from CLOSED — reached only via the
+        AUTO EXPIRY background sweep's own EXPIRE movement (date-triggered,
+        `expiryDate + mailFloatGraceDays`), never via a human action —
+        kept distinct from CLOSED (human/Maker-Checker-triggered Close) so
+        audit/reporting can tell the two legally-different events apart.
+        An EXPIRED contract may transition onward to CLOSED (AUTO CLOSE,
+        once genuinely eligible) or back to ACTIVE (Expiry Extension
+        Amendment, `movementType: 'AMEND_EXPIRY_DATE'`); a CLOSED contract
+        may transition back to ACTIVE or EXPIRED via Reopen
+        (`movementType: 'REOPEN'`, A11/B7) — see the v1.19.0/v1.20.0
+        changelog entries for the full mechanism.
+      enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED]
 
     MovementStatus:
       type: string
@@ -1384,6 +1582,25 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.19.0, F1 — LC's own UCP 600 Art.6(d) expiry/validity date, IPLC_LC/EPLC_LC/
+            EPLC_CONFIRMATION only. A genuinely separate concept from maturityDate above (the Usance/
+            Acceptance's own due date) — set at ISSUE, amendable via `movementType: 'AMEND_EXPIRY_DATE'`
+            (A2/B2's third amendment option). Drives the AUTO EXPIRY background sweep together with
+            mailFloatGraceDays below.
+        mailFloatGraceDays:
+          type: integer
+          nullable: true
+          description: >
+            v1.19.0, F1 — number of grace days added to expiryDate before the AUTO EXPIRY sweep will act
+            on this contract, captured from server-side config ONCE at ISSUE time and fixed thereafter
+            (same "captured, not re-read live" convention as tolerancePct) — a later change to the config
+            default does not retroactively shift the auto-release timing of an already-issued LC. Import
+            and Export sides may configure a different default.
         openingBalance: { $ref: '#/components/schemas/MonetaryAmount' }
         sourceAmendmentNo: { type: integer, nullable: true }
         effectiveFrom: { type: string, format: date-time }
@@ -1434,8 +1651,13 @@ components:
           description: >
             v1.1.0 — see this document's top-level v1.1.0 changelog entry.
             Server-derived at creation, persisted immutably; null for the
-            three ON_BALANCE_ASSET instruments and for any unrecognized
-            movementType.
+            three ON_BALANCE_ASSET instruments, for any unrecognized
+            movementType, for `EPLC_EXAMINATION`/`CREATE` (B3 Present Docs —
+            never actually posts to the books, Design Principle D3), and for
+            `movementType: 'AMEND_EXPIRY_DATE'` (v1.22.0, F1 — never has a
+            real balance/GL effect of its own; the Expiry Extension
+            Amendment's own restoration is its separately-generated linked
+            `REVERSAL` movement's own entry, not this one's).
         lmtsReservationId:
           type: string
           nullable: true
@@ -1447,7 +1669,26 @@ components:
             against source — this field is a placeholder passthrough.
         status: { $ref: '#/components/schemas/MovementStatus' }
         supersededMovementId: { type: string, format: uuid, nullable: true, description: Reserved for the not-yet-implemented edit-in-place flow — see the v1.0.0 changelog note. Never populated by any endpoint in this contract today. }
-        reversalOfMovementId: { type: string, format: uuid, nullable: true, description: Reserved for the not-yet-implemented reversal flow — see the v1.0.0 changelog note. Never populated by any endpoint in this contract today. }
+        reversalOfMovementId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            v1.19.0, F1 — the movementId of the EXPIRE movement this `REVERSAL` movement negates. Reserved
+            on the schema since v1.0.0 but never populated by any endpoint until this release; now set on
+            every `movementType: 'REVERSAL'` movement, generated internally by Expiry Extension Amendment
+            only (never caller-supplied directly) — REOPEN was redesigned in v1.20.0 to carry its own
+            restoration amount directly and no longer uses REVERSAL at all. Determines REVERSAL's own
+            dynamic direction — the negation of whatever movement it points at, not a fixed value.
+        newExpiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.19.0, F1 — request/response field on `movementType: 'AMEND_EXPIRY_DATE'` only, the new
+            expiryDate value to apply to the contract. When the target contract is currently EXPIRED
+            (Expiry Extension Amendment), Checker Release additionally requires this date to be strictly
+            in the future.
         reasonCode: { type: string, nullable: true }
         remarks: { type: string, nullable: true }
         transactionDate: { type: string, format: date, nullable: true }

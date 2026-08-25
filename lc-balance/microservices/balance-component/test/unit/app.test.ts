@@ -2540,6 +2540,36 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(lcNumbers).not.toContain('LC-CLOSEHINT-SG');
   });
 
+  test('GET /balance-contracts/reopen-eligible without instrumentType -> 400', async () => {
+    const res = await request(app).get('/balance-contracts/reopen-eligible').expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/instrumentType is required/);
+  });
+
+  test('GET /balance-contracts/reopen-eligible (F1, A11/B7 Step-1 picker hint) returns a CLOSED LC with no open Events and excludes an ACTIVE one', async () => {
+    const closedOk = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-REOPENHINT-OK' }, movementType: 'ISSUE', eventSeq: 1, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${closedOk.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const close = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: closedOk.body.balanceContractId, movementType: 'CLOSE', eventSeq: 2, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${close.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const stillActive = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-REOPENHINT-ACTIVE' }, movementType: 'ISSUE', eventSeq: 1, amount: '5000', currency: 'USD', createdBy: 'maker1' })
+      .expect(201);
+    await request(app).post(`/balance-movements/${stillActive.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app).get('/balance-contracts/reopen-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    const lcNumbers = (res.body.items as Array<{ naturalKey: { lcNumber: string } }>).map((c) => c.naturalKey.lcNumber);
+    expect(lcNumbers).toContain('LC-REOPENHINT-OK');
+    expect(lcNumbers).not.toContain('LC-REOPENHINT-ACTIVE');
+  });
+
   test('GET /balance-contracts?includeAnyStatus=true still resolves a CLOSED (A10) LC by natural key — user-reported gap 2026-08-21 ("LOOKUP也應該看到此LC 項下所有的交易包括CLOSE EVENT"); the default (no flag) stays 404, matching every existing ACTIVE-only caller', async () => {
     const issue = await request(app)
       .post('/balance-movements')

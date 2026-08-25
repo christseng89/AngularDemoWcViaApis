@@ -36,6 +36,8 @@ export class DocumentArrivalHintsService {
   readonly parentSgEligible = new Set<string>();
   /** A10/B6 (Close) only — see loadCloseEligibility()'s own doc comment for why this is populated by ONE aggregate server call, unlike every other Set/Map above. */
   readonly catalogCloseEligible = new Set<string>();
+  /** A11/B7 (Reopen, F1) only — same "one aggregate server call" shape as catalogCloseEligible above, backed by GET /balance-contracts/reopen-eligible instead (CLOSED status, no open Events — no SG/Acceptance-balance-zero condition, that's Close's own rule). See loadReopenEligibility()'s own doc comment. */
+  readonly catalogReopenEligible = new Set<string>();
   /** A7 (Acceptance Settlement) only — its own Parent LC picker. Set of balanceContractId whose LC has at least one child IPLC_ACCEPTANCE contract with a non-zero Available Balance — see loadChildBalanceEligibility()'s own doc comment. User-reported 2026-08-25 ("A07 交易選擇是 LC number 有Acceptance balance 再顯示2ndary ref"). */
   readonly parentAcceptanceEligible = new Set<string>();
 
@@ -149,6 +151,22 @@ export class DocumentArrivalHintsService {
     this.api.closeEligible(instrumentType).subscribe({
       next: (result) => {
         result.items.forEach((c) => this.catalogCloseEligible.add(c.balanceContractId));
+        onDone();
+      },
+      error: () => onDone(),
+    });
+  }
+
+  /**
+   * A11/B7 (Reopen, F1) only. Same "one aggregate server call, no per-candidate `list` param" shape as
+   * loadCloseEligibility() above — `GET /balance-contracts/reopen-eligible` already computes the whole
+   * eligibility (CLOSED status, no open Events anywhere in the tree) server-side.
+   */
+  loadReopenEligibility(instrumentType: InstrumentType, onDone: () => void): void {
+    this.catalogReopenEligible.clear();
+    this.api.reopenEligible(instrumentType).subscribe({
+      next: (result) => {
+        result.items.forEach((c) => this.catalogReopenEligible.add(c.balanceContractId));
         onDone();
       },
       error: () => onDone(),

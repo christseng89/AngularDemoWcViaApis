@@ -33,6 +33,7 @@ interface MovementRow {
   reversal_of_movement_id: string | null;
   reason_code: string | null;
   remarks: string | null;
+  new_expiry_date: string | null;
   transaction_date: string | null;
   business_date: string | null;
   value_date: string | null;
@@ -84,6 +85,7 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     reversalOfMovementId: row.reversal_of_movement_id,
     reasonCode: row.reason_code,
     remarks: row.remarks,
+    newExpiryDate: row.new_expiry_date,
     transactionDate: row.transaction_date,
     businessDate: row.business_date,
     valueDate: row.value_date,
@@ -134,7 +136,7 @@ export class BalanceMovementStore {
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
             contingent_account_entry,
             lmts_reservation_id, status, superseded_movement_id, reversal_of_movement_id,
-            reason_code, remarks, transaction_date, business_date, value_date,
+            reason_code, remarks, new_expiry_date, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before,
             balance_after, warnings, created_by, released_by, created_at, released_at,
@@ -144,7 +146,7 @@ export class BalanceMovementStore {
             @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
             @contingentAccountEntry,
             @lmtsReservationId, @status, @supersededMovementId, @reversalOfMovementId,
-            @reasonCode, @remarks, @transactionDate, @businessDate, @valueDate,
+            @reasonCode, @remarks, @newExpiryDate, @transactionDate, @businessDate, @valueDate,
             @sourceModule, @sourceFunction, @sourceTransactionRef, @referencedTransactionId,
             @balanceBefore,
             @balanceAfter, @warnings, @createdBy, @releasedBy, @createdAt, @releasedAt,
@@ -170,6 +172,7 @@ export class BalanceMovementStore {
           reversalOfMovementId: movement.reversalOfMovementId ?? null,
           reasonCode: movement.reasonCode ?? null,
           remarks: movement.remarks ?? null,
+          newExpiryDate: movement.newExpiryDate ?? null,
           transactionDate: movement.transactionDate ?? null,
           businessDate: movement.businessDate ?? null,
           valueDate: movement.valueDate ?? null,

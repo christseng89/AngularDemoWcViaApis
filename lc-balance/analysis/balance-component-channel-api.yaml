@@ -114,7 +114,33 @@ info:
     `makerSubmittedAt`/`eventSnapshot` before it (see the Microservice API's own "Persisted Event
     Snapshot" decision-log entry, lc-balance-wc/CLAUDE.md): internal Maker/Checker bookkeeping, not a
     channel-facing projection a channel client's own UI actually needs.
-  version: "1.2.0"
+
+
+    v1.3.0 (2026-08-25, F1 follow-through) — retroactive gap fix + new functionCodes. A10 (Import LC
+    Close) / B6 (Export Confirmed LC Close) were added to the underlying Microservice API back in its own
+    v1.16.0 but were never added to this channel contract's `functionCode` enum (every occurrence, now
+    fixed) — see balance-component-api.yaml's own v1.16.0 changelog for the full A10/B6 rule (hasParent:
+    false, currencyMode: CARRIED, amount server-derived from Confirmed Balance, not caller-typed). Added
+    in the SAME pass: `A11` (Import LC Reopen) / `B7` (Export Confirmed LC Reopen) — see the Microservice
+    API's own v1.19.0 changelog entry for the full REOPEN/REVERSAL mechanism this exposes. `ContractStatus`
+    (`ChannelContract.status`) gains `EXPIRED`, mirroring the Microservice API's own v1.19.0 addition.
+    Deliberately NOT added to this channel contract in this pass — the underlying Microservice API's own
+    `EXPIRE`/`CLOSE` AUTO CLOSE background-sweep mechanism, and the Extension-Amendment behavior of
+    `AMEND_EXPIRY_DATE` against an EXPIRED contract, plus `expiryDate` itself as an A1/B1 input field: all
+    are system-triggered or Phase-8-Angular-only additions with no channel-layer surface of their own yet
+    (AUTO EXPIRY/AUTO CLOSE are never reachable through this — or any — channel client, by design; a
+    channel-facing `expiryDate`/`AMEND_EXPIRY_DATE`/`REVERSAL` projection is left for a future pass, same
+    "not (yet) a running service" posture this whole document already carries per its own top-level
+    description).
+
+    v1.4.0 (2026-08-25, same day — REOPEN redesigned after live UAT, see the Microservice API's own
+    v1.20.0 changelog entry): A11/B7's own `help` text corrected — REOPEN no longer produces a linked
+    `REVERSAL` leg at Release; it now carries its own real restoration amount, computed server-side and
+    visible (as a real Account Entries pair) from the moment of Submit, for the Checker to review before
+    approving. No schema shape changed — `A11`/`B7` were already `amount`-free in this channel contract's
+    own `ChannelDerivedTransactionRequest` posture (Amount was never a channel-level concern to begin
+    with, same as every other server-derived function here).
+  version: "1.4.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -217,7 +243,7 @@ paths:
           schema: { $ref: '#/components/schemas/InstrumentType' }
         - name: status
           in: query
-          schema: { type: string, enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED] }
+          schema: { type: string, enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED] }
         - name: q
           in: query
           schema: { type: string }
@@ -589,7 +615,7 @@ components:
       description: One entry from the named business-function catalog — the channel-level mirror of TransactionFunction (balance-component.model.ts).
       required: [code, label, side, instrumentType, hasParent, currencyMode, submitsTransaction, compoundLegs]
       properties:
-        code: { type: string, enum: [A1, A2, A3, A3S, A4, A6, A7, A8, A9, B1, B2, B3, B4, B5] }
+        code: { type: string, enum: [A1, A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11, B1, B2, B3, B4, B5, B6, B7] }
         label: { type: string }
         side: { type: string, enum: [IMPORT, EXPORT] }
         help: { type: string }
@@ -672,7 +698,7 @@ components:
         logicalContractId: { type: string, format: uuid }
         instrumentType: { $ref: '#/components/schemas/InstrumentType' }
         naturalKey: { $ref: '#/components/schemas/ChannelNaturalKey' }
-        status: { type: string, enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED] }
+        status: { type: string, enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED] }
         currency: { type: string, description: This contract's own authoritative Currency Code — the value every A2-A9/B2-B5 transaction against it, or created under it as parent, carries forward. }
         tenorType: { type: string, nullable: true }
         tenorDays: { type: integer, nullable: true }
@@ -709,7 +735,7 @@ components:
       description: Channel-facing projection of the Microservice API's own BalanceMovement, plus the originating functionCode for display/audit.
       properties:
         transactionId: { type: string, format: uuid, description: Equal to the underlying movementId — this channel is a façade, not a separate identity space. }
-        functionCode: { type: string, enum: [A1, A2, A3, A3S, A4, A6, A7, A8, A9, B1, B2, B3, B4, B5] }
+        functionCode: { type: string, enum: [A1, A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11, B1, B2, B3, B4, B5, B6, B7] }
         balanceContractId: { type: string, format: uuid }
         businessEventId: { type: string, format: uuid, nullable: true }
         instrumentType: { $ref: '#/components/schemas/InstrumentType' }
@@ -768,7 +794,7 @@ components:
       additionalProperties: false
       required: [functionCode, amount, eventSeq, createdBy]
       properties:
-        functionCode: { type: string, enum: [A2, A3, A3S, A4, A6, A7, A8, A9, B2, B3, B4, B5] }
+        functionCode: { type: string, enum: [A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11, B2, B3, B4, B5, B6, B7] }
         naturalKey:
           allOf: [{ $ref: '#/components/schemas/ChannelNaturalKey' }]
           nullable: true
@@ -979,3 +1005,43 @@ components:
           compoundLegs:
             - { legInstrumentType: EPLC_ACCEPTANCE, legMovementType: FULL_SETTLE, description: "Usance held-to-maturity only — CNF_MATURE." }
             - { legInstrumentType: EPLC_ACCEPTANCE_REIMB_RECEIVABLE, legMovementType: REIMBURSE, description: "Its matching Reimbursement Receivable, same amount, same Checker Release." }
+        - code: A10
+          label: LC Close
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: CLOSE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "Amount is server-derived from the LC's own current Confirmed Balance, never caller-typed — see the Microservice API's own v1.16.0 changelog entry for the full eligibility rule."
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: CLOSE, description: "Writes off the remaining Confirmed Balance and retires the LC — eligible only once SG/Acceptance Confirmed Balance both = 0 and no open Event remains anywhere in the tree." }]
+        - code: B6
+          label: Confirmed LC Close
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: CLOSE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "Amount is server-derived from the Confirmation's own current Confirmed Balance, never caller-typed — see the Microservice API's own v1.16.0 changelog entry for the full eligibility rule."
+          compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: CLOSE, description: "Writes off the remaining Confirmed Balance and retires the Confirmation — eligible only once Acceptance Confirmed Balance = 0 and no open Event remains anywhere in the tree." }]
+        - code: A11
+          label: LC Reopen
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: REOPEN
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "F1, v1.20.0 — a non-routine, separately-entitled function (not A2's own movementTypeChoice) reopening a CLOSED LC. No Amount field — the server computes the real restoration amount at Submit from the contract's own not-yet-reversed EXPIRE/CLOSE history, generating a real Account Entries pair the Checker reviews before approving. See the Microservice API's own v1.20.0 changelog entry for the full mechanism."
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: REOPEN, description: "Restores ContractStatus to ACTIVE (or EXPIRED, if the original expiry date has since passed) — eligible only from CLOSED with no open Event remaining anywhere in the tree." }]
+        - code: B7
+          label: Confirmed LC Reopen
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: REOPEN
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "F1, v1.19.0 — Export-side symmetric counterpart of A11; same mechanism and eligibility rule."
+          compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: REOPEN, description: "Restores ContractStatus to ACTIVE (or EXPIRED, if the original expiry date has since passed) — eligible only from CLOSED with no open Event remaining anywhere in the tree." }]

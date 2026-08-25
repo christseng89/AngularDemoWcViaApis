@@ -684,6 +684,35 @@ describe('InquireEventsService', () => {
     });
   });
 
+  // F1, user-reported live-testing gap: EXPIRE/REVERSAL have no TransactionFunction of their own (never
+  // human-selectable), so functionFor() always returns undefined for them — systemLabelFor() is the
+  // plain-text fallback the Function column checks before falling back further to a bare "—".
+  describe('systemLabelFor', () => {
+    it('labels EXPIRE as AUTO EXPIRY', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      expect(svc.systemLabelFor(makeEvent({ movement: makeMovement({ movementType: 'EXPIRE' }), contract }))).toBe('AUTO EXPIRY');
+    });
+
+    it('labels REVERSAL distinctly, so a linked Reopen/Extension reversal never renders as a bare dash', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      expect(svc.systemLabelFor(makeEvent({ movement: makeMovement({ movementType: 'REVERSAL' }), contract }))).toBe('REVERSAL (system, linked)');
+    });
+
+    it('returns null for a movementType that already resolves via functionFor() (REOPEN — A11/B7) — no fallback needed', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      expect(svc.systemLabelFor(makeEvent({ movement: makeMovement({ movementType: 'REOPEN' }), contract }))).toBeNull();
+    });
+
+    it('returns null for genuinely unresolvable legacy data too, same as functionFor()', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'EPLC_EXAMINATION' });
+      expect(svc.systemLabelFor(makeEvent({ movement: makeMovement({ movementType: 'AMEND' }), contract }))).toBeNull();
+    });
+  });
+
   describe('selectEvent', () => {
     it('resolves the producing function, reconstructs a read-only field set, and stashes a fresh FormGroup', () => {
       const svc = new InquireEventsService(makeApi());

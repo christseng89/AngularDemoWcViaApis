@@ -46,7 +46,7 @@ export const INSTRUMENT_TYPE_VALUES = [
   'EPLC_EXAMINATION',
 ] as const;
 
-export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCELLED'] as const;
+export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCELLED', 'EXPIRED'] as const;
 
 export const TENOR_TYPE_VALUES = ['SIGHT', 'BUYERS_USANCE', 'SELLERS_USANCE', 'DP', 'DA'] as const;
 
@@ -71,6 +71,12 @@ export const MOVEMENT_TYPE_VALUES = [
   'PARTIAL_SETTLE',
   'FULL_SETTLE',
   'CLOSE',
+  // F1 (external BA review, 2026-08-25) — AUTO EXPIRY / Expiry Extension Amendment / A11-B7 Reopen.
+  // See domain/expiryEligibility.ts and service/balanceService.ts's own doc comments for each.
+  'EXPIRE',
+  'AMEND_EXPIRY_DATE',
+  'REVERSAL',
+  'REOPEN',
 ] as const;
 
 function sqlInList(values: readonly string[]): string {
@@ -96,6 +102,10 @@ CREATE TABLE IF NOT EXISTS balance_contracts (
   tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
   tenor_days                     INTEGER,
   maturity_date                  TEXT,
+  -- F1 (external BA review, 2026-08-25) — see types.ts's BalanceContract.expiryDate/mailFloatGraceDays
+  -- doc comments. IPLC_LC/EPLC_LC/EPLC_CONFIRMATION only; NULL for every other instrumentType.
+  expiry_date                    TEXT,
+  mail_float_grace_days          INTEGER,
   opening_balance                TEXT NOT NULL,
   source_amendment_no            INTEGER,
   effective_from                 TEXT NOT NULL,
@@ -155,6 +165,11 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   reversal_of_movement_id TEXT REFERENCES balance_movements(movement_id),
   reason_code             TEXT,
   remarks                 TEXT,
+  -- F1 (external BA review, 2026-08-25) — AMEND_EXPIRY_DATE only. The new expiryDate value the Maker
+  -- requested (whether a plain amendment against an ACTIVE contract, or an Expiry Extension Amendment
+  -- against an EXPIRED one) — persisted on the PENDING movement so release() can read it back without
+  -- needing the original request object. NULL for every other movementType.
+  new_expiry_date         TEXT,
   transaction_date        TEXT,
   business_date           TEXT,
   value_date              TEXT,

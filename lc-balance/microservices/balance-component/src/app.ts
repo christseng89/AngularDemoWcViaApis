@@ -7,12 +7,17 @@ import { balanceContractsRouter } from './routes/balanceContracts';
 import { balanceMovementsRouter } from './routes/balanceMovements';
 import { ApiError } from './errors';
 
-export function createApp(db: Db): Express {
+/**
+ * F1 (external BA review) — `service` is now an optional param (defaulting to a fresh instance, exactly
+ * the prior behavior) so server.ts can construct the BalanceService itself and keep a reference to it
+ * for registering the AUTO EXPIRY/AUTO CLOSE background interval — see server.ts's own doc comment.
+ * Every existing call site (`createApp(db)`, ~29 in test/unit/app.test.ts) is unaffected.
+ */
+export function createApp(db: Db, service: BalanceService = new BalanceService(db)): Express {
   const app = express();
   app.use(helmet());
   app.use(express.json());
 
-  const service = new BalanceService(db);
   app.use(balanceContractsRouter(service));
   // Quality-report-balance.md BAL-104: rate limiting scoped to /balance-movements — the create/release/
   // reject/cancel/maker-submit lifecycle (the actual Maker/Checker write surface) — rather than applied

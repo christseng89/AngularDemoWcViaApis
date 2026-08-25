@@ -197,7 +197,8 @@
                   <tr *ngFor="let e of inquireEvents.pagedEvents" (click)="inquireEvents.selectEvent(e)">
                     <td>
                       <span class="tb-type-tag" *ngIf="inquireEvents.functionFor(e) as fn">{{ fn.code }} · {{ fn.label }}</span>
-                      <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e)">—</span>
+                      <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e) && inquireEvents.systemLabelFor(e) as sysLabel">{{ sysLabel }}</span>
+                      <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e) && !inquireEvents.systemLabelFor(e)">—</span>
                     </td>
                     <td>
                       <span class="tb-type-tag">{{ e.contract.instrumentType }}</span>

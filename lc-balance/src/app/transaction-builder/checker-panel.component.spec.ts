@@ -198,7 +198,7 @@ describe('CheckerPanelComponent', () => {
         },
       });
 
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC-SYNC', ibNumber: null, sgNumber: null });
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC-SYNC', ibNumber: null, sgNumber: null }, false);
     });
 
     it('an unrelated change (neither key present) is a no-op', () => {
@@ -228,7 +228,7 @@ describe('CheckerPanelComponent', () => {
 
       expect(c.checkerLcNumber).toBe('S001');
       expect(c.checkerSecondaryRef).toBe('G01');
-      expect(api.resolveContract).toHaveBeenCalledWith('SHGT', { lcNumber: 'S001', ibNumber: null, sgNumber: 'G01' });
+      expect(api.resolveContract).toHaveBeenCalledWith('SHGT', { lcNumber: 'S001', ibNumber: null, sgNumber: 'G01' }, false);
     });
 
     it('defaults secondaryRef to empty string when null', () => {
@@ -299,7 +299,7 @@ describe('CheckerPanelComponent', () => {
 
       c.searchCheckerLc();
 
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC1', ibNumber: null, sgNumber: null });
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, false);
       expect(c.checkerContract?.balanceContractId).toBe('C1');
       expect(c.checkerSearching).toBe(false);
       expect(c.checkerItems).toEqual([pendingMovement]); // loadCheckerQueue() side effect, PENDING-only
@@ -315,7 +315,22 @@ describe('CheckerPanelComponent', () => {
 
       c.searchCheckerLc();
 
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null });
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: null }, false);
+    });
+
+    // F1 regression (found via live browser testing, not a unit test gap that existed before): A11/B7's
+    // whole point is a movement PENDING against an ALREADY-CLOSED contract — the default ACTIVE-only
+    // resolveContract() 404s here ("No Logical Contract exists yet for this natural key" even though a
+    // genuine PENDING REOPEN existed), silently blocking the Checker from ever finding it.
+    it('F1: passes includeAnyStatus=true for A11/B7 (Reopen) — its own target contract is CLOSED, not ACTIVE, while the REOPEN movement is PENDING', () => {
+      const api = mockApi();
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A11');
+      c.checkerLcNumber = 'U01';
+
+      c.searchCheckerLc();
+
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'U01', ibNumber: null, sgNumber: null }, true);
     });
 
     it('sets checkerSearchError from the server message on a resolve failure', () => {

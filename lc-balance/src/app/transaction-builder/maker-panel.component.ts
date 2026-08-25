@@ -472,6 +472,18 @@ export class MakerPanelComponent implements OnChanges {
   onSubChoice(): void {
     if (!this.selectedFunction || !this.subChoiceValue) return;
     const fn = this.selectedFunction;
+    // F1 (external BA review, v1.19.0) — B2's own third option (Expiry Date) declares a
+    // movementTypeOverride: AMEND_EXPIRY_DATE is a genuinely distinct movementType, not an amendDirection
+    // variant, so it bypasses the key-based write below entirely — see SubChoice.options[].
+    // movementTypeOverride's own doc comment for why. A2's own third option needs no override (its key
+    // is already 'movementType', which already writes model.movementType directly via the picked value).
+    const chosenOption = fn.subChoice?.options.find((o) => o.value === this.subChoiceValue);
+    if (chosenOption?.movementTypeOverride) {
+      this.model.instrumentType = fn.instrumentType;
+      this.model.movementType = chosenOption.movementTypeOverride;
+      this.afterResolved();
+      return;
+    }
     if (fn.subChoice?.key === 'amendDirection') {
       this.amendDirection = this.subChoiceValue as 'INCREASE' | 'DECREASE';
       return;
@@ -503,6 +515,9 @@ export class MakerPanelComponent implements OnChanges {
       guardFails: !this.model.instrumentType || this.isCreatingMovement,
       instrumentType: this.model.instrumentType!,
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
+      // A11/B7 (Reopen, F1) only — its own candidates are CLOSED, not ACTIVE like every other flat
+      // Catalog picker this service backs; every other function keeps the default (undefined -> 'ACTIVE').
+      status: this.selectedFunction?.requiresReopenEligibility ? 'CLOSED' : undefined,
       qualifies: () => this.filteredCatalogContracts.length,
       onLoaded: (items) => {
         if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
@@ -529,6 +544,13 @@ export class MakerPanelComponent implements OnChanges {
         // DocumentArrivalHintsService.loadCloseEligibility()'s own doc comment for why.
         if (this.selectedFunction?.requiresCloseEligibility) {
           this.documentArrivalHints.loadCloseEligibility(this.model.instrumentType!, () => {
+            this.catalogPicker.total = this.filteredCatalogContracts.length;
+          });
+        }
+        // A11/B7 (Reopen, F1) only — same "one aggregate server call" shape as A10/B6's own
+        // loadCloseEligibility() above.
+        if (this.selectedFunction?.requiresReopenEligibility) {
+          this.documentArrivalHints.loadReopenEligibility(this.model.instrumentType!, () => {
             this.catalogPicker.total = this.filteredCatalogContracts.length;
           });
         }
@@ -600,6 +622,9 @@ export class MakerPanelComponent implements OnChanges {
     }
     if (this.selectedFunction?.requiresCloseEligibility) {
       return { kind: 'hintSet', ids: this.documentArrivalHints.catalogCloseEligible };
+    }
+    if (this.selectedFunction?.requiresReopenEligibility) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.catalogReopenEligible };
     }
     return { kind: 'genericFallback', gatedByMovementType: true };
   }
@@ -734,6 +759,15 @@ export class MakerPanelComponent implements OnChanges {
     }
     if (this.carriedCurrency) {
       this.model.currency = this.carriedCurrency;
+      this.rebuildFields();
+    }
+    // A11/B7 (Reopen, F1) only — a harmless '0' placeholder set immediately on selection, purely because
+    // the wire schema requires SOME valid MonetaryAmount string; the Amount field itself is hidden (see
+    // builder-fields.ts's own amountFromFixed) since the server computes and substitutes the real
+    // restoration amount at Submit regardless of what's sent — see
+    // FunctionStrategy.movementDerivation.amountFixed's own doc comment.
+    if (this.selectedFunctionStrategy?.movementDerivation.amountFixed != null) {
+      this.model.amount = this.selectedFunctionStrategy.movementDerivation.amountFixed;
       this.rebuildFields();
     }
     this.refreshSelectedContractSnapshot();

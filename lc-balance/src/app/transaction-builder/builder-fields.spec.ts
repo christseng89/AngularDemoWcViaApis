@@ -57,10 +57,23 @@ function fieldByKey(fields: ReturnType<typeof buildFields>, key: string) {
 }
 
 describe('builder-fields', () => {
-  // secondaryRef must be the first input field on the entry screen.
-  it('returns the 8 fixed field keys, in order, for a plain A1 submission', () => {
+  // secondaryRef must be the first input field on the entry screen. F1 (external BA review, v1.19.0)
+  // added newExpiryDate (hidden unless AMEND_EXPIRY_DATE) and expiryDate (A1/B1 only, shown here) as two
+  // new fixed fields, always present in the array (hide toggles visibility, not presence).
+  it('returns the 10 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
-    expect(fields.map((f) => f.key)).toEqual(['secondaryRef', 'amount', 'currency', 'tolerancePct', 'tenorType', 'tenorDays', 'eventSeq', 'createdBy']);
+    expect(fields.map((f) => f.key)).toEqual([
+      'secondaryRef',
+      'amount',
+      'newExpiryDate',
+      'expiryDate',
+      'currency',
+      'tolerancePct',
+      'tenorType',
+      'tenorDays',
+      'eventSeq',
+      'createdBy',
+    ]);
   });
 
   describe('Amount field', () => {
@@ -165,6 +178,31 @@ describe('builder-fields', () => {
       expect(amount.props?.label).toBe('Amount (face-level, per Design doc §6.2)');
     });
 
+    it('F1, redesigned 2026-08-25: is hidden entirely (not merely locked) for A11, with NO snapshot needed at all — the real restoration amount is computed server-side at Submit, never shown/typed by the Maker', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A11'), model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN', amount: '0' }, selectedContractSnapshot: null });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.hide).toBe(true);
+      expect(amount.props?.required).toBe(false);
+    });
+
+    it('F1, redesigned 2026-08-25: B7 (Reopen, Export) also hides Amount entirely, no snapshot needed', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B7'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'REOPEN', amount: '0' },
+        selectedContractSnapshot: null,
+      });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.hide).toBe(true);
+      expect(amount.props?.required).toBe(false);
+    });
+
+    it('F1: is hidden entirely (not merely locked) when movementType is AMEND_EXPIRY_DATE — swapped for the new newExpiryDate field instead', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE' } });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.hide).toBe(true);
+      expect(amount.props?.required).toBe(false);
+    });
+
     it('sets the spinner step from the currency’s own decimal places (JPY has none — step 1)', () => {
       const amount = fieldByKey(buildFields(baseCtx({ model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', currency: 'JPY' } })), 'amount');
       expect(amount.props?.step).toBe(1);
@@ -180,6 +218,42 @@ describe('builder-fields', () => {
       const stepFn = amount.expressions?.['props.step'] as (f: any) => number;
       expect(stepFn({ model: { currency: 'JPY' } })).toBe(1);
       expect(stepFn({ model: { currency: 'USD' } })).toBeCloseTo(0.01);
+    });
+  });
+
+  describe('F1 (external BA review, v1.19.0) — newExpiryDate / expiryDate fields', () => {
+    it('newExpiryDate is hidden and not required for a plain A1 (ISSUE)', () => {
+      const newExpiryDate = fieldByKey(buildFields(baseCtx()), 'newExpiryDate');
+      expect(newExpiryDate.hide).toBe(true);
+      expect(newExpiryDate.props?.required).toBe(false);
+      expect(newExpiryDate.props?.type).toBe('date');
+    });
+
+    it('newExpiryDate is shown and required once A2\'s third subChoice option resolves movementType to AMEND_EXPIRY_DATE', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE' } });
+      const newExpiryDate = fieldByKey(buildFields(ctx), 'newExpiryDate');
+      expect(newExpiryDate.hide).toBe(false);
+      expect(newExpiryDate.props?.required).toBe(true);
+    });
+
+    it('newExpiryDate is shown and required for B2\'s AMEND_EXPIRY_DATE too (reached via its movementTypeOverride, not the amendDirection indirection)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('B2'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND_EXPIRY_DATE' } });
+      const newExpiryDate = fieldByKey(buildFields(ctx), 'newExpiryDate');
+      expect(newExpiryDate.hide).toBe(false);
+      expect(newExpiryDate.props?.required).toBe(true);
+    });
+
+    it('expiryDate is shown (optional) only for A1/B1, hidden for every other function', () => {
+      const a1 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A1') })), 'expiryDate');
+      expect(a1.hide).toBe(false);
+      expect(a1.props?.required).toBeUndefined();
+      expect(a1.props?.type).toBe('date');
+
+      const b1 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('B1'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE' } })), 'expiryDate');
+      expect(b1.hide).toBe(false);
+
+      const a2 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' } })), 'expiryDate');
+      expect(a2.hide).toBe(true);
     });
   });
 

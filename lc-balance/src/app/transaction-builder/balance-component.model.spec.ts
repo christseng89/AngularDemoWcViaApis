@@ -31,6 +31,10 @@
   displayStatus,
   contractStatusBadgeClass,
   contractStatusLabel,
+  isReversalMovement,
+  isReopenMovement,
+  isBatchActor,
+  systemMovementLabel,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -85,12 +89,12 @@ describe('balance-component.model data invariants', () => {
 
   describe('MOVEMENT_TYPES_BY_INSTRUMENT — design doc §5, exact legal movementType sets', () => {
     const expected: Record<InstrumentType, string[]> = {
-      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE'],
+      IPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'UTILIZE', 'CLOSE', 'EXPIRE', 'AMEND_EXPIRY_DATE', 'REOPEN'],
       EPLC_LC: ['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE'],
       IPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       EPLC_ACCEPTANCE: ['CREATE', 'PARTIAL_SETTLE', 'FULL_SETTLE'],
       SHGT: ['ISSUE', 'PARTIAL_REDEEM', 'FULL_REDEEM'],
-      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE'],
+      EPLC_CONFIRMATION: ['ISSUE', 'AMEND', 'HONOUR', 'ACCEPT', 'CLOSE', 'EXPIRE', 'AMEND_EXPIRY_DATE', 'REOPEN'],
       EPLC_DUE_FROM_ISSUING_BANK: ['CREATE', 'REIMBURSE'],
       EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['CREATE', 'REIMBURSE', 'RECLASSIFY_OUT'],
       EPLC_EXPORT_BILLS_DISCOUNTED: ['CREATE', 'REIMBURSE'],
@@ -252,8 +256,8 @@ describe('balance-component.model data invariants', () => {
   });
 
   describe('IMPORT_FUNCTIONS (A-series)', () => {
-    it('has exactly the 10 surviving A-codes, in order (A5 was retired, not reused)', () => {
-      expect(IMPORT_FUNCTIONS.map((f) => f.code)).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10']);
+    it('has exactly the 11 surviving A-codes, in order (A5 was retired, not reused; A11 is F1\'s new Reopen)', () => {
+      expect(IMPORT_FUNCTIONS.map((f) => f.code)).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11']);
     });
 
     it('every function has a unique code', () => {
@@ -301,11 +305,19 @@ describe('balance-component.model data invariants', () => {
       expect(a1.tenorTypeOptions?.map((o) => o.value)).toEqual(['SIGHT', 'SELLERS_USANCE', 'BUYERS_USANCE']);
     });
 
-    it('A2 (LC Amendment) offers Increase/Decrease as a movementType subChoice, with a secondaryRefLabel', () => {
+    it('A2 (LC Amendment) offers Increase/Decrease/Expiry Date as a movementType subChoice, with a secondaryRefLabel', () => {
       const a2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2') as TransactionFunction;
       expect(a2.subChoice?.key).toBe('movementType');
-      expect(a2.subChoice?.options.map((o) => o.value)).toEqual(['AMEND_INCREASE', 'AMEND_DECREASE']);
+      expect(a2.subChoice?.options.map((o) => o.value)).toEqual(['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND_EXPIRY_DATE']);
       expect(a2.secondaryRefLabel).toBe('Amendment No./Times');
+    });
+
+    it('A11 (Reopen, F1) targets IPLC_LC/REOPEN, requires reopen eligibility, and has no defaultParentInstrumentType (flat Catalog picker, no parent concept)', () => {
+      const a11 = IMPORT_FUNCTIONS.find((f) => f.code === 'A11') as TransactionFunction;
+      expect(a11.instrumentType).toBe('IPLC_LC');
+      expect(a11.movementType).toBe('REOPEN');
+      expect(a11.requiresReopenEligibility).toBe(true);
+      expect(a11.defaultParentInstrumentType).toBeUndefined();
     });
 
     // A3/A3S's own Strategy-flag behavior is covered by function-strategy.spec.ts instead — this
@@ -360,8 +372,8 @@ describe('balance-component.model data invariants', () => {
   });
 
   describe('EXPORT_FUNCTIONS (B-series)', () => {
-    it('has exactly the 6 B-codes, in order', () => {
-      expect(EXPORT_FUNCTIONS.map((f) => f.code)).toEqual(['B1', 'B2', 'B3', 'B4', 'B5', 'B6']);
+    it('has exactly the 7 B-codes, in order (B7 is F1\'s new Reopen)', () => {
+      expect(EXPORT_FUNCTIONS.map((f) => f.code)).toEqual(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7']);
     });
 
     it('every function has a unique code', () => {
@@ -409,6 +421,15 @@ describe('balance-component.model data invariants', () => {
       expect(b2.secondaryRefLabel).toBe('Amendment No./Times');
     });
 
+    it('B2\'s own third subChoice option (Expiry Date, F1) declares a movementTypeOverride to AMEND_EXPIRY_DATE, bypassing the amendDirection indirection its other two options use', () => {
+      const b2 = EXPORT_FUNCTIONS.find((f) => f.code === 'B2') as TransactionFunction;
+      expect(b2.subChoice?.key).toBe('amendDirection');
+      const expiryOption = b2.subChoice?.options.find((o) => o.movementTypeOverride);
+      expect(expiryOption?.value).toBe('EXPIRY_DATE');
+      expect(expiryOption?.movementTypeOverride).toBe('AMEND_EXPIRY_DATE');
+      expect(b2.subChoice?.options.map((o) => o.value)).toEqual(['INCREASE', 'DECREASE', 'EXPIRY_DATE']);
+    });
+
     // B3/B4/B5's own Strategy-flag behavior is covered by function-strategy.spec.ts instead — this
     // file only asserts the registry's own non-flag configuration.
     it('B3 (Present Docs) is EPLC_EXAMINATION/CREATE and has no secondaryRefLabel of its own', () => {
@@ -450,13 +471,21 @@ describe('balance-component.model data invariants', () => {
         expect(f.instrumentType).not.toBe('EPLC_LC');
       }
     });
+
+    it('B7 (Reopen, F1) targets EPLC_CONFIRMATION/REOPEN, requires reopen eligibility, and has no defaultParentInstrumentType (flat Catalog picker, no parent concept)', () => {
+      const b7 = EXPORT_FUNCTIONS.find((f) => f.code === 'B7') as TransactionFunction;
+      expect(b7.instrumentType).toBe('EPLC_CONFIRMATION');
+      expect(b7.movementType).toBe('REOPEN');
+      expect(b7.requiresReopenEligibility).toBe(true);
+      expect(b7.defaultParentInstrumentType).toBeUndefined();
+    });
   });
 
   describe('cross-cutting registry invariants (IMPORT_FUNCTIONS + EXPORT_FUNCTIONS combined)', () => {
     const ALL_FUNCTIONS = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS];
 
-    it('has 16 total functions (10 Import + 6 Export)', () => {
-      expect(ALL_FUNCTIONS).toHaveLength(16);
+    it('has 18 total functions (11 Import + 7 Export, F1 added A11/B7)', () => {
+      expect(ALL_FUNCTIONS).toHaveLength(18);
     });
 
     it('every function code is globally unique across both sides', () => {
@@ -796,12 +825,16 @@ describe('balance-component.model data invariants', () => {
         A8: 'issue',
         A9: 'redeem',
         A10: 'cross',
+        // F1 (external BA review, v1.19.0) — A11/B7 (Reopen) join the issue group; see
+        // ISSUE_GROUP_CODES's own doc comment on the source side for why.
+        A11: 'issue',
         B1: 'issue',
         B2: 'amend',
         B3: 'utilize',
         B4: 'utilize',
         B5: 'redeem',
         B6: 'cross',
+        B7: 'issue',
       };
       for (const fn of [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS]) {
         expect(functionActionIcon(fn.code)).toBe(expected[fn.code]);
@@ -846,6 +879,76 @@ describe('balance-component.model data invariants', () => {
       expect(statusBadgeIcon(statusBadgeClass('RELEASED', 'IPLC_LC', 'CLOSE'))).toBe('cross');
       expect(functionActionIcon('A10')).toBe('cross');
       expect(functionActionIcon('B6')).toBe('cross');
+    });
+  });
+
+  describe('F1 (external BA review, v1.19.0) — EXPIRE movement highlight, same shape as CLOSE\'s own above', () => {
+    it('EXPIRE gets the same red --negative badge for PENDING and RELEASED alike, distinct EXPIRING/EXPIRED label text', () => {
+      expect(statusBadgeClass('PENDING', 'IPLC_LC', 'EXPIRE')).toBe('tb-status-badge--negative');
+      expect(statusBadgeClass('RELEASED', 'IPLC_LC', 'EXPIRE')).toBe('tb-status-badge--negative');
+      expect(displayStatus('PENDING', 'IPLC_LC', 'EXPIRE')).toBe('EXPIRING');
+      expect(displayStatus('RELEASED', 'IPLC_LC', 'EXPIRE')).toBe('EXPIRED');
+    });
+
+    it('EXPIRE and CLOSE never get confused for one another — different label text, same badge color', () => {
+      expect(displayStatus('RELEASED', 'IPLC_LC', 'EXPIRE')).not.toBe(displayStatus('RELEASED', 'IPLC_LC', 'CLOSE'));
+      expect(statusBadgeClass('RELEASED', 'IPLC_LC', 'EXPIRE')).toBe(statusBadgeClass('RELEASED', 'IPLC_LC', 'CLOSE'));
+    });
+
+    it('isReversalMovement/isReopenMovement identify REVERSAL/REOPEN exactly, and are mutually exclusive with each other and with CLOSE/EXPIRE', () => {
+      expect(isReversalMovement('REVERSAL')).toBe(true);
+      expect(isReversalMovement('REOPEN')).toBe(false);
+      expect(isReversalMovement('CLOSE')).toBe(false);
+      expect(isReversalMovement(null)).toBe(false);
+      expect(isReopenMovement('REOPEN')).toBe(true);
+      expect(isReopenMovement('REVERSAL')).toBe(false);
+      expect(isReopenMovement(undefined)).toBe(false);
+    });
+
+    it('F1 (user-reported live-testing gap): systemMovementLabel gives EXPIRE/REVERSAL a readable label — neither has a TransactionFunction of its own, so the Function column would otherwise show a bare, orphan-looking dash', () => {
+      expect(systemMovementLabel('EXPIRE')).toBe('AUTO EXPIRY');
+      expect(systemMovementLabel('REVERSAL')).toBe('REVERSAL (system, linked)');
+      expect(systemMovementLabel('REOPEN')).toBeNull(); // REOPEN resolves to a real TransactionFunction (A11/B7) — no fallback needed
+      expect(systemMovementLabel('CLOSE')).toBeNull();
+      expect(systemMovementLabel(null)).toBeNull();
+      expect(systemMovementLabel(undefined)).toBeNull();
+    });
+
+    it('REVERSAL/REOPEN deliberately get NO red special-case — their ordinary PENDING/RELEASED display already reads amber/green, the correct "restorative" signal', () => {
+      expect(statusBadgeClass('PENDING', 'IPLC_LC', 'REVERSAL')).toBe('tb-status-badge--pending');
+      expect(statusBadgeClass('RELEASED', 'IPLC_LC', 'REVERSAL')).toBe('tb-status-badge--approved');
+      expect(statusBadgeClass('PENDING', 'IPLC_LC', 'REOPEN')).toBe('tb-status-badge--pending');
+      expect(statusBadgeClass('RELEASED', 'IPLC_LC', 'REOPEN')).toBe('tb-status-badge--approved');
+      expect(displayStatus('RELEASED', 'IPLC_LC', 'REOPEN')).toBe('APPROVED');
+    });
+  });
+
+  describe('F1 — isBatchActor, distinguishing AUTO EXPIRY/AUTO CLOSE\'s own system actors from a human Maker/Checker', () => {
+    it('recognizes both hand-mirrored system-actor identifiers', () => {
+      expect(isBatchActor('BATCH_MAKER')).toBe(true);
+      expect(isBatchActor('BATCH_CHECKER')).toBe(true);
+    });
+
+    it('a real human actor id is never mistaken for a batch actor', () => {
+      expect(isBatchActor('maker1')).toBe(false);
+      expect(isBatchActor('checker1')).toBe(false);
+    });
+
+    it('handles null/undefined/empty without throwing', () => {
+      expect(isBatchActor(null)).toBe(false);
+      expect(isBatchActor(undefined)).toBe(false);
+      expect(isBatchActor('')).toBe(false);
+    });
+  });
+
+  describe('F1 — contractStatusBadgeClass/contractStatusLabel: EXPIRED is genuinely distinct from CLOSED', () => {
+    it('EXPIRED -> amber/pending token, not CLOSED\'s own red', () => {
+      expect(contractStatusBadgeClass('EXPIRED')).toBe('tb-status-badge--pending');
+      expect(contractStatusBadgeClass('EXPIRED')).not.toBe(contractStatusBadgeClass('CLOSED'));
+    });
+
+    it('EXPIRED displays as its own raw string, no special-case label override (unlike ACTIVE+closingPending -> "CLOSING")', () => {
+      expect(contractStatusLabel('EXPIRED')).toBe('EXPIRED');
     });
   });
 

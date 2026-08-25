@@ -1,10 +1,11 @@
 import { computeAvailableBalance, computeConfirmedBalance, computeFaceAmount } from '../../../src/domain/balanceDerivation';
 import type { BalanceMovement } from '../../../src/types';
 
-type M = Pick<BalanceMovement, 'movementType' | 'amount' | 'ceilingAmount' | 'status'>;
+type M = Pick<BalanceMovement, 'movementId' | 'movementType' | 'amount' | 'ceilingAmount' | 'status' | 'reversalOfMovementId'>;
 
-function m(movementType: string, amount: string, ceilingAmount: string, status: BalanceMovement['status']): M {
-  return { movementType, amount, ceilingAmount, status };
+let nextId = 0;
+function m(movementType: string, amount: string, ceilingAmount: string, status: BalanceMovement['status'], reversalOfMovementId: string | null = null): M {
+  return { movementId: `m${nextId++}`, movementType, amount, ceilingAmount, status, reversalOfMovementId };
 }
 
 describe('computeConfirmedBalance (Design doc §3.3)', () => {
@@ -29,6 +30,27 @@ describe('computeAvailableBalance (Design doc §3.3)', () => {
     const confirmed = computeConfirmedBalance(movements);
     expect(confirmed.toFixed()).toBe('110000');
     expect(computeAvailableBalance(confirmed, movements).toFixed()).toBe('80000');
+  });
+});
+
+describe('REVERSAL dynamic direction (F1, external BA review §11.2)', () => {
+  test('a REVERSAL of an EXPIRE (direction -1) contributes the OPPOSITE (+1) sign to Confirmed Balance', () => {
+    const original = m('EXPIRE', '40000', '40000', 'RELEASED');
+    const reversal = m('REVERSAL', '40000', '40000', 'RELEASED', original.movementId);
+    // ISSUE 100000 -> EXPIRE writes it off to 0 -> REVERSAL restores it back to 100000.
+    const movements: M[] = [m('ISSUE', '100000', '100000', 'RELEASED'), original, reversal];
+    expect(computeConfirmedBalance(movements).toFixed()).toBe('100000');
+  });
+
+  test('a REVERSAL of an ISSUE (direction +1) contributes the OPPOSITE (-1) sign', () => {
+    const original = m('ISSUE', '100000', '100000', 'RELEASED');
+    const reversal = m('REVERSAL', '100000', '100000', 'RELEASED', original.movementId);
+    expect(computeConfirmedBalance([original, reversal]).toFixed()).toBe('0');
+  });
+
+  test('throws when reversalOfMovementId does not resolve within the supplied movements list', () => {
+    const reversal = m('REVERSAL', '100000', '100000', 'RELEASED', 'does-not-exist');
+    expect(() => computeConfirmedBalance([reversal])).toThrow(/no resolvable reversalOfMovementId/);
   });
 });
 

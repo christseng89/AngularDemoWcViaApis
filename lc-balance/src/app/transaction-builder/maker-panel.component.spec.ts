@@ -65,6 +65,7 @@ const A3S = findFn(IMPORT_FUNCTIONS, 'A3S'); // Document Arrival w/ Shipping Gte
 const A7 = findFn(IMPORT_FUNCTIONS, 'A7'); // Acceptance Settlement — defaultParentInstrumentType, requiresEligibleParentAcceptance
 const A9 = findFn(IMPORT_FUNCTIONS, 'A9'); // Shipping Gtee (Redemption) — defaultParentInstrumentType, amountVsAvailableDerivation REDEEM
 const B1 = findFn(EXPORT_FUNCTIONS, 'B1'); // Confirm LC — export side, fixed movementType
+const B2 = findFn(EXPORT_FUNCTIONS, 'B2'); // Confirm LC Amendment — subChoice keyed amendDirection, third option (F1) declares a movementTypeOverride
 const B4a = findFn(EXPORT_FUNCTIONS, 'B4'); // Honour / Acceptance — payableMovementInstrumentType EPLC_EXAMINATION, flat Catalog picker
 
 function mkContract(id: string, lcNumber: string, overrides: Partial<BalanceContract> = {}): BalanceContract {
@@ -122,6 +123,7 @@ function makeApiMock() {
     resolveContract: jest.fn(),
     catalog: jest.fn(() => of(mkCatalogPage([]))),
     closeEligible: jest.fn(() => of(mkCatalogPage([]))),
+    reopenEligible: jest.fn(() => of(mkCatalogPage([]))),
     getSnapshot: jest.fn((id: string) => of(mkSnapshot(id))),
     listMovements: jest.fn(() => of([] as any[])),
     submitByMaker: jest.fn(),
@@ -334,6 +336,44 @@ describe('MakerPanelComponent', () => {
       comp.onSubChoice();
 
       expect(comp.model.movementType).toBe('AMEND_DECREASE');
+    });
+
+    it('F1: A2\'s third option (Expiry Date) resolves movementType to AMEND_EXPIRY_DATE directly — its own key is already \'movementType\', so no override is declared or needed', () => {
+      const { comp, mockApi } = makeComponentA();
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
+      comp.selectedFunction = A2;
+      comp.subChoiceValue = 'AMEND_EXPIRY_DATE';
+
+      comp.onSubChoice();
+
+      expect(comp.model.instrumentType).toBe('IPLC_LC');
+      expect(comp.model.movementType).toBe('AMEND_EXPIRY_DATE');
+    });
+
+    it('F1: B2\'s third option (Expiry Date) declares a movementTypeOverride — resolves movementType to AMEND_EXPIRY_DATE directly, bypassing the amendDirection indirection its other two options use, and never touches this.amendDirection', () => {
+      const { comp, mockApi } = makeComponentA();
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
+      comp.selectedFunction = B2;
+      comp.subChoiceValue = 'EXPIRY_DATE';
+
+      comp.onSubChoice();
+
+      expect(comp.model.instrumentType).toBe('EPLC_CONFIRMATION');
+      expect(comp.model.movementType).toBe('AMEND_EXPIRY_DATE');
+      expect(comp.amendDirection).toBeNull();
+    });
+
+    it('F1: B2\'s own ordinary Increase/Decrease options are unaffected by the new movementTypeOverride branch — still write amendDirection only, model.movementType stays whatever it already was', () => {
+      const { comp, mockApi } = makeComponentA();
+      mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
+      comp.selectedFunction = B2;
+      comp.model.movementType = 'AMEND';
+      comp.subChoiceValue = 'DECREASE';
+
+      comp.onSubChoice();
+
+      expect(comp.amendDirection).toBe('DECREASE');
+      expect(comp.model.movementType).toBe('AMEND');
     });
   });
 
@@ -3185,6 +3225,7 @@ describe('MakerPanelComponent', () => {
       resolveContract: jest.fn(() => of(contract())),
       catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
       closeEligible: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 200 })),
+      reopenEligible: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 200 })),
       getSnapshot: jest.fn(() => of(snapshot())),
       listMovements: jest.fn(() => of([])),
       ...overrides,
@@ -3506,6 +3547,47 @@ describe('MakerPanelComponent', () => {
       c.onSelectContract('c1');
 
       expect(c.model.amount).toBe('7000');
+    });
+
+    it('F1: filteredCatalogContracts for A11 (Reopen) is reopen-eligibility-driven — keeps a candidate the server-computed hint-set includes, excludes one it doesn\'t', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A11'));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'reopen-eligible' }), contract({ balanceContractId: 'reopen-ineligible' })];
+      c.documentArrivalHints.catalogReopenEligible.add('reopen-eligible');
+      expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['reopen-eligible']);
+    });
+
+    it('F1: reloadCatalog() (A11) queries the CLOSED status (not the default ACTIVE) and fetches the reopen-eligible hint-set via ONE aggregate call', () => {
+      const api = mockApiD({
+        catalog: jest.fn(() => of({ items: [contract({ balanceContractId: 'c1', status: 'CLOSED' })], total: 1, page: 1, pageSize: 10 })),
+        reopenEligible: jest.fn(() => of({ items: [contract({ balanceContractId: 'c1' })], total: 1, page: 1, pageSize: 200 })),
+      });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A11'));
+
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', 'CLOSED', undefined, 1, c.catalogPageSize, undefined, undefined, true);
+      expect(api.reopenEligible).toHaveBeenCalledTimes(1);
+      expect(api.reopenEligible).toHaveBeenCalledWith('IPLC_LC');
+      expect(c.documentArrivalHints.catalogReopenEligible).toEqual(new Set(['c1']));
+    });
+
+    it('F1: A10 (Close) still queries the default ACTIVE status — the CLOSED override applies only to A11/B7\'s own requiresReopenEligibility', () => {
+      const api = mockApiD({ catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })) });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A10'));
+
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, c.catalogPageSize, undefined, undefined, true);
+    });
+
+    it('F1: onSelectContract (A11) locks model.amount to the fixed literal \'0\' immediately, with no snapshot fetch needed — unlike A10\'s own Confirmed-Balance-derived amount above', () => {
+      const api = mockApiD({ getSnapshot: jest.fn(() => of(snapshot({ confirmedBalance: '0', availableBalance: '0' }))) });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A11'));
+      c.catalogPicker.contracts = [contract({ balanceContractId: 'c1', status: 'CLOSED' })];
+
+      c.onSelectContract('c1');
+
+      expect(c.model.amount).toBe('0');
     });
 
     it('parentTenorFamily: undefined with no function, USANCE when tenorTypeOptions is set (A6), USANCE when catalogTenorFilter is USANCE (A7)', () => {

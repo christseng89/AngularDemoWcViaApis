@@ -1523,3 +1523,58 @@ ever becomes real, is normalizing it to `HONOUR` alongside `SIGHT` (not rejectin
 Both `analysis/TF-Balance-Component-BA-Review-{en,zh}.docx` are now in sync (15 findings, 3 High) — the
 review previously had a stray un-suffixed English duplicate with the older, unsynced content; that file no
 longer exists, the `-en.docx` is the current one.
+
+## F1 — AUTO EXPIRY + AUTO CLOSE background sweep, Expiry Extension Amendment, A11/B7 Reopen (closes TODO.md's own F1)
+
+New `movementType`s `EXPIRE` (own eligibility, `domain/expiryEligibility.ts` — deliberately NOT
+SG/Acceptance-balance-gated like CLOSE) and `AMEND_EXPIRY_DATE` (A2/B2's third subChoice option, doubles as
+the EXPIRED→ACTIVE Extension entry point). Two independently-flagged background sweeps
+(`AUTO_EXPIRY_ENABLED`/`AUTO_CLOSE_ENABLED`, `server.ts`'s own `setInterval`, never the `BalanceService`
+constructor) drive Maker/Checker via `BATCH_MAKER`/`BATCH_CHECKER` system actors through the existing,
+unmodified `createMovement()`/`release()` path — genuine 4-eyes preserved, `statusTransition.ts` untouched.
+A11 (`IPLC_LC`)/B7 (`EPLC_CONFIRMATION`) Reopen — a new, separately-entitled named function (not folded
+into A2/B2) — reopens a CLOSED contract, reversing every not-yet-reversed EXPIRE/CLOSE in its history (not
+just the last one — a contract reaching CLOSED via EXPIRE→AUTO CLOSE has TWO to reverse, since AUTO CLOSE's
+own write-off amount is already 0 by then). `REVERSAL` movementType (dynamic direction, resolved via
+`reversalOfMovementId`) backs Expiry Extension Amendment's own restoration.
+
+**REOPEN redesigned same day, after live UAT** ("Checker要看交易出的帳 再決定 APPROVE 或 REJECT" — the
+original design's zero-amount REOPEN + a separately-generated, Release-time-only `REVERSAL` leg meant the
+Checker approved an empty movement with no visible entries, and Inquire Events showed two rows for one
+event). REOPEN now carries its own real, positive restoration amount directly — computed at Submit
+(`domain/reopenRestoration.ts`: sum the contract's own trailing run of RELEASED EXPIRE/CLOSE, walking
+backward until the first non-match) and never caller-typed (Angular hides Amount entirely for A11/B7); a
+real `contingentAccountEntry` is generated at the same Submit call, so the Checker reviews the actual
+restoration before approving. `MOVEMENT_DIRECTION.REOPEN` is `1` (not `0`); REOPEN no longer produces any
+`REVERSAL` — that movementType now backs Expiry Extension Amendment only.
+
+Deliberately not done (`TODO.md` §3, F1 §11.4): sweep round-splitting (AUTO CLOSE may re-close a contract
+in the SAME cycle a human/Maker just Reopened, if SG/Acceptance are already 0 — reproduced live); consent-
+gating on Extension/Reopen; mandatory `reasonCode` on CLOSE. Business Case Registry gained Import Case
+13-15 and Export Case #12 exercising the full mechanism (§9.7 chain reversal, the negative eligibility
+gate, and the AUTO EXPIRY→AUTO CLOSE→Reopen path), 23→27 cases.
+
+## F1 follow-up — AUTO EXPIRY/AUTO CLOSE now skip a recently-Reopened contract for one sweep interval
+
+Live-reported the same day: a REOPEN reactivating to `EXPIRED` (original `expiryDate` already past) got
+immediately re-closed by the very next AUTO CLOSE tick, with zero window to follow up. New
+`isRecentlyReopened()` (`service/balanceService.ts`) — both sweeps skip a contract whose own most recent
+RELEASED movement is `REOPEN`, for one full `EXPIRY_SWEEP_INTERVAL`; time-bounded, not permanent (a
+REOPEN-to-`ACTIVE` contract still auto-expires on schedule once its own still-future `expiryDate` for-real
+arrives). Narrows, but does not close, the broader §8.5 round-splitting gap — a genuine `EXPIRE`-then-
+same-cycle-`AUTO CLOSE` sequence (no REOPEN involved) is unaffected, still deliberately deferred.
+
+## F1 — AMEND_EXPIRY_DATE no longer generates a contingentAccountEntry; Extension Amendment double-restoration bug fixed
+
+Two related, same-day, user-reported fixes. (1) `AMEND_EXPIRY_DATE` never has a real balance/GL effect —
+`deriveContingentAccountEntry()` now returns `null` for it explicitly (was a spurious zero-amount pair, an
+artifact of the generic derivation logic, not a deliberate choice), same treatment as `EPLC_EXAMINATION`.
+(2) Real bug, traced to the REOPEN redesign above: a contract reaching `EXPIRED` via A11/B7 Reopen (§9.2
+Option A) restores its balance directly (no `REVERSAL` left behind) — but Extension Amendment's own
+Checker-Release restoration still assumed the old "REOPEN always leaves a REVERSAL" invariant, so it found
+that same already-restored `EXPIRE` and reversed it AGAIN, silently doubling the balance (live-reproduced:
+10,000 → 20,000, "S01 EXTEND後 無法做後續作業"). Fixed: Extension only reverses when the contract's own
+MOST RECENT movement (excluding itself) is a RELEASED `EXPIRE` — anything else (a prior REOPEN, most
+commonly) means nothing is left to restore. Sound by construction: `EXPIRE` can't chain with itself, `CLOSE`
+can't precede `EXPIRED`, so Extension's own relevant trailing run is always 0 or 1 movement, never a
+multi-item chain the way REOPEN's own §9.7 case can be.

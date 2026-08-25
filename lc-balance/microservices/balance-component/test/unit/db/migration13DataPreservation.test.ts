@@ -116,7 +116,11 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
 
       const after = db.prepare('SELECT * FROM balance_contracts ORDER BY balance_contract_id').all();
       expect(after).toHaveLength(3);
-      expect(after).toEqual(before);
+      // F1 (external BA review, 2026-08-25) — migration 14 adds expiry_date/mail_float_grace_days
+      // (both nullable) on top of migration 13's own rebuild; every pre-existing row correctly gains
+      // them as null, same "new nullable column backfills as null on old rows" pattern every earlier
+      // migration in this file already establishes — not a "before === after" preservation failure.
+      expect(after).toEqual(before.map((row) => ({ ...(row as Record<string, unknown>), expiry_date: null, mail_float_grace_days: null })));
     } finally {
       db.close();
     }

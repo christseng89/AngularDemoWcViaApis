@@ -29,6 +29,18 @@ export interface MovementDerivationStrategy {
    * (not `availableBalance` — Close writes off the RELEASED figure, not the PENDING-inclusive one).
    */
   amountAutoFilledFrom: 'confirmedBalance' | null;
+  /**
+   * A11/B7 (Reopen, F1) only — genuinely different from `amountAutoFilledFrom` above: Reopen's own Amount
+   * is NEVER carried from any CLIENT-visible balance figure (a CLOSED contract's own Confirmed Balance is
+   * always exactly 0, having already been written off by the CLOSE/EXPIRE this Reopen restores) — the
+   * REAL restoration amount is computed entirely server-side at Submit time, from the contract's own
+   * write-off history (domain/reopenRestoration.ts on the microservice side), and is never surfaced to
+   * the Maker as an input at all (redesigned 2026-08-25 — see builder-fields.ts's own `amountFromFixed`,
+   * which HIDES the Amount field outright rather than merely locking it). This `'0'` is only ever a
+   * harmless wire placeholder — the request schema requires some valid MonetaryAmount string, and the
+   * server discards whatever is sent and substitutes its own computed figure regardless.
+   */
+  amountFixed: '0' | null;
 }
 
 /** `maker-submit.service.ts`'s own dispatch-table shape — which submission method a function's own Submit uses. */
@@ -67,7 +79,7 @@ export interface FunctionStrategy {
 
 const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
   code: '',
-  movementDerivation: Object.freeze({ derivesMovementTypeFromTenor: false, amountVsAvailableDerivation: null, amountAutoFilledFrom: null }),
+  movementDerivation: Object.freeze({ derivesMovementTypeFromTenor: false, amountVsAvailableDerivation: null, amountAutoFilledFrom: null, amountFixed: null }),
   compoundSubmission: Object.freeze({ possibleShapes: Object.freeze(['plain']) as readonly SubmissionShape[] }),
   checkerRelease: Object.freeze({ releasesExistingMovementInPlace: false, settlesDocumentArrival: false, sourceAlreadyReleasedBeforePick: false, deferSettlement: false }),
   selectionFlow: Object.freeze({ usesSettleableBalanceIndex: false }),
@@ -100,6 +112,9 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
  *   together); usesSettleableBalanceIndex (a dedicated "EB Index" Step-2 picker).
  * - A10/B6 — amountAutoFilledFrom 'confirmedBalance' (Amount is never typed at all, unlike A9/B5's own
  *   amountVsAvailableDerivation above — see that field's own doc comment for the distinction).
+ * - A11/B7 (Reopen, F1) — amountFixed '0' (Amount is a fixed literal, not carried from any live balance —
+ *   see that field's own doc comment for why this is genuinely different from A10/B6's own
+ *   amountAutoFilledFrom).
  */
 const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> = {
   A1: { ...NO_SPECIAL_BEHAVIOR, code: 'A1' },
@@ -137,6 +152,11 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     code: 'A10',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
   },
+  A11: {
+    ...NO_SPECIAL_BEHAVIOR,
+    code: 'A11',
+    movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountFixed: '0' },
+  },
   B1: { ...NO_SPECIAL_BEHAVIOR, code: 'B1' },
   B2: { ...NO_SPECIAL_BEHAVIOR, code: 'B2' },
   B3: { ...NO_SPECIAL_BEHAVIOR, code: 'B3' },
@@ -159,6 +179,11 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     code: 'B6',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
   },
+  B7: {
+    ...NO_SPECIAL_BEHAVIOR,
+    code: 'B7',
+    movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountFixed: '0' },
+  },
 };
 
 /**
@@ -177,7 +202,7 @@ export function deriveFunctionStrategy(fn: TransactionFunction): FunctionStrateg
   };
 }
 
-/** One `FunctionStrategy` per registered function code (A1-A10, B1-B6) — built once from the current registry. */
+/** One `FunctionStrategy` per registered function code (A1-A11, B1-B7) — built once from the current registry. */
 export const FUNCTION_STRATEGIES: Readonly<Record<string, FunctionStrategy>> = Object.fromEntries(
   [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((fn) => [fn.code, deriveFunctionStrategy(fn)]),
 );
@@ -205,7 +230,12 @@ export const FUNCTION_STRATEGIES: Readonly<Record<string, FunctionStrategy>> = O
  */
 export function movementTypeMatchesFunction(fn: TransactionFunction, movementType: string): boolean {
   if (fn.movementType === movementType) return true;
-  if (fn.subChoice?.options.some((o) => o.value === movementType)) return true;
+  // F1 (external BA review, v1.19.0) — a subChoice option's own `value` is what the UI shows/writes into
+  // its own field, but `movementTypeOverride` (when set, B2's own "Expiry Date" option) is the ACTUAL
+  // wire movementType submitted — see SubChoice.options[].movementTypeOverride's own doc comment. Without
+  // this, B2's Checker Queue would never surface a PENDING AMEND_EXPIRY_DATE movement it had itself just
+  // Maker-Submitted, since 'EXPIRY_DATE' (the option's own value) never equals the real movementType.
+  if (fn.subChoice?.options.some((o) => o.value === movementType || o.movementTypeOverride === movementType)) return true;
   const strategy = FUNCTION_STRATEGIES[fn.code];
   // Bug fixed 2026-08-21 (user-reported, "A10 B6 也是交易EVENT 所以 LOOKUP & INQUIRE EVENTS都應該顯示這筆
   // CLOSE EVENT" — U03's own CLOSE row displayed as "B4 Honour/Acceptance" instead of "B6 Confirmed LC

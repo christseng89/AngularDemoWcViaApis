@@ -366,7 +366,8 @@
                     <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
                       <td>
                         <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
-                        <span class="tb-muted" *ngIf="!lookUp.functionFor(row)">—</span>
+                        <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && lookUp.systemLabelFor(row) as sysLabel">{{ sysLabel }}</span>
+                        <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && !lookUp.systemLabelFor(row)">—</span>
                       </td>
                       <td class="tb-table__amount">
                         {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) }}

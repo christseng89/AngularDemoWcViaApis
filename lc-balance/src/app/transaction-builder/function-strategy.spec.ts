@@ -6,9 +6,9 @@ import { FUNCTION_STRATEGIES, deriveFunctionStrategy, resolveFunctionForMovement
  * source of truth.
  */
 describe('PR-2 — FunctionStrategy is a faithful projection of the current registry (not yet consumed by production code)', () => {
-  it('every one of the 16 registered function codes has exactly one FunctionStrategy entry', () => {
+  it('every one of the 18 registered function codes has exactly one FunctionStrategy entry', () => {
     const allCodes = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((f) => f.code);
-    expect(allCodes).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6']);
+    expect(allCodes).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7']);
     expect(Object.keys(FUNCTION_STRATEGIES).sort()).toEqual([...allCodes].sort());
   });
 
@@ -25,10 +25,10 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
       expect(settleCodes.map((s) => s.code)).toEqual(['B5']);
     });
 
-    it('every other function derives neither (null) — A10/B6 included: amountAutoFilledFrom is a genuinely different dimension, see that field\'s own doc comment', () => {
+    it('every other function derives neither (null) — A10/B6/A11/B7 included: amountAutoFilledFrom/amountFixed are genuinely different dimensions, see those fields\' own doc comments', () => {
       const neither = Object.values(FUNCTION_STRATEGIES).filter((s) => s.movementDerivation.amountVsAvailableDerivation === null);
       expect(neither.map((s) => s.code).sort()).toEqual(
-        ['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A10', 'B1', 'B2', 'B3', 'B4', 'B6'].sort(),
+        ['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A10', 'A11', 'B1', 'B2', 'B3', 'B4', 'B6', 'B7'].sort(),
       );
     });
 
@@ -37,6 +37,13 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
       expect(FUNCTION_STRATEGIES['B6'].movementDerivation.amountAutoFilledFrom).toBe('confirmedBalance');
       const autoFilled = Object.values(FUNCTION_STRATEGIES).filter((s) => s.movementDerivation.amountAutoFilledFrom !== null);
       expect(autoFilled.map((s) => s.code).sort()).toEqual(['A10', 'B6']);
+    });
+
+    it('A11/B7 (Reopen, F1) -> amountFixed \'0\', no other function derives it — genuinely different from A10/B6\'s own amountAutoFilledFrom above (a fixed literal, never carried from a live balance)', () => {
+      expect(FUNCTION_STRATEGIES['A11'].movementDerivation.amountFixed).toBe('0');
+      expect(FUNCTION_STRATEGIES['B7'].movementDerivation.amountFixed).toBe('0');
+      const fixed = Object.values(FUNCTION_STRATEGIES).filter((s) => s.movementDerivation.amountFixed !== null);
+      expect(fixed.map((s) => s.code).sort()).toEqual(['A11', 'B7']);
     });
 
     it('B4 (movementTypeFromContractTenor) is the ONLY function reading movementType from the contract\'s own tenor', () => {
@@ -67,7 +74,7 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
         .filter((s) => s.compoundSubmission.possibleShapes.length === 1 && s.compoundSubmission.possibleShapes[0] === 'plain')
         .map((s) => s.code)
         .sort();
-      expect(plainCodes).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'B1', 'B2', 'B3', 'B6'].sort());
+      expect(plainCodes).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'B1', 'B2', 'B3', 'B6', 'B7'].sort());
     });
   });
 
@@ -157,6 +164,19 @@ describe('resolveFunctionForMovement', () => {
 
   it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
     expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
+  });
+
+  it("F1: resolves AMEND_EXPIRY_DATE on IPLC_LC to A2 via its subChoice option's own literal value (no movementTypeOverride needed — A2's subChoice key is already 'movementType')", () => {
+    expect(resolveFunctionForMovement('IPLC_LC', 'AMEND_EXPIRY_DATE')?.code).toBe('A2');
+  });
+
+  it("F1 regression: resolves AMEND_EXPIRY_DATE on EPLC_CONFIRMATION to B2 via its subChoice option's movementTypeOverride, NOT the option's own 'EXPIRY_DATE' value — without checking movementTypeOverride in movementTypeMatchesFunction(), this would return undefined (and B2's own Checker Queue would never surface a PENDING AMEND_EXPIRY_DATE movement it had itself Maker-Submitted)", () => {
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'AMEND_EXPIRY_DATE')?.code).toBe('B2');
+  });
+
+  it('F1: resolves REOPEN to A11 (IPLC_LC) and B7 (EPLC_CONFIRMATION), each via a literal fn.movementType match', () => {
+    expect(resolveFunctionForMovement('IPLC_LC', 'REOPEN')?.code).toBe('A11');
+    expect(resolveFunctionForMovement('EPLC_CONFIRMATION', 'REOPEN')?.code).toBe('B7');
   });
 });
 
