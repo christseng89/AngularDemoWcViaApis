@@ -26,6 +26,14 @@ export const createMovementRequestSchema = z
     amount: z.string({ required_error: 'amount is required.' }).min(1, 'amount is required.'),
     currency: z.string({ required_error: 'currency is required.' }).min(1, 'currency is required.'),
     createdBy: z.string({ required_error: 'createdBy is required.' }).min(1, 'createdBy is required.'),
+    // F1 proposal §13.1 item 2 (BA-ratified 2026-08-25) — AMEND_EXPIRY_DATE/REOPEN's own upstream
+    // consent passthrough. Optional/nullable for every OTHER movementType (never required — this
+    // service accepts and shape-validates, it never judges whether consent was actually obtained).
+    // `consentStatus` is the one field with a real bounded value set; `amendmentApproved`/
+    // `amendmentEffective` are only type-checked (boolean / non-empty string), not enum-restricted.
+    amendmentApproved: z.boolean().nullable().optional(),
+    amendmentEffective: z.string().min(1).nullable().optional(),
+    consentStatus: z.enum(['NOT_REQUIRED', 'OBTAINED']).nullable().optional(),
   })
   .passthrough()
   .superRefine((data, ctx) => {

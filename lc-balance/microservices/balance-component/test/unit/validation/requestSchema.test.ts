@@ -77,6 +77,35 @@ describe('createMovementRequestSchema', () => {
   });
 });
 
+describe('consentStatus/amendmentApproved/amendmentEffective (F1 proposal §13.1 item 2, BA-ratified 2026-08-25)', () => {
+  test('accepts a body with none of the three fields — optional for every movementType', () => {
+    expect(createMovementRequestSchema.safeParse(VALID_BODY).success).toBe(true);
+  });
+
+  test.each(['NOT_REQUIRED', 'OBTAINED'])('accepts consentStatus %s', (consentStatus) => {
+    expect(createMovementRequestSchema.safeParse({ ...VALID_BODY, consentStatus }).success).toBe(true);
+  });
+
+  test('rejects a consentStatus outside the fixed enum', () => {
+    const result = createMovementRequestSchema.safeParse({ ...VALID_BODY, consentStatus: 'MAYBE' });
+    expect(result.success).toBe(false);
+  });
+
+  test('accepts a null consentStatus (explicit "not set", distinct from omitted)', () => {
+    expect(createMovementRequestSchema.safeParse({ ...VALID_BODY, consentStatus: null }).success).toBe(true);
+  });
+
+  test('accepts a boolean amendmentApproved, rejects a non-boolean one', () => {
+    expect(createMovementRequestSchema.safeParse({ ...VALID_BODY, amendmentApproved: true }).success).toBe(true);
+    expect(createMovementRequestSchema.safeParse({ ...VALID_BODY, amendmentApproved: 'yes' }).success).toBe(false);
+  });
+
+  test('accepts a non-empty amendmentEffective string, rejects an empty one', () => {
+    expect(createMovementRequestSchema.safeParse({ ...VALID_BODY, amendmentEffective: '2026-09-01T00:00:00Z' }).success).toBe(true);
+    expect(createMovementRequestSchema.safeParse({ ...VALID_BODY, amendmentEffective: '' }).success).toBe(false);
+  });
+});
+
 describe('firstValidationMessage', () => {
   test("returns the first issue's message when multiple fields are missing", () => {
     const result = createMovementRequestSchema.safeParse({});

@@ -385,20 +385,28 @@ export class BalanceContractStore {
 
   /**
    * F1 (external BA review) §8/§9 — Expiry Extension Amendment (EXPIRED -> ACTIVE) and A11/B7 Reopen
-   * (CLOSED -> ACTIVE or EXPIRED, see §9.1/§9.2) both reactivate a contract's own row: clear
-   * `effective_to` (the contract is current again), and — only for Extension — persist the new
-   * `expiry_date` the Checker just approved. `newExpiryDate` is omitted for a plain Reopen-without-
-   * extension (§9.1, original expiry date still in the future, nothing to change).
+   * (CLOSED -> ACTIVE or EXPIRED, see §9.1/§9.2) both reactivate a contract's own row, and — only for
+   * Extension — persist the new `expiry_date` the Checker just approved. `newExpiryDate` is omitted for
+   * a plain Reopen-without-extension (§9.1, original expiry date still in the future, nothing to change).
+   *
+   * `effective_to`: `NULL` when reactivating to `ACTIVE` (the contract is current again, same convention
+   * as every other "currently in force" row). When reactivating to `EXPIRED` (§9.2 Option A — REOPEN
+   * restores a CLOSED contract whose own expiryDate is already past), `effective_to` is instead stamped
+   * with `releasedAt` — the same "became EXPIRED at this moment" convention `markExpired()` already uses
+   * — NOT left `NULL` (F1 proposal §13.7, 2026-08-25 BA finding: a `NULL` here reads as "still current"
+   * for an EXPIRED row, and the planned Auto Close Grace Period §13.5 needs this field as its own
+   * "became EXPIRED at" anchor to compute N business days from).
    */
-  reactivate(balanceContractId: string, newStatus: 'ACTIVE' | 'EXPIRED', newExpiryDate?: string | null): void {
+  reactivate(balanceContractId: string, newStatus: 'ACTIVE' | 'EXPIRED', releasedAt: string, newExpiryDate?: string | null): void {
+    const effectiveTo = newStatus === 'EXPIRED' ? releasedAt : null;
     if (newExpiryDate !== undefined) {
       this.db
-        .prepare(`UPDATE balance_contracts SET status = @newStatus, effective_to = NULL, expiry_date = @newExpiryDate WHERE balance_contract_id = @balanceContractId`)
-        .run({ balanceContractId, newStatus, newExpiryDate });
+        .prepare(`UPDATE balance_contracts SET status = @newStatus, effective_to = @effectiveTo, expiry_date = @newExpiryDate WHERE balance_contract_id = @balanceContractId`)
+        .run({ balanceContractId, newStatus, effectiveTo, newExpiryDate });
     } else {
       this.db
-        .prepare(`UPDATE balance_contracts SET status = @newStatus, effective_to = NULL WHERE balance_contract_id = @balanceContractId`)
-        .run({ balanceContractId, newStatus });
+        .prepare(`UPDATE balance_contracts SET status = @newStatus, effective_to = @effectiveTo WHERE balance_contract_id = @balanceContractId`)
+        .run({ balanceContractId, newStatus, effectiveTo });
     }
   }
 }

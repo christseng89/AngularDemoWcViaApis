@@ -664,7 +664,40 @@ info:
     immediately clears the `ACTIVE` status AUTO EXPIRY requires — and `CLOSE` can never precede an
     `EXPIRED` contract, so the trailing run relevant to Extension is always exactly 0 or 1 movement, never
     a multi-item chain the way REOPEN's own §9.7 case can be.)
-  version: "1.23.0"
+
+    v1.24.0 (2026-08-25, same day — implements four of the items
+    `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13 formally ratified after the F1 feature
+    above shipped, superseding their earlier "維持待決" status; see that document and `TODO.md`'s own F1
+    §11.4 entry for the full decision record):
+      - FIXED (§13.7): `reactivate()`'s own contract-level side effect for A11/B7 Reopen reactivating a
+        `CLOSED` contract back to `EXPIRED` (§9.2 Option A) now stamps `effectiveTo` with the REOPEN's
+        own Release timestamp, instead of leaving it `NULL`. `NULL` previously read as "still current"
+        on an `EXPIRED` row and gave the new Auto Close Grace Period below no anchor to compute from;
+        reactivating to `ACTIVE` is unaffected — `effectiveTo` still clears to `NULL` there, unchanged.
+      - ADDED (§13.5) — Auto Close Grace Period: AUTO CLOSE now additionally requires
+        `Business Date > effectiveTo + N bank BUSINESS days` (a new fixed config constant,
+        `AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS`) before picking up an `EXPIRED` contract — deliberately
+        independent of the existing calendar-day `mail_float_grace_days` (that one gates AUTO EXPIRY
+        itself, off `expiryDate`; this one gates AUTO CLOSE, off `effectiveTo` — never conflated).
+        Business-day math is a same-repo Phase 1 "weekend-only" mock standing in for the not-yet-built
+        "Standing" microservice BA's proposal envisions for Phase 2. This closes the ORIGINAL §8.5 gap
+        (a freshly-EXPIRED, already-fully-settled contract going straight to `CLOSED` in the SAME sweep
+        cycle) for the general case, not just the REOPEN-originated one v1.21.0 already covered — the
+        v1.21.0 `isRecentlyReopened()` mechanism is UNCHANGED and kept running alongside this as an
+        interim safeguard (see §13.8 in the proposal document for the reconciliation note).
+      - ADDED (§13.1 item 4 / item 3(a)) — `movementType: 'CLOSE'` and `movementType: 'REOPEN'` both now
+        REQUIRE a caller-supplied `reasonCode`; a Submit with none is rejected (400). AUTO CLOSE satisfies
+        this by always supplying a fixed internal value (`NATURAL_EXPIRY_ALL_BALANCES_CLEARED`) rather
+        than being exempted from the check — a human A10/B6/A11/B7 submission must supply its own. Every
+        other movementType is unaffected; `reasonCode` stays optional there, unchanged.
+      - ADDED (§13.1 item 2) — three new optional passthrough fields on the create-movement request,
+        relevant to `AMEND_EXPIRY_DATE`/`REOPEN`: `amendmentApproved` (boolean), `amendmentEffective`
+        (string), `consentStatus` (enum `NOT_REQUIRED`/`OBTAINED`). This service does NOT judge whether
+        consent was actually obtained — per BA's own decision, that determination stays entirely
+        upstream (Channel API/front-office); this service only accepts, shape-validates (`consentStatus`
+        against the fixed enum — an invalid value is rejected, 400), and persists all three for audit.
+        Harmlessly accepted (and stored) on every other movementType too, same posture as `reasonCode`.
+  version: "1.24.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1604,7 +1637,17 @@ components:
         openingBalance: { $ref: '#/components/schemas/MonetaryAmount' }
         sourceAmendmentNo: { type: integer, nullable: true }
         effectiveFrom: { type: string, format: date-time }
-        effectiveTo: { type: string, format: date-time, nullable: true }
+        effectiveTo:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            `NULL` while this contract version is current (ACTIVE, or EXPIRED via v1.24.0's §13.7 fix
+            below). Stamped when superseded, CLOSED (A10/B6/AUTO CLOSE), or EXPIRED (AUTO EXPIRY, or
+            A11/B7 Reopen reactivating a CLOSED contract back to EXPIRED — v1.24.0, F1 proposal §13.7 —
+            this case previously left it `NULL`, which the new Auto Close Grace Period below could not
+            use as a "became EXPIRED at" anchor; reactivating all the way to ACTIVE still clears it to
+            `NULL`, unchanged). AUTO CLOSE's own Grace Period (v1.24.0) computes off this field.
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
 
@@ -1689,7 +1732,31 @@ components:
             expiryDate value to apply to the contract. When the target contract is currently EXPIRED
             (Expiry Extension Amendment), Checker Release additionally requires this date to be strictly
             in the future.
-        reasonCode: { type: string, nullable: true }
+        reasonCode:
+          type: string
+          nullable: true
+          description: >
+            Optional/passthrough for every movementType EXCEPT `CLOSE` and `REOPEN` (v1.24.0, F1 proposal
+            §13.1 item 4 / item 3(a), BA-ratified) — those two now REQUIRE a caller-supplied value (400 on
+            a bare Submit). AUTO CLOSE satisfies this internally with a fixed value
+            (`NATURAL_EXPIRY_ALL_BALANCES_CLEARED`) rather than being exempted from the check.
+        amendmentApproved:
+          type: boolean
+          nullable: true
+          description: >
+            v1.24.0, F1 proposal §13.1 item 2 (BA-ratified) — upstream consent passthrough, relevant to
+            `AMEND_EXPIRY_DATE`/`REOPEN`. This service does NOT judge whether consent was actually
+            obtained (that determination stays entirely upstream, per BA's own decision) — it only
+            accepts and persists this for audit. Harmlessly accepted on every other movementType too.
+        amendmentEffective:
+          type: string
+          nullable: true
+          description: v1.24.0, F1 proposal §13.1 item 2 — companion to amendmentApproved/consentStatus, same posture. Non-empty string when present; no further date-format validation.
+        consentStatus:
+          type: string
+          nullable: true
+          enum: [NOT_REQUIRED, OBTAINED]
+          description: v1.24.0, F1 proposal §13.1 item 2 — the one field of the three with a real bounded value set; an out-of-enum value is rejected (400). Same "accepted, never judged" posture as amendmentApproved/amendmentEffective above.
         remarks: { type: string, nullable: true }
         transactionDate: { type: string, format: date, nullable: true }
         businessDate: { type: string, format: date, nullable: true }
@@ -1883,12 +1950,19 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
+        expiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only. See BalanceContract.expiryDate's own description." }
+        mailFloatGraceDays: { type: integer, nullable: true, description: "v1.19.0, F1 — optional override of the per-side config default (captured onto the contract at ISSUE, fixed thereafter); omit to use the config default." }
+        newExpiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — movementType 'AMEND_EXPIRY_DATE' only. See BalanceMovement.newExpiryDate's own description." }
         legRef: { type: string, nullable: true }
         accountEntries:
           type: array
           nullable: true
           items: { $ref: '#/components/schemas/AccountEntry' }
         businessEventId: { type: string, format: uuid, nullable: true, description: Correlates this movement with any sibling leg movements from the same named business function (see the companion Web/Mobile Channel API) — not a transaction boundary. }
+        reasonCode: { type: string, nullable: true, description: "v1.24.0 — REQUIRED (400 if absent) for movementType 'CLOSE'/'REOPEN'; optional/passthrough otherwise. See BalanceMovement.reasonCode's own description." }
+        amendmentApproved: { type: boolean, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentApproved's own description." }
+        amendmentEffective: { type: string, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentEffective's own description." }
+        consentStatus: { type: string, nullable: true, enum: [NOT_REQUIRED, OBTAINED], description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.consentStatus's own description." }
         transactionDate: { type: string, format: date, nullable: true }
         businessDate: { type: string, format: date, nullable: true }
         valueDate: { type: string, format: date, nullable: true }

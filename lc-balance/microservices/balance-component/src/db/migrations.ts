@@ -481,6 +481,17 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('new_expiry_date')) db.exec('ALTER TABLE balance_movements ADD COLUMN new_expiry_date TEXT');
     },
   },
+  {
+    id: 17,
+    description:
+      'Add amendment_approved/amendment_effective/consent_status to balance_movements (2026-08-25, F1 proposal §13.1 item 2, BA-ratified — AMEND_EXPIRY_DATE/REOPEN upstream consent passthrough; this component accepts and shape-validates these, never judges them) — see schema.ts\'s own column comment. Simple ALTER TABLE ADD COLUMN, no CHECK constraint (consent_status is bounded at the zod layer, same posture as the pre-existing reason_code column).',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('amendment_approved')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_approved INTEGER');
+      if (!columns.includes('amendment_effective')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_effective TEXT');
+      if (!columns.includes('consent_status')) db.exec('ALTER TABLE balance_movements ADD COLUMN consent_status TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

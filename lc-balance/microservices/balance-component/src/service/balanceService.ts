@@ -37,8 +37,19 @@ import { checkRedeemSufficiency } from '../domain/shgtRedeem';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
 import { evaluateExpiryEligibility, isPastExpiryGrace, type ExpiryEligibilityResult } from '../domain/expiryEligibility';
+import { isPastAutoCloseGrace } from '../domain/autoCloseGracePeriod';
 import { computeReopenRestoreAmount } from '../domain/reopenRestoration';
-import { AUTO_CLOSE_ENABLED, AUTO_EXPIRY_ENABLED, BATCH_CHECKER_ACTOR, BATCH_MAKER_ACTOR, EXPIRY_SWEEP_INTERVAL, MAIL_FLOAT_GRACE_DAYS, toIntervalMs } from '../config';
+import {
+  AUTO_CLOSE_ENABLED,
+  AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS,
+  AUTO_CLOSE_REASON_CODE,
+  AUTO_EXPIRY_ENABLED,
+  BATCH_CHECKER_ACTOR,
+  BATCH_MAKER_ACTOR,
+  EXPIRY_SWEEP_INTERVAL,
+  MAIL_FLOAT_GRACE_DAYS,
+  toIntervalMs,
+} from '../config';
 import { CurrencyMismatchError, IllegalStateTransitionError, InsufficientBalanceError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
 import type {
   AccountEntry,
@@ -173,6 +184,24 @@ export interface CreateMovementRequest {
   sourceTransactionRef?: string | null;
   /** See BalanceMovement.referencedTransactionId's own doc comment in types.ts for the full rule. */
   referencedTransactionId?: string | null;
+  /**
+   * F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — mandatory for CLOSE
+   * and REOPEN (assertReasonCodeRequired() below rejects a Submit with none); optional/passthrough for
+   * every other movementType, same as before this fix. AUTO CLOSE (processSweepCandidate()) always
+   * supplies config.ts's own AUTO_CLOSE_REASON_CODE here internally rather than being exempted from the
+   * check.
+   */
+  reasonCode?: string | null;
+  /**
+   * F1 proposal §13.1 item 2 (BA-ratified 2026-08-25) — `AMEND_EXPIRY_DATE`/`REOPEN` only, upstream
+   * consent passthrough. This service does NOT judge whether consent was actually obtained — it only
+   * accepts, shape-validates (`consentStatus` against a fixed enum in requestSchema.ts), and persists
+   * these for audit. Ignored (but harmlessly stored, same posture as reasonCode) for every other
+   * movementType.
+   */
+  amendmentApproved?: boolean | null;
+  amendmentEffective?: string | null;
+  consentStatus?: 'NOT_REQUIRED' | 'OBTAINED' | null;
   createdBy: string;
 }
 
@@ -685,7 +714,13 @@ export class BalanceService {
    * sweep, same "one candidate's failure doesn't sink the batch" posture the backend 中台's own
    * runCase() interpreter already uses for Business Case replay).
    */
-  private processSweepCandidate(contract: BalanceContract, movementType: 'EXPIRE' | 'CLOSE', createdBy: string, releasedBy: string): { balanceContractId: string; ok: boolean; error?: string } {
+  private processSweepCandidate(
+    contract: BalanceContract,
+    movementType: 'EXPIRE' | 'CLOSE',
+    createdBy: string,
+    releasedBy: string,
+    reasonCode?: string,
+  ): { balanceContractId: string; ok: boolean; error?: string } {
     const ownMovements = this.movements.listByContract(contract.balanceContractId);
     const confirmedBalance = computeConfirmedBalance(ownMovements);
     try {
@@ -697,6 +732,7 @@ export class BalanceService {
         amount: confirmedBalance.toFixed(),
         currency: contract.currency,
         createdBy,
+        reasonCode,
       });
       if (!result.created) {
         return { balanceContractId: contract.balanceContractId, ok: false, error: `idempotency conflict — a movement already exists at this eventSeq (unexpected for a fresh Date.now() eventSeq).` };
@@ -745,23 +781,31 @@ export class BalanceService {
    * F1, user-reported 2026-08-25 ("Auto Close 時必須把REOPEN狀態交易排除 不然才REOPEN 下一秒就被AUTO
    * CLOSE掉了") — skips a contract still within one sweep interval of its own most recent REOPEN
    * (isRecentlyReopened() above), giving a human genuine time to act after Reopening an already-expired
-   * contract (§9.2 Option A) before AUTO CLOSE would otherwise immediately re-close it.
+   * contract (§9.2 Option A) before AUTO CLOSE would otherwise immediately re-close it. Kept as an
+   * interim safeguard alongside the Grace Period gate below, per F1 proposal §13.8 — see TODO.md/
+   * CLAUDE.md for the reconciliation note.
    *
-   * Known, accepted gap (§8.5, not yet implemented — see this repo's own
-   * analysis/Balance-Component-F1-Expire-Proposal-zh.md §11.4 item 1), narrower now than before the fix
-   * above: does NOT exclude a contract that transitioned to EXPIRED via a genuine EXPIRE in the SAME
-   * sweep cycle (runExpirySweepCycle() below runs this immediately after runAutoExpirySweep(), so a
-   * freshly-EXPIRED, already-fully-settled contract can still go straight to CLOSED with no Expiry
-   * Extension Amendment window) — only the REOPEN-originated case above is now protected. BA-recommended
-   * broader fix (AUTO CLOSE only contracts EXPIRED as of a PRIOR sweep cycle, regardless of how they got
-   * there) is deliberately still deferred for the plain-EXPIRE case — this comment is that record.
+   * F1 proposal §13.5 (BA-ratified 2026-08-25) — Auto Close Grace Period: also requires
+   * `isPastAutoCloseGrace()` (config.ts's AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS bank BUSINESS days off
+   * the contract's own `effectiveTo`, i.e. when it became EXPIRED — see domain/autoCloseGracePeriod.ts's
+   * own top doc comment). This also closes the ORIGINAL §8.5 gap this comment used to describe as
+   * "known, accepted, deliberately deferred" (a freshly-EXPIRED, already-fully-settled contract going
+   * straight to CLOSED in the SAME sweep cycle, with no Expiry Extension Amendment window) — that
+   * candidate's own `effectiveTo` was just stamped by THIS cycle's own runAutoExpirySweep(), so
+   * `isPastAutoCloseGrace()` is false for it until AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS business days
+   * later, regardless of how it reached EXPIRED (genuine EXPIRE or REOPEN-to-EXPIRED alike).
+   *
+   * `reasonCode` on the generated CLOSE movement is always config.ts's own fixed
+   * AUTO_CLOSE_REASON_CODE — see assertReasonCodeRequired()'s own doc comment for why AUTO CLOSE
+   * satisfies that requirement this way instead of being exempted from it.
    */
   runAutoCloseSweep(asOf: Date = new Date()): { balanceContractId: string; ok: boolean; error?: string }[] {
     if (!AUTO_CLOSE_ENABLED) return [];
     return this.contracts
       .listExpiredContracts()
       .filter((contract) => !this.isRecentlyReopened(contract, asOf))
-      .map((contract) => this.processSweepCandidate(contract, 'CLOSE', BATCH_MAKER_ACTOR, BATCH_CHECKER_ACTOR));
+      .filter((contract) => isPastAutoCloseGrace(contract.effectiveTo, AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS, asOf))
+      .map((contract) => this.processSweepCandidate(contract, 'CLOSE', BATCH_MAKER_ACTOR, BATCH_CHECKER_ACTOR, AUTO_CLOSE_REASON_CODE));
   }
 
   /**
@@ -1381,6 +1425,22 @@ export class BalanceService {
     if (amt.isZero() || amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must be greater than 0.`);
   }
 
+  /**
+   * F1 proposal §13.1 item 4 (CLOSE) / item 3(a) (REOPEN), BA-ratified 2026-08-25 — both must carry a
+   * caller-supplied reasonCode; a human A10/B6/A11/B7 submission with none is rejected outright. AUTO
+   * CLOSE satisfies this by always supplying config.ts's own AUTO_CLOSE_REASON_CODE internally (see
+   * processSweepCandidate()) rather than being exempted from the check — this function doesn't need to
+   * know who's calling. Every other movementType is unaffected — reasonCode stays optional there, same
+   * as before this fix (e.g. still tolerated empty on a pre-existing CLOSE row REOPEN's own restore
+   * chain walks back over, see domain/reopenRestoration.ts — this check only gates a NEW CLOSE/REOPEN
+   * submission, never re-validates an already-stored one).
+   */
+  private assertReasonCodeRequired(movementType: string, reasonCode: string | null | undefined): void {
+    if ((movementType === 'CLOSE' || movementType === 'REOPEN') && !reasonCode) {
+      throw new RequestValidationError(`reasonCode is required for ${movementType}.`);
+    }
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
     // Checked BEFORE resolveOrCreateContract() — a rejected ISSUE/CREATE must never leave an orphaned,
     // empty BalanceContract row behind (same "checked before createContract()" posture the SG/Present-
@@ -1392,6 +1452,7 @@ export class BalanceService {
     if (req.movementType !== 'REOPEN') {
       this.assertValidAmount(req.movementType, req.amount);
     }
+    this.assertReasonCodeRequired(req.movementType, req.reasonCode);
 
     const contract = this.resolveOrCreateContract(req);
 
@@ -1497,6 +1558,10 @@ export class BalanceService {
       contingentAccountEntry,
       status: 'PENDING',
       reversalOfMovementId: req.reversalOfMovementId ?? null,
+      reasonCode: req.reasonCode ?? null,
+      amendmentApproved: req.amendmentApproved ?? null,
+      amendmentEffective: req.amendmentEffective ?? null,
+      consentStatus: req.consentStatus ?? null,
       newExpiryDate: req.newExpiryDate ?? null,
       transactionDate: req.transactionDate ?? null,
       businessDate: req.businessDate ?? null,
@@ -1818,10 +1883,10 @@ export class BalanceService {
         if (expireMovement) {
           this.createAndReleaseReversal(expireMovement, releasedBy, movement.businessEventId ?? movement.movementId);
         }
-        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', newExpiryDate);
+        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
       } else {
         // Plain amendment against an ACTIVE contract — just persist the new expiry date, no status change, no REVERSAL.
-        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', newExpiryDate);
+        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
       }
     }
 
@@ -1835,7 +1900,7 @@ export class BalanceService {
     // yet offer §9.2 Option B's single-transaction "REOPEN WITH EXTENSION" compound).
     if (movement.movementType === 'REOPEN') {
       const targetStatus = contract.expiryDate && contract.expiryDate > releasedAt ? 'ACTIVE' : 'EXPIRED';
-      this.contracts.reactivate(contract.balanceContractId, targetStatus);
+      this.contracts.reactivate(contract.balanceContractId, targetStatus, releasedAt);
     }
 
     return this.movements.findById(movementId)!;

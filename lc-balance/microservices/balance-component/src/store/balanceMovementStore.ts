@@ -63,6 +63,9 @@ interface MovementRow {
   present_docs_consumed_by: string | null;
   cancelled_by: string | null;
   cancelled_at: string | null;
+  amendment_approved: number | null;
+  amendment_effective: string | null;
+  consent_status: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -115,6 +118,9 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     presentDocsConsumedBy: row.present_docs_consumed_by,
     cancelledBy: row.cancelled_by,
     cancelledAt: row.cancelled_at,
+    amendmentApproved: row.amendment_approved === null ? null : row.amendment_approved === 1,
+    amendmentEffective: row.amendment_effective,
+    consentStatus: row.consent_status as BalanceMovement['consentStatus'],
   };
 }
 
@@ -140,7 +146,8 @@ export class BalanceMovementStore {
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before,
             balance_after, warnings, created_by, released_by, created_at, released_at,
-            event_snapshot, root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot
+            event_snapshot, root_event_snapshot, acceptance_event_snapshot, sg_event_snapshot,
+            amendment_approved, amendment_effective, consent_status
           ) VALUES (
             @movementId, @balanceContractId, @eventSeq, @businessEventId, @movementType,
             @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
@@ -150,7 +157,8 @@ export class BalanceMovementStore {
             @sourceModule, @sourceFunction, @sourceTransactionRef, @referencedTransactionId,
             @balanceBefore,
             @balanceAfter, @warnings, @createdBy, @releasedBy, @createdAt, @releasedAt,
-            @eventSnapshot, @rootEventSnapshot, @acceptanceEventSnapshot, @sgEventSnapshot
+            @eventSnapshot, @rootEventSnapshot, @acceptanceEventSnapshot, @sgEventSnapshot,
+            @amendmentApproved, @amendmentEffective, @consentStatus
           )`,
         )
         .run({
@@ -191,6 +199,9 @@ export class BalanceMovementStore {
           rootEventSnapshot: movement.rootEventSnapshot ? JSON.stringify(movement.rootEventSnapshot) : null,
           acceptanceEventSnapshot: movement.acceptanceEventSnapshot ? JSON.stringify(movement.acceptanceEventSnapshot) : null,
           sgEventSnapshot: movement.sgEventSnapshot ? JSON.stringify(movement.sgEventSnapshot) : null,
+          amendmentApproved: movement.amendmentApproved === null || movement.amendmentApproved === undefined ? null : movement.amendmentApproved ? 1 : 0,
+          amendmentEffective: movement.amendmentEffective ?? null,
+          consentStatus: movement.consentStatus ?? null,
         });
       return { created: true };
     } catch (err) {

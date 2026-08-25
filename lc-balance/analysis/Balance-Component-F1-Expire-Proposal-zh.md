@@ -792,3 +792,104 @@ REOPEN 核准的時間點，重新蓋上 `effective_to`，讓該合約重新進�
 **結論：業務這項要求，實際上已經被 §13.7 的修正完整涵蓋**（PENDING 期間天然安全，RELEASED 後回到
 EXPIRED 的情境靠 §13.7 補上 `effective_to`），不需要在 AUTO EXPIRY／AUTO CLOSE 的候選清單查詢邏輯
 裡另外新增「排除 REOPEN」的條件，避免工程team誤解成需要重複做一次已經天然成立的保護。
+
+## 十四、第二輪程式碼審閱（2026-08-25，UAT 後的 REOPEN 重新設計 + reasonCode 落地）
+
+工程team在§十二審閱之後，根據現場UAT回饋（"Checker要看交易出的帳 再決定APPROVE或REJECT"、"Auto Close
+時必須把REOPEN狀態交易排除"）與§13.1第4項/第3項(a)的reasonCode決議，對REOPEN機制做了一次不小的重新
+設計，並補上reasonCode強制欄位。BA對照新程式碼逐項核對如下。
+
+### 14.1　REOPEN 重新設計——核對通過
+
+原設計（§12審閱時確認正確）：REOPEN本身是0金額movement，真正的餘額恢復是Checker Release**之後**才
+以REVERSAL side effect的方式產生，Checker核准當下看不到真正要恢復多少錢。UAT測出這個問題後，重新設計為：
+
+- 新檔案`domain/reopenRestoration.ts`：`computeReopenRestoreAmount()`——從合約最新一筆movement往回走，
+  加總連續的RELEASED EXPIRE/CLOSE金額，遇到非此二者即停止。**BA重新核對過這個算法對§9.7的要求（完整
+  沖銷鏈，路徑A/B）依然正確**，且额外正確處理了「REOPEN過一次、又再關閉、又再REOPEN」的重複循環情境
+  （因為REOPEN本身不是EXPIRE/CLOSE，天然形成停止邊界，不會重複加總舊的沖銷鏈）。
+- REOPEN現在在Maker Submit當下就帶著真實金額，同時透過`domain/contingentAccountEntry.ts`產生真正的
+  Dr/Cr分錄（`deriveContingentAccountEntry()`對REOPEN沒有特殊case，是靠`MOVEMENT_DIRECTION['REOPEN'] = 1`
+  這個既有的通用機制自動算出，屬於正確、無需特例的設計）；Release時重新驗證金額沒有變動，跟CLOSE/
+  EXPIRE既有的「重新核對」模式一致。
+- 前端`builder-fields.ts`確認：REOPEN的Amount欄位整個隱藏（不是鎖定但可見），Maker完全不用看到也不用
+  輸入金額，跟業務原始要求一致。
+
+### 14.2　AUTO EXPIRY／AUTO CLOSE 排除 REOPEN——已用另一套機制實作，比 §13.8 原本的結論更完整
+
+**這裡要更正§13.8的結論。** §13.8當時判斷「業務要求已被§13.7的`effective_to`修正完整涵蓋，AUTO EXPIRY/
+AUTO CLOSE的候選清單查詢邏輯不需要額外新增排除REOPEN的條件」——但工程team實際採用了不同、更即時的做法：
+新增`isRecentlyReopened()`，直接檢查合約「最新一筆movement」是不是剛RELEASED的REOPEN、且距今是否還在
+一個sweep interval以內，兩個批次的候選清單查詢都加了這個過濾。程式註解直接引用了業務現場回饋的原話。
+
+BA核對這個設計的正確性：**通過**。刻意做成「時間有限的保護窗口」而非「永久排除」——因為如果一張合約
+REOPEN救回ACTIVE後、原本到期日之後真的到了，還是要能正常AUTO EXPIRY，永久排除會重新製造F1原本要解決
+的問題；判斷是動態的，鍵在「最新一筆movement」而非「曾經被REOPEN過」，一旦合約上有任何後續動作（辦
+Extension、清SG等），保護窗口自動失效。這個修法不依賴`effective_to`，是獨立於§13.7之外、立即生效的
+一層保護。
+
+**與§13.7的關係釐清**：§13.7指出的`effective_to`被REOPEN清成NULL的問題，**目前查證仍未修正**（這次
+改動的檔案清單裡沒有`balanceContractStore.ts`的`reactivate()`）——但因為`isRecentlyReopened()`已經
+獨立擋住了立即性的race condition，這個bug現階段不會造成實際影響；等§13.5的Auto Close Grace Period
+（用「N個適用日」判斷）真的做出來、需要靠`effective_to`當起算點時，§13.7這項修正仍然必要，不能因為
+§14.2的保護已經上線就誤以為不用修了。
+
+### 14.3　reasonCode 強制要求——核對通過，字面值精確符合決議
+
+§13.1第4項/第3項(a)已落地：`builder-fields.ts`對A10/B6/A11/B7強制要求`reasonCode`欄位（對應
+`BalanceService.assertReasonCodeRequired()`），AUTO CLOSE則正確從UI豁免、改由後端自動代入
+`config.ts`的`AUTO_CLOSE_REASON_CODE`常數——**BA核對這個常數的實際字面值，精確等於決議文字
+`'NATURAL_EXPIRY_ALL_BALANCES_CLEARED'`**，沒有走樣。
+
+### 14.4　新發現的缺口：Checker 畫面看不到 Account Entries，跟這次重新設計的初衷矛盾
+
+**這是本輪審閱找到的真正問題。** 整個REOPEN重新設計的出發點，是UAT回饋「Checker要看交易出的帳 再決定
+APPROVE或REJECT」——但BA查證後發現：**Checker核准畫面（`checker-panel.component.ts`）目前沒有任何
+管道可以查看Account Entries。**
+
+證據：Maker那邊（`maker-panel.component.ts`）在送出結果面板上有3顆「Account Entries」按鈕，透過
+`@Output() openAccountEntries` 把事件往上傳給父層`transaction-builder.component.ts`，由父層開啟共用
+的`AccountEntriesDialogComponent`；`inquire-events.component.html`也有接這個對話框。但
+**`checker-panel.component.ts`（343行）整個檔案裡完全沒有`openAccountEntries`、`AccountEntriesDialog`
+或任何相關字樣，`checker-panel.component.spec.ts`也沒有任何「account entries」相關的測試案例。**
+
+也就是說，後端已經正確算出並儲存了真實的Account Entry（本節14.1已核對正確），Maker送出後看得到，
+Inquire Events查得到，唯獨真正要「看了帳再決定APPROVE或REJECT」的Checker，在核准畫面本身看不到——
+跟這次重新設計的初衷正好矛盾。**建議工程team在`checker-panel.component.ts`／`.html`比照Maker結果
+面板，加上等同的「Account Entries」按鈕，接上同一個共用的`AccountEntriesDialogComponent`。**
+
+### 14.5　本輪結論
+
+14.1-14.3核對通過，程式碼品質高、註解精確引用決議出處。14.4是本輪唯一發現的實質缺口，建議列為
+高優先工程待辦——目前的實作讓Checker事實上仍然是「先核准、才看得到帳」，沒有真正達成UAT回饋要解決
+的問題。§13.7（`effective_to`）維持原本的待辦狀態，不受本輪影響。
+
+### 14.6　§14.4 缺口修復確認（2026-08-25，BA 複查通過）
+
+工程team已針對§14.4補上修正，BA複查程式碼確認如下。
+
+修法位置跟BA原本預期的不同：不是加在`checker-panel.component.ts`／`.html`本身，而是加在
+`transaction-builder.component.html`裡`<app-checker-panel>`的action區塊——這是延續本專案既有架構
+（BAL-003 "Feature Components + Facade"）：Release/Reject這層動作邏輯本來就放在父層、透過`ng-content`
+投影進子元件，不是放在`CheckerPanelComponent`自己身上；新的「Account Entries」按鈕比照同一個慣例放在
+同一處，架構上是對的，不是繞路。
+
+核對細節：
+
+- 新按鈕跟既有的Release／Reject按鈕放在同一排，Checker核准前就能點開查看分錄，直接對應UAT回饋
+  「Checker要看交易出的帳 再決定APPROVE或REJECT」。
+- 用`*ngIf="selectedCheckerMovement?.contingentAccountEntry"`正確地擋掉沒有分錄的情況（跟Maker端
+  按鈕的顯示條件完全一致）。
+- 呼叫既有的`openAccountEntryDialog()`，接同一個共用的`AccountEntriesDialogComponent`，沒有另外
+  重做一套，符合既有架構慣例，不是重複實作。
+- `balance-component-api.service.ts`的`BalanceMovement`介面已正確宣告`contingentAccountEntry?:
+  ContingentAccountEntry | null`欄位，資料不會在API回傳時被型別擋掉或漏接。
+- 程式碼註解明確引用「F1 proposal §14.4（BA code review, 2026-08-25）」，修正動機與出處對應清楚。
+
+**唯一的小提醒（非阻擋）：** 沒有找到針對這顆新按鈕的測試案例（`transaction-builder.component.
+actions.spec.ts`等相關測試檔未同步更新），建議工程team正式上線前補上「Checker選到PENDING項目、有
+分錄時按鈕顯示、點擊正確開對話框」這條測試路徑，其餘沒有阻擋事項。
+
+**結論：§14.4確認修復完成，通過複查。** 至此，§十二／§十四兩輪程式碼審閱找到的兩個實質缺口
+（Inquire Events收合顯示——§12.2，仍待處理；Checker Account Entries——§14.4，已修復）中，一項
+已解決。§13.7（`effective_to`）維持原本待辦狀態，等§13.5 Auto Close Grace Period真正實作時一併處理。

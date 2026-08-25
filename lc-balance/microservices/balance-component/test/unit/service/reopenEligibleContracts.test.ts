@@ -30,6 +30,7 @@ function issueAndCloseImportLc(service: BalanceService, lcNumber: string): Balan
     amount: '10000',
     currency: 'USD',
     createdBy: 'maker1',
+    reasonCode: 'TEST_CLOSE_REASON',
   });
   if (!close.created) throw new Error('expected a new movement');
   service.release(close.movement.movementId, 'checker1');
@@ -124,6 +125,7 @@ describe('BalanceService.listReopenEligibleContracts — A11/B7 Reopen Step-1 pi
       amount: '8000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');

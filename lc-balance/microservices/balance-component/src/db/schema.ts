@@ -245,7 +245,15 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- 2026-08-20 ("SUBMIT/EC/APPROVE DATETIME/USER") — cancel()'s own actor/time, split out from
   -- released_by/released_at (see types.ts BalanceMovement.cancelledAt for why).
   cancelled_by             TEXT,
-  cancelled_at             TEXT
+  cancelled_at             TEXT,
+  -- F1 proposal §13.1 item 2 (BA-ratified 2026-08-25) — AMEND_EXPIRY_DATE/REOPEN's own upstream consent
+  -- passthrough. This component does NOT judge whether consent was actually obtained — it only accepts,
+  -- shape-validates (consent_status against a fixed enum, see validation/requestSchema.ts), and persists
+  -- these for audit; no CHECK constraint here, same posture as reason_code above (bounded but not
+  -- DB-enforced). See types.ts BalanceMovement.consentStatus doc comment.
+  amendment_approved       INTEGER,
+  amendment_effective      TEXT,
+  consent_status           TEXT
 );
 
 -- Design doc §8 — idempotency key: (balanceContractId, eventSeq).

@@ -190,6 +190,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
         amount: '0',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       }),
     ).not.toThrow();
   });
@@ -206,6 +207,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
         amount: '-1',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       }),
     ).toThrow(RequestValidationError);
   });

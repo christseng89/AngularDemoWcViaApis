@@ -37,6 +37,8 @@ export interface CreateMovementRequest {
   expiryDate?: string | null;
   /** F1 — AMEND_EXPIRY_DATE only (A2/B2's third subChoice option). The new expiry date, either a plain amendment (contract ACTIVE) or an Expiry Extension Amendment (contract EXPIRED) depending on the resolved contract's own current status — the UI never distinguishes the two, the server does. */
   newExpiryDate?: string | null;
+  /** F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — mandatory for A10/B6/A11/B7; the microservice rejects a Submit with none for those two movementTypes. */
+  reasonCode?: string | null;
   createdBy: string;
 }
 

@@ -137,6 +137,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -150,6 +151,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     expect(reopen.movement.balanceContractId).toBe(lc.balanceContractId);
@@ -231,11 +233,25 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
   test('rejects a contract that is neither ACTIVE nor EXPIRED (e.g. CLOSED)', () => {
     const service = new BalanceService(createDb(':memory:'));
     const expired = expireLc(service, 'EXT-003');
-    service.runAutoCloseSweep();
+    // Manual A10 Close (not the AUTO CLOSE sweep, which since F1 §13.5 also gates on the Auto Close Grace
+    // Period off effectiveTo — irrelevant to this test's own concern, which is only getting the contract
+    // to a genuine CLOSED status to exercise Extension Amendment's own status-eligibility rejection).
+    const close = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: expired.balanceContractId,
+      movementType: 'CLOSE',
+      eventSeq: 3,
+      amount: '0', // Confirmed Balance is already 0 after the EXPIRE write-off.
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
+    });
+    if (!close.created) throw new Error('expected a new movement');
+    service.release(close.movement.movementId, 'checker1');
     const closed = service.resolveContract('IPLC_LC', { lcNumber: 'EXT-003' }, true)!;
     expect(closed.status).toBe('CLOSED');
 
-    expect(() => submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15')).toThrow(
+    expect(() => submitAmendExpiryDate(service, expired.balanceContractId, 4, '2027-01-01', '2026-01-15')).toThrow(
       /only ACTIVE or EXPIRED contracts are eligible/,
     );
   });
@@ -264,6 +280,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -281,6 +298,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '0',
       currency: 'USD',
       createdBy: BATCH_MAKER_ACTOR,
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     expect(reopen.movement.ceilingAmount).toBe('10000'); // computed at Submit — the single CLOSE's own write-off amount.
@@ -298,11 +316,13 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
   });
 
   test('path B (EXPIRE then AUTO CLOSE — §9.7 chain reversal): reverses BOTH the EXPIRE and the CLOSE, restores the ORIGINAL balance (not 0)', () => {
-    const service = new BalanceService(createDb(':memory:'));
+    // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
+    // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
     const lc = issueImportLc(service, 'REOPEN-B-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
     const asOf = new Date('2026-01-10');
     service.runAutoExpirySweep(asOf);
-    service.runAutoCloseSweep();
+    service.runAutoCloseSweep(new Date('2026-01-20'));
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-B-001' }, true)?.status).toBe('CLOSED');
 
     const movementsBefore = service.listMovements(lc.balanceContractId);
@@ -319,6 +339,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '0',
       currency: 'USD',
       createdBy: BATCH_MAKER_ACTOR,
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     // The whole point of §9.7: only the last CLOSE (amount 0) is directly reflected on the contract —
@@ -349,6 +370,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -361,6 +383,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker2');
@@ -393,6 +416,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
         amount: '0',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_REOPEN_REASON',
       }),
     ).toThrow(/Reopen only applies to a root LC\/Confirmation/);
   });
@@ -409,8 +433,52 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
         amount: '0',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_REOPEN_REASON',
       }),
     ).toThrow(/current status is ACTIVE, not CLOSED/);
+  });
+
+  test('F1 proposal §13.1 item 3(a) (BA-ratified 2026-08-25): rejects a Submit with no reasonCode, even against an otherwise-eligible CLOSED contract', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueImportLc(service, 'REOPEN-REASONCODE-001', { expiryDate: '2099-01-01' });
+    const close = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'CLOSE',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
+    });
+    if (!close.created) throw new Error('expected a new movement');
+    service.release(close.movement.movementId, 'checker1');
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-REASONCODE-001' }, true)?.status).toBe('CLOSED');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'REOPEN',
+        eventSeq: 3,
+        amount: '0',
+        currency: 'USD',
+        createdBy: 'maker1',
+        // reasonCode deliberately omitted.
+      }),
+    ).toThrow(RequestValidationError);
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'REOPEN',
+        eventSeq: 3,
+        amount: '0',
+        currency: 'USD',
+        createdBy: 'maker1',
+        reasonCode: null,
+      }),
+    ).toThrow(/reasonCode is required for REOPEN/);
   });
 
   test('rejects Submit with an open (PENDING) Event anywhere in the tree — a second, concurrent REOPEN Submit sees the first REOPEN itself as an open Event', () => {
@@ -424,6 +492,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -437,6 +506,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
 
     // A second, concurrent REOPEN Submit must see the first one's own still-PENDING record as an open
@@ -452,6 +522,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
         amount: '0',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_REOPEN_REASON',
       }),
     ).toThrow(/not yet fully resolved/);
   });
@@ -472,6 +543,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -484,6 +556,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
       amount: '5', // deliberately wrong/irrelevant — must be ignored, not rejected.
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     expect(reopen.movement.amount).toBe('10000');
@@ -649,10 +722,12 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   // Extension Amendment must NOT find the OLD, already-effectively-neutralized EXPIRE and reverse it a
   // second time.
   test('Expiry Extension Amendment after A11 Reopen reactivated the contract to EXPIRED does NOT double-restore the balance — REOPEN already did it directly, nothing left for Extension to reverse', () => {
-    const service = new BalanceService(createDb(':memory:'));
+    // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
+    // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
     const lc = issueImportLc(service, 'RECHECK-AMEND-005', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
     service.runAutoExpirySweep(new Date('2026-01-10'));
-    service.runAutoCloseSweep(new Date('2026-01-10'));
+    service.runAutoCloseSweep(new Date('2026-01-20'));
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' }, true)?.status).toBe('CLOSED');
 
     const reopen = service.createMovement({
@@ -663,6 +738,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker1');
@@ -692,6 +768,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -703,6 +780,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     db.exec(`UPDATE balance_contracts SET status = 'CANCELLED' WHERE balance_contract_id = '${lc.balanceContractId}'`);
@@ -724,6 +802,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -735,6 +814,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     db.exec(
@@ -765,6 +845,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     expect(reopen.movement.ceilingAmount).toBe('0');
@@ -800,6 +881,7 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -812,6 +894,7 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker2');
@@ -824,8 +907,11 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
     expect(skipped).toHaveLength(0);
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' }, true)?.status).toBe('EXPIRED');
 
-    // Well past one full sweep interval later — AUTO CLOSE now processes it normally.
-    const processed = service.runAutoCloseSweep(new Date(reopenedAt.getTime() + 24 * 60 * 60 * 1000));
+    // Well past one full sweep interval later — AUTO CLOSE now processes it normally. Must also clear
+    // F1 §13.5's own Auto Close Grace Period (2 BUSINESS days off effectiveTo, which reactivate() stamped
+    // to this same REOPEN release moment) — 8 calendar days safely covers that regardless of which day of
+    // the week the REOPEN itself happened to release on.
+    const processed = service.runAutoCloseSweep(new Date(reopenedAt.getTime() + 8 * 24 * 60 * 60 * 1000));
     expect(processed).toHaveLength(1);
     expect(processed[0]!.ok).toBe(true);
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' }, true)?.status).toBe('CLOSED');
@@ -843,6 +929,7 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -858,6 +945,7 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker2');
@@ -892,6 +980,7 @@ describe('REOPEN release-time re-check catches a restore-chain amount that shift
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -904,6 +993,7 @@ describe('REOPEN release-time re-check catches a restore-chain amount that shift
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_REOPEN_REASON',
     });
     if (!reopen.created) throw new Error('expected a new movement');
     expect(reopen.movement.ceilingAmount).toBe('10000');

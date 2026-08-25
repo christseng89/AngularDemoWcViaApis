@@ -140,7 +140,15 @@ info:
     approving. No schema shape changed — `A11`/`B7` were already `amount`-free in this channel contract's
     own `ChannelDerivedTransactionRequest` posture (Amount was never a channel-level concern to begin
     with, same as every other server-derived function here).
-  version: "1.4.0"
+
+    v1.5.0 (2026-08-25, same day, F1 proposal §13.1 items 4/3(a), BA-ratified — see the Microservice API's
+    own v1.24.0 changelog entry): A10/B6/A11/B7's own `help` text updated — all four now REQUIRE a
+    caller-supplied `reasonCode` (the underlying Submit is rejected, 400, without one); the background
+    AUTO CLOSE sweep is unaffected (still supplies its own fixed value internally, never reaches this
+    channel contract). No schema shape changed here — `reasonCode` was already a generic passthrough field
+    on the Microservice API's own request shape, this pass only documents that it is now conditionally
+    mandatory for these four functionCodes specifically.
+  version: "1.5.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.

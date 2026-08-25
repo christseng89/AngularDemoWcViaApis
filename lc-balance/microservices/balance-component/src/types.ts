@@ -170,6 +170,16 @@ export interface BalanceMovement {
    * column comment.
    */
   newExpiryDate?: string | null;
+  /**
+   * F1 proposal §13.1 item 2 (BA-ratified 2026-08-25) — `AMEND_EXPIRY_DATE`/`REOPEN`'s own upstream
+   * consent passthrough (Extension/Reopen consent-gating). This component does NOT judge whether
+   * consent was actually obtained — it only accepts, shape-validates (`consentStatus` against a fixed
+   * enum — see `validation/requestSchema.ts`), and persists these three for audit. `null`/absent for
+   * every other movementType, same posture as `reasonCode` above.
+   */
+  amendmentApproved?: boolean | null;
+  amendmentEffective?: string | null;
+  consentStatus?: 'NOT_REQUIRED' | 'OBTAINED' | null;
   transactionDate?: string | null;
   businessDate?: string | null;
   valueDate?: string | null;

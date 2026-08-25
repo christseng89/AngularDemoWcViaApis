@@ -680,6 +680,81 @@ describe('submit-rules', () => {
     });
   });
 
+  describe('validateSubmit — Reason Code mandatory for A10/B6 (Close) and A11/B7 (Reopen) (F1 proposal §13.1 item 4/3(a), BA-ratified 2026-08-25)', () => {
+    it('rejects A10 (Close) with no Reason Code', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A10'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE', amount: '10000', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBe('Reason Code is mandatory for A10.');
+    });
+
+    it('passes A10 (Close) once Reason Code is supplied', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A10'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE', amount: '10000', currency: 'USD', createdBy: 'maker1', reasonCode: 'MANUAL_CLOSE' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+
+    it('rejects A11 (Reopen) with no Reason Code', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A11'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN', amount: '0', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract({ status: 'CLOSED' }),
+        }),
+      );
+      expect(result.error).toBe('Reason Code is mandatory for A11.');
+    });
+
+    it('passes A11 (Reopen) once Reason Code is supplied', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A11'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN', amount: '0', currency: 'USD', createdBy: 'maker1', reasonCode: 'REINSTATED' },
+          selectedContract: contract({ status: 'CLOSED' }),
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+
+    it('every other function is unaffected — no Reason Code needed for a plain A2 amendment', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '500', currency: 'USD', createdBy: 'maker1' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+  });
+
+  describe('buildSubmitRequest — Reason Code (F1 proposal §13.1)', () => {
+    it('includes reasonCode on the wire request when the Maker supplied one', () => {
+      const { request } = buildSubmitRequest(
+        ctx({
+          selectedFunction: fn('A10'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE', amount: '10000', currency: 'USD', createdBy: 'maker1', reasonCode: 'MANUAL_CLOSE' },
+          selectedContract: contract(),
+        }),
+      );
+      expect(request?.reasonCode).toBe('MANUAL_CLOSE');
+    });
+
+    it('omits reasonCode from the wire request when not supplied (every non-Close/Reopen function)', () => {
+      const { request } = buildSubmitRequest(ctx({ model: { amount: '1000' } }));
+      expect(request?.reasonCode).toBeUndefined();
+    });
+  });
+
   describe('validateSubmit/buildSubmitRequest — B2 Direction / signed Amount (business requirement 2026-08-19, follow-up: "Input the Decrease Amount > 0, then it turns to negative figure to call the APIs"; bug fixed 2026-08-20 — model.amount must NEVER be mutated, only the wire request)', () => {
     const b2Model: Partial<BuilderModel> = { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', amount: '5000', currency: 'USD', createdBy: 'maker1' };
 

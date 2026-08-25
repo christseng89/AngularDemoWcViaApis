@@ -34,6 +34,8 @@ export interface BuilderModel {
   expiryDate?: string;
   /** F1 — A2/B2's third subChoice option (AMEND_EXPIRY_DATE) only. */
   newExpiryDate?: string;
+  /** F1 proposal §13.1 item 4/3(a) (BA-ratified 2026-08-25) — A10/B6 (Close) and A11/B7 (Reopen) only, mandatory. */
+  reasonCode?: string;
 }
 
 /** The three natural-key components a Maker can type or have carried in — shared shape of `naturalKey` and `searchNaturalKey`. */

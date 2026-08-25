@@ -57,3 +57,23 @@ export const BATCH_CHECKER_ACTOR = 'BATCH_CHECKER';
  */
 export const AUTO_EXPIRY_ENABLED = true;
 export const AUTO_CLOSE_ENABLED = true;
+
+/**
+ * F1 proposal §13.1 item 4, BA-ratified 2026-08-25 — AUTO CLOSE always supplies this fixed reasonCode
+ * internally (see BalanceService.processSweepCandidate()); a human A10/B6 submission must supply its own
+ * instead (BalanceService.assertReasonCodeRequired() rejects a bare one).
+ */
+export const AUTO_CLOSE_REASON_CODE = 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED';
+
+/**
+ * F1 proposal §13.5, BA-ratified 2026-08-25 — Auto Close Grace Period: AUTO CLOSE only picks up a
+ * contract once `Business Date > (the date it became EXPIRED) + N bank BUSINESS days` — deliberately
+ * independent of `MAIL_FLOAT_GRACE_DAYS` above (that one gates AUTO EXPIRY itself, in calendar days, off
+ * `expiryDate`; this one gates AUTO CLOSE, in business days, off `effectiveTo` — two different rules for
+ * two different events, per this file's own top doc comment's convention, never conflated). Business-day
+ * math is delegated to `domain/autoCloseGracePeriod.ts`'s `addBusinessDays()` — a Phase 1 same-repo
+ * "weekend-only" mock standing in for the not-yet-built "Standing" microservice BA's proposal envisions
+ * (Phase 2); replace `addBusinessDays()`'s own implementation with a real call once that service exists,
+ * this constant itself doesn't need to change.
+ */
+export const AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2;

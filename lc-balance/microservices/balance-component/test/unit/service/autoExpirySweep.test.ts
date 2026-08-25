@@ -287,7 +287,9 @@ describe('runAutoExpirySweep (F1)', () => {
 
 describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses evaluateContractCloseEligibility() unmodified', () => {
   test('CLOSEs an EXPIRED contract with SG=0/Acceptance=0/no open Events; leaves one with an outstanding SG untouched', () => {
-    const service = new BalanceService(createDb(':memory:'));
+    // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
+    // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
     const clean = issueImportLc(service, 'AUTOCLOSE-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
     const dirty = issueImportLc(service, 'AUTOCLOSE-002', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
     const sgIssue = service.createMovement({
@@ -310,7 +312,7 @@ describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses eval
 
     // runAutoCloseSweep() reports one entry per EXPIRED candidate it attempted, success or failure —
     // not just the successes — so an operator can see WHY a still-EXPIRED contract wasn't auto-closed.
-    const results = service.runAutoCloseSweep();
+    const results = service.runAutoCloseSweep(new Date('2026-01-20'));
     expect(results).toHaveLength(2);
     expect(results).toContainEqual({ balanceContractId: clean.balanceContractId, ok: true });
     expect(results).toContainEqual(
@@ -329,16 +331,38 @@ describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses eval
 });
 
 describe('runExpirySweepCycle (F1) — AUTO EXPIRY then, same cycle, AUTO CLOSE', () => {
-  test('a never-utilized LC (SG/Acceptance already 0) goes ACTIVE -> EXPIRED -> CLOSED in ONE cycle (known §8.5 gap, not yet a reopen-window regression)', () => {
+  // F1 proposal §13.5 (BA-ratified 2026-08-25, see domain/autoCloseGracePeriod.ts) closed the original
+  // §8.5 gap this test used to demonstrate — a same-cycle EXPIRE->CLOSE is no longer possible even for a
+  // never-utilized LC, since AUTO CLOSE's own Auto Close Grace Period gate requires effectiveTo (just
+  // stamped by THIS cycle's own AUTO EXPIRY half) to be at least AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS in
+  // the past — necessarily false within the same synchronous cycle. Rewritten to assert the new,
+  // intended behavior instead of the gap.
+  test('a never-utilized LC (SG/Acceptance already 0) goes ACTIVE -> EXPIRED in one cycle, but AUTO CLOSE does NOT also close it in that same cycle (§8.5 gap closed by the Auto Close Grace Period)', () => {
     const service = new BalanceService(createDb(':memory:'));
     issueImportLc(service, 'CYCLE-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
 
     const { expiry, close } = service.runExpirySweepCycle(new Date('2026-01-10'));
     expect(expiry).toHaveLength(1);
     expect(expiry[0]!.ok).toBe(true);
-    expect(close).toHaveLength(1);
-    expect(close[0]!.ok).toBe(true);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-001' }, true)?.status).toBe('CLOSED');
+    expect(close).toHaveLength(0); // Grace Period not yet elapsed — nothing to CLOSE this cycle.
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-001' }, true)?.status).toBe('EXPIRED');
+  });
+
+  test('once the Auto Close Grace Period has since elapsed, a LATER cycle does CLOSE the same contract', () => {
+    // Fixed now() so the EXPIRE's own effectiveTo is deterministic across the two separate cycle calls.
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
+    issueImportLc(service, 'CYCLE-002', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
+
+    const first = service.runExpirySweepCycle(new Date('2026-01-10'));
+    expect(first.expiry).toHaveLength(1);
+    expect(first.close).toHaveLength(0);
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-002' }, true)?.status).toBe('EXPIRED');
+
+    const later = service.runExpirySweepCycle(new Date('2026-01-20'));
+    expect(later.expiry).toHaveLength(0); // already EXPIRED, nothing left for AUTO EXPIRY to do.
+    expect(later.close).toHaveLength(1);
+    expect(later.close[0]!.ok).toBe(true);
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-002' }, true)?.status).toBe('CLOSED');
   });
 });
 
@@ -355,6 +379,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     // A real SG Issue can't actually land here — Tight Available Balance is already fully consumed by

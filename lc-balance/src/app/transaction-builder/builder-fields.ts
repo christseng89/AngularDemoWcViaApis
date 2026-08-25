@@ -67,6 +67,8 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // the new newExpiryDate date field below, not merely locked in place like amountFromClose/amountFromFixed.
   const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
   const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose || amountFromSgRedeem || amountFromFixed;
+  // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6/A11/B7 only.
+  const requiresReasonCode = !!selectedFunction?.requiresCloseEligibility || !!selectedFunction?.requiresReopenEligibility;
   // A1/B1 only — F1's own new optional Expiry Date input (UCP 600 Art.6(d)); mailFloatGraceDays is
   // captured server-side from config, never a client-side field.
   const showsExpiryDateInput = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
@@ -138,6 +140,17 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       type: 'input',
       props: { label: 'Expiry Date (UCP 600 Art.6(d), optional)', type: 'date' },
       hide: !showsExpiryDateInput,
+    },
+    {
+      // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6 Close and
+      // A11/B7 Reopen both require a caller-supplied Reason Code (the microservice rejects a bare
+      // Submit with none — see BalanceService.assertReasonCodeRequired). AUTO CLOSE is exempt — it
+      // auto-fills its own fixed reasonCode server-side (config.ts's AUTO_CLOSE_REASON_CODE) and never
+      // reaches this UI at all.
+      key: 'reasonCode',
+      type: 'input',
+      props: { label: 'Reason Code', required: requiresReasonCode },
+      hide: !requiresReasonCode,
     },
     {
       key: 'currency',

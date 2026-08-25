@@ -56,6 +56,7 @@ describe('A10 — Import LC Close', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     expect(close.movement.status).toBe('PENDING');
@@ -69,6 +70,48 @@ describe('A10 — Import LC Close', () => {
     // Locked out (free side effect of status no longer being ACTIVE) — the natural-key resolution path
     // every other A2-A10 function uses can no longer find this LC.
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'CLOSE-A10-001' })).toBeUndefined();
+  });
+
+  test('F1 proposal §13.1 item 4 (BA-ratified 2026-08-25): rejects a Submit with no reasonCode, even against an otherwise-eligible ACTIVE contract', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueImportLc(service, 'CLOSE-A10-REASONCODE-001');
+
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'CLOSE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        // reasonCode deliberately omitted.
+      }),
+    ).toThrow(RequestValidationError);
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'CLOSE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        reasonCode: null,
+      }),
+    ).toThrow(/reasonCode is required for CLOSE/);
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.balanceContractId,
+        movementType: 'CLOSE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        reasonCode: '',
+      }),
+    ).toThrow(/reasonCode is required for CLOSE/);
   });
 
   test('blocked: non-zero SG Balance', () => {
@@ -96,6 +139,7 @@ describe('A10 — Import LC Close', () => {
         amount: '10000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       }),
     ).toThrow(InsufficientBalanceError);
   });
@@ -126,6 +170,7 @@ describe('A10 — Import LC Close', () => {
         amount: '10000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       });
     } catch (e) {
       error = e;
@@ -158,6 +203,7 @@ describe('A10 — Import LC Close', () => {
         amount: '10000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       }),
     ).toThrow(InsufficientBalanceError);
   });
@@ -176,6 +222,7 @@ describe('A10 — Import LC Close', () => {
         amount: '9999',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       });
     } catch (e) {
       error = e;
@@ -196,6 +243,7 @@ describe('A10 — Import LC Close', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
 
@@ -232,6 +280,7 @@ describe('A10 — Import LC Close', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -246,6 +295,7 @@ describe('A10 — Import LC Close', () => {
         amount: '0',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       });
     } catch (e) {
       error = e;
@@ -265,6 +315,7 @@ describe('A10 — Import LC Close', () => {
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
@@ -311,6 +362,7 @@ describe('A10 — Import LC Close', () => {
         amount: '2000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       }),
     ).toThrow(InsufficientBalanceError);
   });
@@ -355,6 +407,7 @@ describe('B6 — Export Confirmed LC Close', () => {
       amount: '0',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     const released = service.release(close.movement.movementId, 'checker3');
@@ -390,6 +443,7 @@ describe('B6 — Export Confirmed LC Close', () => {
         amount: '10000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       });
     } catch (e) {
       error = e;
@@ -426,6 +480,7 @@ describe('B6 — Export Confirmed LC Close', () => {
         amount: '10000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       });
     } catch (e) {
       error = e;
@@ -464,6 +519,7 @@ describe('BalanceService.listCloseEligibleContracts — A10/B6 Step-1 picker hin
       amount: '10000',
       currency: 'USD',
       createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');

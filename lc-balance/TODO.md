@@ -64,6 +64,21 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   不再用它。三套測試套件（microservice/Angular/backend）全綠，27 筆 Business Case Registry 案例（含新增的
   Import Case 13-15、Export Case #12）實測通過。
 
+- [x] ~~**F1 proposal §14.4（BA 第二輪 code review，2026-08-25 發現）— Checker 核准畫面看不到 Account
+  Entries，跟 REOPEN 重新設計的初衷矛盾**~~ — **2026-08-25 已修復**（`analysis/Balance-Component-F1-Expire-Proposal-zh.md`
+  §十四）。BA 核對整個 REOPEN 重新設計（上方那項，出發點正是「Checker要看交易出的帳 再決定 APPROVE或
+  REJECT」）後發現：Maker 送出結果面板、Inquire Events 都有「Account Entries」按鈕可查看分錄，唯獨
+  Checker 真正要核准的畫面（`checker-panel.component.ts`／父層 `transaction-builder.component.html` 的
+  Release/Reject 動作區塊）完全沒有——後端算得對、存得對，Checker 事實上仍是「先核准、才看得到帳」。
+  已在父層 `tb-checker-actions` 區塊（Release/Reject 按鈕旁）加上同等的「Account Entries」按鈕，接上
+  既有共用的 `AccountEntriesDialogComponent`（呼叫父層既有的 `openAccountEntryDialog()`，跟這個元件自己
+  的類別註解說「動作層留在父層」的既有架構一致，不需要在 `CheckerPanelComponent` 上新增 `@Output()`），
+  可見性判斷比照 Maker 的既有寫法（`selectedCheckerMovement?.contingentAccountEntry` 有值才顯示）。
+  `ng build --configuration production` 確認模板編譯乾淨，Angular 1133/1133 測試全綠（此為純模板改動，
+  無 `.ts` 覆蓋率變化）。BA §14.1-14.3（REOPEN 重新設計本身、§9.7 沖銷鏈、AUTO EXPIRY/AUTO CLOSE 排除
+  REOPEN 用的 `isRecentlyReopened()`、reasonCode 字面值）核對全部通過，無需修改；§13.7（`effective_to`）
+  BA 確認已於同日稍早修復（見上方 §13 條目），不受本項影響。
+
 - [x] ~~承兑/遲期付款承諾被列為影子備查科目，與分類體系規範相矛盾（原編號 F2）~~ — **BA 已於
   2026-08-25 撤回此項發現，確認並非缺陷**。本項曾在同一天內反覆核查三次：(1) 對照原始碼確認
   `contingentAccountEntry.ts` 對 IPLC_ACCEPTANCE／EPLC_ACCEPTANCE 確實只產生 `(memo)` 影子配對；
@@ -130,46 +145,49 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
     （「才 REOPEN 下一秒就被 AUTO CLOSE 掉了」）實測修復並驗證有效的，**先保留做為過渡期防護**，待
     §13.7/§13.5 真正落地後再評估是要整個換掉、或當作額外一層防禦保留（兩者不互斥，屆時再決定）。
 
-  - [ ] **Sweep 分輪保護 — EXPIRE→同輪 AUTO CLOSE 這一段，BA 已拍板改用「Auto Close Grace Period」機制
-    （§13.5，尚未實作）** — 原始 §8.5 落差（「一筆從未動用過的乾淨 LC，AUTO EXPIRY 剛轉 EXPIRED，同一輪
-    AUTO CLOSE 立刻關閉」）不再用「跳過本輪」這種簡化做法解決，BA 正式決定改採可設定的 **N 個銀行營業日**
-    寬限期（`Business Date > Expiry Date + N 個營業日` 才允許 AUTO CLOSE，明確是**營業日**、不是日曆日——
-    跟既有 `mail_float_grace_days`／`isPastExpiryGrace()` 的日曆日邏輯是兩個獨立機制，不要混用或合併）。
-    營業日運算規劃委由一個獨立的「Standing」微服務負責（本 repo 目前不存在，`lc-balance-new/` 的
-    `standing-mock` 可作為請求/回應形狀的**參考**，但目前連它都還沒有 `/business-days/add` 這個新功能
-    實際需要的端點——不是現成可接的目標）；BA 建議分兩階段：Phase 1 先在 Balance Component 內自建一個
-    最簡單的「只排除週末」mock，Phase 2 才真正對接 Standing 微服務。**尚未動工。**
+  - [x] ~~**Sweep 分輪保護 — EXPIRE→同輪 AUTO CLOSE 這一段，BA 已拍板改用「Auto Close Grace Period」機制
+    （§13.5）**~~ — **Phase 1 已於 2026-08-25 完成**（`analysis/balance-component-api.yaml` v1.24.0）。
+    新增 `domain/autoCloseGracePeriod.ts`（`addBusinessDays()` 同倉庫內建「只排除週末」mock、
+    `isPastAutoCloseGrace()`），`runAutoCloseSweep()` 現在同時要求
+    `Business Date > effectiveTo + N 個營業日`（新 config 常數 `AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2`），
+    與既有 `isRecentlyReopened()` 並存（不是取代——見下方 §13.8 調和說明）。原始 §8.5 落差（一般 EXPIRE→
+    同輪 AUTO CLOSE，非 REOPEN 情境）現已一併關閉，`runExpirySweepCycle` 的測試已改為驗證「同輪
+    `close: []`，晚一輪才會真的 CLOSE」。**Phase 2（真接 Standing 微服務）仍未做**——目前 Phase 1 mock
+    是唯一實作,`standing-mock` 的 `/business-days/add` 端點仍不存在，尚待該微服務真正建置。
 
-  - [ ] **`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7，新發現，尚未修復）** —
-    `balanceContractStore.ts` 的 `reactivate(balanceContractId, newStatus, newExpiryDate?)`，當 REOPEN
-    把合約恢復到 `EXPIRED`（§9.2 情境2）時，目前把 `effective_to` 直接設回 `NULL`；BA 認為應該改成寫入
-    這次 REOPEN 自己的 Release 時間戳，因為上面 §13.5 規劃中的 Auto Close Grace Period 機制需要
-    `effective_to` 當作「這筆合約最近一次變成 EXPIRED 的時間點」這個計算基準——`NULL` 在那個機制下語意
-    不對。**目前程式碼還沒有任何地方真的讀 `effective_to` 做資格判斷**，所以這個欄位錯誤現階段沒有實際
-    行為影響（要等 §13.5 的 Grace Period 機制真的做出來才會被用到），但屬於已明確定案、待補的既知缺口，
-    不應與 §13.5 一起無限期擱置——需要 `reactivate()` 多接受一個「新的 `effective_to`」參數。
+  - [x] ~~**`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7）**~~ — **已於 2026-08-25 修復**。
+    `balanceContractStore.ts` 的 `reactivate()` 新增必填的 `releasedAt` 參數；REOPEN 把合約恢復到
+    `EXPIRED` 時（§9.2 情境2）現在正確寫入這次 Release 的時間戳，不再是 `NULL`（恢復到 `ACTIVE` 時仍維持
+    `NULL`，未變）。這是上面 Auto Close Grace Period 能正確運作的前提，測試已透過
+    `GRACE-CLOSE-001`（`expiryExtensionAndReopen.test.ts`）端到端驗證：REOPEN 恢復到 EXPIRED 後，Grace
+    Period 期滿才真的被 AUTO CLOSE 處理，證明 `effective_to` 確實被正確當作錨點使用。
 
-  - [ ] **Expiry Extension Amendment／A11-B7 Reopen 的 consent 把關（§13.1 第2項，已拍板，尚未實作）** —
-    BA 確認 Balance Component **不自行判斷** consent 是否已取得（不是自己去核實受益人/相關方同意），但
-    請求本身必須能承接並驗證上游（Channel API/前置系統）傳入的新欄位：`amendmentApproved`（布林）、
-    `amendmentEffective`（生效時間）、`consentStatus`（`NOT_REQUIRED`／`OBTAINED` 列舉）——目前
-    `AMEND_EXPIRY_DATE` 請求形狀完全沒有這三個欄位，需要新增到 OAS＋zod schema＋domain 驗證。仍串既有
-    F4（生產級身份驗證/授權，見上方 BAL-001）缺口一併處理，因為這些欄位的可信度最終仍取決於呼叫端是否
-    真的是被授權的上游系統。
+  - [x] ~~**CLOSE（含既有 A10/B6）／A11/B7 Reopen 強制要求 `reasonCode`（§13.1 第4項／第3項(a)）**~~ —
+    **已於 2026-08-25 實作**。`BalanceService.assertReasonCodeRequired()`：`CLOSE`／`REOPEN` 兩者現在都
+    要求呼叫端提供非空 `reasonCode`（Submit 時 400），AUTO CLOSE 批次內部自動帶入固定值
+    `NATURAL_EXPIRY_ALL_BALANCES_CLEARED`（不是被排除在檢查之外，而是這個值由批次自己內部供應）。
+    Angular 端新增對應的 `reasonCode` 表單欄位（`builder-fields.ts`／`submit-rules.ts`，只在
+    A10/B6/A11/B7 顯示＋必填，複用既有的 `requiresCloseEligibility`/`requiresReopenEligibility` 旗標,
+    未新增 BuilderModel 維度）。REOPEN 自己的資格判斷仍容忍「原 CLOSE 的 `reasonCode` 為空」（既有舊資料
+    向下相容,視為原因不明,不阻擋）——這點在新規則下不變。三層（UI/Maker-Checker/API）測試已同步更新。
 
-  - [ ] **A11/B7 Reopen 本身的把關（§13.1 第3項，已拍板，部分不在本組件範圍）** — 拆成四個子決策：
-    (a) 強制要求 `reasonCode`——**可行，尚未實作**（目前 A11/B7 沒有這項要求）；(b) Maker≠Checker——
-    **已存在**，走既有 `assertMakerCheckerSeparation()`，不需另外處理；(c) 特殊角色/權限管控——BA 明確
-    決定屬於上游 Channel API／IAM 的職責，**不在 Balance Component 內建**（§13.5 子決策B 同時指出這個
-    前提目前並不成立：`app.ts` 完全沒有呼叫端身份驗證 middleware，只有 `helmet()`＋rate-limiting——跟
-    既有 BAL-001/F4 是同一個根因缺口，不是新問題，只是這裡再次被點名為「B 方案能不能真的成立」的前提
-    條件）；(d) 信用覆核——跨系統前置條件，本組件無法實作，非本組件範疇；(e)「法律義務已終止時應該開新
-    LC 而非 Reopen」——屬程序/教育訓練層面，不是系統需求，不需要程式碼變動。
+  - [x] ~~**Expiry Extension Amendment／A11-B7 Reopen 的 consent 把關——上游欄位部分（§13.1 第2項）**~~ —
+    **已於 2026-08-25 實作**。新增三個選填 passthrough 欄位（`amendmentApproved`/`amendmentEffective`/
+    `consentStatus`），OAS＋zod schema（`consentStatus` 有真正的列舉驗證,`NOT_REQUIRED`/`OBTAINED`
+    以外的值會被拒絕）＋DB 三個新欄位（migration 17,無 CHECK constraint,比照既有 `reason_code`）全部
+    到位。**刻意不做 Angular UI 輸入欄位**——BA 原意是「Balance Component 不判斷,只接收＋驗證」,這些欄位
+    的語意屬於上游 Channel API 的職責,這個 Angular demo 的 Maker Panel 本身就是在扮演那個上游角色,但跟
+    `sourceModule`/`sourceFunction` 等既有純 passthrough 稽核欄位一樣沒有對應輸入框——之後如果需要示範
+    用途的輸入欄位,可以再補。**A11/B7 自己的角色/權限把關（§13.1 第3項 (b)-(e)）維持未做**，見下方。
 
-  - [ ] **CLOSE（含既有 A10/B6）強制要求 `reasonCode`（§13.1 第4項，已拍板，尚未實作）** — 目前維持選填；
-    BA 正式決定改為：A10/B6 及任何人工 CLOSE 呼叫端必須提供 `reasonCode`，AUTO CLOSE 批次自動代入固定值
-    `NATURAL_EXPIRY_ALL_BALANCES_CLEARED`。REOPEN 自己的資格判斷已能容忍「原 CLOSE 的 `reasonCode`
-    為空」（既有舊資料，視為原因不明，不阻擋）——這點在 CLOSE 改成必填後仍要保留向下相容。
+  - [ ] **A11/B7 Reopen 本身的角色/權限把關（§13.1 第3項 (b)-(e)，已拍板，部分不在本組件範圍——
+    reasonCode 部分已如上完成，此處剩餘子項）** — (b) Maker≠Checker——**已存在**，走既有
+    `assertMakerCheckerSeparation()`，不需另外處理；(c) 特殊角色/權限管控——BA 明確決定屬於上游
+    Channel API／IAM 的職責，**不在 Balance Component 內建**（§13.5 子決策B 同時指出這個前提目前並不
+    成立：`app.ts` 完全沒有呼叫端身份驗證 middleware，只有 `helmet()`＋rate-limiting——跟既有
+    BAL-001/F4 是同一個根因缺口，不是新問題，只是這裡再次被點名為「B 方案能不能真的成立」的前提條件）；
+    (d) 信用覆核——跨系統前置條件，本組件無法實作，非本組件範疇；(e)「法律義務已終止時應該開新 LC 而非
+    Reopen」——屬程序/教育訓練層面，不是系統需求，不需要程式碼變動。
 
   - [ ] **Inquire Events／Look Up 未收合同一 `businessEventId` 底下多筆 `REVERSAL` 列（§12.2，BA code
     review 發現，多數已隨 REOPEN 重新設計而失效）** — 原始發現是針對「REOPEN 舊設計（金額固定0＋Release

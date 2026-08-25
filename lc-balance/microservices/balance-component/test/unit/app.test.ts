@@ -2554,7 +2554,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     await request(app).post(`/balance-movements/${closedOk.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const close = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: closedOk.body.balanceContractId, movementType: 'CLOSE', eventSeq: 2, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: closedOk.body.balanceContractId, movementType: 'CLOSE', eventSeq: 2, amount: '10000', currency: 'USD', createdBy: 'maker1', reasonCode: 'TEST_CLOSE_REASON' })
       .expect(201);
     await request(app).post(`/balance-movements/${close.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
@@ -2596,6 +2596,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         amount: '10000',
         currency: 'USD',
         createdBy: 'maker1',
+        reasonCode: 'TEST_CLOSE_REASON',
       })
       .expect(201);
     await request(app).post(`/balance-movements/${close.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
@@ -2612,6 +2613,38 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     // The Events Timeline (Inquire Events/Look Up) must still show the CLOSE event itself.
     const movements = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
     expect(movements.body.map((m: any) => m.movementType)).toEqual(['ISSUE', 'CLOSE']);
+  });
+
+  test('POST /balance-movements with movementType CLOSE and no reasonCode -> 400 (F1 proposal §13.1 item 4, BA-ratified 2026-08-25)', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-CLOSE-REASONCODE-HTTP-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'CLOSE',
+        eventSeq: 2,
+        amount: '10000',
+        currency: 'USD',
+        createdBy: 'maker1',
+        // reasonCode deliberately omitted.
+      })
+      .expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+    expect(res.body.message).toMatch(/reasonCode is required for CLOSE/);
   });
 
   test('POST /balance-movements with amount "0" or a negative amount -> 400 (user-reported gap 2026-08-21, "SUBMIT & RELEASE API 也要有交易金額控制檢查" — live-reproduced before this fix: both were silently accepted)', async () => {

@@ -59,14 +59,16 @@ function fieldByKey(fields: ReturnType<typeof buildFields>, key: string) {
 describe('builder-fields', () => {
   // secondaryRef must be the first input field on the entry screen. F1 (external BA review, v1.19.0)
   // added newExpiryDate (hidden unless AMEND_EXPIRY_DATE) and expiryDate (A1/B1 only, shown here) as two
-  // new fixed fields, always present in the array (hide toggles visibility, not presence).
-  it('returns the 10 fixed field keys, in order, for a plain A1 submission', () => {
+  // new fixed fields, always present in the array (hide toggles visibility, not presence). F1 proposal
+  // §13.1 (BA-ratified 2026-08-25) added a third, reasonCode (hidden unless A10/B6/A11/B7).
+  it('returns the 11 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
     expect(fields.map((f) => f.key)).toEqual([
       'secondaryRef',
       'amount',
       'newExpiryDate',
       'expiryDate',
+      'reasonCode',
       'currency',
       'tolerancePct',
       'tenorType',
@@ -254,6 +256,40 @@ describe('builder-fields', () => {
 
       const a2 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' } })), 'expiryDate');
       expect(a2.hide).toBe(true);
+    });
+  });
+
+  describe('F1 proposal §13.1 item 4/3(a) (BA-ratified 2026-08-25) — reasonCode field', () => {
+    it('is hidden and not required for a plain A1 (ISSUE)', () => {
+      const reasonCode = fieldByKey(buildFields(baseCtx()), 'reasonCode');
+      expect(reasonCode.hide).toBe(true);
+      expect(reasonCode.props?.required).toBe(false);
+    });
+
+    it('is shown and required for A10 (Close)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A10'), model: { instrumentType: 'IPLC_LC', movementType: 'CLOSE' } });
+      const reasonCode = fieldByKey(buildFields(ctx), 'reasonCode');
+      expect(reasonCode.hide).toBe(false);
+      expect(reasonCode.props?.required).toBe(true);
+    });
+
+    it('is shown and required for A11 (Reopen)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A11'), model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN' } });
+      const reasonCode = fieldByKey(buildFields(ctx), 'reasonCode');
+      expect(reasonCode.hide).toBe(false);
+      expect(reasonCode.props?.required).toBe(true);
+    });
+
+    it('is shown and required for B6/B7 too (Export side)', () => {
+      const b6 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('B6'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'CLOSE' } })), 'reasonCode');
+      expect(b6.hide).toBe(false);
+      const b7 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('B7'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'REOPEN' } })), 'reasonCode');
+      expect(b7.hide).toBe(false);
+    });
+
+    it('stays hidden for every other function, e.g. a plain A2 amendment', () => {
+      const reasonCode = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' } })), 'reasonCode');
+      expect(reasonCode.hide).toBe(true);
     });
   });
 

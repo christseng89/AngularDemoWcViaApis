@@ -1610,3 +1610,57 @@ flagging in this log specifically:
   middleware today, so that boundary doesn't actually hold yet (same root gap as BAL-001/F4, not a new one).
 
 No code changed by this entry — tracking only, per the user's explicit request scope.
+
+## F1 §13 — four of the newly-ratified items actually implemented (§13.7, §13.5 Phase 1, mandatory CLOSE/REOPEN reasonCode, consent passthrough)
+
+User picked these four off the tracking entry above to implement now (OAS bumped to v1.24.0 — see its own
+changelog entry for the full write-up; this log stays terse per this file's own convention).
+
+- **§13.7 fixed:** `balanceContractStore.ts`'s `reactivate(balanceContractId, newStatus, releasedAt,
+  newExpiryDate?)` gained a required `releasedAt` param — `effective_to` is now `releasedAt` when
+  reactivating to `EXPIRED` (was unconditionally `NULL`), still `NULL` when reactivating to `ACTIVE`. Both
+  `balanceService.ts` call sites (Extension Amendment, REOPEN) updated to pass their own `releasedAt`.
+- **§13.5 Phase 1 shipped:** new `domain/autoCloseGracePeriod.ts` (`addBusinessDays()` — same-repo
+  weekend-only mock standing in for the not-yet-built Standing microservice; `isPastAutoCloseGrace()`)
+  gates `runAutoCloseSweep()` alongside the existing `isRecentlyReopened()` filter (kept, not superseded —
+  see §13.8 note above). New config constant `AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2`. This closes the
+  ORIGINAL §8.5 gap for the general case (a freshly-EXPIRED, already-settled contract no longer goes
+  straight to `CLOSED` in the same sweep cycle — `runExpirySweepCycle`'s own test now asserts `close: []`
+  in-cycle, `close: [...]` in a later one), not just the REOPEN-originated case v1.21.0 already covered.
+- **Mandatory `reasonCode` shipped:** new `BalanceService.assertReasonCodeRequired()` rejects a bare
+  `CLOSE`/`REOPEN` Submit (400); AUTO CLOSE supplies a fixed value (`AUTO_CLOSE_REASON_CODE =
+  'NATURAL_EXPIRY_ALL_BALANCES_CLEARED'`) internally rather than being exempted from the check. Angular:
+  new `reasonCode` field in `builder-fields.ts`/`submit-rules.ts` (shown/required only for
+  A10/B6/A11/B7, via `requiresCloseEligibility`/`requiresReopenEligibility` — no new BuilderModel dimension
+  needed, reused the existing flags).
+- **Consent passthrough shipped:** `amendmentApproved`/`amendmentEffective`/`consentStatus` — three new
+  optional fields end-to-end (types.ts, zod schema with a real `consentStatus` enum check, DB columns
+  `amendment_approved`/`amendment_effective`/`consent_status` — migration 17, no CHECK constraint, same
+  posture as `reason_code`). Deliberately API-contract-only, no Angular UI field — BA's own decision frames
+  these as an UPSTREAM Channel API responsibility ("Balance Component 不判斷"), and this Angular app's Maker
+  Panel already stands in for that upstream caller only for the fields it actually needs to demonstrate;
+  every other purely-passthrough audit field in this API (`sourceModule`/`sourceFunction`, etc.) has the
+  same no-UI precedent. Revisit if the user wants a demo-purposes input added later.
+- **Not done, still tracked** (per the tracking entry above, unchanged): §13.5 Phase 2 (real Standing
+  microservice integration), the A11/B7 role/permission boundary and its `app.ts` auth precondition, and
+  §12.2 (still assessed as moot/low-priority).
+
+## F1 proposal §14.4 — Checker's own Release/Reject screen had no way to view Account Entries, fixed
+
+BA's second-round code review (§14 of the proposal doc) confirmed §14.1-14.3 (the REOPEN redesign itself,
+§9.7 chain-reversal correctness including the "Reopen→Close→Reopen again" repeat case, `isRecentlyReopened()`
+as a better-than-§13.8-recommended fix, `AUTO_CLOSE_REASON_CODE`'s literal value) all pass — but found one
+real gap (§14.4): the whole point of the REOPEN redesign above was "Checker要看交易出的帳 再決定 APPROVE或
+REJECT", yet `checker-panel.component.ts`/the parent's own Release/Reject action block had no Account
+Entries button at all — Maker's result panel and Inquire Events both already had one. Verified directly
+(grepped `checker-panel.component.ts` for `AccountEntries` — zero hits) before fixing. Fixed by adding the
+same button to `transaction-builder.component.html`'s `tb-checker-actions` block (next to Release/Reject),
+calling the parent's own pre-existing `openAccountEntryDialog()` — no new `@Output()` needed on
+`CheckerPanelComponent`, consistent with that component's own class doc comment ("the action layer stays on
+`TransactionBuilderComponent`, not this component"). Gated the same way Maker's button is
+(`selectedCheckerMovement?.contingentAccountEntry` present). `ng build --configuration production` used to
+catch an Angular template-only regression `tsc --noEmit` alone would have missed (this component's own spec
+files are all "no-TestBed direct instantiation" — template bindings are never exercised by Jest here, only
+by an actual Angular-compiler build) — first pass had a real NG8107 warning (`selectedFunction?.` should be
+`selectedFunction.`, narrowed non-null by the enclosing `*ngIf`), fixed before landing. Pure template change,
+no `.ts` coverage impact; Angular 1133/1133 stays green.

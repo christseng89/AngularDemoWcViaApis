@@ -68,6 +68,13 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   if (isAmendExpiryDate && !model.newExpiryDate) {
     return fail('New Expiry Date is mandatory.');
   }
+  // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6 and A11/B7 both
+  // require a caller-supplied Reason Code; the microservice rejects a bare Submit with none (see
+  // BalanceService.assertReasonCodeRequired). AUTO CLOSE never reaches this client-side path at all
+  // (it auto-fills its own fixed reasonCode server-side), so no exemption is needed here.
+  if ((selectedFunction?.requiresCloseEligibility || selectedFunction?.requiresReopenEligibility) && !model.reasonCode) {
+    return fail(`Reason Code is mandatory for ${selectedFunction?.code}.`);
+  }
   if (!isAmendExpiryDate && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
     return fail(`Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`);
   }
@@ -209,6 +216,8 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
   if (model.movementType === 'AMEND_EXPIRY_DATE' && model.newExpiryDate) {
     request.newExpiryDate = model.newExpiryDate;
   }
+  // F1 proposal §13.1 — A10/B6/A11/B7 only (validateSubmit() above already made it mandatory for them).
+  if (model.reasonCode) request.reasonCode = model.reasonCode;
 
   if (isCreatingMovement(model)) {
     request.naturalKey = {
