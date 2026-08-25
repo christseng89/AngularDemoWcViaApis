@@ -1506,3 +1506,14 @@ same boundary already drawn for EBL/IBL's own booking. See
 notes the BA review's own withdrawal cites. No code change needed. `TODO.md`'s own F2 entry closed
 accordingly (Buyer's Usance renumbered up to F2 in both files, matching the review's own post-withdrawal
 renumbering).
+
+## `BUYERS_USANCE`/`EPLC_CONFIRMATION` rejection (action item 3) re-characterized: pure engineering task, not an open business question
+
+BA review revision 2026-08-25: `Balance-Component-Business-Rule-Decisions-2026-08-21.md`'s own Decision 2
+already settled this (Buyer's Usance carries no deferred-payment exposure on the Export/Confirming Bank's
+own books — must route identically to Sight). Only the code guard in `tenorRouting.ts`/`balanceService.ts`
+is outstanding; do not reopen this as a business question.
+
+Both `analysis/TF-Balance-Component-BA-Review-{en,zh}.docx` are now in sync (15 findings, 3 High) — the
+review previously had a stray un-suffixed English duplicate with the older, unsynced content; that file no
+longer exists, the `-en.docx` is the current one.

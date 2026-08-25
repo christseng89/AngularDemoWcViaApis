@@ -41,6 +41,12 @@ BA 專家評審（範圍：`microservices/balance-component` 源代碼、API 規
 **BAL-001** 為同一件事，已併入該項而非另立條目。中/低嚴重度發現（修訂後 F4–F15）該文件本身已建議
 「各建一條待辦即可，不會阻礙後續開發」，暫不逐條搬進本清單，需要時直接查該 docx。
 
+~~⚠️ 已知落差（2026-08-25 發現）~~ — **已由 BA 解決**：`analysis/` 底下曾同時存在三份 BA Review
+docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是過期的16項版本。BA 已於同日將無後綴檔案
+重新命名為 `TF-Balance-Component-BA-Review-en.docx`（取代舊內容）並移除無後綴檔案，現在 `analysis/`
+底下只剩 `-zh.docx`／`-en.docx` 兩份，符合本專案命名慣例，且兩份都已同步最新修訂（15項發現，高3／中8／
+低4，含撤回原F2、改寫F2買方遠期的兩段 Revision note）——不必再另外核對。
+
 - [ ] **F1**（🔴 High）— 完全缺失到期 / UCP 600 第16(f)條自動釋放觸發機制
   知識庫 Knowledge-Gaps GAP-005/GAP-006——原始碼檢查確認：不存在任何 timer/cron，也不存在第16(f)條拒付推定
   （preclusion）邏輯；目前只有單一 `CLOSE` movement 類型，完全依賴經辦/複核的人工操作觸發。
@@ -68,15 +74,21 @@ BA 專家評審（範圍：`microservices/balance-component` 源代碼、API 規
   不是 Balance Component 自己要做的事——兩份文件本來就不衝突，只是分別描述交易鏈的不同段落。
   `CLAUDE.md` 決策日誌已同步記錄最終結論（供未來 `TF_Balance_Component_Mapping-*.xlsx` 校閱時參考）。
 
-- [ ] **F2**（🔴 High，原編號 F3）— 出口買方遠期（Buyer's Usance）仍未被拒絕或規範化處理
-  與本文件第4節「`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3」為**同一件事**，
-  BA 評審將其升級標記為高嚴重度：`Business-Rule-Decisions` 行動項3，在 2026-08-24 的補充說明中仍標註為未完成；
-  `TenorType` 枚舉未包含 `undertakingAvailability`／`financingStructure`／`fundingParty`／`availableWith`／
-  `bankRole` 等欄位；代碼註解寫明賣方遠期與買方遠期「驅動完全相同的餘額機制」。
-  *影響：會計處理目前完全依賴 `tenorType` 單一欄位路由——這正是會把 BU-B（`REFINANCING_BANK`，融資行）項下
-  的行際負債隱藏在看似普通的 BU-A（自籌資金）遠期背後的典型模式。*
-  建議：儘快關閉此項——要麼按當初 BA 決策實現拒絕/規範化規則，要麼正式記錄範圍變更；這是業務方（而非工程
-  團隊）尚未關閉的行動項，距今已三週。
+- [ ] **F2**（🔴 High，原編號 F3）— 出口買方遠期（Buyer's Usance）路由邏輯尚未落實既有決策
+  與本文件第4節「`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3」為**同一件事**。
+  **2026-08-25 BA 複核修正**：本項原始敘述將此定性為「業務方尚未關閉的行動項」，此說法不準確——業務決策
+  本身早在 2026-08-21 已經定案，見該備忘錄「決策2」：Buyer's Usance 是開證行對買方（申請人）的融資安排，
+  只存在於 Import 側；對 Export／保兌行自身的資產負債表而言，Buyer's Usance 不構成任何延期付款曝險，必須
+  與 Sight 做完全相同的處理——B4 必須路由至 `HONOUR`，絕不可為 `ACCEPT`；`tenorType: 'BUYERS_USANCE'` 對
+  `EPLC_CONFIRMATION` 而言不是合法宣告。目前唯一尚未完成的，純粹是這項已定案決策的程式碼落實：
+  `tenorRouting.ts`／`balanceService.ts` 至今仍未補上拒絕/正規化防護，`checkAcceptanceTenorConsistency()`
+  也未攔截這個組合；`export-case-2`／`export-case-4` 目前只在測試資料層面改為 `SELLERS_USANCE`
+  （2026-08-22 已驗證），未觸及領域層本身的防護邏輯。
+  *影響：若有人（無論經由 UI 或直接呼叫 API）對 `EPLC_CONFIRMATION` 宣告 `BUYERS_USANCE`，B4 目前仍會落入
+  既有「非 SIGHT 一律走 ACCEPT」的邏輯，在保兌行自己的帳上錯誤建立一筆不該存在的 Acceptance
+  Liability／Reimbursement Receivable——這是一項真實的會計正確性風險，不是單純的輸入驗證缺失。*
+  建議：這是一項規格已經完全明確、不存在待決業務問題的工程任務——直接依決策2原文實作拒絕/正規化規則即可，
+  不需要再等 BA 進一步確認。
 
 ---
 
@@ -112,7 +124,8 @@ BA 專家評審（範圍：`microservices/balance-component` 源代碼、API 規
   伺服器端修復本身；先前記錄「本次範圍不做」是指更早一次 pass，這次 user 明確要求後已補上。
 
 - [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3**
-  （`BUYERS_USANCE` 的拒絕/正規化）——仍然尚未實作，範圍外。
+  （`BUYERS_USANCE` 的拒絕/正規化）——仍然尚未實作，範圍外（詳見上方第2節 F2；2026-08-25 BA 複核確認業務
+  層面無待決問題，純屬工程待辦）。
 
 - [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 5**
   （Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭）——
@@ -181,3 +194,9 @@ BA 專家評審（範圍：`microservices/balance-component` 源代碼、API 規
   action item 3 為同一件事）。原 F4（缺乏生產級身份驗證/授權，修訂後編號 F3）與第1節 BAL-001 為同一件
   事，已直接併入 BAL-001 的說明中，未另立條目。撤回的原 F2 完整核查過程（含中途一度誤判的 EBL/IBL 假設、
   最終 BA 引用的三份知識庫文檔）記錄於第2節該條目本身與 `CLAUDE.md` 決策日誌，供之後避免重複誤會。
+- **2026-08-25 再次修訂**：BA 針對第2節 F2（出口買方遠期）的定性提出更正——原始敘述誤將其描述為
+  「業務方尚未關閉的行動項」，經核對 `analysis/Balance-Component-Business-Rule-Decisions-2026-08-21.md`
+  「決策2」確認業務決策本身早已定案（Buyer's Usance 對出口／保兌行而言不構成延期付款曝險，須與 Sight
+  做完全相同處理，B4 必須路由至 `HONOUR`），目前只剩程式碼落實（該備忘錄行動項3）尚未完成——已更正為
+  「決策已定案、純屬工程待辦」的定性，嚴重程度維持 High 不變。`TF-Balance-Component-BA-Review.docx`／
+  `-zh.docx` 與本清單第2節、第4節該條目已同步更新。
