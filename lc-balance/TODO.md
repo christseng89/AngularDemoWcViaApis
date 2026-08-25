@@ -74,21 +74,21 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   不是 Balance Component 自己要做的事——兩份文件本來就不衝突，只是分別描述交易鏈的不同段落。
   `CLAUDE.md` 決策日誌已同步記錄最終結論（供未來 `TF_Balance_Component_Mapping-*.xlsx` 校閱時參考）。
 
-- [ ] **F2**（🔴 High，原編號 F3）— 出口買方遠期（Buyer's Usance）路由邏輯尚未落實既有決策
-  與本文件第4節「`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3」為**同一件事**。
-  **2026-08-25 BA 複核修正**：本項原始敘述將此定性為「業務方尚未關閉的行動項」，此說法不準確——業務決策
-  本身早在 2026-08-21 已經定案，見該備忘錄「決策2」：Buyer's Usance 是開證行對買方（申請人）的融資安排，
-  只存在於 Import 側；對 Export／保兌行自身的資產負債表而言，Buyer's Usance 不構成任何延期付款曝險，必須
-  與 Sight 做完全相同的處理——B4 必須路由至 `HONOUR`，絕不可為 `ACCEPT`；`tenorType: 'BUYERS_USANCE'` 對
-  `EPLC_CONFIRMATION` 而言不是合法宣告。目前唯一尚未完成的，純粹是這項已定案決策的程式碼落實：
-  `tenorRouting.ts`／`balanceService.ts` 至今仍未補上拒絕/正規化防護，`checkAcceptanceTenorConsistency()`
-  也未攔截這個組合；`export-case-2`／`export-case-4` 目前只在測試資料層面改為 `SELLERS_USANCE`
-  （2026-08-22 已驗證），未觸及領域層本身的防護邏輯。
-  *影響：若有人（無論經由 UI 或直接呼叫 API）對 `EPLC_CONFIRMATION` 宣告 `BUYERS_USANCE`，B4 目前仍會落入
-  既有「非 SIGHT 一律走 ACCEPT」的邏輯，在保兌行自己的帳上錯誤建立一筆不該存在的 Acceptance
-  Liability／Reimbursement Receivable——這是一項真實的會計正確性風險，不是單純的輸入驗證缺失。*
-  建議：這是一項規格已經完全明確、不存在待決業務問題的工程任務——直接依決策2原文實作拒絕/正規化規則即可，
-  不需要再等 BA 進一步確認。
+- [x] ~~F2（🔴 High，原編號 F3）— 出口買方遠期（Buyer's Usance）路由邏輯尚未落實既有決策~~ —
+  **2026-08-25 業務端確認：不需要動手實作，關閉**。與本文件第4節「`Balance-Component-Business-Rule-
+  Decisions-2026-08-21.md` 的 action item 3」為同一件事。背景：BA 複核曾先把這項從「業務方尚未關閉的
+  行動項」修正為「業務決策已定案（決策2：Buyer's Usance 是開證行對買方的融資安排，只存在於 Import
+  側，Export／保兌行自身帳上不構成延期付款曝險，須與 Sight 做完全相同的處理），純屬工程待實作」；
+  隨後**業務端進一步確認並更正**：實務上出口（Export／保兌）根本不存在 Buyer's Usance 案例，
+  `tenorType: 'BUYERS_USANCE'` 對 `EPLC_CONFIRMATION` 這個組合在真實業務流程裡不會出現，因此不需要
+  投入工程資源新增防護性拒絕邏輯。**若萬一真的出現，正確處理方式是當作 Sight 處理**（不是報錯拒絕）——
+  對應到目前程式碼，就是 `maker-panel.component.ts:733`
+  `this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT'` 這行的
+  三元判斷；嚴格照決策2實作的話應改成排除 `BUYERS_USANCE` 也走 `HONOUR`（例如
+  `=== 'SELLERS_USANCE' ? 'ACCEPT' : 'HONOUR'`），但因為這個輸入實務上不會發生，這行維持現狀即可，
+  純記錄「萬一發生時的正確行為」供之後參考，不代表現在要改。`export-case-2`／`export-case-4` 已改為
+  `SELLERS_USANCE`（2026-08-22 驗證）即已反映正確的實務情境。若未來業務面出現真實的出口買方遠期案例，
+  應重新開啟此項，並依上述方式（正規化為 Sight/HONOUR，而非拒絕）落實。
 
 ---
 
@@ -123,9 +123,9 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   `businessEventId` 強制檢查）~~ — **已完成（2026-08-24）**，就是上面那項 A9 Full-Redeem-only
   伺服器端修復本身；先前記錄「本次範圍不做」是指更早一次 pass，這次 user 明確要求後已補上。
 
-- [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3**
-  （`BUYERS_USANCE` 的拒絕/正規化）——仍然尚未實作，範圍外（詳見上方第2節 F2；2026-08-25 BA 複核確認業務
-  層面無待決問題，純屬工程待辦）。
+- [x] ~~`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 3
+  （`BUYERS_USANCE` 的拒絕/正規化）~~ — **2026-08-25 業務端確認不需要處理，關閉**：實務上出口／保兌
+  不存在 Buyer's Usance 案例，這個防護對應的是一個不會發生的輸入。詳見上方第2節 F2 條目的完整說明。
 
 - [ ] **`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 的 action item 5**
   （Mapping workbook Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭）——

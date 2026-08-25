@@ -1507,12 +1507,18 @@ notes the BA review's own withdrawal cites. No code change needed. `TODO.md`'s o
 accordingly (Buyer's Usance renumbered up to F2 in both files, matching the review's own post-withdrawal
 renumbering).
 
-## `BUYERS_USANCE`/`EPLC_CONFIRMATION` rejection (action item 3) re-characterized: pure engineering task, not an open business question
+## `BUYERS_USANCE`/`EPLC_CONFIRMATION` (action item 3) — CLOSED, no code change; Export never actually produces this input
 
-BA review revision 2026-08-25: `Balance-Component-Business-Rule-Decisions-2026-08-21.md`'s own Decision 2
-already settled this (Buyer's Usance carries no deferred-payment exposure on the Export/Confirming Bank's
-own books — must route identically to Sight). Only the code guard in `tenorRouting.ts`/`balanceService.ts`
-is outstanding; do not reopen this as a business question.
+Superseded same day: the BA review revision below first re-characterized this as a pure engineering task
+(`Balance-Component-Business-Rule-Decisions-2026-08-21.md`'s Decision 2 already settled the business
+question), then the user closed it outright — Export/Confirmation contracts never carry
+`tenorType: 'BUYERS_USANCE'` in practice, so the input this guard would protect against cannot occur. No
+`tenorRouting.ts`/`balanceService.ts`/`maker-panel.component.ts` change was made.
+
+Recorded for if this ever changes: today `maker-panel.component.ts:733`
+(`this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT'`) would route
+a `BUYERS_USANCE` Confirmation to `ACCEPT`, which is wrong per Decision 2 — the correct fix, if this input
+ever becomes real, is normalizing it to `HONOUR` alongside `SIGHT` (not rejecting it).
 
 Both `analysis/TF-Balance-Component-BA-Review-{en,zh}.docx` are now in sync (15 findings, 3 High) — the
 review previously had a stray un-suffixed English duplicate with the older, unsynced content; that file no
