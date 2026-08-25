@@ -114,22 +114,70 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   409 `CONTRACT_VERSION_CONFLICT` 錯誤類別，但整個 `src/` 沒有任何地方真的拋出它（死碼），OAS 的
   `Error.code` enum 也完全沒列這個代碼。影響很小（目前用不到），但屬於 OAS 全面稽核時發現、尚未處理的項目。
 
-- [ ] **F1 §11.4（原三項，2026-08-25 使用者確認維持待決，不阻礙已核准部分動工；第一項已於同日縮小範圍）**
-  — AUTO EXPIRY/AUTO CLOSE 背景批次上線後，以下項目刻意不做，記錄於此供未來重新評估：
+- [ ] **F1 §11.4（原三項「維持待決」，已於 2026-08-25 由 BA 透過
+  `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13〈§11.4 四項待決事項正式拍板〉正式拍板——
+  四項全部轉為「已決定、尚未實作」，不再是懸而未決；以下逐項列出拍板後的具體工程需求，仍未動手，記錄於此）**：
+
   - [x] ~~**Sweep 分輪保護 — REOPEN 這一段**~~ — **2026-08-25 已修復**（`analysis/balance-component-api.yaml`
     v1.21.0）。原問題：`DISPLAY-TEST-01` 實測重現「EXPIRE → 同一輪 AUTO CLOSE → 手動 A11 Reopen 後又立刻被
     下一輪 AUTO CLOSE 掃回關閉」，完全沒有 Expiry Extension Amendment 的重啟窗口。已加上
     `isRecentlyReopened()`：一筆合約的最新交易若是 RELEASED 的 `REOPEN`，AUTO EXPIRY／AUTO CLOSE 兩個批次
     都會在**一個完整 sweep 間隔**內跳過它不處理（不是永久排除——用意是給人為操作留出時間，不是讓合約卡死；
     間隔一過，或有其他交易落在這筆合約上，正常掃描行為即恢復，真正到期的 ACTIVE 合約仍會準時被 AUTO EXPIRY
-    處理）。
-  - [ ] **Sweep 分輪保護 — EXPIRE→同輪 AUTO CLOSE 這一段（仍待決）** — 上面修的是「REOPEN 之後」的分輪落差；
-    「一筆從未動用過的乾淨 LC，AUTO EXPIRY 剛把它轉 EXPIRED，同一輪 AUTO CLOSE 立刻把它關閉」這個原始
-    §8.5 落差本身**仍未修**（BA 建議修法：AUTO CLOSE 只處理「上一輪或更早」轉 EXPIRED 的合約）。
-  - **Expiry Extension Amendment／A11-B7 Reopen 的 consent 把關** — 是否需要受益人/相關方同意佐證才能
-    延展效期或重新開啟，串既有 F4（生產級身份驗證/授權）缺口一併處理。
-  - **CLOSE（含既有 A10/B6）強制要求 `reasonCode`** — 目前維持選填；REOPEN 自己的資格判斷已能容忍
-    原 CLOSE 的 `reasonCode` 為空（視為原因不明，不阻擋）。
+    處理）。**與下方 §13.7/§13.5 的關係**：BA §13.8 事後分析認為 PENDING 期間本來就靠既有機制天然安全，
+    不需要另外的「排除 REOPEN」邏輯，RELEASED 之後的缺口應該改用 §13.7＋§13.5 解決，而非本項這種以
+    movementType＋時間窗口為準的做法——但本項是在 BA 這份分析成形前、依使用者當面回報的即時 bug
+    （「才 REOPEN 下一秒就被 AUTO CLOSE 掉了」）實測修復並驗證有效的，**先保留做為過渡期防護**，待
+    §13.7/§13.5 真正落地後再評估是要整個換掉、或當作額外一層防禦保留（兩者不互斥，屆時再決定）。
+
+  - [ ] **Sweep 分輪保護 — EXPIRE→同輪 AUTO CLOSE 這一段，BA 已拍板改用「Auto Close Grace Period」機制
+    （§13.5，尚未實作）** — 原始 §8.5 落差（「一筆從未動用過的乾淨 LC，AUTO EXPIRY 剛轉 EXPIRED，同一輪
+    AUTO CLOSE 立刻關閉」）不再用「跳過本輪」這種簡化做法解決，BA 正式決定改採可設定的 **N 個銀行營業日**
+    寬限期（`Business Date > Expiry Date + N 個營業日` 才允許 AUTO CLOSE，明確是**營業日**、不是日曆日——
+    跟既有 `mail_float_grace_days`／`isPastExpiryGrace()` 的日曆日邏輯是兩個獨立機制，不要混用或合併）。
+    營業日運算規劃委由一個獨立的「Standing」微服務負責（本 repo 目前不存在，`lc-balance-new/` 的
+    `standing-mock` 可作為請求/回應形狀的**參考**，但目前連它都還沒有 `/business-days/add` 這個新功能
+    實際需要的端點——不是現成可接的目標）；BA 建議分兩階段：Phase 1 先在 Balance Component 內自建一個
+    最簡單的「只排除週末」mock，Phase 2 才真正對接 Standing 微服務。**尚未動工。**
+
+  - [ ] **`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7，新發現，尚未修復）** —
+    `balanceContractStore.ts` 的 `reactivate(balanceContractId, newStatus, newExpiryDate?)`，當 REOPEN
+    把合約恢復到 `EXPIRED`（§9.2 情境2）時，目前把 `effective_to` 直接設回 `NULL`；BA 認為應該改成寫入
+    這次 REOPEN 自己的 Release 時間戳，因為上面 §13.5 規劃中的 Auto Close Grace Period 機制需要
+    `effective_to` 當作「這筆合約最近一次變成 EXPIRED 的時間點」這個計算基準——`NULL` 在那個機制下語意
+    不對。**目前程式碼還沒有任何地方真的讀 `effective_to` 做資格判斷**，所以這個欄位錯誤現階段沒有實際
+    行為影響（要等 §13.5 的 Grace Period 機制真的做出來才會被用到），但屬於已明確定案、待補的既知缺口，
+    不應與 §13.5 一起無限期擱置——需要 `reactivate()` 多接受一個「新的 `effective_to`」參數。
+
+  - [ ] **Expiry Extension Amendment／A11-B7 Reopen 的 consent 把關（§13.1 第2項，已拍板，尚未實作）** —
+    BA 確認 Balance Component **不自行判斷** consent 是否已取得（不是自己去核實受益人/相關方同意），但
+    請求本身必須能承接並驗證上游（Channel API/前置系統）傳入的新欄位：`amendmentApproved`（布林）、
+    `amendmentEffective`（生效時間）、`consentStatus`（`NOT_REQUIRED`／`OBTAINED` 列舉）——目前
+    `AMEND_EXPIRY_DATE` 請求形狀完全沒有這三個欄位，需要新增到 OAS＋zod schema＋domain 驗證。仍串既有
+    F4（生產級身份驗證/授權，見上方 BAL-001）缺口一併處理，因為這些欄位的可信度最終仍取決於呼叫端是否
+    真的是被授權的上游系統。
+
+  - [ ] **A11/B7 Reopen 本身的把關（§13.1 第3項，已拍板，部分不在本組件範圍）** — 拆成四個子決策：
+    (a) 強制要求 `reasonCode`——**可行，尚未實作**（目前 A11/B7 沒有這項要求）；(b) Maker≠Checker——
+    **已存在**，走既有 `assertMakerCheckerSeparation()`，不需另外處理；(c) 特殊角色/權限管控——BA 明確
+    決定屬於上游 Channel API／IAM 的職責，**不在 Balance Component 內建**（§13.5 子決策B 同時指出這個
+    前提目前並不成立：`app.ts` 完全沒有呼叫端身份驗證 middleware，只有 `helmet()`＋rate-limiting——跟
+    既有 BAL-001/F4 是同一個根因缺口，不是新問題，只是這裡再次被點名為「B 方案能不能真的成立」的前提
+    條件）；(d) 信用覆核——跨系統前置條件，本組件無法實作，非本組件範疇；(e)「法律義務已終止時應該開新
+    LC 而非 Reopen」——屬程序/教育訓練層面，不是系統需求，不需要程式碼變動。
+
+  - [ ] **CLOSE（含既有 A10/B6）強制要求 `reasonCode`（§13.1 第4項，已拍板，尚未實作）** — 目前維持選填；
+    BA 正式決定改為：A10/B6 及任何人工 CLOSE 呼叫端必須提供 `reasonCode`，AUTO CLOSE 批次自動代入固定值
+    `NATURAL_EXPIRY_ALL_BALANCES_CLEARED`。REOPEN 自己的資格判斷已能容忍「原 CLOSE 的 `reasonCode`
+    為空」（既有舊資料，視為原因不明，不阻擋）——這點在 CLOSE 改成必填後仍要保留向下相容。
+
+  - [ ] **Inquire Events／Look Up 未收合同一 `businessEventId` 底下多筆 `REVERSAL` 列（§12.2，BA code
+    review 發現，多數已隨 REOPEN 重新設計而失效）** — 原始發現是針對「REOPEN 舊設計（金額固定0＋Release
+    時另外產生連動 REVERSAL）」寫的；REOPEN 已於 2026-08-25 UAT 後重新設計為 Submit 當下直接帶入真實金額、
+    不再產生 REVERSAL，該情境已不存在。**唯一可能仍相關的殘留**：Expiry Extension Amendment
+    （`AMEND_EXPIRY_DATE`）本身仍會在 Release 時對其中一筆 `REVERSAL` 動作，但每個 `businessEventId`
+    下永遠只有這一筆，不構成「多筆需要收合」的情境——實務上很可能整項已經是 moot，暫不列入實作範圍，
+    僅記錄避免遺漏，未來若真的出現多筆 REVERSAL 的案例再重新評估。
 
 ---
 

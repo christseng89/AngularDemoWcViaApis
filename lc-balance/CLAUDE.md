@@ -1578,3 +1578,35 @@ MOST RECENT movement (excluding itself) is a RELEASED `EXPIRE` — anything else
 commonly) means nothing is left to restore. Sound by construction: `EXPIRE` can't chain with itself, `CLOSE`
 can't precede `EXPIRED`, so Extension's own relevant trailing run is always 0 or 1 movement, never a
 multi-item chain the way REOPEN's own §9.7 case can be.
+
+## F1 §11.4 — BA formally ratifies all four previously-deferred items (§13 of the proposal doc); tracked, not yet implemented
+
+`analysis/Balance-Component-F1-Expire-Proposal-zh.md` gained §12 (BA code-review checklist against §1-11)
+and §13 (formal ratification of the four `TODO.md` §11.4 items that were left "維持待決" above) after the
+work already logged above shipped — read in full 2026-08-25, reconciled into `TODO.md` §3's F1 §11.4 block
+rather than re-litigated here; that's the authoritative item-by-item breakdown now. Headline points worth
+flagging in this log specifically:
+- **§13.7 (new bug, real, currently inert):** `balanceContractStore.ts`'s `reactivate()` nulls
+  `effective_to` when a REOPEN restores a contract to `EXPIRED`, instead of stamping the REOPEN's own
+  Release time — wrong once the below Grace Period lands (it needs `effective_to` as its "became EXPIRED
+  at" anchor), harmless today since nothing yet reads `effective_to` for eligibility.
+- **§13.5 (new mechanism, not built):** BA's own chosen fix for the remaining EXPIRE→same-cycle-AUTO CLOSE
+  round-splitting gap is a configurable N-*bank-business-day* Grace Period off `effective_to` (deliberately
+  independent of the calendar-day `mail_float_grace_days`), business-day math delegated to a not-yet-built
+  "Standing" microservice (Phase 1: same-repo weekend-only mock; Phase 2: real integration) — NOT the
+  sweep-round-skip idea floated earlier in this file's own F1 entry, and NOT the same mechanism as
+  `isRecentlyReopened()` below.
+- **§13.8 verdict on `isRecentlyReopened()`:** BA's own analysis (written independently of the live bug
+  report that drove that fix) argues the PENDING-window case is already safe by construction and the
+  RELEASED-window case should be solved via §13.7+§13.5 instead of a movementType/time-window check. Not
+  acting on this by ripping `isRecentlyReopened()` out — it's a proven, live-verified fix for a real
+  reported bug and §13.5 doesn't exist yet. Keeping it as the interim safeguard; revisit once §13.5 ships.
+- Consent-gating (Extension/Reopen) and mandatory CLOSE `reasonCode` are no longer "deferred" — BA
+  ratified concrete shapes for both (new `amendmentApproved`/`amendmentEffective`/`consentStatus` request
+  fields; A10/B6 `reasonCode` becomes mandatory, AUTO CLOSE auto-fills
+  `NATURAL_EXPIRY_ALL_BALANCES_CLEARED`) — see `TODO.md` for the full breakdown. A11/B7's own
+  role/permission control is explicitly ruled OUT of this component's scope (upstream Channel API/IAM
+  responsibility) — and §13.5's own sub-decision B flags that `app.ts` has zero caller-authentication
+  middleware today, so that boundary doesn't actually hold yet (same root gap as BAL-001/F4, not a new one).
+
+No code changed by this entry — tracking only, per the user's explicit request scope.
