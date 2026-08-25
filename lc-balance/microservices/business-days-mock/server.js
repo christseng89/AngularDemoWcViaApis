@@ -25,11 +25,30 @@ const calendar = require('./data/calendar.json');
  * shape exactly (same skip-weekend-then-holiday walk) — this mock is what a real Phase 2
  * `addBusinessDays()` implementation would call over HTTP instead of computing in-process; not yet wired
  * into `balanceService.ts` (Phase 1's own weekend-only mock still runs there).
+ *
+ * Fail-closed on calendar coverage (BA-flagged gap, fixed 2026-08-26): `CALENDAR_MIN_DATE`/
+ * `CALENDAR_MAX_DATE` (derived from `data/calendar.json`'s own holiday years) bound both the input date
+ * and the walk itself — a query outside that range is rejected (422 `CALENDAR_RANGE_EXCEEDED`), never
+ * silently answered as if an uncovered year had no holidays at all.
  */
 
 const PORT = process.env.PORT || 4500;
 const WEEKDAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MAX_WALK_DAYS = 3650; // safety cap (~10 years) so a misconfigured/huge businessDays value can't hang the request
+
+/**
+ * Fail-closed calendar coverage guard (BA-flagged gap, fixed 2026-08-26): `calendar.holidays` only
+ * covers the years it was actually authored for (currently 2026-2028, see data/calendar.json's own
+ * `_disclaimer`) — outside that range there is no holiday data at all, so treating those dates as
+ * "no holidays, weekend-only" would silently produce a plausible-looking but unsupported answer instead
+ * of a clear error. Derived from the data itself (not hardcoded), so extending `calendar.json` with more
+ * years automatically widens this range without a separate code change. Covers the WHOLE calendar year
+ * on both ends (Jan 1 of the earliest year through Dec 31 of the latest), not just the specific holiday
+ * dates themselves — every day in a covered year is a supported query, holiday or not.
+ */
+const CALENDAR_YEARS = calendar.holidays.map((h) => Number(h.date.slice(0, 4)));
+const CALENDAR_MIN_DATE = `${Math.min(...CALENDAR_YEARS)}-01-01`;
+const CALENDAR_MAX_DATE = `${Math.max(...CALENDAR_YEARS)}-12-31`;
 
 function parseDateUTC(dateStr) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || '');
@@ -68,6 +87,12 @@ function addBusinessDays(date, businessDays) {
   for (let i = 0; i < MAX_WALK_DAYS && remaining > 0; i++) {
     current = addDaysUTC(current, 1);
     const dateStr = formatDateUTC(current);
+    // Fail-closed: stop rather than silently walking into a year with no holiday data (see
+    // CALENDAR_MAX_DATE's own doc comment) — a caller relying on this mock deserves a clear error, not a
+    // plausible-looking answer computed as if the uncovered year had no holidays at all.
+    if (dateStr > CALENDAR_MAX_DATE) {
+      return { adjustedDate: null, skippedDates, exhausted: false, outOfRange: true };
+    }
     const reason = nonBusinessDayReason(dateStr, current);
     if (reason) {
       skippedDates.push({ date: dateStr, ...reason });
@@ -75,7 +100,7 @@ function addBusinessDays(date, businessDays) {
       remaining -= 1;
     }
   }
-  return { adjustedDate: formatDateUTC(current), skippedDates, exhausted: remaining > 0 };
+  return { adjustedDate: formatDateUTC(current), skippedDates, exhausted: remaining > 0, outOfRange: false };
 }
 
 const app = express();
@@ -92,8 +117,22 @@ app.post('/business-days/add', (req, res) => {
   if (!Number.isInteger(businessDays) || businessDays < 0) {
     return res.status(400).json({ errorCode: 'INVALID_BUSINESS_DAYS', message: 'businessDays must be a non-negative integer' });
   }
+  // Fail-closed (BA-flagged gap, fixed 2026-08-26) — reject outright rather than silently answering as
+  // if an uncovered year had no holidays at all. See CALENDAR_MAX_DATE's own doc comment.
+  if (date < CALENDAR_MIN_DATE || date > CALENDAR_MAX_DATE) {
+    return res.status(422).json({
+      errorCode: 'CALENDAR_RANGE_EXCEEDED',
+      message: `date "${date}" is outside this mock's known calendar coverage (${CALENDAR_MIN_DATE} to ${CALENDAR_MAX_DATE}) — no holiday data exists for it.`,
+    });
+  }
 
   const result = addBusinessDays(dateObj, businessDays);
+  if (result.outOfRange) {
+    return res.status(422).json({
+      errorCode: 'CALENDAR_RANGE_EXCEEDED',
+      message: `resolving ${businessDays} business days from "${date}" would walk past this mock's known calendar coverage (through ${CALENDAR_MAX_DATE}) — no holiday data exists beyond it.`,
+    });
+  }
   if (result.exhausted) {
     return res.status(422).json({ errorCode: 'CALENDAR_WALK_EXHAUSTED', message: `Could not resolve ${businessDays} business days within the allowed search window` });
   }

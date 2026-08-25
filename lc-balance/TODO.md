@@ -211,13 +211,15 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
     順延；`addBusinessDays(date, 0)` 跟 Phase 1 既有的 `domain/autoCloseGracePeriod.ts` 同名函式行為
     一致（直接回傳原日期），未來真要接 Phase 2 時函式簽名確實不需要改。
 
-    - [ ] **小缺口，非阻擋（BA 複驗發現，2026-08-26）** — `business-days-mock` 沒有行事曆資料範圍
-      檢查／fail-closed 機制：查詢日期算到 2029 年以後（或 2026 年以前，`data/calendar.json`／
-      `calendars.json` 都只到 2028 年）時，不會報錯，只會安靜地把那些日期當成「沒有假日資料、只看
-      週末」處理——等於默默算錯，不是明確拒絕。原本被刪掉的那份 947 行 Maturity Date OAS 設計文件裡
-      的 fail-closed 原則正是要防這種情況，這個簡化後的 mock 沒有跟著做。風險很低（Grace Period 只有
-      2 個營業日，`effectiveTo` 本身不太可能算到 2029 年以後，且本來就是 local dev/demo 用途），暫不
-      列為要修的項目，記錄於此供未來若真的需要更長時間跨度測試時參考。
+    - [x] ~~**小缺口，非阻擋（BA 複驗發現，2026-08-26）** — `business-days-mock` 沒有行事曆資料範圍
+      檢查／fail-closed 機制~~ — **2026-08-26 已修復**。新增 `CALENDAR_MIN_DATE`/`CALENDAR_MAX_DATE`
+      （從 `data/calendar.json` 自己的假日年份動態算出，不是寫死常數，未來擴充行事曆資料範圍會自動
+      跟著變寬）：查詢的 `date` 本身、或是為了湊滿 `businessDays` 而必須往前走到的日期，只要超出涵蓋
+      範圍（目前 2026-01-01 至 2028-12-31），一律回傳 `422 CALENDAR_RANGE_EXCEEDED`，不再安靜地把
+      範圍外的年份當成「沒有假日資料、只看週末」處理。同時新增這個 mock 自己的第一份 Jest 測試套件
+      （`test/server.test.js`，15 個測試，涵蓋原本的週末/假日/跨年度/固定假日不順延行為＋這次新增的
+      fail-closed 邊界情況——範圍外日期、範圍內但走勢會超出範圍、邊界剛好卡在範圍內兩種情境都測過），
+      全數通過。
 
     Phase 2 本身仍未動工,等 BA 審閱這份簡化後的參考資料＋mock server 後再決定要走哪個選項。
 

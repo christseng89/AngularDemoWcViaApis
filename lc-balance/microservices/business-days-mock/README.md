@@ -26,12 +26,18 @@ Business Day Convention）。AUTO CLOSE 完全沒有交易對手——是單一�
 （對一個已知日期做行事曆調整,那是 Maturity Date 的用途）、任何多行事曆／角色／combination rule 的
 概念、行事曆快照版本控管、身份驗證、correlation-ID/重試機制。
 
+**Fail-closed 行事曆範圍防護（2026-08-26，BA 複驗發現後修復）**：查詢的 `date` 本身,或是為了湊滿
+`businessDays` 而必須往前走到的日期,只要超出 `data/calendar.json` 實際涵蓋的年份範圍（目前
+2026-01-01 至 2028-12-31，從行事曆資料本身動態算出,不是寫死的常數）,一律回傳 `422
+CALENDAR_RANGE_EXCEEDED`,不會安靜地把涵蓋範圍外的年份當成「沒有假日資料、只看週末」處理。
+
 ## 執行
 
 ```bash
 cd microservices/business-days-mock
 npm install
 npm start          # 或 npm run dev 啟用 --watch 自動重啟
+npm test           # Jest 測試套件（test/server.test.js）
 ```
 
 監聽 port `4500`（可用 `PORT` 環境變數覆蓋）——跟這個專案自己的 `4100`（balance-component）／`4200`

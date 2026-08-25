@@ -1711,4 +1711,15 @@ those years) and roll forward to the next weekday when that lands on a Saturday/
 fixed statutory holidays (New Year 01-01, 228 Peace Memorial Day 02-28, Labor Day 05-01, National Day
 10-10) which always stay on their literal date, never rolled. Live-verified via the mock server: a
 cross-year walk (2026-12-31 → 2027-01-04, skipping New Year + weekend) and a rolled 2027 holiday (Dragon
-Boat 06-19 Saturday → 06-21 Monday, correctly flagged `PUBLIC_HOLIDAY` on the rolled date).
+Boat 06-19 Saturday → 06-21 Monday, correctly flagged `PUBLIC_HOLIDAY` on the rolled date). BA independently
+re-verified all of the above (hand-traced the walk logic, recomputed all 16 rolled 2027/2028 dates,
+confirmed the four fixed holidays never roll) and flagged one real gap: no fail-closed guard for a date
+outside the calendar's known coverage.
+
+**Gap fixed same day**: `server.js` gained `CALENDAR_MIN_DATE`/`CALENDAR_MAX_DATE` (derived from
+`calendar.holidays`' own years, not hardcoded) — both the input `date` and the walk itself are bounded;
+stepping outside now returns `422 CALENDAR_RANGE_EXCEEDED` instead of silently treating an uncovered year
+as holiday-free. Also added this mock's first test suite (`test/server.test.js`, Jest + supertest, 15
+tests) covering the existing weekend/holiday/cross-year/fixed-holiday behavior plus the new guard's three
+edge cases (out-of-range input, in-range input whose walk would cross the boundary, and a genuinely
+resolvable near-boundary case that must NOT false-positive) — all green.
