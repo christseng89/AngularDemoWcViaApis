@@ -1070,6 +1070,117 @@ Rule #1 補充「Matched Amount ≠ Redeemed Amount」與 A3S 例外的措辭，
 已完成）——`Balance-Component-Business-Rule-Decisions-2026-08-21.md` 六項行動項目（1-6）至此
 全數處理完畢，無剩餘待辦。
 
+---
+
+## 十八、business-days-mock 程式碼審閱（2026-08-26，BA 複查通過）
+
+延續上一輪「Standing 微服務參考資料範圍過大」的複查結論，這輪針對工程team後續的兩項動作重新核對：
+(1) 依建議把範圍收斂到 `analysis/standing-microservice-reference/Auto-Close-Grace-Period-Business-Day-Requirement.md`；
+(2) 新增可執行的 `microservices/business-days-mock/`。
+
+### 18.1　範圍收斂確認完成
+
+原本複製自 `lc-balance-new/` 的 947 行 Maturity Date OAS 設計文件（19 輪審閱）與對應決策請求文件已
+刪除，改為工程team自行撰寫、僅描述 AUTO CLOSE 自己實際需求的
+`Auto-Close-Grace-Period-Business-Day-Requirement.md`——文件本身清楚點出被刪內容的問題所在（多方
+付款結算的 calendar role／combination rule／版本快照，對一個沒有交易對手的背景批次作業不適用）。
+`calendars.json` 同步從 8 國裁剪為僅 `TW` 一份。BA 搜尋過 `analysis/`、repo 根目錄下所有 `.md`
+檔案，確認沒有任何殘留引用指向已刪除的兩份檔案，無失效連結。
+
+### 18.2　`microservices/business-days-mock/` 程式碼核對——手動推演算法，非僅閱讀
+
+`server.js`（118 行）僅實作 `POST /business-days/add`：逐日往前走，跳過週末與假日直到湊滿 N 個
+營業日；`parseDateUTC()`／`Date.UTC()` 加反向驗證擋掉溢位假日期（如 2026-02-30）；
+`MAX_WALK_DAYS = 3650` 防止異常輸入造成請求掛住。BA 沒有只看程式邏輯是否「看起來合理」，而是拿
+README 自己給的範例（`2026-01-08` 週四 + 2 個營業日）逐步手動推演一次：01-09（五，營業日，剩
+1）→01-10（六，跳過）→01-11（日，跳過）→01-12（一，營業日，剩 0），得出 `2026-01-12`，與 README
+宣稱的結果完全一致。
+
+**與 Phase 1 既有 `domain/autoCloseGracePeriod.ts` 之 `addBusinessDays()` 介面形狀核對一致**：兩者
+在 `days=0` 時都是直接回傳原日期、不判斷起算日本身是否為營業日——確認將來把 Phase 1 換成呼叫這個
+mock 時，函式簽名不需要變動，README 這項承諾兌現。
+
+### 18.3　行事曆測試資料——BA 獨立寫程式重新驗算，非採信文件自身宣稱
+
+`data/calendar.json`（`TW`，2026-2028）宣稱「2027／2028 用同樣月／日重複 2026 的型態，但遇週六／
+週日順延到下一個平日；4 個固定國定假日（元旦 01-01、和平紀念日 02-28、勞動節 05-01、國慶日
+10-10）永遠不順延」。BA 未直接採信此文字敘述，而是另外寫 Python 腳本，拿 2026 年的月／日當基準，
+獨立算出 2027／2028 兩年各 8 筆「應順延」日期理論上應該落在哪一天，逐筆比對 `calendar.json` 實際
+內容：
+
+**16 筆（2027／2028 各 8 筆）獨立驗算結果與檔案內容全部吻合，無一筆錯誤**——包含跨連假的情況（如
+2028 年 02-19 原始週六會被順延，而檔案正確地把「春節連假2」記在順延後的 02-21，而非原始的
+02-19）。同時核對 3 年內這 4 個固定假日凡是剛好落在週六／週日的所有情況（2026 年 02-28／10-10、
+2027 年 01-01／02-28／05-01／10-10、2028 年 01-01），確認全部維持在原日期、未被誤順延。
+
+### 18.4　發現的缺口——已記錄、非阻擋
+
+**沒有行事曆資料涵蓋範圍檢查。** 若查詢日期算到 2029 年以後（或 2026 年以前），`calendar.json`
+沒有該年度假日資料，`server.js` 不會報錯，只會安靜地把那些日期當成「叫看週末、沒有假日」處理——
+這正是被刪除的那份大型設計文件裡「fail-closed」原則（`CALENDAR_YEAR_NOT_AVAILABLE`）想防止的情境，
+這個精簡版 mock 沒有繼承這一層防護。因為 Auto Close Grace Period 只有 2 個營業日、`effectiveTo`
+本身不太可能算到 2029 年以後，加上這本來就是 local dev/demo 用途，實際風險很低，**不列為阻擋項**。
+使用者已於 `TODO.md` 記錄此缺口為「非阻擋、記錄用」，不佔用 Gate Condition 排序。
+
+### 18.5　結論
+
+`business-days-mock` 的範圍收斂、程式邏輯、行事曆測試資料一致性，三方面 BA 複查皆通過——且驗證
+方式為獨立推演／獨立寫程式重算，而非採信文件或程式本身的自我宣稱。目前仍**尚未接進**
+`microservices/balance-component/` 本身，Phase 1 的同倉庫週末限定 mock 照常運作，這批新增內容對
+現有程式碼零風險。
+
+---
+
+## 十九、business-days-mock「再檢查一次」複驗（2026-08-26，BA 獨立起服務實測，非採信文件宣稱）
+
+延續 §18 的複查，這輪針對 `analysis/standing-microservice-reference/README.md` 與
+`microservices/business-days-mock/README.md` 兩份檔案再次成長（分別成長至 3877 bytes／3624
+bytes）進行複查。
+
+### 19.1　確認純文件性質變動，無夾帶未申報的程式碼變動
+
+比對檔案時間戳：`data/calendar.json`、`server.js` 的內容與 §18.3 已驗證過的版本逐位元組一致，
+未再被修改。本輪兩份 README 的新增內容純屬文字說明（強調本 mock 與 `lc-balance-new/microservices/
+standing-mock` 的端點／用途區隔、`calendars.json` 已於 2026-08-26 依使用者指示由單一年度擴充為
+2026-2028 三年、以及一句「已即時 smoke test 驗證正確（跨週末順延、真實 TW 假日順延、
+`businessDays: 0`、400 驗證錯誤）」的宣稱），未涉及可執行程式碼或測試資料本身。
+
+### 19.2　BA 未採信 README 自述的 smoke test 結果，親自起服務驗證
+
+比照本專案一貫方法論，BA 沒有把 README 這句「已驗證正確」的宣稱當作結論，而是自己把
+`business-days-mock` 實際啟動並發送請求驗證。
+
+**過程中的環境問題**：透過裝置橋接 shell（`device_bash`）以一般方式背景啟動
+`node server.js`（`nohup`／`setsid`＋`disown`皆試過）會導致行程雖顯示存活、但完全無法綁定
+port、亦無任何 log 輸出——判斷是這個沙盒環境的背景行程在跨指令呼叫之間會被回收。改用「同一個
+node 程序內 `require()` 匯出的 Express app、自建 in-process HTTP server 送請求」的方式繞過，
+不依賴實際綁定固定 port，藉此仍能在不修改 `server.js` 本身的前提下對其真實邏輯發送請求並讀取
+真實回應。
+
+**實測 7 個情境（比 README 自稱驗證的 4 個多測 3 個），全部通過：**
+
+| # | 情境 | 結果 |
+|---|------|------|
+| 1 | `GET /healthz` | `{"status":"ok","calendarCode":"TW"}` |
+| 2 | README 自己的範例：`2026-01-08`（四）+2 營業日 | `adjustedDate: 2026-01-12`，跳過 01-10（六）／01-11（日）——與 README 宣稱結果一致 |
+| 3 | `businessDays: 0` | 原日期原樣返回，`skippedDates: []`——與 Phase 1 既有 `addBusinessDays()` 介面行為一致 |
+| 4 | `2026-02-27`（五）+1 營業日（228 固定假日剛好落在週六的邊界情況） | 正確只標記一次 WEEKEND（02-28），未重複標記 PUBLIC_HOLIDAY，落在 `2026-03-02`（一） |
+| 5 | **本輪新增情境**：`2026-09-24`（四）+1 營業日（真正平日國定假日〔中秋節,09-25週五〕緊接週末） | 依序正確標記 `PUBLIC_HOLIDAY`（中秋節）→`WEEKEND`（六）→`WEEKEND`（日），落在 `2026-09-28`（一）——確認平日假日與連續週末串接情境正確 |
+| 6 | 無效日期格式（`2026-02-30`） | `400 INVALID_DATE_FORMAT` |
+| 7 | 缺少 `businessDays` 欄位 | `400 INVALID_BUSINESS_DAYS` |
+| 8 | 負數 `businessDays`（`-1`） | `400 INVALID_BUSINESS_DAYS` |
+
+### 19.3　結論
+
+README 的 smoke test 宣稱經 BA 獨立起服務複驗**屬實**，且本輪額外驗證的「平日國定假日＋緊接
+連續週末」串接情境（情境5，`server.js` 的 `nonBusinessDayReason()`／`addBusinessDays()` 迴圈
+邏輯）也正確無誤，強化了 §18.2 手動推演單一範例的驗證強度。`calendar.json`／`server.js` 本身
+確認未再變動，§18 的結論（範圍收斂完成、程式邏輯正確、行事曆測試資料 100% 吻合、尚未接進
+`microservices/balance-component/` 本身、日期範圍涵蓋缺口已記錄為非阻擋）維持有效，本輪未發現
+新問題。
+
+
+
 
 
 

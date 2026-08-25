@@ -171,15 +171,55 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
     `Business Date > effectiveTo + N 個營業日`（新 config 常數 `AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2`），
     與既有 `isRecentlyReopened()` 並存（不是取代——見下方 §13.8 調和說明）。原始 §8.5 落差（一般 EXPIRE→
     同輪 AUTO CLOSE，非 REOPEN 情境）現已一併關閉，`runExpirySweepCycle` 的測試已改為驗證「同輪
-    `close: []`，晚一輪才會真的 CLOSE」。**Phase 2（真接 Standing 微服務）仍未做,更正說明如下**：目前
-    Phase 1 mock 是這個 repo（`lc-balance/`）唯一實作,本身沒有任何 Standing client 接線。**2026-08-25
-    複查發現**：獨立、gitignored 的平行專案 `lc-balance-new/microservices/standing-mock` 確實有一個
-    Standing 微服務 mock,但形狀不同——它做的是 `POST /business-days/adjust`（給日期+多國家/銀行
-    calendar,回傳「調整後」日期,服務 A6/B4 Maturity Date 假日調整這個完全不同的功能），不是
-    `lc-balance/` 這裡 Grace Period 需要的 `/business-days/add`（給日期+N天,回傳往後推 N 個營業日）。
-    要真正做 Phase 2,選項是：(a) 在 `standing-mock` 上新增 `/business-days/add` 端點並在 `lc-balance/`
-    寫 client 去接，或 (b) `lc-balance/` 自己另建。**兩者都還沒做**，且 (a) 涉及跨到另一個平行專案動工，
-    依 `lc-balance/CLAUDE.md` 自己的既有規定，需要先跟使用者確認才能動 `lc-balance-new/` 裡的東西。
+    `close: []`，晚一輪才會真的 CLOSE」。**Phase 2（真接 Standing 微服務）仍未做**，目前 Phase 1 mock
+    是這個 repo（`lc-balance/`）唯一實作,本身沒有任何 Standing client 接線；只服務 **AUTO CLOSE**
+    自己的 Grace Period,跟 AUTO EXPIRY 無關（AUTO EXPIRY 自己的寬限期是 `mail_float_grace_days`,日曆
+    天,不需要營業日行事曆）。
+
+    **2026-08-25／26 反覆核對後定案的需求範圍（`analysis/standing-microservice-reference/`）**：一度
+    複製了 `lc-balance-new/`（獨立平行專案）的 Maturity Date OAS 設計文件（947 行,19 輪審閱）＋8 國
+    行事曆測試資料,後來使用者親自指出**真正的需求簡單很多**：這只是一個背景批次作業,問的問題只是
+    「這張已 EXPIRED 的 LC,照銀行自己的單一行事曆算,是否已過 N 個營業日」——沒有交易對手、沒有多方
+    付款路徑、不需要歷史版本重算,跟 Maturity Date 那種多方結算情境（calendar role、combination rule、
+    calendar snapshot 版本控管）完全不是一回事。**已依此重新簡化**：複製來的兩份 Maturity Date 文件
+    已刪除,改成自己撰寫的 `Auto-Close-Grace-Period-Business-Day-Requirement.md`（只描述這個單一行事曆、
+    單一批次的實際需求，以及 Phase 1 現有的 `addBusinessDays()`/`isPastAutoCloseGrace()` 形狀跟 Phase 2
+    真正要補的東西——換掉週末限定的邏輯本體,換成真正的假日清單，函式簽名不需要變）；
+    `calendars.json` 也從 8 國行事曆裁剪到只剩 `TW`（本國）一份,因為 AUTO CLOSE 沒有交易對手的概念。
+
+    **2026-08-26 新增可執行的 mock server**（使用者要求）：`microservices/business-days-mock/`
+    （自己的 `package.json`／`server.js`／`data/calendar.json`／`README.md`）——只有
+    `POST /business-days/add` 這一個端點,單一 `TW` 行事曆,port `4500`。**不是**複製
+    `lc-balance-new/microservices/standing-mock`（那個做的是 `/adjust`,服務 Maturity Date 那個不同
+    功能）,是重新寫的,形狀完全對應這裡簡化後的需求。已即時 smoke test 過（跨週末、真實 TW 假日、
+    `businessDays: 0`、400 驗證錯誤都驗證正確）。**尚未接進 `microservices/balance-component/` 本身**
+    ——Phase 1 的同倉庫週末限定 mock 仍在跑,這個 mock server 目前只是 Phase 2 的參考/開發用素材,還沒
+    真正串接。
+
+    **2026-08-26 行事曆測試資料擴充為 3 年（使用者要求,`calendars.json`／`data/calendar.json` 兩份都
+    同步）**：原本只有 2026 一年,擴充到 2026-2028。2026 的日期先逐一核對過真實星期幾/農曆換算（春節
+    2026-02-17、端午 2026-06-19、中秋 2026-09-25 均對照確認無誤）；2027／2028 用同樣的月/日重複 2026
+    的型態（並非真正的農曆換算,僅供跨年度測試涵蓋範圍用,已在資料檔自己的 `_disclaimer` 裡註明），
+    遇到週六/週日時順延到下一個平日——**除了**元旦、和平紀念日／228（使用者更正為 02-28,不是 02-27
+    補假日那筆）、勞動節、國慶日（使用者更正為 10-10,不是 10-09 補假日那筆）這四個固定日期的國定
+    假日,永遠維持在同一天不順延。已用即時 mock server smoke test 驗證跨年度（2026→2027 元旦）與
+    順延（2027 端午節 06-19 是週六,正確順延到 06-21 週一）兩種情境都正確。
+
+    **2026-08-26 BA 獨立複驗通過**：程式邏輯逐行手算追蹤過（README 範例 2026-01-08+2 營業日的每一步
+    都對得上）；16 筆「應該順延」的 2027/2028 日期用獨立程式重新驗算,全部跟 `calendar.json` 實際內容
+    一致；4 個固定假日（元旦/228/勞動節/國慶日）在 2026-2028 三年裡凡是落在週六日的都確認沒有被誤
+    順延；`addBusinessDays(date, 0)` 跟 Phase 1 既有的 `domain/autoCloseGracePeriod.ts` 同名函式行為
+    一致（直接回傳原日期），未來真要接 Phase 2 時函式簽名確實不需要改。
+
+    - [ ] **小缺口，非阻擋（BA 複驗發現，2026-08-26）** — `business-days-mock` 沒有行事曆資料範圍
+      檢查／fail-closed 機制：查詢日期算到 2029 年以後（或 2026 年以前，`data/calendar.json`／
+      `calendars.json` 都只到 2028 年）時，不會報錯，只會安靜地把那些日期當成「沒有假日資料、只看
+      週末」處理——等於默默算錯，不是明確拒絕。原本被刪掉的那份 947 行 Maturity Date OAS 設計文件裡
+      的 fail-closed 原則正是要防這種情況，這個簡化後的 mock 沒有跟著做。風險很低（Grace Period 只有
+      2 個營業日，`effectiveTo` 本身不太可能算到 2029 年以後，且本來就是 local dev/demo 用途），暫不
+      列為要修的項目，記錄於此供未來若真的需要更長時間跨度測試時參考。
+
+    Phase 2 本身仍未動工,等 BA 審閱這份簡化後的參考資料＋mock server 後再決定要走哪個選項。
 
   - [x] ~~**`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7）**~~ — **已於 2026-08-25 修復**。
     `balanceContractStore.ts` 的 `reactivate()` 新增必填的 `releasedAt` 參數；REOPEN 把合約恢復到

@@ -1684,3 +1684,31 @@ no `.ts` coverage impact; Angular 1133/1133 stays green.
   (this file's own top doc comment says as much) without ever wiring it up. Removed the class and its one
   `errorsAndMoney.test.ts` row; left `SUPERSEDED`/`markSuperseded()` untouched (different situation, not
   this cleanup's scope). Microservice suite: 546/546, `errors.ts` still 100%/100%/100%/100%.
+
+## F1 §13.5 Phase 2 reference material — copied from `lc-balance-new/`, then simplified down to what AUTO CLOSE actually needs
+
+User-directed, 2026-08-25/26: copied `lc-balance-new/`'s own Standing microservice Maturity Date OAS design
+(947 lines, 19 review rounds) + its decision-request doc + an 8-country calendar dataset into
+`analysis/standing-microservice-reference/`, as background for F1 §13.5 Phase 2 (real business-day
+calendar for AUTO CLOSE's own Grace Period — **not** AUTO EXPIRY, which stays calendar-day-based via
+`mail_float_grace_days`). User then correctly identified the real requirement is far simpler than that
+material's own multi-party payment-settlement scope (calendar roles, combination rules, calendar-snapshot
+versioning) — AUTO CLOSE is a single-bank background sweep with no counterparty at all. Both copied
+Maturity Date documents were deleted and replaced with a freshly-authored
+`Auto-Close-Grace-Period-Business-Day-Requirement.md` (one date in, one fixed N, one calendar, one boolean
+out); `calendars.json` trimmed to a single `TW` calendar. Also added a runnable mock server,
+`microservices/business-days-mock/` (`POST /business-days/add` only, port 4500, live-smoke-tested) —
+written fresh to match the simplified shape, not copied from `lc-balance-new/microservices/standing-mock`
+(that one implements `/adjust` for the different Maturity Date use case). **Not yet wired into
+`microservices/balance-component/`** — Phase 1's own same-repo weekend-only mock
+(`domain/autoCloseGracePeriod.ts`) still runs there; all of this is Phase 2 reference/dev material only,
+Phase 2 itself remains unimplemented.
+
+Calendar test data (`calendars.json`/`data/calendar.json`, kept identical) expanded 2026-08-26 (user-
+directed) from one year to 2026-2028: 2026 dates verified against real day-of-week/lunar-calendar facts
+(CNY/Dragon Boat/Mid-Autumn); 2027/2028 repeat the same month/day (illustrative, not lunar-accurate for
+those years) and roll forward to the next weekday when that lands on a Saturday/Sunday — **except** four
+fixed statutory holidays (New Year 01-01, 228 Peace Memorial Day 02-28, Labor Day 05-01, National Day
+10-10) which always stay on their literal date, never rolled. Live-verified via the mock server: a
+cross-year walk (2026-12-31 → 2027-01-04, skipping New Year + weekend) and a rolled 2027 holiday (Dragon
+Boat 06-19 Saturday → 06-21 Monday, correctly flagged `PUBLIC_HOLIDAY` on the rolled date).
