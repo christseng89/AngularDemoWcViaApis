@@ -347,6 +347,11 @@ this project (bugs, vulnerabilities, code smells, duplication, coverage) with pr
 remediation log — check it before assuming an area is unreviewed; it records what's already been fixed
 (and what was deliberately deferred, and why) rather than needing to be re-derived from scratch.
 
+`lc-balance/TODO.md` is the actual outstanding-work tracker for this sub-project — production gate
+conditions (auth, Angular CVEs, SQLite locking), findings from any external BA/expert review, and other
+known-but-not-yet-fixed items — kept append-only with dated resolution notes rather than deleted-and-
+forgotten; check it, not just `Quality-report-balance.md`, before assuming something is unaddressed.
+
 ### Source layout
 
 - `src/app/business-case-runner/` — runs a whole registered Business Case (via `backend/`'s
