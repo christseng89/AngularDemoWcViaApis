@@ -126,14 +126,17 @@
         </ng-container>
 
         <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
-          <!-- User-requested 2026-08-26 ("Back to Import LC Index 顯示太小不明顯") — was .tb-btn--tiny
-           (11px), easy to miss; bumped to the standard .tb-btn--outline size so it reads as a real nav
-           control, not a footnote. -->
-          <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">
+          <!-- User-requested 2026-08-26 ("Back to Import LC Index 顯示太小不明顯", then further
+           "字體放大 變粗 顏色用顯明一點的 與 Found:... 垂直間距加大", then "垂直間距上下一致") — first
+           bumped from .tb-btn--tiny (11px) to the standard .tb-btn--outline size, then upgraded again to
+           .tb-btn--nav-back (solid-fill, larger/bolder) once that still read as too quiet for a primary
+           nav control; the gap ABOVE this button (from the tabs) and the gap BELOW it (to the "Found:"
+           hint) are both mt-3 — deliberately equal, not independently tuned. -->
+          <button type="button" class="tb-btn tb-btn--nav-back mt-3" (click)="inquireEvents.backToIndex()">
             ‹ Back to {{ inquireEvents.indexEntityLabel }} Index
           </button>
           <div class="tb-error mt-2" role="alert" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
-          <div class="tb-hint tb-hint--ok" *ngIf="inquireEvents.rootContract">
+          <div class="tb-hint tb-hint--ok mt-3" *ngIf="inquireEvents.rootContract">
             Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}
           </div>
         </ng-container>

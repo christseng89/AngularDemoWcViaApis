@@ -2750,6 +2750,131 @@ function exportCase12(lc) {
   };
 }
 
+// User-directed 2026-08-26 ("All test cases 有 Reopen嗎？如果沒有加一些") — the comment above Export
+// Case #12 explicitly deferred Export's own twin of Import Case 14 (negative eligibility gate) and
+// Case 15 (§9.7 path-B chain reversal); closing that gap now for genuine Import/Export parity on the
+// Reopen mechanism specifically (F1 §10's own "Extension/Reopen皆為進出口對稱設計" requirement).
+function exportCase13(lc) {
+  return {
+    id: 'export-case-13',
+    title: 'Export Case #13 — B7 Reopen eligibility gate, negative path (ACTIVE contract, expect ERROR)',
+    description:
+      'Confirm LC 30,000, left ACTIVE (never Closed) -> B7 Reopen attempted directly against it — reopenShaped() must reject it (contract status is ACTIVE, not CLOSED), not silently allow it.',
+    steps: [
+      ...createAndRelease(
+        'Confirm LC 30,000 (Sight)',
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '30000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2028-12-28',
+          createdBy: MAKER,
+        },
+        'Checker releases Confirmation Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'B7 Reopen attempted while the Confirmation is still ACTIVE — expect 409 eligibility ERROR',
+        captureAs: 'reopen',
+        expectError: true,
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'REOPEN',
+          eventSeq: 2,
+          amount: '0',
+          currency: 'USD',
+          reasonCode: 'MAKER_INITIATED_REOPEN',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'snapshot', label: 'CONF LIAB unchanged (expect still Confirmed 30,000, status still ACTIVE — the rejected Reopen never applied)', contractRef: 'conf' },
+    ],
+  };
+}
+
+function exportCase14(lc) {
+  return {
+    id: 'export-case-14',
+    title: 'Export Case #14 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> B7 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
+    description:
+      "Confirm LC 40,000 with an Expiry Date already in the past -> EXPIRE (date-triggered write-off) writes off the full 40,000 -> the contract is now EXPIRED, so AUTO CLOSE's own write-off amount is already 0 (nothing left) -> B7 Reopen must reverse BOTH not-yet-reversed write-offs in the chain to restore the real historic balance (40,000), not just the last one (which would incorrectly restore 0). Same mechanism as Import Case 15's own path-B — see that case's own doc comment for the shared §9.7 rationale.",
+    steps: [
+      ...createAndRelease(
+        'Confirm LC 40,000 (Sight, Expiry Date already in the past)',
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '40000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2020-01-01',
+          createdBy: MAKER,
+        },
+        'Checker releases Confirmation Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'EXPIRE — date-triggered write-off of the full 40,000 (expiryDate + mailFloatGraceDays already elapsed)',
+        captureAs: 'expire',
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'EXPIRE',
+          eventSeq: 2,
+          amount: '40000',
+          currency: 'USD',
+          createdBy: 'BATCH_MAKER',
+        },
+      },
+      { type: 'release', label: 'BATCH_CHECKER releases Expire — status becomes EXPIRED', movementRef: 'expire', releasedBy: 'BATCH_CHECKER' },
+      { type: 'snapshot', label: 'CONF LIAB after Expire (expect Confirmed 0, status EXPIRED)', contractRef: 'conf' },
+      {
+        type: 'createMovement',
+        label: "AUTO CLOSE's own Close — amount is already 0, nothing left to write off (this is exactly the §9.7 path-B case: reversing only THIS movement would restore 0, not the real 40,000)",
+        captureAs: 'close',
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'CLOSE',
+          eventSeq: 3,
+          amount: '0',
+          currency: 'USD',
+          reasonCode: 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED',
+          createdBy: 'BATCH_MAKER',
+        },
+      },
+      { type: 'release', label: 'BATCH_CHECKER releases Close — status becomes CLOSED', movementRef: 'close', releasedBy: 'BATCH_CHECKER' },
+      { type: 'snapshot', label: 'CONF LIAB after (Expire then) Close (expect Confirmed 0, status CLOSED)', contractRef: 'conf' },
+      {
+        type: 'createMovement',
+        label: 'B7 Reopen (human-triggered, not batch) — must reverse BOTH the Expire and the Close in the chain',
+        captureAs: 'reopen',
+        request: {
+          instrumentType: 'EPLC_CONFIRMATION',
+          balanceContractIdRef: 'conf',
+          movementType: 'REOPEN',
+          eventSeq: 4,
+          amount: '0',
+          currency: 'USD',
+          reasonCode: 'MAKER_INITIATED_REOPEN',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'release', label: 'Checker releases Reopen — status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
+      { type: 'snapshot', label: 'CONF LIAB after Reopen (expect Confirmed 40,000 — the ORIGINAL Expire amount, proving the chain was fully reversed, not just the follow-on Close’s own 0)', contractRef: 'conf' },
+    ],
+  };
+}
+
 /** Fresh natural keys per run so the same case can be re-run repeatedly against the same DB without idempotency-key/one-ACTIVE-per-logicalContractId collisions. */
 function buildRegistry() {
   return [
@@ -2780,6 +2905,8 @@ function buildRegistry() {
     exportCase10(lcNumberFor('EXP-C10')),
     exportCase11(lcNumberFor('EXP-C11'), 'IB0001'),
     exportCase12(lcNumberFor('EXP-C12')),
+    exportCase13(lcNumberFor('EXP-C13')),
+    exportCase14(lcNumberFor('EXP-C14')),
   ];
 }
 

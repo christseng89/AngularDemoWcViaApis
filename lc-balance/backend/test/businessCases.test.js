@@ -33,6 +33,8 @@ const EXPECTED_IDS = [
   'export-case-10',
   'export-case-11',
   'export-case-12',
+  'export-case-13',
+  'export-case-14',
 ];
 
 const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
@@ -40,8 +42,8 @@ const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 's
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 27 business cases, Import Case 1-15 then Export Case #1-#12, in order', () => {
-    expect(registry).toHaveLength(27);
+  it('returns exactly 29 business cases, Import Case 1-15 then Export Case #1-#14, in order', () => {
+    expect(registry).toHaveLength(29);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -93,6 +95,10 @@ describe('data/businessCases.js buildRegistry()', () => {
       'Import Case 15 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> A11 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
     );
     expect(byId['export-case-12'].title).toBe('Export Case #12 — B6 Close -> B7 Reopen (carries its own restoration amount, server-computed at Submit)');
+    expect(byId['export-case-13'].title).toBe('Export Case #13 — B7 Reopen eligibility gate, negative path (ACTIVE contract, expect ERROR)');
+    expect(byId['export-case-14'].title).toBe(
+      'Export Case #14 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> B7 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
+    );
   });
 
   it('every step has a type from the six the generic executor understands', () => {

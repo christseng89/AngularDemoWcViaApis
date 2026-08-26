@@ -79,7 +79,11 @@ npm start        # ng serve --open
 - `src/app/web-components/` — vanilla Custom Elements (`balance.element.ts`, `charge.element.ts`,
   `charge-grid.element.ts`, `payment.element.ts`, `payment-grid.element.ts`) wrapped for use inside the
   Angular/Formly shell (`src/app/features/lc-issue/`).
-- No test runner is configured for this project (no `test` script in `package.json`).
+- `npm run build` (`ng build`) / `npm run watch` (`ng build --watch --configuration development`) exist
+  but produce no reusable bundle the way `lc-payment-wc/`'s `build:wc` does — mainly useful for a
+  production-config sanity check.
+- No test runner is configured for this project (no `test` script in `package.json`), and no
+  lint/format scripts either.
 
 ## `lc-payment-wc/` — LC Payment demo + Payment Component microservice
 
@@ -324,6 +328,10 @@ Same single-test syntax as `lc-payment-wc/` throughout (`npm test -- <file-or--t
 **never let the two Jest configs cross** caveat applies between the Angular app and the microservice
 (this project's `tsconfig.json` also sets `noPropertyAccessFromIndexSignature`) — always `cd` into
 `microservices/balance-component` before running its own Jest commands.
+
+`npm run lint` (eslint) and `npm run format:check` (prettier) exist in all three of this project's
+sub-projects (Angular app, `backend/`, `microservices/balance-component/`) — baseline-only, not wired
+into CI or `npm test`. Neither `lc-issue-angular/` nor `lc-payment-wc/` has equivalent scripts.
 
 Coverage-tracking is inconsistent across this project's own three sub-projects, unlike `lc-payment-wc/`
 (same "tracked in git, not gitignored" convention for the whole project): `microservices/balance-component/coverage/`
