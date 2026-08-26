@@ -223,30 +223,56 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 
     Phase 2 本身仍未動工,等 BA 審閱這份簡化後的參考資料＋mock server 後再決定要走哪個選項。
 
-    - [ ] **Phase 2 設計強化 — 統一 `isBusinessDay()` 判斷 + Special Working Day Override（2026-08-26，
+    - [x] ~~**Phase 2 設計強化 — 統一 `isBusinessDay()` 判斷 + Special Working Day Override（2026-08-26，
       BA 補充需求，記錄於 `analysis/standing-microservice-reference/Auto-Close-Grace-Period-Business-Day-
-      Requirement.md`「Phase 2 設計強化」一節）**：起因是上一輪 BA 複查發現 `domain/domesticCalendar.ts`
-      （A1/B1 Expiry Date 檢查）跟 `microservices/business-days-mock/server.js`（AUTO CLOSE 參考 mock）
-      查詢順序不一致（前者先查假日、後者先查週末，已於 2026-08-26 統一成「先查週末」，見本檔
-      `CLAUDE.md` 決策日誌對應條目）；使用者複核後指出這個「先查誰」本身問錯方向——**真正該補的是
-      「補班日／特殊營業日 Override」，不是週末跟假日誰先查**，若某週六被指定為補班日，單純
-      「Saturday/Sunday → 一律非營業日」規則不管查詢順序為何都會誤判，因為根本沒查過 Override。
-      BA 記錄的完整設計期望（供 Phase 2／未來統一 Calendar Service 落地時參考，目前**不阻擋**任何現行
-      功能）：
-      1. 判斷優先順序應改為「Special Working Day Override → Holiday Calendar → Weekend Rule → 預設營業
-         日」（Override 最優先，不是效能考量，是正確性問題）。
-      2. Calendar 資料設計應支援逐日期明確標記 `WORKING_DAY_OVERRIDE`/`HOLIDAY`/`WEEKEND`。
-      3. 週末規則本身不應寫死「僅六日」，應可依國家/銀行/分行配置。
-      4. Trade Finance 系統裡不只 AUTO EXPIRY／AUTO CLOSE 需要問「今天是不是營業日」——Acceptance
-         Maturity Date、Operation／Payment Date、SWIFT 發送、Currency Settlement 都各自可能需要問**不同**
-         的行事曆；這是全 repo 架構層級的長期觀察，不代表 AUTO CLOSE 自己要處理多行事曆協調。
-      5. 長期應統一走 `calendarService.isBusinessDay(date, calendarIds)`，取代目前這個 repo 裡各自獨立、
-         寫法不一致的四份「是不是營業日」邏輯（`domain/autoCloseGracePeriod.ts` Phase 1 只排除週末、
-         `business-days-mock/server.js` 週末優先、`domain/domesticCalendar.ts` 現已改成週末優先、
-         Angular 手動同步副本 `domestic-calendar.ts`）——四份都不支援 Special Working Day Override。
-      **現階段務實做法（BA 明確認可）**：Phase 1／`domesticCalendar.ts` 維持「先查週末、再查假日」不變
-      （效能考量，跟 `business-days-mock/server.js` 一致），不需要現在為此重構；但正式做 Phase 2／統一
-      Calendar Service 時，Override 機制須是設計第一優先，而非事後補丁。
+      Requirement.md`「Phase 2 設計強化」一節）**~~ — **2026-08-26 BA 最終決定：登記移交 Standing
+      微服務團隊，Balance Component 不修改**（決策討論過程曾整理於一份決策比較文件，決定拍板後已刪除，
+      見本條目末段說明）。起因是上一輪 BA 複查
+      發現 `domain/domesticCalendar.ts`（A1/B1 Expiry Date 檢查）跟 `microservices/business-days-mock/
+      server.js`（AUTO CLOSE 參考 mock）查詢順序不一致（前者先查假日、後者先查週末，已於 2026-08-26
+      統一成「先查週末」，見本檔 `CLAUDE.md` 決策日誌對應條目）；使用者複核後指出這個「先查誰」本身
+      問錯方向——真正該補的是「補班日／特殊營業日 Override」機制。BA 先補了完整設計期望（優先順序
+      Override→Holiday→Weekend、逐日期 Override 標記、週末規則可配置、多作業可能要問不同行事曆、
+      長期統一走 `calendarService.isBusinessDay(date, calendarIds)`），工程team接著整理出方案 A／B／C
+      三個比較（各自補 Override／升格既有 `business-days-mock` 走 HTTP／抽成 repo 內共用套件），架構
+      觀點原本傾向方案 B（先做 AUTO CLOSE 子選項）。
+
+      **最終決定（Business Day Calculation Ownership，2026-08-26）**：
+      ```text
+      Decision: Deferred to Standing Service Team
+      Balance Component Change: None
+      ```
+      Business Day／Weekend／Holiday／Working Day Override／Grace Period／`closeEligibleDate` 的計算
+      統一交由 Standing 微服務（或其外部批次）負責；`balance-component` 本階段**不新增或修改任何
+      Calendar 相關邏輯**（不建 Calendar Service、不建假日表、不做 `isBusinessDay()` 共用邏輯）——
+      方案 A/B/C 均不在 `balance-component` 這邊執行，登記後直接移交。Standing 篩選出符合 AUTO CLOSE
+      條件的 LC 後，應逐筆呼叫**既有**的 A10／B6 Maker API 與 Checker／Release API（BA 已查證這兩個
+      Function Code/端點是本系統既有、已有完整 Maker/Checker/4-Eyes 邏輯與測試覆蓋的 API，不需要
+      `balance-component` 為此另開新介面）；`balance-component` 繼續負責 Close Eligibility 最終檢查、
+      Maker／Checker 分離、4-Eyes、Idempotency、Audit Trail，但不負責計算營業日/Grace Period/維護
+      Calendar 資料。Angular／WC 的 Expiry Date 即時檢查，未來也應改調用 Standing 提供的 Calendar
+      API，不在 Angular 或 `balance-component` 內維護另一份 Calendar 規則。
+
+      **留給 Standing 團隊未來真正串接時才需要處理的實作細節（不影響本次決定，先記錄）**：
+      - `runAutoCloseSweep()` 目前是 `balance-component` 服務**內部**直接呼叫
+        `createMovement()`/`release()`（操作人身份是 `config.ts` 兩個寫死常數
+        `BATCH_MAKER_ACTOR`/`BATCH_CHECKER_ACTOR`），不是透過對外 A10/B6 HTTP API 被呼叫進來——日後
+        改成「Standing 從外部逐筆呼叫 A10/B6 API」時，這條內部 sweep 路徑要嘛被取代、要嘛跟外部呼叫
+        並存，操作人身份是否要換成 Standing 自己的服務身份，屆時才需要拍板。
+      - 目前 `BATCH_MAKER_ACTOR`/`BATCH_CHECKER_ACTOR` 是同一個自動化流程接續呼叫的兩個字串常數，
+        滿足 `assertMakerCheckerSeparation()` 字面檢查，但不是兩個各自由 IAM 授權的真 4-Eyes 身份——
+        跟 BAL-001（零身份驗證）同一個更大的既有 Gate Condition，不因這次決定而變成新的阻擋項，一併
+        掛在第1節追蹤。
+      - `processSweepCandidate()` 目前 Maker 成功、Checker 失敗時**不會**重複建立第二筆 Maker（該筆
+        合約會因已有 PENDING 的 CLOSE/EXPIRE movement 被下一輪 `hasOpenEvents` 排除），但也**沒有**
+        機制回頭單獨重試那筆卡住的 Checker/Release，等於一旦發生就永久卡住待人工介入——本輪查證挖出
+        的真實缺口，暫不列為阻擋項（單一 process 記憶體內操作，`release()` 失敗率預期很低），先記錄。
+
+      決策準備過程中曾整理方案 A/B/C 原始比較、以及對外部 19 節 Review Comments 的逐點採納/不採納分析
+      （Fail-Closed 原則、`closeEligibleDate` 批次預算效能建議、Override schema 應結構化等技術判斷經
+      查證屬實）於 `analysis/standing-microservice-reference/Phase2-CalendarService-Options-for-BA-
+      Decision-zh.md`；該檔案本身已於決定拍板後刪除——決定內容與查證要點已完整收錄於本條目，不代表
+      `balance-component` 這邊還有待辦，未來需要交接給 Standing 微服務團隊時以本條目為準。
 
   - [x] ~~**`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7）**~~ — **已於 2026-08-25 修復**。
     `balanceContractStore.ts` 的 `reactivate()` 新增必填的 `releasedAt` 參數；REOPEN 把合約恢復到
