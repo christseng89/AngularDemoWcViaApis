@@ -223,6 +223,31 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 
     Phase 2 本身仍未動工,等 BA 審閱這份簡化後的參考資料＋mock server 後再決定要走哪個選項。
 
+    - [ ] **Phase 2 設計強化 — 統一 `isBusinessDay()` 判斷 + Special Working Day Override（2026-08-26，
+      BA 補充需求，記錄於 `analysis/standing-microservice-reference/Auto-Close-Grace-Period-Business-Day-
+      Requirement.md`「Phase 2 設計強化」一節）**：起因是上一輪 BA 複查發現 `domain/domesticCalendar.ts`
+      （A1/B1 Expiry Date 檢查）跟 `microservices/business-days-mock/server.js`（AUTO CLOSE 參考 mock）
+      查詢順序不一致（前者先查假日、後者先查週末，已於 2026-08-26 統一成「先查週末」，見本檔
+      `CLAUDE.md` 決策日誌對應條目）；使用者複核後指出這個「先查誰」本身問錯方向——**真正該補的是
+      「補班日／特殊營業日 Override」，不是週末跟假日誰先查**，若某週六被指定為補班日，單純
+      「Saturday/Sunday → 一律非營業日」規則不管查詢順序為何都會誤判，因為根本沒查過 Override。
+      BA 記錄的完整設計期望（供 Phase 2／未來統一 Calendar Service 落地時參考，目前**不阻擋**任何現行
+      功能）：
+      1. 判斷優先順序應改為「Special Working Day Override → Holiday Calendar → Weekend Rule → 預設營業
+         日」（Override 最優先，不是效能考量，是正確性問題）。
+      2. Calendar 資料設計應支援逐日期明確標記 `WORKING_DAY_OVERRIDE`/`HOLIDAY`/`WEEKEND`。
+      3. 週末規則本身不應寫死「僅六日」，應可依國家/銀行/分行配置。
+      4. Trade Finance 系統裡不只 AUTO EXPIRY／AUTO CLOSE 需要問「今天是不是營業日」——Acceptance
+         Maturity Date、Operation／Payment Date、SWIFT 發送、Currency Settlement 都各自可能需要問**不同**
+         的行事曆；這是全 repo 架構層級的長期觀察，不代表 AUTO CLOSE 自己要處理多行事曆協調。
+      5. 長期應統一走 `calendarService.isBusinessDay(date, calendarIds)`，取代目前這個 repo 裡各自獨立、
+         寫法不一致的四份「是不是營業日」邏輯（`domain/autoCloseGracePeriod.ts` Phase 1 只排除週末、
+         `business-days-mock/server.js` 週末優先、`domain/domesticCalendar.ts` 現已改成週末優先、
+         Angular 手動同步副本 `domestic-calendar.ts`）——四份都不支援 Special Working Day Override。
+      **現階段務實做法（BA 明確認可）**：Phase 1／`domesticCalendar.ts` 維持「先查週末、再查假日」不變
+      （效能考量，跟 `business-days-mock/server.js` 一致），不需要現在為此重構；但正式做 Phase 2／統一
+      Calendar Service 時，Override 機制須是設計第一優先，而非事後補丁。
+
   - [x] ~~**`reactivate()` 的 `effective_to` 重啟後未正確回填（§13.7）**~~ — **已於 2026-08-25 修復**。
     `balanceContractStore.ts` 的 `reactivate()` 新增必填的 `releasedAt` 參數；REOPEN 把合約恢復到
     `EXPIRED` 時（§9.2 情境2）現在正確寫入這次 Release 的時間戳，不再是 `NULL`（恢復到 `ACTIVE` 時仍維持
