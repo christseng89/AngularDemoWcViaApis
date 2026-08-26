@@ -716,7 +716,7 @@ describe('InquireEventsService', () => {
   describe('selectEvent', () => {
     it('resolves the producing function, reconstructs a read-only field set, and stashes a fresh FormGroup', () => {
       const svc = new InquireEventsService(makeApi());
-      const contract = makeContract({ instrumentType: 'IPLC_LC', tolerancePct: '10', tenorType: 'SIGHT', tenorDays: 0 });
+      const contract = makeContract({ instrumentType: 'IPLC_LC', tolerancePct: '10', tenorType: 'SIGHT', tenorDays: 0, expiryDate: '2026-12-31' });
       const movement = makeMovement({ movementType: 'ISSUE', amount: '50000', currency: 'USD', sourceTransactionRef: null });
 
       svc.selectEvent(makeEvent({ movement, contract }));
@@ -730,6 +730,27 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventFields.length).toBeGreaterThan(0);
       expect(svc.selectedEventFields.every((f) => f.props?.disabled === true)).toBe(true);
       expect(svc.selectedEventForm.value).toEqual({});
+    });
+
+    it('carries the saved expiryDate onto the model, so A1/B1\'s Original Transaction Screen shows the saved date instead of the field\'s empty placeholder (reviewer-reported 2026-08-26)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', expiryDate: '2026-12-31' });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventFunction?.code).toBe('A1');
+      expect(svc.selectedEventModel.expiryDate).toBe('2026-12-31');
+    });
+
+    it('leaves expiryDate undefined (not null) when the original contract never had one, matching every other optional field on this model', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC', expiryDate: null });
+      const movement = makeMovement({ movementType: 'ISSUE' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.expiryDate).toBeUndefined();
     });
 
     it('falls back to a generic "Reference No." label when the resolved function has no secondaryRefLabel of its own but the movement did carry a reference (A1 has none; sourceTransactionRef still shown rather than silently dropped)', () => {

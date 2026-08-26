@@ -1723,3 +1723,14 @@ as holiday-free. Also added this mock's first test suite (`test/server.test.js`,
 tests) covering the existing weekend/holiday/cross-year/fixed-holiday behavior plus the new guard's three
 edge cases (out-of-range input, in-range input whose walk would cross the boundary, and a genuinely
 resolvable near-boundary case that must NOT false-positive) — all green.
+
+## Inquire Events → Original Transaction Screen — A1/B1's saved `expiryDate` wasn't shown (reviewer-reported 2026-08-26)
+
+`InquireEventsService.selectEvent()`'s reconstructed read-only model (`inquire-events.service.ts`) copied
+`tolerancePct`/`tenorType`/`tenorDays` off the event's own contract but omitted `expiryDate` — the A1/B1
+Original Transaction Screen's date input rendered its own empty placeholder instead of the value actually
+saved at Issue. Fixed by adding `expiryDate: contract.expiryDate ?? undefined` to that model; the
+`showsExpiryDateInput`/field definition (`builder-fields.ts`) and the `BalanceContract`/`BuilderModel`
+plumbing were already correct — this was a plain omission in the read-only reconstruction path, not a
+missing feature. Regression coverage added to `inquire-events.service.spec.ts` (saved date shown; absent
+date stays `undefined`, not `null`). All three suites re-run green.

@@ -500,6 +500,10 @@ export class InquireEventsService {
       secondaryRef: movement.sourceTransactionRef ?? undefined,
       tenorType: contract.tenorType ?? undefined,
       tenorDays: contract.tenorDays ?? undefined,
+      // Bug fix (reviewer-reported 2026-08-26, "Expiry Date not shown in Inquire Events → Original
+      // Transaction Screen") — A1/B1's own saved expiryDate was missing from this reconstructed model,
+      // so the read-only date input rendered its placeholder instead of the saved value.
+      expiryDate: contract.expiryDate ?? undefined,
     };
     this.selectedEventModel = model;
 
