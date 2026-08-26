@@ -146,6 +146,12 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // below) and for A11/B7 (amountFromFixed — see that flag's own doc comment above: nothing for a
       // Maker to see or type, the real amount is entirely server-computed at Submit).
       hide: isAmendExpiryDate || amountFromFixed,
+      // Formly's default resetOnHide:true wipes model.amount the moment this (freshly rebuilt) field
+      // initializes hidden — which clobbers the '0' placeholder onSelectContract() just set for A11/B7
+      // (amountFromFixed), since rebuildFields() runs right after that assignment. Safe to disable here:
+      // selectFunction() already replaces `model` wholesale on every function switch, so nothing depends
+      // on Formly's own hide-triggered clearing to keep amount clean between functions.
+      resetOnHide: false,
       // Uses Formly's expressions to keep props.step live as Currency changes, rather than a full field
       // rebuild (which would reassign `fields` on every keystroke and risk input-focus loss).
       expressions: {

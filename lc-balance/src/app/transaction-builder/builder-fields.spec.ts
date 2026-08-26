@@ -204,6 +204,18 @@ describe('builder-fields', () => {
       expect(amount.props?.required).toBe(false);
     });
 
+    // Bug fixed 2026-08-26 (user-reported live: "A11 選了 TESTREL01 輸入REASON AAAA後 SUBMIT BUTTON還是暗的").
+    // onSelectContract() sets model.amount = '0' then calls rebuildFields() — Formly's default
+    // resetOnHide:true wipes that value the moment this freshly-built hidden field initializes, since it
+    // has no way to know the '0' was set on purpose. Without resetOnHide: false here, isSubmitReady's
+    // mandatory-field check (`!model.amount`) fails silently and the Submit button never enables on a
+    // genuine first LC selection — only a coincidental second selection could win the race.
+    it('F1 2026-08-26 fix: sets resetOnHide: false on the Amount field for A11, so Formly does not wipe the amountFixed placeholder after rebuildFields()', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A11'), model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN', amount: '0' }, selectedContractSnapshot: null });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.resetOnHide).toBe(false);
+    });
+
     it('F1, redesigned 2026-08-25: B7 (Reopen, Export) also hides Amount entirely, no snapshot needed', () => {
       const ctx = baseCtx({
         selectedFunction: fn('B7'),
@@ -213,6 +225,16 @@ describe('builder-fields', () => {
       const amount = fieldByKey(buildFields(ctx), 'amount');
       expect(amount.hide).toBe(true);
       expect(amount.props?.required).toBe(false);
+    });
+
+    it('F1 2026-08-26 fix: sets resetOnHide: false on the Amount field for B7 too — same amountFixed mechanism, same bug, same fix', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B7'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'REOPEN', amount: '0' },
+        selectedContractSnapshot: null,
+      });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.resetOnHide).toBe(false);
     });
 
     it('F1: is hidden entirely (not merely locked) when movementType is AMEND_EXPIRY_DATE — swapped for the new newExpiryDate field instead', () => {

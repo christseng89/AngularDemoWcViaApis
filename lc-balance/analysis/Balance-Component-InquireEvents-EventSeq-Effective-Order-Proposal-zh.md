@@ -318,3 +318,93 @@ Submit/EC/Approve 三件事各自獨立可查而刻意拆開的，`toEventRows()
 **未變更**：`eventSeq`、冪等鍵、Balance 計算引擎（`confirmedBalance`/`availableBalance`/
 `asOfEventSeq`/REOPEN 還原金額）、`toEventRows()` 的 `'create'`/`'finalize'` 分支——完全符合 §6.1
 的範圍界定建議。
+
+
+## 8. BA Code Review（2026-08-26，複查 §7 實作）
+
+依專案「不盲目採信，逐項對照真實程式碼複查」慣例，對 §7 宣稱完成的實作重新查證，結論：**主要業務情境
+（業務原文 EB001/EB002 範例）的實作正確、測試到位、範圍控制得宜；但發現一個既有、非本次引入的資料
+完整性問題，會影響本功能在一種複合情境下的正確性，建議一併處理或至少正式登記追蹤。**
+
+### 8.1 複查通過的項目
+
+- `effectiveEventTime()`（`inquire-events.service.ts` 新增函式）：`movement.releasedAt ?? movement.cancelledAt
+  ?? movement.createdAt`，與 §7 描述完全一致；`toEventRows()` 只有 `'primary'` 分支改用它，`'create'`/
+  `'finalize'` 分支維持原樣——逐行核對程式碼屬實。
+- `LookUpPanelService`（`look-up-panel.service.ts:312`）確實只讀 `eventTime` 排序、透過共用的
+  `movementsOf$()`/`toEventRows()`，因此不需另外改動——核對屬實，§7 宣稱「範圍比原本設想的還小」成立。
+- 3 筆新測試（`inquire-events.service.spec.ts:199/225/237`）逐字重現業務 EB001/EB002 範例、PENDING 情境、
+  `cancelledAt` 情境，斷言正確且對應到 `effectiveEventTime()` 的三個分支——測試本身有意義，不是形式測試。
+- REJECT 沿用 `releasedAt`：核對 `balanceService.ts:2171`（`reject()` 呼叫 `updateStatus({status:
+  'REJECTED', releasedAt: this.now(), ...})`）屬實。
+- 冪等鍵/`eventSeq`/Balance 計算引擎（`confirmedBalance`/`availableBalance`/`asOfEventSeq`/REOPEN 還原）
+  確實完全未被觸碰——核對 `balanceService.ts`/`domain/reopenRestoration.ts` 這幾處程式碼，本次改動範圍
+  僅止於 Angular 前端兩個顯示層 Service，屬實。
+
+### 8.2 發現的問題——「`releasedAt`／`cancelledAt` 互斥」這個前提不完全成立
+
+§6.5／§7 都主張「`releasedAt`／`cancelledAt` 互斥（一筆 movement 不會同時有兩者）」，這句話對**最終落地
+的 DB 資料**是對的，但推導過程掩蓋了一個既有的資料完整性副作用，值得記錄：
+
+**查證**（`microservices/balance-component/src/domain/statusTransition.ts:27-28`）：
+
+```ts
+const LEGAL_TRANSITIONS: Record<MovementStatus, Partial<Record<MovementAction, MovementStatus>>> = {
+  PENDING: { RELEASE: 'RELEASED', REJECT: 'REJECTED', CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },
+  REJECTED: { CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },   // ← REJECTED 也能被 CANCEL
+  ...
+};
+```
+
+也就是說一筆先被 Checker REJECT（此時 `released_at` 已被寫入 REJECT 的時間）的交易，之後 Maker 還可以
+對它執行 `cancel()`（EC）。查證 `cancel()` 本身（`balanceService.ts:2191-2202`）與
+`balanceMovementStore.ts:updateStatus()`（line 442-460 的 SQL）：
+
+```sql
+UPDATE balance_movements
+SET status = @status, released_by = @releasedBy, released_at = @releasedAt, ...
+    cancelled_by = @cancelledBy, cancelled_at = @cancelledAt
+WHERE movement_id = @movementId
+```
+
+`released_by`/`released_at` 這兩欄是**直接覆寫（plain overwrite），不是 COALESCE**（跟同一個函式裡
+`reason_code`/`event_snapshot` 等欄位刻意用 `COALESCE(@param, column)` 保留舊值的寫法不同）。而
+`cancel()` 呼叫 `updateStatus()` 時**沒有傳入** `releasedBy`/`releasedAt`，兩者依函式簽章預設綁定為
+`null`（`releasedAt: params.releasedAt ?? null`）。
+
+**結果**：REJECTED → CANCELLED 這個合法的既有狀態轉換，會把原本 REJECT 當下寫入的 `released_at`／
+`released_by`（「這筆交易何時、被誰 Reject」的稽核紀錄）**覆寫成 `null`**，只留下新的 `cancelled_at`。
+`updateStatus()` 自己對 `cancelledBy`/`cancelledAt` 欄位的既有註解寫著「a movement is only ever
+transitioned once — status is terminal — so a plain write here...is safe」——這個假設**不成立**，因為
+`statusTransition.ts` 自己的狀態機明確允許 REJECTED 之後再轉一次到 CANCELLED。
+
+**對本次功能的實際影響**：一筆先 REJECT、後又被 EC/Cancel 掉的交易，Inquire Events 顯示的
+`effectiveEventTime` 會落在 `cancelledAt`（因為 `releasedAt` 已被清空），也就是排序/顯示只反映
+「最後一次 EC 的時間」，而「這筆交易何時被 Checker Reject」這個更早、原本應該獨立可查的稽核事實，
+在這條路徑上會消失不見——跟 2026-08-20 那次「Submit/EC/Approve 三件事各自獨立可查」的稽核軌跡設計
+初衷有落差。
+
+**性質判斷**：這是一個**既有（pre-existing）**的資料完整性問題，不是本次 eventSeq 排序需求新引入的
+臭蟲——`updateStatus()` 的這個覆寫行為在今天之前就存在。只是本次新功能（`effectiveEventTime()`）第一
+次讓「`released_at` 曾經有值、之後又被清空」這件事，從單純的稽核欄位缺陷，變成會**實際影響排序/顯示
+結果**的行為，才讓它變得值得現在处理，而不是繼續放著。三筆新測試都沒有涵蓋「先 REJECT 再 CANCEL」
+這個複合情境，所以這個落差沒有被本次的單元測試或瀏覽器驗證抓到。
+
+### 8.3 建議
+
+1. **不阻擋本次上線**——主要業務情境（Submit/Approve 排序）已正確實作且驗證，這個問題是邊緣情境
+   （先 Reject 又 EC 掉），發生機率低，也不影響資料正確性以外的任何既有功能。
+2. **建議登記一張獨立的技術債/缺陷**（而非塞進本次 §7 的範圍），標題可用「`cancel()` 覆寫
+   REJECTED 狀態既有的 `released_at`/`released_by`，遺失 Reject 稽核時間」，修法方向：
+   `updateStatus()` 的 `released_by`/`released_at` 兩欄改成跟 `reason_code` 一樣的
+   `COALESCE(@param, column)` 寫法（`cancel()` 從不傳這兩個值，COALESCE 後自然保留原值），
+   同時補一筆「REJECTED 之後 CANCEL」的 store 層測試釘住這個修正。
+3. 待該缺陷修好後，`effectiveEventTime()` 不需要任何改動——`releasedAt ?? cancelledAt ?? createdAt`
+   這個 fallback 順序本身沒有問題，問題出在上游欄位被錯誤清空，不是本次排序邏輯設計錯誤。
+
+### 8.4 次要觀察（非缺陷，僅記錄）
+
+`inquire-events.service.ts` 的 `loadIndexRow()`（LC Index 頁「Last Event Date/Time」欄）也是讀
+`e.eventTime`，因此本次改動後該欄位語意會一併從「最後一筆交易的 Submit 時間」變成「最後一筆交易的
+生效（Release/Reject/Cancel）時間」——這是合理、甚至更正確的副作用，但 §7 的實作紀錄沒有提到這個
+下游影響面，補記於此供之後查閱。

@@ -913,12 +913,14 @@ describe('MakerPanelComponent', () => {
   describe('catalogIbHint', () => {
     it('returns empty string when there are no pending IBs for the contract', () => {
       const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A4);
       const c1 = mkContract('c1', '810');
       expect(comp.catalogIbHint(c1)).toBe('');
     });
 
-    it('renders a single pending IB inline', () => {
+    it('renders a single pending IB inline (A4 — the only function catalogPayableIbs is populated for)', () => {
       const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A4);
       const c1 = mkContract('c1', '810');
       comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001']);
       expect(comp.catalogIbHint(c1)).toBe(' — IB00001');
@@ -926,9 +928,27 @@ describe('MakerPanelComponent', () => {
 
     it('renders multiple pending IBs with a count prefix', () => {
       const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A4);
       const c1 = mkContract('c1', '810');
       comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
       expect(comp.catalogIbHint(c1)).toBe(' — 2 pending: IB00001, IB00002');
+    });
+
+    // Bug fixed 2026-08-26 (user-reported live: LC Index rows for A11 showing a stale "— B02" IB hint).
+    // catalogPayableIbs is A4-only, but resetForFunction() never clears it on a function switch — without
+    // a strategy guard, a leftover hint from an earlier-in-session A4 selection kept bleeding into every
+    // other catalog-picker function's rows too (e.g. A11/B7, which have no concept of a pending IB at all).
+    it('F1 2026-08-26 fix: stays empty for a function that does not use catalogPayableIbs (A11), even with stale data left over from an earlier A4 selection', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A4);
+      const c1 = mkContract('c1', '810');
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001']);
+      expect(comp.catalogIbHint(c1)).toBe(' — IB00001');
+
+      triggerSelectFunction(comp, findFn(IMPORT_FUNCTIONS, 'A11'));
+      // resetForFunction() does not clear catalogPayableIbs — the stale entry is still there.
+      expect(comp.documentArrivalHints.catalogPayableIbs.get('c1')).toEqual(['IB00001']);
+      expect(comp.catalogIbHint(c1)).toBe('');
     });
   });
 
@@ -2752,6 +2772,41 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '100';
       comp.model.secondaryRef = 'AMD01';
       comp.selectedContract = makeContractC();
+      expect(comp.isSubmitReady).toBe(true);
+    });
+
+    // Bug fixed 2026-08-26 (user-reported live: "A11 選了 TESTREL01 輸入REASON AAAA後 SUBMIT BUTTON還是暗的
+    // 除非再選 1次TESTREL01 SUBMIT BUTTON才可以"). onSelectContract() is the only place model.amount ever
+    // gets set for A11/B7 (the Amount field itself is hidden — see builder-fields.ts's amountFromFixed);
+    // validateMandatoryFields() still requires it to be truthy since A11 is not the AMEND_EXPIRY_DATE
+    // case. This is the consequence-level check (isSubmitReady flips true once amount/reasonCode are
+    // both in place) — the actual root cause (Formly's resetOnHide silently wiping this '0' after
+    // rebuildFields()) is covered at the config level by builder-fields.spec.ts's own resetOnHide
+    // assertions, since reproducing Formly's async wipe here would need a TestBed-rendered form.
+    it('A11 (LC Reopen) — true once onSelectContract has set the amountFixed placeholder and Reason Code is filled in', () => {
+      const { comp } = setupC();
+      triggerSelectFunction(comp, findFn(IMPORT_FUNCTIONS, 'A11'));
+      comp.catalogPicker.contracts = [makeContractC({ balanceContractId: 'bc-1', status: 'CLOSED' })];
+      expect(comp.isSubmitReady).toBe(false); // nothing picked yet
+
+      comp.onSelectContract('bc-1');
+      expect(comp.model.amount).toBe('0'); // amountFixed placeholder, set by onSelectContract itself
+      expect(comp.isSubmitReady).toBe(false); // Reason Code still blank
+
+      comp.model.reasonCode = 'AAAA';
+      expect(comp.isSubmitReady).toBe(true);
+    });
+
+    it('B7 (Confirmation Reopen, Export) — same amountFixed mechanism, same isSubmitReady behavior as A11', () => {
+      const { comp } = setupC();
+      triggerSelectFunction(comp, findFn(EXPORT_FUNCTIONS, 'B7'));
+      comp.catalogPicker.contracts = [makeContractC({ balanceContractId: 'bc-1', instrumentType: 'EPLC_CONFIRMATION', status: 'CLOSED' })];
+
+      comp.onSelectContract('bc-1');
+      expect(comp.model.amount).toBe('0');
+      expect(comp.isSubmitReady).toBe(false); // Reason Code still blank
+
+      comp.model.reasonCode = 'AAAA';
       expect(comp.isSubmitReady).toBe(true);
     });
   });

@@ -118,6 +118,44 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 
 ## 3. 次要但仍開著的項目
 
+- [ ] **BAL-143**（🔵 Minor，既有缺陷，非本次排序需求引入，不擋上線）— REJECTED 交易被 EC/Cancel 後，
+  Reject 當下的 `released_at`/`released_by` 稽核時間被靜默覆寫成 Cancel 的值，Inquire Events 只看得到
+  最後一次 EC，Reject 這個稽核事實消失
+  完整查證過程、程式碼引用、建議修法方向已記錄於
+  `analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-Proposal-zh.md` §8（BA Code
+  Review，複查第9節排序實作時發現）；本條目為該節的摘要版，方便在 TODO 清單裡直接追蹤。
+  使用者於本次 Inquire Events 排序需求（見第9節）驗證期間查證發現：`domain/statusTransition.ts`
+  的 `LEGAL_TRANSITIONS`（第28行）允許 `REJECTED: { CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' }`——
+  一筆已 Reject 的交易確實可以再被 Cancel（EC），並非終態。但 `store/balanceMovementStore.ts` 的
+  `updateStatus()`（第450-466行）對 `released_by`/`released_at` 是直接覆寫（`SET released_by =
+  @releasedBy, released_at = @releasedAt`），不像同一條 SQL 裡的 `reason_code` 那樣用
+  `COALESCE(@reasonCode, reason_code)` 保留舊值；而 `reject()`（`balanceService.ts:2171`）本身就是把
+  Checker 的 Reject 時間寫進這兩個共用欄位（`released_by`/`released_at` 兼作「Release 或 Reject 的
+  第二方操作時間」，同一個「第二方操作時間」慣例，跟這次排序需求用的 `effectiveEventTime()` 概念
+  一致），而 `cancel()`（`balanceService.ts:2195`）呼叫 `updateStatus()` 時完全沒傳
+  `releasedBy`/`releasedAt` 這兩個 key，於是它們在 SQL 參數繫結時 `?? null`（第470-471行），直接把
+  Reject 當下寫入的值覆寫成 `null`，只留下新的 `cancelled_by`/`cancelled_at`。
+  `updateStatus()` 自己的 doc comment（第442-446行）宣稱「a movement is only ever transitioned once —
+  status is terminal — so a plain write here, not a COALESCE, is safe」——這個假設對 PENDING→RELEASED／
+  PENDING→REJECTED 成立，但對 REJECTED→CANCELLED 這條既有合法路徑不成立，是文件記載的設計理由本身有
+  遺漏，不是單純的程式碼疏漏。
+  **影響範圍**：僅限「先 Reject、後又被 EC/Cancel」這個複合情境（`REJECTED` 狀態下再 `CANCEL`）；純
+  Release 或純 Reject（未再被 Cancel）不受影響，`reason_code`／`cancelled_by`／`cancelled_at` 等其他
+  稽核欄位不受影響。**不擋這次 Inquire Events 排序上線**——本次改動（第9節）是純顯示層，且
+  `effectiveEventTime()` 的 fallback 順序（`releasedAt ?? cancelledAt ?? createdAt`）在這個複合情境下
+  仍會退回使用 `cancelledAt`，時間本身不會顯示錯誤或報錯，只是「Reject 這一段稽核歷史消失、只看得到
+  最後一次 EC」這件事本身是既有缺陷，屬於資料完整性/稽核軌跡問題，不是這次排序邏輯造成的行為異常。
+  **建議修法方向**：`updateStatus()` 的 `released_by`/`released_at` 仿照 `reason_code` 改成
+  `COALESCE(@releasedBy, released_by)`/`COALESCE(@releasedAt, released_at)`，讓 `cancel()`（本來就不傳
+  這兩個 key）保留 Reject 當下寫入的舊值；同時需要重新檢查其他所有呼叫 `updateStatus()` 的地方
+  （`release()`/`reject()`）是否都預期在自己呼叫時「一定要能覆寫」這兩欄——目前只有 `reject()`
+  會寫入非 null 值，`release()` 呼叫時機是否也有可能發生在已有舊值的列上需要一併確認，避免改成
+  COALESCE 後反而讓 `release()` 自己的合法覆寫需求被誤擋。
+  **建議測試補強點**：微服務新增一個「Reject 後再 Cancel」的整合測試，斷言 Cancel 後
+  `released_at`/`released_by` 仍是 Reject 當下寫入的值（不是 null），`cancelled_at`/`cancelled_by`
+  才是新值；`inquire-events.service.spec.ts` 補一個對應案例，確認這個複合情境下 Inquire Events 顯示的
+  時間與 `reasonCode` 都完整反映兩段歷史，而不是只剩最後一次 EC。
+
 - [x] ~~**BAL-129**（🔵 Minor，Test Gap）— BAL-117 修的「泛用 500 handler 不外洩內部錯誤訊息」本身沒有測試覆蓋~~
   — **2026-08-25 已修復**。`test/unit/app.test.ts` 新增一則測試：`jest.spyOn` 讓 `service.resolveContract()`
   拋出一個帶有特徵字串的普通 `Error`（不是 `ApiError` 子類別，故意走 `app.ts` 錯誤 middleware 的
@@ -483,6 +521,10 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
 下兩筆 SG Issue，一筆先 Submit 後 Approve、另一筆後 Submit 先 Approve），到瀏覽器打開 Inquire Events
 親眼確認「後 Approve 的排在前面」——跟修改前的行為完全相反，親眼驗證過，不只是斷言通過。全程 Console
 無錯誤。完整過程記錄在文件 §7。
+
+- [ ] **BA Code Review 複查發現的既有缺陷**——見文件 §8：`released_at`/`released_by` 在 REJECTED→
+  CANCELLED 這條既有合法路徑上被靜默覆寫成 `null`，Reject 稽核時間消失。不擋本次上線，已另立
+  **BAL-143**（見第3節）獨立追蹤。
 
 ---
 

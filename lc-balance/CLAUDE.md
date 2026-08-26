@@ -1962,3 +1962,50 @@ tests: built a real scenario via direct microservice `curl` calls (two SG Issues
 Submit-then-Approve, the other Submit-second-Approve-first) and confirmed in the browser that Inquire
 Events lists the later-approved one first — the literal business requirement, not just a passing assertion.
 All three suites green (Angular 1174/1174, backend 38/38, microservice 585/585), zero console errors.
+
+## Fixed: A11/B7 Submit button stayed disabled after selecting an LC until reselected a second time (2026-08-26)
+
+User-reported live ("A11 選了 TESTREL01 輸入REASON AAAA後 SUBMIT BUTTON還是暗的 除非再選 1次TESTREL01 SUBMIT
+BUTTON才可以"; confirmed identical on B7). Root cause was in the Angular form layer, not `submit-rules.ts`'s
+own mandatory-field check (which was working correctly and reporting the true state): A11/B7's Amount field
+is hidden outright (`amountFromFixed`, `builder-fields.ts`) since the server always computes the real
+restoration amount at Submit — `onSelectContract()` (`maker-panel.component.ts`) sets a harmless `'0'`
+placeholder into `model.amount` purely because the wire schema requires some MonetaryAmount string, then
+calls `rebuildFields()` right after. `@ngx-formly/core`'s own `resetOnHide` defaults to `true`
+(`fieldconfig.d.ts`), and its `FieldExpressionExtension.changeHideState()` treats a freshly-built field that
+initializes already-hidden the same as one just toggled hidden — it wipes the model value on the very next
+change-detection cycle regardless. So the `'0'` was set, then silently erased a tick later, and
+`validateMandatoryFields()`'s `!model.amount` check correctly reported not-ready. A second reselection only
+"worked" by chance — Submit got clicked inside the brief window between the second `onSelectContract()` call
+setting `'0'` again and Formly's own async wipe catching up to it; it was never a real fix, just a race the
+user was consistently winning.
+
+Fix: explicit `resetOnHide: false` on the Amount field config (only place this needed setting — every other
+hidden-field case in `builder-fields.ts` either never carries a value while hidden, like AMEND_EXPIRY_DATE,
+or isn't cleared this way at all). Safe because `resetForFunction()` already replaces `model` wholesale on
+every function switch — nothing relies on Formly's own hide-triggered clearing to keep `amount` clean
+between functions.
+
+Same investigation surfaced a second, independently-reported live bug: A11's LC Index list could show a
+stale IB hint on an unrelated row (user: "S01 — B02" instead of plain "S01"). `catalogIbHint()`
+(`maker-panel.component.ts`) had no `selectedFunctionStrategy` guard — unlike its sibling
+`catalogPendingHint()` — so a `documentArrivalHints.catalogPayableIbs` entry left over from an earlier A4
+(Sight Settlement) selection in the same session (`resetForFunction()` never clears that map) kept
+rendering on every later catalog-picker function's rows, including A11/B7 which have no concept of a
+pending IB at all. Fixed with the same `releasesExistingMovementInPlace` guard `catalogPendingHint()`
+already uses.
+
+4 new/updated tests: `builder-fields.spec.ts` asserts `resetOnHide: false` on the Amount field for both
+A11 and B7; `maker-panel.component.spec.ts` adds an `isSubmitReady` A11/B7 pair that drives the real
+`onSelectContract()` → Reason Code flow end to end, and a `catalogIbHint` case proving a stale A4 entry
+stays suppressed after switching to A11 (the 3 pre-existing `catalogIbHint` tests updated to select A4
+first, since the new guard makes them otherwise return `''` with no function selected). Reproducing
+Formly's own async wipe itself would need a TestBed-rendered form (not this file's convention — direct
+instantiation + mocked services); the config-level `resetOnHide` assertion plus the live browser pass below
+are the two checks that actually cover the root cause. All three suites green (Angular 1179/1179, backend
+38/38, microservice 585/585). Live-verified in the browser for both A11 and B7: a genuine first click on
+the LC Index row now leaves `model.amount === '0'` in place (confirmed stable after a 1s wait, not just in
+the same tick), Submit enables right after typing Reason Code with no reselection needed, and a real Submit
+on B7 round-tripped through the microservice successfully (server-computed amount `9999`, not the `'0'`
+placeholder). The stale-hint fix was also confirmed live by injecting a leftover `catalogPayableIbs` entry
+onto A11's own selected contract and confirming `catalogIbHint()` now returns `''`. Zero console errors.

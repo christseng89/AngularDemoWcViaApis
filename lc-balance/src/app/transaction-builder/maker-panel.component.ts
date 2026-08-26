@@ -605,6 +605,10 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   catalogIbHint(c: BalanceContract): string {
+    // catalogPayableIbs is A4-only (see DocumentArrivalHintsService's own doc comment) but resetForFunction()
+    // never clears it on a function switch — without this guard, a leftover hint from an earlier A4 selection
+    // in the same session keeps rendering on every other catalog-picker function's rows too (e.g. A11/B7).
+    if (!this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) return '';
     const ibs = this.documentArrivalHints.catalogPayableIbs.get(c.balanceContractId);
     if (!ibs?.length) return '';
     return ibs.length === 1 ? ` — ${ibs[0]}` : ` — ${ibs.length} pending: ${ibs.join(', ')}`;
