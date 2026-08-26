@@ -453,40 +453,36 @@ Quality Gate FAILED → **PASSED**；Code Smells 59 → **44**；Technical Debt 
 
 ---
 
-## 9. Inquire Events 事件排序（Event Effective Order）——業務新提案，待工程可行性評估（2026-08-26）
+## 9. Inquire Events 事件排序（Event Effective Order）——業務提案，已評估並實作（2026-08-26）
 
-`analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-Proposal-zh.md`（新文件，BA 已依「先
-查證、後轉交工程」慣例核對過真實程式碼，業務描述與現況一致，不是誤解）。**現況：Pending Engineering
-Feasibility Assessment——尚未拍板，Balance Component 尚未開始任何修改**，本節只記錄需求與待評估問題。
+`analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-Proposal-zh.md`（BA 先查證程式碼、
+工程再逐項回覆 5 個評估問題、拍板選項 1 後同日實作完成）。
 
-- [ ] **業務建議**：Inquire Events（`inquire-events.service.ts`，與 `LookUpPanelService` 共用同一套
+- [x] ~~**業務建議**：Inquire Events（`inquire-events.service.ts`，與 `LookUpPanelService` 共用同一套
   `toEventRows()`）目前依 `movement.createdAt`（Maker Submit 時間）排序事件，業務認為應改成反映「交易
-  正式生效的先後順序」——**APPROVED/EARMARKED 事件依 Checker Release/Approval Time 排序，PENDING/
-  EARMARKING 事件（還沒有 Release 時間）則暫用 Maker Submit Time 兜底**。BA 已查證：現況確實
-  100% 用 `createdAt`（唯一既有例外是 A4 Sight Settlement 的 `create`/`finalize` 兩列拆分，屬窄範圍
-  設計，不是業務講的這種通則），用業務自己給的 EB001/EB002 範例回推也證實現況輸出跟業務期望不同。
+  正式生效的先後順序」——APPROVED/EARMARKED 依 Checker Release/Approval Time 排序，PENDING/EARMARKING
+  暫用 Maker Submit Time 兜底~~ — **已實作**。`toEventRows()` 的 `'primary'` phase（絕大多數事件）
+  `eventTime` 改用新函式 `effectiveEventTime(movement) = movement.releasedAt ?? movement.cancelledAt
+  ?? movement.createdAt`——只改這一處，`InquireEventsService`/`LookUpPanelService` 兩邊排序與顯示的
+  TIME 欄位就同時反映新規則（兩邊本來就共用同一個 `toEventRows()`，不需要各自改 `.sort()`）。A4 既有
+  `'create'`/`'finalize'` 兩列拆分維持原樣不動。
 
-- [ ] **範圍界定是關鍵決策點，兩個選項風險/工作量差很多**：
-  1. **僅顯示層**（Inquire Events + LookUpPanelService 的 Event Timeline）——排序鍵從 `createdAt`
-     改成「已 Release 用 `releasedAt`、否則用 `createdAt`」的混合鍵，**不動**冪等鍵設計
-     （`eventSeq` 仍在 Maker Submit 當下生成、Release 不改寫，Design doc §8 不變）。風險/工作量小。
-  2. **連同 Balance 計算引擎本身**——BA 額外查證發現 `eventSeq` 不只是顯示排序鍵，同時是
-     `confirmedBalance`/`availableBalance`（`balanceService.ts:754` 的 `listByContract()` 排序）、
-     `asOfEventSeq` 時點快照（`balanceService.ts:959-989`）、REOPEN 還原金額計算
-     （`domain/reopenRestoration.ts:29-30`，F1 這次 Session 才新增）共用的權威時間序假設——業務原始
-     建議並未觸及這一層，是 BA 主動點名工程部門一併評估的範圍。若要同步套用「以 Release 時間為準」
-     到這裡，牽動 Design doc §8 冪等鍵設計核心，屬架構層級變更。**BA 建議先只評估選項 1，選項 2
-     不建議未經評估就動手**。
+- [x] ~~**範圍界定**~~ — **採用選項 1（僅顯示層）**，選項 2（Balance 計算引擎本身的
+  `confirmedBalance`/`availableBalance`/`asOfEventSeq`/REOPEN 還原金額）**未動**，`eventSeq`／冪等鍵
+  （Design doc §8）完全未變更，符合 BA 原本「選項 2 不建議未經評估就動手」的建議。
 
-- [ ] **BA 交予工程部門的 5 個評估問題**（原文件 §4，待回覆，非最終決定）：範圍界定（同上）；冪等鍵
-  是否需要調整（BA 自己的判斷是選項 1 不需要，待工程確認）；混合排序鍵的邊界情況（同一批事件裡
-  已 Release／還 PENDING 的時間軸本質不同，UI 上要不要額外標示「含尚未生效項目」）；A4 既有的
-  `create`/`finalize` 拆分特例是否會跟新規則衝突（需要一併檢視 `toEventRows()`）；REJECT/CANCEL
-  事件該用哪個時間戳排序（業務規則只講到 APPROVED/PENDING 兩種狀態，`releasedAt` 欄位在 REJECT
-  時語意上是「第二動作的時間」，不限定於核准，需要業務確認規則是否也適用 REJECT 情境）。
+- [x] ~~**BA 交予工程部門的 5 個評估問題**~~ — 全數回覆並記錄於文件 §6（範圍界定、冪等鍵不需調整、
+  混合鍵邊界情況的具體實作方式、A4 特例不衝突且是既有先例、REJECT 沿用 `releasedAt`）。**額外發現
+  一個 BA 文件沒提到的欄位**：Maker 自己 EC/Cancel 是獨立的 `cancelledAt`（不是 `releasedAt`），已
+  一併納入 `effectiveEventTime()` 的判斷順序，不需要另外請示業務。
 
-**下一步**：本節五個問題需要先回覆/評估過（尤其範圍界定），業務或工程才能拍板要不要動手、動多大——
-在那之前不建議直接開始實作。若之後有拍板決定，依專案慣例回填本節並同步 `CLAUDE.md` 決策日誌。
+**驗證**（依 `CLAUDE.md` Standing Rule「every code change gets unit tests + a live functional pass」）：
+新增 3 筆 `inquire-events.service.spec.ts` 測試（逐字重現業務 EB001/EB002 範例、PENDING 事件仍用
+`createdAt`、`cancelledAt` 的獨立分支），Angular 1171→**1174**，三套測試全綠（Angular 1174/1174、
+backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外用 `curl` 直接建了一個真實情境（同 LC
+下兩筆 SG Issue，一筆先 Submit 後 Approve、另一筆後 Submit 先 Approve），到瀏覽器打開 Inquire Events
+親眼確認「後 Approve 的排在前面」——跟修改前的行為完全相反，親眼驗證過，不只是斷言通過。全程 Console
+無錯誤。完整過程記錄在文件 §7。
 
 ---
 

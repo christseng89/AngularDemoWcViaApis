@@ -196,6 +196,62 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter });
     });
 
+    it('orders a primary-phase RELEASED event by Checker Release Time, not Maker Submit Time — reproduces the business-directed EB001/EB002 example verbatim (2026-08-26)', () => {
+      // Business example: EB001 Submit 10:00 / Approve 10:30; EB002 Submit 10:10 / Approve 10:20 — EB002
+      // approved FIRST despite submitting SECOND, so it must be listed first.
+      const root = makeContract({ instrumentType: 'IPLC_LC' });
+      const eb001 = makeMovement({
+        movementId: 'mv-eb001',
+        status: 'RELEASED',
+        createdAt: '2026-08-26T10:00:00.000Z',
+        releasedAt: '2026-08-26T10:30:00.000Z',
+      });
+      const eb002 = makeMovement({
+        movementId: 'mv-eb002',
+        status: 'RELEASED',
+        createdAt: '2026-08-26T10:10:00.000Z',
+        releasedAt: '2026-08-26T10:20:00.000Z',
+      });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([eb001, eb002])) });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+
+      expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-eb002', 'mv-eb001']);
+      expect(svc.events.map((e) => e.eventTime)).toEqual([eb002.releasedAt, eb001.releasedAt]);
+    });
+
+    it('a still-PENDING primary-phase event (no releasedAt/cancelledAt yet) keeps ordering by Maker Submit Time', () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC' });
+      const pending = makeMovement({ movementId: 'mv-pending', status: 'PENDING', createdAt: '2026-08-26T09:00:00.000Z', releasedAt: undefined });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([pending])) });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+
+      expect(svc.events[0].eventTime).toBe(pending.createdAt);
+    });
+
+    it("a Maker's own EC/Cancel (cancelledAt, distinct from releasedAt) is treated as the second-actor time too — a BA-doc gap this feature's own feasibility assessment found and closed", () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC' });
+      const cancelled = makeMovement({
+        movementId: 'mv-cancelled',
+        status: 'CANCELLED',
+        createdAt: '2026-08-26T09:00:00.000Z',
+        cancelledAt: '2026-08-26T09:05:00.000Z',
+        releasedAt: undefined,
+      });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([cancelled])) });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+
+      expect(svc.events[0].eventTime).toBe(cancelled.cancelledAt);
+    });
+
     it("a 'finalize' row falls back to eventSnapshot when finalizeEventSnapshot is null (a movement created before that field existed)", () => {
       const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
       const utilizeMovement = makeMovement({ movementType: 'UTILIZE', status: 'RELEASED', releasedAt: '2026-08-17T15:00:00.000Z', eventSnapshot: makeSnapshot({ confirmedBalance: '55555' }), finalizeEventSnapshot: null });

@@ -90,6 +90,20 @@ export function secondaryReferenceForEvent(event: InquiredEvent): string {
   return '—';
 }
 
+/**
+ * Business-directed 2026-08-26 ("APPROVED/EARMARKED events are ordered by Checker Release/Approval Time
+ * ... PENDING/EARMARKING events ... should use Maker Submit Time until a Checker Release/Approval Time
+ * becomes available") — see `analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-
+ * Proposal-zh.md` §6 for the full engineering feasibility assessment this implements (display-layer
+ * only; `eventSeq`/idempotency/Balance calculation engine deliberately untouched). A second-actor time
+ * (`releasedAt`, covering RELEASED/REJECTED per `toEventRows()`'s own established convention; `cancelledAt`
+ * for a Maker's own EC — a BA-doc gap this assessment's own §6.5 found and closed) always wins once
+ * present; a still-PENDING/EARMARKING movement (neither set) falls back to `createdAt`.
+ */
+function effectiveEventTime(movement: BalanceMovement): string {
+  return movement.releasedAt ?? movement.cancelledAt ?? movement.createdAt;
+}
+
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
   const isFinalizedSightUtilize =
     contract.instrumentType === 'IPLC_LC' &&
@@ -98,8 +112,12 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
     movement.status !== 'PENDING' &&
     !!movement.releasedAt;
   if (!isFinalizedSightUtilize) {
-    return [{ movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'primary' }];
+    return [{ movement, contract, eventTime: effectiveEventTime(movement), eventStatus: movement.status, phase: 'primary' }];
   }
+  // A4's own pre-existing 'create'/'finalize' split is a narrower, already-proven instance of the SAME
+  // rule above — 'finalize' already used releasedAt before this change, unaffected; 'create' deliberately
+  // stays createdAt (the real historical A3/A3S submission moment), not effectiveEventTime(), as this
+  // assessment's own §6.4 concluded.
   return [
     { movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'create' },
     { movement, contract, eventTime: movement.releasedAt as string, eventStatus: movement.status, phase: 'finalize' },

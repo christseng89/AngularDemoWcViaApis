@@ -187,3 +187,134 @@ Balance Component Change: Not yet started — awaiting engineering's scope/impac
 *本文件由 BA 依專案「先查證、後轉交工程」慣例撰寫，內容為新建文件（無既有文件可附加），日後若有
 後續討論或工程部門回覆，請依專案 append-only 慣例以日期標注方式附加於本文件末端，不要覆寫以上
 內容。*
+
+---
+
+## 6. 工程可行性評估（2026-08-26，逐項回覆 §4 的 5 個問題）
+
+依專案慣例（不盲目採信/否決 BA 主張，逐項對照真實程式碼查證後才回覆）。**本節純屬分析與建議，未變更
+任何程式碼**——仍待業務/BA 拍板後才會實作。
+
+### 6.1 回覆問題 1（範圍界定）——明確建議：只做選項 1（顯示層），選項 2（引擎層）不建議現在做
+
+除了 BA 已查證的 `listByContract()`（`balanceService.ts:754`，供 `confirmedBalance`/`availableBalance`
+迭代）、`asOfEventSeq`（`balanceService.ts:986`）、`computeReopenRestoreAmount()`
+（`domain/reopenRestoration.ts:29-30`）三處，我額外查證了 `domain/balanceDerivation.ts` 裡
+`computeConfirmedBalance()`/`computeAvailableBalance()`/`computePendingDecreaseTotal()` 的實際實作：
+三者都是單純的 `.reduce()` 加總（`signedAmount()` 用 `Map` 依 `movementId` 查找，不依賴陣列順序）——
+**加總本身是順序無關的**，只要參與加總的集合（哪些是 RELEASED、哪些是 PENDING）不變，`eventSeq`
+排序方式改變並不會改變 `confirmedBalance`/`availableBalance`/`pendingDecreaseTotal` 這幾個數字本身，
+只會改變 `listByContract()` 回傳陣列的「顯示/疊代順序」。
+
+真正**會**因為 `eventSeq` 定義改變而改變**數值結果**的，只有兩處：
+
+1. **`asOfEventSeq`（時點快照，`balanceService.ts:981-992`）**——這是門檻比較（`m.eventSeq <= asOfEventSeq`），
+   不只是相對順序，`eventSeq` 的**絕對值**本身就是「時點」的定義。目前語意是「這筆交易 Maker Submit
+   當下，所有已存在的交易」；如果改成 Checker Release 時才決定 `eventSeq`，語意會變成「這筆交易
+   Checker Approve 當下，所有已存在的交易」——這是兩個**不同的業務問題**，而且一筆還在 PENDING、
+   根本沒有 Release Time 的交易，無法定義它自己的 `asOfEventSeq` 該是多少，需要重新設計。
+2. **`computeReopenRestoreAmount()`（REOPEN 還原金額，`domain/reopenRestoration.ts:29-30`）**——這裡
+   真的是「依 `eventSeq` 排序後，從最後一筆往前走，直到遇到非 EXPIRE/CLOSE 為止」，是貨真價實的
+   順序相依邏輯。若 Submit 順序與 Release 順序不一致（業務範例本身就是這種情境），改變 `eventSeq`
+   語意可能改變「最近一筆」的判定，進而改變還原金額——這是 F1 這次 Session 才新增的邏輯，還沒有
+   通過長時間實戰驗證，改動風險評估難度較高。
+
+**建議**：明確只做選項 1（顯示層），**不建議**現在把 §2.3 的引擎層也一併改——不是因為做不到，而是
+「數值計算本身多數不受影響，真正受影響的兩處（`asOfEventSeq`、REOPEN 還原）語意都會質變，需要各自
+重新設計，不是把同一個排序鍵套用過去就好」，投入產出比很低，且業務目前提出的原始需求（Inquire
+Events 顯示順序）用選項 1 就能完全滿足。
+
+### 6.2 回覆問題 2（冪等鍵是否需要調整）——確認：選項 1 完全不需要動冪等鍵設計
+
+BA 自己的判斷正確，且經上述 6.1 查證後更確定：選項 1 只是把 Inquire Events／LookUpPanelService 這兩個
+**純顯示層**服務裡 `toEventRows()`/`movementsOf$()` 回傳的 `eventTime` 欄位，從單純 `movement.createdAt`
+改成「已 Release/Reject/Cancel 用對應的第二動作時間、否則用 `createdAt`」的混合鍵——`eventSeq` 本身
+（Design doc §8 冪等鍵，`(balanceContractId, eventSeq)` DB UNIQUE constraint，Maker Submit 當下由
+`Date.now()` 產生、Release 永不改寫）**完全不需要變更**，資料庫層的唯一性/冪等保證不受影響。
+
+### 6.3 回覆問題 3（混合排序鍵邊界情況）——具體建議實作方式
+
+建議排序鍵定義為 `event.releasedAt ?? event.createdAt`（見 6.5 對 `cancelledAt` 的補充，實際應為
+`event.releasedAt ?? event.cancelledAt ?? event.createdAt`），並在 UI 上對「排序鍵取自 `createdAt`
+（即仍是 PENDING/EARMARKING，尚未有第二動作時間）」的列，加一個視覺標示（例如既有 `.tb-status-badge`
+系統已經用顏色/圖示區分 PENDING vs APPROVED，可以直接複用，不需要新元件）——這樣列表本身的排序已經
+反映「已生效的事件」跟「尚未生效、僅供參考的事件」是兩條不同時間軸，不需要額外文字提示，跟現有
+`displayStatus()`/`statusBadgeClass()` 的既有慣例一致。
+
+### 6.4 回覆問題 4（A4 既有特例是否衝突）——確認：不衝突，A4 本身就是這個規則的既有先例
+
+查證 `toEventRows()`（`inquire-events.service.ts:93-107`）：A4（Sight Settlement）finalize 既有 A3/A3S
+UTILIZE 時，`'create'` 列用 `movement.createdAt`（原始 A3 Submit 時間），`'finalize'` 列用
+`movement.releasedAt`（A4 Release 時間）——**這正是業務這次要求的通則「APPROVED 用 Release 時間」的
+一個既有、範圍較窄的先例**，只是目前只套用在這一種特殊情境（一筆 movement 被兩個動作完成）。
+**不會衝突**：套用新規則後，`'finalize'` 列的排序鍵本來就已經是 `releasedAt`，跟新規則算出來的值
+完全一樣；`'create'` 列本來就該保持 `createdAt`（代表 A3 這個真實發生過的歷史事件本身，不該因為
+A4 之後才 Release 就往後移），這點新規則也不會去動它——`toEventRows()` 這個函式**不需要修改**，
+只有 `loadEvents()`/`LookUpPanelService` 呼叫端的排序邏輯（目前直接讀 `eventTime`）需要改成讀新的
+混合鍵。反而是這個既有先例證明了「用 Release 時間排序」這個做法在這個 codebase 裡已經穩定運作過。
+
+### 6.5 回覆問題 5（REJECT/CANCEL 排序基準）——確認 BA 判斷成立，但發現一個 BA 文件未提及的欄位
+
+BA 原文件已指出 `releasedAt` 在 REJECT 時也會被寫入，語意是「第二動作時間」不限於核准，`toEventRows()`
+自己的既有 doc comment 也這樣寫（"`releasedAt` is reused for any second-actor outcome
+(release/reject/cancel)"）——查證 `statusTransition.ts`/`balanceMovementStore.ts` 的 `reject()` 呼叫
+路徑確認屬實，這部分業務規則可以直接沿用到 REJECT。
+
+**但發現一個 BA 文件沒提到的欄位**：Maker 自己的 EC/Cancel（`cancel()`）**不是**寫入 `releasedAt`，而是
+寫入獨立的 `cancelledAt`/`cancelledBy`（`types.ts:221-222`；`CLAUDE.md` 決策日誌「Submit/EC/Approve
+audit trail — `cancelledBy`/`cancelledAt` split out from `releasedBy`/`releasedAt`」條目——這是為了讓
+Submit/EC/Approve 三件事各自獨立可查而刻意拆開的，`toEventRows()` 目前完全沒有讀取這個欄位）。
+如果新排序規則要涵蓋「Maker 自己 EC 掉的 PENDING 交易」，混合鍵必須是
+`releasedAt ?? cancelledAt ?? createdAt`，不能只看 `releasedAt`——否則一筆已經被 Maker EC 掉的交易，
+排序鍵會錯誤地退回 `createdAt`（EC 動作本身的時間點反而沒被反映）。**建議把這一點一併納入選項 1 的
+實作範圍**，不需要另外請示業務——這純粹是把 BA 自己講的「第二動作時間」原則正確套用到 EC 這個既有的
+第二動作類型上，不是新增業務規則。
+
+### 6.6 總結建議
+
+| 問題 | 結論 |
+|---|---|
+| 範圍 | 只做選項 1（顯示層），選項 2（引擎層）不建議現在做——真正受影響的只有 `asOfEventSeq`/REOPEN 還原，且都需要各自重新設計語意，投入產出比低 |
+| 冪等鍵 | 確認不需要調整 |
+| 混合鍵邊界 | 排序鍵 = `releasedAt ?? cancelledAt ?? createdAt`；PENDING 列沿用既有 status badge 視覺區分，不需要額外文字提示 |
+| A4 特例 | 不衝突，`toEventRows()` 本身不用改，只需改呼叫端的排序邏輯；A4 本身就是這個規則已驗證過的先例 |
+| REJECT/CANCEL | REJECT 沿用 `releasedAt` 沒問題；**新發現**：CANCEL 要讀 `cancelledAt`（獨立欄位），BA 原文件未提及 |
+
+實作範圍明確後，工作量很小：`inquire-events.service.ts`/`look-up-panel.service.ts` 各自的排序 `.sort()`
+呼叫（`inquire-events.service.ts:361`、`look-up-panel.service.ts:312`）改成讀一個新的
+`effectiveEventTime(event)` 共用函式（比照 `functionForEvent()`/`secondaryReferenceForEvent()` 既有
+「兩個服務共用同一個 free function，避免各自實作出現分歧」的慣例），不動 `toEventRows()`／
+`eventSeq`／冪等鍵／Balance 計算引擎。**仍待業務/BA 對這份評估拍板後才會動手實作，本次未寫任何
+程式碼。**
+
+---
+
+## 7. 實作完成（2026-08-26，同日，使用者拍板選項 1 後實作）
+
+依 §6 評估的方案 1（僅顯示層）實作，範圍比 §6.6 原本設想的還更小——**不需要**在兩個服務的
+`.sort()` 呼叫端各自加一個新函式，因為 `look-up-panel.service.ts` 本來就是透過 `movementsOf$()`／
+`childMovementsOf$()` 呼叫 `inquire-events.service.ts` 匯出的 `toEventRows()`，兩邊排序也都是直接讀
+`InquiredEvent.eventTime`——只要在 `toEventRows()` 內部把 `'primary'` phase 的 `eventTime` 計算改成
+`effectiveEventTime(movement) = movement.releasedAt ?? movement.cancelledAt ?? movement.createdAt`，
+兩個服務的排序與顯示（TIME 欄位本身，不只是排序順序）就會**同時**改變，完全不需要碰兩個服務各自的
+`.sort()` 呼叫或新增外部函式。`'create'`/`'finalize'`（A4 既有拆分）維持原樣，如 §6.4 所述。
+
+**與 §6.5 的差異**：§6.5 原本建議 `releasedAt ?? cancelledAt ?? createdAt`，實作時確認欄位優先序
+正確——`releasedAt`／`cancelledAt` 互斥（一筆 movement 不會同時有兩者），故先後順序寫成
+`releasedAt ?? cancelledAt` 或反過來寫都不影響結果，這裡維持 §6.5 原建議的寫法。
+
+**測試**（依專案 Standing Rule「every code change gets unit tests + a live functional pass」）：
+- 新增 3 筆 `inquire-events.service.spec.ts` 測試：逐字重現業務原文的 EB001/EB002 範例
+  （Submit 10:00/10:10、Approve 10:30/10:20，驗證排序輸出是 EB002 先、EB001 後）、還在 PENDING
+  的事件仍用 `createdAt` 排序、Maker 自己 EC/Cancel 的事件改用 `cancelledAt` 排序（§6.5 發現的
+  欄位）。Angular 全套測試 1171→**1174**，三套測試套件全綠（Angular 1174/1174、backend 38/38、
+  微服務 585/585，微服務/backend 本來就不受影響，純 Angular 端改動）。
+- **即時 API + 瀏覽器雙重驗證**：先用 `curl` 直接對微服務建了一個真實情境——同一張 LC 底下兩筆 SG
+  Issue（SGORD01 先 Submit 後 Approve；SGORD02 後 Submit 但先 Approve，時間差刻意錯開重現業務範例的
+  形狀），再到瀏覽器打開 Inquire Events 畫面實際檢視——**SGORD02 確實排在 SGORD01 之前**，跟修改前
+  （會照 createdAt 排 SGORD01 在前）完全相反，親眼確認業務要的效果，不只是單元測試斷言。全程
+  Console 無錯誤。
+
+**未變更**：`eventSeq`、冪等鍵、Balance 計算引擎（`confirmedBalance`/`availableBalance`/
+`asOfEventSeq`/REOPEN 還原金額）、`toEventRows()` 的 `'create'`/`'finalize'` 分支——完全符合 §6.1
+的範圍界定建議。

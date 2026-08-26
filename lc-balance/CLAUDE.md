@@ -237,6 +237,16 @@ coverage floor.
 New decision-log entries here, and any code/doc comment documenting a change, should stay to ~2 lines —
 no dates, no quoted instructions, no verification narrative. State only the surviving rule/invariant.
 
+## Standing rule: every code change gets unit tests + a live functional pass — not just "tests still pass"
+
+User-directed 2026-08-26 ("記得測試 UNIT測試 測試案例測試 API測試 瀏覽器測試等" — recorded here so this
+never needs repeating). Before calling any code change in this sub-project done: (1) add/update Jest specs
+covering the new behavior, not just re-run the existing suite; (2) all three suites green (per the standing
+rule above); (3) exercise the actual change live — a direct `curl`/API call against the running microservice
+for a backend/domain change, and/or a real browser walkthrough (`ng serve`, click through the affected
+screen) for anything touching the Angular app — console/network checked for errors, not just "it compiled."
+Static checks (`tsc`, `ng build`) and a passing test suite are necessary but not sufficient on their own.
+
 - **`InstrumentType`**: `IPLC_LC`, `EPLC_LC`, `IPLC_ACCEPTANCE`, `EPLC_ACCEPTANCE`, `SHGT`,
   `EPLC_CONFIRMATION`, plus `EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/
   `EPLC_EXPORT_BILLS_DISCOUNTED` (asset-side counterparts a Confirmation transforms into on Honour/Accept;
@@ -1927,3 +1937,28 @@ Verified: all three suites green throughout (Angular 1171/1171, backend 38/38, m
 coverage regression), plus a live browser walkthrough (A1 Issue→Release, A8 SG Issue→Release, A9 SG Full
 Redeem→Release, A10 LC Close→Release) confirming the `release()`/`submit-rules.ts`/`builder-fields.ts`
 refactors behave identically in the running app — zero console errors.
+
+## Inquire Events now orders events by Checker Release/Approval Time, not Maker Submit Time (2026-08-26)
+
+Business-directed; BA verification + engineering feasibility assessment (options, 5 answered questions,
+one BA-doc gap found) both in `analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-
+Proposal-zh.md` §6, implementation in §7. Display-layer only, per that assessment's own recommendation —
+`eventSeq`/idempotency (Design doc §8) and the Balance calculation engine (`confirmedBalance`/
+`availableBalance`/`asOfEventSeq`/REOPEN restoration) are deliberately untouched.
+
+`toEventRows()`'s `'primary'`-phase `eventTime` now reads a new `effectiveEventTime(movement) =
+movement.releasedAt ?? movement.cancelledAt ?? movement.createdAt` instead of always `createdAt` — since
+`InquireEventsService`/`LookUpPanelService` already share this one function (via `movementsOf$()`), both
+screens' ordering AND displayed TIME column change together with this one edit; no change needed to either
+service's own `.sort()` call site. A4's existing `'create'`/`'finalize'` split is untouched (already used
+`releasedAt` for `'finalize'` before this change — a narrower, already-proven precedent for the same rule).
+`cancelledAt` (a Maker's own EC, a separate field from `releasedAt` per the earlier "Submit/EC/Approve audit
+trail" decision) was a gap the business's own proposal doc didn't cover — closed without needing to ask,
+since it's the same "second-actor time" principle applied to an existing second-actor type.
+
+3 new tests in `inquire-events.service.spec.ts` (the business's own EB001/EB002 worked example reproduced
+verbatim, a still-PENDING event keeps using `createdAt`, `cancelledAt` fallback). Live-verified beyond unit
+tests: built a real scenario via direct microservice `curl` calls (two SG Issues on one LC, one
+Submit-then-Approve, the other Submit-second-Approve-first) and confirmed in the browser that Inquire
+Events lists the later-approved one first — the literal business requirement, not just a passing assertion.
+All three suites green (Angular 1174/1174, backend 38/38, microservice 585/585), zero console errors.
