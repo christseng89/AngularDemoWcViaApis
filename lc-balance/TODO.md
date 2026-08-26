@@ -400,6 +400,49 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 
 ---
 
+## 8. SonarQube 實際掃描發現（2026-08-26，`lc-balance/SonarQube-scan-report.md`）
+
+Docker 上真實 SonarQube 9.9.8 LTS 掃描（`sonarsource/sonar-scanner-cli:5.0.1`，非人工 code review），對照
+`SonarQube-report2.md`（2026-08-20 上次掃描）逐項比較。Bugs/Vulnerabilities/未複核 Security Hotspots 三項
+維持 0，Reliability/Security/Maintainability/Security Review 四個 Rating 全維持 A——沒有退步；以下只收錄
+這次掃描發現、值得排入待辦的項目，完整數據見報告檔案本身。
+
+- [ ] **Quality Gate 現在是 FAILED（ERROR）**——6 個條件中唯一沒過的是 **New Duplicated Lines Density
+  5.15%（門檻 ≤3%）**，相對上次掃描的 2.17% PASS 是真退步。已追查根本原因：`backend/data/
+  businessCases.js` 一家佔全部重複行數的 81%（2,057/2,532 行，從上次的 732 行暴增），因為 Business
+  Case Registry 從 ~21 案增加到 27 案，加上這幾天兩次「全 27 案都要補欄位」的機械式修改
+  （`expiryDate`/`tenorType`/`sourceTransactionRef`/`reasonCode`），讓本來就相似的案例區塊變得更相似
+  ——這是 BAL-127 已經拍板的「每案獨立可讀」設計取捨的直接後果，不是設計退步。另外今天新增的
+  `domesticCalendar.ts`（微服務）／`domestic-calendar.ts`（Angular）這對檔案也貢獻了一小段（67-71 行）
+  刻意手動同步的跨檔案重複（兩個獨立部署專案，設計上就是複製而非共用 import）。**需要決策**：(a) 幫
+  這個專案調高 New Duplicated Lines Density 門檻（例如到 12-15%），註明理由指向 BAL-127；或
+  (b) 把 `backend/data/businessCases.js` 加進 `sonar.cpd.exclusions`，讓門檻繼續對真正的原始碼有意義。
+  **不建議**真的去重構 `businessCases.js` 消除重複——會違背 BAL-127 已拍板的「每案獨立可讀」設計，屬於
+  重新翻案已解決的決策。兩個選項都只需要改 `sonar-project.properties`，不涉及應用程式邏輯改動。
+
+- [ ] **`microservices/balance-component/src/service/balanceService.ts:1737`（`release()`）Cognitive
+  Complexity 93，全案最高**——超越上次掃描最高的 `createMovement()`（71，已於 BAL-142 拆解降複雜度，
+  這次掃描已不在榜上）。`release()` 複雜度飆高的原因是這幾天陸續加的 Checker 端防禦性複查
+  （`assertExpiryDateRequired`/`assertExpiryDateIsBusinessDay`/`assertNaturalKeyFieldsRequired`/
+  `assertSecondaryRefRequired`/`assertTenorRequired`/`assertReasonCodeRequired`/
+  `assertMakerCheckerSeparation`/`isSightUtilizeFinalize` 快照路由）全部堆在同一個方法裡——跟
+  `createMovement()` 被 BAL-142 拆解前的「防禦性複查逐漸堆積」是同一種模式。建議比照 BAL-141/BAL-142
+  的做法（table/registry 取代條件鏈）做一次同等的拆解。非 Quality Gate 卡關項，屬於維護性債務。
+
+- [ ] **7 個 `Web:AvoidCommentedOutCodeCheck` 誤判，上次掃描就建議標記 False Positive，至今仍未標記**
+  ——這次掃描重新逐一核對過，全部仍是誤判（本專案慣例的長篇說明式 doc comment，不是真的被註解掉的
+  程式碼）：`account-entries-dialog.component.html:1`、`inquire-events.component.html:8,144`、
+  `maker-panel.component.html:18,187,215,789`（後兩個 `inquire-events.component.html` 位置是新的，
+  隨 2026-08-21 Part B 抽出 `InquireEventsComponent` 才出現）。直接在 SonarQube UI 上標記
+  「Won't Fix / False Positive」即可，不需要改程式碼，純粹是清掉之後掃描的雜訊。
+
+- [ ] **持續存在、非阻擋的次要維護性項目**（兩次掃描都出現、都還沒處理，優先度低於上面三項）：
+  `submit-rules.ts:56`（Cognitive Complexity 60）、`builder-fields.ts:24`（63）——這兩個是重複出現的
+  複雜度離群值；`maker-panel.component.ts` 裡 4 筆 `S1871`（重複的條件分支內容，L499/L505/L925/L928）
+  ——這兩次掃描都在同一個檔案，只是行號隨檔案成長而位移，分支內容從未真正整併過。
+
+---
+
 ## 備註
 
 - 除以上項目外，`transaction-builder.component.ts`「God Component」(BAL-003) 已於 2026-08-21 正式收尾，
