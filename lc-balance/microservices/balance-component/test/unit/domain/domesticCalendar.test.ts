@@ -45,4 +45,8 @@ describe('domesticNonBusinessDayReason', () => {
   test('a genuine business day in an out-of-range year passes (no holiday to false-match, and it is not a weekend)', () => {
     expect(domesticNonBusinessDayReason('2099-01-05')).toBeNull(); // Monday
   });
+
+  test('reports Saturday/Sunday, not the holiday name, when a fixed statutory holiday falls on a weekend — matches business-days-mock/server.js check order', () => {
+    expect(domesticNonBusinessDayReason('2027-10-10')).toBe('Saturday/Sunday'); // 國慶日, a Sunday
+  });
 });

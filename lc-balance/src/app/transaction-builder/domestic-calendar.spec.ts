@@ -37,4 +37,9 @@ describe('domesticNonBusinessDayReason', () => {
   it('returns null for a genuine business day', () => {
     expect(domesticNonBusinessDayReason('2026-01-08')).toBeNull();
   });
+
+  it('reports Saturday/Sunday, not the holiday name, when a fixed statutory holiday falls on a weekend', () => {
+    // 2027-10-10 (國慶日) is a Sunday — weekend is checked first, matching business-days-mock/server.js.
+    expect(domesticNonBusinessDayReason('2027-10-10')).toBe('Saturday/Sunday');
+  });
 });

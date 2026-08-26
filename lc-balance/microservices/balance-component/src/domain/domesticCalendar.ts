@@ -82,10 +82,15 @@ export function knownHolidayName(dateStr: string): string | null {
   return HOLIDAYS_BY_DATE.get(dateStr) ?? null;
 }
 
-/** `null` when `dateStr` is a genuine domestic business day; otherwise a human-readable reason ("Saturday/Sunday" or the holiday's own name) suitable for a rejection message. */
+/**
+ * `null` when `dateStr` is a genuine domestic business day; otherwise a human-readable reason
+ * ("Saturday/Sunday" or the holiday's own name) suitable for a rejection message. Checks weekend
+ * BEFORE holiday (cheap day-of-week arithmetic vs. a Map lookup) — matches
+ * `microservices/business-days-mock/server.js`'s own check order; a fixed statutory holiday that
+ * happens to fall on a weekend (e.g. 2027-10-10, 國慶日/Sunday) reports "Saturday/Sunday" here, same as
+ * that mock. Either order reaches the same accept/reject outcome — only the reported reason text differs.
+ */
 export function domesticNonBusinessDayReason(dateStr: string): string | null {
-  const holidayName = knownHolidayName(dateStr);
-  if (holidayName) return holidayName;
   if (isWeekend(dateStr)) return 'Saturday/Sunday';
-  return null;
+  return knownHolidayName(dateStr);
 }

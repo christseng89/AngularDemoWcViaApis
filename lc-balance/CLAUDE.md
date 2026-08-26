@@ -1882,3 +1882,15 @@ shows the correct final text once both resolve, never the false-negative flash. 
 green (added dedicated `Subject`-based tests in `catalog-picker.service.spec.ts`/
 `maker-panel.component.spec.ts`, since the existing synchronous `of(...)`-based tests can never reproduce
 an in-flight window).
+
+## `domesticNonBusinessDayReason()` check order unified — weekend before holiday, matching `business-days-mock/server.js`
+
+Reviewer-reported 2026-08-26: the Expiry Date domestic-business-day rule's own `domesticCalendar.ts`
+(microservice) / `domestic-calendar.ts` (Angular mirror) checked holiday before weekend, the opposite
+order from its sibling `business-days-mock/server.js`. Never a wrong accept/reject outcome — only the
+reported reason text differs when a fixed statutory holiday happens to land on a weekend (e.g. 2027-10-10,
+國慶日/Sunday: old order reported "國慶日", the mock reported "Saturday/Sunday"). Reordered both copies to
+check weekend first (cheap day-of-week arithmetic) before the holiday Map lookup, for performance parity
+with the mock as well as consistent messaging. New regression test in both `domesticCalendar.test.ts` and
+`domestic-calendar.spec.ts` pins the 2027-10-10 case. All three suites re-run green (Angular 1171,
+backend 38, microservice 585).
