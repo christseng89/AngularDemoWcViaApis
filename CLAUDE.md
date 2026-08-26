@@ -275,7 +275,7 @@ touching this logic):
 | Process | Port | Serves |
 |---|---|---|
 | `ng serve` (this project) | 4200 | The Angular app itself |
-| `backend/` (Express) | 4300 | Node.js 中台 orchestrator — sequences calls into the microservice per a declarative Business Case Registry (Import Case 1-5, Export Case 1-5, `backend/data/businessCases.js`) so the UI can run/replay a whole scenario in one click (`GET /api/business-cases`, `POST /api/business-cases/:id/run`) |
+| `backend/` (Express) | 4300 | Node.js 中台 orchestrator — sequences calls into the microservice per a declarative Business Case Registry (Import/Export Cases, `backend/data/businessCases.js`) so the UI can run/replay a whole scenario in one click (`GET /api/business-cases`, `POST /api/business-cases/:id/run`) — the exact case count grows frequently, check `lc-balance/CLAUDE.md`'s own decision log for the current total rather than assuming a number here is still accurate |
 | `microservices/balance-component/` (Express/TS) | 4100 | `POST /balance-movements` + `GET /balance-contracts/*` — the actual Balance Component ledger |
 
 `proxy.conf.json` forwards `/api/*` → `:4300` and `/balance-component/*` → `:4100` (rewriting the prefix
