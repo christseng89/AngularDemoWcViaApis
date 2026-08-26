@@ -2021,3 +2021,22 @@ into 2). All three suites green (Angular 1181/1181, backend 38/38, microservice 
 against the real reported data (LC S05, dev DB): now shows exactly 3 rows, no duplicate REJECTED; LC S01's
 own genuinely-finalized Sight Document Arrivals (B01/B02) still correctly show as 2 rows each
 (EARMARKED → APPROVED). Zero console errors.
+
+## Business Case Runner — "Cleanup Database Tables" button (dev-only), standalone addition
+
+User-requested, minimum-changes: a button after the Business Case picker wipes every
+`balance_movements`/`balance_contracts` row so a fresh sequence of Business Cases can run without
+natural-key collisions. Three standalone, additive pieces — no existing route/method/component logic
+touched: microservice `app.ts` gains `POST /admin/reset-database` (raw `db.exec` DELETE, movements before
+contracts per the FK — a disclosed, dev-only exception to the store layer's own append-only invariant);
+`backend/server.js` gains `POST /api/admin/reset-database`, a plain proxy through the existing
+`callMicroservice()` helper; Angular gets `BalanceCaseApiService.resetDatabase()` and
+`BusinessCaseRunnerComponent.resetDatabase()` (native `window.confirm()` gate — no custom modal, per the
+minimum-changes ask). New tests in all three suites (microservice HTTP integration, backend proxy,
+Angular service + component incl. the confirm-declined/accepted paths). All three suites green (Angular
+1187/1187, backend 39/39, microservice 586/586). Live-verified end-to-end: clicked the real button (dev
+DB, confirm stubbed via injected JS to avoid the automation-blocking native dialog — same effect as a
+real accept), confirmed both tables empty via direct microservice query, then ran `import-case-1` through
+the full stack (Angular → backend → microservice) to confirm the app works normally post-cleanup. Zero
+console errors. (Backend runs via plain `node server.js`, no `--watch` — needed a manual restart to pick
+up the new route, same gotcha `CLAUDE.md`'s own "Run All Cases 500" entry already documents.)

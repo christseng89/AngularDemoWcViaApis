@@ -19,7 +19,11 @@
         <button class="btn btn-outline-secondary" (click)="runAll()" [disabled]="runningAll || !cases.length">
           {{ runningAll ? 'Running all…' : 'Run All Cases' }}
         </button>
+        <button class="btn btn-outline-danger" (click)="resetDatabase()" [disabled]="resettingDatabase">
+          {{ resettingDatabase ? 'Cleaning up…' : 'Cleanup Database Tables' }}
+        </button>
       </div>
+      <div class="alert alert-info mt-2" *ngIf="resetDatabaseMessage">{{ resetDatabaseMessage }}</div>
     </div>
   </div>
 

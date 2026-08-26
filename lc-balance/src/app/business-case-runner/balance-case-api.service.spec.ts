@@ -56,4 +56,18 @@ describe('BalanceCaseApiService', () => {
       expect(post).toHaveBeenCalledWith('/api/business-cases/export-case-5/run', {});
     });
   });
+
+  describe('resetDatabase', () => {
+    it('POSTs /api/admin/reset-database with an empty body and returns the emitted result', (done) => {
+      const post = jest.fn(() => of({ status: 'ok' }));
+      const { service } = makeService({ post });
+
+      service.resetDatabase().subscribe((result) => {
+        expect(result).toEqual({ status: 'ok' });
+        expect(post).toHaveBeenCalledWith('/api/admin/reset-database', {});
+        expect(post).toHaveBeenCalledTimes(1);
+        done();
+      });
+    });
+  });
 });

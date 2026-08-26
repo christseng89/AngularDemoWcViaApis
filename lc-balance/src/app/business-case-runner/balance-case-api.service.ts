@@ -40,4 +40,9 @@ export class BalanceCaseApiService {
   runCase(id: string): Observable<BusinessCaseRunResult> {
     return this.http.post<BusinessCaseRunResult>(`/api/business-cases/${id}/run`, {});
   }
+
+  /** Dev-only — Business Case Runner's "Cleanup Database Tables" button. Wipes every balance_movements/balance_contracts row. */
+  resetDatabase(): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>('/api/admin/reset-database', {});
+  }
 }

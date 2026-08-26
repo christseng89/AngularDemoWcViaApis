@@ -410,6 +410,22 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
     });
   });
 
+  describe('POST /api/admin/reset-database — dev-only Business Case Runner "Cleanup Database Tables" button', () => {
+    it('proxies straight through to the microservice\'s own /admin/reset-database and forwards its status/body', async () => {
+      global.fetch = jest.fn(async (url, opts = {}) => {
+        expect(url).toBe('http://localhost:4100/admin/reset-database');
+        expect(opts.method).toBe('POST');
+        return jsonResponse(200, { status: 'ok' });
+      });
+
+      const res = await request(app).post('/api/admin/reset-database').send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ status: 'ok' });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('POST /api/business-cases/:id/run — rate limiting (Quality-report-balance.md BAL-118)', () => {
     it('carries standard RateLimit-* response headers, confirming the limiter is actually wired to this route', async () => {
       global.fetch = createGenericFetchMock();

@@ -189,6 +189,14 @@ app.post('/api/business-cases/:id/run', runLimiter, async (req, res) => {
   }
 });
 
+// Dev-only — Business Case Runner's "Cleanup Database Tables" button. Standalone: proxies straight
+// through to the microservice's own /admin/reset-database, same as every other route here, no change to
+// callMicroservice()/runCase() themselves.
+app.post('/api/admin/reset-database', async (_req, res) => {
+  const result = await callMicroservice('POST', '/admin/reset-database');
+  res.status(result.status).json(result.body);
+});
+
 app.get('/healthz', (_req, res) => res.json({ status: 'ok', balanceServiceUrl: BALANCE_SERVICE_URL }));
 
 // Was 4200 — collided with `ng serve`'s own default dev-server port, so

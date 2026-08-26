@@ -39,6 +39,17 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
 
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
 
+  // Dev-only — Business Case Runner's "Cleanup Database Tables" button. Standalone: wipes every
+  // balance_movements/balance_contracts row (movements first, satisfying the FK to contracts) so a fresh
+  // sequence of Business Cases can run without natural-key collisions. Deliberately bypasses the
+  // append-only store layer (BalanceMovementStore/BalanceContractStore never expose a delete) — this is a
+  // disclosed, dev-only exception to that invariant, not a new persistence pattern.
+  app.post('/admin/reset-database', (_req, res) => {
+    db.exec('DELETE FROM balance_movements');
+    db.exec('DELETE FROM balance_contracts');
+    res.json({ status: 'ok' });
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ApiError) {

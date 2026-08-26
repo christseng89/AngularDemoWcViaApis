@@ -30,6 +30,10 @@ export class BusinessCaseRunnerComponent implements OnInit {
   allResults: BusinessCaseRunResult[] = [];
   loadError: string | null = null;
 
+  /** "Cleanup Database Tables" button state — independent of run()/runAll()'s own busy/error state. */
+  resettingDatabase = false;
+  resetDatabaseMessage: string | null = null;
+
   constructor(private readonly api: BalanceCaseApiService) {}
 
   ngOnInit(): void {
@@ -94,6 +98,23 @@ export class BusinessCaseRunnerComponent implements OnInit {
       });
     };
     next();
+  }
+
+  /** Standalone — does not read/touch run()/runAll()'s own state (result/allResults/running/runningAll). */
+  resetDatabase(): void {
+    if (!confirm('This permanently deletes ALL Balance Contracts and Movements from the database. Continue?')) return;
+    this.resettingDatabase = true;
+    this.resetDatabaseMessage = null;
+    this.api.resetDatabase().subscribe({
+      next: () => {
+        this.resettingDatabase = false;
+        this.resetDatabaseMessage = 'Database tables cleaned up.';
+      },
+      error: (err) => {
+        this.resettingDatabase = false;
+        this.resetDatabaseMessage = `Cleanup failed: ${err.message ?? err}`;
+      },
+    });
   }
 
   rowClass(step: TraceStep): string {

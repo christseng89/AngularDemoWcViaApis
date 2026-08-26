@@ -1960,6 +1960,30 @@ describe('HTTP integration — B4\'s OWN still-PENDING Accept (Maker Submit, bef
   });
 });
 
+describe('POST /admin/reset-database — dev-only Business Case Runner "Cleanup Database Tables" button', () => {
+  test('wipes every balance_movements/balance_contracts row', async () => {
+    const db = createDb(':memory:');
+    const app = createApp(db);
+
+    await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'RESET-001' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+      .expect(201);
+
+    const res = await request(app).post('/admin/reset-database').expect(200);
+    expect(res.body).toEqual({ status: 'ok' });
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_contracts').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_movements').get() as { n: number }).n).toBe(0);
+
+    // Confirms the same natural key can be re-ISSUEd afterward — a genuinely clean slate, not just an empty count.
+    await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'RESET-001' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+      .expect(201);
+  });
+});
+
 describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amount validation', () => {
   const app = createApp(createDb(':memory:'));
 

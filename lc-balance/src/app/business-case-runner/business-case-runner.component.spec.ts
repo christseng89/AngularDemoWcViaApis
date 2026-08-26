@@ -7,10 +7,11 @@ import type { BalanceCaseApiService, BusinessCaseRunResult, BusinessCaseSummary,
  * business-case-runner.component.spec.ts) — no DOM rendering needed since
  * this component's own .html template is excluded from the coverage config.
  */
-function makeApi(overrides: { listCases?: jest.Mock; runCase?: jest.Mock } = {}) {
+function makeApi(overrides: { listCases?: jest.Mock; runCase?: jest.Mock; resetDatabase?: jest.Mock } = {}) {
   return {
     listCases: overrides.listCases ?? jest.fn(() => of([])),
     runCase: overrides.runCase ?? jest.fn(() => of({} as BusinessCaseRunResult)),
+    resetDatabase: overrides.resetDatabase ?? jest.fn(() => of({ status: 'ok' })),
   } as unknown as BalanceCaseApiService;
 }
 
@@ -247,6 +248,76 @@ describe('BusinessCaseRunnerComponent', () => {
       expect(component.runningAll).toBe(true);
       expect(component.allResults).toEqual([]);
       expect(component.result).toBeNull();
+    });
+  });
+
+  describe('resetDatabase', () => {
+    let confirmSpy: jest.SpyInstance;
+
+    afterEach(() => {
+      confirmSpy.mockRestore();
+    });
+
+    it('does nothing and never calls the API when the confirm dialog is declined', () => {
+      confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+      const resetDatabase = jest.fn(() => of({ status: 'ok' }));
+      const api = makeApi({ resetDatabase });
+      const component = makeComponent(api);
+
+      component.resetDatabase();
+
+      expect(resetDatabase).not.toHaveBeenCalled();
+      expect(component.resettingDatabase).toBe(false);
+    });
+
+    it('calls the API and sets a confirmation message on success when the confirm dialog is accepted', () => {
+      confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+      const resetDatabase = jest.fn(() => of({ status: 'ok' }));
+      const api = makeApi({ resetDatabase });
+      const component = makeComponent(api);
+
+      component.resetDatabase();
+
+      expect(resetDatabase).toHaveBeenCalledTimes(1);
+      expect(component.resettingDatabase).toBe(false);
+      expect(component.resetDatabaseMessage).toBe('Database tables cleaned up.');
+    });
+
+    it('sets resettingDatabase=true and clears any previous message before the response arrives', () => {
+      confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+      const subject = new Subject<{ status: string }>();
+      const resetDatabase = jest.fn(() => subject.asObservable());
+      const api = makeApi({ resetDatabase });
+      const component = makeComponent(api);
+      component.resetDatabaseMessage = 'stale message';
+
+      component.resetDatabase();
+
+      expect(component.resettingDatabase).toBe(true);
+      expect(component.resetDatabaseMessage).toBeNull();
+    });
+
+    it('clears resettingDatabase and sets an error message on failure', () => {
+      confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+      const resetDatabase = jest.fn(() => throwError(() => new Error('microservice down')));
+      const api = makeApi({ resetDatabase });
+      const component = makeComponent(api);
+
+      component.resetDatabase();
+
+      expect(component.resettingDatabase).toBe(false);
+      expect(component.resetDatabaseMessage).toBe('Cleanup failed: microservice down');
+    });
+
+    it('falls back to the raw error value when it has no .message', () => {
+      confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+      const resetDatabase = jest.fn(() => throwError(() => 'plain string failure'));
+      const api = makeApi({ resetDatabase });
+      const component = makeComponent(api);
+
+      component.resetDatabase();
+
+      expect(component.resetDatabaseMessage).toBe('Cleanup failed: plain string failure');
     });
   });
 
