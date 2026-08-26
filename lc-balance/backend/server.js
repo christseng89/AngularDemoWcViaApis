@@ -38,6 +38,14 @@ async function callMicroservice(method, path, body) {
 async function resolveLogicalContractId(captured, ref) {
   const entry = captured[ref];
   if (!entry) throw new Error(`Step references unknown captureAs key "${ref}" — check step ordering in businessCases.js.`);
+  // Reviewer-reported 2026-08-26 ("Run All Cases" 500) — the referenced step's own createMovement call
+  // can fail (a genuine business rejection, or the microservice's own rate limiter kicking in mid-burst
+  // across a full "Run All Cases" pass) without this step ever knowing; `entry.response` is then either
+  // absent or an error body with no `balanceContractId`. A bare `entry.response.balanceContractId` threw
+  // an opaque TypeError in that case, surfacing as a generic 500 with no indication of the real cause.
+  if (!entry.response?.balanceContractId) {
+    throw new Error(`Step "${ref}" never produced a balanceContractId (its own createMovement call did not succeed) — cannot resolve a parent for a dependent step. Last known response: ${JSON.stringify(entry.response)}`);
+  }
   if (entry.logicalContractId) return entry.logicalContractId;
   const snap = await callMicroservice('GET', `/balance-contracts/${entry.response.balanceContractId}/balance`);
   if (!snap.ok) throw new Error(`Could not resolve logicalContractId for "${ref}": ${JSON.stringify(snap.body)}`);
@@ -75,7 +83,15 @@ async function runCase(businessCase) {
     if (step.type === 'createMovement') {
       const request = { ...step.request };
       if (request.balanceContractIdRef) {
-        request.balanceContractId = captured[request.balanceContractIdRef]?.response.balanceContractId;
+        // See resolveLogicalContractId()'s own doc comment on why the full chain must be optional —
+        // a referenced step's own createMovement call can fail without this step knowing.
+        const referenced = captured[request.balanceContractIdRef];
+        if (!referenced?.response?.balanceContractId) {
+          throw new Error(
+            `Step references "${request.balanceContractIdRef}" for its own balanceContractId, but that step never produced one (its own createMovement call did not succeed). Last known response: ${JSON.stringify(referenced?.response)}`,
+          );
+        }
+        request.balanceContractId = referenced.response.balanceContractId;
         delete request.balanceContractIdRef;
       }
       if (request.parentLogicalContractIdRef) {
@@ -89,6 +105,11 @@ async function runCase(businessCase) {
       if (request.referencedTransactionIdRef) {
         const entry = captured[request.referencedTransactionIdRef];
         if (!entry) throw new Error(`Step references unknown captureAs key "${request.referencedTransactionIdRef}" — check step ordering in businessCases.js.`);
+        if (!entry.response?.movementId) {
+          throw new Error(
+            `Step references "${request.referencedTransactionIdRef}" for its own movementId, but that step never produced one (its own createMovement call did not succeed). Last known response: ${JSON.stringify(entry.response)}`,
+          );
+        }
         request.referencedTransactionId = entry.response.movementId;
         delete request.referencedTransactionIdRef;
       }

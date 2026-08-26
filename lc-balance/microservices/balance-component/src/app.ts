@@ -25,7 +25,16 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
   // the Business Case Runner's own replay-a-whole-scenario flow and the Transaction Builder's pickers)
   // are unaffected. Generous limit (over a real network, a Maker/Checker workflow is nowhere near this
   // busy) — this is basic abuse protection, not a throughput cap on normal use.
-  app.use('/balance-movements', rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
+  //
+  // Bug fix (reviewer-reported 2026-08-26, "Run All Cases" 500) — 120/60s was sized for the Business
+  // Case Registry's original ~10 cases; it now has 27, and a single "Run All Cases" click legitimately
+  // fires ~105 sequential /balance-movements calls over localhost (near-zero latency, so they land well
+  // within one rate-limit window) — a normal, intended use of this exact endpoint, not abuse. Raised to
+  // 1000/60s: still meaningfully caps a genuine flood (this is a local prototype, not internet-facing),
+  // comfortably clears a full Run-All-Cases pass with headroom for concurrent manual testing in the same
+  // window. See backend/server.js's own resolveLogicalContractId()/createMovement-step doc comments for
+  // the companion fix — a 429 mid-run (now much rarer) surfaces a clear error instead of crashing.
+  app.use('/balance-movements', rateLimit({ windowMs: 60_000, limit: 1000, standardHeaders: true, legacyHeaders: false }));
   app.use(balanceMovementsRouter(service));
 
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));

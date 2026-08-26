@@ -62,6 +62,29 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       // Cache-hit branch: no additional fetch call was made the second time.
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
+
+    // Reviewer-reported 2026-08-26 ("Run All Cases" 500) — a referenced step's own createMovement call
+    // can fail (a business rejection, or the microservice's own rate limiter mid-burst) without this
+    // step ever knowing; `entry.response` is then an error body with no `balanceContractId`. This used
+    // to throw an opaque TypeError from a bare `entry.response.balanceContractId`; now throws a clear,
+    // diagnosable error instead — same posture as the "unknown captureAs key" test above.
+    it('throws a clear error (not an opaque TypeError) when the referenced entry has no balanceContractId', async () => {
+      global.fetch = jest.fn();
+
+      const captured = { lc: { response: { code: 'TOO_MANY_REQUESTS', message: 'rate limited' } } };
+
+      await expect(resolveLogicalContractId(captured, 'lc')).rejects.toThrow(/Step "lc" never produced a balanceContractId/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('throws the same clear error when the referenced entry has no response at all', async () => {
+      global.fetch = jest.fn();
+
+      const captured = { lc: {} };
+
+      await expect(resolveLogicalContractId(captured, 'lc')).rejects.toThrow(/Step "lc" never produced a balanceContractId/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('runCase', () => {
@@ -89,6 +112,62 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       // Nothing downstream depends on a captured key here; confirm the step just ran cleanly
       // with no thrown error and no captured-side effect to assert against (captureAs was falsy).
       expect(trace[0].response).toEqual({ movementId: 'mv-1', balanceContractId: 'bc-1' });
+    });
+
+    // Reviewer-reported 2026-08-26 ("Run All Cases" 500) — same class of bug as
+    // resolveLogicalContractId's own new test above, but for the balanceContractIdRef resolution
+    // inlined directly in the createMovement step handler.
+    it('throws a clear error (not an opaque TypeError) when a balanceContractIdRef points at a step that never produced a balanceContractId', async () => {
+      global.fetch = jest
+        .fn()
+        // First step's own createMovement "fails" (e.g. rate-limited) — no balanceContractId in the body.
+        .mockImplementationOnce(async () => jsonResponse(429, { code: 'TOO_MANY_REQUESTS', message: 'rate limited' }));
+
+      const businessCase = {
+        id: 'synthetic-missing-balance-contract-id',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'LC Issue (fails)',
+            captureAs: 'lc',
+            request: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000' },
+          },
+          {
+            type: 'createMovement',
+            label: 'Amendment against the (never-issued) LC',
+            request: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', balanceContractIdRef: 'lc' },
+          },
+        ],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(/Step references "lc" for its own balanceContractId, but that step never produced one/);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    // Same class of bug, for the referencedTransactionIdRef resolution (Export Case #6/#7's own
+    // B3->B4 compound release shape).
+    it('throws a clear error (not an opaque TypeError) when a referencedTransactionIdRef points at a step that never produced a movementId', async () => {
+      global.fetch = jest.fn().mockImplementationOnce(async () => jsonResponse(429, { code: 'TOO_MANY_REQUESTS', message: 'rate limited' }));
+
+      const businessCase = {
+        id: 'synthetic-missing-movement-id',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Present Docs (fails)',
+            captureAs: 'presentDocs',
+            request: { instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE', amount: '1000' },
+          },
+          {
+            type: 'createMovement',
+            label: 'Honour referencing the (never-created) Present Docs',
+            request: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR', referencedTransactionIdRef: 'presentDocs' },
+          },
+        ],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(/Step references "presentDocs" for its own movementId, but that step never produced one/);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('throws "Unknown step type" for a step.type outside note/createMovement/release/makerSubmit/snapshot', async () => {
