@@ -105,11 +105,16 @@ function effectiveEventTime(movement: BalanceMovement): string {
 }
 
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
+  // Bug fixed (reviewer-reported, "A1 ISSUE S05 -> APPROVE. A3 S05 B01 -> Submit, Checker Reject 為何出現
+  // 兩筆REJECTED?"): reject() shares the same releasedAt/releasedBy columns as release() (disambiguated
+  // only by `status`), so `status !== 'PENDING'` wrongly matched a REJECTED movement too — a rejected
+  // Sight Document Arrival was split into a phantom 'create'/'finalize' pair (two REJECTED rows) even
+  // though A4 never finalized it. Narrowed to the actual RELEASED transition this split exists for.
   const isFinalizedSightUtilize =
     contract.instrumentType === 'IPLC_LC' &&
     movement.movementType === 'UTILIZE' &&
     contract.tenorType === 'SIGHT' &&
-    movement.status !== 'PENDING' &&
+    movement.status === 'RELEASED' &&
     !!movement.releasedAt;
   if (!isFinalizedSightUtilize) {
     return [{ movement, contract, eventTime: effectiveEventTime(movement), eventStatus: movement.status, phase: 'primary' }];

@@ -2009,3 +2009,15 @@ the same tick), Submit enables right after typing Reason Code with no reselectio
 on B7 round-tripped through the microservice successfully (server-computed amount `9999`, not the `'0'`
 placeholder). The stale-hint fix was also confirmed live by injecting a leftover `catalogPayableIbs` entry
 onto A11's own selected contract and confirming `catalogIbHint()` now returns `''`. Zero console errors.
+
+## S05 duplicate-REJECTED-rows bug fixed — `toEventRows()`'s finalized-Sight-UTILIZE split no longer matches a REJECTED movement
+
+Reviewer-reported ("A1 ISSUE S05 -> APPROVE. A3 S05 B01 -> Submit, Checker Reject 為何出現兩筆REJECTED?").
+`reject()` shares `releasedAt`/`releasedBy` with `release()` (disambiguated only by `status`), so
+`toEventRows()`'s own `status !== 'PENDING'` check wrongly matched a REJECTED Document Arrival too,
+splitting it into a phantom 'create'/'finalize' pair. Narrowed to `status === 'RELEASED'`
+(`inquire-events.service.ts`). 2 new tests (REJECTED stays 1 row; a genuinely RELEASED one still splits
+into 2). All three suites green (Angular 1181/1181, backend 38/38, microservice 585/585). Live-verified
+against the real reported data (LC S05, dev DB): now shows exactly 3 rows, no duplicate REJECTED; LC S01's
+own genuinely-finalized Sight Document Arrivals (B01/B02) still correctly show as 2 rows each
+(EARMARKED → APPROVED). Zero console errors.

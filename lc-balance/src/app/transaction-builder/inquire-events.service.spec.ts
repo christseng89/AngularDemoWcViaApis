@@ -196,6 +196,53 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter });
     });
 
+    /** Reproduces the reviewer-reported bug verbatim: "A1 ISSUE S05 -> APPROVE. A3 S05 B01 -> Submit, Checker Reject 為何出現兩筆REJECTED?" */
+    it('does NOT split a REJECTED Sight IPLC_LC/UTILIZE into 2 rows — reject() sets releasedAt/releasedBy too, but this is never a real A4 finalize', () => {
+      const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S05' } });
+      const rejectedUtilize = makeMovement({
+        movementId: 'mv-utilize',
+        balanceContractId: 'bc-lc',
+        movementType: 'UTILIZE',
+        status: 'REJECTED',
+        sourceTransactionRef: 'B01',
+        createdAt: '2026-08-26T09:00:00.000Z',
+        releasedBy: 'checker1',
+        releasedAt: '2026-08-26T09:05:00.000Z',
+        reasonCode: 'MANUAL_QUEUE_REJECT',
+      });
+
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([rejectedUtilize])) });
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S05';
+      svc.search();
+
+      expect(svc.events.length).toBe(1);
+      expect(svc.events[0].phase).toBe('primary');
+      expect(svc.events[0].eventStatus).toBe('REJECTED');
+    });
+
+    it('still splits a genuinely RELEASED Sight IPLC_LC/UTILIZE into 2 rows (create/finalize) — confirms the REJECTED fix above did not also break the real A4 finalize case', () => {
+      const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S05' } });
+      const releasedUtilize = makeMovement({
+        movementId: 'mv-utilize',
+        balanceContractId: 'bc-lc',
+        movementType: 'UTILIZE',
+        status: 'RELEASED',
+        sourceTransactionRef: 'B01',
+        createdAt: '2026-08-26T09:00:00.000Z',
+        releasedBy: 'checker1',
+        releasedAt: '2026-08-26T09:05:00.000Z',
+      });
+
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([releasedUtilize])) });
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S05';
+      svc.search();
+
+      expect(svc.events.length).toBe(2);
+      expect(svc.events.map((e) => e.phase)).toEqual(['create', 'finalize']);
+    });
+
     it('orders a primary-phase RELEASED event by Checker Release Time, not Maker Submit Time — reproduces the business-directed EB001/EB002 example verbatim (2026-08-26)', () => {
       // Business example: EB001 Submit 10:00 / Approve 10:30; EB002 Submit 10:10 / Approve 10:20 — EB002
       // approved FIRST despite submitting SECOND, so it must be listed first.
