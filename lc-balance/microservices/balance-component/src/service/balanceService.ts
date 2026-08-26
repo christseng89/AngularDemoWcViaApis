@@ -38,6 +38,7 @@ import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { evaluateCloseEligibility, type CloseEligibilityResult } from '../domain/closeEligibility';
 import { evaluateExpiryEligibility, isPastExpiryGrace, type ExpiryEligibilityResult } from '../domain/expiryEligibility';
 import { isPastAutoCloseGrace } from '../domain/autoCloseGracePeriod';
+import { domesticNonBusinessDayReason } from '../domain/domesticCalendar';
 import { computeReopenRestoreAmount } from '../domain/reopenRestoration';
 import {
   AUTO_CLOSE_ENABLED,
@@ -1506,6 +1507,21 @@ export class BalanceService {
   }
 
   /**
+   * User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要") — the
+   * LC/Confirmation's own Expiry Date must be a genuine domestic business day, not a Saturday/Sunday or a
+   * public holiday. Same scope as assertExpiryDateRequired() just above (ISSUE against a root
+   * instrumentType only) — see domesticCalendar.ts's own top doc comment for the calendar itself and why
+   * an out-of-range year is treated as "unknown", not rejected.
+   */
+  private assertExpiryDateIsBusinessDay(req: CreateMovementRequest): void {
+    if (req.movementType !== 'ISSUE' || !ROOT_INSTRUMENT_TYPES.has(req.instrumentType) || !req.expiryDate) return;
+    const reason = domesticNonBusinessDayReason(req.expiryDate);
+    if (reason) {
+      throw new RequestValidationError(`expiryDate ${req.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`);
+    }
+  }
+
+  /**
    * User-directed 2026-08-26 ("UI必輸欄位 API也是必輸欄位 三者一體") — the Angular client already blocks
    * Submit without these (naturalKey.lcNumber/ibNumber/sgNumber on a creating movement — see
    * submit-rules.ts's own "LC Number is mandatory."/"IB Number is mandatory."/"SG Number is mandatory..."
@@ -1569,6 +1585,7 @@ export class BalanceService {
     }
     this.assertReasonCodeRequired(req.movementType, req.reasonCode);
     this.assertExpiryDateRequired(req);
+    this.assertExpiryDateIsBusinessDay(req);
     this.assertNaturalKeyFieldsRequired(req);
     this.assertSecondaryRefRequired(req);
     this.assertTenorRequired(req);
@@ -1757,6 +1774,14 @@ export class BalanceService {
         }
         if (pairKey === 'IPLC_LC:ISSUE' && contract.tenorType !== 'SIGHT' && !(contract.tenorDays && contract.tenorDays > 0)) {
           throw new RequestValidationError(`tenorDays must be greater than 0 for ${contract.tenorType}.`);
+        }
+      }
+      // User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... API包括 MAKER CHECKER") — same
+      // re-check posture as above, against the contract's own already-persisted expiryDate.
+      if (movement.movementType === 'ISSUE' && contract.expiryDate) {
+        const reason = domesticNonBusinessDayReason(contract.expiryDate);
+        if (reason) {
+          throw new RequestValidationError(`expiryDate ${contract.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`);
         }
       }
     }

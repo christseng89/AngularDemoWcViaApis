@@ -520,37 +520,50 @@ export class MakerPanelComponent implements OnChanges {
       status: this.selectedFunction?.requiresReopenEligibility ? 'CLOSED' : undefined,
       qualifies: () => this.filteredCatalogContracts.length,
       onLoaded: (items) => {
+        // hintsPending — see eligiblePickersLoading's own doc comment for why each of these 5 branches
+        // needs its own increment/decrement: each is a THIRD, independent async fetch (beyond load()'s own
+        // contracts+snapshots) that CatalogPickerService.loading knows nothing about.
         if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+          this.hintsPending++;
           this.documentArrivalHints.loadCatalogHints(items, () => {
+            this.hintsPending--;
             this.catalogPicker.total = this.filteredCatalogContracts.length;
           });
         }
         if (this.selectedFunction?.payableMovementInstrumentType) {
+          this.hintsPending++;
           this.documentArrivalHints.loadChildHints(
             items,
             this.selectedFunction.payableMovementInstrumentType,
             this.selectedFunction.payableMovementType ?? 'UTILIZE',
             () => {
+              this.hintsPending--;
               this.catalogPicker.total = this.filteredCatalogContracts.length;
             },
           );
         }
         if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+          this.hintsPending++;
           this.documentArrivalHints.loadCatalogSgEligibility(items, () => {
+            this.hintsPending--;
             this.catalogPicker.total = this.filteredCatalogContracts.length;
           });
         }
         // A10/B6 only — one aggregate server call, not per-candidate like every hint above; see
         // DocumentArrivalHintsService.loadCloseEligibility()'s own doc comment for why.
         if (this.selectedFunction?.requiresCloseEligibility) {
+          this.hintsPending++;
           this.documentArrivalHints.loadCloseEligibility(this.model.instrumentType!, () => {
+            this.hintsPending--;
             this.catalogPicker.total = this.filteredCatalogContracts.length;
           });
         }
         // A11/B7 (Reopen, F1) only — same "one aggregate server call" shape as A10/B6's own
         // loadCloseEligibility() above.
         if (this.selectedFunction?.requiresReopenEligibility) {
+          this.hintsPending++;
           this.documentArrivalHints.loadReopenEligibility(this.model.instrumentType!, () => {
+            this.hintsPending--;
             this.catalogPicker.total = this.filteredCatalogContracts.length;
           });
         }
@@ -656,19 +669,26 @@ export class MakerPanelComponent implements OnChanges {
       tenorFamily: this.parentTenorFamily,
       qualifies: () => this.filteredParentCatalog.length,
       onLoaded: (items) => {
+        // hintsPending — same rationale as reloadCatalog()'s own identical comment.
         if (this.requiresEligibleParentDocumentArrival) {
+          this.hintsPending++;
           this.documentArrivalHints.loadParentHints(items, () => {
+            this.hintsPending--;
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
         if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
+          this.hintsPending++;
           this.documentArrivalHints.loadParentSgEligibility(items, () => {
+            this.hintsPending--;
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
         // A7 only — user-reported 2026-08-25; see requiresEligibleParentAcceptance's own doc comment.
         if (this.selectedFunction?.requiresEligibleParentAcceptance) {
+          this.hintsPending++;
           this.documentArrivalHints.loadParentAcceptanceEligibility(items, () => {
+            this.hintsPending--;
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
@@ -1142,8 +1162,40 @@ export class MakerPanelComponent implements OnChanges {
     return policy.hasParent(this.model) ? this.parentPicker.total : this.catalogPicker.total;
   }
 
+  /**
+   * Reviewer-reported 2026-08-26 ("A35 A7 先出現 ⚠ No eligible records... 再出現交易" / "如果有交易 ⚠ No
+   * eligible records... 訊息不應該出現" / "選 A3S 或 A7 FULL SETTLE 就可以看到這 ERROR 訊息一閃而過") — two
+   * independent gaps, both closed here:
+   *
+   * 1. `eligibleCandidateCount`'s own source picker (`parentPicker`/`catalogPicker`, same `hasParent`
+   *    branch as that getter) starts its `total` at 0 the instant `load()` resets paging, before the HTTP
+   *    round trip (contracts, then snapshots) resolves.
+   * 2. For any function whose own `resolveCatalogEligibilityRule()`/`resolveParentEligibilityRule()`
+   *    returns `{kind:'hintSet', ...}` (A3S/A4/A6/A7/A9/A10/A11/B3/B4/B5/B6/B7 — every function with a
+   *    server-computed eligibility hint-set), `total` is NOT final even once `loading` itself goes false:
+   *    `reloadCatalog()`/`loadParent()`'s own `onLoaded` callback fires a THIRD, separate async hint-set
+   *    fetch (`DocumentArrivalHintsService.loadXxxEligibility()`) — `CatalogPickerService.loading` only
+   *    wraps the first two steps (contracts + snapshots), never this one. The hint-set Map/Set itself
+   *    starts EMPTY, so `applyEligibilityRule()`'s `'hintSet'` branch reads 0 eligible candidates for the
+   *    entire window between `loading` going false and the hint-set actually arriving — reproduced live by
+   *    switching A7's own Settlement Type (Full/Partial Settle re-triggers `loadParent()` from scratch).
+   *
+   * `hintsPending` (incremented immediately before each hint-set fetch starts in `reloadCatalog()`/
+   * `loadParent()`, decremented in that fetch's own completion callback) closes gap 2 — only consulted
+   * when the CURRENT function's own eligibility rule is actually `'hintSet'`-shaped, so a function with no
+   * hint-set dependency (e.g. A2's plain flat Catalog) is never held up by an unrelated counter.
+   */
+  private hintsPending = 0;
+
+  get eligiblePickersLoading(): boolean {
+    if (policy.hasParent(this.model)) {
+      return this.parentPicker.loading || (this.resolveParentEligibilityRule().kind === 'hintSet' && this.hintsPending > 0);
+    }
+    return this.catalogPicker.loading || (this.resolveCatalogEligibilityRule().kind === 'hintSet' && this.hintsPending > 0);
+  }
+
   get noEligibleRecordsMessage(): string | null {
-    if (!this.requiresEligibleTarget || this.hasEligibleTargetSelected) return null;
+    if (!this.requiresEligibleTarget || this.hasEligibleTargetSelected || this.eligiblePickersLoading) return null;
     return this.eligibleCandidateCount === 0
       ? 'No eligible records available for this transaction.'
       : 'Pick an eligible record from the list below to continue.';

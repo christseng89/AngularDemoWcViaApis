@@ -68,7 +68,7 @@ function ctx(overrides: Partial<SubmitRulesContext> = {}): SubmitRulesContext {
     tenorType: 'SIGHT',
     // Mandatory for A1/B1 since 2026-08-26 (see submit-rules.ts's own expiryDate guard) — part of this
     // helper's own "fully-valid A1" baseline, same posture as every other field here.
-    expiryDate: '2028-12-31',
+    expiryDate: '2028-12-28',
     ...overrides.model,
   };
   const result: SubmitRulesContext = {
@@ -581,16 +581,16 @@ describe('submit-rules', () => {
 
     it('F1: a typed A1 expiryDate is included on the request', () => {
       const { request } = buildSubmitRequest(
-        ctx({ model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', expiryDate: '2028-12-31' } }),
+        ctx({ model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', expiryDate: '2028-12-28' } }),
       );
-      expect(request?.expiryDate).toBe('2028-12-31');
+      expect(request?.expiryDate).toBe('2028-12-28');
     });
 
     it('F1: expiryDate is omitted for a non-A1/B1 function even if somehow present on the model', () => {
       const { request } = buildSubmitRequest(
         ctx({
           selectedFunction: fn('A2'),
-          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '1000', currency: 'USD', createdBy: 'maker1', expiryDate: '2028-12-31' },
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '1000', currency: 'USD', createdBy: 'maker1', expiryDate: '2028-12-28' },
           selectedContract: contract(),
         }),
       );
@@ -696,7 +696,7 @@ describe('submit-rules', () => {
     it('passes A1 (LC Issue) once Expiry Date is supplied', () => {
       const result = validateSubmit(
         ctx({
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2028-12-31' },
+          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2028-12-28' },
         }),
       );
       expect(result.error).toBeNull();
@@ -718,6 +718,57 @@ describe('submit-rules', () => {
         ctx({
           selectedFunction: fn('A2'),
           model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '5000', currency: 'USD', createdBy: 'maker1', secondaryRef: 'AMD-01', expiryDate: undefined },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+  });
+
+  describe('validateSubmit — Expiry Date must be a domestic business day for A1/B1 (user-directed 2026-08-26, "Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要")', () => {
+    it('rejects A1 (LC Issue) with an Expiry Date on a known public holiday', () => {
+      const result = validateSubmit(
+        ctx({
+          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-01' },
+        }),
+      );
+      expect(result.error).toBe('Expiry Date 2026-01-01 falls on a domestic non-business day (元旦) — pick a genuine business day.');
+    });
+
+    it('rejects A1 (LC Issue) with an Expiry Date on a Saturday/Sunday', () => {
+      const result = validateSubmit(
+        ctx({
+          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-03' },
+        }),
+      );
+      expect(result.error).toBe('Expiry Date 2026-01-03 falls on a domestic non-business day (Saturday/Sunday) — pick a genuine business day.');
+    });
+
+    it('rejects B1 (Confirm LC) the same way', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('B1'),
+          activeFunctionSide: 'EXPORT',
+          model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-01' },
+        }),
+      );
+      expect(result.error).toBe('Expiry Date 2026-01-01 falls on a domestic non-business day (元旦) — pick a genuine business day.');
+    });
+
+    it('passes A1 with a genuine business day', () => {
+      const result = validateSubmit(
+        ctx({
+          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-08' },
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+
+    it('does not apply to any other function — an AMEND_EXPIRY_DATE newExpiryDate on a holiday is unaffected (a different field, a different rule)', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', currency: 'USD', createdBy: 'maker1', newExpiryDate: '2027-01-01' },
           selectedContract: contract(),
         }),
       );

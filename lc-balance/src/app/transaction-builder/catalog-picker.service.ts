@@ -45,6 +45,16 @@ const DISPLAY_PAGE_SIZE = 5;
 export class CatalogPickerService {
   contracts: BalanceContract[] = [];
   search = '';
+  /**
+   * Reviewer-reported 2026-08-26 ("A35 A7 先出現 ⚠ No eligible records... 再出現交易") — `total` starts at
+   * 0 the instant `load()` resets paging, before the HTTP round trip (and, for a qualifying filter that
+   * depends on `snapshots`, the SECOND async step) ever resolves — a caller gating a "no eligible records"
+   * warning on `total === 0` alone sees a false-positive flash on every load, not just a slow one. `true`
+   * from the moment `load()` starts until the FINAL total is known (after snapshots, not just after
+   * `contracts`), so callers can show a loading state instead of a premature empty/warning one — mirrors
+   * `IndexPickerComponent`'s own pre-existing `loading` input, which this was never wired up to.
+   */
+  loading = false;
   readonly snapshots = new Map<string, BalanceSnapshot>();
   private readonly paging: PagedListState;
 
@@ -102,8 +112,10 @@ export class CatalogPickerService {
     this.resetPaging();
     if (args.guardFails) {
       this.contracts = [];
+      this.loading = false;
       return;
     }
+    this.loading = true;
     // requireIssueReleased: true (default) — every A1-A9/B1-B5 Maker-side ACTION picker (flat Catalog,
     // Parent LC, IB/SG Index — this ONE service backs all three) should only ever offer a contract whose
     // own creating movement has already cleared Checker approval. See
@@ -118,11 +130,13 @@ export class CatalogPickerService {
           this.total = args.qualifies ? args.qualifies() : result.items.length;
           this.loadSnapshotsInto(result.items, () => {
             this.total = args.qualifies ? args.qualifies() : this.contracts.length;
+            this.loading = false;
           });
           args.onLoaded?.(result.items);
         },
         error: () => {
           this.contracts = [];
+          this.loading = false;
         },
       });
   }

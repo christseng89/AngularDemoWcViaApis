@@ -1,5 +1,5 @@
 import { FormGroup } from '@angular/forms';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { MakerPanelComponent } from './maker-panel.component';
 import type {
   BalanceComponentApiService,
@@ -772,6 +772,80 @@ describe('MakerPanelComponent', () => {
 
       expect(comp.documentArrivalHints.parentAcceptanceEligible.has('p1')).toBe(false);
       expect(comp.filteredParentCatalog).toEqual([]);
+    });
+  });
+
+  // Reviewer-reported 2026-08-26 ("A35 A7 先出現 ⚠ No eligible records... 再出現交易" / "選 A3S 或 A7 FULL
+  // SETTLE 就可以看到這 ERROR 訊息一閃而過後 再顯示交易 INDEX") — the LIVE bug traced to a THIRD async step
+  // (the hint-set fetch: loadCatalogSgEligibility for A3S, loadParentAcceptanceEligibility for A7) that
+  // fires AFTER CatalogPickerService.loading has already gone false (contracts+snapshots done), during
+  // which the hint-set Map/Set is still empty — `filteredCatalogContracts`/`filteredParentCatalog` read 0
+  // eligible candidates for that whole window even though real ones exist. `hintsPending` closes this;
+  // these tests use a controllable Subject for the hint fetch's own underlying catalog() call so the
+  // in-flight window is actually observable (the earlier tests above all use synchronous `of(...)`, which
+  // can never reproduce this).
+  describe('hintsPending — suppresses noEligibleRecordsMessage during the hint-set fetch itself, not just during CatalogPickerService.loading (reviewer-reported "flash" bug)', () => {
+    it('A3S (documentArrivalWithSg): message stays suppressed while loadCatalogSgEligibility is still in flight, even though catalogPicker.loading has already gone false', () => {
+      const { comp, mockApi } = makeComponentA();
+      triggerSelectFunction(comp, A3S);
+      comp.model.movementType = 'UTILIZE';
+      const c1 = mkContract('c1', 'S01');
+      const sgSubject = new Subject<CatalogPage>();
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) => (instrumentType === 'IPLC_LC' ? of(mkCatalogPage([c1], 1)) : sgSubject));
+
+      comp.reloadCatalog();
+
+      // catalogPicker's own contracts+snapshots step is fully synchronous here (of(...)), so loading is
+      // already false — but the SG hint fetch (sgSubject) hasn't resolved yet.
+      expect(comp.catalogPicker.loading).toBe(false);
+      expect(comp.eligibleCandidateCount).toBe(0); // the hint Set is still empty
+      expect(comp.eligiblePickersLoading).toBe(true); // hintsPending must cover this gap
+      expect(comp.noEligibleRecordsMessage).toBeNull();
+
+      sgSubject.next(mkCatalogPage([mkContract('sg1', 'S01', { instrumentType: 'SHGT' })], 1));
+      sgSubject.complete();
+
+      expect(comp.eligiblePickersLoading).toBe(false);
+      expect(comp.documentArrivalHints.catalogSgEligible.has('c1')).toBe(true);
+      expect(comp.noEligibleRecordsMessage).toBe('Pick an eligible record from the list below to continue.');
+    });
+
+    it('A7 (requiresEligibleParentAcceptance): message stays suppressed while loadParentAcceptanceEligibility is still in flight', () => {
+      const { comp, mockApi } = makeComponentA();
+      comp.selectedFunction = A7;
+      // eligibleCandidateCount/eligiblePickersLoading branch on policy.hasParent(model.instrumentType) —
+      // in the real app this is already set to A7's own instrumentType by onSubChoice() before
+      // afterResolved() ever triggers this reload; set it explicitly here since this test calls
+      // onParentInstrumentTypeChange() directly, bypassing that flow.
+      comp.model.instrumentType = 'IPLC_ACCEPTANCE';
+      comp.parentInstrumentType = 'IPLC_LC';
+      const p1 = mkContract('p1', 'U01');
+      const accSubject = new Subject<CatalogPage>();
+      (mockApi.catalog as jest.Mock).mockImplementation((instrumentType: string) => (instrumentType === 'IPLC_LC' ? of(mkCatalogPage([p1], 1)) : accSubject));
+
+      comp.onParentInstrumentTypeChange();
+
+      expect(comp.parentPicker.loading).toBe(false);
+      expect(comp.eligibleCandidateCount).toBe(0);
+      expect(comp.eligiblePickersLoading).toBe(true);
+      expect(comp.noEligibleRecordsMessage).toBeNull();
+
+      accSubject.next(mkCatalogPage([mkContract('acc1', 'U01', { instrumentType: 'IPLC_ACCEPTANCE' })], 1));
+      accSubject.complete();
+
+      expect(comp.eligiblePickersLoading).toBe(false);
+      expect(comp.documentArrivalHints.parentAcceptanceEligible.has('p1')).toBe(true);
+      expect(comp.noEligibleRecordsMessage).toBe('Pick an eligible record from the list below to continue.');
+    });
+
+    it('a function with no hint-set dependency (A2) is never held up by hintsPending — eligiblePickersLoading tracks catalogPicker.loading alone', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A2);
+      comp.catalogPicker.total = 0;
+      comp.catalogPicker.loading = false;
+      (comp as any).hintsPending = 5; // simulates an unrelated in-flight hint fetch from a different function
+      expect(comp.eligiblePickersLoading).toBe(false);
+      expect(comp.noEligibleRecordsMessage).toBe('No eligible records available for this transaction.');
     });
   });
 
@@ -2460,7 +2534,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '10000.5';
       comp.model.currency = 'JPY';
       comp.model.createdBy = 'maker1';
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
       comp.submit();
       expect(comp.submitError).toBe('Amount 10000.5 has more decimal places than JPY allows (0).');
       expect(api.createMovement).not.toHaveBeenCalled();
@@ -2504,7 +2578,7 @@ describe('MakerPanelComponent', () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A1);
       comp.model.amount = '1000';
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
       // naturalKey.lcNumber left unset
       comp.submit();
       expect(comp.submitError).toBe('LC Number is mandatory.');
@@ -2540,7 +2614,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '1000';
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.tenorType = 'SELLERS_USANCE';
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
       // model.tenorDays left unset
       comp.submit();
       expect(comp.submitError).toBe("Tenor Days must be greater than 0 for Seller's/Buyer's Usance.");
@@ -2642,7 +2716,7 @@ describe('MakerPanelComponent', () => {
 
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.amount = '100000';
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
       // model.currency/createdBy already default 'USD'/'maker1'; tenorType defaults to SIGHT via resetForFunction()
       expect(comp.isSubmitReady).toBe(true);
     });
@@ -2693,7 +2767,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '100000';
       comp.model.tolerancePct = '10';
       comp.model.eventSeq = 42;
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
       // tenorType defaults to SIGHT via resetForFunction()
 
       comp.submit();
@@ -2709,7 +2783,7 @@ describe('MakerPanelComponent', () => {
         createdBy: 'maker1',
         tolerancePct: '10',
         tenorType: 'SIGHT',
-        expiryDate: '2028-12-31',
+        expiryDate: '2028-12-28',
         naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: null },
       });
       // 0 is falsy — `if (this.model.tenorDays)` never fires for Sight's forced 0.
@@ -2729,7 +2803,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '50000';
       comp.model.tenorType = 'BUYERS_USANCE';
       comp.model.tenorDays = 90;
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
       // tolerancePct left unset
 
       comp.submit();
@@ -2746,7 +2820,7 @@ describe('MakerPanelComponent', () => {
       triggerSelectFunction(comp, A1);
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.amount = '100000';
-      comp.model.expiryDate = '2028-12-31';
+      comp.model.expiryDate = '2028-12-28';
 
       comp.submit();
 
@@ -3426,6 +3500,46 @@ describe('MakerPanelComponent', () => {
       expect(c.formLocked).toBe(true);
       expect(c.fieldsLocked).toBe(true);
       expect(c.noEligibleRecordsMessage).toBeNull(); // formLocked is a different lock reason, not "no target"
+    });
+
+    // Reviewer-reported 2026-08-26 ("A35 A7 先出現 ⚠ No eligible records... 再出現交易" / "如果有交易 ⚠ No
+    // eligible records... 訊息不應該出現") — catalogPicker/parentPicker.total both start at 0 the instant
+    // load() resets paging, before the HTTP round trip resolves; noEligibleRecordsMessage must suppress
+    // its own text entirely while the relevant picker is still loading, not read the (still-stale) count.
+    it('A2 (flat Catalog) suppresses the message entirely while catalogPicker is still loading, even though total currently reads 0', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A2'));
+      c.catalogPicker.total = 0;
+      c.catalogPicker.loading = true;
+      expect(c.eligiblePickersLoading).toBe(true);
+      expect(c.noEligibleRecordsMessage).toBeNull();
+    });
+
+    it('A2 (flat Catalog) shows the real message again once catalogPicker finishes loading', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A2'));
+      c.catalogPicker.total = 0;
+      c.catalogPicker.loading = false;
+      expect(c.noEligibleRecordsMessage).toBe('No eligible records available for this transaction.');
+    });
+
+    it('A6 (hasParent) suppresses the message while parentPicker is still loading, ignoring catalogPicker.loading entirely', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A6'));
+      c.parentPicker.total = 0;
+      c.parentPicker.loading = true;
+      c.catalogPicker.loading = false; // must not matter for a hasParent function
+      expect(c.eligiblePickersLoading).toBe(true);
+      expect(c.noEligibleRecordsMessage).toBeNull();
+    });
+
+    it('A6 (hasParent) shows the real message again once parentPicker finishes loading', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A6'));
+      c.parentPicker.total = 0;
+      c.parentPicker.loading = false;
+      expect(c.eligiblePickersLoading).toBe(false);
+      expect(c.noEligibleRecordsMessage).toBe('No eligible records available for this transaction.');
     });
   });
 

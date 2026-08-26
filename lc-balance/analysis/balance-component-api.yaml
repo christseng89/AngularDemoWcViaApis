@@ -737,7 +737,19 @@ info:
         A1-only backstop; deliberately NOT extended to B1/A6, which have no equivalent client-side
         backstop today (only builder-fields.ts's own live reactive expression) — this changelog entry
         documents an existing rule server-side, not a new client-side one.
-  version: "1.26.0"
+
+    v1.27.0 (2026-08-26, same day, user-directed — "Expiry Date也不可以是本國的假日或周末... 加一道檢查FOR
+    A1 B1... UI API都需要"): `expiryDate` on `ISSUE` against a root instrumentType (`IPLC_LC`/
+    `EPLC_CONFIRMATION` — A1/B1) must now also fall on a genuine domestic (Taiwan) business day, not a
+    Saturday/Sunday or a known public holiday — same scope as `assertExpiryDateRequired()` (v1.25.0).
+    New `domain/domesticCalendar.ts` (a same-repo copy of the illustrative 2026-2028 calendar data already
+    used for the F1 §13.5 Auto Close Grace Period reference material — see that module's own top doc
+    comment for why a year outside 2026-2028 is treated as "unknown", not rejected, and why this is a copy
+    rather than a shared import). Enforced at BOTH the Maker's `POST /balance-movements`
+    (`assertExpiryDateIsBusinessDay()`) and the Checker's own `.../release` (defense-in-depth re-check
+    against the already-persisted contract), plus a client-side mirror in submit-rules.ts — same
+    three-layer convention as `expiryDate`/`reasonCode` (v1.24.0/v1.25.0).
+  version: "1.27.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.

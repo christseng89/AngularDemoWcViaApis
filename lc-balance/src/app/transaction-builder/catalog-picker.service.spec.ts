@@ -1,6 +1,6 @@
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { CatalogPickerService } from './catalog-picker.service';
-import { BalanceComponentApiService, BalanceContract } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 
 /**
  * desiger-comments.md F-09 — direct unit tests for `load()`'s own `status`/`requireIssueReleased`
@@ -59,5 +59,69 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', requireIssueReleased: false });
 
     expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, 100, undefined, undefined, false);
+  });
+});
+
+/**
+ * Reviewer-reported 2026-08-26 ("A35 A7 先出現 ⚠ No eligible records... 再出現交易") — `total` used to read
+ * 0 for the whole HTTP round trip (a real gap in a real browser, invisible to the earlier tests above
+ * since `of(...)` emits synchronously). `loading` closes that gap; these tests use a manually-controlled
+ * `Subject` so the pending (not-yet-resolved) state is actually observable, unlike `of(...)`.
+ */
+describe('CatalogPickerService — loading flag (reviewer-reported "No eligible records" flash)', () => {
+  it('is true immediately after load() starts, and false once contracts arrive with no snapshots to await (empty result)', () => {
+    const catalogSubject = new Subject<{ items: BalanceContract[]; total: number; page: number; pageSize: number }>();
+    const api = { catalog: jest.fn(() => catalogSubject) } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+
+    svc.load({ guardFails: false, instrumentType: 'IPLC_LC' });
+    expect(svc.loading).toBe(true);
+
+    catalogSubject.next({ items: [], total: 0, page: 1, pageSize: 100 });
+    expect(svc.loading).toBe(false);
+  });
+
+  it('stays true until snapshots ALSO resolve, not just once contracts arrive — total is not final till then', () => {
+    const c = contract();
+    const catalogSubject = new Subject<{ items: BalanceContract[]; total: number; page: number; pageSize: number }>();
+    const snapshotSubject = new Subject<BalanceSnapshot>();
+    const api = {
+      catalog: jest.fn(() => catalogSubject),
+      getSnapshot: jest.fn(() => snapshotSubject),
+    } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+
+    svc.load({ guardFails: false, instrumentType: 'IPLC_LC' });
+    catalogSubject.next({ items: [c], total: 1, page: 1, pageSize: 100 });
+    expect(svc.loading).toBe(true); // contracts arrived, but the snapshot fetch is still in flight
+
+    // forkJoin (loadSnapshotsInto's own combinator) waits for each inner observable to COMPLETE, not just
+    // emit — a raw Subject (unlike a real HttpClient call, which auto-completes after one emission) needs
+    // both.
+    snapshotSubject.next({ balanceContractId: 'bc-1', confirmedBalance: '0', availableBalance: '0' } as BalanceSnapshot);
+    snapshotSubject.complete();
+    expect(svc.loading).toBe(false);
+  });
+
+  it('is false again on a failed load (error path), not stuck true', () => {
+    const catalogSubject = new Subject<{ items: BalanceContract[]; total: number; page: number; pageSize: number }>();
+    const api = { catalog: jest.fn(() => catalogSubject) } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+
+    svc.load({ guardFails: false, instrumentType: 'IPLC_LC' });
+    expect(svc.loading).toBe(true);
+
+    catalogSubject.error(new Error('boom'));
+    expect(svc.loading).toBe(false);
+  });
+
+  it('is false, not left true, when guardFails short-circuits the load entirely', () => {
+    const api = { catalog: jest.fn() } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+
+    svc.load({ guardFails: true, instrumentType: 'IPLC_LC' });
+
+    expect(svc.loading).toBe(false);
+    expect(api.catalog).not.toHaveBeenCalled();
   });
 });

@@ -51,6 +51,7 @@
               <app-index-picker
                 label="LC Index — Existing Contract"
                 [items]="pagedFilteredParentCatalog"
+                [loading]="parentPicker.loading"
                 [selectedId]="selectedParent?.balanceContractId ?? null"
                 [searchable]="true"
                 [(searchValue)]="parentPicker.search"
@@ -85,6 +86,7 @@
             <app-index-picker
               label="LC Index — Existing Contract"
               [items]="filteredParentCatalog"
+              [loading]="parentPicker.loading"
               [selectedId]="selectedParent?.balanceContractId ?? null"
               [searchable]="true"
               [(searchValue)]="parentPicker.search"
@@ -274,6 +276,7 @@
                   searchNaturalKey.lcNumber
                 }}"
                 [items]="pagedFilteredIbIndexCatalog"
+                [loading]="ibIndexPicker.loading"
                 [selectedId]="selectedContract?.balanceContractId ?? null"
                 emptyText="{{
                   ibIndexPicker.contracts.length
@@ -376,6 +379,7 @@
                 : 'LC Index — Existing Contract'
             }}"
             [items]="pagedFilteredCatalogContracts"
+            [loading]="catalogPicker.loading"
             [selectedId]="selectedContract?.balanceContractId ?? null"
             [searchable]="true"
             [(searchValue)]="catalogPicker.search"

@@ -107,8 +107,8 @@ describe('AMEND_EXPIRY_DATE — plain amendment against an ACTIVE contract', () 
 describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-ACTIVE contract (F1 §8.6/§9.6)', () => {
   test('AMEND_EXPIRY_DATE resolves an EXPIRED contract by naturalKey (not just balanceContractId)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'NK-EXT-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    service.runAutoExpirySweep(new Date('2026-01-10'));
+    const lc = issueImportLc(service, 'NK-EXT-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    service.runAutoExpirySweep(new Date('2026-01-08'));
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'NK-EXT-001' }, true)?.status).toBe('EXPIRED');
 
     const amend = service.createMovement({
@@ -167,7 +167,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
 
   test('naturalKey resolution for AMEND_EXPIRY_DATE/REOPEN never matches an ACTIVE contract under a DIFFERENT logical contract of the same LC number (only the currently non-ACTIVE version)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    issueImportLc(service, 'NK-002', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
+    issueImportLc(service, 'NK-002', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
     // No EXPIRED/CLOSED version exists yet — the plain ACTIVE-amendment path should be used instead,
     // proving findExpiredByNaturalKey()/findClosedByNaturalKey() are NOT consulted when the ACTIVE
     // resolver already found something (avoids ever attempting the fallback needlessly).
@@ -191,8 +191,8 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
 
 describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED contract (F1 §8)', () => {
   function expireLc(service: BalanceService, lcNumber: string) {
-    const lc = issueImportLc(service, lcNumber, { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    const results = service.runAutoExpirySweep(new Date('2026-01-10'));
+    const lc = issueImportLc(service, lcNumber, { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    const results = service.runAutoExpirySweep(new Date('2026-01-08'));
     expect(results).toContainEqual({ balanceContractId: lc.balanceContractId, ok: true });
     return service.resolveContract('IPLC_LC', { lcNumber }, true)!;
   }
@@ -332,11 +332,11 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
   test('path B (EXPIRE then AUTO CLOSE — §9.7 chain reversal): reverses BOTH the EXPIRE and the CLOSE, restores the ORIGINAL balance (not 0)', () => {
     // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
     // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.
-    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
-    const lc = issueImportLc(service, 'REOPEN-B-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    const asOf = new Date('2026-01-10');
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-08T00:00:00Z');
+    const lc = issueImportLc(service, 'REOPEN-B-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    const asOf = new Date('2026-01-08');
     service.runAutoExpirySweep(asOf);
-    service.runAutoCloseSweep(new Date('2026-01-20'));
+    service.runAutoCloseSweep(new Date('2026-01-18'));
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-B-001' }, true)?.status).toBe('CLOSED');
 
     const movementsBefore = service.listMovements(lc.balanceContractId);
@@ -369,7 +369,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     const movementsAfter = service.listMovements(lc.balanceContractId);
     expect(movementsAfter.filter((m) => m.movementType === 'REVERSAL')).toHaveLength(0);
 
-    // Original expiryDate (2026-01-01) is well in the past relative to the release date -> EXPIRED, not ACTIVE.
+    // Original expiryDate (2025-12-30) is well in the past relative to the release date -> EXPIRED, not ACTIVE.
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-B-001' }, true)?.status).toBe('EXPIRED');
   });
 
@@ -615,8 +615,8 @@ describe('REVERSAL — internal-only sufficiency checks (F1)', () => {
   test('rejects reversing an already-reversed movement (double-reversal)', () => {
     const service = new BalanceService(createDb(':memory:'));
     const expired = (() => {
-      const lc = issueImportLc(service, 'REV-003', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-      service.runAutoExpirySweep(new Date('2026-01-10'));
+      const lc = issueImportLc(service, 'REV-003', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+      service.runAutoExpirySweep(new Date('2026-01-08'));
       return service.resolveContract('IPLC_LC', { lcNumber: 'REV-003' }, true)!;
     })();
     const amend = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
@@ -640,8 +640,8 @@ describe('REVERSAL — internal-only sufficiency checks (F1)', () => {
 
   test('rejects an amount that does not exactly match the reversed movement', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REV-004', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    service.runAutoExpirySweep(new Date('2026-01-10'));
+    const lc = issueImportLc(service, 'REV-004', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    service.runAutoExpirySweep(new Date('2026-01-08'));
     const expireMovement = service.listMovements(lc.balanceContractId).find((m) => m.movementType === 'EXPIRE')!;
 
     expect(() =>
@@ -694,8 +694,8 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   test('Expiry Extension Amendment: hasOpenEvents becomes true between Submit and Release (DB-bypass simulated)', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-AMEND-003', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    service.runAutoExpirySweep(new Date('2026-01-10'));
+    const lc = issueImportLc(service, 'RECHECK-AMEND-003', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    service.runAutoExpirySweep(new Date('2026-01-08'));
     const expired = service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-003' }, true)!;
     const amend = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
     if (!amend.created) throw new Error('expected a new movement');
@@ -719,7 +719,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   test('Expiry Extension Amendment against a contract EXPIRED via a raw status write (no real EXPIRE — DB-bypass simulated) reactivates cleanly with no REVERSAL generated, since there is nothing to restore', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-AMEND-004', { expiryDate: '2026-01-01' });
+    const lc = issueImportLc(service, 'RECHECK-AMEND-004', { expiryDate: '2025-12-30' });
     db.exec(`UPDATE balance_contracts SET status = 'EXPIRED' WHERE balance_contract_id = '${lc.balanceContractId}'`);
     const amend = submitAmendExpiryDate(service, lc.balanceContractId, 2, '2027-01-01', '2026-01-15');
     if (!amend.created) throw new Error('expected a new movement');
@@ -738,10 +738,10 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   test('Expiry Extension Amendment after A11 Reopen reactivated the contract to EXPIRED does NOT double-restore the balance — REOPEN already did it directly, nothing left for Extension to reverse', () => {
     // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
     // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.
-    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
-    const lc = issueImportLc(service, 'RECHECK-AMEND-005', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    service.runAutoExpirySweep(new Date('2026-01-10'));
-    service.runAutoCloseSweep(new Date('2026-01-20'));
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-08T00:00:00Z');
+    const lc = issueImportLc(service, 'RECHECK-AMEND-005', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    service.runAutoExpirySweep(new Date('2026-01-08'));
+    service.runAutoCloseSweep(new Date('2026-01-18'));
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' }, true)?.status).toBe('CLOSED');
 
     const reopen = service.createMovement({
@@ -756,7 +756,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker1');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' }, true)?.status).toBe('EXPIRED'); // original expiryDate (2026-01-01) is still in the past.
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' }, true)?.status).toBe('EXPIRED'); // original expiryDate (2025-12-30) is still in the past.
     expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('10000'); // REOPEN's own direct restoration.
 
     const amend = submitAmendExpiryDate(service, lc.balanceContractId, 4, '2027-01-01', '2026-01-15');

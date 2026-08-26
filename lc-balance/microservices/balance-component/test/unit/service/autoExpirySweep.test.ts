@@ -81,7 +81,7 @@ describe('ISSUE captures expiryDate/mailFloatGraceDays onto the contract (F1)', 
 describe('EXPIRE movementType (createMovement/release wiring)', () => {
   test('happy path: ACTIVE, no open Events -> Submit + Release writes off Confirmed Balance to 0 and sets status EXPIRED, REGARDLESS of outstanding SG/Acceptance (BA §7.2)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'EXPIRE-001', { expiryDate: '2026-01-01' });
+    const lc = issueImportLc(service, 'EXPIRE-001', { expiryDate: '2025-12-30' });
 
     // Issue an outstanding SG under this LC — proves EXPIRE does NOT require SG=0 (unlike CLOSE).
     const sgIssue = service.createMovement({
@@ -226,10 +226,10 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
 describe('runAutoExpirySweep (F1)', () => {
   test('EXPIREs an ACTIVE LC past expiryDate + mailFloatGraceDays, leaves one not yet past grace untouched', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const due = issueImportLc(service, 'SWEEP-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    const notDue = issueImportLc(service, 'SWEEP-002', { expiryDate: '2026-01-01', mailFloatGraceDays: 30 });
+    const due = issueImportLc(service, 'SWEEP-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    const notDue = issueImportLc(service, 'SWEEP-002', { expiryDate: '2025-12-30', mailFloatGraceDays: 30 });
 
-    const results = service.runAutoExpirySweep(new Date('2026-01-10'));
+    const results = service.runAutoExpirySweep(new Date('2026-01-08'));
 
     expect(results).toEqual([{ balanceContractId: due.balanceContractId, ok: true }]);
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'SWEEP-001' }, true)?.status).toBe('EXPIRED');
@@ -252,8 +252,8 @@ describe('runAutoExpirySweep (F1)', () => {
 
   test('is idempotent across repeated sweep calls — a second run finds nothing left to do', () => {
     const service = new BalanceService(createDb(':memory:'));
-    issueImportLc(service, 'SWEEP-004', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    const asOf = new Date('2026-01-10');
+    issueImportLc(service, 'SWEEP-004', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    const asOf = new Date('2026-01-08');
     expect(service.runAutoExpirySweep(asOf)).toHaveLength(1);
     expect(service.runAutoExpirySweep(asOf)).toEqual([]);
   });
@@ -261,7 +261,7 @@ describe('runAutoExpirySweep (F1)', () => {
   test('Import and Export sides respect their own independently-configured grace days', () => {
     const service = new BalanceService(createDb(':memory:'));
     // Import default is 5 days (config.ts) — 3 days past expiry is still within Import's own grace.
-    const importLc = issueImportLc(service, 'SWEEP-005', { expiryDate: '2026-01-01' });
+    const importLc = issueImportLc(service, 'SWEEP-005', { expiryDate: '2025-12-30' });
     const exportIssue = service.createMovement({
       instrumentType: 'EPLC_CONFIRMATION',
       naturalKey: { lcNumber: 'SWEEP-006' },
@@ -269,14 +269,14 @@ describe('runAutoExpirySweep (F1)', () => {
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
-      expiryDate: '2026-01-01',
+      expiryDate: '2025-12-30',
       tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     if (!exportIssue.created) throw new Error('expected a new movement');
     service.release(exportIssue.movement.movementId, 'checker1');
 
-    const results = service.runAutoExpirySweep(new Date('2026-01-04')); // 3 days past expiry
+    const results = service.runAutoExpirySweep(new Date('2026-01-02')); // 3 days past expiry
     expect(results).toEqual([]);
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'SWEEP-005' })?.balanceContractId).toBe(importLc.balanceContractId);
   });
@@ -296,7 +296,7 @@ describe('runAutoExpirySweep (F1)', () => {
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
-      expiryDate: '2026-01-01',
+      expiryDate: '2025-12-30',
       mailFloatGraceDays: 5,
       tenorType: 'SIGHT',
       createdBy: 'maker1',
@@ -313,9 +313,9 @@ describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses eval
   test('CLOSEs an EXPIRED contract with SG=0/Acceptance=0/no open Events; leaves one with an outstanding SG untouched', () => {
     // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
     // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.
-    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
-    const clean = issueImportLc(service, 'AUTOCLOSE-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
-    const dirty = issueImportLc(service, 'AUTOCLOSE-002', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-08T00:00:00Z');
+    const clean = issueImportLc(service, 'AUTOCLOSE-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
+    const dirty = issueImportLc(service, 'AUTOCLOSE-002', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
     const sgIssue = service.createMovement({
       instrumentType: 'SHGT',
       naturalKey: { lcNumber: 'AUTOCLOSE-002', sgNumber: 'SG01' },
@@ -329,14 +329,14 @@ describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses eval
     if (!sgIssue.created) throw new Error('expected a new movement');
     service.release(sgIssue.movement.movementId, 'checker1');
 
-    const asOf = new Date('2026-01-10');
+    const asOf = new Date('2026-01-08');
     service.runAutoExpirySweep(asOf);
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'AUTOCLOSE-001' }, true)?.status).toBe('EXPIRED');
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'AUTOCLOSE-002' }, true)?.status).toBe('EXPIRED');
 
     // runAutoCloseSweep() reports one entry per EXPIRED candidate it attempted, success or failure —
     // not just the successes — so an operator can see WHY a still-EXPIRED contract wasn't auto-closed.
-    const results = service.runAutoCloseSweep(new Date('2026-01-20'));
+    const results = service.runAutoCloseSweep(new Date('2026-01-18'));
     expect(results).toHaveLength(2);
     expect(results).toContainEqual({ balanceContractId: clean.balanceContractId, ok: true });
     expect(results).toContainEqual(
@@ -363,9 +363,9 @@ describe('runExpirySweepCycle (F1) — AUTO EXPIRY then, same cycle, AUTO CLOSE'
   // intended behavior instead of the gap.
   test('a never-utilized LC (SG/Acceptance already 0) goes ACTIVE -> EXPIRED in one cycle, but AUTO CLOSE does NOT also close it in that same cycle (§8.5 gap closed by the Auto Close Grace Period)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    issueImportLc(service, 'CYCLE-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
+    issueImportLc(service, 'CYCLE-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
 
-    const { expiry, close } = service.runExpirySweepCycle(new Date('2026-01-10'));
+    const { expiry, close } = service.runExpirySweepCycle(new Date('2026-01-08'));
     expect(expiry).toHaveLength(1);
     expect(expiry[0]!.ok).toBe(true);
     expect(close).toHaveLength(0); // Grace Period not yet elapsed — nothing to CLOSE this cycle.
@@ -374,15 +374,15 @@ describe('runExpirySweepCycle (F1) — AUTO EXPIRY then, same cycle, AUTO CLOSE'
 
   test('once the Auto Close Grace Period has since elapsed, a LATER cycle does CLOSE the same contract', () => {
     // Fixed now() so the EXPIRE's own effectiveTo is deterministic across the two separate cycle calls.
-    const service = new BalanceService(createDb(':memory:'), () => '2026-01-10T00:00:00Z');
-    issueImportLc(service, 'CYCLE-002', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
+    const service = new BalanceService(createDb(':memory:'), () => '2026-01-08T00:00:00Z');
+    issueImportLc(service, 'CYCLE-002', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
 
-    const first = service.runExpirySweepCycle(new Date('2026-01-10'));
+    const first = service.runExpirySweepCycle(new Date('2026-01-08'));
     expect(first.expiry).toHaveLength(1);
     expect(first.close).toHaveLength(0);
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-002' }, true)?.status).toBe('EXPIRED');
 
-    const later = service.runExpirySweepCycle(new Date('2026-01-20'));
+    const later = service.runExpirySweepCycle(new Date('2026-01-18'));
     expect(later.expiry).toHaveLength(0); // already EXPIRED, nothing left for AUTO EXPIRY to do.
     expect(later.close).toHaveLength(1);
     expect(later.close[0]!.ok).toBe(true);
@@ -428,7 +428,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
   test('EXPIRE: a new PENDING SG appears after Submit — Release re-checks eligibility and throws', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-EXPIRE-001', { expiryDate: '2026-01-01' });
+    const lc = issueImportLc(service, 'RECHECK-EXPIRE-001', { expiryDate: '2025-12-30' });
     const expire = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -458,7 +458,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
   test('EXPIRE: Confirmed Balance changes after Submit (an unrelated AMEND_INCREASE releases first) — Release re-checks the frozen amount and throws', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-EXPIRE-002', { expiryDate: '2026-01-01' });
+    const lc = issueImportLc(service, 'RECHECK-EXPIRE-002', { expiryDate: '2025-12-30' });
     const expire = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -491,7 +491,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
 describe('processSweepCandidate — reports (not throws) an idempotency conflict on the eventSeq it generates', () => {
   test('a pre-existing movement at the exact Date.now() eventSeq the sweep would generate is reported as ok:false, not thrown', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'SWEEP-IDEMPOTENCY-001', { expiryDate: '2026-01-01', mailFloatGraceDays: 5 });
+    const lc = issueImportLc(service, 'SWEEP-IDEMPOTENCY-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
 
     const fixedNow = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockReturnValue(fixedNow);
@@ -509,7 +509,7 @@ describe('processSweepCandidate — reports (not throws) an idempotency conflict
         createdBy: 'maker1',
       });
 
-      const results = service.runAutoExpirySweep(new Date('2026-01-10'));
+      const results = service.runAutoExpirySweep(new Date('2026-01-08'));
       expect(results).toEqual([{ balanceContractId: lc.balanceContractId, ok: false, error: expect.stringContaining('idempotency conflict') }]);
     } finally {
       jest.spyOn(Date, 'now').mockRestore();

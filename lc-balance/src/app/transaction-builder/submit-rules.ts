@@ -11,6 +11,7 @@ import {
   requiredNaturalKeyFields,
   toleranceApplicable,
 } from './function-policy';
+import { domesticNonBusinessDayReason } from './domestic-calendar';
 
 /**
  * BAL-003 (God Component) — Maker Submit's own validation and request assembly, extracted from
@@ -80,6 +81,15 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // expiryDate could never be picked up by runAutoExpirySweep()'s own candidate query.
   if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !model.expiryDate) {
     return fail(`Expiry Date is mandatory for ${selectedFunction?.code}.`);
+  }
+  // User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要") —
+  // mirrors the microservice's own BalanceService.assertExpiryDateIsBusinessDay(); this client-side guard
+  // is a convenience only, the server-side check is the authoritative enforcement.
+  if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && model.expiryDate) {
+    const reason = domesticNonBusinessDayReason(model.expiryDate);
+    if (reason) {
+      return fail(`Expiry Date ${model.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`);
+    }
   }
   if (!isAmendExpiryDate && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
     return fail(`Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`);

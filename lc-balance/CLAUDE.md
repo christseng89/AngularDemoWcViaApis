@@ -1819,3 +1819,66 @@ rules, including `release()`-side DB-bypass tests proving the defense-in-depth r
 All three suites re-run green (Angular 1146, backend 34, microservice 567) — live-verified via direct curl
 (`expiryDate`/`tenorType` missing → 400) and via the running Angular app (Submit A1 stays disabled until
 Expiry Date is filled, enables once it is).
+
+## "Run All Cases" 500 — three independent root causes, all fixed
+
+Reviewer-reported 2026-08-26. (1) `backend/server.js` run via plain `node server.js` (no `--watch`) served
+a stale `require()`-cached `businessCases.js` after edits — restart needed after any registry edit, same
+gotcha `microservices/balance-component/`'s own `npm run dev` avoids via `--watch`. (2) The
+`/balance-movements` rate limiter (120 req/60s) was sized for the registry's original ~10 cases; a full
+27-case run fires ~105 sequential calls — raised to 1000/60s (`app.ts`). (3) `server.js`'s
+`resolveLogicalContractId()`/createMovement step handler dereferenced `.response.balanceContractId`/
+`.response.movementId` without checking the referenced step actually succeeded — a rate-limited or
+rejected referenced step threw an opaque TypeError instead of a diagnosable error; fixed with explicit
+`!referenced?.response?.balanceContractId` guards. Backend gained matching tests
+(`runCase.test.js`). Button label corrected "Run All 10 Cases" → "Run All Cases" (registry has grown past
+10 since). Live-verified: a real "Run All Cases" browser click completes all 27 cases.
+
+## Expiry Date must be a genuine domestic (Taiwan) business day at A1/B1 ISSUE (v1.27.0)
+
+User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要"), same day
+as the `expiryDate`-mandatory rule above. New `domain/domesticCalendar.ts` (microservice) /
+`domestic-calendar.ts` (Angular, hand-synced copy) — reuses the same illustrative 2026-2028 TW calendar
+data already established for the F1 §13.5 Auto Close Grace Period reference material, copied rather than
+called over HTTP (same "Phase 1, same-repo" posture as `autoCloseGracePeriod.ts`). A year outside
+2026-2028 is deliberately treated as "unknown" (weekend check still applies, holiday check silently has
+nothing to match), not rejected — the opposite failure mode from the AUTO CLOSE sweep's own fail-closed
+`CALENDAR_RANGE_EXCEEDED` guard, since silently allowing an unverifiable far-future date is safer here than
+blocking every long-tenor LC. Enforced identically to `expiryDate`-mandatory: Maker `createMovement()`
+(`assertExpiryDateIsBusinessDay()`), Checker `release()` re-check, and a `submit-rules.ts` client-side
+mirror. Broke 23 microservice tests (`expiryExtensionAndReopen.test.ts`/`autoExpirySweep.test.ts`) whose
+own placeholder `expiryDate: '2026-01-01'` is 元旦 — shifted to `2025-12-30` (and every asOf/businessDate in
+the same test uniformly by the same 2 days, preserving each test's own relative day-math) rather than
+picking an unrelated date. Also broke the Business Case Registry's own `2028-12-31` placeholder (a Sunday)
+across 25 occurrences — shifted to `2028-12-28`, plus the matching Angular spec fixtures
+(`maker-panel.component.spec.ts`/`submit-rules.spec.ts`). All three suites re-run green (Angular 1159,
+backend 38, microservice 584) — live-verified via direct curl (holiday/weekend/business-day expiryDate)
+and a full "Run All Cases" browser-equivalent curl sweep (27/27 pass).
+
+## Every Step-1/Step-2 picker's own "⚠ No eligible records available for this transaction" could flash falsely before the real candidate list rendered
+
+Reviewer-reported 2026-08-26 ("A35 A7 先出現 ⚠ No eligible records... 再出現交易" / "選 A3S 或 A7 FULL
+SETTLE 就可以看到這 ERROR 訊息一閃而過"), traced to TWO independent gaps in `CatalogPickerService`/
+`MakerPanelComponent`, both closed:
+
+1. `CatalogPickerService.total` reset to 0 the instant `load()` started, staying 0 through the whole HTTP
+   round trip (contracts, then per-candidate snapshots) — a caller reading `total === 0` mid-flight saw a
+   false "zero eligible" reading. Fixed with a new `loading` boolean (mirrors `IndexPickerComponent`'s own
+   pre-existing `loading` input, which `catalogPicker`/`parentPicker`/`ibIndexPicker` were never wired up
+   to) — wired into every one of their `<app-index-picker>` usages.
+2. For any function whose eligibility is `{kind:'hintSet', ...}`-driven (A3S/A4/A6/A7/A9/A10/A11/B3/B4/B5/
+   B6/B7 — every function with a server-computed hint-set), `reloadCatalog()`/`loadParent()`'s own
+   `onLoaded` callback fires a THIRD, independent async fetch (`DocumentArrivalHintsService.loadXxxEligibility()`)
+   that `CatalogPickerService.loading` knows nothing about — the hint-set Map/Set starts empty, so
+   `total` read 0 for the entire window between `loading` going false and the hint-set actually arriving.
+   New `MakerPanelComponent.hintsPending` counter (incremented/decremented around each of the 8 hint-load
+   call sites) closes this — `eligiblePickersLoading` only consults it when the CURRENT function's own
+   rule is actually hint-set-shaped, so a plain function (A2) is never held up by an unrelated counter.
+
+Live-verified via direct component-instance inspection (`window.ng.getOwningComponent()` + a polling
+trace) rather than screenshots alone, since the race window is only reliably observable that way — A3S
+and A7 (Full Settle) both confirmed: the message stays `null` throughout `loading`/`hintsPending`, then
+shows the correct final text once both resolve, never the false-negative flash. All 1170 Angular tests
+green (added dedicated `Subject`-based tests in `catalog-picker.service.spec.ts`/
+`maker-panel.component.spec.ts`, since the existing synchronous `of(...)`-based tests can never reproduce
+an in-flight window).
