@@ -53,34 +53,33 @@ export interface SubmitValidation {
   patch: Partial<BuilderModel>;
 }
 
-export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
-  const { model, naturalKey, selectedFunction } = ctx;
-  const patch: Partial<BuilderModel> = {};
-  const fail = (error: string): SubmitValidation => ({ error, patch });
-  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
-  // F1 — AMEND_EXPIRY_DATE (A2/B2's third subChoice option) never has a real Amount at all (the field is
-  // hidden — see builder-fields.ts's own isAmendExpiryDate) — buildSubmitRequest() below sends a fixed
-  // '0' regardless of what model.amount currently holds, so the blank-amount guard below must not fire.
-  const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
-
+/**
+ * `validateSubmit()`'s own mandatory-field guards — instrumentType/movementType/amount/currency/
+ * createdBy, New Expiry Date (AMEND_EXPIRY_DATE), Reason Code (CLOSE/REOPEN), A1/B1's own Expiry Date
+ * (mandatory + domestic-business-day), Amount decimal-places/positivity. Pure code motion out of
+ * validateSubmit() (2026-08-26, SonarQube-scan-report.md — that function had grown to Cognitive
+ * Complexity 60) — verbatim logic/messages/order preserved; returns the first failing message or `null`.
+ */
+function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boolean): string | null {
+  const { model, selectedFunction } = ctx;
   if (!model.instrumentType || !model.movementType || (!isAmendExpiryDate && !model.amount) || !model.currency || !model.createdBy) {
-    return fail('Fill in amount, currency, createdBy.');
+    return 'Fill in amount, currency, createdBy.';
   }
   if (isAmendExpiryDate && !model.newExpiryDate) {
-    return fail('New Expiry Date is mandatory.');
+    return 'New Expiry Date is mandatory.';
   }
   // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6 and A11/B7 both
   // require a caller-supplied Reason Code; the microservice rejects a bare Submit with none (see
   // BalanceService.assertReasonCodeRequired). AUTO CLOSE never reaches this client-side path at all
   // (it auto-fills its own fixed reasonCode server-side), so no exemption is needed here.
   if ((selectedFunction?.requiresCloseEligibility || selectedFunction?.requiresReopenEligibility) && !model.reasonCode) {
-    return fail(`Reason Code is mandatory for ${selectedFunction?.code}.`);
+    return `Reason Code is mandatory for ${selectedFunction?.code}.`;
   }
   // User-directed 2026-08-26 ("A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理") — mirrors the
   // microservice's own BalanceService.assertExpiryDateRequired(); without it, a contract ISSUEd with no
   // expiryDate could never be picked up by runAutoExpirySweep()'s own candidate query.
   if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !model.expiryDate) {
-    return fail(`Expiry Date is mandatory for ${selectedFunction?.code}.`);
+    return `Expiry Date is mandatory for ${selectedFunction?.code}.`;
   }
   // User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要") —
   // mirrors the microservice's own BalanceService.assertExpiryDateIsBusinessDay(); this client-side guard
@@ -88,11 +87,11 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && model.expiryDate) {
     const reason = domesticNonBusinessDayReason(model.expiryDate);
     if (reason) {
-      return fail(`Expiry Date ${model.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`);
+      return `Expiry Date ${model.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`;
     }
   }
   if (!isAmendExpiryDate && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
-    return fail(`Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`);
+    return `Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`;
   }
   // Applies uniformly, including B2 (which used to accept a negative Amount to express Decrease — now
   // always positive; see the amendDirection guard below). Checked before that guard's own transform
@@ -105,45 +104,73 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // builder-fields.ts's own amountFromFixed/isAmendExpiryDate). Every OTHER function still means "0 isn't
   // a real transaction" here.
   if (model.movementType !== 'CLOSE' && model.movementType !== 'REOPEN' && !isAmendExpiryDate && Number(model.amount) <= 0) {
-    return fail('Amount must be greater than 0.');
+    return 'Amount must be greater than 0.';
   }
+  return null;
+}
+
+/**
+ * `validateSubmit()`'s own natural-key-field guards — secondaryRef, SHGT's own SG Number, LC Number
+ * (both the Parent-picker-supplied and free-text-typed shapes), IB/EB Number, Tenor Type. Pure code
+ * motion out of validateSubmit() (2026-08-26, SonarQube-scan-report.md) — verbatim logic/messages/order
+ * preserved; returns the first failing message or `null`.
+ */
+function validateNaturalKeyFields(ctx: SubmitRulesContext): string | null {
+  const { model, naturalKey, selectedFunction } = ctx;
   if (ctx.dynamicSecondaryRefLabel && !model.secondaryRef) {
-    return fail(`${ctx.dynamicSecondaryRefLabel} is mandatory for ${selectedFunction?.code}.`);
+    return `${ctx.dynamicSecondaryRefLabel} is mandatory for ${selectedFunction?.code}.`;
   }
   if (isCreatingMovement(model) && model.instrumentType === 'SHGT' && !naturalKey.sgNumber) {
-    return fail('SG Number is mandatory when issuing a Shipping Guarantee.');
+    return 'SG Number is mandatory when issuing a Shipping Guarantee.';
   }
   if (lcNumberFromParent(model) && !naturalKey.lcNumber) {
-    return fail("Pick the Parent LC first — that selection supplies this record's LC Number.");
+    return "Pick the Parent LC first — that selection supplies this record's LC Number.";
   }
   // A1/B1 type the LC Number free-text — lcNumberFromParent above only covers A6/B4/A8 (Parent picker),
   // so nothing else stops a blank submission from silently creating a contract with lc_number=''.
   if (isCreatingMovement(model) && !lcNumberFromParent(model) && !naturalKey.lcNumber) {
-    return fail('LC Number is mandatory.');
+    return 'LC Number is mandatory.';
   }
   if (requiredNaturalKeyFields(model).includes('ibNumber') && isCreatingMovement(model) && !naturalKey.ibNumber) {
-    return fail(`${ibNumberLabel(ctx.activeFunctionSide)} is mandatory.`);
+    return `${ibNumberLabel(ctx.activeFunctionSide)} is mandatory.`;
   }
   if (selectedFunction?.tenorTypeOptions?.length && !model.tenorType) {
-    return fail(`Tenor Type is mandatory for ${selectedFunction.code}.`);
+    return `Tenor Type is mandatory for ${selectedFunction.code}.`;
   }
+  return null;
+}
+
+/**
+ * `validateSubmit()`'s own function-specific guards that also derive `patch` (A1's Tenor-Days-0
+ * normalization; A9/B5's FULL vs PARTIAL movementType) — A1 Tenor Days, A6/B4's settlesDocumentArrival
+ * target, A3S's own SG pick, A9 Full-Redeem-only, B5 Full/Partial Settle, B2's own amendDirection pick.
+ * Pure code motion out of validateSubmit() (2026-08-26, SonarQube-scan-report.md) — verbatim logic/
+ * messages/order preserved; mutates `patch` in place (same object validateSubmit() returns), returns the
+ * first failing message or `null`.
+ */
+function validateFunctionSpecificRules(
+  ctx: SubmitRulesContext,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+  patch: Partial<BuilderModel>,
+): string | null {
+  const { model, selectedFunction } = ctx;
   // A1: Sight => Tenor Days = 0 (protected); not Sight => must be > 0. buildFields() already enforces
   // this reactively; this is the submit-time backstop (submit() never gates on form.valid).
   if (selectedFunction?.code === 'A1') {
     if (model.tenorType === 'SIGHT') {
       patch.tenorDays = 0;
     } else if (!model.tenorDays || Number(model.tenorDays) <= 0) {
-      return fail("Tenor Days must be greater than 0 for Seller's/Buyer's Usance.");
+      return "Tenor Days must be greater than 0 for Seller's/Buyer's Usance.";
     }
   }
   // A6/B4 must convert a SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
   if (strategy?.checkerRelease.settlesDocumentArrival && !ctx.selectedPayMovement) {
-    return fail(`Pick the still-PENDING ${selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`);
+    return `Pick the still-PENDING ${selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`;
   }
   // A3S must be tied to a SPECIFIC Shipping Guarantee — same reasoning as A6 above, just against an
   // outstanding SG record instead of an existing PENDING Document Arrival.
   if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
-    return fail('Pick the Shipping Guarantee this Document Arrival is against first.');
+    return 'Pick the Shipping Guarantee this Document Arrival is against first.';
   }
   // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
   // instrument-based, not amount-based" — SG_RELEASE is always the FULL amount, no residual): movementType
@@ -157,11 +184,11 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // businessEventId — and never routes through this branch at all.
   if (strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
     if (!ctx.selectedContractSnapshot) {
-      return fail('Search for the Shipping Guarantee to redeem first.');
+      return 'Search for the Shipping Guarantee to redeem first.';
     }
     const available = ctx.selectedContractSnapshot.availableBalance;
     if (Number(model.amount) !== Number(available)) {
-      return fail(`A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (${available}) — Partial Redeem is no longer supported here.`);
+      return `A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (${available}) — Partial Redeem is no longer supported here.`;
     }
     patch.movementType = 'FULL_REDEEM';
   }
@@ -170,11 +197,11 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // its matching Reimbursement Receivable together, not two independent ones.
   if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE') {
     if (!ctx.selectedContractSnapshot) {
-      return fail('Search for the Acceptance to settle first.');
+      return 'Search for the Acceptance to settle first.';
     }
     const available = ctx.selectedContractSnapshot.availableBalance;
     if (Number(model.amount) > Number(available)) {
-      return fail(`Amount must not exceed the Acceptance's Available Balance (${available}).`);
+      return `Amount must not exceed the Acceptance's Available Balance (${available}).`;
     }
     patch.movementType = Number(model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
   }
@@ -184,8 +211,36 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   // negative right after Submit. The sign transform happens in buildSubmitRequest() instead, purely for
   // the outgoing wire request — `model.amount` always stays what the Maker typed.
   if (selectedFunction?.subChoice?.key === 'amendDirection' && !ctx.amendDirection) {
-    return fail('Pick Increase or Decrease for this Amendment.');
+    return 'Pick Increase or Decrease for this Amendment.';
   }
+  return null;
+}
+
+export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
+  const { model, selectedFunction } = ctx;
+  const patch: Partial<BuilderModel> = {};
+  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  // F1 — AMEND_EXPIRY_DATE (A2/B2's third subChoice option) never has a real Amount at all (the field is
+  // hidden — see builder-fields.ts's own isAmendExpiryDate) — buildSubmitRequest() below sends a fixed
+  // '0' regardless of what model.amount currently holds, so the blank-amount guard below must not fire.
+  const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
+
+  // 2026-08-26 (SonarQube-scan-report.md, Cognitive Complexity 60 -> decomposed) — three grouped guard
+  // functions called in the SAME order their checks used to run inline, so an early failure short-
+  // circuits later groups exactly like the original single top-to-bottom function did; `patch` is one
+  // shared object threaded through all three, so a mutation from an earlier-running group (e.g. A1's own
+  // `patch.tenorDays`) still survives into the returned `SubmitValidation` even when a LATER group's own
+  // guard is what actually fails — same "apply patch regardless of error" contract this function's own
+  // doc comment already establishes.
+  const mandatoryError = validateMandatoryFields(ctx, isAmendExpiryDate);
+  if (mandatoryError) return { error: mandatoryError, patch };
+
+  const naturalKeyError = validateNaturalKeyFields(ctx);
+  if (naturalKeyError) return { error: naturalKeyError, patch };
+
+  const functionError = validateFunctionSpecificRules(ctx, strategy, patch);
+  if (functionError) return { error: functionError, patch };
+
   return { error: null, patch };
 }
 

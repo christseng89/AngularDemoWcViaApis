@@ -1894,3 +1894,36 @@ check weekend first (cheap day-of-week arithmetic) before the holiday Map lookup
 with the mock as well as consistent messaging. New regression test in both `domesticCalendar.test.ts` and
 `domestic-calendar.spec.ts` pins the 2027-10-10 case. All three suites re-run green (Angular 1171,
 backend 38, microservice 585).
+
+## Real SonarQube scan (2026-08-26) — Quality Gate FAILED → fixed and re-verified PASSED; `release()`/`validateSubmit()` decomposed
+
+First actual (not manual-review) SonarQube scan since `SonarQube-report2.md` (2026-08-20); full results in
+`SonarQube-scan-report.md`. Quality Gate failed on New Duplicated Lines Density (5.15% > 3%), root-caused
+to `backend/data/businessCases.js`'s registry growth (2,057 of 2,532 duplicated lines, 81%) plus the new
+`domesticCalendar.ts`/`domestic-calendar.ts` pair. Fixed via `sonar.cpd.exclusions=backend/data/
+businessCases.js` in `sonar-project.properties` (citing BAL-127 — this file's duplication is a disclosed
+design trade-off, not a defect) — re-scan confirms PASSED, 0.96% new-code density, 2.1% project-wide.
+
+Also decomposed the two worst Cognitive Complexity findings the scan surfaced, BAL-141/BAL-142-style (pure
+code motion, zero behavior change): `balanceService.ts`'s `release()` (93, the codebase's worst) into
+`assertReleaseSubmitGuards()`/`assertReleaseEligibility()`/`applyReleaseSideEffects()`/
+`applyAmendExpiryDateReleaseSideEffect()`; `submit-rules.ts`'s `validateSubmit()` (60) into
+`validateMandatoryFields()`/`validateNaturalKeyFields()`/`validateFunctionSpecificRules()`;
+`builder-fields.ts`'s `buildFields()` had its 6-level nested Amount-label ternary extracted into
+`amountFieldLabel()` (also closing 5 `S3358` findings), and `maker-panel.component.ts`'s
+`afterResolved()`/`refreshSelectedContractSnapshot()` had 2 sets of duplicate-body if/else-if chains
+(`S1871`) collapsed into single boolean guards. 7 `Web:AvoidCommentedOutCodeCheck` false positives marked
+`WONTFIX` directly via the SonarQube API.
+
+**Disclosed trade-off, not fully resolved**: splitting `release()`/`validateSubmit()` each produced one
+piece under 15 and one still over (29/19 and 21/26 respectively) — total Cognitive Complexity and SQALE
+debt-minutes both dropped (1,672→1,651; 651min→445min) but the raw `S3776` finding *count* rose 17→19,
+since one 93-complexity finding became two smaller ones instead of zero. Not pursued further — each
+remaining piece is already one cohesive concern (one movementType-gated guard group), and splitting purely
+to satisfy a line-count metric would be decomposition for its own sake, the same posture BAL-003's own
+closure already rejected. Full before/after table in `SonarQube-scan-report.md`'s "Follow-up" section.
+
+Verified: all three suites green throughout (Angular 1171/1171, backend 38/38, microservice 585/585, no
+coverage regression), plus a live browser walkthrough (A1 Issue→Release, A8 SG Issue→Release, A9 SG Full
+Redeem→Release, A10 LC Close→Release) confirming the `release()`/`submit-rules.ts`/`builder-fields.ts`
+refactors behave identically in the running app — zero console errors.

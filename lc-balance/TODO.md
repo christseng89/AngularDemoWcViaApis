@@ -407,39 +407,49 @@ Docker 上真實 SonarQube 9.9.8 LTS 掃描（`sonarsource/sonar-scanner-cli:5.0
 維持 0，Reliability/Security/Maintainability/Security Review 四個 Rating 全維持 A——沒有退步；以下只收錄
 這次掃描發現、值得排入待辦的項目，完整數據見報告檔案本身。
 
-- [ ] **Quality Gate 現在是 FAILED（ERROR）**——6 個條件中唯一沒過的是 **New Duplicated Lines Density
-  5.15%（門檻 ≤3%）**，相對上次掃描的 2.17% PASS 是真退步。已追查根本原因：`backend/data/
-  businessCases.js` 一家佔全部重複行數的 81%（2,057/2,532 行，從上次的 732 行暴增），因為 Business
-  Case Registry 從 ~21 案增加到 27 案，加上這幾天兩次「全 27 案都要補欄位」的機械式修改
-  （`expiryDate`/`tenorType`/`sourceTransactionRef`/`reasonCode`），讓本來就相似的案例區塊變得更相似
-  ——這是 BAL-127 已經拍板的「每案獨立可讀」設計取捨的直接後果，不是設計退步。另外今天新增的
-  `domesticCalendar.ts`（微服務）／`domestic-calendar.ts`（Angular）這對檔案也貢獻了一小段（67-71 行）
-  刻意手動同步的跨檔案重複（兩個獨立部署專案，設計上就是複製而非共用 import）。**需要決策**：(a) 幫
-  這個專案調高 New Duplicated Lines Density 門檻（例如到 12-15%），註明理由指向 BAL-127；或
-  (b) 把 `backend/data/businessCases.js` 加進 `sonar.cpd.exclusions`，讓門檻繼續對真正的原始碼有意義。
-  **不建議**真的去重構 `businessCases.js` 消除重複——會違背 BAL-127 已拍板的「每案獨立可讀」設計，屬於
-  重新翻案已解決的決策。兩個選項都只需要改 `sonar-project.properties`，不涉及應用程式邏輯改動。
+- [x] ~~**Quality Gate 現在是 FAILED（ERROR）**——New Duplicated Lines Density 5.15%（門檻 ≤3%）~~ —
+  **2026-08-26 已修復並重新掃描驗證，Quality Gate 轉為 PASSED（OK）**。採用方案 (b)：
+  `sonar-project.properties` 新增 `sonar.cpd.exclusions=backend/data/businessCases.js`（附註記引用
+  BAL-127），未動任何應用程式邏輯。重新掃描結果：New Duplicated Lines Density 5.15% → **0.96%**；
+  專案整體重複率 11.4% → **2.1%**（2,532 → 475 重複行，`businessCases.js` 的 2,057 行不再計入，其餘
+  6 個檔案的重複行數完全不變）。
 
-- [ ] **`microservices/balance-component/src/service/balanceService.ts:1737`（`release()`）Cognitive
-  Complexity 93，全案最高**——超越上次掃描最高的 `createMovement()`（71，已於 BAL-142 拆解降複雜度，
-  這次掃描已不在榜上）。`release()` 複雜度飆高的原因是這幾天陸續加的 Checker 端防禦性複查
-  （`assertExpiryDateRequired`/`assertExpiryDateIsBusinessDay`/`assertNaturalKeyFieldsRequired`/
-  `assertSecondaryRefRequired`/`assertTenorRequired`/`assertReasonCodeRequired`/
-  `assertMakerCheckerSeparation`/`isSightUtilizeFinalize` 快照路由）全部堆在同一個方法裡——跟
-  `createMovement()` 被 BAL-142 拆解前的「防禦性複查逐漸堆積」是同一種模式。建議比照 BAL-141/BAL-142
-  的做法（table/registry 取代條件鏈）做一次同等的拆解。非 Quality Gate 卡關項，屬於維護性債務。
+- [x] ~~**`microservices/balance-component/src/service/balanceService.ts:1737`（`release()`）Cognitive
+  Complexity 93，全案最高**~~ — **2026-08-26 已拆解**，比照 BAL-141/BAL-142 的手法拆成
+  `assertReleaseSubmitGuards()`（欄位/自然鍵/A4 Maker-Submit 閘門，不再上榜）、
+  `assertReleaseEligibility()`（CLOSE/EXPIRE/REOPEN/A9 資格複查，降到 29）、
+  `applyReleaseSideEffects()`（referencedTransactionId/CLOSE/EXPIRE/REOPEN 副作用，不再上榜）、
+  `applyAmendExpiryDateReleaseSideEffect()`（AMEND_EXPIRY_DATE 子狀態機，降到 19）——純程式碼搬移，
+  邏輯/訊息/順序逐字保留。**誠實記錄一個真實的取捨**：93/83min 這一筆消失了，但拆出來的 4 個方法有
+  2 個仍然超過 15（29、19），所以這個檔案的 S3776 筆數從 4 筆變成 5 筆（+1）——不過總 effort 從 83min
+  降到 48min，是淨改善，只是「筆數」這個單一指標没有跟著同步下降。細節與理由（為何不繼續往下拆）見
+  `SonarQube-scan-report.md`「Follow-up」一節。三套測試全綠（微服務 585/585，coverage 不變）+ 瀏覽器
+  實測 A1 Issue→Release 全程正確。
 
-- [ ] **7 個 `Web:AvoidCommentedOutCodeCheck` 誤判，上次掃描就建議標記 False Positive，至今仍未標記**
-  ——這次掃描重新逐一核對過，全部仍是誤判（本專案慣例的長篇說明式 doc comment，不是真的被註解掉的
-  程式碼）：`account-entries-dialog.component.html:1`、`inquire-events.component.html:8,144`、
-  `maker-panel.component.html:18,187,215,789`（後兩個 `inquire-events.component.html` 位置是新的，
-  隨 2026-08-21 Part B 抽出 `InquireEventsComponent` 才出現）。直接在 SonarQube UI 上標記
-  「Won't Fix / False Positive」即可，不需要改程式碼，純粹是清掉之後掃描的雜訊。
+- [x] ~~**7 個 `Web:AvoidCommentedOutCodeCheck` 誤判，上次掃描就建議標記 False Positive，至今仍未標記**~~
+  — **2026-08-26 已透過 SonarQube API（`/api/issues/do_transition`）逐筆標記 `WONTFIX`**，每筆附上
+  查證註解。不需要改程式碼，這 7 筆已從後續掃描的 unresolved 清單消失。
 
-- [ ] **持續存在、非阻擋的次要維護性項目**（兩次掃描都出現、都還沒處理，優先度低於上面三項）：
-  `submit-rules.ts:56`（Cognitive Complexity 60）、`builder-fields.ts:24`（63）——這兩個是重複出現的
-  複雜度離群值；`maker-panel.component.ts` 裡 4 筆 `S1871`（重複的條件分支內容，L499/L505/L925/L928）
-  ——這兩次掃描都在同一個檔案，只是行號隨檔案成長而位移，分支內容從未真正整併過。
+- [x] ~~**持續存在、非阻擋的次要維護性項目**：`submit-rules.ts:56`（60）、`builder-fields.ts:24`（63）、
+  `maker-panel.component.ts` 4 筆 `S1871`~~ — **2026-08-26 部分處理**：
+  - `maker-panel.component.ts` 的 4 筆 `S1871`（重複條件分支）**已修復**——`afterResolved()`/
+    `refreshSelectedContractSnapshot()`裡「3-4 個分支、內容完全一樣」的 if/else-if 鏈，各自收斂成一個
+    布林 guard，行為逐字保留。瀏覽器實測 A9 SG Redeem 全程正確（Amount 自動帶入 SG Available Balance）。
+  - `submit-rules.ts` 的 `validateSubmit()`（60）**已拆解**成 `validateMandatoryFields()`（降到 21）、
+    `validateNaturalKeyFields()`（不再上榜）、`validateFunctionSpecificRules()`（降到 26）——跟
+    `release()` 那項一樣的取捨：60/50min 這一筆消失，變成兩筆 21+26，但總 effort 50min→27min 是淨改善，
+    這個檔案的 S3776 筆數因此從 3 筆變 4 筆（`buildSubmitRequest`/`hasEligibleTargetSelected` 兩個既有
+    發現完全沒動，不在這次範圍內）。
+  - `builder-fields.ts` 的 `buildFields()`（63）**部分改善**——把 Amount 欄位那段 6 層巢狀三元運算子
+    抽成新函式 `amountFieldLabel()`（同時修掉 5 筆 `S3358` 巢狀三元判斷發現），複雜度降到 36，但函式
+    本身仍超過 15 門檻（筆數不變，effort 從 53min 降到 26min）。
+  - 三套測試全綠（Angular 1171/1171），瀏覽器實測 A1/A8/A9/A10 全程正確，Console 無錯誤。
+
+**2026-08-26 整體結果**（重新掃描驗證，見 `SonarQube-scan-report.md`「Follow-up」一節完整數據）：
+Quality Gate FAILED → **PASSED**；Code Smells 59 → **44**；Technical Debt 651min → **445min**
+（−206min，−31.6%）；Cognitive Complexity 總和 1,672 → 1,651。誠實揭露：S3776（Cognitive Complexity）
+筆數本身從 17 筆微幅增加到 19 筆（+2），因為兩個超大函式各自拆成兩個較小、但仍超過 15 門檻的函式——
+細節見上方兩個條目與報告本身，這是揭露過的取捨，不是遺漏。
 
 ---
 

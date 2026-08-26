@@ -494,15 +494,14 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   private afterResolved(): void {
-    if (this.model.movementType === 'FULL_SETTLE' && this.selectedContractSnapshot) {
-      this.model.amount = this.selectedContractSnapshot.availableBalance;
-    } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && this.selectedContractSnapshot) {
-      this.model.amount = this.selectedContractSnapshot.availableBalance;
-    } else if (
-      this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' &&
-      this.model.instrumentType === 'EPLC_ACCEPTANCE' &&
-      this.selectedContractSnapshot
-    ) {
+    // 2026-08-26 (SonarQube-scan-report.md, typescript:S1871) — was 3 separate if/else-if branches with
+    // an identical body (`this.model.amount = this.selectedContractSnapshot.availableBalance;`),
+    // differing only in which function's own Amount-derivation rule matched; collapsed into one guard.
+    const amountFromAvailableBalance =
+      this.model.movementType === 'FULL_SETTLE' ||
+      this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' ||
+      (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && this.model.instrumentType === 'EPLC_ACCEPTANCE');
+    if (amountFromAvailableBalance && this.selectedContractSnapshot) {
       this.model.amount = this.selectedContractSnapshot.availableBalance;
     }
     this.rebuildFields();
@@ -916,16 +915,14 @@ export class MakerPanelComponent implements OnChanges {
       next: (snap) => {
         this.snapshotLoading = false;
         this.selectedContractSnapshot = snap;
-        if (this.model.movementType === 'FULL_SETTLE') {
-          this.model.amount = snap.availableBalance;
-          this.rebuildFields();
-        } else if (
-          this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' &&
-          this.model.instrumentType === 'EPLC_ACCEPTANCE'
-        ) {
-          this.model.amount = snap.availableBalance;
-          this.rebuildFields();
-        } else if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
+        // 2026-08-26 (SonarQube-scan-report.md, typescript:S1871) — was 3 separate if/else-if branches
+        // with an identical body (`this.model.amount = snap.availableBalance; this.rebuildFields();`),
+        // differing only in which function's own Amount-derivation rule matched; collapsed into one guard.
+        const amountFromAvailableBalance =
+          this.model.movementType === 'FULL_SETTLE' ||
+          (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && this.model.instrumentType === 'EPLC_ACCEPTANCE') ||
+          this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM';
+        if (amountFromAvailableBalance) {
           this.model.amount = snap.availableBalance;
           this.rebuildFields();
         } else if (this.selectedFunctionStrategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance') {

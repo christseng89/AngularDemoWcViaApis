@@ -21,9 +21,14 @@ export interface BuilderFieldsContext {
   dynamicSecondaryRefLabel: string | null;
 }
 
-export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
-  const { model, selectedFunction, selectedContractSnapshot } = ctx;
-  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+/**
+ * `buildFields()`'s own Amount-field lock derivation — which of A6/B4/A7/A9/A10/B6/A11/B7's own
+ * mutually-independent "Amount is carried/locked" rules applies, if any. Pure code motion out of
+ * `buildFields()` (2026-08-26, SonarQube-scan-report.md — that function had grown to Cognitive
+ * Complexity 63) — verbatim logic/comments preserved, just relocated.
+ */
+function deriveAmountLockFlags(ctx: BuilderFieldsContext, strategy: ReturnType<typeof deriveFunctionStrategy> | null) {
+  const { model, selectedContractSnapshot } = ctx;
   // A6/B4 (once the source is picked) and A7 Full Settle — Amount carries from the source record and
   // is protected. Partial Settle stays free-typed.
   //
@@ -62,11 +67,46 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // requires SOME valid MonetaryAmount string — the server discards it and substitutes its own computed
   // figure regardless of what's sent.
   const amountFromFixed = strategy?.movementDerivation.amountFixed != null;
+  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose || amountFromSgRedeem || amountFromFixed;
+  return { amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountFromFixed, amountLocked };
+}
+
+/**
+ * `buildFields()`'s own Amount-field label — was a single 6-level-deep nested ternary (2026-08-26,
+ * SonarQube-scan-report.md — flagged individually as 5 separate `typescript:S3358` findings, and the
+ * single largest contributor to that function's own Cognitive Complexity 63). Converted to a flat
+ * sequence of independent guard clauses, same order of precedence, verbatim strings preserved.
+ */
+function amountFieldLabel(
+  flags: Pick<ReturnType<typeof deriveAmountLockFlags>, 'amountFromFullSettle' | 'amountFromSgRedeem' | 'amountCappedAtAcceptance' | 'amountFromClose' | 'amountLocked'>,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+): string {
+  if (flags.amountFromFullSettle) return "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)";
+  if (flags.amountFromSgRedeem) {
+    return "Amount (Full Redeem only — carried from the Shipping Guarantee's Available Balance, protected; Partial Redeem is no longer supported here)";
+  }
+  if (flags.amountCappedAtAcceptance) {
+    return "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)";
+  }
+  if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
+    return 'Bill Amount (actual document amount — see SG Redemption Amount below)';
+  }
+  if (flags.amountFromClose) return 'Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)';
+  if (flags.amountLocked) return 'Amount (carried from the Document Arrival, protected)';
+  return 'Amount (face-level, per Design doc §6.2)';
+}
+
+export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
+  const { model, selectedFunction, selectedContractSnapshot } = ctx;
+  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  const { amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountFromFixed, amountLocked } = deriveAmountLockFlags(
+    ctx,
+    strategy,
+  );
   // F1 — A2/B2's third subChoice option (AMEND_EXPIRY_DATE). Amount has no meaning here (always '0' by
   // construction, same reasoning as amountFromFixed above) — the Amount field is swapped out entirely for
   // the new newExpiryDate date field below, not merely locked in place like amountFromClose/amountFromFixed.
   const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
-  const amountLocked = amountFromDocArrival || amountFromFullSettle || amountFromClose || amountFromSgRedeem || amountFromFixed;
   // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6/A11/B7 only.
   const requiresReasonCode = !!selectedFunction?.requiresCloseEligibility || !!selectedFunction?.requiresReopenEligibility;
   // A1/B1 only — F1's own new optional Expiry Date input (UCP 600 Art.6(d)); mailFloatGraceDays is
@@ -91,19 +131,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       key: 'amount',
       type: 'input',
       props: {
-        label: amountFromFullSettle
-          ? "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)"
-          : amountFromSgRedeem
-            ? "Amount (Full Redeem only — carried from the Shipping Guarantee's Available Balance, protected; Partial Redeem is no longer supported here)"
-            : amountCappedAtAcceptance
-              ? "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)"
-              : strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')
-                ? 'Bill Amount (actual document amount — see SG Redemption Amount below)'
-                : amountFromClose
-                  ? 'Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)'
-                  : amountLocked
-                    ? 'Amount (carried from the Document Arrival, protected)'
-                    : 'Amount (face-level, per Design doc §6.2)',
+        label: amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
         required: !isAmendExpiryDate && !amountFromFixed,
         type: 'number',
         disabled: amountLocked,

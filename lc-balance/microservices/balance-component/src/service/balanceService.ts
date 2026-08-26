@@ -1740,52 +1740,7 @@ export class BalanceService {
 
     applyStatusTransition({ currentStatus: movement.status, action: 'RELEASE', createdBy: movement.createdBy, actingUser: releasedBy });
 
-    // Re-check (not just at Submit) — see assertValidAmount()'s own doc comment for why. Uses the
-    // movement's own already-persisted amount, unchanged since Submit (movements are immutable once
-    // created); this is a pure defense-in-depth backstop, not expected to ever actually fire for a
-    // movement createMovement() itself created — only for one that reached PENDING some other way.
-    this.assertValidAmount(movement.movementType, movement.amount);
-    // User-directed 2026-08-26 ("API包括 MAKER CHECKER") — same defense-in-depth posture as
-    // assertValidAmount() just above: re-checked against the movement's own already-persisted
-    // sourceTransactionRef, not expected to ever actually fire for a movement createMovement() itself
-    // created — only for one that reached PENDING some other way (e.g. a raw DB insert).
-    if (SECONDARY_REF_REQUIRED_MOVEMENT_TYPES.has(movement.movementType) && !movement.sourceTransactionRef) {
-      throw new RequestValidationError(`sourceTransactionRef is required for ${movement.movementType}.`);
-    }
-
     const contract = this.contracts.findById(movement.balanceContractId)!;
-    // Same re-check posture as above, but only meaningful for the movement that ORIGINALLY created this
-    // contract (ISSUE/CREATE) — naturalKey/tenorType/tenorDays are fixed on the CONTRACT at that moment
-    // and never change afterward, so re-validating them on every other movementType's own release() would
-    // just needlessly re-check the same already-valid contract over and over.
-    if (this.movementTypeRegistry[movement.movementType]?.isCreating) {
-      if (!contract.naturalKey.lcNumber) {
-        throw new RequestValidationError(`naturalKey.lcNumber is required for ${movement.movementType} against ${contract.instrumentType}.`);
-      }
-      for (const field of NATURAL_KEY_FIELDS_BY_INSTRUMENT[contract.instrumentType] ?? []) {
-        if (!contract.naturalKey[field]) {
-          throw new RequestValidationError(`naturalKey.${field} is required for ${movement.movementType} against ${contract.instrumentType}.`);
-        }
-      }
-      const pairKey = `${contract.instrumentType}:${movement.movementType}`;
-      if (TENOR_TYPE_REQUIRED_PAIRS.has(pairKey)) {
-        if (!contract.tenorType) {
-          throw new RequestValidationError(`tenorType is required for ${movement.movementType} against ${contract.instrumentType}.`);
-        }
-        if (pairKey === 'IPLC_LC:ISSUE' && contract.tenorType !== 'SIGHT' && !(contract.tenorDays && contract.tenorDays > 0)) {
-          throw new RequestValidationError(`tenorDays must be greater than 0 for ${contract.tenorType}.`);
-        }
-      }
-      // User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... API包括 MAKER CHECKER") — same
-      // re-check posture as above, against the contract's own already-persisted expiryDate.
-      if (movement.movementType === 'ISSUE' && contract.expiryDate) {
-        const reason = domesticNonBusinessDayReason(contract.expiryDate);
-        if (reason) {
-          throw new RequestValidationError(`expiryDate ${contract.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`);
-        }
-      }
-    }
-
     // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found) / 2026-08-18 (reused again below,
     // for the eventSnapshot-preservation fix) — identifies a Sight-tenor IPLC_LC/UTILIZE, i.e. this
     // release() call is A4 (Sight Settlement) finalizing an EXISTING A3/A3S Document Arrival. Scoped to
@@ -1814,102 +1769,18 @@ export class BalanceService {
     // overwrite every other movement type's own release() already gets, exactly like a normal PENDING ->
     // RELEASED transition should. No special-casing needed here any more.
 
-    // BAL-123's own Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be
-    // enforced ONLY by the reference Transaction Builder client's own checkerAct(), never here, so any
-    // other caller (curl, a future second UI, an integration test) could release an A4-type UTILIZE
-    // that was never Maker-submitted, defeating the whole point of the gate.
-    if (isSightUtilizeFinalize && !movement.makerSubmittedAt) {
-      throw new IllegalStateTransitionError(
-        `Cannot release movement ${movementId} — A4 (Sight Settlement) requires a Maker Submit ` +
-          `(POST /balance-movements/${movementId}/maker-submit) before the Checker can Release it.`,
-      );
-    }
+    // BAL-142-style decomposition (2026-08-26, SonarQube-scan-report.md — release() had grown to
+    // Cognitive Complexity 93, the codebase's own worst finding, after createMovement()'s own equivalent
+    // guard-accumulation was decomposed by BAL-142). Every extracted method below is pure code motion —
+    // verbatim logic/messages/order preserved, split purely by concern: field-level re-checks that don't
+    // need the balance figure, movementType-specific eligibility re-checks that do, the write itself
+    // (kept inline — it's the one truly sequential, non-reorderable part), and the post-write side
+    // effects (AMEND_EXPIRY_DATE kept as its own method, since it's a self-contained sub-state-machine —
+    // Extension vs. plain amendment — not a single side-effect call like its siblings).
+    this.assertReleaseSubmitGuards(movement, contract, isSightUtilizeFinalize);
 
     const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
-
-    // A10/B6 Close — re-run the SAME eligibility check createMovement() ran at Submit, against the
-    // THEN-current state, before actually flipping status (Checker Approve is the 3rd of 3 layers sharing
-    // evaluateContractCloseEligibility() — see that method's own doc comment). Confirmed Balance is also
-    // re-verified still EXACTLY equal to this movement's own frozen ceilingAmount (`before`, computed just
-    // above, IS that current figure) — a movement's own ceilingAmount is fixed forever at Submit time
-    // (never recomputed here, same invariant every other movementType relies on), so if anything changed
-    // it in the Submit-to-Approve window, this Close would either under- or over-write the real balance;
-    // safer to force a fresh Submit with the current figure than to special-case CLOSE into recomputing
-    // its own amount at Release time.
-    if (movement.movementType === 'CLOSE') {
-      const eligibility = this.evaluateContractCloseEligibility(contract, movement.movementId);
-      if (!eligibility.eligible) {
-        throw new IllegalStateTransitionError(
-          `Cannot release CLOSE movement ${movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this CLOSE request and re-submit.`,
-        );
-      }
-      if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
-        throw new IllegalStateTransitionError(
-          `Cannot release CLOSE movement ${movementId} — Confirmed Balance has changed since Submit ` +
-            `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this CLOSE request and re-submit with the current figure.`,
-        );
-      }
-    }
-
-    // F1 (external BA review) — AUTO EXPIRY's own Release-time re-check, same shape/rationale as
-    // CLOSE's above (re-run eligibility + exact-amount check against the THEN-current state).
-    if (movement.movementType === 'EXPIRE') {
-      const eligibility = this.evaluateContractExpiryEligibility(contract, movement.movementId);
-      if (!eligibility.eligible) {
-        throw new IllegalStateTransitionError(
-          `Cannot release EXPIRE movement ${movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this EXPIRE request and re-submit.`,
-        );
-      }
-      if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
-        throw new IllegalStateTransitionError(
-          `Cannot release EXPIRE movement ${movementId} — Confirmed Balance has changed since Submit ` +
-            `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this EXPIRE request and re-submit with the current figure.`,
-        );
-      }
-    }
-
-    // F1, redesigned 2026-08-25 — REOPEN's own Release-time re-check, same shape/rationale as CLOSE/
-    // EXPIRE above: re-run eligibility, and re-verify the amount frozen at Submit still matches what
-    // domain/reopenRestoration.ts would compute fresh right now — a movement's own ceilingAmount is
-    // fixed forever at Submit time (never recomputed here), so if the restore-chain total shifted in
-    // the Submit-to-Release window (e.g. a second, racing Reopen attempt), forcing a re-submit is safer
-    // than silently restoring a stale figure.
-    if (movement.movementType === 'REOPEN') {
-      if (contract.status !== 'CLOSED') {
-        throw new IllegalStateTransitionError(`Cannot release REOPEN movement ${movementId} — contract status is now ${contract.status}, no longer CLOSED.`);
-      }
-      const { hasOpenEvents } = this.gatherEventTree(contract, movement.movementId);
-      if (hasOpenEvents) {
-        throw new IllegalStateTransitionError(`Cannot release REOPEN movement ${movementId} — one or more Events under this LC are not yet fully resolved.`);
-      }
-      // Excludes THIS movement itself — by Release time it already exists in the DB (created at Submit,
-      // still PENDING), and since it's the contract's own most RECENT movement by eventSeq, an
-      // un-filtered walk would hit it FIRST (movementType REOPEN, not EXPIRE/CLOSE) and immediately
-      // stop, always computing 0 — the exact same excludeMovementId shape gatherEventTree() already
-      // needs for its own re-check just above.
-      const currentRestoreAmount = computeReopenRestoreAmount(
-        this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== movement.movementId),
-      );
-      if (!parseMonetaryAmount(movement.ceilingAmount).equals(currentRestoreAmount)) {
-        throw new IllegalStateTransitionError(
-          `Cannot release REOPEN movement ${movementId} — the amount to restore has changed since Submit ` +
-            `(was ${movement.ceilingAmount}, now ${currentRestoreAmount.toFixed()}). Cancel this Reopen request and re-submit with the current figure.`,
-        );
-      }
-    }
-
-    // A9 Full-Redeem-only re-check (business-confirmed 2026-08-24) — mirrors the Maker-side guard in
-    // buildMovementTypeRegistry()'s own outstandingCapped check above. Not expected to ever actually fire
-    // for a movement createMovement() itself created (businessEventId is immutable once set, so a
-    // movement that passed the Maker-side gate can't later lose it) — pure defense-in-depth for a
-    // movement that reached PENDING some other way, same posture assertValidAmount()'s own doc comment
-    // already established for this codebase.
-    if (contract.instrumentType === 'SHGT' && movement.movementType === 'PARTIAL_REDEEM' && !movement.businessEventId) {
-      throw new IllegalStateTransitionError(
-        `Cannot release movement ${movementId} — A9 (Shipping Guarantee Redemption) must be Full Redeem only; ` +
-          `a standalone Partial Redeem (no businessEventId) is not a legal release target.`,
-      );
-    }
+    this.assertReleaseEligibility(movement, contract, before);
 
     const releasedAt = this.now();
     // Compute the after-figure by simulating this one movement flipping to RELEASED,
@@ -1974,6 +1845,180 @@ export class BalanceService {
       ...snapshotFields,
     });
 
+    this.applyReleaseSideEffects(movement, contract, releasedBy, releasedAt);
+    this.applyAmendExpiryDateReleaseSideEffect(movement, contract, releasedBy, releasedAt);
+
+    return this.movements.findById(movementId)!;
+  }
+
+  /**
+   * release()'s own pre-write, non-balance-dependent guards — amount/secondaryRef/naturalKey-tenor-
+   * expiryDate re-checks (creating movementTypes only) and A4's own Maker-Submit gate. Pure code motion
+   * out of release() (BAL-142-style decomposition, 2026-08-26, SonarQube-scan-report.md) — verbatim
+   * logic/messages/order preserved.
+   */
+  private assertReleaseSubmitGuards(movement: BalanceMovement, contract: BalanceContract, isSightUtilizeFinalize: boolean): void {
+    // Re-check (not just at Submit) — see assertValidAmount()'s own doc comment for why. Uses the
+    // movement's own already-persisted amount, unchanged since Submit (movements are immutable once
+    // created); this is a pure defense-in-depth backstop, not expected to ever actually fire for a
+    // movement createMovement() itself created — only for one that reached PENDING some other way.
+    this.assertValidAmount(movement.movementType, movement.amount);
+    // User-directed 2026-08-26 ("API包括 MAKER CHECKER") — same defense-in-depth posture as
+    // assertValidAmount() just above: re-checked against the movement's own already-persisted
+    // sourceTransactionRef, not expected to ever actually fire for a movement createMovement() itself
+    // created — only for one that reached PENDING some other way (e.g. a raw DB insert).
+    if (SECONDARY_REF_REQUIRED_MOVEMENT_TYPES.has(movement.movementType) && !movement.sourceTransactionRef) {
+      throw new RequestValidationError(`sourceTransactionRef is required for ${movement.movementType}.`);
+    }
+
+    // Same re-check posture as above, but only meaningful for the movement that ORIGINALLY created this
+    // contract (ISSUE/CREATE) — naturalKey/tenorType/tenorDays are fixed on the CONTRACT at that moment
+    // and never change afterward, so re-validating them on every other movementType's own release() would
+    // just needlessly re-check the same already-valid contract over and over.
+    if (this.movementTypeRegistry[movement.movementType]?.isCreating) {
+      if (!contract.naturalKey.lcNumber) {
+        throw new RequestValidationError(`naturalKey.lcNumber is required for ${movement.movementType} against ${contract.instrumentType}.`);
+      }
+      for (const field of NATURAL_KEY_FIELDS_BY_INSTRUMENT[contract.instrumentType] ?? []) {
+        if (!contract.naturalKey[field]) {
+          throw new RequestValidationError(`naturalKey.${field} is required for ${movement.movementType} against ${contract.instrumentType}.`);
+        }
+      }
+      const pairKey = `${contract.instrumentType}:${movement.movementType}`;
+      if (TENOR_TYPE_REQUIRED_PAIRS.has(pairKey)) {
+        if (!contract.tenorType) {
+          throw new RequestValidationError(`tenorType is required for ${movement.movementType} against ${contract.instrumentType}.`);
+        }
+        if (pairKey === 'IPLC_LC:ISSUE' && contract.tenorType !== 'SIGHT' && !(contract.tenorDays && contract.tenorDays > 0)) {
+          throw new RequestValidationError(`tenorDays must be greater than 0 for ${contract.tenorType}.`);
+        }
+      }
+      // User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... API包括 MAKER CHECKER") — same
+      // re-check posture as above, against the contract's own already-persisted expiryDate.
+      if (movement.movementType === 'ISSUE' && contract.expiryDate) {
+        const reason = domesticNonBusinessDayReason(contract.expiryDate);
+        if (reason) {
+          throw new RequestValidationError(`expiryDate ${contract.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`);
+        }
+      }
+    }
+
+    // BAL-123's own Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be
+    // enforced ONLY by the reference Transaction Builder client's own checkerAct(), never here, so any
+    // other caller (curl, a future second UI, an integration test) could release an A4-type UTILIZE
+    // that was never Maker-submitted, defeating the whole point of the gate.
+    if (isSightUtilizeFinalize && !movement.makerSubmittedAt) {
+      throw new IllegalStateTransitionError(
+        `Cannot release movement ${movement.movementId} — A4 (Sight Settlement) requires a Maker Submit ` +
+          `(POST /balance-movements/${movement.movementId}/maker-submit) before the Checker can Release it.`,
+      );
+    }
+  }
+
+  /**
+   * release()'s own pre-write, balance-dependent eligibility re-checks — CLOSE/EXPIRE/REOPEN's own
+   * "still eligible, amount unchanged since Submit" gates, plus A9's own Full-Redeem-only re-check. Pure
+   * code motion out of release() (BAL-142-style decomposition, 2026-08-26, SonarQube-scan-report.md) —
+   * verbatim logic/messages/order preserved; `before` is the Confirmed Balance release() already
+   * computed for its own write.
+   */
+  private assertReleaseEligibility(movement: BalanceMovement, contract: BalanceContract, before: Decimal): void {
+    // A10/B6 Close — re-run the SAME eligibility check createMovement() ran at Submit, against the
+    // THEN-current state, before actually flipping status (Checker Approve is the 3rd of 3 layers sharing
+    // evaluateContractCloseEligibility() — see that method's own doc comment). Confirmed Balance is also
+    // re-verified still EXACTLY equal to this movement's own frozen ceilingAmount (`before`, computed just
+    // above, IS that current figure) — a movement's own ceilingAmount is fixed forever at Submit time
+    // (never recomputed here, same invariant every other movementType relies on), so if anything changed
+    // it in the Submit-to-Approve window, this Close would either under- or over-write the real balance;
+    // safer to force a fresh Submit with the current figure than to special-case CLOSE into recomputing
+    // its own amount at Release time.
+    if (movement.movementType === 'CLOSE') {
+      const eligibility = this.evaluateContractCloseEligibility(contract, movement.movementId);
+      if (!eligibility.eligible) {
+        throw new IllegalStateTransitionError(
+          `Cannot release CLOSE movement ${movement.movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this CLOSE request and re-submit.`,
+        );
+      }
+      if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
+        throw new IllegalStateTransitionError(
+          `Cannot release CLOSE movement ${movement.movementId} — Confirmed Balance has changed since Submit ` +
+            `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this CLOSE request and re-submit with the current figure.`,
+        );
+      }
+    }
+
+    // F1 (external BA review) — AUTO EXPIRY's own Release-time re-check, same shape/rationale as
+    // CLOSE's above (re-run eligibility + exact-amount check against the THEN-current state).
+    if (movement.movementType === 'EXPIRE') {
+      const eligibility = this.evaluateContractExpiryEligibility(contract, movement.movementId);
+      if (!eligibility.eligible) {
+        throw new IllegalStateTransitionError(
+          `Cannot release EXPIRE movement ${movement.movementId} — eligibility no longer holds: ${eligibility.reasons.join(' ')} Cancel this EXPIRE request and re-submit.`,
+        );
+      }
+      if (!parseMonetaryAmount(movement.ceilingAmount).equals(before)) {
+        throw new IllegalStateTransitionError(
+          `Cannot release EXPIRE movement ${movement.movementId} — Confirmed Balance has changed since Submit ` +
+            `(was ${movement.ceilingAmount}, now ${before.toFixed()}). Cancel this EXPIRE request and re-submit with the current figure.`,
+        );
+      }
+    }
+
+    // F1, redesigned 2026-08-25 — REOPEN's own Release-time re-check, same shape/rationale as CLOSE/
+    // EXPIRE above: re-run eligibility, and re-verify the amount frozen at Submit still matches what
+    // domain/reopenRestoration.ts would compute fresh right now — a movement's own ceilingAmount is
+    // fixed forever at Submit time (never recomputed here), so if the restore-chain total shifted in
+    // the Submit-to-Release window (e.g. a second, racing Reopen attempt), forcing a re-submit is safer
+    // than silently restoring a stale figure.
+    if (movement.movementType === 'REOPEN') {
+      if (contract.status !== 'CLOSED') {
+        throw new IllegalStateTransitionError(`Cannot release REOPEN movement ${movement.movementId} — contract status is now ${contract.status}, no longer CLOSED.`);
+      }
+      const { hasOpenEvents } = this.gatherEventTree(contract, movement.movementId);
+      if (hasOpenEvents) {
+        throw new IllegalStateTransitionError(`Cannot release REOPEN movement ${movement.movementId} — one or more Events under this LC are not yet fully resolved.`);
+      }
+      // Excludes THIS movement itself — by Release time it already exists in the DB (created at Submit,
+      // still PENDING), and since it's the contract's own most RECENT movement by eventSeq, an
+      // un-filtered walk would hit it FIRST (movementType REOPEN, not EXPIRE/CLOSE) and immediately
+      // stop, always computing 0 — the exact same excludeMovementId shape gatherEventTree() already
+      // needs for its own re-check just above.
+      const currentRestoreAmount = computeReopenRestoreAmount(
+        this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== movement.movementId),
+      );
+      if (!parseMonetaryAmount(movement.ceilingAmount).equals(currentRestoreAmount)) {
+        throw new IllegalStateTransitionError(
+          `Cannot release REOPEN movement ${movement.movementId} — the amount to restore has changed since Submit ` +
+            `(was ${movement.ceilingAmount}, now ${currentRestoreAmount.toFixed()}). Cancel this Reopen request and re-submit with the current figure.`,
+        );
+      }
+    }
+
+    // A9 Full-Redeem-only re-check (business-confirmed 2026-08-24) — mirrors the Maker-side guard in
+    // buildMovementTypeRegistry()'s own outstandingCapped check above. Not expected to ever actually fire
+    // for a movement createMovement() itself created (businessEventId is immutable once set, so a
+    // movement that passed the Maker-side gate can't later lose it) — pure defense-in-depth for a
+    // movement that reached PENDING some other way, same posture assertValidAmount()'s own doc comment
+    // already established for this codebase.
+    if (contract.instrumentType === 'SHGT' && movement.movementType === 'PARTIAL_REDEEM' && !movement.businessEventId) {
+      throw new IllegalStateTransitionError(
+        `Cannot release movement ${movement.movementId} — A9 (Shipping Guarantee Redemption) must be Full Redeem only; ` +
+          `a standalone Partial Redeem (no businessEventId) is not a legal release target.`,
+      );
+    }
+  }
+
+  /**
+   * release()'s own post-write side effects for the referencedTransactionId consumption marker and
+   * CLOSE/EXPIRE/REOPEN's own contract-level state changes. AMEND_EXPIRY_DATE is deliberately NOT here —
+   * see applyAmendExpiryDateReleaseSideEffect() below, kept as its own method since it's a self-contained
+   * sub-state-machine (Extension vs. plain amendment), not a single side-effect call like its siblings.
+   * Pure code motion out of release() (BAL-142-style decomposition, 2026-08-26,
+   * SonarQube-scan-report.md) — verbatim logic/order preserved (the two methods' relative call order is
+   * safe to swap: AMEND_EXPIRY_DATE and REOPEN are mutually exclusive movementTypes on the same
+   * movement, so at most one of the two methods' own movementType-gated bodies can ever fire).
+   */
+  private applyReleaseSideEffects(movement: BalanceMovement, contract: BalanceContract, releasedBy: string, releasedAt: string): void {
     // 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 must
     // genuinely RELEASE on its own before B4, the next step in the flow, can act on it; superseded the
     // prior acknowledge()-only design). B3's own Present Docs earmark (EPLC_EXAMINATION/CREATE) is now
@@ -2011,59 +2056,6 @@ export class BalanceService {
       this.contracts.markExpired(contract.balanceContractId, releasedAt);
     }
 
-    // F1 (external BA review) §8 — Expiry Extension Amendment / plain expiry-date amendment, both
-    // carried by AMEND_EXPIRY_DATE. Re-validates the SAME conditions createMovement() checked at
-    // Submit, against the THEN-current state (same "Submit-to-Release window" posture CLOSE/EXPIRE
-    // above already establish), before applying the side effect.
-    if (movement.movementType === 'AMEND_EXPIRY_DATE') {
-      if (contract.status !== 'ACTIVE' && contract.status !== 'EXPIRED') {
-        throw new IllegalStateTransitionError(
-          `Cannot release AMEND_EXPIRY_DATE movement ${movementId} — contract status is now ${contract.status}, no longer ACTIVE or EXPIRED.`,
-        );
-      }
-      const newExpiryDate = movement.newExpiryDate;
-      if (!newExpiryDate) throw new IllegalStateTransitionError(`AMEND_EXPIRY_DATE movement ${movementId} has no newExpiryDate recorded.`);
-      if (newExpiryDate <= releasedAt) {
-        throw new IllegalStateTransitionError(
-          `Cannot release AMEND_EXPIRY_DATE movement ${movementId} — newExpiryDate (${newExpiryDate}) is no longer strictly later than the Business Date (${releasedAt}).`,
-        );
-      }
-      if (contract.status === 'EXPIRED') {
-        // Expiry Extension Amendment (§8) — re-check hasOpenEvents, restore whatever is still genuinely
-        // outstanding, reactivate to ACTIVE.
-        const { hasOpenEvents } = this.gatherEventTree(contract, movement.movementId);
-        if (hasOpenEvents) {
-          throw new IllegalStateTransitionError(
-            `Cannot release Expiry Extension Amendment ${movementId} — one or more Events under this LC are not yet fully resolved.`,
-          );
-        }
-        // F1, user-reported live-testing bug (2026-08-25, "IMPORT S01 EXTEND後 無法做後續作業" — traced to
-        // a real double-restoration): this contract can reach EXPIRED via a genuine EXPIRE, OR via A11/B7
-        // Reopen reactivating it back to EXPIRED (§9.2 Option A, when the original expiryDate had already
-        // passed) — and since the 2026-08-25 REOPEN redesign, REOPEN restores the balance DIRECTLY on its
-        // own signed amount, leaving no REVERSAL trace behind. The OLD "find the most recent EXPIRE with
-        // no REVERSAL pointed at it, always reverse it" logic couldn't tell the two paths apart — it kept
-        // finding that same already-restored EXPIRE (no REVERSAL row existed for it) and reversed it a
-        // SECOND time, double-crediting the balance. EXPIRE can never chain with itself (it requires
-        // status ACTIVE, which its own release side effect immediately clears), and CLOSE can never
-        // precede an EXPIRED contract (CLOSE only follows EXPIRED, never the reverse) — so the ONLY
-        // movement that could ever need reversing here is a RELEASED EXPIRE sitting as this contract's
-        // own most recent movement (excluding this AMEND_EXPIRY_DATE itself); if the most recent movement
-        // is anything else (a REOPEN, most commonly), a prior action already restored the balance and
-        // there is genuinely nothing left to reverse.
-        const ownMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== movement.movementId);
-        const trailing = [...ownMovements].sort((a, b) => a.eventSeq - b.eventSeq).pop();
-        const expireMovement = trailing && trailing.status === 'RELEASED' && trailing.movementType === 'EXPIRE' ? trailing : undefined;
-        if (expireMovement) {
-          this.createAndReleaseReversal(expireMovement, releasedBy, movement.businessEventId ?? movement.movementId);
-        }
-        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
-      } else {
-        // Plain amendment against an ACTIVE contract — just persist the new expiry date, no status change, no REVERSAL.
-        this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
-      }
-    }
-
     // F1 (external BA review) §9, redesigned 2026-08-25 — A11/B7 Reopen. The movement itself already
     // carries its own real restoration amount (computed at Submit, re-verified above) and has just gone
     // through the SAME generic RELEASED-status/balance-update write every other movementType uses — no
@@ -2076,8 +2068,69 @@ export class BalanceService {
       const targetStatus = contract.expiryDate && contract.expiryDate > releasedAt ? 'ACTIVE' : 'EXPIRED';
       this.contracts.reactivate(contract.balanceContractId, targetStatus, releasedAt);
     }
+  }
 
-    return this.movements.findById(movementId)!;
+  /**
+   * release()'s own AMEND_EXPIRY_DATE side effect — Expiry Extension Amendment (contract EXPIRED ->
+   * ACTIVE, restoring whatever's still genuinely outstanding) or a plain expiry-date amendment against
+   * an ACTIVE contract (no status change). Kept as its own method rather than folded into
+   * applyReleaseSideEffects() above — this is a self-contained sub-state-machine in its own right, not a
+   * single side-effect call. Pure code motion out of release() (BAL-142-style decomposition, 2026-08-26,
+   * SonarQube-scan-report.md) — verbatim logic/messages/order preserved.
+   */
+  private applyAmendExpiryDateReleaseSideEffect(movement: BalanceMovement, contract: BalanceContract, releasedBy: string, releasedAt: string): void {
+    // F1 (external BA review) §8 — Expiry Extension Amendment / plain expiry-date amendment, both
+    // carried by AMEND_EXPIRY_DATE. Re-validates the SAME conditions createMovement() checked at
+    // Submit, against the THEN-current state (same "Submit-to-Release window" posture CLOSE/EXPIRE
+    // above already establish), before applying the side effect.
+    if (movement.movementType !== 'AMEND_EXPIRY_DATE') return;
+
+    if (contract.status !== 'ACTIVE' && contract.status !== 'EXPIRED') {
+      throw new IllegalStateTransitionError(
+        `Cannot release AMEND_EXPIRY_DATE movement ${movement.movementId} — contract status is now ${contract.status}, no longer ACTIVE or EXPIRED.`,
+      );
+    }
+    const newExpiryDate = movement.newExpiryDate;
+    if (!newExpiryDate) throw new IllegalStateTransitionError(`AMEND_EXPIRY_DATE movement ${movement.movementId} has no newExpiryDate recorded.`);
+    if (newExpiryDate <= releasedAt) {
+      throw new IllegalStateTransitionError(
+        `Cannot release AMEND_EXPIRY_DATE movement ${movement.movementId} — newExpiryDate (${newExpiryDate}) is no longer strictly later than the Business Date (${releasedAt}).`,
+      );
+    }
+    if (contract.status === 'EXPIRED') {
+      // Expiry Extension Amendment (§8) — re-check hasOpenEvents, restore whatever is still genuinely
+      // outstanding, reactivate to ACTIVE.
+      const { hasOpenEvents } = this.gatherEventTree(contract, movement.movementId);
+      if (hasOpenEvents) {
+        throw new IllegalStateTransitionError(
+          `Cannot release Expiry Extension Amendment ${movement.movementId} — one or more Events under this LC are not yet fully resolved.`,
+        );
+      }
+      // F1, user-reported live-testing bug (2026-08-25, "IMPORT S01 EXTEND後 無法做後續作業" — traced to
+      // a real double-restoration): this contract can reach EXPIRED via a genuine EXPIRE, OR via A11/B7
+      // Reopen reactivating it back to EXPIRED (§9.2 Option A, when the original expiryDate had already
+      // passed) — and since the 2026-08-25 REOPEN redesign, REOPEN restores the balance DIRECTLY on its
+      // own signed amount, leaving no REVERSAL trace behind. The OLD "find the most recent EXPIRE with
+      // no REVERSAL pointed at it, always reverse it" logic couldn't tell the two paths apart — it kept
+      // finding that same already-restored EXPIRE (no REVERSAL row existed for it) and reversed it a
+      // SECOND time, double-crediting the balance. EXPIRE can never chain with itself (it requires
+      // status ACTIVE, which its own release side effect immediately clears), and CLOSE can never
+      // precede an EXPIRED contract (CLOSE only follows EXPIRED, never the reverse) — so the ONLY
+      // movement that could ever need reversing here is a RELEASED EXPIRE sitting as this contract's
+      // own most recent movement (excluding this AMEND_EXPIRY_DATE itself); if the most recent movement
+      // is anything else (a REOPEN, most commonly), a prior action already restored the balance and
+      // there is genuinely nothing left to reverse.
+      const ownMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== movement.movementId);
+      const trailing = [...ownMovements].sort((a, b) => a.eventSeq - b.eventSeq).pop();
+      const expireMovement = trailing && trailing.status === 'RELEASED' && trailing.movementType === 'EXPIRE' ? trailing : undefined;
+      if (expireMovement) {
+        this.createAndReleaseReversal(expireMovement, releasedBy, movement.businessEventId ?? movement.movementId);
+      }
+      this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
+    } else {
+      // Plain amendment against an ACTIVE contract — just persist the new expiry date, no status change, no REVERSAL.
+      this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
+    }
   }
 
   /**
