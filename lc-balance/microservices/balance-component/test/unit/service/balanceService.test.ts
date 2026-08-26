@@ -24,6 +24,8 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -37,6 +39,7 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
         eventSeq: 2,
         amount: 'not-a-number',
         currency: 'USD',
+        sourceTransactionRef: 'AD-001',
         createdBy: 'maker1',
       }),
     ).toThrow(InvalidMonetaryAmountError);
@@ -51,6 +54,8 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -81,6 +86,8 @@ describe('BalanceService.createMovement — parseMonetaryAmount enforcement at t
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -120,6 +127,8 @@ describe('BalanceService.createMovement — currency consistency (CurrencyMismat
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -133,6 +142,7 @@ describe('BalanceService.createMovement — currency consistency (CurrencyMismat
         eventSeq: 2,
         amount: '5000',
         currency: 'EUR',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       }),
     ).toThrow(CurrencyMismatchError);
@@ -147,6 +157,8 @@ describe('BalanceService.createMovement — currency consistency (CurrencyMismat
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -159,6 +171,7 @@ describe('BalanceService.createMovement — currency consistency (CurrencyMismat
       eventSeq: 2,
       amount: '5000',
       currency: 'USD',
+      sourceTransactionRef: 'AMD-001',
       createdBy: 'maker1',
     });
     expect(amend.created).toBe(true);
@@ -173,6 +186,8 @@ describe('BalanceService.createMovement — currency consistency (CurrencyMismat
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -203,6 +218,8 @@ describe('BalanceService.createMovement — currency consistency (CurrencyMismat
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -240,6 +257,8 @@ describe('BalanceService.findByBusinessEventId', () => {
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');
@@ -278,6 +297,7 @@ describe('BalanceService.findByBusinessEventId', () => {
       eventSeq: 2,
       amount: '20000',
       currency: 'USD',
+      sourceTransactionRef: 'B01',
       businessEventId,
       createdBy: 'maker1',
     });
@@ -316,6 +336,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -338,6 +360,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -361,6 +385,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -393,6 +419,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');
@@ -442,6 +470,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       eventSeq: 1,
       amount: '50000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -458,6 +488,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!cnfIssue.created) throw new Error('expected a new movement');
@@ -511,6 +543,7 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       amount: '100000',
       currency: 'USD',
       tenorType: 'SELLERS_USANCE',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!cnfIssue.created) throw new Error('expected a new movement');
@@ -565,6 +598,8 @@ describe('BalanceService — persisted Event Snapshot (createMovement PENDING, r
       amount: '100000',
       currency: 'USD',
       tenorType: 'BUYERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');
@@ -616,6 +651,8 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');
@@ -663,7 +700,11 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
     // No Acceptance exists under this (Sight) LC — stays null.
     expect(utilize.movement.acceptanceEventSnapshot).toBeNull();
 
-    // Releasing re-captures it too (still exactly one SG, still 12345).
+    // Releasing re-captures it too (still exactly one SG, still 12345). The LC's own ISSUE now defaults
+    // tenorType: 'SIGHT', so this UTILIZE's own Release requires A4's own Maker Submit gate first
+    // (isSightUtilizeFinalize) — same requirement any other Sight-tenor UTILIZE has, unrelated to what
+    // THIS test is actually about.
+    service.submitByMaker(utilize.movement.movementId, 'maker1');
     const released = service.release(utilize.movement.movementId, 'checker1');
     expect(released.sgEventSnapshot!.confirmedBalance).toBe('12345');
   });
@@ -677,6 +718,8 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');
@@ -706,6 +749,7 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
       eventSeq: 2,
       amount: '1000',
       currency: 'USD',
+      sourceTransactionRef: 'B01',
       createdBy: 'maker1',
     });
     if (!utilize.created) throw new Error('expected a new movement');
@@ -723,6 +767,8 @@ describe('BalanceService — sibling Acceptance/SG snapshots (captureSiblingSnap
       amount: '100000',
       currency: 'USD',
       tenorType: 'BUYERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');
@@ -773,6 +819,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       amount: '10000',
       currency: 'USD',
       tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -786,6 +833,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
         eventSeq: 2,
         amount: '1000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       }),
     ).toThrow(IllegalStateTransitionError);
@@ -801,6 +849,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       amount: '10000',
       currency: 'USD',
       tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -829,6 +878,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       amount: '10000',
       currency: 'USD',
       tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -857,6 +907,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       amount: '10000',
       currency: 'USD',
       tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     expect(issue.created).toBe(true);
@@ -872,6 +923,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       amount: '10000',
       currency: 'USD',
       tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -884,6 +936,7 @@ describe('BalanceService — assertRootIssueReleased (business-reported gap 2026
       eventSeq: 2,
       amount: '1000',
       currency: 'USD',
+      sourceTransactionRef: 'AMD-001',
       createdBy: 'maker1',
     });
     expect(decrease.created).toBe(true);
@@ -922,6 +975,8 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
       eventSeq: 1,
       amount: '100000',
       currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -994,6 +1049,7 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
       eventSeq: 2,
       amount: '10000',
       currency: 'USD',
+      sourceTransactionRef: 'HN-001',
       referencedTransactionId: exam.movement.movementId,
       createdBy: 'maker1',
     });
@@ -1051,6 +1107,7 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
       eventSeq: 2,
       amount: '60000',
       currency: 'USD',
+      sourceTransactionRef: 'HN-001',
       referencedTransactionId: exam.movement.movementId,
       createdBy: 'maker1',
     });
@@ -1069,6 +1126,8 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
       amount: '100000',
       currency: 'USD',
       tenorType: 'SELLERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
       createdBy: 'maker1',
     });
     if (!lcIssue.created) throw new Error('expected a new movement');

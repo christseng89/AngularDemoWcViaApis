@@ -133,12 +133,16 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       props: { label: 'New Expiry Date', type: 'date', required: isAmendExpiryDate },
       hide: !isAmendExpiryDate,
     },
-    // F1 — A1/B1 only, optional. The LC's own UCP 600 Art.6(d) expiry/validity date; mailFloatGraceDays
-    // itself is captured server-side from config at ISSUE time, never a client-side field.
+    // F1 — A1/B1 only. The LC's own UCP 600 Art.6(d) expiry/validity date; mailFloatGraceDays itself is
+    // captured server-side from config at ISSUE time, never a client-side field. Made mandatory
+    // (user-directed 2026-08-26, "A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理") — a contract
+    // ISSUEd with none could never be picked up by runAutoExpirySweep()'s own candidate query on the
+    // microservice side (it only scans contracts whose expiry_date IS NOT NULL); server-side enforcement
+    // lives in BalanceService.assertExpiryDateRequired(), this is just the matching UI-side mirror.
     {
       key: 'expiryDate',
       type: 'input',
-      props: { label: 'Expiry Date (UCP 600 Art.6(d), optional)', type: 'date' },
+      props: { label: 'Expiry Date (UCP 600 Art.6(d))', type: 'date', required: showsExpiryDateInput },
       hide: !showsExpiryDateInput,
     },
     {
@@ -231,4 +235,43 @@ export function toReadOnlyFields(fields: FormlyFieldConfig[]): FormlyFieldConfig
     expressions: undefined,
     props: { ...f.props, disabled: true },
   }));
+}
+
+/**
+ * Generic Requirement (reviewer-reported 2026-08-26, "Original Transaction Screen Must Display All Saved
+ * Fields") — one exhaustive source-of-truth mapping from every `BuilderModel` key to the movement/contract
+ * property that actually saved it, so `InquireEventsService.selectEvent()`'s reconstructed read-only model
+ * can never again silently omit a field the way it originally did for `expiryDate` (fixed same day, then
+ * generalized here once the reviewer flagged it as a systemic gap, not a one-off).
+ *
+ * `Required<BuilderModel>` in the mapped type is the enforcement mechanism: adding a new key to
+ * `BuilderModel` (function-policy.ts) — the same interface `buildFields()` itself reads every field key
+ * from — without adding its source here is a TypeScript compile error, not a silent runtime omission. This
+ * is the intentionally-generic fix the reviewer asked for; there is no reflection/JSON-schema layer in this
+ * client (movement/contract are plain typed interfaces, not a dynamic bag of fields), so an exhaustive,
+ * compiler-enforced table is the idiomatic equivalent here.
+ */
+const MODEL_FIELD_SOURCES: { [K in keyof Required<BuilderModel>]: (movement: BalanceMovement, contract: BalanceContract) => BuilderModel[K] } = {
+  instrumentType: (_movement, contract) => contract.instrumentType,
+  movementType: (movement) => movement.movementType,
+  amount: (movement) => movement.amount,
+  currency: (movement) => movement.currency,
+  tolerancePct: (_movement, contract) => contract.tolerancePct ?? undefined,
+  eventSeq: (movement) => movement.eventSeq,
+  createdBy: (movement) => movement.createdBy,
+  secondaryRef: (movement) => movement.sourceTransactionRef ?? undefined,
+  tenorType: (_movement, contract) => contract.tenorType ?? undefined,
+  tenorDays: (_movement, contract) => contract.tenorDays ?? undefined,
+  expiryDate: (_movement, contract) => contract.expiryDate ?? undefined,
+  newExpiryDate: (movement) => movement.newExpiryDate ?? undefined,
+  reasonCode: (movement) => movement.reasonCode ?? undefined,
+};
+
+/** Rebuilds the full `BuilderModel` a historical Event's Original Transaction Screen should show, straight off the saved movement/contract — see MODEL_FIELD_SOURCES' own doc comment for why this is exhaustive by construction rather than hand-picked. */
+export function reconstructOriginalModel(movement: BalanceMovement, contract: BalanceContract): BuilderModel {
+  const model = {} as { [K in keyof Required<BuilderModel>]: BuilderModel[K] };
+  (Object.keys(MODEL_FIELD_SOURCES) as (keyof BuilderModel)[]).forEach((key) => {
+    (model as any)[key] = MODEL_FIELD_SOURCES[key](movement, contract);
+  });
+  return model;
 }

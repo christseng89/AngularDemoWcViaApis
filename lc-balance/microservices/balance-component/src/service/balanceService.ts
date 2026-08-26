@@ -113,6 +113,55 @@ type UpdateMovementStatusParams = Parameters<BalanceMovementStore['updateStatus'
 const ROOT_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set(['IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION']);
 
 /**
+ * User-directed 2026-08-26 ("UI必輸欄位 API也是必輸欄位 三者一體") — mirrors the Angular client's own
+ * `NATURAL_KEY_FIELDS_BY_INSTRUMENT` (balance-component.model.ts), the table `requiredNaturalKeyFields()`
+ * reads to decide which of IB Number/SG Number is mandatory, per instrumentType, on a creating movement
+ * (A6/A8/B3's own naturalKey field). `lcNumber` itself is always required on any creating movement
+ * regardless of instrumentType — enforced unconditionally in assertNaturalKeyFieldsRequired() below, not
+ * listed per-type here.
+ */
+const NATURAL_KEY_FIELDS_BY_INSTRUMENT: Readonly<Record<InstrumentType, ReadonlyArray<'ibNumber' | 'sgNumber'>>> = {
+  IPLC_LC: [],
+  EPLC_LC: [],
+  IPLC_ACCEPTANCE: ['ibNumber'],
+  EPLC_ACCEPTANCE: ['ibNumber'],
+  SHGT: ['sgNumber'],
+  EPLC_CONFIRMATION: [],
+  EPLC_DUE_FROM_ISSUING_BANK: ['ibNumber'],
+  EPLC_ACCEPTANCE_REIMB_RECEIVABLE: ['ibNumber'],
+  EPLC_EXPORT_BILLS_DISCOUNTED: ['ibNumber'],
+  EPLC_EXAMINATION: ['ibNumber'],
+};
+
+/**
+ * User-directed 2026-08-26 — mirrors `dynamicSecondaryRefLabel`/`ctx.dynamicSecondaryRefLabel` client-side
+ * (each of these movementTypes has a `TransactionFunction.secondaryRefLabel` set — Amendment No./Times for
+ * A2/B2 incl. their own AMEND_EXPIRY_DATE third option, IB/EB Number for A3/A3S/B4). Deliberately NOT
+ * every movementType that CAN carry a `sourceTransactionRef` — ISSUE/CREATE/PARTIAL_REDEEM/FULL_REDEEM/
+ * PARTIAL_SETTLE/FULL_SETTLE/CLOSE/EXPIRE/REOPEN/REVERSAL all resolve their own identifying reference a
+ * different way (naturalKey field, two-field LC+IB/SG search, or reasonCode) and stay optional here, same
+ * as before this fix.
+ */
+const SECONDARY_REF_REQUIRED_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
+  'AMEND_INCREASE',
+  'AMEND_DECREASE',
+  'AMEND',
+  'AMEND_EXPIRY_DATE',
+  'UTILIZE',
+  'HONOUR',
+  'ACCEPT',
+]);
+
+/**
+ * User-directed 2026-08-26 — mirrors builder-fields.ts's own `required: !!selectedFunction?.
+ * tenorTypeOptions?.length`: exactly the 3 (instrumentType, movementType) pairs the Angular client ever
+ * submits directly with a Tenor Type picker shown (A1/B1's own ISSUE, A6's own CREATE) — B4's own
+ * internal EPLC_ACCEPTANCE leg is server-derived from its parent Confirmation's tenorType, never a
+ * separate client submission, so it is deliberately NOT in this set.
+ */
+const TENOR_TYPE_REQUIRED_PAIRS: ReadonlySet<string> = new Set(['IPLC_LC:ISSUE', 'EPLC_CONFIRMATION:ISSUE', 'IPLC_ACCEPTANCE:CREATE']);
+
+/**
  * 2026-08-20 (reviewer-directed, closing a Cognitive Complexity finding on captureSiblingSnapshots()) —
  * the Acceptance instrumentType a given root instrumentType produces, or `undefined` when it has none
  * (SHGT/EPLC_EXAMINATION's own root, IPLC_CONFIRMATION doesn't exist). Replaces a nested ternary with a
@@ -1441,6 +1490,72 @@ export class BalanceService {
     }
   }
 
+  /**
+   * User-reported 2026-08-26 ("A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理") — expiryDate was
+   * previously optional at ISSUE, which meant a contract issued with none could never surface in
+   * runAutoExpirySweep()'s own candidate query (it only scans contracts whose expiry_date IS NOT NULL —
+   * see this file's own doc comment above that sweep). Mandatory only for ISSUE against a root
+   * instrumentType (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — expiryDate is structurally inert for any child
+   * contract (createContract() already nulls it out for those regardless of what's sent), so there is
+   * nothing to require there.
+   */
+  private assertExpiryDateRequired(req: CreateMovementRequest): void {
+    if (req.movementType === 'ISSUE' && ROOT_INSTRUMENT_TYPES.has(req.instrumentType) && !req.expiryDate) {
+      throw new RequestValidationError(`expiryDate is required for ISSUE against ${req.instrumentType}.`);
+    }
+  }
+
+  /**
+   * User-directed 2026-08-26 ("UI必輸欄位 API也是必輸欄位 三者一體") — the Angular client already blocks
+   * Submit without these (naturalKey.lcNumber/ibNumber/sgNumber on a creating movement — see
+   * submit-rules.ts's own "LC Number is mandatory."/"IB Number is mandatory."/"SG Number is mandatory..."
+   * guards), but nothing on the server enforced it — a direct API caller could still create a contract
+   * with a blank/missing lcNumber, or an IPLC_ACCEPTANCE/SHGT/etc. with no ibNumber/sgNumber at all. Only
+   * applies when `req.naturalKey` is actually supplied (the balanceContractId path is a different,
+   * already-resolved-contract case this doesn't touch).
+   */
+  private assertNaturalKeyFieldsRequired(req: CreateMovementRequest): void {
+    if (!this.movementTypeRegistry[req.movementType]?.isCreating || !req.naturalKey) return;
+    if (!req.naturalKey.lcNumber) {
+      throw new RequestValidationError(`naturalKey.lcNumber is required for ${req.movementType} against ${req.instrumentType}.`);
+    }
+    for (const field of NATURAL_KEY_FIELDS_BY_INSTRUMENT[req.instrumentType] ?? []) {
+      if (!req.naturalKey[field]) {
+        throw new RequestValidationError(`naturalKey.${field} is required for ${req.movementType} against ${req.instrumentType}.`);
+      }
+    }
+  }
+
+  /**
+   * User-directed 2026-08-26 — mirrors submit-rules.ts's own `ctx.dynamicSecondaryRefLabel &&
+   * !model.secondaryRef` guard (sent as `sourceTransactionRef` on the wire). See
+   * SECONDARY_REF_REQUIRED_MOVEMENT_TYPES' own doc comment for exactly which movementTypes this covers.
+   */
+  private assertSecondaryRefRequired(req: CreateMovementRequest): void {
+    if (SECONDARY_REF_REQUIRED_MOVEMENT_TYPES.has(req.movementType) && !req.sourceTransactionRef) {
+      throw new RequestValidationError(`sourceTransactionRef is required for ${req.movementType}.`);
+    }
+  }
+
+  /**
+   * User-directed 2026-08-26 — mirrors builder-fields.ts's own `required: !!selectedFunction?.
+   * tenorTypeOptions?.length` (Tenor Type) and submit-rules.ts's own A1-only "Tenor Days must be greater
+   * than 0 for Seller's/Buyer's Usance" backstop (Tenor Days). Tenor Days is deliberately checked ONLY
+   * for IPLC_LC:ISSUE (A1) — B1/A6 have no equivalent client-side backstop today (they rely solely on
+   * builder-fields.ts's own live reactive expression, which this server-side mirror does not extend to,
+   * to avoid inventing a NEW client-side rule that doesn't actually exist yet).
+   */
+  private assertTenorRequired(req: CreateMovementRequest): void {
+    const pairKey = `${req.instrumentType}:${req.movementType}`;
+    if (!TENOR_TYPE_REQUIRED_PAIRS.has(pairKey)) return;
+    if (!req.tenorType) {
+      throw new RequestValidationError(`tenorType is required for ${req.movementType} against ${req.instrumentType}.`);
+    }
+    if (pairKey === 'IPLC_LC:ISSUE' && req.tenorType !== 'SIGHT' && !(req.tenorDays && req.tenorDays > 0)) {
+      throw new RequestValidationError(`tenorDays must be greater than 0 for ${req.tenorType}.`);
+    }
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
     // Checked BEFORE resolveOrCreateContract() — a rejected ISSUE/CREATE must never leave an orphaned,
     // empty BalanceContract row behind (same "checked before createContract()" posture the SG/Present-
@@ -1453,6 +1568,10 @@ export class BalanceService {
       this.assertValidAmount(req.movementType, req.amount);
     }
     this.assertReasonCodeRequired(req.movementType, req.reasonCode);
+    this.assertExpiryDateRequired(req);
+    this.assertNaturalKeyFieldsRequired(req);
+    this.assertSecondaryRefRequired(req);
+    this.assertTenorRequired(req);
 
     const contract = this.resolveOrCreateContract(req);
 
@@ -1609,8 +1728,38 @@ export class BalanceService {
     // created); this is a pure defense-in-depth backstop, not expected to ever actually fire for a
     // movement createMovement() itself created — only for one that reached PENDING some other way.
     this.assertValidAmount(movement.movementType, movement.amount);
+    // User-directed 2026-08-26 ("API包括 MAKER CHECKER") — same defense-in-depth posture as
+    // assertValidAmount() just above: re-checked against the movement's own already-persisted
+    // sourceTransactionRef, not expected to ever actually fire for a movement createMovement() itself
+    // created — only for one that reached PENDING some other way (e.g. a raw DB insert).
+    if (SECONDARY_REF_REQUIRED_MOVEMENT_TYPES.has(movement.movementType) && !movement.sourceTransactionRef) {
+      throw new RequestValidationError(`sourceTransactionRef is required for ${movement.movementType}.`);
+    }
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
+    // Same re-check posture as above, but only meaningful for the movement that ORIGINALLY created this
+    // contract (ISSUE/CREATE) — naturalKey/tenorType/tenorDays are fixed on the CONTRACT at that moment
+    // and never change afterward, so re-validating them on every other movementType's own release() would
+    // just needlessly re-check the same already-valid contract over and over.
+    if (this.movementTypeRegistry[movement.movementType]?.isCreating) {
+      if (!contract.naturalKey.lcNumber) {
+        throw new RequestValidationError(`naturalKey.lcNumber is required for ${movement.movementType} against ${contract.instrumentType}.`);
+      }
+      for (const field of NATURAL_KEY_FIELDS_BY_INSTRUMENT[contract.instrumentType] ?? []) {
+        if (!contract.naturalKey[field]) {
+          throw new RequestValidationError(`naturalKey.${field} is required for ${movement.movementType} against ${contract.instrumentType}.`);
+        }
+      }
+      const pairKey = `${contract.instrumentType}:${movement.movementType}`;
+      if (TENOR_TYPE_REQUIRED_PAIRS.has(pairKey)) {
+        if (!contract.tenorType) {
+          throw new RequestValidationError(`tenorType is required for ${movement.movementType} against ${contract.instrumentType}.`);
+        }
+        if (pairKey === 'IPLC_LC:ISSUE' && contract.tenorType !== 'SIGHT' && !(contract.tenorDays && contract.tenorDays > 0)) {
+          throw new RequestValidationError(`tenorDays must be greater than 0 for ${contract.tenorType}.`);
+        }
+      }
+    }
 
     // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found) / 2026-08-18 (reused again below,
     // for the eventSnapshot-preservation fix) — identifies a Sight-tenor IPLC_LC/UTILIZE, i.e. this

@@ -19,11 +19,12 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC0001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
         tolerancePct: '10',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -48,6 +49,7 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -70,6 +72,7 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
         eventSeq: 3,
         amount: '50000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -79,6 +82,7 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
   });
 
   test('4. Accept Pay 50,000 -> LC settles at 71,000', async () => {
+    await request(app).post(`/balance-movements/${utilizeMovementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
     await request(app).post(`/balance-movements/${utilizeMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const snapshot = await request(app).get(`/balance-contracts/${lcBalanceContractId}/balance`).expect(200);
     expect(snapshot.body.confirmedBalance).toBe('71000');
@@ -95,6 +99,7 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
         eventSeq: 3,
         amount: '999999', // ignored — the ORIGINAL record is returned
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(200);
@@ -121,6 +126,7 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
         eventSeq: 4,
         amount: '80000', // ceilingAmount 88,000 > Available 71,000
         currency: 'USD',
+        sourceTransactionRef: 'AMD-002',
         createdBy: 'maker1',
       })
       .expect(409);
@@ -145,11 +151,13 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC0002' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
         tolerancePct: '10',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 30,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -166,6 +174,7 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -198,7 +207,7 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
   test('plain, unmatched Document Arrival 50,000 -> 409, rejected (v0.12 — offBalanceExposure resolved via parentLogicalContractId join, still 100,000 since the SG has not been touched)', async () => {
     const res = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 3, amount: '50000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 3, amount: '50000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
       .expect(409);
     expect(res.body.message).toMatch(/exceeds Tight Available Balance 21000/);
   });
@@ -234,6 +243,7 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
         eventSeq: 4,
         amount: '100000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-002',
         createdBy: 'maker1',
         businessEventId: 'A3-SG-demo-1',
       })
@@ -262,7 +272,7 @@ describe('HTTP integration — AMEND_DECREASE now checked against Tight Availabl
   test('setup: LC0002B Issue 100,000 (no tolerance) + SG 10,000 outstanding -> plain Available 100,000, Tight Available 90,000', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC0002B' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC0002B' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     lcId = lc.body.balanceContractId;
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
@@ -293,7 +303,7 @@ describe('HTTP integration — AMEND_DECREASE now checked against Tight Availabl
   test('a Decrease of 95,000 -- within plain Available (100,000) but exceeding Tight Available (90,000) -- is now REJECTED (would leave only 5,000 of real capacity under a 10,000 outstanding SG)', async () => {
     const res = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_DECREASE', eventSeq: 2, amount: '95000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_DECREASE', eventSeq: 2, amount: '95000', currency: 'USD', sourceTransactionRef: 'AMD-001', createdBy: 'maker1' })
       .expect(409);
     expect(res.body.code).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
     expect(res.body.message).toMatch(/exceeds Tight Available Balance \(90000/);
@@ -302,7 +312,7 @@ describe('HTTP integration — AMEND_DECREASE now checked against Tight Availabl
   test('a Decrease of 90,000 -- exactly Tight Available -- is accepted', async () => {
     const res = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_DECREASE', eventSeq: 3, amount: '90000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'AMEND_DECREASE', eventSeq: 3, amount: '90000', currency: 'USD', sourceTransactionRef: 'AMD-002', createdBy: 'maker1' })
       .expect(201);
     expect(res.body.status).toBe('PENDING');
   });
@@ -317,7 +327,7 @@ describe('HTTP integration — a still-PENDING (not yet Checker-approved) SG red
   test('setup: LC S01-shape Issue 1,000,000 (no tolerance) + SG G01 800,000 issued and Released -> Confirmed 1,000,000, Off-Balance Exposure 800,000, Tight Available 200,000', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S01-SHAPE' }, movementType: 'ISSUE', eventSeq: 1, amount: '1000000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S01-SHAPE' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     lcId = lc.body.balanceContractId;
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
@@ -383,7 +393,7 @@ describe('HTTP integration — a still-PENDING (not yet Checker-approved) SG red
   test('a plain, unmatched Document Arrival for 300,000 (no businessEventId) is ALSO rejected against the still-800,000 exposure, not the prematurely-freed figure', async () => {
     const res = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 2, amount: '300000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 2, amount: '300000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
       .expect(409);
     expect(res.body.message).toMatch(/exceeds Tight Available Balance 200000/);
   });
@@ -422,7 +432,7 @@ describe('HTTP integration — A3S\'s OWN matched SG redemption must still net f
   test('setup: LC S02-shape Issue 10,000 (no tolerance) + SG G02 8,000 issued and Released -> Confirmed 10,000, Off-Balance Exposure 8,000, Tight Available 2,000', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S02-SHAPE' }, movementType: 'ISSUE', eventSeq: 1, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S02-SHAPE' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '10000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     lcId = lc.body.balanceContractId;
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
@@ -476,6 +486,7 @@ describe('HTTP integration — A3S\'s OWN matched SG redemption must still net f
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
         businessEventId: 'S02-G02-demo',
       })
@@ -530,10 +541,11 @@ describe('HTTP integration — SG Issue capped at parent LC Available Balance (b
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC0003' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '3000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -616,10 +628,11 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC0004' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -722,7 +735,7 @@ describe('HTTP integration — A9 Full-Redeem-only server-side guard (business-c
   test('setup: Issue LC-A9G for 100,000, then SG-A9G for 10,000, both released', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-A9G' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-A9G' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     lcId = lc.body.balanceContractId;
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
@@ -795,7 +808,7 @@ describe('HTTP integration — A9 Full-Redeem-only server-side guard (business-c
     // assertValidAmount()'s own doc comment already establishes a precedent for testing this way.
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-A9G2' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' });
+    const lc = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-A9G2' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' });
     if (!lc.created) throw new Error('expected a new movement');
     service.release(lc.movement.movementId, 'checker1');
     const lcContract = service.resolveContract('IPLC_LC', { lcNumber: 'LC-A9G2' });
@@ -848,10 +861,11 @@ describe('HTTP integration — event timeline (business instruction 2026-08-14)'
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'TIMELINE-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -868,6 +882,7 @@ describe('HTTP integration — event timeline (business instruction 2026-08-14)'
         eventSeq: 2,
         amount: '20000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -877,9 +892,10 @@ describe('HTTP integration — event timeline (business instruction 2026-08-14)'
 
     const utilize = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 3, amount: '30000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 3, amount: '30000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
       .expect(201);
     utilizeMovementId = utilize.body.movementId;
+    await request(app).post(`/balance-movements/${utilizeMovementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
     await request(app).post(`/balance-movements/${utilizeMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     // Confirmed now 50,000 -- this final state is NOT what we're checking below.
   });
@@ -960,10 +976,11 @@ describe('HTTP integration — presentDocsEarmarkPending/Approved are ALSO point
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'PIT-CNF-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1009,10 +1026,12 @@ describe('HTTP integration — Tenor Type Routing (business instruction 2026-08-
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'TENOR-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1027,6 +1046,7 @@ describe('HTTP integration — Tenor Type Routing (business instruction 2026-08-
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1091,10 +1111,11 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'DUP-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1105,10 +1126,11 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'DUP-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 2,
         amount: '999999',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(409);
@@ -1125,10 +1147,11 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'DUP-002' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1143,6 +1166,8 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1157,6 +1182,8 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
         eventSeq: 2,
         amount: '77777',
         currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
         createdBy: 'maker1',
       })
       .expect(409);
@@ -1169,10 +1196,11 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'DUP-003' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1181,10 +1209,11 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'DUP-004' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '200000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1201,10 +1230,11 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'REF-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1274,10 +1304,11 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'REF-002' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1310,7 +1341,7 @@ describe('HTTP integration — LC Issue requires Tenor Type, and Acceptance flow
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'FLOW-SIGHT' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
@@ -1347,11 +1378,12 @@ describe('HTTP integration — LC Issue requires Tenor Type, and Acceptance flow
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'FLOW-SELLERS' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
         tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1381,11 +1413,12 @@ describe('HTTP integration — LC Issue requires Tenor Type, and Acceptance flow
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'FLOW-BUYERS' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
         tenorType: 'BUYERS_USANCE',
+        tenorDays: 120,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1419,10 +1452,11 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC0005' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1440,6 +1474,7 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1471,6 +1506,7 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
         eventSeq: 3,
         amount: '5000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-002',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1488,6 +1524,7 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
         eventSeq: 4,
         amount: '1000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-003',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1506,6 +1543,7 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
         eventSeq: 5,
         amount: '2000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-004',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1518,7 +1556,7 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
   test('a CANCELLED movement never counts toward Available Balance, even after the fact', async () => {
     const utilize = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 6, amount: '30000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId: lcId, movementType: 'UTILIZE', eventSeq: 6, amount: '30000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
       .expect(201);
     let lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
     expect(lcSnapshot.body.pendingEarmarkTotal).toBe('-30000');
@@ -1547,10 +1585,11 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'E001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1768,7 +1807,7 @@ describe('HTTP integration — B3 (Present Docs) real Release, then B4 consumes 
   test('B3 releases on its own (EARMARKED); B4\'s own linked HONOUR release then marks it consumed, dropping it out of Present Docs Earmark', async () => {
     const cnf = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'B3B4-HTTP-001' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'B3B4-HTTP-001' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'B3B4-HTTP-001' }).expect(200);
@@ -1805,6 +1844,7 @@ describe('HTTP integration — B3 (Present Docs) real Release, then B4 consumes 
         eventSeq: 2,
         amount: '30000',
         currency: 'USD',
+        sourceTransactionRef: 'E01',
         referencedTransactionId: exam.body.movementId,
         createdBy: 'maker1',
       })
@@ -1837,7 +1877,7 @@ describe('HTTP integration — B4\'s OWN still-PENDING Accept (Maker Submit, bef
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'U02-SHAPE' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000',
         currency: 'USD',
@@ -1881,6 +1921,7 @@ describe('HTTP integration — B4\'s OWN still-PENDING Accept (Maker Submit, bef
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'E01',
         referencedTransactionId: examMovementId,
         createdBy: 'maker1',
       })
@@ -1933,7 +1974,7 @@ describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amou
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'BAD-AMOUNT-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: 'not-a-number', // truthy, so passes the route's own !body.amount check, but now caught by the pattern check right after it
         currency: 'USD',
@@ -1954,7 +1995,7 @@ describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amou
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'JPY-DP-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000.50',
         currency: 'JPY',
@@ -1971,10 +2012,11 @@ describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amou
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'JPY-DP-002' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000',
         currency: 'JPY',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -1987,10 +2029,11 @@ describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amou
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'KWD-DP-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000.125',
         currency: 'KWD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2003,7 +2046,7 @@ describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amou
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'XYZ-DP-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000.999',
         currency: 'XYZ',
@@ -2040,7 +2083,7 @@ describe('HTTP integration — route-layer request validation gaps not otherwise
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'VALID-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         createdBy: 'maker1',
@@ -2061,10 +2104,11 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC0006' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2082,6 +2126,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2103,6 +2148,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
         eventSeq: 3,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-002',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2123,6 +2169,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
         eventSeq: 100,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-100',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2143,6 +2190,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
         eventSeq: 101,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-101',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2164,6 +2212,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
         eventSeq: 4,
         amount: '25000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-004',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2192,6 +2241,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
         eventSeq: 5,
         amount: '1000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-005',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2218,6 +2268,7 @@ describe('HTTP integration — balanceService.ts createMovement() error branches
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(404);
@@ -2301,10 +2352,11 @@ describe('HTTP integration — balanceService.ts createMovement() error branches
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-BOGUSTYPE' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2348,7 +2400,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
   test('POST /balance-movements with neither naturalKey nor balanceContractId -> 400 ("naturalKey or balanceContractId is required")', async () => {
     const res = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', movementType: 'ISSUE', eventSeq: 1, amount: '1000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(400);
     expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
     expect(res.body.message).toMatch(/naturalKey or balanceContractId is required/);
@@ -2360,10 +2412,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'CNF-REISSUE' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2372,10 +2425,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'CNF-REISSUE' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(409);
@@ -2408,10 +2462,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-ACCTENTRIES' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
         accountEntries: [{ accountRef: 'CUST-ACC', drCr: 'D', amount: '1000' }],
       })
@@ -2434,10 +2489,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-PAGETEST' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2452,7 +2508,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-ISSUEPENDING' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
@@ -2496,10 +2552,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-CLOSEHINT-OK' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2510,10 +2567,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-CLOSEHINT-SG' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2549,7 +2607,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
   test('GET /balance-contracts/reopen-eligible (F1, A11/B7 Step-1 picker hint) returns a CLOSED LC with no open Events and excludes an ACTIVE one', async () => {
     const closedOk = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-REOPENHINT-OK' }, movementType: 'ISSUE', eventSeq: 1, amount: '10000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-REOPENHINT-OK' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '10000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     await request(app).post(`/balance-movements/${closedOk.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const close = await request(app)
@@ -2560,7 +2618,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
 
     const stillActive = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-REOPENHINT-ACTIVE' }, movementType: 'ISSUE', eventSeq: 1, amount: '5000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-REOPENHINT-ACTIVE' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '5000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     await request(app).post(`/balance-movements/${stillActive.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
@@ -2576,10 +2634,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-CLOSED-LOOKUP' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2621,10 +2680,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-CLOSE-REASONCODE-HTTP-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '10000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2653,7 +2713,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'AMT-HTTP-ZERO-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '0',
         currency: 'USD',
@@ -2667,7 +2727,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'AMT-HTTP-NEG-001' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '-5000',
         currency: 'USD',
@@ -2683,10 +2743,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-NORELEASEDBY' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2704,10 +2765,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-MAKERSUBMIT' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2721,6 +2783,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2737,10 +2800,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-MAKERSUBMIT2' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2754,6 +2818,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2770,10 +2835,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'CNF-MAKERSUBMIT' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2787,10 +2853,12 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-MAKERSUBMIT3' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2804,6 +2872,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2820,10 +2889,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-NOMAKERSUBMITBY' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2837,6 +2907,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '500',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2854,10 +2925,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-ACK' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2871,6 +2943,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2887,10 +2960,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-ACK2' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2904,6 +2978,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2920,10 +2995,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'CNF-ACK' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2937,10 +3013,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-ACK-MC' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2954,6 +3031,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '40000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2969,10 +3047,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'LC-NOACKBY' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '1000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -2986,6 +3065,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 2,
         amount: '500',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3004,12 +3084,12 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     test('blocks release of a Sight LC UTILIZE that was never Maker-submitted -> 409, ILLEGAL_STATE_TRANSITION', async () => {
       const lc = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-SIGHT' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-SIGHT' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
         .expect(201);
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       const utilize = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
         .expect(201);
 
       const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(409);
@@ -3023,12 +3103,12 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     test('allows release of a Sight LC UTILIZE once Maker-submitted', async () => {
       const lc = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-SIGHT-OK' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-SIGHT-OK' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
         .expect(201);
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       const utilize = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
         .expect(201);
       await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
 
@@ -3042,7 +3122,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         .send({
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: 'LC-BAL123-USANCE' },
-          movementType: 'ISSUE',
+          movementType: 'ISSUE', expiryDate: '2099-12-31',
           eventSeq: 1,
           amount: '100000',
           currency: 'USD',
@@ -3054,7 +3134,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       const utilize = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
         .expect(201);
 
       const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
@@ -3062,18 +3142,41 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     });
 
     test('does NOT block an IPLC_LC UTILIZE whose parent contract never declared an explicit tenorType (null) — backward compatible with the Business Case Runner\'s own older Import Case #1/#3/#4/#5', async () => {
-      const lc = await request(app)
-        .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-BAL123-NOTENOR' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
-        .expect(201);
-      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-      const utilize = await request(app)
-        .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
-        .expect(201);
+      // tenorType is now mandatory at ISSUE (user-directed 2026-08-26) — a null-tenorType root contract
+      // can no longer be constructed via a real ISSUE call, so this legacy state is simulated via a
+      // direct DB write instead, same "bypass the Maker-side gate directly via the store" convention
+      // already used elsewhere in this file for a now-unconstructible legacy state.
+      const bypassDb = createDb(':memory:');
+      const bypassService = new BalanceService(bypassDb);
+      const lc = bypassService.createMovement({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-BAL123-NOTENOR' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      });
+      if (!lc.created) throw new Error('expected a new movement');
+      bypassService.release(lc.movement.movementId, 'checker1');
+      bypassDb.exec(`UPDATE balance_contracts SET tenor_type = NULL WHERE balance_contract_id = '${lc.movement.balanceContractId}'`);
 
-      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-      expect(res.body.status).toBe('RELEASED');
+      const utilize = bypassService.createMovement({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: lc.movement.balanceContractId,
+        movementType: 'UTILIZE',
+        eventSeq: 2,
+        amount: '40000',
+        currency: 'USD',
+        sourceTransactionRef: 'IB-001',
+        createdBy: 'maker1',
+      });
+      if (!utilize.created) throw new Error('expected a new movement');
+
+      const released = bypassService.release(utilize.movement.movementId, 'checker1');
+      expect(released.status).toBe('RELEASED');
     });
 
     // 2026-08-18, business instruction ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" —
@@ -3085,7 +3188,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     test("A4's own Release does NOT overwrite the UTILIZE's own eventSnapshot (A3's Create-time view) — the release-time figures go into finalizeEventSnapshot instead", async () => {
       const lc = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-S01-SNAPSHOT' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-S01-SNAPSHOT' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
         .expect(201);
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
@@ -3122,7 +3225,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         .send({
           instrumentType: 'IPLC_LC',
           naturalKey: { lcNumber: 'LC-USANCE-SNAPSHOT' },
-          movementType: 'ISSUE',
+          movementType: 'ISSUE', expiryDate: '2099-12-31',
           eventSeq: 1,
           amount: '100000',
           currency: 'USD',
@@ -3134,7 +3237,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       const utilize = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
         .expect(201);
       const createTimeSnapshot = utilize.body.eventSnapshot;
 
@@ -3155,7 +3258,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     test("A4's own Release does NOT overwrite the UTILIZE's own acceptanceEventSnapshot/sgEventSnapshot either — reproduces LC S01: A3 submitted before SG G01 existed, so its own sgEventSnapshot must stay null even after A4 finalizes", async () => {
       const lc = await request(app)
         .post('/balance-movements')
-        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-S01-SG-SNAPSHOT' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-S01-SG-SNAPSHOT' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
         .expect(201);
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-S01-SG-SNAPSHOT' }).expect(200);
@@ -3214,7 +3317,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'CAE-LC1' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
@@ -3251,6 +3354,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         eventSeq: 2,
         amount: '10000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3264,7 +3368,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
 
     const utilize = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', balanceContractId, movementType: 'UTILIZE', eventSeq: 3, amount: '30000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', balanceContractId, movementType: 'UTILIZE', eventSeq: 3, amount: '30000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
       .expect(201);
     expect(utilize.body.contingentAccountEntry).toEqual({
       drAccount: 'Documentary Credits Outstanding — Sight',
@@ -3298,7 +3402,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'CAE-CNF1' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '80000',
         currency: 'USD',
@@ -3323,6 +3427,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         eventSeq: 2,
         amount: '-5000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3383,10 +3488,11 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .send({
         instrumentType: 'EPLC_CONFIRMATION',
         naturalKey: { lcNumber: 'CAE-CNF2' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3427,10 +3533,11 @@ describe('HTTP integration — GET /balance-movements?businessEventId= (bug fixe
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'BEID-LC1' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3474,6 +3581,7 @@ describe('HTTP integration — GET /balance-movements?businessEventId= (bug fixe
         eventSeq: 2,
         amount: '20000',
         currency: 'USD',
+        sourceTransactionRef: 'IB-001',
         businessEventId,
         createdBy: 'maker1',
       })
@@ -3499,11 +3607,12 @@ describe('HTTP integration — referencedTransactionId passthrough (bug fixed 20
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'RTID-LC1' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
         tenorType: 'BUYERS_USANCE',
+        tenorDays: 120,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3549,10 +3658,11 @@ describe('HTTP integration — referencedTransactionId passthrough (bug fixed 20
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'RTID-LC2' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '50000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3569,10 +3679,11 @@ describe('HTTP integration — persisted Event Snapshot (business instruction 20
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'EVSNAP-HTTP-1' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3598,10 +3709,11 @@ describe('HTTP integration — persisted Event Snapshot (business instruction 20
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'EVSNAP-HTTP-2' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
+        tenorType: 'SIGHT',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3616,6 +3728,7 @@ describe('HTTP integration — persisted Event Snapshot (business instruction 20
         eventSeq: 2,
         amount: '15000',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3633,7 +3746,7 @@ describe('HTTP integration — rootEventSnapshot, Inquire Events Balance Tabs (2
   test('an SHGT ISSUE carries BOTH its own eventSnapshot (own ledger) AND a rootEventSnapshot (parent LC, plain, no decoration)', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ROOTSNAP-1' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ROOTSNAP-1' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'ROOTSNAP-1' }).expect(200);
@@ -3672,7 +3785,7 @@ describe('HTTP integration — rootEventSnapshot, Inquire Events Balance Tabs (2
   test('the root LC\'s own ISSUE movement carries a null rootEventSnapshot — nothing to redirect to', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ROOTSNAP-2' }, movementType: 'ISSUE', eventSeq: 1, amount: '50000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ROOTSNAP-2' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '50000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     expect(lc.body.rootEventSnapshot).toBeNull();
   });
@@ -3683,11 +3796,12 @@ describe('HTTP integration — rootEventSnapshot, Inquire Events Balance Tabs (2
       .send({
         instrumentType: 'IPLC_LC',
         naturalKey: { lcNumber: 'ROOTSNAP-3' },
-        movementType: 'ISSUE',
+        movementType: 'ISSUE', expiryDate: '2099-12-31',
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
         tenorType: 'BUYERS_USANCE',
+        tenorDays: 120,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3720,7 +3834,7 @@ describe('HTTP integration — sibling Acceptance/SG snapshots (2026-08-17, "就
   test('a plain A3 (LC UTILIZE, no direct SG movement) carries sgEventSnapshot = the one existing SG\'s own CURRENT balance', async () => {
     const lc = await request(app)
       .post('/balance-movements')
-      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S02' }, movementType: 'ISSUE', eventSeq: 1, amount: '100000', currency: 'USD', createdBy: 'maker1' })
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S02' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'S02' }).expect(200);

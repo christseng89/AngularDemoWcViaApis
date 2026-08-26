@@ -2460,6 +2460,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '10000.5';
       comp.model.currency = 'JPY';
       comp.model.createdBy = 'maker1';
+      comp.model.expiryDate = '2028-12-31';
       comp.submit();
       expect(comp.submitError).toBe('Amount 10000.5 has more decimal places than JPY allows (0).');
       expect(api.createMovement).not.toHaveBeenCalled();
@@ -2503,6 +2504,7 @@ describe('MakerPanelComponent', () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A1);
       comp.model.amount = '1000';
+      comp.model.expiryDate = '2028-12-31';
       // naturalKey.lcNumber left unset
       comp.submit();
       expect(comp.submitError).toBe('LC Number is mandatory.');
@@ -2538,6 +2540,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '1000';
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.tenorType = 'SELLERS_USANCE';
+      comp.model.expiryDate = '2028-12-31';
       // model.tenorDays left unset
       comp.submit();
       expect(comp.submitError).toBe("Tenor Days must be greater than 0 for Seller's/Buyer's Usance.");
@@ -2639,6 +2642,7 @@ describe('MakerPanelComponent', () => {
 
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.amount = '100000';
+      comp.model.expiryDate = '2028-12-31';
       // model.currency/createdBy already default 'USD'/'maker1'; tenorType defaults to SIGHT via resetForFunction()
       expect(comp.isSubmitReady).toBe(true);
     });
@@ -2689,6 +2693,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '100000';
       comp.model.tolerancePct = '10';
       comp.model.eventSeq = 42;
+      comp.model.expiryDate = '2028-12-31';
       // tenorType defaults to SIGHT via resetForFunction()
 
       comp.submit();
@@ -2704,6 +2709,7 @@ describe('MakerPanelComponent', () => {
         createdBy: 'maker1',
         tolerancePct: '10',
         tenorType: 'SIGHT',
+        expiryDate: '2028-12-31',
         naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: null },
       });
       // 0 is falsy — `if (this.model.tenorDays)` never fires for Sight's forced 0.
@@ -2723,6 +2729,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '50000';
       comp.model.tenorType = 'BUYERS_USANCE';
       comp.model.tenorDays = 90;
+      comp.model.expiryDate = '2028-12-31';
       // tolerancePct left unset
 
       comp.submit();
@@ -2739,6 +2746,7 @@ describe('MakerPanelComponent', () => {
       triggerSelectFunction(comp, A1);
       comp.naturalKey.lcNumber = 'LC001';
       comp.model.amount = '100000';
+      comp.model.expiryDate = '2028-12-31';
 
       comp.submit();
 

@@ -16,6 +16,7 @@ import {
   displayMovementAmount as displayMovementAmountShared,
   statusBadgeIcon as statusBadgeIconShared,
 } from './balance-component.model';
+import { ibNumberLabel as ibNumberLabelShared } from './function-policy';
 
 /** Emitted when the "Original Transaction Screen" panel's own Account Entries button is clicked — the dialog itself stays parent-owned (`TransactionBuilderComponent`), since it's also opened from the Maker Result panel and the Look Up panel's own Event Timeline, not just from here. */
 export interface InquireOpenAccountEntriesEvent {
@@ -61,5 +62,10 @@ export class InquireEventsComponent {
 
   openAccountEntryDialog(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined, phase?: 'primary' | 'create' | 'finalize'): void {
     this.openAccountEntries.emit({ movement, instrumentType, phase });
+  }
+
+  /** User-reported 2026-08-26 — the "IB Number" row label was hardcoded regardless of side; B3/B4's own live Maker Submit screen already calls this same value "EB Number" on the Export side (ibNumberLabel(), function-policy.ts). */
+  get ibNumberLabel(): string {
+    return ibNumberLabelShared(this.inquireEvents.side);
   }
 }

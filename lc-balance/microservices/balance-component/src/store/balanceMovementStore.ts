@@ -383,6 +383,14 @@ export class BalanceMovementStore {
     status: MovementStatus;
     releasedBy?: string | null;
     releasedAt?: string | null;
+    /**
+     * Bug fix (reviewer-reported 2026-08-26, "Reason Code not shown in Inquire Events for Close/Reopen") —
+     * COALESCE(@reasonCode, reason_code), same "don't touch unless the caller actually passes it" posture
+     * as eventSnapshot/rootEventSnapshot below. release() never supplies this (CLOSE/REOPEN's mandatory
+     * reasonCode — F1 §13.1 — is captured at createMovement() time, not at Release), so a plain overwrite
+     * here silently nulled it out on every single Release; reject()/cancel() are unaffected by the change
+     * since both always pass a real, non-null reasonCode of their own at the point they call this.
+     */
     reasonCode?: string | null;
     remarks?: string | null;
     balanceBefore?: string | null;
@@ -444,7 +452,7 @@ export class BalanceMovementStore {
       .prepare(
         `UPDATE balance_movements
          SET status = @status, released_by = @releasedBy, released_at = @releasedAt,
-             reason_code = @reasonCode, remarks = @remarks,
+             reason_code = COALESCE(@reasonCode, reason_code), remarks = @remarks,
              balance_before = @balanceBefore, balance_after = @balanceAfter,
              event_snapshot = COALESCE(@eventSnapshot, event_snapshot),
              root_event_snapshot = COALESCE(@rootEventSnapshot, root_event_snapshot),

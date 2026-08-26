@@ -126,7 +126,10 @@
         </ng-container>
 
         <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
-          <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">
+          <!-- User-requested 2026-08-26 ("Back to Import LC Index 顯示太小不明顯") — was .tb-btn--tiny
+           (11px), easy to miss; bumped to the standard .tb-btn--outline size so it reads as a real nav
+           control, not a footnote. -->
+          <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="inquireEvents.backToIndex()">
             ‹ Back to {{ inquireEvents.indexEntityLabel }} Index
           </button>
           <div class="tb-error mt-2" role="alert" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
@@ -276,14 +279,18 @@
                   Account Entries
                 </button>
               </div>
+              <!-- User-requested 2026-08-26 ("LC Number/IB Number 字可否放大一點、號碼用不同顏色顯示") — these
+               three natural-key identifier rows get their own larger/accented value style
+               (.tb-balance-row__value--id) so the LC/IB/SG Number stands out at a glance; every other row in
+               this box (Status/Submitted/Approved/etc.) keeps the plain .tb-balance-row__value styling. -->
               <div class="tb-balance-row">
-                <span class="tb-balance-row__label">LC Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.lcNumber }}</span>
+                <span class="tb-balance-row__label">LC Number</span><span class="tb-balance-row__value tb-balance-row__value--id">{{ sel.contract.naturalKey.lcNumber }}</span>
               </div>
               <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber">
-                <span class="tb-balance-row__label">IB Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.ibNumber }}</span>
+                <span class="tb-balance-row__label">{{ ibNumberLabel }}</span><span class="tb-balance-row__value tb-balance-row__value--id">{{ sel.contract.naturalKey.ibNumber }}</span>
               </div>
               <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber">
-                <span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value">{{ sel.contract.naturalKey.sgNumber }}</span>
+                <span class="tb-balance-row__label">SG Number</span><span class="tb-balance-row__value tb-balance-row__value--id">{{ sel.contract.naturalKey.sgNumber }}</span>
               </div>
               <formly-form
                 [form]="inquireEvents.selectedEventForm"

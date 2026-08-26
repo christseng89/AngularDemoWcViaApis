@@ -18,6 +18,8 @@ function issueImportLc(service: BalanceService, lcNumber: string, amount = '1000
     eventSeq: 1,
     amount,
     currency: 'USD',
+    expiryDate: '2099-12-31',
+    tenorType: 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -79,6 +81,8 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     expect(retry.created).toBe(true);
@@ -124,6 +128,8 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
       eventSeq: 1,
       amount,
       currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -144,6 +150,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
         eventSeq: 2,
         amount: '-2000',
         currency: 'USD',
+        sourceTransactionRef: 'BAMD-01',
         createdBy: 'maker1',
       }),
     ).not.toThrow();
@@ -160,6 +167,7 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
         eventSeq: 2,
         amount: '0',
         currency: 'USD',
+        sourceTransactionRef: 'BAMD-01',
         createdBy: 'maker1',
       }),
     ).toThrow(RequestValidationError);
@@ -176,9 +184,14 @@ describe('BalanceService — server-side amount validation (createMovement)', ()
       eventSeq: 2,
       amount: '10000',
       currency: 'USD',
+      sourceTransactionRef: 'IB-001',
       createdBy: 'maker1',
     });
     if (!utilize.created) throw new Error('expected a new movement');
+    // issueImportLc() now defaults tenorType: 'SIGHT', so this UTILIZE's own Release requires A4's own
+    // Maker Submit gate first (isSightUtilizeFinalize) — same requirement any other Sight-tenor UTILIZE
+    // has, unrelated to what THIS test is actually about.
+    service.submitByMaker(utilize.movement.movementId, 'maker1');
     service.release(utilize.movement.movementId, 'checker1');
 
     expect(() =>

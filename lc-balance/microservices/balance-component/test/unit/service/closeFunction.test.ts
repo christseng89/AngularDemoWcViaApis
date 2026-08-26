@@ -17,6 +17,8 @@ function issueImportLc(service: BalanceService, lcNumber: string, amount = '1000
     eventSeq: 1,
     amount,
     currency: 'USD',
+    expiryDate: '2099-12-31',
+    tenorType: 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -26,7 +28,7 @@ function issueImportLc(service: BalanceService, lcNumber: string, amount = '1000
   return lc;
 }
 
-function issueConfirmation(service: BalanceService, lcNumber: string, amount = '10000') {
+function issueConfirmation(service: BalanceService, lcNumber: string, amount = '10000', tenorType: 'SIGHT' | 'SELLERS_USANCE' = 'SIGHT') {
   const issue = service.createMovement({
     instrumentType: 'EPLC_CONFIRMATION',
     naturalKey: { lcNumber },
@@ -34,6 +36,8 @@ function issueConfirmation(service: BalanceService, lcNumber: string, amount = '
     eventSeq: 1,
     amount,
     currency: 'USD',
+    expiryDate: '2099-12-31',
+    tenorType,
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -63,6 +67,11 @@ describe('A10 — Import LC Close', () => {
 
     const released = service.release(close.movement.movementId, 'checker1');
     expect(released.status).toBe('RELEASED');
+    // Bug fix (reviewer-reported 2026-08-26) — release() used to silently null out reason_code (a plain
+    // SQL overwrite in updateStatus(), unlike the COALESCE every snapshot column already used), erasing
+    // this F1 §13.1-mandatory field the moment a Close was approved. See balanceMovementStore.ts's own
+    // updateStatus() doc comment.
+    expect(released.reasonCode).toBe('TEST_CLOSE_REASON');
 
     const snapshot = service.getBalanceSnapshot(lc.balanceContractId);
     expect(snapshot.confirmedBalance).toBe('0');
@@ -70,6 +79,12 @@ describe('A10 — Import LC Close', () => {
     // Locked out (free side effect of status no longer being ACTIVE) — the natural-key resolution path
     // every other A2-A10 function uses can no longer find this LC.
     expect(service.resolveContract('IPLC_LC', { lcNumber: 'CLOSE-A10-001' })).toBeUndefined();
+
+    // Re-fetch through the movements-history read path too — not just the in-memory return value from
+    // release() itself — since the bug was specifically a persistence-layer issue.
+    const history = service.listMovements(lc.balanceContractId);
+    const closeRow = history.find((m) => m.movementId === close.movement.movementId);
+    expect(closeRow?.reasonCode).toBe('TEST_CLOSE_REASON');
   });
 
   test('F1 proposal §13.1 item 4 (BA-ratified 2026-08-25): rejects a Submit with no reasonCode, even against an otherwise-eligible ACTIVE contract', () => {
@@ -189,6 +204,7 @@ describe('A10 — Import LC Close', () => {
       eventSeq: 2,
       amount: '500',
       currency: 'USD',
+      sourceTransactionRef: 'AMD-01',
       createdBy: 'maker1',
     });
     if (!amend.created) throw new Error('expected a new movement');
@@ -261,6 +277,7 @@ describe('A10 — Import LC Close', () => {
       eventSeq: 3,
       amount: '3000',
       currency: 'USD',
+      sourceTransactionRef: 'AMD-02',
       createdBy: 'maker2',
     });
     if (!increase.created) throw new Error('expected a new movement');
@@ -328,6 +345,7 @@ describe('A10 — Import LC Close', () => {
         eventSeq: 3,
         amount: '500',
         currency: 'USD',
+        sourceTransactionRef: 'AMD-03',
         createdBy: 'maker1',
       }),
     ).toThrow(NotFoundError);
@@ -394,6 +412,7 @@ describe('B6 — Export Confirmed LC Close', () => {
       amount: '10000',
       currency: 'USD',
       referencedTransactionId: exam.movement.movementId,
+      sourceTransactionRef: 'IB-01',
       createdBy: 'maker1',
     });
     if (!honour.created) throw new Error('expected a new movement');
@@ -454,7 +473,7 @@ describe('B6 — Export Confirmed LC Close', () => {
 
   test('blocked: non-zero Acceptance Balance', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const confirmation = issueConfirmation(service, 'CLOSE-B6-003');
+    const confirmation = issueConfirmation(service, 'CLOSE-B6-003', '10000', 'SELLERS_USANCE');
 
     const acceptCreate = service.createMovement({
       instrumentType: 'EPLC_ACCEPTANCE',

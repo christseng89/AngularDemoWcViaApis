@@ -8,8 +8,9 @@
 import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { BATCH_CHECKER_ACTOR, BATCH_MAKER_ACTOR } from '../../../src/config';
+import type { TenorType } from '../../../src/types';
 
-function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number } = {}) {
+function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number; tenorType?: TenorType } = {}) {
   const issue = service.createMovement({
     instrumentType: 'IPLC_LC',
     naturalKey: { lcNumber },
@@ -19,6 +20,7 @@ function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount
     currency: 'USD',
     expiryDate: opts.expiryDate,
     mailFloatGraceDays: opts.mailFloatGraceDays,
+    tenorType: opts.tenorType ?? 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -42,10 +44,18 @@ describe('ISSUE captures expiryDate/mailFloatGraceDays onto the contract (F1)', 
     expect(lc.mailFloatGraceDays).toBe(5); // MAIL_FLOAT_GRACE_DAYS.IMPORT in config.ts
   });
 
-  test('omitted expiryDate stays null (not every LC needs one recorded)', () => {
+  // Superseded 2026-08-26 by the new mandatory-expiryDate-at-ISSUE rule (assertExpiryDateRequired()) —
+  // "omitted expiryDate stays null" is no longer reachable via a real ISSUE against a root instrumentType
+  // (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION), since AUTO EXPIRY can never sweep a contract with a null
+  // expiry_date. Rewritten to assert the new, intended behavior instead of the superseded one — a
+  // contract genuinely missing expiryDate (e.g. legacy data predating this rule) is covered separately
+  // below by 'leaves a contract with no recorded expiryDate untouched', which simulates that state via a
+  // direct DB write rather than a real ISSUE.
+  test('omitted expiryDate is rejected at ISSUE for a root instrumentType (mandatory since AUTO EXPIRY needs it)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'F1-CAPTURE-003');
-    expect(lc.expiryDate).toBeNull();
+    expect(() => issueImportLc(service, 'F1-CAPTURE-003')).toThrow(
+      /expiryDate is required for ISSUE against IPLC_LC/,
+    );
   });
 
   test('Export side (B1/EPLC_CONFIRMATION) falls back to the Export-side config default', () => {
@@ -58,6 +68,7 @@ describe('ISSUE captures expiryDate/mailFloatGraceDays onto the contract (F1)', 
       amount: '10000',
       currency: 'USD',
       expiryDate: '2026-06-01',
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');
@@ -109,7 +120,7 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
 
   test('rejects EXPIRE on a non-root instrumentType', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'EXPIRE-002');
+    const lc = issueImportLc(service, 'EXPIRE-002', { expiryDate: '2099-12-31' });
     const sgIssue = service.createMovement({
       instrumentType: 'SHGT',
       naturalKey: { lcNumber: 'EXPIRE-002', sgNumber: 'SG01' },
@@ -139,7 +150,7 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
 
   test('rejects EXPIRE with an open (PENDING) event anywhere in the tree', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'EXPIRE-003');
+    const lc = issueImportLc(service, 'EXPIRE-003', { expiryDate: '2099-12-31' });
     // A PENDING UTILIZE keeps hasOpenEvents true.
     service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -148,6 +159,7 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
       eventSeq: 2,
       amount: '1000',
       currency: 'USD',
+      sourceTransactionRef: 'EXPIRE-003-UTILIZE-1',
       createdBy: 'maker1',
     });
 
@@ -166,7 +178,7 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
 
   test('rejects an EXPIRE amount that does not exactly equal the current Confirmed Balance', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'EXPIRE-004');
+    const lc = issueImportLc(service, 'EXPIRE-004', { expiryDate: '2099-12-31' });
     expect(() =>
       service.createMovement({
         instrumentType: 'IPLC_LC',
@@ -182,7 +194,7 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
 
   test('zero-amount EXPIRE is accepted (a fully-utilized, expired LC has nothing left to write off)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'EXPIRE-005');
+    const lc = issueImportLc(service, 'EXPIRE-005', { expiryDate: '2099-12-31' });
     const utilize = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -190,9 +202,11 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
       eventSeq: 2,
       amount: '10000',
       currency: 'USD',
+      sourceTransactionRef: 'EXPIRE-005-UTILIZE-1',
       createdBy: 'maker1',
     });
     if (!utilize.created) throw new Error('expected a new movement');
+    service.submitByMaker(utilize.movement.movementId, 'maker1');
     service.release(utilize.movement.movementId, 'checker1');
 
     const expire = service.createMovement({
@@ -223,8 +237,16 @@ describe('runAutoExpirySweep (F1)', () => {
   });
 
   test('leaves a contract with no recorded expiryDate untouched', () => {
-    const service = new BalanceService(createDb(':memory:'));
-    issueImportLc(service, 'SWEEP-003');
+    // expiryDate is now mandatory at ISSUE for a root instrumentType (assertExpiryDateRequired(), added
+    // 2026-08-26), so a real ISSUE can no longer land a null expiry_date — this simulates a legacy
+    // contract that predates that rule (or arrived via some other non-ISSUE path) via a direct DB write,
+    // same bypass technique this file already uses elsewhere (see the Release-time re-check describe
+    // block below) — runAutoExpirySweep()'s own query-level `expiry_date IS NOT NULL` filter still needs
+    // coverage regardless of how such a contract came to exist.
+    const db = createDb(':memory:');
+    const service = new BalanceService(db);
+    const lc = issueImportLc(service, 'SWEEP-003', { expiryDate: '2099-12-31' });
+    db.exec(`UPDATE balance_contracts SET expiry_date = NULL WHERE balance_contract_id = '${lc.balanceContractId}'`);
     expect(service.runAutoExpirySweep(new Date('2099-01-01'))).toEqual([]);
   });
 
@@ -248,6 +270,7 @@ describe('runAutoExpirySweep (F1)', () => {
       amount: '10000',
       currency: 'USD',
       expiryDate: '2026-01-01',
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     if (!exportIssue.created) throw new Error('expected a new movement');
@@ -275,6 +298,7 @@ describe('runAutoExpirySweep (F1)', () => {
       currency: 'USD',
       expiryDate: '2026-01-01',
       mailFloatGraceDays: 5,
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     service.release(issue.movement.movementId, 'checker1');
@@ -370,7 +394,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
   test('CLOSE: a new PENDING SG appears after Submit — Release re-checks eligibility and throws', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-CLOSE-001');
+    const lc = issueImportLc(service, 'RECHECK-CLOSE-001', { expiryDate: '2099-12-31' });
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -452,6 +476,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
       eventSeq: 3,
       amount: '500',
       currency: 'USD',
+      sourceTransactionRef: 'RECHECK-EXPIRE-002-AMEND-1',
       createdBy: 'maker1',
     });
     if (!increase.created) throw new Error('expected a new movement');
@@ -480,6 +505,7 @@ describe('processSweepCandidate — reports (not throws) an idempotency conflict
         eventSeq: fixedNow,
         amount: '1',
         currency: 'USD',
+        sourceTransactionRef: 'SWEEP-IDEMPOTENCY-001-AMEND-1',
         createdBy: 'maker1',
       });
 

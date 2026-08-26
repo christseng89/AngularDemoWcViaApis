@@ -66,6 +66,9 @@ function ctx(overrides: Partial<SubmitRulesContext> = {}): SubmitRulesContext {
     currency: 'USD',
     createdBy: 'maker1',
     tenorType: 'SIGHT',
+    // Mandatory for A1/B1 since 2026-08-26 (see submit-rules.ts's own expiryDate guard) — part of this
+    // helper's own "fully-valid A1" baseline, same posture as every other field here.
+    expiryDate: '2028-12-31',
     ...overrides.model,
   };
   const result: SubmitRulesContext = {
@@ -677,6 +680,48 @@ describe('submit-rules', () => {
         }),
       );
       expect(result.error).toBe('New Expiry Date is mandatory.');
+    });
+  });
+
+  describe('validateSubmit — Expiry Date mandatory for A1/B1 (user-directed 2026-08-26, "A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理")', () => {
+    it('rejects A1 (LC Issue) with no Expiry Date, even when every other mandatory field is filled', () => {
+      const result = validateSubmit(
+        ctx({
+          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: undefined },
+        }),
+      );
+      expect(result.error).toBe('Expiry Date is mandatory for A1.');
+    });
+
+    it('passes A1 (LC Issue) once Expiry Date is supplied', () => {
+      const result = validateSubmit(
+        ctx({
+          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2028-12-31' },
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+
+    it('rejects B1 (Confirm LC) with no Expiry Date the same way', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('B1'),
+          activeFunctionSide: 'EXPORT',
+          model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: undefined },
+        }),
+      );
+      expect(result.error).toBe('Expiry Date is mandatory for B1.');
+    });
+
+    it('does not apply to any other function — A2 (Amendment) passes with no expiryDate on the model', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '5000', currency: 'USD', createdBy: 'maker1', secondaryRef: 'AMD-01', expiryDate: undefined },
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).toBeNull();
     });
   });
 

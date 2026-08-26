@@ -7,8 +7,9 @@ import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { IllegalStateTransitionError, InsufficientBalanceError, RequestValidationError } from '../../../src/errors';
 import { BATCH_CHECKER_ACTOR, BATCH_MAKER_ACTOR } from '../../../src/config';
+import type { TenorType } from '../../../src/types';
 
-function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number } = {}) {
+function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number; tenorType?: TenorType } = {}) {
   const issue = service.createMovement({
     instrumentType: 'IPLC_LC',
     naturalKey: { lcNumber },
@@ -18,6 +19,7 @@ function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount
     currency: 'USD',
     expiryDate: opts.expiryDate,
     mailFloatGraceDays: opts.mailFloatGraceDays,
+    tenorType: opts.tenorType ?? 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -37,6 +39,7 @@ function submitAmendExpiryDate(service: BalanceService, balanceContractId: strin
     currency: 'USD',
     newExpiryDate,
     businessDate,
+    sourceTransactionRef: `AMEND-EXPIRY-DATE-${eventSeq}`,
     createdBy: 'maker1',
   });
 }
@@ -68,6 +71,7 @@ describe('AMEND_EXPIRY_DATE — plain amendment against an ACTIVE contract', () 
         eventSeq: 2,
         amount: '0',
         currency: 'USD',
+        sourceTransactionRef: 'AMEND-EXP-002-AMEND-1',
         createdBy: 'maker1',
       }),
     ).toThrow(/newExpiryDate is required/);
@@ -93,6 +97,7 @@ describe('AMEND_EXPIRY_DATE — plain amendment against an ACTIVE contract', () 
         amount: '1',
         currency: 'USD',
         newExpiryDate: '2026-12-31',
+        sourceTransactionRef: 'AMEND-EXP-004-AMEND-1',
         createdBy: 'maker1',
       }),
     ).toThrow(RequestValidationError);
@@ -115,6 +120,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
       currency: 'USD',
       newExpiryDate: '2027-01-01',
       businessDate: '2026-01-15',
+      sourceTransactionRef: 'NK-EXT-001-AMEND-1',
       createdBy: 'maker1',
     });
     if (!amend.created) throw new Error('expected a new movement');
@@ -174,6 +180,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
       currency: 'USD',
       newExpiryDate: '2026-12-31',
       businessDate: '2026-01-01',
+      sourceTransactionRef: 'NK-002-AMEND-1',
       createdBy: 'maker1',
     });
     if (!amend.created) throw new Error('expected a new movement');
@@ -313,6 +320,13 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     const movements = service.listMovements(lc.balanceContractId);
     expect(movements.filter((m) => m.movementType === 'REVERSAL')).toHaveLength(0);
     expect(movements).toHaveLength(3); // ISSUE, CLOSE, REOPEN — nothing else.
+
+    // Bug fix (reviewer-reported 2026-08-26) — release() used to silently null out reason_code for BOTH
+    // movements (a plain SQL overwrite in updateStatus(), unlike the COALESCE every snapshot column
+    // already used) — the CLOSE's own reasonCode as well as the REOPEN's own, each erased the moment its
+    // own Release happened. See balanceMovementStore.ts's own updateStatus() doc comment.
+    expect(movements.find((m) => m.movementType === 'CLOSE')?.reasonCode).toBe('TEST_CLOSE_REASON');
+    expect(movements.find((m) => m.movementType === 'REOPEN')?.reasonCode).toBe('TEST_REOPEN_REASON');
   });
 
   test('path B (EXPIRE then AUTO CLOSE — §9.7 chain reversal): reverses BOTH the EXPIRE and the CLOSE, restores the ORIGINAL balance (not 0)', () => {
@@ -392,7 +406,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
 
   test('rejects Submit on a non-root instrumentType', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REOPEN-003');
+    const lc = issueImportLc(service, 'REOPEN-003', { expiryDate: '2099-12-31' });
     const sgIssue = service.createMovement({
       instrumentType: 'SHGT',
       naturalKey: { lcNumber: 'REOPEN-003', sgNumber: 'SG01' },
@@ -423,7 +437,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
 
   test('rejects Submit on a contract that is not CLOSED', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REOPEN-004');
+    const lc = issueImportLc(service, 'REOPEN-004', { expiryDate: '2099-12-31' });
     expect(() =>
       service.createMovement({
         instrumentType: 'IPLC_LC',
@@ -483,7 +497,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
 
   test('rejects Submit with an open (PENDING) Event anywhere in the tree — a second, concurrent REOPEN Submit sees the first REOPEN itself as an open Event', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REOPEN-005');
+    const lc = issueImportLc(service, 'REOPEN-005', { expiryDate: '2099-12-31' });
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -534,7 +548,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
   // see the Angular UI's own removal of REOPEN's Amount field for the client-side half of this.
   test('server overrides whatever amount is submitted with the computed restore-chain total, regardless of what the caller sent', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REOPEN-006');
+    const lc = issueImportLc(service, 'REOPEN-006', { expiryDate: '2099-12-31' });
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -567,7 +581,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
 describe('REVERSAL — internal-only sufficiency checks (F1)', () => {
   test('rejects a missing reversalOfMovementId', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REV-001');
+    const lc = issueImportLc(service, 'REV-001', { expiryDate: '2099-12-31' });
     expect(() =>
       service.createMovement({
         instrumentType: 'IPLC_LC',
@@ -583,7 +597,7 @@ describe('REVERSAL — internal-only sufficiency checks (F1)', () => {
 
   test('rejects a reversalOfMovementId that does not resolve on this contract', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const lc = issueImportLc(service, 'REV-002');
+    const lc = issueImportLc(service, 'REV-002', { expiryDate: '2099-12-31' });
     expect(() =>
       service.createMovement({
         instrumentType: 'IPLC_LC',
@@ -759,7 +773,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   test('REOPEN: contract status changed to something else between Submit and Release (DB-bypass simulated)', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-REOPEN-001');
+    const lc = issueImportLc(service, 'RECHECK-REOPEN-001', { expiryDate: '2099-12-31' });
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -793,7 +807,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   test('REOPEN: hasOpenEvents becomes true between Submit and Release (DB-bypass simulated)', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-REOPEN-002');
+    const lc = issueImportLc(service, 'RECHECK-REOPEN-002', { expiryDate: '2099-12-31' });
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -835,8 +849,13 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
   test('REOPEN against a CLOSED contract with no real EXPIRE/CLOSE in its history (raw status bypass) restores 0, not an error', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-REOPEN-003');
-    db.exec(`UPDATE balance_contracts SET status = 'CLOSED' WHERE balance_contract_id = '${lc.balanceContractId}'`);
+    // ISSUE now mandates expiryDate (F1 §13.5 Phase 2) — issue with a placeholder value, then null it back
+    // out via the same raw-SQL bypass convention this file already uses, to simulate a legacy pre-F1
+    // contract with no expiryDate recorded at all. This test's own point depends on that: REOPEN's own
+    // targetStatus logic must fall back to EXPIRED (not ACTIVE) when there is genuinely no future
+    // expiryDate to reactivate into.
+    const lc = issueImportLc(service, 'RECHECK-REOPEN-003', { expiryDate: '2099-12-31' });
+    db.exec(`UPDATE balance_contracts SET status = 'CLOSED', expiry_date = NULL WHERE balance_contract_id = '${lc.balanceContractId}'`);
     const reopen = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -868,11 +887,14 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
 // REOPEN, before either is allowed to act on it again.
 describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep interval (F1)', () => {
   test('AUTO CLOSE skips a contract whose latest movement is a REOPEN reactivating it to EXPIRED, then processes it once the grace interval has elapsed', () => {
-    const service = new BalanceService(createDb(':memory:'));
-    // No expiryDate -> REOPEN's own targetStatus logic falls back to EXPIRED (see the RECHECK-REOPEN-003
-    // case above) -> immediately re-eligible for AUTO CLOSE (SG/Acceptance both trivially 0) without the
-    // fix under test.
-    const lc = issueImportLc(service, 'GRACE-CLOSE-001');
+    const db = createDb(':memory:');
+    const service = new BalanceService(db);
+    // ISSUE now mandates expiryDate (F1 §13.5 Phase 2) — issue with a placeholder value, then null it back
+    // out via a raw-SQL bypass (same convention as RECHECK-REOPEN-003 above) to simulate a legacy pre-F1
+    // contract with no expiryDate recorded at all: REOPEN's own targetStatus logic falls back to EXPIRED
+    // -> immediately re-eligible for AUTO CLOSE (SG/Acceptance both trivially 0) without the fix under test.
+    const lc = issueImportLc(service, 'GRACE-CLOSE-001', { expiryDate: '2099-12-31' });
+    db.exec(`UPDATE balance_contracts SET expiry_date = NULL WHERE balance_contract_id = '${lc.balanceContractId}'`);
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -920,7 +942,7 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
   test('AUTO EXPIRY skips a contract whose latest movement is a REOPEN still within the grace window, even if expiryDate+grace has already elapsed (defense-in-depth — REOPEN itself never reactivates to ACTIVE with an already-past expiryDate, so this is exercised via a direct DB bypass of expiryDate, same convention as this file\'s other DB-bypass re-check tests)', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'GRACE-EXPIRE-001');
+    const lc = issueImportLc(service, 'GRACE-EXPIRE-001', { expiryDate: '2099-12-31' }); // overwritten below via raw SQL regardless
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,
@@ -971,7 +993,7 @@ describe('REOPEN release-time re-check catches a restore-chain amount that shift
   test('rejects Release when a raw-SQL-inserted extra CLOSE lands on the chain between Submit and Release, changing the computed restore amount', () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
-    const lc = issueImportLc(service, 'RECHECK-REOPEN-AMOUNT-001');
+    const lc = issueImportLc(service, 'RECHECK-REOPEN-AMOUNT-001', { expiryDate: '2099-12-31' });
     const close = service.createMovement({
       instrumentType: 'IPLC_LC',
       balanceContractId: lc.balanceContractId,

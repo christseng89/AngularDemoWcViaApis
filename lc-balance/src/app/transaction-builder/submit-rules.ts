@@ -75,6 +75,12 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   if ((selectedFunction?.requiresCloseEligibility || selectedFunction?.requiresReopenEligibility) && !model.reasonCode) {
     return fail(`Reason Code is mandatory for ${selectedFunction?.code}.`);
   }
+  // User-directed 2026-08-26 ("A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理") — mirrors the
+  // microservice's own BalanceService.assertExpiryDateRequired(); without it, a contract ISSUEd with no
+  // expiryDate could never be picked up by runAutoExpirySweep()'s own candidate query.
+  if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !model.expiryDate) {
+    return fail(`Expiry Date is mandatory for ${selectedFunction?.code}.`);
+  }
   if (!isAmendExpiryDate && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
     return fail(`Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`);
   }

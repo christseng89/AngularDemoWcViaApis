@@ -753,6 +753,46 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventModel.expiryDate).toBeUndefined();
     });
 
+    it('carries the saved reasonCode onto the model for a Close event — Generic Requirement (reviewer-reported 2026-08-26)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'CLOSE', reasonCode: 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.reasonCode).toBe('NATURAL_EXPIRY_ALL_BALANCES_CLEARED');
+    });
+
+    it('carries the saved reasonCode onto the model for a Reopen event too — same field, A11/B7\'s own Reopen Reason', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'REOPEN', reasonCode: 'CLOSED_IN_ERROR' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.reasonCode).toBe('CLOSED_IN_ERROR');
+    });
+
+    it('carries the saved newExpiryDate onto the model for an AMEND_EXPIRY_DATE event — Generic Requirement (reviewer-reported 2026-08-26)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'AMEND_EXPIRY_DATE', newExpiryDate: '2027-06-30' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.newExpiryDate).toBe('2027-06-30');
+    });
+
+    it('carries the saved Amendment No./secondaryRef onto the model for an A2 amendment', () => {
+      const svc = new InquireEventsService(makeApi());
+      const contract = makeContract({ instrumentType: 'IPLC_LC' });
+      const movement = makeMovement({ movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD-03' });
+
+      svc.selectEvent(makeEvent({ movement, contract }));
+
+      expect(svc.selectedEventModel.secondaryRef).toBe('AMD-03');
+    });
+
     it('falls back to a generic "Reference No." label when the resolved function has no secondaryRefLabel of its own but the movement did carry a reference (A1 has none; sourceTransactionRef still shown rather than silently dropped)', () => {
       const svc = new InquireEventsService(makeApi());
       const contract = makeContract({ instrumentType: 'IPLC_LC' });

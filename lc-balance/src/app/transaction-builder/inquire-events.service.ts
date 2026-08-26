@@ -13,7 +13,7 @@ import {
   systemMovementLabel,
   tenorTypeLabel,
 } from './balance-component.model';
-import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
+import { BuilderFieldsContext, buildFields, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
 import { payExistingUtilizeFunctionFor, resolveFunctionForMovement } from './function-strategy';
 import { BuilderModel } from './function-policy';
 import { describeApiError } from './api-error';
@@ -489,22 +489,12 @@ export class InquireEventsService {
     const fn = this.functionFor(event) ?? null;
     this.selectedEventFunction = fn;
 
-    const model: BuilderModel = {
-      instrumentType: contract.instrumentType,
-      movementType: movement.movementType,
-      amount: movement.amount,
-      currency: movement.currency,
-      tolerancePct: contract.tolerancePct ?? undefined,
-      eventSeq: movement.eventSeq,
-      createdBy: movement.createdBy,
-      secondaryRef: movement.sourceTransactionRef ?? undefined,
-      tenorType: contract.tenorType ?? undefined,
-      tenorDays: contract.tenorDays ?? undefined,
-      // Bug fix (reviewer-reported 2026-08-26, "Expiry Date not shown in Inquire Events → Original
-      // Transaction Screen") — A1/B1's own saved expiryDate was missing from this reconstructed model,
-      // so the read-only date input rendered its placeholder instead of the saved value.
-      expiryDate: contract.expiryDate ?? undefined,
-    };
+    // Generic Requirement (reviewer-reported 2026-08-26, "Original Transaction Screen Must Display All
+    // Saved Fields") — reconstructOriginalModel() is exhaustive over every BuilderModel key by
+    // construction (see its own doc comment in builder-fields.ts); this replaced an earlier hand-picked
+    // field list here that silently dropped expiryDate (fixed same day) and would have kept dropping any
+    // future field the same way.
+    const model: BuilderModel = reconstructOriginalModel(movement, contract);
     this.selectedEventModel = model;
 
     const ctx: BuilderFieldsContext = {

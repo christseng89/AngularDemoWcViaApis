@@ -16,7 +16,8 @@ function issueImportLc(service: BalanceService, lcNumber: string, opts: { expiry
     eventSeq: 1,
     amount: '10000',
     currency: 'USD',
-    expiryDate: opts.expiryDate,
+    expiryDate: opts.expiryDate ?? '2099-12-31',
+    tenorType: 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -40,6 +41,7 @@ describe('Consent passthrough on AMEND_EXPIRY_DATE (plain amendment against an A
       currency: 'USD',
       newExpiryDate: '2026-12-31',
       businessDate: '2026-01-01',
+      sourceTransactionRef: 'CONSENT-001-AMEND-1',
       amendmentApproved: true,
       amendmentEffective: '2026-01-02T00:00:00Z',
       consentStatus: 'OBTAINED',
@@ -70,6 +72,7 @@ describe('Consent passthrough on AMEND_EXPIRY_DATE (plain amendment against an A
       currency: 'USD',
       newExpiryDate: '2026-12-31',
       businessDate: '2026-01-01',
+      sourceTransactionRef: 'CONSENT-002-AMEND-1',
       consentStatus: 'NOT_REQUIRED',
       createdBy: 'maker1',
     });
@@ -92,6 +95,7 @@ describe('Consent passthrough on AMEND_EXPIRY_DATE (plain amendment against an A
       currency: 'USD',
       newExpiryDate: '2026-12-31',
       businessDate: '2026-01-01',
+      sourceTransactionRef: 'CONSENT-003-AMEND-1',
       createdBy: 'maker1',
     });
     if (!amend.created) throw new Error('expected a new movement');
@@ -114,6 +118,7 @@ describe('Consent passthrough on AMEND_EXPIRY_DATE (plain amendment against an A
       currency: 'USD',
       newExpiryDate: '2026-12-31',
       businessDate: '2026-01-01',
+      sourceTransactionRef: 'CONSENT-004-AMEND-1',
       amendmentApproved: false,
       createdBy: 'maker1',
     });
@@ -130,6 +135,8 @@ describe('Consent passthrough on AMEND_EXPIRY_DATE (plain amendment against an A
       eventSeq: 1,
       amount: '10000',
       currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
       consentStatus: 'OBTAINED', // harmlessly accepted and stored even though ISSUE has no real use for it
       createdBy: 'maker1',
     });

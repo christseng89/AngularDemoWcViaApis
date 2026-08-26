@@ -1734,3 +1734,88 @@ saved at Issue. Fixed by adding `expiryDate: contract.expiryDate ?? undefined` t
 plumbing were already correct — this was a plain omission in the read-only reconstruction path, not a
 missing feature. Regression coverage added to `inquire-events.service.spec.ts` (saved date shown; absent
 date stays `undefined`, not `null`). All three suites re-run green.
+
+## Inquire Events Original Transaction Screen — generalized to a compiler-enforced field reconstruction, not a hand-picked list (reviewer-reported 2026-08-26, "Original Transaction Screen Must Display All Saved Fields")
+
+Following straight on from the `expiryDate` fix above, the reviewer flagged the omission as systemic, not
+a one-off: `selectEvent()`'s reconstructed model was a hand-written object literal that could silently drop
+any future `BuilderModel` field the same way. Replaced with `reconstructOriginalModel(movement, contract)`
+(`builder-fields.ts`) — an exhaustive `{ [K in keyof Required<BuilderModel>]: ... }`-typed mapping table
+from every `BuilderModel` key to the movement/contract property that actually saved it; adding a new
+`BuilderModel` field without adding its entry here is now a TypeScript compile error, not a silent runtime
+gap. `selectEvent()` now just calls this function instead of building the model by hand. Verified
+end-to-end via live browser walkthrough of every A1–A11/B1–B7 function's own Original Transaction Screen
+(Maker Submit → Checker Release → Inquire Events), not just unit tests.
+
+## `release()` was silently nulling out `reason_code` on every Release — real bug, found via the browser walkthrough above
+
+`balanceMovementStore.ts`'s `updateStatus()` had `reason_code = @reasonCode` as a plain SQL overwrite,
+unlike the sibling snapshot columns which correctly use `COALESCE(@param, column)` to preserve the existing
+value when a caller omits the key. `release()` never passes `reasonCode` (CLOSE/REOPEN's own mandatory
+Reason Code — F1 §13.1 — is captured at `createMovement()` time, not at Release), so **every single
+Release silently erased it** — the reason a human Maker typed for a Close/Reopen was gone the instant a
+Checker approved it, ever since that feature shipped. Fixed to `COALESCE(@reasonCode, reason_code)`
+(`reject()`/`cancel()` are unaffected — both always pass a real, non-null `reasonCode` of their own).
+Regression coverage added in `closeFunction.test.ts`/`expiryExtensionAndReopen.test.ts` (asserts
+`reasonCode` survives `release()` and a re-fetch via `listMovements()`, not just the in-memory return
+value). **Pre-existing demo data (LC `S01`) still shows a blank Reason Code for its CLOSE/REOPEN** — that
+data was written before this fix and the original value is permanently gone; not recoverable, not a sign
+the fix didn't work.
+
+## `expiryDate` made mandatory at A1/B1 ISSUE (user-directed 2026-08-26, "A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理")
+
+Previously optional since F1 shipped (v1.19.0) — but an LC/Confirmation issued with none could never be
+picked up by `runAutoExpirySweep()`'s own candidate query (it only scans contracts whose `expiry_date`
+column is non-null), silently defeating the AUTO EXPIRY mechanism for that contract. Enforced at all three
+layers, same convention as the Reason Code mandatory rule (F1 §13.1): Angular `builder-fields.ts`
+(`required: showsExpiryDateInput`, label no longer says "optional"), `submit-rules.ts`'s own client-side
+guard (blocks Submit with "Expiry Date is mandatory for A1/B1."), and
+`BalanceService.assertExpiryDateRequired()` server-side (`400` if absent, for `ISSUE` against a root
+instrumentType only — child instrumentTypes are structurally unaffected). OAS bumped to v1.25.0 with a
+matching changelog entry. This broke a large number of pre-existing microservice tests that ISSUE a root
+contract without `expiryDate` as incidental setup (206 failures across 9 files) — all fixed to supply a
+placeholder `expiryDate` (mostly via each file's own shared `issueImportLc()`/`issueConfirmation()` helper,
+a handful of individual stragglers beyond that); two tests whose own subject was specifically "a contract
+with no recorded expiryDate" (`autoExpirySweep.test.ts`'s `SWEEP-003`,
+`expiryExtensionAndReopen.test.ts`'s `RECHECK-REOPEN-003`/`GRACE-CLOSE-001`) were converted to simulate
+that now-unconstructible legacy state via a direct DB write instead of a real ISSUE, rather than being
+deleted. All three suites re-run green (Angular 1146, backend 34, microservice 546).
+
+## 5 more UI-only mandatory fields closed server-side (user-directed 2026-08-26, "UI必輸欄位 API也是必輸欄位 三者一體... API包括 MAKER CHECKER")
+
+Audited every field the Angular client already treats as mandatory (`required:` in builder-fields.ts,
+guards in submit-rules.ts) against what `BalanceService` actually enforced, following straight on from the
+`expiryDate` audit above. Found 5 more gaps — enforced ONLY client-side, trivially bypassed by any direct
+API caller — and closed all of them, each at BOTH `createMovement()` (Maker) and `release()` (Checker,
+defense-in-depth against a movement/contract that reached the DB some other way — same posture the
+pre-existing `assertValidAmount()` re-check already used):
+
+1. `naturalKey.lcNumber` required (non-empty) on any creating (ISSUE/CREATE) movement.
+2. `naturalKey.ibNumber` additionally required for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/etc.;
+   `naturalKey.sgNumber` for SHGT — mirrors the client's own `NATURAL_KEY_FIELDS_BY_INSTRUMENT` table.
+3. `sourceTransactionRef` required for `AMEND_INCREASE`/`AMEND_DECREASE`/`AMEND`/`AMEND_EXPIRY_DATE`/
+   `UTILIZE`/`HONOUR`/`ACCEPT` — mirrors `dynamicSecondaryRefLabel` (Amendment No./IB/EB Number).
+4. `tenorType` required for `IPLC_LC:ISSUE`/`EPLC_CONFIRMATION:ISSUE`/`IPLC_ACCEPTANCE:CREATE` (A1/B1/A6)
+   — the 3 pairs the client ever shows a Tenor Type picker for.
+5. `tenorDays > 0` when non-Sight, but ONLY for `IPLC_LC:ISSUE` (A1) — deliberately NOT extended to B1/A6,
+   which have no equivalent client-side backstop today (this is a server-side mirror of an EXISTING rule,
+   not an invented new one).
+
+New constants `NATURAL_KEY_FIELDS_BY_INSTRUMENT`/`SECONDARY_REF_REQUIRED_MOVEMENT_TYPES`/
+`TENOR_TYPE_REQUIRED_PAIRS` and `assertNaturalKeyFieldsRequired()`/`assertSecondaryRefRequired()`/
+`assertTenorRequired()` in `balanceService.ts`, same shape as `assertReasonCodeRequired()`/
+`assertExpiryDateRequired()`. OAS bumped to v1.26.0.
+
+This broke 236 pre-existing microservice tests (mostly the same 9 files the `expiryDate` rule already
+touched, since most ISSUE calls now also need `tenorType`) plus the ENTIRE Business Case Registry
+(`backend/data/businessCases.js` — all 27 cases, none of which had ever needed `tenorType`/
+`sourceTransactionRef`/`expiryDate` before) — fixed via 6 parallel agents (5 for the microservice test
+files, 1 that live-verified and fixed the Business Case Registry against the actually-running backend+
+microservice, curl-testing each case end-to-end rather than just reading code). The Business Case fix also
+surfaced one more, PRE-EXISTING gap unrelated to this batch: 15 CLOSE/REOPEN steps across several cases
+were missing the F1 §13.1 mandatory `reasonCode` too (never previously exercised by an actual run). Added
+`test/unit/service/mandatoryFieldRules.test.ts` (21 tests) — dedicated Maker+Checker coverage for all 5
+rules, including `release()`-side DB-bypass tests proving the defense-in-depth re-check actually fires.
+All three suites re-run green (Angular 1146, backend 34, microservice 567) — live-verified via direct curl
+(`expiryDate`/`tenorType` missing → 400) and via the running Angular app (Submit A1 stays disabled until
+Expiry Date is filled, enables once it is).

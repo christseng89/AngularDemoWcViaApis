@@ -237,6 +237,14 @@
   text-align: right;
 }
 
+// User-requested 2026-08-26 — the LC/IB/SG Number identifier rows get a bigger, accented value so the
+// natural-key reference stands out at a glance against the surrounding rows (Status/Submitted/Approved/etc.,
+// which keep the plain .tb-balance-row__value styling above).
+.tb-balance-row__value--id {
+  font-size: 15px;
+  color: var(--blue-dark);
+}
+
 .tb-tabs {
   display: flex;
   flex-wrap: wrap;

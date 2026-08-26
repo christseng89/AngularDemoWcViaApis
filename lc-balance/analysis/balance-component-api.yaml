@@ -697,7 +697,47 @@ info:
         upstream (Channel API/front-office); this service only accepts, shape-validates (`consentStatus`
         against the fixed enum — an invalid value is rejected, 400), and persists all three for audit.
         Harmlessly accepted (and stored) on every other movementType too, same posture as `reasonCode`.
-  version: "1.24.0"
+
+    v1.25.0 (2026-08-26, user-directed — "A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理"):
+      - CHANGED (breaking for callers relying on the old optional behavior): `expiryDate` is now REQUIRED
+        (400 if absent) for `movementType: 'ISSUE'` against a root instrumentType (`IPLC_LC`/`EPLC_LC`/
+        `EPLC_CONFIRMATION`) — previously optional since v1.19.0. Without this, a contract ISSUEd with no
+        `expiryDate` could never be picked up by the AUTO EXPIRY sweep (it only scans contracts whose
+        `expiry_date` column is non-null), silently defeating the whole F1 auto-release mechanism for that
+        contract. Unaffected: every other `movementType` (still optional/passthrough, unchanged), and
+        every child instrumentType (`SHGT`/`IPLC_ACCEPTANCE`/`EPLC_EXAMINATION`/`EPLC_ACCEPTANCE`), for
+        which `expiryDate` remains structurally inert regardless of what's sent (createContract() already
+        nulled it out for those). Same three-layer enforcement convention as `reasonCode` (v1.24.0):
+        Angular Maker Submit form (required, blocks Submit), submit-rules.ts's own client-side guard, and
+        BalanceService.assertExpiryDateRequired() server-side.
+
+    v1.26.0 (2026-08-26, same day, user-directed — "UI必輸欄位 API也是必輸欄位 三者一體... API包括 MAKER
+    CHECKER"): audited every field the Angular client already treats as mandatory and closed 5 more
+    server-side gaps, all previously enforced ONLY client-side (a direct API caller could bypass every one
+    of them). Each is checked at BOTH the Maker's `POST /balance-movements` AND (defense-in-depth) the
+    Checker's own `.../release` — same posture `expiryDate`/`reasonCode` already established, mirroring
+    the identical `assertValidAmount()` re-check `release()` has always done.
+      - ADDED: `naturalKey.lcNumber` REQUIRED (400 if blank) whenever `naturalKey` is supplied on an
+        `ISSUE`/`CREATE` movement — previously an empty string silently created a contract with a blank
+        LC Number.
+      - ADDED: `naturalKey.ibNumber` REQUIRED additionally for `IPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE`/
+        `EPLC_EXAMINATION`/`EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/
+        `EPLC_EXPORT_BILLS_DISCOUNTED`; `naturalKey.sgNumber` REQUIRED additionally for `SHGT` — on
+        `ISSUE`/`CREATE` only, mirroring `NATURAL_KEY_FIELDS_BY_INSTRUMENT` client-side.
+      - ADDED: `sourceTransactionRef` REQUIRED (400 if absent) for `movementType` ∈
+        {`AMEND_INCREASE`, `AMEND_DECREASE`, `AMEND`, `AMEND_EXPIRY_DATE`, `UTILIZE`, `HONOUR`, `ACCEPT`}
+        — the Amendment No./Times or IB/EB Number every one of A2/A3/A3S/B2/B4 already requires as a
+        typed field client-side. Every other `movementType` (ISSUE/CREATE/CLOSE/REOPEN/EXPIRE/REVERSAL/
+        the two-field-search-resolved ones) is unaffected — `sourceTransactionRef` stays optional there,
+        unchanged.
+      - ADDED: `tenorType` REQUIRED for `ISSUE` against `IPLC_LC`/`EPLC_CONFIRMATION` (A1/B1) and `CREATE`
+        against `IPLC_ACCEPTANCE` (A6) — the 3 (instrumentType, movementType) pairs the client ever shows
+        a Tenor Type picker for. Additionally, for `IPLC_LC`'s own `ISSUE` (A1) specifically, `tenorDays`
+        must be a positive integer whenever `tenorType` isn't `SIGHT` — mirrors submit-rules.ts's own
+        A1-only backstop; deliberately NOT extended to B1/A6, which have no equivalent client-side
+        backstop today (only builder-fields.ts's own live reactive expression) — this changelog entry
+        documents an existing rule server-side, not a new client-side one.
+  version: "1.26.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1624,7 +1664,10 @@ components:
             EPLC_CONFIRMATION only. A genuinely separate concept from maturityDate above (the Usance/
             Acceptance's own due date) — set at ISSUE, amendable via `movementType: 'AMEND_EXPIRY_DATE'`
             (A2/B2's third amendment option). Drives the AUTO EXPIRY background sweep together with
-            mailFloatGraceDays below.
+            mailFloatGraceDays below. v1.25.0 — mandatory at ISSUE against those three instrumentTypes
+            (the request-side field is `nullable: true` only because it's harmlessly passed through for
+            every OTHER movementType too; ISSUE itself rejects a request with none, 400 — see
+            CreateMovementRequest.expiryDate's own description).
         mailFloatGraceDays:
           type: integer
           nullable: true
@@ -1950,7 +1993,7 @@ components:
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
-        expiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only. See BalanceContract.expiryDate's own description." }
+        expiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only. v1.25.0: REQUIRED (400 if absent) for ISSUE against those three instrumentTypes — a contract issued with none could never be picked up by the AUTO EXPIRY sweep. See BalanceContract.expiryDate's own description." }
         mailFloatGraceDays: { type: integer, nullable: true, description: "v1.19.0, F1 — optional override of the per-side config default (captured onto the contract at ISSUE, fixed thereafter); omit to use the config default." }
         newExpiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — movementType 'AMEND_EXPIRY_DATE' only. See BalanceMovement.newExpiryDate's own description." }
         legRef: { type: string, nullable: true }

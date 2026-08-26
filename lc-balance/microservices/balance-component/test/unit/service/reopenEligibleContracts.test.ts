@@ -17,6 +17,8 @@ function issueAndCloseImportLc(service: BalanceService, lcNumber: string): Balan
     eventSeq: 1,
     amount: '10000',
     currency: 'USD',
+    expiryDate: '2099-12-31',
+    tenorType: 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -52,6 +54,8 @@ describe('BalanceService.listReopenEligibleContracts — A11/B7 Reopen Step-1 pi
       eventSeq: 1,
       amount: '5000',
       currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     if (!active.created) throw new Error('expected a new movement');
@@ -113,6 +117,8 @@ describe('BalanceService.listReopenEligibleContracts — A11/B7 Reopen Step-1 pi
       eventSeq: 1,
       amount: '8000',
       currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
       createdBy: 'maker1',
     });
     if (!issue.created) throw new Error('expected a new movement');

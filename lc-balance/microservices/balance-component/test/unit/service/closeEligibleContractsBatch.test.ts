@@ -28,7 +28,9 @@ function issueImportLc(service: BalanceService, lcNumber: string, tenorType?: 'B
     eventSeq: 1,
     amount: '10000',
     currency: 'USD',
-    ...(tenorType ? { tenorType } : {}),
+    expiryDate: '2099-12-31',
+    tenorType: tenorType ?? 'SIGHT',
+    ...(tenorType === 'BUYERS_USANCE' ? { tenorDays: 90 } : {}),
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -46,6 +48,8 @@ function issueConfirmation(service: BalanceService, lcNumber: string): BalanceCo
     eventSeq: 1,
     amount: '10000',
     currency: 'USD',
+    expiryDate: '2099-12-31',
+    tenorType: 'SIGHT',
     createdBy: 'maker1',
   });
   if (!issue.created) throw new Error('expected a new movement');
@@ -71,6 +75,7 @@ function buildImportLcCandidates(service: BalanceService) {
     eventSeq: 2,
     amount: '1000',
     currency: 'USD',
+    sourceTransactionRef: 'AMD-01',
     createdBy: 'maker1',
   });
   if (!amendDecrease.created) throw new Error('expected a new movement');

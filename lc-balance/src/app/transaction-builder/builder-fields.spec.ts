@@ -1,6 +1,6 @@
-import { BuilderFieldsContext, buildFields, toReadOnlyFields } from './builder-fields';
+import { BuilderFieldsContext, buildFields, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
 import { CURRENCY_OPTIONS, IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
-import type { BalanceContract, BalanceSnapshot } from './balance-component-api.service';
+import type { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 
 /**
  * BAL-003 (God Component) — dedicated unit coverage for `builder-fields.ts`'s `buildFields()`, where
@@ -54,6 +54,23 @@ function fieldByKey(fields: ReturnType<typeof buildFields>, key: string) {
   const found = fields.find((f) => f.key === key);
   if (!found) throw new Error(`No field with key "${key}"`);
   return found;
+}
+
+function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
+  return {
+    movementId: 'mv-1',
+    balanceContractId: 'bc-1',
+    eventSeq: 1,
+    movementType: 'ISSUE',
+    exposureNature: 'CONTINGENT',
+    amount: '50000',
+    ceilingAmount: '50000',
+    currency: 'USD',
+    status: 'RELEASED',
+    createdBy: 'maker1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
 }
 
 describe('builder-fields', () => {
@@ -245,10 +262,10 @@ describe('builder-fields', () => {
       expect(newExpiryDate.props?.required).toBe(true);
     });
 
-    it('expiryDate is shown (optional) only for A1/B1, hidden for every other function', () => {
+    it('expiryDate is shown and mandatory only for A1/B1, hidden for every other function (mandatory since 2026-08-26 — see BalanceService.assertExpiryDateRequired\'s own doc comment)', () => {
       const a1 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('A1') })), 'expiryDate');
       expect(a1.hide).toBe(false);
-      expect(a1.props?.required).toBeUndefined();
+      expect(a1.props?.required).toBe(true);
       expect(a1.props?.type).toBe('date');
 
       const b1 = fieldByKey(buildFields(baseCtx({ selectedFunction: fn('B1'), model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE' } })), 'expiryDate');
@@ -502,6 +519,73 @@ describe('builder-fields', () => {
       expect(decorated.map((f) => f.key)).toEqual(original.map((f) => f.key));
       expect(fieldByKey(decorated, 'amount').props?.required).toBe(true);
       expect(fieldByKey(decorated, 'amount').className).toContain('tb-field--required');
+    });
+  });
+
+  describe('reconstructOriginalModel (Generic Requirement, reviewer-reported 2026-08-26 — "Original Transaction Screen Must Display All Saved Fields")', () => {
+    it('carries every BuilderModel field through from a fully-populated movement/contract, not a hand-picked subset', () => {
+      const c = contract({
+        instrumentType: 'IPLC_LC',
+        tolerancePct: '10',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
+        expiryDate: '2026-12-31',
+      });
+      const m = movement({
+        movementType: 'CLOSE',
+        amount: '0',
+        currency: 'USD',
+        eventSeq: 7,
+        createdBy: 'maker-7',
+        sourceTransactionRef: 'AMD-02',
+        newExpiryDate: '2027-06-30',
+        reasonCode: 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED',
+      });
+
+      const model = reconstructOriginalModel(m, c);
+
+      expect(model).toEqual({
+        instrumentType: 'IPLC_LC',
+        movementType: 'CLOSE',
+        amount: '0',
+        currency: 'USD',
+        tolerancePct: '10',
+        eventSeq: 7,
+        createdBy: 'maker-7',
+        secondaryRef: 'AMD-02',
+        tenorType: 'SELLERS_USANCE',
+        tenorDays: 90,
+        expiryDate: '2026-12-31',
+        newExpiryDate: '2027-06-30',
+        reasonCode: 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED',
+      });
+    });
+
+    it('leaves every optional field undefined (never null) when the source movement/contract never had one', () => {
+      const c = contract({ tolerancePct: null, tenorType: null, tenorDays: null, expiryDate: null });
+      const m = movement({ sourceTransactionRef: null, newExpiryDate: null, reasonCode: null });
+
+      const model = reconstructOriginalModel(m, c);
+
+      expect(model.tolerancePct).toBeUndefined();
+      expect(model.tenorType).toBeUndefined();
+      expect(model.tenorDays).toBeUndefined();
+      expect(model.expiryDate).toBeUndefined();
+      expect(model.secondaryRef).toBeUndefined();
+      expect(model.newExpiryDate).toBeUndefined();
+      expect(model.reasonCode).toBeUndefined();
+    });
+
+    it('every field buildFields() can ever render ends up populated in the reconstructed model whenever the source data has a value — no field is silently dropped', () => {
+      const c = contract({ tolerancePct: '5', tenorType: 'SIGHT', tenorDays: 0, expiryDate: '2026-01-01' });
+      const m = movement({ sourceTransactionRef: 'REF-1', newExpiryDate: '2026-02-02', reasonCode: 'RC-1' });
+
+      const model = reconstructOriginalModel(m, c);
+      const allFieldKeys = buildFields(baseCtx({ model, selectedContract: c })).map((f) => f.key as string);
+
+      for (const key of allFieldKeys) {
+        expect((model as Record<string, unknown>)[key]).not.toBeUndefined();
+      }
     });
   });
 });
