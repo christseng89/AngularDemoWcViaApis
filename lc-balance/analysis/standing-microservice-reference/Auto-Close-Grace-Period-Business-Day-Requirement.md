@@ -63,3 +63,103 @@ addBusinessDays(date: Date, n: number, calendar: { weekendDays: string[]; holida
 
 `calendars.json`（同資料夾）——一份本國（`TW`，台灣）行事曆，僅供示意的 2026 週末/假日日期。並非
 權威資料來源，實際使用前務必換成銀行真正的假日清單。
+
+
+---
+
+## Phase 2 設計強化：統一 `isBusinessDay()` 判斷 + Special Working Day Override（2026-08-26，業務端補充，BA 記錄）
+
+使用者針對「先查週末、還是先查假日」這個問題，提出了更完整的 Trade Finance 作業日判斷設計，指出
+單純固定順序（不管哪一種）都不夠，銀行系統還需要支援「補班日」选類例外。這一節記錄完整的補充需求，
+供 Phase 2 真正實作時參考。
+
+### 為什麼「先查週末」或「先查假日」都不是完整答案
+
+上一輪 BA 複查發現 `domain/domesticCalendar.ts`（A1/B1 Expiry Date 檢查）跟
+`microservices/business-days-mock/server.js`（AUTO CLOSE 參考用 mock）兩邊查詢順序不一樣（前者
+先查假日、後者先查週末），純粹只影響「拒絕訊息文字」，不影響是否放行的結果。但使用者指出這個
+「先查誰」的問題本身問錯了方向——**真正該問的是「有沒有補班日 Override」，而不是週末跟假日誰先查**。
+如果某個週六被指定為補班日（例如颱風假後補班、或政府調整放假），單純的「Saturday/Sunday → 一律非
+營業日」規則會直接判斷錯誤，不管週末檢查放第一還是第二都一樣錯——因為根本沒有查過 Override『
+
+### 建議的判斷優先順序
+
+```
+1. 特殊營業日／補班日（Special Working Day / Working Day Override）
+2. 法定假日／銀行假日（Holiday Calendar）
+3. 一般週末規則（Weekend Rule）
+4. 其餘日期 = 營業日
+```
+
+判斷邏輯：
+
+```
+if 日期被設定為 Special Working Day
+    → BUSINESS DAY
+else if 日期存在 Holiday Calendar
+    → NON-BUSINESS DAY
+else if 日期符合 Weekend Rule
+    → NON-BUSINESS DAY
+else
+    → BUSINESS DAY
+```
+
+**範例**：`2026-10-10` 是星期六，但若該年度行事曆把這天設為補班日（`Special Working Day`），
+正確答案應該是 `BUSINESS DAY`，而不是單純因為「星期六」就判定為非營業日。
+
+### 建議的 Calendar 資料設計——每個日期可帶明確 Override
+
+| 日期設定                 | 判斷結果 | 優先級 |
+| ------------------------ | -------- | -----: |
+| `WORKING_DAY_OVERRIDE`   | 營業日   |   最高 |
+| `HOLIDAY`                | 非營業日 |   第二 |
+| `WEEKEND`                | 非營業日 |   第三 |
+| 沒有設定                 | 營業日   |   預設 |
+
+週末規則本身也不應該寫死「只有星期六、星期日」——應按國家／銀行／分行配置（不同市場可能有不同的
+週末安排）。
+
+### Trade Finance 系統裡不只一處需要「今天是不是營業日」——而且未必是同一份行事曆
+
+| 作業                       | 建議使用的行事曆                 |
+| -------------------------- | -------------------------------- |
+| AUTO EXPIRY／AUTO CLOSE     | 該 LC 所屬銀行／分行的行事曆      |
+| Acceptance Maturity Date    | 本行與付款地／對手行相關的行事曆  |
+| Operation／Payment Date     | 本行、幣別清算及對手行行事曆      |
+| SWIFT 發送或交易處理        | 本行營業日曆                      |
+| Currency Settlement         | 相應幣別的清算市場行事曆          |
+
+這跟這份文件最上面「AUTO CLOSE 不需要交易對手／付款行行事曆」的結論並不衝突——AUTO CLOSE 本身
+確實只需要單一行事曆，上面這張表列出的是「`lc-balance/` 之外，Trade Finance 整體還有其他作業也需要
+問同一種問題（是不是營業日），但可能要問不同的行事曆」，屬於長期架構層級的觀察，不是要 AUTO CLOSE
+自己去處理多行事曆的協調。
+
+### 長期建議：統一走 `calendarService.isBusinessDay(date, calendarIds)`，而不是每個微服務各自土法煉鋼
+
+目前這個 repo 裡實際上已經有三份各自獨立、寫法不完全一致的「是不是營業日」邏輯：
+`domain/autoCloseGracePeriod.ts`（Phase 1，只排除週末）、`microservices/business-days-mock/
+server.js`（AUTO CLOSE 參考 mock，週末優先）、`domain/domesticCalendar.ts`（A1/B1 Expiry Date
+檢查，假日優先）——外加 Angular 手動同步的第四份副本 `domestic-calendar.ts`。三份都不支援
+Special Working Day Override，且彼此順序不一致這件事本身就是「各自土法煉鋼」的直接後果：沒有一個
+共同的服務可以問，每個地方就會各自寫一份、各自做出（可能不一致的）選擇。
+
+長期設計方向應該是統一呼叫：
+
+```
+calendarService.isBusinessDay(date, calendarIds)
+```
+
+而不是讓每個微服務／每個功能自己各寫一份 `isWeekend(date)` / `isHoliday(date)`。
+
+### 現階段（Phase 1／這份文件描述的 Phase 2 範圍）務實的中間做法
+
+目前系統還沒有補班／特殊營業日機制的情況下，第一階段可以先檢查週末、再查假日（以減少查詢，效能
+考量），這跟 `business-days-mock/server.js` 目前的做法一致，不需要現在就為了这个而重构。但長期設計
+仍應以「統一 Calendar Service 的 `isBusinessDay()` 最終判斷結果」為準，並且優先順序要把
+Special Working Day Override 放在最前面——這是正確性問題，不是效能問題，跟「先查週末還是先查假日」
+的效能取捨是兩件不同層次的事，不能混為一談。
+
+**結論**：這一節記錄業務端對 Phase 2（以及未來可能跨多個 Trade Finance 作業共用的 Calendar Service）
+的完整設計期望，供工程team之後真正動手實作時參考。目前 Phase 1（`autoCloseGracePeriod.ts`）與
+A1/B1 的 `domesticCalendar.ts` 都還沒有 Special Working Day Override 機制，不列為現階段阻擋項，
+但正式做 Phase 2／統一 Calendar Service 時，Override 機制應該是設計的第一優先順序，而不是事後才加。
