@@ -18,7 +18,17 @@
        used throughout this template, no new CSS. -->
   <div class="tb-tabs tb-tabs--side mb-4">
     <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'PROCESSING'" (click)="selectMode('PROCESSING')">Transaction Processing</button>
+    <!-- Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
+       Proposal-zh.md §2.1) — the Maker's own "My Pending/My Rejected" worklist, mirroring Inquire
+       Events' own top-level mode-tab convention. User-requested tab order swap: Maker Queue before
+       Inquire Events. -->
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'MAKER_QUEUE'" (click)="selectMode('MAKER_QUEUE')">Maker Queue</button>
     <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'INQUIRE'" (click)="selectMode('INQUIRE')">Inquire Events</button>
+    <!-- Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11,
+       BA & business-directed 2026-08-27) — a dedicated, independent audit query, deliberately separate
+       from Inquire Events ("只查所有曾經發生過的 Delete Pending 操作，不混入 Resubmit/Fix/Approve/
+       Reject"). -->
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'DELETE_PENDING_AUDIT'" (click)="selectMode('DELETE_PENDING_AUDIT')">Inquire Delete Pending</button>
   </div>
 
   <ng-container *ngIf="activeMode === 'PROCESSING'">
@@ -486,6 +496,12 @@
     [inquireEvents]="inquireEvents"
     (openAccountEntries)="onInquireOpenAccountEntries($event)"
   ></app-inquire-events>
+
+  <!-- ══════════════════════════ MAKER QUEUE (Fix Pending/Delete Pending Phase 2) ══════════════════════════ -->
+  <app-maker-queue *ngIf="activeMode === 'MAKER_QUEUE'" [makerQueue]="makerQueue"></app-maker-queue>
+
+  <!-- ══════════════════════════ INQUIRE DELETE PENDING (§11) ══════════════════════════ -->
+  <app-inquire-delete-pending *ngIf="activeMode === 'DELETE_PENDING_AUDIT'" [service]="inquireDeletePending"></app-inquire-delete-pending>
 
   <!-- ══════ View Voucher pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html;
        retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement) ══════

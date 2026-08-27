@@ -492,6 +492,31 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('consent_status')) db.exec('ALTER TABLE balance_movements ADD COLUMN consent_status TEXT');
     },
   },
+  {
+    id: 18,
+    description:
+      'Add delete_pending_audit table (2026-08-27, Fix Pending/Delete Pending Phase — BA/business-directed dedicated audit trail for every Delete Pending action across all A1-A11/B1-B7 functions) — see schema.ts\'s own doc comment on this table for the full rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally (idempotent), same as every other fresh-table addition in this codebase to date.',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS delete_pending_audit (
+          audit_id                TEXT PRIMARY KEY,
+          delete_seq               INTEGER NOT NULL,
+          movement_id             TEXT NOT NULL REFERENCES balance_movements(movement_id),
+          balance_contract_id     TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+          event_seq               INTEGER NOT NULL,
+          movement_type           TEXT NOT NULL,
+          source_transaction_ref  TEXT,
+          status_before           TEXT NOT NULL CHECK (status_before IN ('PENDING', 'REJECTED')),
+          cancelled_by            TEXT NOT NULL,
+          cancelled_at            TEXT NOT NULL,
+          reason_code             TEXT,
+          remarks                 TEXT
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_movement ON delete_pending_audit(movement_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_contract ON delete_pending_audit(balance_contract_id)');
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

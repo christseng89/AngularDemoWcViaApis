@@ -528,6 +528,58 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
 
 ---
 
+## 10. Fix Pending / Delete Pending 系列（2026-08-27）——現況與待辦，換人接手前必讀
+
+完整過程記錄於 `analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md`（§1–§11）。**以下
+所有項目截至本次記錄時全部尚未 commit**（使用者明確指示「不要COMMIT」，尚未收到「commit and push」
+指示前不得執行 git 操作）。
+
+- [x] **Phase 1（REJECTED 開放 Delete Pending）+ Phase 2（Maker Queue 新分頁）**——已實作、已三套件
+  全綠、已 live 驗證（文件 §9.1/§9.2）。
+- [x] **A1/B1 Delete Pending 後 LC Number 可重複使用**——新增 `ContractStatus.CANCELLED` 實際賦值
+  （`BalanceContractStore.markCancelled()`），僅限 root ISSUE（A1/B1），A6/A7/A8/B3 等子合約類
+  CREATE/ISSUE **不在範圍內**（文件 §9.3）。
+- [x] **`delete_pending_audit` 稽核表（BA 方案B，涵蓋 A1–A11/B1–B7 全部功能）**——已實作、已三套件
+  全綠（Angular 1210/1210、backend 39/39、microservice 602/602，覆蓋率四項皆過95%）、已 live 驗證
+  （文件 §10）。**目前沒有任何 HTTP 路由可以查詢這張表的內容**——只有寫入路徑（`cancel()` 內部
+  insert），讀取要等第11節的 Inquire Delete Pending 畫面做出來才有。
+  - [x] **同日修復**：新表對 `balance_movements`/`balance_contracts` 有外鍵約束
+    （`PRAGMA foreign_keys = ON`），既有的 `/admin/reset-database`（Cleanup Database Tables 按鈕）
+    路由沒有同步更新去刪這張新表，只要資料庫裡發生過一次 Delete Pending，再點 Cleanup 就會外鍵違反
+    500。已修復（`app.ts` 補上 `DELETE FROM delete_pending_audit`，順序放最前面）並補上專屬回歸測試
+    （`test/unit/app.test.ts`：Submit→Cancel 產生稽核列→reset-database 應為 200 且三表皆清空）。
+    **教訓（已記入 Claude 端的長期記憶，供以後所有新表都要照做）**：新增一張有外鍵約束的表，除了為
+    新功能本身寫測試，還必須額外 grep 全 repo 找出所有既有對被參照資料表做 raw
+    DELETE/reset/wipe 的地方（測試 helper 也算），逐一確認是否要同步更新——這種交叉情境不會被
+    「新功能自己的測試全綠」抓到。
+- [x] **業務已確認 (a) Delete Sequence 為系統自動生成、持久化欄位**——`delete_pending_audit` 新增
+  `delete_seq INTEGER NOT NULL` 欄位，`BalanceService.cancel()` 寫入時依自然鍵
+  （`instrument_type`/`lc_number`/`ib_number`/`sg_number`，不是 `balance_contract_id`）計算並存入，
+  已實作、已三套件全綠（Angular 1210/1210、backend 39/39、microservice 605/605）、已 live 驗證
+  （文件 §11.4）。
+- [x] **Inquire Delete Pending 獨立稽核查詢功能——業務已回覆 (b)/(c) 並追加 UI 需求，全部實作完成**
+  （見文件 §13）：
+  1. (b) Secondary Reference——業務確認「用第一個方案」，採用 §11.2(b) 的合併邏輯（子合約類用
+     `ib_number`/`sg_number`；Amendment/Utilize 類用 `source_transaction_ref`）。
+  2. (c) Function 篩選——業務同意前端過濾，維持 §11.2(c) 的建議設計。
+  3. **追加 UI 需求**：整體操作方式與 INQUIRE EVENTS 一致（Import/Export → LC Catalog → 選 LC →
+     該 LC 的 Delete Pending 記錄）；LC Catalog 只顯示「曾經被 Delete Pending 過」的 LC（新
+     microservice 路由 `GET /delete-pending-audit/lc-catalog`，`SELECT DISTINCT` 依 LC Number
+     去重，即使跨多張合約列/多次 Delete Pending 也只顯示一次）；樣式表與 INQUIRE EVENTS 相同。
+  4. **SOLID/避免重複**：新增共用的 `LcCatalogIndexService`（Import/Export 切換 + LC Catalog
+     搜尋/分頁，`fetchPage`/`decorate` 可替換，供 Inquire Delete Pending 使用；`InquireEventsService`
+     本身因為已有 80+ 測試綁定既有欄位名稱，這次未一併遷移，留作後續獨立重構項目）；把
+     `InquireEventsService` 原本私有的 `loadIndexRow()` 抽成模組層級匯出函式
+     `computeLcIndexRow()`，兩邊共用同一份 Tenor Type/Currency/Face Amount/Last Event Date 計算邏輯。
+  5. **過程中發現並修復一個真實 UI bug**：切換 Function 篩選時，先前開著的 View 明細面板沒有跟著
+     清除，顯示過期資料——已修正（`[ngModel]`+`(ngModelChange)` 展開語法，一併呼叫 `closeView()`）。
+  三套件全綠：Angular 1254/1254、backend 39/39、microservice 619/619，覆蓋率四項皆過 95%。已透過
+  curl（確認 12 個曾 Delete Pending 過的 LC 各自只出現一次）與完整瀏覽器操作（LC Catalog → 選 LC →
+  查看該 LC 的 Delete Pending 記錄，Delete Sequence 依自然鍵正確分組 → View → 切換 Function 篩選確認
+  View 自動關閉）live 驗證，全程無 Console 錯誤。**仍未 commit**，等候使用者「commit and push」指示。
+
+---
+
 ## 備註
 
 - 除以上項目外，`transaction-builder.component.ts`「God Component」(BAL-003) 已於 2026-08-21 正式收尾，

@@ -799,11 +799,20 @@
              Document Arrival — silently destroying upstream work under a label ("Delete Pending") that,
              for every OTHER function, means "withdraw only my own just-created record". A4 offers no
              correct "delete my own pending thing" action at all (there is no such record), so hiding it
-             is the fix, not relabeling it. -->
+             is the fix, not relabeling it.
+
+             Widened to also cover REJECTED (Fix Pending/Delete Pending Phase 1, analysis/Balance-
+             Component-FixPending-DeletePending-Proposal-zh.md §2.4) — "Checker Reject 不代表交易已
+             取消或刪除", the rejected record must return to the Maker with Delete Pending still an
+             option, not just PENDING. Backend already allows REJECTED -> CANCELLED
+             (statusTransition.ts) — this was purely a front-end display gap. -->
   <button
     type="button"
     class="tb-btn tb-btn--danger-outline mt-2"
-    *ngIf="submitResult?.status === 'PENDING' && !selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace"
+    *ngIf="
+      (submitResult?.status === 'PENDING' || submitResult?.status === 'REJECTED') &&
+      !selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace
+    "
     (click)="deletePendingRequested.emit()"
     [disabled]="actionBusy"
   >

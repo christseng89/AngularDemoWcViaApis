@@ -1,0 +1,80 @@
+<section class="tb-section tb-section--maker">
+  <div class="tb-section__body">
+    <div class="tb-field tb-field--inline tb-field--search">
+      <label class="tb-field__label">Maker (createdBy)</label>
+      <input class="tb-input tb-input--required" placeholder="maker1" [(ngModel)]="makerQueue.createdBy" (keyup.enter)="makerQueue.load()" />
+      <button type="button" class="tb-btn tb-btn--outline" (click)="makerQueue.load()" [disabled]="makerQueue.loading">
+        <span class="tb-spinner" aria-hidden="true" *ngIf="makerQueue.loading"></span>{{ makerQueue.loading ? 'Loading…' : 'Load' }}
+      </button>
+    </div>
+    <div class="tb-error mt-2" role="alert" *ngIf="makerQueue.error">{{ makerQueue.error }}</div>
+    <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="makerQueue.loading">
+      <span class="tb-spinner" aria-hidden="true"></span>Loading My Pending/My Rejected…
+    </div>
+
+    <div class="tb-table-scroll mt-2" *ngIf="!makerQueue.loading && makerQueue.items.length">
+      <table class="tb-table">
+        <caption class="visually-hidden">My Pending/My Rejected</caption>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>LC Number</th>
+            <th>Reference</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of makerQueue.items">
+            <td>
+              <span class="tb-type-tag" *ngIf="makerQueue.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
+              <span class="tb-muted" *ngIf="!makerQueue.functionFor(row)">—</span>
+            </td>
+            <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
+            <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
+            <td class="tb-table__amount">{{ row.movement.amount }} {{ row.movement.currency }}</td>
+            <td class="tb-table__status">
+              <span class="tb-status-badge" [ngClass]="statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType)"
+                ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType))"></app-tb-icon
+                >{{ displayStatus(row.movement.status, row.contract.instrumentType, row.movement.movementType) }}</span
+              >
+            </td>
+            <td class="tb-table__time">{{ row.movement.createdAt | date: 'short' }}</td>
+            <td>
+              <!-- Fix Pending itself is Phase 3, not yet approved (awaiting business's written
+                 confirmation of the editable-field scope — see the proposal doc's own status block) —
+                 only Delete Pending is wired up in this Phase 2 pass. Compound submissions (A3S/B4/B5)
+                 are excluded, see MakerQueueService.isCompoundShape()'s own doc comment. -->
+              <button
+                type="button"
+                class="tb-btn tb-btn--tiny tb-btn--danger-outline"
+                [title]="deletePendingLabel(row)"
+                [disabled]="makerQueue.isCompoundShape(row)"
+                (click)="makerQueue.deletePending(row)"
+              >
+                Delete Pending
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tb-pagination" *ngIf="makerQueue.paging.totalPages > 1">
+      <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="makerQueue.paging.page <= 1" (click)="makerQueue.prevPage()">‹ Prev</button>
+      <span class="tb-muted">Page {{ makerQueue.paging.page }} / {{ makerQueue.paging.totalPages }} ({{ makerQueue.paging.total }} total)</span>
+      <button
+        type="button"
+        class="tb-btn tb-btn--tiny tb-btn--outline"
+        [disabled]="makerQueue.paging.page >= makerQueue.paging.totalPages"
+        (click)="makerQueue.nextPage()"
+      >
+        Next ›
+      </button>
+    </div>
+    <div class="tb-hint mt-2" *ngIf="!makerQueue.loading && !makerQueue.items.length && !makerQueue.error">
+      Nothing PENDING or REJECTED under this Maker right now.
+    </div>
+  </div>
+</section>

@@ -18,6 +18,7 @@ import { parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
+import { DeletePendingAuditStore } from '../store/deletePendingAuditStore';
 import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
@@ -57,8 +58,10 @@ import type {
   BalanceContract,
   BalanceMovement,
   BalanceSnapshot,
+  DeletePendingAuditWithContract,
   ExposureNature,
   InstrumentType,
+  MovementStatus,
   MovementWarning,
   NaturalKey,
   TenorType,
@@ -260,6 +263,7 @@ export type CreateMovementResult = { created: true; movement: BalanceMovement } 
 export class BalanceService {
   private readonly contracts: BalanceContractStore;
   private readonly movements: BalanceMovementStore;
+  private readonly deletePendingAudit: DeletePendingAuditStore;
   private readonly movementTypeRegistry: Readonly<Record<string, MovementTypeDescriptor>>;
   private readonly newContractSufficiencyRegistry: Readonly<Record<string, (req: CreateMovementRequest) => void>>;
 
@@ -269,6 +273,7 @@ export class BalanceService {
   ) {
     this.contracts = new BalanceContractStore(db);
     this.movements = new BalanceMovementStore(db);
+    this.deletePendingAudit = new DeletePendingAuditStore(db);
     this.movementTypeRegistry = this.buildMovementTypeRegistry();
     this.newContractSufficiencyRegistry = this.buildNewContractSufficiencyRegistry();
   }
@@ -650,6 +655,11 @@ export class BalanceService {
 
   catalog(filter: CatalogFilter): CatalogPage {
     return this.contracts.listCatalog(filter);
+  }
+
+  /** Inquire Delete Pending's own LC Catalog step (§11) — see BalanceContractStore.listWithDeletePendingHistory()'s own doc comment. */
+  catalogWithDeletePendingHistory(filter: { instrumentType: InstrumentType; q?: string; page?: number; pageSize?: number }): CatalogPage {
+    return this.contracts.listWithDeletePendingHistory(filter);
   }
 
   /**
@@ -1259,6 +1269,13 @@ export class BalanceService {
     return this.movements.listByContract(balanceContractId);
   }
 
+  /** Inquire Delete Pending's own View action (§11) — resolves a contract directly by ID, no natural key required. */
+  getContractById(balanceContractId: string): BalanceContract {
+    const contract = this.contracts.findById(balanceContractId);
+    if (!contract) throw new NotFoundError(`No BalanceContract ${balanceContractId}`);
+    return contract;
+  }
+
   /** Balance snapshot "as of" one specific movement in the timeline — resolves its own contract, no separate balanceContractId needed from the caller. */
   getBalanceSnapshotAsOfMovement(movementId: string): BalanceSnapshot {
     const movement = this.movements.findById(movementId);
@@ -1273,6 +1290,48 @@ export class BalanceService {
    */
   findByBusinessEventId(businessEventId: string): BalanceMovement[] {
     return this.movements.findByBusinessEventId(businessEventId);
+  }
+
+  /**
+   * Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
+   * Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/My Rejected" worklist, cross-contract and
+   * cross-instrumentType. Deliberately does NOT filter to single-leg functions here — that's an
+   * Angular-side, per-row action-eligibility concern (Delete Pending's own compound-shape exclusion,
+   * §2.5), not a data-access one; this method just answers "what's PENDING/REJECTED under this
+   * createdBy". Pairs each movement with its own contract so the caller can resolve LC Number/
+   * instrumentType/function without a second round trip per row.
+   */
+  listMyMovements(params: { createdBy: string; statuses?: MovementStatus[]; page?: number; pageSize?: number }): {
+    items: Array<{ movement: BalanceMovement; contract: BalanceContract }>;
+    total: number;
+    page: number;
+    pageSize: number;
+  } {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 10;
+    const statuses = params.statuses ?? (['PENDING', 'REJECTED'] as MovementStatus[]);
+    const { items, total } = this.movements.listByCreatedByAndStatus({ createdBy: params.createdBy, statuses, page, pageSize });
+    const rows = items.map((movement) => {
+      const contract = this.contracts.findById(movement.balanceContractId);
+      if (!contract) throw new NotFoundError(`No BalanceContract ${movement.balanceContractId} (owner of movement ${movement.movementId})`);
+      return { movement, contract };
+    });
+    return { items: rows, total, page, pageSize };
+  }
+
+  /**
+   * Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11, BA &
+   * business-directed 2026-08-27) — thin pass-through to DeletePendingAuditStore.search(), which owns
+   * the actual JOIN/filter/pagination/sort SQL. See that method's own doc comment for the fixed sort
+   * order and why Function is not a server-side filter.
+   */
+  listDeletePendingAudit(filter: { lcNumber?: string; deletedBy?: string; from?: string; to?: string; page?: number; pageSize?: number }): {
+    items: DeletePendingAuditWithContract[];
+    total: number;
+    page: number;
+    pageSize: number;
+  } {
+    return this.deletePendingAudit.search(filter);
   }
 
   /**
@@ -2192,14 +2251,56 @@ export class BalanceService {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
     applyStatusTransition({ currentStatus: movement.status, action: 'CANCEL', createdBy: movement.createdBy, actingUser: cancelledBy });
+    // applyStatusTransition() above only allows CANCEL from PENDING/REJECTED (statusTransition.ts's own
+    // LEGAL_TRANSITIONS table) — movement.status is one of those two here, by construction.
+    const statusBefore = movement.status as 'PENDING' | 'REJECTED';
+    const cancelledAt = this.now();
+    const contract = this.contracts.findById(movement.balanceContractId);
+    if (!contract) throw new NotFoundError(`No BalanceContract ${movement.balanceContractId} (owner of movement ${movement.movementId})`);
     this.movements.updateStatus({
       movementId,
       status: 'CANCELLED',
       cancelledBy,
-      cancelledAt: this.now(),
+      cancelledAt,
       reasonCode: reasonCode ?? 'MAKER_EC',
       remarks,
     });
+    // Fix Pending/Delete Pending Phase (analysis/Balance-Component-FixPending-DeletePending-
+    // Proposal-zh.md §10, BA/business-directed 2026-08-27) — a dedicated, append-only audit trail for
+    // EVERY Delete Pending action across all A1-A11/B1-B7 functions, one row per cancel() call. A
+    // compound function's own cascade (A3S/B4/B5, checker-actions.service.ts's deleteMakerPending())
+    // already calls cancel() once per leg, so each leg gets its own independent audit row automatically
+    // — no per-function wiring needed. See db/schema.ts's own delete_pending_audit table doc comment.
+    const deleteSeq = this.deletePendingAudit.nextDeleteSeq(
+      contract.instrumentType,
+      contract.naturalKey.lcNumber,
+      contract.naturalKey.ibNumber ?? null,
+      contract.naturalKey.sgNumber ?? null,
+    );
+    this.deletePendingAudit.insert({
+      auditId: randomUUID(),
+      deleteSeq,
+      movementId,
+      balanceContractId: movement.balanceContractId,
+      eventSeq: movement.eventSeq,
+      movementType: movement.movementType,
+      sourceTransactionRef: movement.sourceTransactionRef ?? null,
+      statusBefore,
+      cancelledBy,
+      cancelledAt,
+      reasonCode: reasonCode ?? 'MAKER_EC',
+      remarks: remarks ?? null,
+    });
+    // Fix Pending/Delete Pending — Delete Pending on a root A1/B1 ISSUE (analysis/Balance-Component-
+    // FixPending-DeletePending-Proposal-zh.md, user-directed follow-up) — "同一個 LC number必須可以重復
+    //使用": without this, the contract this ISSUE created stays ACTIVE forever (cancel() only ever
+    // touched the movement), permanently blocking the same natural key via resolveOrCreateContract()'s
+    // own re-ISSUE guard (findActiveByNaturalKey()). Safe by construction: assertRootIssueReleased()
+    // guarantees no other movement can exist on a root contract while its own ISSUE is still
+    // un-Released, so cancelling it always means this contract never became real.
+    if (movement.movementType === 'ISSUE' && ROOT_INSTRUMENT_TYPES.has(contract.instrumentType)) {
+      this.contracts.markCancelled(movement.balanceContractId, cancelledAt);
+    }
     return this.movements.findById(movementId)!;
   }
 

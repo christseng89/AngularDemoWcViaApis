@@ -266,4 +266,45 @@ CREATE INDEX IF NOT EXISTS idx_movements_contract_status
 
 CREATE INDEX IF NOT EXISTS idx_movements_business_event
   ON balance_movements(business_event_id);
+
+-- Fix Pending/Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §10,
+-- BA/business-directed 2026-08-27) — a dedicated, append-only audit trail for every Delete Pending
+-- action across ALL A1-A11/B1-B7 functions. Deliberately NOT a replacement for balance_movements' own
+-- cancelled_by/cancelled_at columns (those stay, unchanged) — this is an ADDITIONAL, purpose-built
+-- record so "every Delete Pending that ever happened" can be queried in one place without joining/
+-- filtering the main movements table, and so the SAME underlying movement_id can be traced across
+-- repeated Delete Pending cycles if the state machine's own terminal-CANCELLED guarantee is ever
+-- relaxed in the future. One row per cancel() call — a compound function's own cascade (A3S/B4/B5)
+-- already calls cancel() once per leg, so each leg gets its own independent audit row automatically,
+-- with no extra wiring needed per function.
+CREATE TABLE IF NOT EXISTS delete_pending_audit (
+  audit_id                TEXT PRIMARY KEY,
+  -- BA/business-directed 2026-08-27 ("delete seq系統自動生成的ID") — a system-generated, per-natural-key
+  -- sequence number (1, 2, 3, ...), computed and PERSISTED at insert time (BalanceService.cancel(), via
+  -- DeletePendingAuditStore.nextDeleteSeq()), not derived on the fly at query time. Grouped by the
+  -- CONTRACT'S OWN natural key (instrument_type, lc_number, ib_number, sg_number) — deliberately NOT by
+  -- balance_contract_id, because A1/B1's own LC-reuse fix (§9.3) gives every Resubmit after a Delete
+  -- Pending a BRAND NEW balance_contract_id while the natural key stays the same; grouping by contract id
+  -- would reset every A1/B1 Resubmit back to "Delete #1" instead of counting the true chain.
+  delete_seq               INTEGER NOT NULL,
+  movement_id             TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  balance_contract_id     TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+  event_seq               INTEGER NOT NULL,
+  movement_type           TEXT NOT NULL,
+  source_transaction_ref  TEXT,
+  -- The movement's own status immediately before this Delete Pending — PENDING or REJECTED (Fix
+  -- Pending/Delete Pending Phase 1 widened Delete Pending to cover both; see statusTransition.ts's own
+  -- CANCEL entries for the two legal source states).
+  status_before           TEXT NOT NULL CHECK (status_before IN ('PENDING', 'REJECTED')),
+  cancelled_by            TEXT NOT NULL,
+  cancelled_at            TEXT NOT NULL,
+  reason_code             TEXT,
+  remarks                 TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_movement
+  ON delete_pending_audit(movement_id);
+
+CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_contract
+  ON delete_pending_audit(balance_contract_id);
 `;

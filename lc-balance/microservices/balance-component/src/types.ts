@@ -354,6 +354,46 @@ export interface BalanceMovement {
   finalizeSgEventSnapshot?: BalanceSnapshot | null;
 }
 
+/**
+ * Fix Pending/Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §10,
+ * BA/business-directed 2026-08-27) — one row per `BalanceService.cancel()` call, across every A1-A11/
+ * B1-B7 function. See db/schema.ts's own `delete_pending_audit` table doc comment for the full
+ * rationale — this is an ADDITIONAL, purpose-built audit trail, not a replacement for
+ * `BalanceMovement.cancelledBy`/`cancelledAt` (those stay, unchanged).
+ */
+export interface DeletePendingAuditRecord {
+  auditId: string;
+  /** System-generated, 1-based sequence per natural key (instrumentType/lcNumber/ibNumber/sgNumber) — see db/schema.ts's own doc comment on this column for why it's grouped by natural key, not balanceContractId. */
+  deleteSeq: number;
+  movementId: string;
+  balanceContractId: string;
+  eventSeq: number;
+  movementType: string;
+  sourceTransactionRef: string | null;
+  /** The movement's own status immediately before this Delete Pending — PENDING or REJECTED (Fix Pending/Delete Pending Phase 1 widened Delete Pending to cover both). */
+  statusBefore: 'PENDING' | 'REJECTED';
+  cancelledBy: string;
+  cancelledAt: string;
+  reasonCode: string | null;
+  remarks: string | null;
+}
+
+/**
+ * Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11, BA &
+ * business-directed 2026-08-27) — a DeletePendingAuditRecord joined with the natural-key fields of the
+ * contract it belongs to (instrumentType/lcNumber/ibNumber/sgNumber). Function and Secondary Reference
+ * are deliberately NOT included here — both are client-only display concepts derived from these fields
+ * (resolveFunctionForMovement()/the merged Secondary Reference logic), same convention as
+ * InquireEventsService/MakerQueueService, which also ship raw movement+contract pairs and let Angular
+ * derive the display layer.
+ */
+export interface DeletePendingAuditWithContract extends DeletePendingAuditRecord {
+  instrumentType: InstrumentType;
+  lcNumber: string;
+  ibNumber: string | null;
+  sgNumber: string | null;
+}
+
 export interface BalanceSnapshot {
   balanceContractId: string;
   logicalContractId: string;

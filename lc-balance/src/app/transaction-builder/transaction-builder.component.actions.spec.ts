@@ -719,7 +719,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   // deleteMakerPending() — Maker EC / Cancel, distinct from reject()
   // ---------------------------------------------------------------------
   describe('deleteMakerPending()', () => {
-    it('no-ops when there is no submitResult, or status is not PENDING', () => {
+    it('no-ops when there is no submitResult, or status is not PENDING/REJECTED', () => {
       const { comp, api } = setup();
       comp.deleteMakerPending();
       expect(api.cancel).not.toHaveBeenCalled();
@@ -727,6 +727,22 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'RELEASED' }) });
       comp.deleteMakerPending();
       expect(api.cancel).not.toHaveBeenCalled();
+    });
+
+    // Fix Pending/Delete Pending Phase 1 (analysis/Balance-Component-FixPending-DeletePending-
+    // Proposal-zh.md §2.4) — "Checker Reject 不代表交易已取消或刪除": a REJECTED movement must still
+    // be Delete-Pending-able, same as PENDING. Backend already allows REJECTED -> CANCELLED
+    // (statusTransition.ts); this was purely a front-end/component guard gap.
+    it('REJECTED path: calls api.cancel with createdBy/MAKER_EC, same as PENDING', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A2);
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'REJECTED' }) });
+      api.cancel.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'CANCELLED' }) as any);
+
+      comp.deleteMakerPending();
+
+      expect(api.cancel).toHaveBeenCalledWith('mv-1', 'maker1', 'MAKER_EC');
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'CANCELLED' } });
     });
 
     it('plain path: calls api.cancel with createdBy/MAKER_EC, distinct from reject()', () => {

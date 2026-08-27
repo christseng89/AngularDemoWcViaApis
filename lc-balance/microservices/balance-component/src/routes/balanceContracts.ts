@@ -38,7 +38,7 @@ export function balanceContractsRouter(service: BalanceService): Router {
   // requireIssueReleased — business-reported gap 2026-08-18 ("S10 still shown in A4 function which is
   // wrong" — S10's own ISSUE was still PENDING), see CatalogFilter's own doc comment for the full rule.
   router.get('/balance-contracts/catalog', (req, res) => {
-    const { instrumentType, status, q, lcNumber, tenorFamily, page, pageSize, requireIssueReleased } = req.query;
+    const { instrumentType, status, q, lcNumber, tenorFamily, page, pageSize, requireIssueReleased, excludeCancelled } = req.query;
     if (!instrumentType) throw new RequestValidationError('instrumentType is required.');
     if (tenorFamily && tenorFamily !== 'SIGHT' && tenorFamily !== 'USANCE') {
       throw new RequestValidationError('tenorFamily must be SIGHT or USANCE.');
@@ -53,6 +53,7 @@ export function balanceContractsRouter(service: BalanceService): Router {
         page: page ? Number(page) : undefined,
         pageSize: pageSize ? Number(pageSize) : undefined,
         requireIssueReleased: requireIssueReleased === 'true',
+        excludeCancelled: excludeCancelled === 'true',
       }),
     );
   });
@@ -89,6 +90,17 @@ export function balanceContractsRouter(service: BalanceService): Router {
         pageSize: pageSize ? Number(pageSize) : undefined,
       }),
     );
+  });
+
+  // GET /balance-contracts/:balanceContractId
+  // Inquire Delete Pending's own View action (analysis/Balance-Component-FixPending-DeletePending-
+  // Proposal-zh.md §11) — resolves a contract directly by ID, no natural key round trip. A
+  // delete_pending_audit row only ever carries balanceContractId, not the natural key needed by the
+  // GET /balance-contracts?instrumentType=&lcNumber=... route above. Registered AFTER /catalog,
+  // /close-eligible, /reopen-eligible (Express matches routes in registration order — this catch-all
+  // single-segment path would otherwise shadow those static ones).
+  router.get('/balance-contracts/:balanceContractId', (req, res) => {
+    res.json(service.getContractById(req.params.balanceContractId));
   });
 
   // GET /balance-contracts/:balanceContractId/balance

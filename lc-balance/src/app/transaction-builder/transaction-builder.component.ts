@@ -9,6 +9,10 @@ import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } fro
 import { LookUpPanelService } from './look-up-panel.service';
 import { InquireEventsService } from './inquire-events.service';
 import { InquireEventsComponent, InquireOpenAccountEntriesEvent } from './inquire-events.component';
+import { MakerQueueService } from './maker-queue.service';
+import { MakerQueueComponent } from './maker-queue.component';
+import { InquireDeletePendingService } from './inquire-delete-pending.service';
+import { InquireDeletePendingComponent } from './inquire-delete-pending.component';
 import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import {
@@ -48,17 +52,19 @@ import { deriveFunctionStrategy } from './function-strategy';
     TbIconComponent,
     InquireEventsComponent,
     BalanceSnapshotBoxComponent,
+    MakerQueueComponent,
+    InquireDeletePendingComponent,
   ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
-  providers: [LookUpPanelService, InquireEventsService],
+  providers: [LookUpPanelService, InquireEventsService, MakerQueueService, InquireDeletePendingService],
 })
 export class TransactionBuilderComponent {
   readonly importFunctions = IMPORT_FUNCTIONS;
   readonly exportFunctions = EXPORT_FUNCTIONS;
 
   activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
-  activeMode: 'PROCESSING' | 'INQUIRE' = 'PROCESSING';
+  activeMode: 'PROCESSING' | 'INQUIRE' | 'MAKER_QUEUE' | 'DELETE_PENDING_AUDIT' = 'PROCESSING';
   selectedFunction: TransactionFunction | null = null;
 
   get selectedFunctionStrategy() {
@@ -107,15 +113,23 @@ export class TransactionBuilderComponent {
     private readonly checkerActions: CheckerActionsService = new CheckerActionsService(api),
     readonly lookUp: LookUpPanelService = new LookUpPanelService(api),
     readonly inquireEvents: InquireEventsService = new InquireEventsService(api),
+    readonly makerQueue: MakerQueueService = new MakerQueueService(api),
+    readonly inquireDeletePending: InquireDeletePendingService = new InquireDeletePendingService(api),
   ) {}
 
-  selectMode(mode: 'PROCESSING' | 'INQUIRE'): void {
+  selectMode(mode: 'PROCESSING' | 'INQUIRE' | 'MAKER_QUEUE' | 'DELETE_PENDING_AUDIT'): void {
     this.activeMode = mode;
     this.accountEntryDialogMovement = null;
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
     if (mode === 'INQUIRE') {
       this.inquireEvents.loadIndex();
+    }
+    if (mode === 'MAKER_QUEUE') {
+      this.makerQueue.load();
+    }
+    if (mode === 'DELETE_PENDING_AUDIT') {
+      this.inquireDeletePending.loadIndex();
     }
   }
 
@@ -478,7 +492,13 @@ export class TransactionBuilderComponent {
   }
 
   deleteMakerPending(): void {
-    if (!this.makerContext.submitResult?.movementId || this.makerContext.submitResult.status !== 'PENDING') return;
+    // Widened to also cover REJECTED — see maker-panel.component.html's own doc comment on the button
+    // that emits deletePendingRequested (Fix Pending/Delete Pending Phase 1).
+    if (
+      !this.makerContext.submitResult?.movementId ||
+      (this.makerContext.submitResult.status !== 'PENDING' && this.makerContext.submitResult.status !== 'REJECTED')
+    )
+      return;
     this.actionBusy = true;
     this.checkerActions.deleteMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => {
       this.actionBusy = false;

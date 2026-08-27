@@ -240,4 +240,50 @@ describe('BalanceComponentApiService', () => {
     expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/balance-as-of');
     expect(result).toBe('OBS');
   });
+
+  describe('listMyMovements() — Fix Pending/Delete Pending Phase 2 Maker Queue worklist', () => {
+    it('GETs /balance-movements with only createdBy when statuses/page/pageSize are omitted', () => {
+      const result = service.listMyMovements({ createdBy: 'maker1' });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', { params: { createdBy: 'maker1' } });
+      expect(result).toBe('OBS');
+    });
+
+    it('joins statuses with a comma and includes page/pageSize when supplied', () => {
+      service.listMyMovements({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], page: 2, pageSize: 5 });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', {
+        params: { createdBy: 'maker1', status: 'PENDING,REJECTED', page: 2, pageSize: 5 },
+      });
+    });
+
+    it('omits the status param for an empty statuses array', () => {
+      service.listMyMovements({ createdBy: 'maker1', statuses: [] });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', { params: { createdBy: 'maker1' } });
+    });
+  });
+
+  it('getContract() GETs /balance-contracts/:id directly by ID', () => {
+    const result = service.getContract('BC-1');
+    expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/BC-1');
+    expect(result).toBe('OBS');
+  });
+
+  describe('listDeletePendingAudit() — Inquire Delete Pending (§11)', () => {
+    it('GETs /delete-pending-audit with no params when every filter is omitted', () => {
+      const result = service.listDeletePendingAudit({});
+      expect(http.get).toHaveBeenCalledWith('/balance-component/delete-pending-audit', { params: {} });
+      expect(result).toBe('OBS');
+    });
+
+    it('includes only the filters that are supplied, page/pageSize stringified', () => {
+      service.listDeletePendingAudit({ lcNumber: 'S01', deletedBy: 'maker1', from: '2026-01-01', to: '2026-12-31', page: 2, pageSize: 5 });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/delete-pending-audit', {
+        params: { lcNumber: 'S01', deletedBy: 'maker1', from: '2026-01-01', to: '2026-12-31', page: '2', pageSize: '5' },
+      });
+    });
+
+    it('omits page/pageSize when not supplied', () => {
+      service.listDeletePendingAudit({ lcNumber: 'S01' });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/delete-pending-audit', { params: { lcNumber: 'S01' } });
+    });
+  });
 });

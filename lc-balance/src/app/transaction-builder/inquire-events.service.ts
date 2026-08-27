@@ -96,15 +96,34 @@ export function secondaryReferenceForEvent(event: InquiredEvent): string {
  * becomes available") — see `analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-
  * Proposal-zh.md` §6 for the full engineering feasibility assessment this implements (display-layer
  * only; `eventSeq`/idempotency/Balance calculation engine deliberately untouched). A second-actor time
- * (`releasedAt`, covering RELEASED/REJECTED per `toEventRows()`'s own established convention; `cancelledAt`
- * for a Maker's own EC — a BA-doc gap this assessment's own §6.5 found and closed) always wins once
- * present; a still-PENDING/EARMARKING movement (neither set) falls back to `createdAt`.
+ * (`releasedAt`, covering RELEASED/REJECTED per `toEventRows()`'s own established convention) always wins
+ * once present; a still-PENDING/EARMARKING movement (not set) falls back to `createdAt`.
+ *
+ * `cancelledAt` deliberately dropped from this fallback chain (2026-08-27, analysis/Balance-Component-
+ * FixPending-DeletePending-Proposal-zh.md §11, "Deleted Pending records 不應顯示在 INQUIRE EVENTS 中") —
+ * `toEventRows()`'s own CANCELLED early-return below means this function is never actually called for a
+ * CANCELLED movement any more, so a `cancelledAt` branch here would be unreachable dead code. It was
+ * live code (and covered by a dedicated test) between the 2026-08-26 event-ordering feature and this
+ * fix; superseded, not a mistake in that earlier change — that feature only became true dead weight once
+ * CANCELLED movements stopped reaching this function at all.
  */
 function effectiveEventTime(movement: BalanceMovement): string {
-  return movement.releasedAt ?? movement.cancelledAt ?? movement.createdAt;
+  return movement.releasedAt ?? movement.createdAt;
 }
 
 export function toEventRows(movement: BalanceMovement, contract: BalanceContract): InquiredEvent[] {
+  // Inquire Events / Inquire Delete Pending rule (business-directed 2026-08-27, analysis/Balance-
+  // Component-FixPending-DeletePending-Proposal-zh.md §11) — "Deleted Pending records 不應顯示在
+  // INQUIRE EVENTS 中，包括 A1–A11 與 B1–B7" / "INQUIRE EVENTS 只顯示正常的交易生命週期事件". A CANCELLED
+  // movement (Delete Pending / Maker EC — the ONLY action that ever sets this status, statusTransition.ts's
+  // own CANCEL entries) never contributed to Confirmed/Available Balance in the first place (both only
+  // ever sum RELEASED/PENDING respectively), so hiding it here is display-layer only, same posture as
+  // every other change to this shared function. Shared by BOTH InquireEventsService and
+  // LookUpPanelService's own Event Timeline (both call this via movementsOf$()) — filtering here, not at
+  // either call site, keeps the two screens unable to disagree, matching this function's own established
+  // "one shared rule" convention. Every Delete Pending that ever happened is still fully queryable via the
+  // dedicated Inquire Delete Pending screen (delete_pending_audit), which reads independently of this list.
+  if (movement.status === 'CANCELLED') return [];
   // Bug fixed (reviewer-reported, "A1 ISSUE S05 -> APPROVE. A3 S05 B01 -> Submit, Checker Reject 為何出現
   // 兩筆REJECTED?"): reject() shares the same releasedAt/releasedBy columns as release() (disambiguated
   // only by `status`), so `status !== 'PENDING'` wrongly matched a REJECTED movement too — a rejected
@@ -204,6 +223,47 @@ function deriveLcAmount(rootEvents: readonly InquiredEvent[]): string {
     }
   }, 0);
   return String(total);
+}
+
+/**
+ * One catalog row's own Face Amount/Available Balance/Last Event Date (+ closingPending) — module-level,
+ * not a private method, so `InquireDeletePendingService`'s own LC Catalog step (via
+ * `LcCatalogIndexService`'s `decorate` hook) can share this exact computation instead of duplicating it
+ * (SOLID/DRY, business-directed 2026-08-27 — "應與 INQUIRE EVENTS 保持一致" extends to reusing the same
+ * Face Amount/Last Event Date figures, not just the same navigation shape). Inquire Delete Pending's own
+ * template only displays a subset of this shape's fields (LC Number/Tenor Type/Currency/LC Amount/Last
+ * Event Date/Time — no Available Balance/Status/closingPending) — cheaper to share one computation than
+ * maintain two overlapping ones for a screen that just ignores the fields it doesn't need.
+ */
+export function computeLcIndexRow(api: BalanceComponentApiService, contract: BalanceContract, side: 'IMPORT' | 'EXPORT'): Observable<LcIndexRow> {
+  const childTypes = childInstrumentTypesOf(contract.instrumentType);
+  return forkJoin({
+    snapshot: api.getSnapshot(contract.balanceContractId).pipe(catchError(() => of(null))),
+    root: movementsOf$(api, contract),
+    children: childTypes.length
+      ? forkJoin(childTypes.map((childType) => childMovementsOf$(api, childType, contract.naturalKey.lcNumber)))
+      : of([] as InquiredEvent[][]),
+  }).pipe(
+    map(({ snapshot, root, children }) => {
+      const allEvents = [...root, ...children.flat()];
+      const lastEventAt = allEvents.length
+        ? allEvents.reduce((latest, e) => (new Date(e.eventTime).getTime() > new Date(latest).getTime() ? e.eventTime : latest), allEvents[0].eventTime)
+        : null;
+      // A10/B6 Close is always a ROOT-level movement (see closeEligibility.ts — only IPLC_LC/EPLC_LC/
+      // EPLC_CONFIRMATION are eligible) — checking `root` alone, not `allEvents`, is correct and cheaper.
+      const closingPending = root.some((e) => e.movement.movementType === 'CLOSE' && e.eventStatus === 'PENDING');
+      return {
+        contract,
+        currency: contract.currency,
+        tenorType: tenorTypeLabel(contract.tenorType, side),
+        lcAmount: deriveLcAmount(root),
+        availableBalance: snapshot ? snapshot.availableBalance : '—',
+        status: contract.status,
+        lastEventAt,
+        closingPending,
+      };
+    }),
+  );
 }
 
 /** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
@@ -391,63 +451,38 @@ export class InquireEventsService {
   /**
    * One page of the current side's catalog, then per row fans out Available Balance + events
    * (movementsOf$/childMovementsOf$) to derive `lcAmount`/`lastEventAt`. No `status`/`requireIssueReleased`
-   * filter — this is an inquiry browse, every status is legitimate to look up.
+   * filter — this is an inquiry browse, every status is legitimate to look up, EXCEPT CANCELLED
+   * (`excludeCancelled: true`, business-reported gap 2026-08-27) — a contract whose root ISSUE was
+   * Delete-Pending'd never had any real Released event by construction, so listing it here is pure noise;
+   * its own Delete Pending history is fully queryable via the dedicated Inquire Delete Pending screen
+   * instead. See `BalanceComponentApiService.catalog()`'s own `excludeCancelled` doc comment.
    */
   loadIndex(page: number = this.indexPaging.page): void {
     this.indexLoading = true;
     this.indexError = null;
-    this.api.catalog(defaultLcInstrumentTypeForSide(this.side), undefined, this.indexSearch.trim() || undefined, page, this.indexPaging.pageSize).subscribe({
-      next: (result) => {
-        this.indexPaging.total = result.total;
-        this.indexPaging.page = result.page;
-        if (!result.items.length) {
+    this.api
+      .catalog(defaultLcInstrumentTypeForSide(this.side), undefined, this.indexSearch.trim() || undefined, page, this.indexPaging.pageSize, undefined, undefined, undefined, true)
+      .subscribe({
+        next: (result) => {
+          this.indexPaging.total = result.total;
+          this.indexPaging.page = result.page;
+          if (!result.items.length) {
+            this.indexRows = [];
+            this.indexLoading = false;
+            return;
+          }
+          forkJoin(result.items.map((contract) => computeLcIndexRow(this.api, contract, this.side))).subscribe((rows) => {
+            this.indexRows = rows;
+            this.indexLoading = false;
+          });
+        },
+        error: (err) => {
+          this.indexLoading = false;
+          this.indexError = describeApiError(err);
           this.indexRows = [];
-          this.indexLoading = false;
-          return;
-        }
-        forkJoin(result.items.map((contract) => this.loadIndexRow(contract))).subscribe((rows) => {
-          this.indexRows = rows;
-          this.indexLoading = false;
-        });
-      },
-      error: (err) => {
-        this.indexLoading = false;
-        this.indexError = describeApiError(err);
-        this.indexRows = [];
-        this.indexPaging.total = 0;
-      },
-    });
-  }
-
-  private loadIndexRow(contract: BalanceContract): Observable<LcIndexRow> {
-    const childTypes = childInstrumentTypesOf(contract.instrumentType);
-    return forkJoin({
-      snapshot: this.api.getSnapshot(contract.balanceContractId).pipe(catchError(() => of(null))),
-      root: movementsOf$(this.api, contract),
-      children: childTypes.length
-        ? forkJoin(childTypes.map((childType) => childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber)))
-        : of([] as InquiredEvent[][]),
-    }).pipe(
-      map(({ snapshot, root, children }) => {
-        const allEvents = [...root, ...children.flat()];
-        const lastEventAt = allEvents.length
-          ? allEvents.reduce((latest, e) => (new Date(e.eventTime).getTime() > new Date(latest).getTime() ? e.eventTime : latest), allEvents[0].eventTime)
-          : null;
-        // A10/B6 Close is always a ROOT-level movement (see closeEligibility.ts — only IPLC_LC/EPLC_LC/
-        // EPLC_CONFIRMATION are eligible) — checking `root` alone, not `allEvents`, is correct and cheaper.
-        const closingPending = root.some((e) => e.movement.movementType === 'CLOSE' && e.eventStatus === 'PENDING');
-        return {
-          contract,
-          currency: contract.currency,
-          tenorType: tenorTypeLabel(contract.tenorType, this.side),
-          lcAmount: deriveLcAmount(root),
-          availableBalance: snapshot ? snapshot.availableBalance : '—',
-          status: contract.status,
-          lastEventAt,
-          closingPending,
-        };
-      }),
-    );
+          this.indexPaging.total = 0;
+        },
+      });
   }
 
   /** Resets to page 1 and re-fetches — the LC Number Search/Filter box's own Search button and Enter key. */

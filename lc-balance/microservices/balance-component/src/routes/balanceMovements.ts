@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { RequestValidationError } from '../errors';
 import type { CreateMovementRequest } from '../service/balanceService';
+import type { MovementStatus } from '../types';
 import { createMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 
 export function balanceMovementsRouter(service: BalanceService): Router {
@@ -39,10 +40,35 @@ export function balanceMovementsRouter(service: BalanceService): Router {
   // the linked leg(s) of a compound submission (A3S's SG redemption, B5's Reimbursement Receivable)
   // by their shared businessEventId, instead of requiring the Maker's own in-memory submitResult to
   // still be present — see BalanceMovementStore.findByBusinessEventId's own doc comment.
+  // GET /balance-movements?createdBy=&status=&page=&pageSize= — Fix Pending/Delete Pending Phase 2
+  // (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.1) — the Maker Queue's own
+  // "My Pending/My Rejected" worklist. A second, independent query shape on the same route (mutually
+  // exclusive with businessEventId above) rather than a new endpoint — same convention this route
+  // already establishes. `status` is a comma-separated list; defaults to PENDING,REJECTED when omitted.
   router.get('/balance-movements', (req, res) => {
-    const { businessEventId } = req.query as { businessEventId?: string };
-    if (!businessEventId) throw new RequestValidationError('businessEventId query parameter is required.');
-    res.json(service.findByBusinessEventId(businessEventId));
+    const { businessEventId, createdBy, status, page, pageSize } = req.query as {
+      businessEventId?: string;
+      createdBy?: string;
+      status?: string;
+      page?: string;
+      pageSize?: string;
+    };
+    if (businessEventId) {
+      res.json(service.findByBusinessEventId(businessEventId));
+      return;
+    }
+    if (createdBy) {
+      res.json(
+        service.listMyMovements({
+          createdBy,
+          statuses: status ? (status.split(',') as MovementStatus[]) : undefined,
+          page: page ? Number(page) : undefined,
+          pageSize: pageSize ? Number(pageSize) : undefined,
+        }),
+      );
+      return;
+    }
+    throw new RequestValidationError('businessEventId or createdBy query parameter is required.');
   });
 
   // POST /balance-movements/:movementId/reject

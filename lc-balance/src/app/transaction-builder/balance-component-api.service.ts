@@ -249,6 +249,11 @@ export class BalanceComponentApiService {
     return this.http.get<BalanceContract>(`${this.base}/balance-contracts`, { params });
   }
 
+  /** Inquire Delete Pending's own View action (§11) — resolves a contract directly by ID, no natural key needed (a delete_pending_audit row only carries balanceContractId). */
+  getContract(balanceContractId: string): Observable<BalanceContract> {
+    return this.http.get<BalanceContract>(`${this.base}/balance-contracts/${balanceContractId}`);
+  }
+
   /**
    * @param lcNumber — exact match: once an LC is picked from the LC Index, drives the IB Index step to
    *   exactly that LC's own IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT rows. Separate from `q` (substring
@@ -258,6 +263,10 @@ export class BalanceComponentApiService {
    * @param requireIssueReleased — excludes a contract whose own creating movement (ISSUE/CREATE) hasn't
    *   been Checker-Released yet. Opt-in — `CatalogPickerService` passes `true` for every Maker-side
    *   ACTION picker; Look Up Current Balance / Inquire Events omit it.
+   * @param excludeCancelled — business-reported gap 2026-08-27 ("CANCELLED 不應該顯示在 INQUIRE EVENTS
+   *   CATALOG 上") — excludes a contract whose root ISSUE was Delete-Pending'd (§9.3's LC-reuse fix marks
+   *   it CANCELLED). `InquireEventsService.loadIndex()` passes `true`; every other caller omits it
+   *   (Maker-action pickers already imply this via their own default `status: 'ACTIVE'`).
    */
   catalog(
     instrumentType: InstrumentType,
@@ -268,6 +277,7 @@ export class BalanceComponentApiService {
     lcNumber?: string,
     tenorFamily?: 'SIGHT' | 'USANCE',
     requireIssueReleased?: boolean,
+    excludeCancelled?: boolean,
   ): Observable<CatalogPage> {
     const params: Record<string, string | number> = { instrumentType, page, pageSize };
     if (status) params['status'] = status;
@@ -275,7 +285,15 @@ export class BalanceComponentApiService {
     if (lcNumber) params['lcNumber'] = lcNumber;
     if (tenorFamily) params['tenorFamily'] = tenorFamily;
     if (requireIssueReleased) params['requireIssueReleased'] = 'true';
+    if (excludeCancelled) params['excludeCancelled'] = 'true';
     return this.http.get<CatalogPage>(`${this.base}/balance-contracts/catalog`, { params });
+  }
+
+  /** Inquire Delete Pending's own LC Catalog step (§11, "只有被 DELETE PENDING 過的才顯示") — one row per distinct LC Number with at least one delete_pending_audit record. */
+  catalogWithDeletePendingHistory(instrumentType: InstrumentType, q?: string, page = 1, pageSize = 10): Observable<CatalogPage> {
+    const params: Record<string, string | number> = { instrumentType, page, pageSize };
+    if (q) params['q'] = q;
+    return this.http.get<CatalogPage>(`${this.base}/delete-pending-audit/lc-catalog`, { params });
   }
 
   /**
@@ -334,4 +352,71 @@ export class BalanceComponentApiService {
   findByBusinessEventId(businessEventId: string): Observable<BalanceMovement[]> {
     return this.http.get<BalanceMovement[]>(`${this.base}/balance-movements`, { params: { businessEventId } });
   }
+
+  /**
+   * Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
+   * Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/My Rejected" worklist. A second, independent
+   * query shape on the same `GET /balance-movements` route as findByBusinessEventId() above (mutually
+   * exclusive server-side), not a new endpoint.
+   */
+  listMyMovements(filter: { createdBy: string; statuses?: string[]; page?: number; pageSize?: number }): Observable<MyMovementsPage> {
+    const params: Record<string, string | number> = { createdBy: filter.createdBy };
+    if (filter.statuses?.length) params['status'] = filter.statuses.join(',');
+    if (filter.page) params['page'] = filter.page;
+    if (filter.pageSize) params['pageSize'] = filter.pageSize;
+    return this.http.get<MyMovementsPage>(`${this.base}/balance-movements`, { params });
+  }
+
+  /**
+   * Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11, BA &
+   * business-directed 2026-08-27) — a dedicated, independent read-only audit query, never merged with
+   * Inquire Events. All filter fields are optional. Function is deliberately not a filter param here —
+   * see InquireDeletePendingService's own doc comment for why it's applied client-side instead.
+   */
+  listDeletePendingAudit(filter: { lcNumber?: string; deletedBy?: string; from?: string; to?: string; page?: number; pageSize?: number }): Observable<DeletePendingAuditPage> {
+    const params: Record<string, string> = {};
+    if (filter.lcNumber) params['lcNumber'] = filter.lcNumber;
+    if (filter.deletedBy) params['deletedBy'] = filter.deletedBy;
+    if (filter.from) params['from'] = filter.from;
+    if (filter.to) params['to'] = filter.to;
+    if (filter.page) params['page'] = String(filter.page);
+    if (filter.pageSize) params['pageSize'] = String(filter.pageSize);
+    return this.http.get<DeletePendingAuditPage>(`${this.base}/delete-pending-audit`, { params });
+  }
+}
+
+/** One page of BalanceComponentApiService.listMyMovements()'s own result — mirrors the microservice's own `BalanceService.listMyMovements()` response shape. */
+export interface MyMovementsPage {
+  items: Array<{ movement: BalanceMovement; contract: BalanceContract }>;
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Mirrors the microservice's own `DeletePendingAuditWithContract` (src/types.ts) — one row per Delete Pending action, paired with the natural key of the contract it belongs to. */
+export interface DeletePendingAuditRow {
+  auditId: string;
+  deleteSeq: number;
+  movementId: string;
+  balanceContractId: string;
+  eventSeq: number;
+  movementType: string;
+  sourceTransactionRef: string | null;
+  statusBefore: 'PENDING' | 'REJECTED';
+  cancelledBy: string;
+  cancelledAt: string;
+  reasonCode: string | null;
+  remarks: string | null;
+  instrumentType: InstrumentType;
+  lcNumber: string;
+  ibNumber: string | null;
+  sgNumber: string | null;
+}
+
+/** One page of BalanceComponentApiService.listDeletePendingAudit()'s own result. */
+export interface DeletePendingAuditPage {
+  items: DeletePendingAuditRow[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

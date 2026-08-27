@@ -252,6 +252,31 @@ export class BalanceMovementStore {
     return rows.map(rowToMovement);
   }
 
+  /**
+   * Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
+   * Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/My Rejected" worklist. Cross-contract,
+   * genuine server-side pagination (unlike listByContract() below, which is a single-contract, fully-
+   * loaded list) — ordered by created_at DESC (most recent first — this is a worklist, not an audit
+   * timeline, so a Maker wants their newest items first, the opposite of listByContract()'s ASC).
+   */
+  listByCreatedByAndStatus(params: { createdBy: string; statuses: MovementStatus[]; page: number; pageSize: number }): {
+    items: BalanceMovement[];
+    total: number;
+  } {
+    const { createdBy, statuses, page, pageSize } = params;
+    const placeholders = statuses.map(() => '?').join(', ');
+    const total = (
+      this.db.prepare(`SELECT COUNT(*) AS n FROM balance_movements WHERE created_by = ? AND status IN (${placeholders})`).get(createdBy, ...statuses) as {
+        n: number;
+      }
+    ).n;
+    const offset = (page - 1) * pageSize;
+    const rows = this.db
+      .prepare(`SELECT * FROM balance_movements WHERE created_by = ? AND status IN (${placeholders}) ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .all(createdBy, ...statuses, pageSize, offset) as unknown as MovementRow[];
+    return { items: rows.map(rowToMovement), total };
+  }
+
   /** Design doc §3.3 — everything needed to derive Confirmed/Available Balance for one contract version. */
   listByContract(balanceContractId: string): BalanceMovement[] {
     const rows = this.db

@@ -445,3 +445,477 @@ Status: Engineering proposal finalized (2026-08-27) after two rounds of BA revie
         remains deferred to a future round. No application code changed as part of this document or
         its review rounds.
 ```
+
+---
+
+## 9. Phase 1/2 實作完成 + 使用者追加需求：Delete Pending 後 A1/B1 的 LC Number 必須可重複使用（2026-08-27）
+
+使用者確認 Phase 1（REJECTED 開放 Delete Pending）與 Phase 2（Maker Queue）可以動工後實作完成；實作
+過程中使用者進一步發現並確認一項追加需求：**A1/B1 執行 Delete Pending 後，同一個 LC Number 必須可以
+重新拿來 Submit**。
+
+### 9.1 Phase 1（REJECTED 開放 Delete Pending）
+
+`maker-panel.component.html`／`transaction-builder.component.ts` 的 Delete Pending 按鈕/guard 從
+`status === 'PENDING'` 放寬為 `'PENDING' || 'REJECTED'`（A4 排除邏輯不變）。
+
+### 9.2 Phase 2（Maker Queue）
+
+新增 `GET /balance-movements?createdBy=&status=&page=&pageSize=` 查詢分支
+（`BalanceService.listMyMovements()` / `BalanceMovementStore.listByCreatedByAndStatus()`），Angular
+新增 `MakerQueueService`/`MakerQueueComponent`，掛在新的頂層「Maker Queue」分頁。`isCompoundShape()`
+（判斷 A3S/B4/B5 這類複合提交、依 §2.5 排除 Delete Pending）改用 `movement.businessEventId` 是否有值
+判斷，而非原計畫的 `resolveFunctionForMovement()` Strategy 查表——後者對 `IPLC_LC`/`UTILIZE` 這種
+情況永遠先解析成單腿的 A3（registry 裡第一個相符的項目），不會是 A3S，屬於已知的既有限制
+（`function-strategy.ts` 自己的 doc comment 也明講這點），改用 `businessEventId` 更直接可靠。
+
+### 9.3 追加發現與修復：A1/B1 Delete Pending 後合約本身沒有被釋放
+
+**查證**：A1/B1 的 ISSUE 除了建立 movement，也會同時建立一筆全新的 `balance_contracts` 合約列
+（`createContract()`，`status: 'ACTIVE'`，與其 movement 的命運完全獨立）。既有 `cancel()`
+（`balanceService.ts`）只 `UPDATE` movement 的 `status`，從不觸碰 `balance_contracts`——導致 Delete
+Pending 後，這張 LC 合約永遠停留在 `ACTIVE`，之後同一個 LC Number 再次 Submit 會被既有的 re-ISSUE
+guard（`resolveOrCreateContract()`／`findActiveByNaturalKey()`）擋下（409
+`NaturalKeyAlreadyExistsError`）。
+
+**修法**：`ContractStatus` 這個 enum 本來就有 `CANCELLED` 這個值，跟 §5.2 發現的 Movement 層級
+`SUPERSEDED` 一樣，屬於「保留但從未真正被設過」的既有狀態。新增
+`BalanceContractStore.markCancelled()`（沿用 `markClosed()`/`markExpired()`同樣的形狀），並在
+`BalanceService.cancel()` 裡：當被取消的 movement 本身是 `ISSUE`、且其合約是 root 類型
+（`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION`，也就是 A1/B1）時，順便把合約也標成 `CANCELLED`。
+
+**安全性依據**：`assertRootIssueReleased()` 既有邏輯保證 root 合約的 ISSUE 尚未 Release 前，不可能有
+任何其他 movement 存在——因此「取消一筆 root ISSUE」在邏輯上等同「這張合約從頭到尾只有這一筆、從未
+生效」，可以安全退場，不會誤傷任何真實資料。標成 CANCELLED 後，`findActiveByNaturalKey()`
+自然找不到它，同一個 LC Number 即可重新 Submit——會建立一張全新、獨立的合約（新
+`balanceContractId`/`logicalContractId`），不是復用舊的。
+
+**範圍**：僅限 A1/B1（root ISSUE）。A6/A7/A8/B3 這類建立子合約的 CREATE/ISSUE（Acceptance/SG/Present
+Docs）**不在本次範圍內**——是否有一樣「取消時保證是唯一 movement」的前提成立尚未查證，留待需要時
+另外評估。特別驗證了 SHGT（A8）也用同一個 `'ISSUE'` 字串當 movementType，但因為不是 root 類型，
+`cancel()` 正確地不會去動它的合約。
+
+**測試**：微服務新增 5 筆 `BalanceService.cancel` 測試（PENDING/REJECTED 的 A1 各一、B1 一筆、
+非-ISSUE 動作不受影響一筆、SHGT 子合約不受影響一筆）；三套件全綠（Angular 1210/1210、backend
+39/39、microservice 597/597）。**即時驗證**：先用 curl 完整跑過 Submit→Delete Pending→確認合約變
+CANCELLED（`GET /balance-contracts` 404）→同 LC Number 重新 Submit 成功；再到瀏覽器上重複一次完整
+UI 流程（A1 Submit「REUSE-BROWSER-01」→ Delete Pending → 重新選 A1、輸入同一個 LC Number 並用新金額
+Submit → 成功變成 PENDING，Inquire Events 的 LC Index 上同時看到一筆 CANCELLED 與一筆 ACTIVE 的
+「REUSE-BROWSER-01」），全程 Console 無錯誤。
+
+**UI 順序調整**：使用者要求把頂層分頁順序從「Transaction Processing / Inquire Events / Maker Queue」
+改為「Transaction Processing / Maker Queue / Inquire Events」——純 DOM 順序調整，無邏輯變更。
+
+```text
+Status: Phase 1 + Phase 2 implemented and live-verified (2026-08-27), including the user-directed
+        follow-up (A1/B1 Delete Pending frees the LC Number for reuse via a new contract-level
+        CANCELLED status). All changes currently UNCOMMITTED per explicit user instruction — awaiting
+        a separate "commit and push" instruction before this lands on main.
+```
+
+---
+
+## 10. BA & 業務追加需求：Delete Pending Audit Table（涵蓋 A1–A11/B1–B7 全部功能）（2026-08-27）
+
+**BA & 業務需求原文重點**：同一筆 Business Event 可能經歷多次「Pending → Delete Pending → Resubmit」循環
+（不只限於 A1/B1，涵蓋 A1–A11/B1–B7 所有功能），每一次 Delete Pending 都必須留下獨立稽核紀錄
+（操作人員、操作時間、Event Seq、交易參考號、刪除原因、相關狀態），**不可覆蓋前一次的紀錄**。
+
+### 10.1 現況查證
+
+- `statusTransition.ts` 的 `CANCELLED` 是終態（`CANCELLED: {}`），單一 movement 列一旦被 Delete Pending
+  就不可能再被 Delete Pending 第二次——append-only 設計下，每一次 Delete Pending 對應的那一列本身的資料
+  永久保留，不會被覆蓋。
+- 但「同一個 Business Event」跨越多次 Delete Pending → Resubmit 循環時，是分散在多筆**獨立的** movement
+  列上（每次 Resubmit 都是全新的 `movementId`），今天**沒有任何機制把這一串 Delete Pending 紀錄關聯起來**
+  ——`businessEventId` 只用於複合提交（A3S/B4/B5）的同批次多腿關聯，不是為了串連「同一個自然鍵的歷史
+  重試鏈」而設計的。
+
+### 10.2 兩個方案的權衡
+
+- **方案 A（輕量）**：擴充既有 `businessEventId` 關聯機制，不新增資料表。
+- **方案 B（BA 本身提出）**：新增一張獨立的 `delete_pending_audit` 表，每次 Delete Pending 都
+  INSERT 一筆，不依賴/不修改任何既有欄位或關聯機制。
+
+使用者選擇**方案 B**。
+
+### 10.3 實作內容
+
+- **新表 `delete_pending_audit`**（`src/db/schema.ts` 新建 DB 用；`src/db/migrations.ts` migration
+  `id: 18` 補現有 DB 用）：`audit_id`（PK）、`movement_id`、`balance_contract_id`、`event_seq`、
+  `movement_type`、`source_transaction_ref`、`status_before`（CHECK IN
+  `('PENDING','REJECTED')`）、`cancelled_by`、`cancelled_at`、`reason_code`、`remarks`，另建
+  `movement_id`/`balance_contract_id` 兩個索引。純 append-only——`DeletePendingAuditStore`
+  （新檔 `src/store/deletePendingAuditStore.ts`）只有 `insert()`/`listByMovement()`/
+  `listByContract()`，沒有任何 update/delete 方法，比既有 `balanceMovementStore.ts` 的
+  「只 insert 新列、只 update 狀態欄位」更進一步——這張表連狀態欄位都不允許被改。
+- **掛載點**：`BalanceService.cancel()` 這一個共用方法——不論是 A1–A11/B1–B7 哪一個功能呼叫 Delete
+  Pending，或是複合提交（A3S/B4/B5）自己的逐腿 cascade（`deleteMakerPending()` 對每一條腿各呼叫一次
+  `api.cancel()`），最終都會經過這唯一入口，因此新增一次 audit insert 就自然涵蓋全部 18 個功能與所有
+  複合腿情境，不需要在任何呼叫端另外加程式碼。
+- **`DeletePendingAuditRecord`**（`src/types.ts`）：與資料表逐欄位對應的介面。
+
+### 10.4 測試與驗證
+
+- 微服務新增 4 筆測試（`test/unit/service/balanceService.test.ts`，`describe('BalanceService.cancel —
+  delete_pending_audit ...')`）：單次 Delete Pending 寫入一筆稽核列且欄位正確、REJECTED 狀態下
+  Delete Pending 同樣寫入（`status_before: 'REJECTED'`）、`reasonCode`/`remarks` 缺省時落地為
+  `null` 而非拋錯、複合功能自己的逐腿 cascade（`cancel()` 每腿各呼叫一次）各自寫入一筆獨立稽核列
+  （驗證兩筆 `audit_id` 不同、各自的 `movement_id` 對應到各自的腿）。
+- 三套件全綠：Angular 1210/1210、backend 39/39、microservice 601/601
+  （整體覆蓋率 98.72%/95.22%/98.94%/99.31%，四項指標皆高於 95% 門檻；`deletePendingAuditStore.ts`
+  本身的 `listByMovement()`/`listByContract()` 目前僅被測試直接以 SQL 查詢繞過驗證，尚未有專屬單元
+  測試呼叫這兩個方法本身，但不影響整體覆蓋率門檻，`insert()`——唯一在生產路徑上真正被呼叫的方法——
+  已有完整覆蓋）。
+- **即時驗證**（直接對執行中的微服務 curl + 直接查詢 SQLite 檔案，因為此表目前尚無對應的 HTTP
+  查詢路由）：Submit 一筆 A1 ISSUE（LC `AUDIT-LIVE-001`）→ Delete Pending →
+  直接查詢 `balance-component.sqlite` 的 `delete_pending_audit` 表，確認寫入一筆
+  `status_before: 'PENDING'`、`cancelled_by`/`cancelled_at`/`reason_code`/`remarks` 皆正確落地的紀錄；
+  同時確認 §9.3 的 LC Number 重複使用行為未受影響（同一個 LC Number 重新 Submit 成功，取得全新
+  `balanceContractId`），`cancel()` 對外的 HTTP 回應形狀也完全沒有變化（純伺服器端旁路寫入）。
+
+```text
+Status: Option B (delete_pending_audit table) implemented and live-verified (2026-08-27), covering all
+        18 functions (A1-A11/B1-B7) via the single shared cancel() entry point, including independent
+        per-leg audit rows for compound-submission cascades. All changes currently UNCOMMITTED per
+        explicit user instruction — awaiting a separate "commit and push" instruction before this lands
+        on main. No HTTP route yet exposes this table's contents — read access (e.g. a Maker/Checker-
+        facing "Delete Pending history" view) is not yet requested and out of scope for this pass.
+```
+
+---
+
+## 11. BA & 業務建議：新增獨立的「INQUIRE DELETE PENDING」稽核查詢功能（2026-08-27）——工程可行性回覆，尚未動工
+
+**BA & 業務原提案重點**：Delete Pending 後的紀錄不進 Inquire Events；另建一個獨立、只查 Delete Pending
+操作本身的稽核查詢畫面（不混入 Resubmit/Fix/Approve/Reject），直接讀 §10 的 `delete_pending_audit`
+表（不即時算），查詢條件（LC Number/Function/Secondary Reference/Deleted By/Delete DateTime
+From–To）、結果欄位（LC Number/Function/Secondary Reference/Event Seq/Delete Sequence/Deleted
+By/Delete DateTime/Delete Reason/Previous Status/Audit ID）、固定排序（LC Number, Secondary
+Reference, Delete DateTime, Audit ID）、支援 View 開原始交易畫面唯讀重現。
+
+### 11.1 逐欄位可行性查證（對照 §10 的 `delete_pending_audit` 表 + 既有程式碼）
+
+| 建議欄位 | 可行性 | 來源 |
+|---|---|---|
+| LC Number | ✅ 免改表 | JOIN `balance_contracts.lc_number`（用 `delete_pending_audit.balance_contract_id`）|
+| Function（A1–A11/B1–B7）| ✅ 免改表 | 沿用既有 `resolveFunctionForMovement(contract.instrumentType, movement_type)`（`function-strategy.ts`，Inquire Events/Maker Queue 都已在用同一套）|
+| Secondary Reference | ✅ 免改表，但要合併兩個既有來源（見 11.2）| `balance_contracts.ib_number`/`sg_number`（子合約類功能）或 `delete_pending_audit.source_transaction_ref`（同合約 Amendment/Utilize 類功能，本來就存在稽核列本身）|
+| Event Seq | ✅ 已有欄位 | `delete_pending_audit.event_seq` |
+| Delete Sequence | ✅ 可算，但分組鍵需要業務確認（見 11.2）| 需 group by 自然鍵，見下 |
+| Deleted By | ✅ 已有欄位 | `delete_pending_audit.cancelled_by` |
+| Delete DateTime | ✅ 已有欄位 | `delete_pending_audit.cancelled_at` |
+| Delete Reason | ✅ 已有欄位 | `delete_pending_audit.reason_code`（/`remarks`）|
+| Previous Status | ✅ 已有欄位 | `delete_pending_audit.status_before` |
+| Audit ID | ✅ 已有欄位（PK）| `delete_pending_audit.audit_id` |
+| 查詢即使原合約後來 Resubmit/Approve/Close 仍完整保留 | ✅ 天然成立 | `balance_contracts` 本身也是 append-only、從不物理刪除，即使狀態變成 CANCELLED/CLOSED/SUPERSEDED，JOIN 永遠找得到那一列原始資料 |
+| View 開原始交易畫面（唯讀，重現「當時刪的是什麼」）| ✅ 免新建路由 | movement 本身的欄位值從建立那刻起就凍結不變（CANCELLED 是終態，沒有人事後改內容）——用既有 `GET /balance-contracts/:id/movements` 撈出該合約全部 movement，配合既有 `reconstructOriginalModel(movement, contract)`（Inquire Events Original Transaction Screen 已在用）就能 100% 重現，不需要新的單筆 movement GET 路由 |
+
+**結論：完全不需要修改 `delete_pending_audit` 這張表本身**——§10 已有的欄位涵蓋所有需求，只需要新增一個查詢層（新 API + 新 Angular 畫面）。
+
+### 11.2 三個需要業務確認的設計點（不是技術限制，是行為定義）
+
+**(a) Delete Sequence 的分組鍵，應該用「自然鍵」而不是 `balance_contract_id`**
+
+原因：A1/B1（root ISSUE）因為 §9.3 的 LC 重複使用修法，每次 Resubmit 都會產生一張**全新**的
+`balance_contract_id`（新合約列），但 LC Number 不變；A2–A11/B2–B7（非 root）Delete Pending 後
+Resubmit，走的是同一張既有合約，`balance_contract_id` 不變。也就是說如果直接用
+`balance_contract_id` 分組計算「第幾次」，A1/B1 的多次 Resubmit 鏈永遠只會各自顯示「Delete #1」
+（因為每次都是不同合約 ID），沒辦法呈現您畫面範例裡「LC001 → 連續 Delete #1/#2/#3」那種效果。
+
+**建議**：Delete Sequence 改用**自然鍵**分組——`(instrument_type, lc_number, ib_number,
+sg_number)`——同一個 LC/IB/SG 組合不論中間換過幾張合約列，都算同一條鏈，按 `cancelled_at` 排序給
+序號。這樣 A1/B1、A2–A11/B2–B7 都能正確呈現連續的 Delete #1/#2/#3。
+
+**待確認**：以上「自然鍵分組」是否就是您畫面範例真正想要的定義？（範例本身只示範了子合約類情境
+LC001/IB001/SG001，沒有涵蓋 A1/B1 這種會換合約 ID 的情況，所以特別點出來確認。）
+
+**(b) Secondary Reference 要合併兩個既有來源，不是單一欄位**
+
+現有 `secondaryReferenceForEvent()`（Inquire Events 共用）目前只處理 SHGT（`sg_number`）跟
+`EPLC_EXAMINATION`（`ib_number`）兩種子合約類型，其他功能（A2 Amendment No、A3/A4 IB
+Number、B4/B5 EB Number 等）回傳固定的 `'—'`——因為那些場景的「Secondary Reference」其實是存在
+`sourceTransactionRef`（movement 自己的欄位，§10 的 `delete_pending_audit.source_transaction_ref`
+本來就有存），不是合約的自然鍵欄位。這個新畫面要把兩種來源合併成一個統一的顯示邏輯（子合約類用
+`ib_number`/`sg_number`，其餘用 `source_transaction_ref`），是**新的、比現有 Inquire Events 更完整**
+的呈現，不是既有 bug，但需要新寫一個函式，不能直接複用 `secondaryReferenceForEvent()`。
+
+**(c) Function 篩選條件是前端計算，不是伺服器端真篩選**
+
+Function（A1–A11/B1–B7）本身沒有存在任何資料表欄位裡，是既有 `resolveFunctionForMovement()` 這個
+Angular 端的純函式，依 `instrumentType`+`movementType` 查表算出來的顯示層概念（跟 Inquire
+Events/Maker Queue 完全同一套邏輯）。**建議**：新 API 只依 LC Number/Deleted By/Delete DateTime
+區間做伺服器端篩選+分頁（配合 JOIN `balance_contracts` 取得 LC Number 才能篩），Function 篩選在
+Angular 端對已抓回的那一頁結果再過濾一次——跟本專案既有 `CatalogPickerService`「抓一批、前端再篩」
+的既定慣例一致。**取捨**：如果某個 LC 的 Delete Pending 歷史筆數很多、又剛好篩選的 Function
+在該頁裡佔比很低，畫面上一頁可能顯示筆數偏少——考量稽核查詢通常先用 LC Number 縮小範圍，且單一 LC
+的 Delete Pending 歷史筆數在實務上不會很大，這個取捨可接受，但先點出來確認。
+
+### 11.3 建議的技術設計（供確認，尚未動工）
+
+- **新 microservice 路由**：`GET /delete-pending-audit?lcNumber=&deletedBy=&from=&to=&page=&pageSize=`
+  ——`DeletePendingAuditStore` 新增一個 JOIN 查詢方法（`delete_pending_audit` JOIN
+  `balance_contracts`），一次回傳稽核列 + 該列需要的合約欄位（`instrumentType`/`lcNumber`/
+  `ibNumber`/`sgNumber`），伺服器端排序固定為 `lc_number, (ib_number 或 sg_number), cancelled_at,
+  audit_id`（對應您要求的排序）。
+- **Angular 新增**：`InquireDeletePendingService`（比照 `MakerQueueService`/`InquireEventsService`
+  的既有慣例，plain class）+ `InquireDeletePendingComponent`，掛在新的頂層分頁（獨立於 Inquire
+  Events/Maker Queue，符合您「不用出現在 Inquire Events 裡、獨立功能」的定位）。
+- **View 動作**：沿用既有 `GET /balance-contracts/:id/movements` + `reconstructOriginalModel()` +
+  `resolveFunctionForMovement()`，開一個唯讀的 Original Transaction Screen（跟 Inquire Events 現有
+  的完全同一套元件/邏輯，只是進入點不同）。
+
+```text
+Status: Engineering feasibility review complete (2026-08-27) — every proposed field/behavior is
+        achievable with ZERO changes to the delete_pending_audit table itself; only a new query API +
+        new Angular screen are needed. Three business-meaning design points flagged for confirmation
+        before implementation starts: (a) Delete Sequence's grouping key (recommend natural key
+        instrument_type+lcNumber+ibNumber+sgNumber, not balance_contract_id, so A1/B1's multi-contract
+        Resubmit chains display correctly), (b) Secondary Reference must merge two existing sources
+        (contract natural key vs. the audit row's own source_transaction_ref) — new derivation logic,
+        not a reuse of the existing secondaryReferenceForEvent(), (c) Function filtering is
+        client-side-after-fetch, matching this project's existing CatalogPickerService convention, not a
+        true server-side filter. No application code changed yet — awaiting confirmation on (a)/(b)/(c)
+        before implementation begins.
+```
+
+### 11.4 業務回覆與實作（2026-08-27）——(a) Delete Sequence 確認為系統自動生成、持久化欄位
+
+**業務回覆原文**：「delete seq系統自動生成的ID」——確認 Delete Sequence 是系統自動產生的識別碼，不是
+查詢當下才算出來的暫時值，而是**寫入時就由伺服器計算好、存成正式欄位**（跟 §11.1 原本設想的「查詢時
+用 window function 動態算排名」不同，屬於更明確的實作方向）。
+
+**與 §11.1 原可行性結論的差異**：這一點使 §11.1「完全不需要修改 `delete_pending_audit` 這張表本身」
+的結論需要修正——既然要「持久化」，就需要在這張表新增一個真實欄位，不能只在查詢時用 SQL 動態算。
+
+**實作內容**：
+
+- `delete_pending_audit` 新增 `delete_seq INTEGER NOT NULL` 欄位（`schema.ts` 新建 DB 用；因為這張表
+  本身在 git 上還沒有任何 commit，屬於同一個尚未發布的功能，所以直接修改既有的 migration
+  `id: 18`，而不是另外疊加一個 migration 19——沒有「不可更動既有已發布 migration」的顧慮）。
+- `DeletePendingAuditStore` 新增 `nextDeleteSeq(instrumentType, lcNumber, ibNumber, sgNumber)`：用
+  `delete_pending_audit JOIN balance_contracts` 依**自然鍵**（`instrument_type`/`lc_number`/
+  `ib_number`/`sg_number`，`ib_number`/`sg_number` 用 `COALESCE(..., '')` 比對讓兩個 NULL 視為相同，
+  避開 SQL 的 NULL 比較永遠不相等的陷阱）取目前最大值 `+1`——維持 §11.2(a) 原本的分組建議：分組鍵是
+  自然鍵，不是 `balance_contract_id`，這樣 A1/B1 每次 Resubmit 換一張新合約列時，Delete Sequence
+  仍然能正確接續（1、2、3...），不會因為換了合約 ID 就重新從 1 起算。
+- `BalanceService.cancel()`：在寫入稽核列之前，先用移動本身的 `balanceContractId` 查出合約（沿用
+  既有 `NotFoundError` 慣例），取得自然鍵欄位算出 `deleteSeq`，一併寫入 `delete_pending_audit`。
+
+**測試**：微服務新增 3 筆測試——(1) 同一自然鍵連續 3 次 Delete Pending→Resubmit（含 A1 換合約 ID 的
+情境）確認 `delete_seq` 正確接續 1/2/3；(2) 兩個不同自然鍵（不同 LC Number）各自獨立從 1 起算，互不
+干擾；(3) `DeletePendingAuditStore.listByMovement()`/`listByContract()` 這兩個公開讀取方法本身補上
+直接呼叫的測試（原本只被測試繞過去直接下 SQL 驗證，從未真正呼叫過這兩個方法，屬於 §10 就已知的覆蓋率
+缺口，這次一併補齊）。三套件全綠：Angular 1210/1210、backend 39/39、microservice
+**605/605**（覆蓋率 99.02%/95.14%/100%/99.74%，四項皆過 95% 門檻；`deletePendingAuditStore.ts`
+本身覆蓋率補到 100%/83.33%/100%/100%）。
+
+**即時驗證**：對執行中的微服務 curl 建立一筆 A1 ISSUE（LC `SEQ-LIVE-001`）→ Delete Pending →
+同一個 LC Number 重新 Submit（取得全新 `balanceContractId`，印證 §9.3 的 LC 重複使用機制確實生效）
+→ 再次 Delete Pending → 直接查詢 SQLite 確認兩筆稽核列 `lc_number` 相同、`balance_contract_id`
+不同、`delete_seq` 正確為 1 與 2。驗證完畢後透過 Cleanup Database Tables 清除測試資料（同時再次確認
+該按鈕本身的外鍵修復仍然正常運作）。
+
+**(b)/(c) 仍待業務確認**——Secondary Reference 合併邏輯、Function 篩選為前端過濾兩點，業務尚未回覆，
+維持待確認狀態，尚未動工。
+
+```text
+Status: (a) confirmed and implemented (2026-08-27) — delete_seq is now a real, persisted column on
+        delete_pending_audit, computed server-side at cancel()-time via a natural-key-grouped query
+        (DeletePendingAuditStore.nextDeleteSeq()), NOT derived transiently at read time as §11.1
+        originally assumed. This required editing the (still-uncommitted) migration 18 in place, since
+        the table has never shipped. 3 new microservice tests, all three suites green (Angular
+        1210/1210, backend 39/39, microservice 605/605, all four coverage metrics above 95%), live
+        curl-verified against the running dev microservice (two Delete Pending cycles on the same LC
+        Number, across two different balanceContractIds, correctly sequenced 1 then 2). (b) Secondary
+        Reference merge logic and (c) Function client-side-filter convention remain UNCONFIRMED — the
+        rest of the Inquire Delete Pending screen (query API, Angular component) has not started.
+```
+
+
+## 12. BA Review（2026-08-27，複查 §9／§10／§11.4 的實作）
+
+依專案慣例，逐項對照真實程式碼複查已完成的部分（Phase 1、Phase 2、A1/B1 LC 重複使用修法、
+`delete_pending_audit` 稽核表、`delete_seq` 持久化欄位）。**結論：核對下來全部屬實，這幾項的安全性
+論證都站得住腳，可以視為完成，沒有發現需要修正的錯誤**——與前兩輪（§7 對 SUPERSEDED 顯示的判斷有誤、
+§6.2 對「既有模式」成熟度的誤判）不同，這一輪沒有找到類似的認知落差，只有幾點次要觀察供參考。
+
+### 12.1 Phase 1／Phase 2 複查
+
+- `maker-panel.component.html:813` 確認 Delete Pending 按鈕的 `*ngIf` 已改為
+  `(submitResult?.status === 'PENDING' || submitResult?.status === 'REJECTED')`，A4 排除條件不變——
+  屬實。旁邊 line 786「Go to the Checker section... Release or Reject」提示文字仍只在 PENDING
+  顯示——**這是正確行為，不是遺漏**：一筆已經 REJECTED 的交易，叫使用者「去 Release 或 Reject
+  它」沒有意義（已經 Reject 過了），維持 PENDING-only 是對的。
+- `balanceMovementStore.ts:262`（`listByCreatedByAndStatus()`）、`balanceService.ts:1304`
+  （`listMyMovements()`）、`routes/balanceMovements.ts:62` 三層都確實存在——Maker Queue 的後端查詢
+  分支核實無誤。
+
+### 12.2 A1/B1 LC Number 重複使用修法——安全性論證逐一核實成立
+
+這是本輪風險最高的一項變更（觸及合約生命週期狀態），逐一核對支撐論證：
+
+- `assertRootIssueReleased()`（`balanceService.ts:1350-1357`）確認：任何非-ISSUE 動作要套用到一個
+  root 合約（`ROOT_INSTRUMENT_TYPES = {IPLC_LC, EPLC_LC, EPLC_CONFIRMATION}`），都必須先通過這個
+  ISSUE 已經 RELEASED 的檢查（`resolveOrCreateContract()` line 1406-1408 呼叫點，對「用
+  `balanceContractId` 直接指定」與「用自然鍵解析」兩種路徑都適用，不是只擋自然鍵路徑）——確認
+  「root 合約的 ISSUE 未 Release 前，不可能有其他 movement 存在」這個安全前提站得住腳，REJECTED
+  狀態的 ISSUE（`status !== 'RELEASED'`）同樣被這個檢查涵蓋，不只是 PENDING。
+- `markCancelled()`（`balanceContractStore.ts:464-469`）是單純 `UPDATE status='CANCELLED',
+  effective_to=...`，跟既有 `markClosed()`/`markExpired()` 同一種形狀——核實屬實。
+- `findActiveByNaturalKey()`（`balanceContractStore.ts:202-212`）確認 `WHERE status = 'ACTIVE'`——
+  一旦舊合約被標記 CANCELLED，這個查詢自然找不到它，`resolveOrCreateContract()` 的 re-ISSUE guard
+  不會再誤擋，新 ISSUE 能夠成立——核實屬實。
+- **額外查證（兩份文件都沒提到，但屬於審慎覆核範圍）**：`idx_contracts_one_active`
+  （`schema.ts:121-123`，`UNIQUE INDEX ... WHERE status = 'ACTIVE'`）是綁在
+  `logical_contract_id` 上，不是自然鍵欄位——新 Submit 產生的是全新、獨立的
+  `logicalContractId`，不會跟舊的（已 CANCELLED）合約在這個唯一索引上衝突。確認這個修法不會在
+  重複使用同一個 LC Number 時撞到任何既有的資料庫唯一性約束。
+
+**結論**：這項修法的安全論證是紮實的，不是想當然爾——查證下來三層防護（ISSUE-未 Release 前無法
+附掛其他 movement、`markCancelled()` 正確排除舊合約、唯一索引不會衝突）環環相扣，沒有發現漏洞。
+
+### 12.3 `delete_pending_audit` 表與 `delete_seq` 複查
+
+- `schema.ts:280-309` 的欄位定義（`audit_id` PK、`delete_seq INTEGER NOT NULL`、兩個 FK 參照、
+  `status_before` 的 CHECK 限制在 `('PENDING','REJECTED')`、兩個索引）與 §10/§11.4 描述逐欄位核對
+  一致。
+- `nextDeleteSeq()`（`deletePendingAuditStore.ts:71-84`）：`COALESCE(MAX(delete_seq), 0) + 1`，
+  JOIN `balance_contracts` 依自然鍵分組，`COALESCE(c.ib_number, '') = COALESCE(@ibNumber, '')`
+  正確迴避了 SQL `NULL = NULL` 恆為假的陷阱——核實屬實，寫法正確。
+- **額外查證（審慎覆核）**：`nextDeleteSeq()` 的 SELECT 與後續 `insert()` 是否有並發競態風險（例如
+  兩個 Delete Pending 幾乎同時發生，各自算出同一個 `delete_seq`）？查證後**沒有這個風險**——本專案
+  全程使用 `better-sqlite3`（同步驅動），加上 Node.js 單執行緒模型，`cancel()` 這整個方法（含
+  `nextDeleteSeq()` 的 SELECT 跟 `insert()` 的 INSERT）在同一個呼叫堆疊內同步執行完畢，中途不會有
+  其他請求插入執行——不需要額外的交易包裝或鎖，這點與 §5.2/§6.1 提到「Fix Pending 那個
+  `db.transaction()` 才需要」是不同情境（那邊需要是因為橫跨兩個 store 的寫入需要原子性，不是為了
+  防併發競態；這裡的 `nextDeleteSeq()`+`insert()` 本來就同步無競態）。
+- 測試核對：`test/unit/service/balanceService.test.ts:1391` 起確實有對應的
+  `describe('BalanceService.cancel — delete_pending_audit ...')` 區塊，`delete_seq` 遞增
+  （line 1540-1572）與跨自然鍵獨立計數（line 1575-1629）兩個關鍵情境都有對應斷言，不是空講——核實
+  屬實。
+
+### 12.4 次要觀察（不影響核准，供參考）
+
+- §10 自己揭露的覆蓋率缺口（`listByMovement()`/`listByContract()` 原本沒有專屬單元測試，只被
+  SQL 直接繞過驗證）已經在 §11.4 這一輪一併補齊——這是好的紀律，值得肯定。
+- 本文件所有實作都明確標註「UNCOMMITTED，等候另外的 commit and push 指示」——這是正確的作法，
+  但提醒一下：目前這些變更只存在於工作目錄，尚未進版控，若這台機器/環境有任何意外都可能遺失，
+  建議確認範圍都滿意後儘快 commit（不需要現在就 push，但至少先 commit 留一個復原點）。
+
+### 12.5 尚未完成、待業務回覆的部分（現況提醒，非新發現）
+
+- §11(b) Secondary Reference 合併邏輯、§11(c) Function 篩選為前端過濾——業務尚未回覆，「INQUIRE
+  DELETE PENDING」查詢畫面本身（新 API + 新 Angular 元件）尚未開始動工，這點文件本身已誠實揭露，
+  複查後確認現況描述準確，沒有言過其實。
+
+### 12.6 總結
+
+**核准**：Phase 1、Phase 2、A1/B1 LC 重複使用修法、`delete_pending_audit` 表、`delete_seq`
+持久化欄位——五項複查全數通過，安全性與正確性論證站得住腳，測試覆蓋對應到位，可以視為這幾項
+正式完成。建議：(1) 儘快 commit 這批變更留一個復原點；(2) §11(b)/(c) 等業務回覆後再繼續「INQUIRE
+DELETE PENDING」畫面本身的開發，目前暫緩狀態正確，不需要催促。
+
+---
+
+## 13. 「INQUIRE DELETE PENDING」畫面正式實作完成（2026-08-27）——業務回覆 §11(b)/(c) + 追加 UI 需求
+
+業務對 §11.2 的三個設計點依序回覆並追加需求：(a) Delete Sequence 系統自動生成、持久化欄位（已於
+§10 補充實作）；(b) Secondary Reference「用第一個方案」（採用 §11.2(b) 提出的合併邏輯）；(c) Function
+篩選同意前端過濾。隨後業務再追加三項 UI 需求：整體操作方式應與 INQUIRE EVENTS 一致（Import/Export →
+LC Catalog → 選 LC → 該 LC 的 Delete Pending 記錄）；LC Catalog 只顯示「曾經被 Delete Pending 過」的
+LC；樣式表比照 INQUIRE EVENTS。
+
+### 13.1 實作內容
+
+**微服務**：
+- `BalanceContractStore.listWithDeletePendingHistory()`（新方法）——LC Catalog 的資料來源改為直接查
+  `delete_pending_audit`（JOIN `balance_contracts`），用 `SELECT DISTINCT` + 相關子查詢確保：(1) 每個
+  LC Number 只出現一次，即使被 Delete Pending 過好幾次、或像 A1/B1 那樣每次 Resubmit 都換一張新
+  `balance_contract_id`（§9.3 LC 重複使用機制）；(2) 代表列取「最近一次 Delete Pending」對應的那張
+  合約，讓 Tenor Type/Currency/Face Amount 反映最新狀態。新路由
+  `GET /delete-pending-audit/lc-catalog?instrumentType=&q=&page=&pageSize=`，回傳格式與既有 `catalog()`
+  的 `CatalogPage` 完全相同，方便前端共用同一套分頁元件。
+
+**Angular（SOLID / 避免重複）**：
+- 新增 `LcCatalogIndexService`（單一職責：Import/Export 切換 + LC Catalog 搜尋/分頁），
+  `fetchPage`/`decorate` 兩個建構子參數讓它可以同時服務「查全部合約」（一般用途，預設行為）跟
+  「只查有 Delete Pending 記錄的合約」（Inquire Delete Pending 專用，`fetchPage` 換成新的
+  `catalogWithDeletePendingHistory()`）兩種資料來源，不需要為 Inquire Delete Pending 另外複製一份
+  side/search/paging 邏輯。
+- 把 `InquireEventsService.loadIndex()`原本內嵌的私有方法 `loadIndexRow()`（計算每列的 Tenor
+  Type/Currency/Face Amount/Last Event Date）抽成模組層級的匯出函式 `computeLcIndexRow()`——純程式碼
+  搬移，行為完全不變（`inquire-events.service.spec.ts` 80 個測試原封不動全過）——`InquireDeletePendingService`
+  的 `LcCatalogIndexService` 把這個函式當 `decorate` 使用，兩邊共用同一份計算邏輯，不是各自維護一份
+  幾乎一樣的程式碼。**`InquireEventsService` 本身沒有在這次一併改成使用 `LcCatalogIndexService`**——
+  它自己的 `indexRows`/`indexSearch` 等欄位名稱已經被 `inquire-events.component.html`
+  直接綁定、也被~80個既有測試覆蓋，重新命名/搬遷屬於另一個獨立、有自己風險的重構，不是這次新畫面的
+  附帶工作，先記錄下來作為後續建議項目。
+- `InquireDeletePendingComponent`/`.scss` 改成跟 `InquireEventsComponent` 完全相同的版面結構
+  （`.tb-workspace.tb-workspace--single > .tb-main`）與樣式定義（`.tb-tabs`/`.tb-tab`/`.tb-btn--nav-back`/
+  `.tb-hint--ok` 等，全部從 `inquire-events.component.scss` 逐一複製過來，同一套「disclosed, deliberate
+  copy」慣例）。
+- LC Catalog 表格欄位依業務指示定案為：LC Number / Tenor Type / Currency / LC Amount / Last Event
+  Date/Time——**沒有 Status、沒有 Available Balance**（這兩欄是 Inquire Events 自己的欄位，Inquire
+  Delete Pending 不需要即時餘額資訊）。
+
+### 13.2 過程中發現並修復的一個真實 UI bug
+
+使用者實測發現：切換 Function 篩選下拉選單時，先前開著的「View」原始交易畫面沒有跟著關閉，會顯示
+過期資料。原因是 `[(ngModel)]="service.functionFilter"` 只更新篩選值本身，沒有連帶清除
+`service.viewing`。修法：改用展開語法 `[ngModel]="service.functionFilter"
+(ngModelChange)="service.functionFilter = $event; service.closeView()"`，切換篩選時一併關閉 View。
+純模板變更，依本專案慣例透過 `ng build` 嚴格模板檢查 + 實際瀏覽器操作驗證（Jest 不會渲染模板）。
+
+### 13.3 測試與驗證
+
+- 微服務新增 6 筆 HTTP 整合測試（`GET /delete-pending-audit/lc-catalog`）：`instrumentType` 缺漏
+  400、從未 Delete Pending 過的 LC 不出現、Delete Pending 一次的 LC 剛好出現一次、Delete Pending
+  多次（跨多張合約）的 LC 仍只出現一次且代表列是最新一次、`instrumentType` 篩選正確區分 Import/Export、
+  分頁與 LC Number 排序正確。
+- Angular 新增 `lc-catalog-index.service.spec.ts`（12 筆，含預設/自訂 `fetchPage`/`decorate`、
+  `excludeCancelled` 透傳、`selectSide`/分頁/錯誤處理）與擴充
+  `inquire-delete-pending.service.spec.ts`（+9 筆，涵蓋 `catalogIndex` 的 `fetchPage`/`decorate`
+  接線、`selectLcFromIndex()`/`backToIndex()` 的狀態轉換）。
+- 三套件全綠：Angular **1254/1254**（覆蓋率 98.68%/96.45%/97%/99%）、backend **39/39**、
+  microservice **619/619**（覆蓋率 98.99%/95.08%/100%/99.67%）——`lc-catalog-index.service.ts` 本身
+  100%/100%/100%/100%，`inquire-delete-pending.service.ts` 98.92%/86.2%/100%/100%。
+- **Live 驗證**：直接 curl `GET /delete-pending-audit/lc-catalog?instrumentType=IPLC_LC` 確認 12 個
+  曾經 Delete Pending 過的 LC 各自只出現一次（含 S01、S02 這種被刪過好幾次的舊資料）；瀏覽器完整走一次
+  「Inquire Delete Pending → Import LC → 點 RVDP-ROOT-A1 → 顯示 6 筆該 LC 的 Delete Pending 記錄
+  （A2/A3×2/A3S/A7/A6，Delete Sequence 依自然鍵正確分組為 1-4 與各自獨立的 1）→ 點 View 開啟原始
+  交易畫面 → 切換 Function 篩選為 A3 確認表格正確篩選且 View 面板自動關閉」全程無 Console 錯誤。
+
+```text
+Status: Inquire Delete Pending screen (§11's own UI, business-directed 2026-08-27) fully implemented —
+        two-layer Import/Export → LC Catalog (scoped to only LC Numbers with delete-pending history,
+        DISTINCT-deduplicated even across A1/B1's multi-contract Resubmit chains) → drill-down flow,
+        matching Inquire Events' own navigation/stylesheet. One real UI bug found and fixed live
+        (Function filter change didn't clear the open View panel). All three suites green (Angular
+        1254/1254, backend 39/39, microservice 619/619), live-verified via curl + full browser
+        walkthrough. All changes in this section remain UNCOMMITTED per the standing "不要COMMIT"
+        instruction.
+```
+
+### 13.4 追加調整：View 按鈕改為點擊整列（業務指示，2026-08-27）
+
+移除稽核記錄表格的「Action」欄位/「View」按鈕，改成跟 Inquire Events 自己的 Events 表格一樣的
+「Row-click 取代逐列按鈕」慣例（`<tr (click)="service.view(row)">`）——純模板變更，`.tb-table`
+既有的 `tbody tr { cursor: pointer; ... }` 樣式（從 Inquire Events 複製過來的同一份）已經內建
+hover/pointer 視覺效果，不需要額外補樣式。
+
+### 13.5 過程中發現並修復第二個真實 bug——`describeApiError()` 對連線層級錯誤顯示「[object Object]」
+
+Live 測試 LC Catalog 載入時偶發顯示一個沒有意義的錯誤訊息「[object Object]」。查證：這不是這次新
+功能本身的邏輯錯誤（該次載入的全部 49 個 HTTP 請求實際上都回 200），而是這個橫跨全專案共用的
+`describeApiError()`（`api-error.ts`）既有的一個缺口——它原本只認得伺服器回傳的 JSON 錯誤格式
+（`err.error.message`），遇到連線層級的失敗（伺服器一時連不上、CORS、DNS 等）時，Angular 的
+`HttpErrorResponse.error` 是一個 `ProgressEvent`，沒有 `.message`，退回 `String(err)` 就印出
+`[object Object]`（`HttpErrorResponse` 沒有覆寫 `toString()`）。修法：在 `String(err)`
+之前多檢查一層 `err.message`——`HttpErrorResponse` 本身就有一個現成的、人類看得懂的 `.message`
+欄位（例如「Http failure response for http://localhost:4200/...: 0 Unknown Error」），原本一直
+沒被用到。新增 `api-error.spec.ts`（5 筆測試，這個共用函式先前完全沒有專屬測試），Angular
+1259/1259 全綠（`api-error.ts` 覆蓋率 100%），無既有測試受影響（全部既有呼叫端都用
+`err.error.message` 這個形狀，沒有依賴舊的 `String(err)` 兜底行為）。**這是一個橫跨全專案的共用
+函式修復，不是 Inquire Delete Pending 專屬的**——`CheckerActionsService`、`MakerQueueService`
+等所有既有呼叫端都受益。

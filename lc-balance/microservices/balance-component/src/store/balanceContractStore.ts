@@ -114,6 +114,20 @@ export interface CatalogFilter {
    * still-pending record's own current state, just can't pick it to act on further.
    */
   requireIssueReleased?: boolean;
+  /**
+   * Business-reported gap 2026-08-27 ("CANCELLED 不應該顯示在 INQUIRE EVENTS CATALOG 上") — the Fix
+   * Pending/Delete Pending Phase's own A1/B1 LC-reuse fix (§9.3) started actually setting
+   * `ContractStatus.CANCELLED` on a Delete-Pending'd root ISSUE's own contract; this catalog had no
+   * status filter at all for Inquire Events' own LC Master Records Index (deliberately, so a CLOSED
+   * contract stays inquirable — see the CLOSE feature's own decision-log entry), so a CANCELLED
+   * contract — one that never had ANY real Released event, by construction — started appearing there
+   * too, pure noise. Opt-in (default false/omitted) rather than folding into the existing `status`
+   * exact-match filter, since `status` and this need to compose (Inquire Events passes neither `status`
+   * NOR this by default for every OTHER status; only CANCELLED needs excluding). Every Delete Pending
+   * that ever happened is still fully queryable via the dedicated Inquire Delete Pending screen
+   * (delete_pending_audit), independent of this catalog.
+   */
+  excludeCancelled?: boolean;
 }
 
 export interface CatalogPage {
@@ -311,6 +325,9 @@ export class BalanceContractStore {
       clauses.push('status = @status');
       whereParams.status = filter.status;
     }
+    if (filter.excludeCancelled) {
+      clauses.push(`status != 'CANCELLED'`);
+    }
     if (filter.q) {
       clauses.push('lc_number LIKE @q');
       whereParams.q = `%${filter.q}%`;
@@ -341,6 +358,56 @@ export class BalanceContractStore {
 
     const rows = this.db
       .prepare(`SELECT * FROM balance_contracts WHERE ${where} ORDER BY lc_number ASC LIMIT @limit OFFSET @offset`)
+      .all({ ...whereParams, limit: pageSize, offset }) as unknown as ContractRow[];
+
+    return { items: rows.map(rowToContract), total, page, pageSize };
+  }
+
+  /**
+   * Inquire Delete Pending's own LC Catalog step (analysis/Balance-Component-FixPending-DeletePending-
+   * Proposal-zh.md §11, business-directed 2026-08-27, "只有被 DELETE PENDING 過的才顯示") — unlike
+   * `listCatalog()` above (every contract of the given instrumentType), this returns only one row per
+   * distinct LC Number that has AT LEAST ONE `delete_pending_audit` record, ordered by LC Number to match
+   * the same "ORDER BY LC Number" convention this business requirement specifies. A1/B1's own LC-reuse fix
+   * (§9.3) means one LC Number can span multiple `balance_contracts` rows (a fresh one per Resubmit cycle)
+   * — the representative row returned for each LC Number is the one tied to its MOST RECENT Delete
+   * Pending action (`ORDER BY d.cancelled_at DESC, d.audit_id DESC LIMIT 1`), so Tenor Type/Currency/Face
+   * Amount reflect that latest incarnation, not an arbitrary one.
+   */
+  listWithDeletePendingHistory(filter: { instrumentType: InstrumentType; q?: string; page?: number; pageSize?: number }): CatalogPage {
+    const clauses = ['c.instrument_type = @instrumentType'];
+    const whereParams: Record<string, string> = { instrumentType: filter.instrumentType };
+    if (filter.q) {
+      clauses.push('c.lc_number LIKE @q');
+      whereParams.q = `%${filter.q}%`;
+    }
+    const where = clauses.join(' AND ');
+
+    const totalRow = this.db
+      .prepare(`SELECT COUNT(DISTINCT c.lc_number) AS n FROM delete_pending_audit d JOIN balance_contracts c ON c.balance_contract_id = d.balance_contract_id WHERE ${where}`)
+      .get(whereParams) as { n: number } | undefined;
+    const total = totalRow?.n ?? 0;
+
+    const page = filter.page && filter.page > 0 ? filter.page : 1;
+    const pageSize = filter.pageSize && filter.pageSize > 0 ? filter.pageSize : 10;
+    const offset = (page - 1) * pageSize;
+
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT c.* FROM balance_contracts c
+         JOIN delete_pending_audit d ON d.balance_contract_id = c.balance_contract_id
+         WHERE ${where}
+           AND c.balance_contract_id = (
+             SELECT d2.balance_contract_id
+             FROM delete_pending_audit d2
+             JOIN balance_contracts c2 ON c2.balance_contract_id = d2.balance_contract_id
+             WHERE c2.lc_number = c.lc_number AND c2.instrument_type = @instrumentType
+             ORDER BY d2.cancelled_at DESC, d2.audit_id DESC
+             LIMIT 1
+           )
+         ORDER BY c.lc_number ASC
+         LIMIT @limit OFFSET @offset`,
+      )
       .all({ ...whereParams, limit: pageSize, offset }) as unknown as ContractRow[];
 
     return { items: rows.map(rowToContract), total, page, pageSize };
@@ -378,6 +445,24 @@ export class BalanceContractStore {
    */
   markExpired(balanceContractId: string, effectiveTo: string): void {
     this.db.prepare(`UPDATE balance_contracts SET status = 'EXPIRED', effective_to = @effectiveTo WHERE balance_contract_id = @balanceContractId`).run({
+      balanceContractId,
+      effectiveTo,
+    });
+  }
+
+  /**
+   * Fix Pending/Delete Pending — Delete Pending on a root A1/B1 ISSUE (analysis/Balance-Component-
+   * FixPending-DeletePending-Proposal-zh.md) — mirrors markClosed()/markExpired()'s own shape. Called
+   * ONLY when the movement being cancelled is the ISSUE itself on a root (IPLC_LC/EPLC_LC/
+   * EPLC_CONFIRMATION) contract — assertRootIssueReleased()'s own guard (service/balanceService.ts)
+   * guarantees no other movement can exist on that contract while its ISSUE is still un-Released, so
+   * cancelling it always means "this contract never became real," safe to retire the same way. Frees the
+   * natural key for a fresh ISSUE (resolveOrCreateContract() only matches on ACTIVE via
+   * findActiveByNaturalKey()) — the new ISSUE creates a genuinely new, independent contract row, not a
+   * revival of this one.
+   */
+  markCancelled(balanceContractId: string, effectiveTo: string): void {
+    this.db.prepare(`UPDATE balance_contracts SET status = 'CANCELLED', effective_to = @effectiveTo WHERE balance_contract_id = @balanceContractId`).run({
       balanceContractId,
       effectiveTo,
     });

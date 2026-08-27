@@ -1982,6 +1982,35 @@ describe('POST /admin/reset-database — dev-only Business Case Runner "Cleanup 
       .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'RESET-001' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
       .expect(201);
   });
+
+  // Regression test for a real bug: delete_pending_audit (added for the Fix Pending/Delete Pending
+  // Phase, analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §10) has FK REFERENCES to
+  // both balance_movements and balance_contracts with no ON DELETE CASCADE, and PRAGMA foreign_keys is
+  // ON — once any Delete Pending had ever happened, this route 500'd with a foreign key constraint
+  // failure instead of wiping the DB, because it never cleared delete_pending_audit first.
+  test('also wipes delete_pending_audit — a prior Delete Pending must not 500 this route (FK constraint regression)', async () => {
+    const db = createDb(':memory:');
+    const app = createApp(db);
+
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'RESET-002' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+      .expect(201);
+
+    await request(app)
+      .post(`/balance-movements/${created.body.movementId}/cancel`)
+      .send({ cancelledBy: 'maker1', reasonCode: 'MAKER_EC' })
+      .expect(200);
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM delete_pending_audit').get() as { n: number }).n).toBe(1);
+
+    const res = await request(app).post('/admin/reset-database').expect(200);
+    expect(res.body).toEqual({ status: 'ok' });
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM delete_pending_audit').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_contracts').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_movements').get() as { n: number }).n).toBe(0);
+  });
 });
 
 describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amount validation', () => {
@@ -3619,6 +3648,325 @@ describe('HTTP integration — GET /balance-movements?businessEventId= (bug fixe
   test('returns an empty array for a businessEventId no movement carries', async () => {
     const res = await request(app).get('/balance-movements').query({ businessEventId: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }).expect(200);
     expect(res.body).toEqual([]);
+  });
+});
+
+describe('HTTP integration — GET /balance-movements?createdBy= (Fix Pending/Delete Pending Phase 2 — Maker Queue worklist)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('400 REQUEST_VALIDATION_FAILED when neither businessEventId nor createdBy is supplied', async () => {
+    const res = await request(app).get('/balance-movements').expect(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+  });
+
+  test('defaults to PENDING+REJECTED, paired with each movement\'s own contract, scoped to the given createdBy', async () => {
+    const pending = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'MYMV-HTTP-001' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const rejectedSource = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'MYMV-HTTP-002' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${rejectedSource.body.movementId}/reject`).send({ releasedBy: 'checker1', reasonCode: 'MANUAL_TEST_REJECT' }).expect(200);
+
+    const res = await request(app).get('/balance-movements').query({ createdBy: 'maker1' }).expect(200);
+
+    expect(res.body.total).toBe(2);
+    const movementIds = res.body.items.map((r: { movement: { movementId: string } }) => r.movement.movementId);
+    expect(movementIds).toContain(pending.body.movementId);
+    expect(movementIds).toContain(rejectedSource.body.movementId);
+    const rejectedRow = res.body.items.find((r: { movement: { movementId: string } }) => r.movement.movementId === rejectedSource.body.movementId);
+    expect(rejectedRow.movement.status).toBe('REJECTED');
+    expect(rejectedRow.contract.naturalKey.lcNumber).toBe('MYMV-HTTP-002');
+  });
+
+  test('status= filters to a single status, and page/pageSize are honored', async () => {
+    for (let i = 0; i < 3; i++) {
+      await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: `MYMV-HTTP-PAGE-${i}` },
+          movementType: 'ISSUE',
+          expiryDate: '2099-12-31',
+          eventSeq: 1,
+          amount: '1000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          createdBy: 'maker-http-paging',
+        })
+        .expect(201);
+    }
+
+    const filtered = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'REJECTED' }).expect(200);
+    expect(filtered.body.total).toBe(0);
+    expect(filtered.body.items).toEqual([]);
+
+    const page1 = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'PENDING', page: 1, pageSize: 2 }).expect(200);
+    expect(page1.body.total).toBe(3);
+    expect(page1.body.items).toHaveLength(2);
+    const page2 = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'PENDING', page: 2, pageSize: 2 }).expect(200);
+    expect(page2.body.items).toHaveLength(1);
+  });
+});
+
+describe('HTTP integration — GET /delete-pending-audit (Inquire Delete Pending, analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  async function issueAndCancel(lcNumber: string, createdBy: string, cancelledBy: string) {
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy,
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${created.body.movementId}/cancel`).send({ cancelledBy, reasonCode: 'MAKER_EC' }).expect(200);
+    return created.body.movementId as string;
+  }
+
+  test('with no filters, returns every Delete Pending audit row paired with its own contract natural key', async () => {
+    const movementId = await issueAndCancel('DPA-HTTP-001', 'maker1', 'maker1');
+
+    const res = await request(app).get('/delete-pending-audit').expect(200);
+
+    expect(res.body.total).toBeGreaterThanOrEqual(1);
+    const row = res.body.items.find((r: { movementId: string }) => r.movementId === movementId);
+    expect(row).toMatchObject({
+      movementId,
+      instrumentType: 'IPLC_LC',
+      lcNumber: 'DPA-HTTP-001',
+      ibNumber: null,
+      sgNumber: null,
+      deleteSeq: 1,
+      statusBefore: 'PENDING',
+      cancelledBy: 'maker1',
+      reasonCode: 'MAKER_EC',
+    });
+    expect(row.auditId).toEqual(expect.any(String));
+  });
+
+  test('lcNumber= narrows to exactly that LC Number', async () => {
+    await issueAndCancel('DPA-HTTP-LCA', 'maker1', 'maker1');
+    await issueAndCancel('DPA-HTTP-LCB', 'maker1', 'maker1');
+
+    const res = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-LCA' }).expect(200);
+
+    expect(res.body.total).toBe(1);
+    expect(res.body.items[0].lcNumber).toBe('DPA-HTTP-LCA');
+  });
+
+  test('deletedBy= narrows to that Maker only', async () => {
+    await issueAndCancel('DPA-HTTP-BY-001', 'maker-alpha', 'maker-alpha');
+    await issueAndCancel('DPA-HTTP-BY-002', 'maker-beta', 'maker-beta');
+
+    const res = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-BY-001', deletedBy: 'maker-alpha' }).expect(200);
+    expect(res.body.total).toBe(1);
+
+    const none = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-BY-001', deletedBy: 'maker-beta' }).expect(200);
+    expect(none.body.total).toBe(0);
+    expect(none.body.items).toEqual([]);
+  });
+
+  test('from=/to= filters by cancelled_at range', async () => {
+    await issueAndCancel('DPA-HTTP-RANGE-001', 'maker1', 'maker1');
+    const farFuture = '2099-01-01T00:00:00.000Z';
+
+    const tooLate = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-RANGE-001', from: farFuture }).expect(200);
+    expect(tooLate.body.total).toBe(0);
+
+    const includesIt = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-RANGE-001', to: farFuture }).expect(200);
+    expect(includesIt.body.total).toBe(1);
+  });
+
+  test('page=/pageSize= paginate, and delete_seq increments across repeated Delete Pending cycles on the same LC Number', async () => {
+    const first = await issueAndCancel('DPA-HTTP-PAGE-001', 'maker1', 'maker1');
+    const resubmitted = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'DPA-HTTP-PAGE-001' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 2,
+        amount: '20000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${resubmitted.body.movementId}/cancel`).send({ cancelledBy: 'maker1', reasonCode: 'MAKER_EC' }).expect(200);
+
+    const page1 = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-PAGE-001', page: 1, pageSize: 1 }).expect(200);
+    expect(page1.body.total).toBe(2);
+    expect(page1.body.items).toHaveLength(1);
+    expect(page1.body.items[0].movementId).toBe(first);
+    expect(page1.body.items[0].deleteSeq).toBe(1);
+
+    const page2 = await request(app).get('/delete-pending-audit').query({ lcNumber: 'DPA-HTTP-PAGE-001', page: 2, pageSize: 1 }).expect(200);
+    expect(page2.body.items).toHaveLength(1);
+    expect(page2.body.items[0].movementId).toBe(resubmitted.body.movementId);
+    expect(page2.body.items[0].deleteSeq).toBe(2);
+  });
+});
+
+describe('HTTP integration — GET /delete-pending-audit/lc-catalog (Inquire Delete Pending LC Catalog, §11, "只有被 DELETE PENDING 過的才顯示")', () => {
+  const app = createApp(createDb(':memory:'));
+
+  async function issueAndCancel(lcNumber: string, instrumentType: string = 'IPLC_LC') {
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType,
+        naturalKey: { lcNumber },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${created.body.movementId}/cancel`).send({ cancelledBy: 'maker1', reasonCode: 'MAKER_EC' }).expect(200);
+    return created.body;
+  }
+
+  test('400 when instrumentType is missing', async () => {
+    const res = await request(app).get('/delete-pending-audit/lc-catalog').expect(400);
+    expect(res.body.code).toBeDefined();
+  });
+
+  test('an LC that was Issued and RELEASED (never Delete Pending) does NOT appear', async () => {
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LCCAT-NEVER-DELETED' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${created.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    expect(res.body.items.some((row: { naturalKey: { lcNumber: string } }) => row.naturalKey.lcNumber === 'LCCAT-NEVER-DELETED')).toBe(false);
+  });
+
+  test('an LC Delete-Pending\'d exactly once appears exactly once', async () => {
+    await issueAndCancel('LCCAT-ONE-001');
+
+    const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-ONE-001' }).expect(200);
+
+    expect(res.body.total).toBe(1);
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].naturalKey.lcNumber).toBe('LCCAT-ONE-001');
+  });
+
+  test('an LC Delete-Pending\'d multiple times (each cycle its own balanceContractId, §9.3 LC-reuse) appears exactly ONCE — DISTINCT by LC Number', async () => {
+    const first = await issueAndCancel('LCCAT-MULTI-001');
+    const second = await issueAndCancel('LCCAT-MULTI-001');
+    expect(second.balanceContractId).not.toBe(first.balanceContractId);
+
+    const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-MULTI-001' }).expect(200);
+
+    expect(res.body.total).toBe(1);
+    expect(res.body.items).toHaveLength(1);
+    // Representative row is the LATEST Delete Pending cycle's own contract.
+    expect(res.body.items[0].balanceContractId).toBe(second.balanceContractId);
+  });
+
+  test('instrumentType filters correctly — an EPLC_CONFIRMATION Delete Pending never appears under IPLC_LC', async () => {
+    await issueAndCancel('LCCAT-EXPORT-001', 'EPLC_CONFIRMATION');
+
+    const importRes = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-EXPORT-001' }).expect(200);
+    expect(importRes.body.total).toBe(0);
+
+    const exportRes = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'EPLC_CONFIRMATION', q: 'LCCAT-EXPORT-001' }).expect(200);
+    expect(exportRes.body.total).toBe(1);
+  });
+
+  test('page/pageSize paginate, ordered by LC Number ascending', async () => {
+    await issueAndCancel('LCCAT-PAGE-A');
+    await issueAndCancel('LCCAT-PAGE-B');
+    await issueAndCancel('LCCAT-PAGE-C');
+
+    const page1 = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-PAGE-', page: 1, pageSize: 2 }).expect(200);
+    expect(page1.body.total).toBe(3);
+    expect(page1.body.items.map((r: { naturalKey: { lcNumber: string } }) => r.naturalKey.lcNumber)).toEqual(['LCCAT-PAGE-A', 'LCCAT-PAGE-B']);
+
+    const page2 = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-PAGE-', page: 2, pageSize: 2 }).expect(200);
+    expect(page2.body.items.map((r: { naturalKey: { lcNumber: string } }) => r.naturalKey.lcNumber)).toEqual(['LCCAT-PAGE-C']);
+  });
+});
+
+describe('HTTP integration — GET /balance-contracts/:balanceContractId (Inquire Delete Pending View action, §11)', () => {
+  const app = createApp(createDb(':memory:'));
+
+  test('resolves a contract directly by ID, no natural key needed', async () => {
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'BCID-001' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    const res = await request(app).get(`/balance-contracts/${created.body.balanceContractId}`).expect(200);
+    expect(res.body).toMatchObject({ balanceContractId: created.body.balanceContractId, naturalKey: { lcNumber: 'BCID-001' } });
+  });
+
+  test('404 for an unknown balanceContractId', async () => {
+    const res = await request(app).get('/balance-contracts/no-such-contract').expect(404);
+    expect(res.body.code).toBeDefined();
+  });
+
+  // Regression: this catch-all single-segment route is registered AFTER /catalog, /close-eligible,
+  // /reopen-eligible specifically so it can never shadow them (Express matches route registration order).
+  test('does not shadow the more specific /balance-contracts/catalog|close-eligible|reopen-eligible routes', async () => {
+    await request(app).get('/balance-contracts/catalog').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    await request(app).get('/balance-contracts/close-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    await request(app).get('/balance-contracts/reopen-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
   });
 });
 

@@ -281,8 +281,9 @@ describe('InquireEventsService', () => {
       expect(svc.events[0].eventTime).toBe(pending.createdAt);
     });
 
-    it("a Maker's own EC/Cancel (cancelledAt, distinct from releasedAt) is treated as the second-actor time too — a BA-doc gap this feature's own feasibility assessment found and closed", () => {
+    it("a CANCELLED movement (Delete Pending / Maker EC) produces ZERO rows — Inquire Events / Inquire Delete Pending rule (business-directed 2026-08-27, 'Deleted Pending records 不應顯示在 INQUIRE EVENTS 中'); superseded a prior test that expected cancelledAt to drive ordering here (removed 2026-08-26 event-ordering feature — that rule is now moot since the row itself never appears)", () => {
       const root = makeContract({ instrumentType: 'IPLC_LC' });
+      const pending = makeMovement({ movementId: 'mv-pending', status: 'PENDING', createdAt: '2026-08-26T09:00:00.000Z' });
       const cancelled = makeMovement({
         movementId: 'mv-cancelled',
         status: 'CANCELLED',
@@ -290,13 +291,14 @@ describe('InquireEventsService', () => {
         cancelledAt: '2026-08-26T09:05:00.000Z',
         releasedAt: undefined,
       });
-      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([cancelled])) });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([pending, cancelled])) });
 
       const svc = new InquireEventsService(api);
       svc.lcNumber = 'S001';
       svc.search();
 
-      expect(svc.events[0].eventTime).toBe(cancelled.cancelledAt);
+      expect(svc.events).toHaveLength(1);
+      expect(svc.events[0].movement.movementId).toBe('mv-pending');
     });
 
     it("a 'finalize' row falls back to eventSnapshot when finalizeEventSnapshot is null (a movement created before that field existed)", () => {
@@ -595,7 +597,7 @@ describe('InquireEventsService', () => {
 
       svc.searchIndex();
 
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, 'S0', 1, 10);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, 'S0', 1, 10, undefined, undefined, undefined, true);
     });
 
     it('nextIndexPage()/prevIndexPage() re-fetch the target page (server-paginated, unlike eventsPaging) and are no-ops at the boundaries', () => {
@@ -606,10 +608,10 @@ describe('InquireEventsService', () => {
       catalog.mockClear();
 
       svc.nextIndexPage();
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 2, 10);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 2, 10, undefined, undefined, undefined, true);
 
       svc.prevIndexPage();
-      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, 10);
+      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
 
       catalog.mockClear();
       svc.prevIndexPage(); // already on page 1 — no-op, no extra fetch
@@ -664,7 +666,7 @@ describe('InquireEventsService', () => {
       svc.selectSide('EXPORT');
       expect(svc.indexView).toBe('INDEX');
       expect(svc.indexSearch).toBe('');
-      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, 10);
+      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
 
       catalog.mockClear();
       svc.indexView = 'EVENTS';
@@ -673,7 +675,7 @@ describe('InquireEventsService', () => {
       svc.selectSide('IMPORT');
       expect(svc.indexView).toBe('INDEX');
       expect(svc.indexSearch).toBe('');
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 10);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
     });
 
     it('indexEntityLabel reflects the current side ("Import LC" / "Export Confirmed LC") — drives the Index/heading/hint text', () => {
