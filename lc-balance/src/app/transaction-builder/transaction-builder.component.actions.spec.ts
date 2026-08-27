@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
@@ -83,9 +83,11 @@ function makeApi() {
     reject: jest.fn(() => of({ movementId: 'mv-rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'mv-cancelled', status: 'CANCELLED' })),
     acknowledge: jest.fn(() => of({ movementId: 'mv-acknowledged', status: 'PENDING' })),
+    withdrawMakerSubmit: jest.fn(() => of({ movementId: 'mv-withdrawn', status: 'PENDING', makerSubmittedAt: null })),
     resolveContract: jest.fn(() => of(makeContract())),
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(() => of(makeSnapshot())),
+    getContract: jest.fn(() => of(makeContract())),
     listMovements: jest.fn(() => of([] as any[])),
     findByBusinessEventId: jest.fn(() => of([] as any[])),
   };
@@ -933,6 +935,54 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
+  // withdrawMakerPending() — A4's own Delete Pending (business-confirmed 2026-08-27)
+  // ---------------------------------------------------------------------
+  describe('withdrawMakerPending()', () => {
+    it('no-ops when there is no submitResult, or status is not PENDING/REJECTED', () => {
+      const { comp, api } = setup();
+      comp.withdrawMakerPending();
+      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'RELEASED' }) });
+      comp.withdrawMakerPending();
+      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+    });
+
+    it('PENDING path: calls api.withdrawMakerSubmit with submitResult\'s movementId/createdBy, not api.cancel', () => {
+      const { comp, api } = setup();
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
+      api.withdrawMakerSubmit.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'PENDING', makerSubmittedAt: null }) as any);
+
+      comp.withdrawMakerPending();
+
+      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-1', 'maker1');
+      expect(api.cancel).not.toHaveBeenCalled();
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'PENDING', makerSubmittedAt: null } });
+      expect(comp.actionBusy).toBe(false);
+    });
+
+    it('REJECTED path: same call shape as PENDING', () => {
+      const { comp, api } = setup();
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'REJECTED' }) });
+      api.withdrawMakerSubmit.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'PENDING', makerSubmittedAt: null }) as any);
+
+      comp.withdrawMakerPending();
+
+      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-1', 'maker1');
+    });
+
+    it('a failed withdraw sets submitError via makerOutcomeSignal', () => {
+      const { comp, api } = setup();
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
+      api.withdrawMakerSubmit.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
+
+      comp.withdrawMakerPending();
+
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
+    });
+  });
+
+  // ---------------------------------------------------------------------
   // checkerAct()
   // ---------------------------------------------------------------------
   describe('checkerAct()', () => {
@@ -1202,6 +1252,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
         status: 'RELEASED',
         eventSeq: 2,
         createdAt: '2026-08-18T01:00:00.000Z',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-18T04:00:00.000Z',
         releasedAt: '2026-08-18T05:00:00.000Z',
       });
       api.resolveContract.mockReturnValueOnce(of(sightLc) as any);
@@ -1240,11 +1292,15 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp } = setup();
       const sgRow = makeEventRow({ contract: makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: 'G01' } }) });
       const examRow = makeEventRow({ contract: makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'LC001', ibNumber: 'E01', sgNumber: null } }) });
+      // makeEventRow()'s own default movement is IPLC_LC/UTILIZE with sourceTransactionRef 'IB001' — the
+      // A6/B4 Accounting Event Ownership Rule (2026-08-28) reclassifies this as Secondary Ref., not
+      // Reference (lookUp.primaryReferenceFor() is its own delegating counterpart, same pairing).
       const lcRow = makeEventRow({ contract: makeContract({ instrumentType: 'IPLC_LC' }) });
 
       expect(comp.lookUp.secondaryReferenceFor(sgRow)).toBe('SG G01');
       expect(comp.lookUp.secondaryReferenceFor(examRow)).toBe('E01');
-      expect(comp.lookUp.secondaryReferenceFor(lcRow)).toBe('—');
+      expect(comp.lookUp.secondaryReferenceFor(lcRow)).toBe('IB001');
+      expect(comp.lookUp.primaryReferenceFor(lcRow)).toBe('—');
     });
 
     // toEventRows() never splits a still-PENDING movement — isFinalizedSightUtilize requires status !== 'PENDING'.
@@ -1305,8 +1361,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.lookUp.runLookup();
 
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001');
-      expect(api.catalog).toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001');
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
       expect(comp.lookUp.acceptancesUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-acc-1']);
       expect(comp.lookUp.sgsUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-sg-1']);
       // Sole candidate on each tab auto-selects.
@@ -1321,8 +1377,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.lookUp.runLookup();
 
-      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001');
-      expect(api.catalog).not.toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001');
+      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
+      expect(api.catalog).not.toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
     });
 
     // Tab 1's Event Timeline used to fetch only the LC's own contract, so each B3/EPLC_EXAMINATION
@@ -1687,6 +1743,219 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.lookUp.acceptanceSnapshot).toBeNull();
       expect(comp.lookUp.acceptanceMovements).toEqual([]);
+    });
+  });
+
+  /**
+   * Business-reported gap 2026-08-28 (Checker's own pre-Release "Account Entries" button: "只看到一組
+   * Account Entries for Acceptance. Where is the Account Entries (Pending) for reverse LC Balance?") — the
+   * Checker screen only ever has the raw `selectedCheckerMovement`, no merged `InquiredEvent` the way
+   * Inquire Events/Look Up already carry a `linkedMovement` on. See CLAUDE.md's own "A6/B4 Accounting
+   * Event Ownership Rule" entry for the shared design this closes the last gap in.
+   */
+  describe('openCheckerAccountEntryDialog()', () => {
+    it('opens the dialog immediately with just the primary movement, then no-ops for a shape with no linkable partner (e.g. a plain A1 ISSUE)', () => {
+      const { comp, api } = setup();
+      const A1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1')!;
+      comp.selectedFunction = A1;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'ISSUE', referencedTransactionId: null, businessEventId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(comp.accountEntryDialogMovement).toBe(comp.selectedCheckerMovement);
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+      expect(api.getContract).not.toHaveBeenCalled();
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when selectedCheckerMovement is null', () => {
+      const { comp, api } = setup();
+      comp.selectedCheckerMovement = null;
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(comp.accountEntryDialogMovement).toBeNull();
+      expect(api.getContract).not.toHaveBeenCalled();
+    });
+
+    it('A6 (IPLC_ACCEPTANCE): resolves the referenced UTILIZE via getContract -> resolveContract(IPLC_LC) -> listMovements, and fills in linkedMovement', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A6;
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-a6-create',
+        movementType: 'CREATE',
+        balanceContractId: 'bc-acceptance',
+        referencedTransactionId: 'mv-utilize',
+      });
+      api.getContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01', sgNumber: null } })) as any);
+      api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } })) as any);
+      const utilizeMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'mv-other' }), utilizeMovement]) as any);
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.getContract).toHaveBeenCalledWith('bc-acceptance');
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'U01' });
+      expect(api.listMovements).toHaveBeenCalledWith('bc-lc');
+      expect(comp.accountEntryDialogLinkedMovement).toBe(utilizeMovement);
+    });
+
+    it('A6: no referencedTransactionId at all (e.g. legacy data) — no lookup attempted, dialog stays single-set', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A6;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'CREATE', referencedTransactionId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.getContract).not.toHaveBeenCalled();
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+    });
+
+    it('B4 (EPLC_CONFIRMATION/ACCEPT): resolves the sibling EPLC_ACCEPTANCE/CREATE via findByBusinessEventId, skipping itself and a CANCELLED/no-contingentAccountEntry candidate', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = B4;
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-accept', movementType: 'ACCEPT', businessEventId: 'be-1' });
+      const receivable = makeMovement({ movementId: 'mv-receivable', movementType: 'CREATE', contingentAccountEntry: null }); // ON_BALANCE_ASSET leg, no contingent pair
+      const acceptanceCreate = makeMovement({ movementId: 'mv-acceptance-create', movementType: 'CREATE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      api.findByBusinessEventId.mockReturnValueOnce(of([comp.selectedCheckerMovement, receivable, acceptanceCreate]) as any);
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-1');
+      expect(comp.accountEntryDialogLinkedMovement).toBe(acceptanceCreate);
+    });
+
+    it('B4: HONOUR (Sight) is unaffected — its own second leg is an ON_BALANCE_ASSET instrument, no lookup attempted', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = B4;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'HONOUR', businessEventId: 'be-2' });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+    });
+
+    // Business-reported gap 2026-08-28 ("B3 也檢查一下有沒有一樣的問題" ... "其他 A1–A11、B1–B7 也全部檢查一遍")
+    // — A3S's own single Checker Release click genuinely releases the matched SG redemption AND
+    // acknowledges the LC's own UTILIZE (CheckerActionsService.release()'s own documentArrivalWithSg
+    // branch) — same "Checker要看交易出的帳 再決定" principle as A6/B4, via businessEventId correlation
+    // instead of referencedTransactionId. Deliberately NOT the same as mergeAccountingEventRows()'s own
+    // row-merge decision (A3S stays 2 separate rows there, on purpose — see that function's own doc
+    // comment) — this is a narrower "show both sets before one Release click approves both" fix.
+    it('A3S (IPLC_LC/UTILIZE with its own businessEventId): resolves the matched SG redemption via findByBusinessEventId', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A3S;
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', businessEventId: 'be-a3s' });
+      const sgRedeem = makeMovement({ movementId: 'mv-sg-redeem', movementType: 'FULL_REDEEM', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      api.findByBusinessEventId.mockReturnValueOnce(of([comp.selectedCheckerMovement, sgRedeem]) as any);
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-a3s');
+      expect(comp.accountEntryDialogLinkedMovement).toBe(sgRedeem);
+    });
+
+    it('A3 (plain, not A3S): IPLC_LC/UTILIZE with NO businessEventId — no lookup attempted, unaffected by the A3S fix', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A3;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', businessEventId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+    });
+
+    it('A9 viewing the OTHER side of an A3S match (SHGT/FULL_REDEEM with a businessEventId): resolves the matched UTILIZE the same way', () => {
+      const { comp, api } = setup();
+      const A9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9')!;
+      comp.selectedFunction = A9;
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-sg-redeem', movementType: 'FULL_REDEEM', businessEventId: 'be-a3s' });
+      const utilize = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      api.findByBusinessEventId.mockReturnValueOnce(of([comp.selectedCheckerMovement, utilize]) as any);
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(comp.accountEntryDialogLinkedMovement).toBe(utilize);
+    });
+
+    it('A9 standalone (no businessEventId, not matched to any A3S): no lookup attempted', () => {
+      const { comp, api } = setup();
+      const A9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9')!;
+      comp.selectedFunction = A9;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'FULL_REDEEM', businessEventId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+    });
+
+    it('a lookup failure (either shape) resolves null, not an error — dialog stays open, single-set', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A6;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'CREATE', balanceContractId: 'bc-acceptance', referencedTransactionId: 'mv-utilize' });
+      api.getContract.mockReturnValueOnce(apiErr('boom') as any);
+
+      expect(() => comp.openCheckerAccountEntryDialog()).not.toThrow();
+      expect(comp.accountEntryDialogMovement).toBe(comp.selectedCheckerMovement);
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+    });
+
+    it('guards against a stale response landing after the dialog has moved on to a different movement', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A6;
+      const firstMovement = makeMovement({ movementId: 'mv-first', movementType: 'CREATE', balanceContractId: 'bc-acceptance', referencedTransactionId: 'mv-utilize' });
+      comp.selectedCheckerMovement = firstMovement;
+      let resolveListMovements: (v: any) => void;
+      api.listMovements.mockReturnValueOnce(new Observable((subscriber) => { resolveListMovements = (v) => { subscriber.next(v); subscriber.complete(); }; }) as any);
+
+      comp.openCheckerAccountEntryDialog();
+      // The Checker moves on to a different movement before the async lookup resolves.
+      comp.openAccountEntryDialog(makeMovement({ movementId: 'mv-second' }), 'IPLC_LC');
+      resolveListMovements!([makeMovement({ movementId: 'mv-utilize', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1' } })]);
+
+      expect(comp.accountEntryDialogMovement?.movementId).toBe('mv-second');
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+    });
+  });
+
+  /**
+   * Business-reported gap 2026-08-28 ("A6 Maker Account Entries 只顯示一套") — reported immediately after
+   * the Checker's own equivalent button above was fixed: the Maker Result panel's own "Account Entries"
+   * button has the exact same root cause (`e.movement` is the raw `createMovement()` response, never a
+   * merged `InquiredEvent`). Both now delegate to the same shared `openAccountEntryDialogWithLinkedResolution()`
+   * / `resolveLinkedAccountingMovement()` — this describe block only re-proves the Maker's own call site
+   * wires through correctly; the resolution logic itself is already fully covered by the
+   * `openCheckerAccountEntryDialog()` tests above.
+   */
+  describe('onMakerOpenAccountEntries()', () => {
+    it('A6, right after Submit: resolves the referenced UTILIZE the same way the Checker\'s own button does', () => {
+      const { comp, api } = setup();
+      const created = makeMovement({ movementId: 'mv-a6-create', movementType: 'CREATE', balanceContractId: 'bc-acceptance', referencedTransactionId: 'mv-utilize' });
+      api.getContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01', sgNumber: null } })) as any);
+      api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } })) as any);
+      const utilizeMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      api.listMovements.mockReturnValueOnce(of([utilizeMovement]) as any);
+
+      comp.onMakerOpenAccountEntries({ movement: created, instrumentType: 'IPLC_ACCEPTANCE' });
+
+      expect(comp.accountEntryDialogMovement).toBe(created);
+      expect(comp.accountEntryDialogLinkedMovement).toBe(utilizeMovement);
+    });
+
+    it('still forwards phase, and no-ops the linked lookup for a plain shape with nothing to link (e.g. A1 ISSUE)', () => {
+      const { comp, api } = setup();
+      const m = makeMovement({ movementType: 'ISSUE' });
+
+      comp.onMakerOpenAccountEntries({ movement: m, instrumentType: 'IPLC_LC', phase: 'finalize' });
+
+      expect(comp.accountEntryDialogMovement).toBe(m);
+      expect(comp.accountEntryDialogPhase).toBe('finalize');
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
+      expect(api.getContract).not.toHaveBeenCalled();
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
     });
   });
 });

@@ -267,23 +267,53 @@ export function movementTypeMatchesFunction(fn: TransactionFunction, movementTyp
 export function resolveFunctionForMovement(instrumentType: InstrumentType, movementType: string): TransactionFunction | undefined {
   const direct = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].find((fn) => fn.instrumentType === instrumentType && movementTypeMatchesFunction(fn, movementType));
   if (direct) return direct;
-  // B4's Usance compound Submit creates EPLC_ACCEPTANCE/CREATE as a secondary leg, but B4's own
-  // registry entry is instrumentType EPLC_CONFIRMATION, so the direct match above can't find it
-  // (unlike A6, whose entry IS IPLC_ACCEPTANCE/CREATE). A real in-scope event, so it gets a fallback
-  // rather than staying blank.
+  // B4's own compound Submit creates a THIRD-instrumentType secondary leg beyond its own registry entry
+  // (instrumentType EPLC_CONFIRMATION), so the direct match above can't find any of them — same reasoning
+  // as EPLC_ACCEPTANCE/CREATE below (unlike A6, whose entry IS IPLC_ACCEPTANCE/CREATE) applies to the
+  // asset-side receivable leg every B4 shape also creates in the SAME businessEventId (reviewer-reported
+  // 2026-08-28, Maker Queue showing a bare "—" Function for this exact row): EPLC_ACCEPTANCE_REIMB_
+  // RECEIVABLE/CREATE for the Usance shape, EPLC_DUE_FROM_ISSUING_BANK/CREATE for the Sight shape. Real
+  // in-scope events, so they get a fallback rather than staying blank, same as the Acceptance leg.
   if (instrumentType === 'EPLC_ACCEPTANCE' && movementType === 'CREATE') {
     return EXPORT_FUNCTIONS.find((fn) => FUNCTION_STRATEGIES[fn.code]?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable'));
+  }
+  if (instrumentType === 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE' && movementType === 'CREATE') {
+    return EXPORT_FUNCTIONS.find((fn) => FUNCTION_STRATEGIES[fn.code]?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable'));
+  }
+  if (instrumentType === 'EPLC_DUE_FROM_ISSUING_BANK' && movementType === 'CREATE') {
+    return EXPORT_FUNCTIONS.find((fn) => FUNCTION_STRATEGIES[fn.code]?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable'));
   }
   return undefined;
 }
 
 /**
- * The one function that finalizes (Maker-Submits + Checker-Releases) an EXISTING movement instead of
- * creating a new one (A4 only). `resolveFunctionForMovement()` above always resolves this same pair to
- * A3 (the first registry match) — correct for the CREATE event, wrong for the later FINALIZE event
- * (A4's own Release). `InquireEventsService` uses this instead for that later event, so "View" shows
- * "A4 · Sight Settlement" rather than "A3 · Document Arrival" once actually Settled.
+ * The Function that finalizes an EXISTING A3/A3S UTILIZE instead of creating a new movement of its own —
+ * A4 for Sight (Maker-Submits + Checker-Releases the SAME movement directly,
+ * `releasesExistingMovementInPlace`), A6 for Usance (business-confirmed 2026-08-27, "A6 必須... 承接並
+ * 正式轉換 A3/A3S 的 EARMARKED exposure" — creates its OWN separate `IPLC_ACCEPTANCE/CREATE`, but its own
+ * Checker Release CASCADES into finalizing the referenced UTILIZE too, see `BalanceService.
+ * applyReleaseSideEffects()`'s own doc comment; `settlesDocumentArrival && !sourceAlreadyReleasedBeforePick`
+ * picks out exactly A6 from that flag's shared set — B4 also sets `settlesDocumentArrival` but its own
+ * referenced B3 record is ALREADY released before B4 ever picks it, so B4 needs no such cascade).
+ * `resolveFunctionForMovement()` above always resolves an IPLC_LC/UTILIZE to A3 (the first registry
+ * match) — correct for the CREATE event, wrong for the later FINALIZE event. `InquireEventsService` uses
+ * this instead for that later event, so "View" shows "A4 · Sight Settlement"/"A6 · Acceptance (Usance)"
+ * rather than "A3 · Document Arrival" once actually finalized.
  */
-export function payExistingUtilizeFunctionFor(instrumentType: InstrumentType): TransactionFunction | undefined {
-  return IMPORT_FUNCTIONS.find((fn) => fn.instrumentType === instrumentType && FUNCTION_STRATEGIES[fn.code]?.checkerRelease.releasesExistingMovementInPlace);
+export function payExistingUtilizeFunctionFor(instrumentType: InstrumentType, tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null): TransactionFunction | undefined {
+  if (instrumentType !== 'IPLC_LC' || !tenorType) return undefined;
+  if (tenorType === 'SIGHT') {
+    // A4 finalizes the referenced UTILIZE directly, in place — its OWN registry instrumentType is
+    // IPLC_LC too, so this can filter on it directly.
+    return IMPORT_FUNCTIONS.find((fn) => fn.instrumentType === instrumentType && FUNCTION_STRATEGIES[fn.code]?.checkerRelease.releasesExistingMovementInPlace);
+  }
+  // A6's OWN registry instrumentType is IPLC_ACCEPTANCE, not IPLC_LC (it creates a genuinely separate
+  // contract) — filtering on `fn.instrumentType === instrumentType` here would never match it, unlike
+  // A4's in-place case above. `settlesDocumentArrival && !sourceAlreadyReleasedBeforePick` alone already
+  // uniquely identifies A6 among every Import Function (B4 sets settlesDocumentArrival too, but only
+  // A6's own strategy omits sourceAlreadyReleasedBeforePick — and B4 lives in EXPORT_FUNCTIONS, never
+  // searched here, anyway).
+  return IMPORT_FUNCTIONS.find(
+    (fn) => FUNCTION_STRATEGIES[fn.code]?.checkerRelease.settlesDocumentArrival && !FUNCTION_STRATEGIES[fn.code]?.checkerRelease.sourceAlreadyReleasedBeforePick,
+  );
 }

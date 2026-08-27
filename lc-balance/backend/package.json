@@ -5,7 +5,7 @@
   "description": "Node.js 中台 orchestrator — sequences calls into the balance-component microservice per a declarative Business Case Registry (Import Case 1-5, Export Case 1-5) so the Angular UI can run/replay a whole scenario with one click.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --watch server.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint server.js data test",

@@ -3,7 +3,7 @@ import { Observable, forkJoin } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError } from './api-error';
-import { InquiredEvent, childMovementsOf$, functionForEvent, movementsOf$, secondaryReferenceForEvent, systemLabelForEvent } from './inquire-events.service';
+import { InquiredEvent, childMovementsOf$, functionForEvent, mergeAccountingEventRows, movementsOf$, primaryReferenceForEvent, secondaryReferenceForEvent, systemLabelForEvent } from './inquire-events.service';
 import { PagedListState } from './paged-list-state';
 
 /**
@@ -121,6 +121,11 @@ export class LookUpPanelService {
   /** Delegates to the same `secondaryReferenceForEvent()` free function `InquireEventsService.secondaryReferenceFor()` uses (user instruction 2026-08-21, "Lookup 除了 REFERENCE 還要有 SECONDARY REF"), so both screens resolve the Secondary Ref. column identically by construction. */
   secondaryReferenceFor(event: InquiredEvent): string {
     return secondaryReferenceForEvent(event);
+  }
+
+  /** Delegates to the same `primaryReferenceForEvent()` free function `InquireEventsService.primaryReferenceFor()` uses — the Reference column's own counterpart to `secondaryReferenceFor()` above. */
+  primaryReferenceFor(event: InquiredEvent): string {
+    return primaryReferenceForEvent(event);
   }
 
   /** LC Number is the one natural-key field every instrumentType always carries (Design doc §3.1), so it's always the primary label; suffixed with IB#/SG# only when drilled into that specific Acceptance/SG. */
@@ -309,19 +314,30 @@ export class LookUpPanelService {
       ...mergeChildTypes.map((childType) => childMovementsOf$(this.api, childType, contract.naturalKey.lcNumber)),
     ];
     forkJoin(sources).subscribe({
-      next: (groups) => setMovements(groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime())),
+      next: (groups) => setMovements(mergeAccountingEventRows(groups.flat()).sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime())),
       error: () => setMovements([]),
     });
   }
 
-  /** Shared body behind runLookup()'s two "fetch candidates under this LC, auto-pick if exactly one" catalog calls (Acceptance tab / SG tab). */
+  /**
+   * Shared body behind runLookup()'s two "fetch candidates under this LC, auto-pick if exactly one"
+   * catalog calls (Acceptance tab / SG tab).
+   *
+   * Business-confirmed 2026-08-27 ("Look Up Current Balance 各式 BALANCES 如果交易是 CANCELLED 不須顯示
+   * 出來") — `excludeCancelled: true`, same flag `InquireEventsService.loadIndex()` already uses. Only
+   * became reachable today: A6/A8/B3's own `markCancelled()` widening means a Delete-Pending'd child
+   * SG/Acceptance contract can now genuinely reach `CANCELLED` (previously only a root A1/B1 ever could)
+   * — without this, such a contract still showed up as its own selectable tab here, offering an all-zero
+   * balance (Confirmed/Available never summed a CANCELLED contract's own sole, cancelled movement) for a
+   * transaction that no longer exists in any business sense.
+   */
   private loadUnderLookupCandidates(
     instrumentType: InstrumentType,
     lcNumber: string,
     setCandidates: (items: BalanceContract[]) => void,
     autoSelect: (contractId: string) => void,
   ): void {
-    this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).subscribe({
+    this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber, undefined, undefined, true).subscribe({
       next: (result) => {
         setCandidates(result.items);
         if (result.items.length === 1) autoSelect(result.items[0].balanceContractId);

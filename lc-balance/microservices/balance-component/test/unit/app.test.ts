@@ -254,6 +254,10 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
 
   test('Checker approves BOTH with one compound Release action — SG redemption first, then the Document Arrival (component.ts release() ordering) — LC settles at 21,000, SG at 0', async () => {
     await request(app).post(`/balance-movements/${sgRedeemMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    // Widened 2026-08-27 (business-confirmed) — this LC's own UTILIZE is an explicit-tenor (SELLERS_USANCE)
+    // IPLC_LC/UTILIZE, so a direct /release now requires makerSubmittedAt first, same gate Sight/A4
+    // already had; this test isn't about that gate, just needs the movement genuinely RELEASED.
+    await request(app).post(`/balance-movements/${matchedUtilizeMovementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
     await request(app).post(`/balance-movements/${matchedUtilizeMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
@@ -1050,6 +1054,10 @@ describe('HTTP integration — Tenor Type Routing (business instruction 2026-08-
         createdBy: 'maker1',
       })
       .expect(201);
+    // Widened 2026-08-27 (business-confirmed) — a direct /release on an explicit-tenor IPLC_LC/UTILIZE
+    // now requires makerSubmittedAt first, same gate Sight/A4 already had; this test isn't about that
+    // gate, just needs the movement genuinely RELEASED before creating the Acceptances below.
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
     await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const sellersAcceptance = await request(app)
@@ -2929,6 +2937,10 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         createdBy: 'maker1',
       })
       .expect(201);
+    // Widened 2026-08-27 (business-confirmed, A6 finalizing a Usance UTILIZE) — a direct /release call on
+    // an explicit-tenor IPLC_LC/UTILIZE now requires makerSubmittedAt first, same gate Sight/A4 already
+    // had; this test only needs the movement genuinely RELEASED to exercise the actual assertion below.
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
     await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(409);
@@ -3127,6 +3139,128 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(res.body.message).toMatch(/acknowledgedBy is required/);
   });
 
+  // Business-confirmed 2026-08-27 ("做 A4 或 A6 DELETE PENDING 後 交易退回到 A4 或 A6 SUBMIT 前即可") — A4's
+  // own Delete Pending: see service.withdrawMakerSubmit()'s own doc comment.
+  describe('POST /balance-movements/:movementId/withdraw-maker-submit', () => {
+    async function issueSightLcAcknowledgedAndSubmitted(lcNumber: string) {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      return { lc, utilize };
+    }
+
+    test('from still-PENDING (A4 awaiting Checker): clears makerSubmittedAt, keeps status PENDING and acknowledgedAt intact', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-1');
+      const withdrawn = await request(app)
+        .post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`)
+        .send({ withdrawnBy: 'maker1' })
+        .expect(200);
+      expect(withdrawn.body.status).toBe('PENDING');
+      expect(withdrawn.body.makerSubmittedAt).toBeNull();
+      expect(withdrawn.body.makerSubmittedBy).toBeNull();
+      expect(withdrawn.body.acknowledgedAt).toBeTruthy();
+      expect(withdrawn.body.acknowledgedBy).toBe('checker1');
+    });
+
+    test('business-confirmed 2026-08-27 ("DELETE 後要記錄在 Inquire Delete Pending 內") — visible via GET /delete-pending-audit', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-AUDIT');
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(200);
+
+      const audit = await request(app).get('/delete-pending-audit').query({ lcNumber: 'LC-WD-AUDIT' }).expect(200);
+      const row = audit.body.items.find((r: { movementId: string }) => r.movementId === utilize.body.movementId);
+      expect(row).toMatchObject({ statusBefore: 'PENDING', cancelledBy: 'maker1', reasonCode: 'MAKER_EC' });
+    });
+
+    test('the SAME record becomes eligible for A4 picking again — status PENDING + acknowledgedAt set + makerSubmittedAt null is exactly the client-side eligibility filter (document-arrival-hints.service.ts)', async () => {
+      const { lc, utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-QP');
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(200);
+
+      const movements = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+      const eligible = (movements.body as { movementId: string; status: string; movementType: string; acknowledgedAt: string | null; makerSubmittedAt: string | null }[]).filter(
+        (m) => m.status === 'PENDING' && m.movementType === 'UTILIZE' && !!m.acknowledgedAt && !m.makerSubmittedAt,
+      );
+      expect(eligible.map((m) => m.movementId)).toContain(utilize.body.movementId);
+    });
+
+    test('"A4回A4" — after withdrawing from PENDING, the Maker can submitByMaker() (attempt A4) again', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-2');
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(200);
+      const resubmitted = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      expect(resubmitted.body.makerSubmittedAt).toBeTruthy();
+    });
+
+    test('unified logic — from REJECTED (A4\'s own Checker already rejected it): clears makerSubmittedAt AND reverts status back to PENDING', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-3');
+      const rejected = await request(app).post(`/balance-movements/${utilize.body.movementId}/reject`).send({ releasedBy: 'checker1', reasonCode: 'SETTLEMENT_DECLINED' }).expect(200);
+      expect(rejected.body.status).toBe('REJECTED');
+
+      const withdrawn = await request(app)
+        .post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`)
+        .send({ withdrawnBy: 'maker1' })
+        .expect(200);
+      expect(withdrawn.body.status).toBe('PENDING');
+      expect(withdrawn.body.makerSubmittedAt).toBeNull();
+      expect(withdrawn.body.acknowledgedAt).toBeTruthy();
+    });
+
+    test('"A4回A4" — after withdrawing from REJECTED, the Maker can submitByMaker() (attempt A4) again — was stuck forever before this ruling', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-4');
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/reject`).send({ releasedBy: 'checker1', reasonCode: 'SETTLEMENT_DECLINED' }).expect(200);
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(200);
+      const resubmitted = await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      expect(resubmitted.body.makerSubmittedAt).toBeTruthy();
+      const released = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      expect(released.body.status).toBe('RELEASED');
+    });
+
+    test('rejects a movement that was never Maker-Submitted -> 409, nothing to withdraw', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'LC-WD-5' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '100000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(409);
+      expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    });
+
+    test('rejects a RELEASED movement -> 409', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-6');
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(409);
+      expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    });
+
+    test('rejects a non-IPLC_LC/UTILIZE movement -> 400', async () => {
+      const cnf = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'LC-WD-7' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '50000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+        .expect(201);
+      const res = await request(app).post(`/balance-movements/${cnf.body.movementId}/withdraw-maker-submit`).send({ withdrawnBy: 'maker1' }).expect(400);
+      expect(res.body.message).toMatch(/withdrawMakerSubmit\(\) only applies to an IPLC_LC UTILIZE movement/);
+    });
+
+    test('without withdrawnBy -> 400', async () => {
+      const { utilize } = await issueSightLcAcknowledgedAndSubmitted('LC-WD-8');
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/withdraw-maker-submit`).send({}).expect(400);
+      expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+      expect(res.body.message).toMatch(/withdrawnBy is required/);
+    });
+  });
+
   // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found): A4's own Maker/Checker 4-eyes gate
   // used to be enforced ONLY by the reference Transaction Builder client, never here — any other caller
   // (curl, a future second UI) could release a Sight LC's own UTILIZE without ever calling
@@ -3169,7 +3303,11 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       expect(res.body.status).toBe('RELEASED');
     });
 
-    test('does NOT block a Usance LC UTILIZE — the gate is Sight-only, since Usance settles via A6 (referencedTransactionId), never /maker-submit', async () => {
+    // Widened 2026-08-27 (business-confirmed, "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure") —
+    // the gate now covers any explicit tenorType, not just Sight; A6's own createMovement() sets
+    // makerSubmittedAt on the referenced UTILIZE (applyCreateSideEffects()), so a Usance LC UTILIZE is
+    // now ALSO blocked until that has happened, same as Sight/A4.
+    test('DOES block a Usance LC UTILIZE that was never Maker-submitted -> 409, ILLEGAL_STATE_TRANSITION', async () => {
       const lc = await request(app)
         .post('/balance-movements')
         .send({
@@ -3190,8 +3328,50 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
         .expect(201);
 
+      const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(409);
+      expect(res.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    });
+
+    test('allows release of a Usance LC UTILIZE once A6 has been created against it (referencedTransactionId sets makerSubmittedAt via applyCreateSideEffects)', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: 'LC-BAL123-USANCE-OK' },
+          movementType: 'ISSUE', expiryDate: '2099-12-31',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          createdBy: 'maker1',
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const utilize = await request(app)
+        .post('/balance-movements')
+        .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
+        .expect(201);
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+      await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_ACCEPTANCE',
+          naturalKey: { lcNumber: 'LC-BAL123-USANCE-OK', ibNumber: 'IB-001' },
+          movementType: 'CREATE',
+          eventSeq: 3,
+          amount: '40000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          parentLogicalContractId: lc.body.logicalContractId,
+          referencedTransactionId: utilize.body.movementId,
+          createdBy: 'maker1',
+        })
+        .expect(201);
+
       const res = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
       expect(res.body.status).toBe('RELEASED');
+      expect(res.body.makerSubmittedAt).toBeTruthy();
     });
 
     test('does NOT block an IPLC_LC UTILIZE whose parent contract never declared an explicit tenorType (null) — backward compatible with the Business Case Runner\'s own older Import Case #1/#3/#4/#5', async () => {
@@ -3272,7 +3452,10 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       expect(utilizeRow.finalizeEventSnapshot.confirmedBalance).toBe('60000');
     });
 
-    test('a Usance LC UTILIZE (released via A6, not A4) still gets eventSnapshot overwritten normally — finalizeEventSnapshot stays null, this preservation is Sight-only', async () => {
+    // Widened 2026-08-27 (business-confirmed) — A6 finalizing a Usance UTILIZE now gets the EXACT SAME
+    // eventSnapshot-preservation treatment A4/Sight already had: A3's own Create-time view stays frozen,
+    // the release-time figures land in finalizeEventSnapshot. No longer Sight-only.
+    test('a Usance LC UTILIZE finalized via A6 (referencedTransactionId cascade) ALSO gets eventSnapshot preserved — finalizeEventSnapshot holds the release-time figures, same as Sight/A4', async () => {
       const lc = await request(app)
         .post('/balance-movements')
         .send({
@@ -3293,12 +3476,32 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         .send({ instrumentType: 'IPLC_LC', balanceContractId: lc.body.balanceContractId, movementType: 'UTILIZE', eventSeq: 2, amount: '40000', currency: 'USD', sourceTransactionRef: 'IB-001', createdBy: 'maker1' })
         .expect(201);
       const createTimeSnapshot = utilize.body.eventSnapshot;
+      expect(createTimeSnapshot.confirmedBalance).toBe('100000');
+      await request(app).post(`/balance-movements/${utilize.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+      const acceptance = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_ACCEPTANCE',
+          naturalKey: { lcNumber: 'LC-USANCE-SNAPSHOT', ibNumber: 'IB-001' },
+          movementType: 'CREATE',
+          eventSeq: 3,
+          amount: '40000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          parentLogicalContractId: lc.body.logicalContractId,
+          referencedTransactionId: utilize.body.movementId,
+          createdBy: 'maker1',
+        })
+        .expect(201);
 
-      const released = await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      await request(app).post(`/balance-movements/${acceptance.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
-      expect(released.body.eventSnapshot).not.toEqual(createTimeSnapshot);
-      expect(released.body.eventSnapshot.confirmedBalance).toBe('60000');
-      expect(released.body.finalizeEventSnapshot).toBeNull();
+      const movements = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/movements`).expect(200);
+      const utilizeRow = movements.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
+      expect(utilizeRow.status).toBe('RELEASED');
+      expect(utilizeRow.eventSnapshot).toEqual(createTimeSnapshot);
+      expect(utilizeRow.finalizeEventSnapshot).not.toBeNull();
+      expect(utilizeRow.finalizeEventSnapshot.confirmedBalance).toBe('60000');
     });
 
     // 2026-08-18, business instruction ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易
@@ -3930,6 +4133,106 @@ describe('HTTP integration — GET /delete-pending-audit/lc-catalog (Inquire Del
 
     const page2 = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-PAGE-', page: 2, pageSize: 2 }).expect(200);
     expect(page2.body.items.map((r: { naturalKey: { lcNumber: string } }) => r.naturalKey.lcNumber)).toEqual(['LCCAT-PAGE-C']);
+  });
+
+  /**
+   * Bug fixed 2026-08-28, business-reported live ("A8 SG Issue Submit 後 Delete Pending =>
+   * Inquire Delete Pending沒顯示"): a Delete Pending on a CHILD contract (SHGT/IPLC_ACCEPTANCE for
+   * Import, EPLC_EXAMINATION/EPLC_ACCEPTANCE for Export) was invisible from its own ROOT LC's catalog
+   * row, since the original query only matched a delete_pending_audit record whose OWN contract's
+   * instrumentType equalled the root being Browse-d. See listWithDeletePendingHistory()'s own doc
+   * comment for the fix.
+   */
+  describe('child-contract Delete Pending (A6/A8/A9/A3S-SG-leg for Import; B3/B4-own-Acceptance-leg/B5 for Export) surfaces under the ROOT LC', () => {
+    async function issueRootAndCancelChild(lcNumber: string, rootInstrumentType: 'IPLC_LC' | 'EPLC_CONFIRMATION', childInstrumentType: string, naturalKey: Record<string, unknown>, childMovementType: string = 'ISSUE', extraChildFields: Record<string, unknown> = {}, rootTenorType: string = 'SIGHT') {
+      const root = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: rootInstrumentType,
+          naturalKey: { lcNumber },
+          movementType: 'ISSUE',
+          expiryDate: '2099-12-31',
+          eventSeq: 1,
+          amount: '10000',
+          currency: 'USD',
+          tenorType: rootTenorType,
+          ...(rootTenorType !== 'SIGHT' ? { tenorDays: 90 } : {}),
+          createdBy: 'maker1',
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${root.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const child = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: childInstrumentType,
+          naturalKey: { lcNumber, ...naturalKey },
+          parentLogicalContractId: root.body.eventSnapshot.logicalContractId,
+          movementType: childMovementType,
+          eventSeq: 1,
+          amount: '1000',
+          currency: 'USD',
+          createdBy: 'maker1',
+          ...extraChildFields,
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${child.body.movementId}/cancel`).send({ cancelledBy: 'maker1', reasonCode: 'MAKER_EC' }).expect(200);
+      return { root: root.body, child: child.body };
+    }
+
+    test('A8 (SHGT) Delete Pending surfaces under the IPLC_LC catalog — the exact reported repro', async () => {
+      await issueRootAndCancelChild('LCCAT-CHILD-SHGT', 'IPLC_LC', 'SHGT', { sgNumber: 'G01' });
+
+      const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-CHILD-SHGT' }).expect(200);
+
+      expect(res.body.total).toBe(1);
+      expect(res.body.items[0].naturalKey.lcNumber).toBe('LCCAT-CHILD-SHGT');
+      expect(res.body.items[0].instrumentType).toBe('IPLC_LC'); // representative row is the ROOT contract, not the child.
+    });
+
+    test('B3 (EPLC_EXAMINATION) Delete Pending surfaces under the EPLC_CONFIRMATION catalog', async () => {
+      await issueRootAndCancelChild('LCCAT-CHILD-EXAM', 'EPLC_CONFIRMATION', 'EPLC_EXAMINATION', { ibNumber: 'E01' }, 'CREATE');
+
+      const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'EPLC_CONFIRMATION', q: 'LCCAT-CHILD-EXAM' }).expect(200);
+
+      expect(res.body.total).toBe(1);
+      expect(res.body.items[0].naturalKey.lcNumber).toBe('LCCAT-CHILD-EXAM');
+    });
+
+    test('A6 (IPLC_ACCEPTANCE) Delete Pending surfaces under the IPLC_LC catalog', async () => {
+      await issueRootAndCancelChild('LCCAT-CHILD-ACC', 'IPLC_LC', 'IPLC_ACCEPTANCE', { ibNumber: 'B01' }, 'CREATE', { tenorType: 'SELLERS_USANCE', tenorDays: 90 }, 'SELLERS_USANCE');
+
+      const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-CHILD-ACC' }).expect(200);
+
+      expect(res.body.total).toBe(1);
+      expect(res.body.items[0].naturalKey.lcNumber).toBe('LCCAT-CHILD-ACC');
+    });
+
+    test('B4/B5 (EPLC_ACCEPTANCE) Delete Pending surfaces under the EPLC_CONFIRMATION catalog', async () => {
+      await issueRootAndCancelChild('LCCAT-CHILD-EACC', 'EPLC_CONFIRMATION', 'EPLC_ACCEPTANCE', { ibNumber: 'B01' }, 'CREATE', { tenorType: 'SELLERS_USANCE' }, 'SELLERS_USANCE');
+
+      const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'EPLC_CONFIRMATION', q: 'LCCAT-CHILD-EACC' }).expect(200);
+
+      expect(res.body.total).toBe(1);
+      expect(res.body.items[0].naturalKey.lcNumber).toBe('LCCAT-CHILD-EACC');
+    });
+
+    test('a child Delete Pending under one root incarnation does NOT leak into an UNRELATED contract that merely shares the same LC Number on a different root instrumentType', async () => {
+      // Same LC Number string, deliberately reused across Import and Export — the fix must scope by the
+      // real parent_logical_contract_id relationship, not a bare lc_number string match.
+      await issueRootAndCancelChild('LCCAT-CHILD-CROSS', 'IPLC_LC', 'SHGT', { sgNumber: 'G01' });
+
+      const exportRes = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'EPLC_CONFIRMATION', q: 'LCCAT-CHILD-CROSS' }).expect(200);
+
+      expect(exportRes.body.total).toBe(0);
+    });
+
+    test('the representative row is the MOST RECENT root incarnation even when only a CHILD contract was ever Delete-Pending\'d (never the root itself)', async () => {
+      const { root } = await issueRootAndCancelChild('LCCAT-CHILD-RECENT', 'IPLC_LC', 'SHGT', { sgNumber: 'G01' });
+
+      const res = await request(app).get('/delete-pending-audit/lc-catalog').query({ instrumentType: 'IPLC_LC', q: 'LCCAT-CHILD-RECENT' }).expect(200);
+
+      expect(res.body.items[0].balanceContractId).toBe(root.balanceContractId);
+    });
   });
 });
 

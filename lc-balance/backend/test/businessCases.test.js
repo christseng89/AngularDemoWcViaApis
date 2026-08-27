@@ -37,7 +37,7 @@ const EXPECTED_IDS = [
   'export-case-14',
 ];
 
-const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'snapshot'];
+const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'acknowledge', 'snapshot'];
 
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();

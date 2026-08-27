@@ -1,6 +1,8 @@
 import { Component, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Observable, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { FormlyModule } from '@ngx-formly/core';
 import { IndexPickerComponent } from './index-picker.component';
 import { TbIconComponent } from '../tb-icon.component';
@@ -106,6 +108,8 @@ export class TransactionBuilderComponent {
   accountEntryDialogMovement: BalanceMovement | null = null;
   accountEntryDialogInstrumentType: InstrumentType | null = null;
   accountEntryDialogPhase: 'primary' | 'create' | 'finalize' | null = null;
+  /** See `InquiredEvent.linkedMovement`'s own doc comment — A6's own cascade-linked second Account Entries set, only ever non-null via `onInquireOpenAccountEntries()`. */
+  accountEntryDialogLinkedMovement: BalanceMovement | null = null;
 
   /** Constructor params default-construct their own service so `new TransactionBuilderComponent(mockApi)` still works in tests; `lookUp`/`inquireEvents` are also registered in `providers` above (not `providedIn: 'root'`). */
   constructor(
@@ -122,6 +126,7 @@ export class TransactionBuilderComponent {
     this.accountEntryDialogMovement = null;
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
+    this.accountEntryDialogLinkedMovement = null;
     if (mode === 'INQUIRE') {
       this.inquireEvents.loadIndex();
     }
@@ -152,6 +157,7 @@ export class TransactionBuilderComponent {
     this.accountEntryDialogMovement = null;
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
+    this.accountEntryDialogLinkedMovement = null;
     this.makerContext = {
       submitResult: null,
       selectedPayMovement: null,
@@ -196,14 +202,27 @@ export class TransactionBuilderComponent {
     }
   }
 
-  /** Maker Result panel's "Account Entries" buttons, emitted from `MakerPanelComponent`. */
-  onMakerOpenAccountEntries(e: { movement: BalanceMovement; instrumentType: InstrumentType | null }): void {
-    this.openAccountEntryDialog(e.movement, e.instrumentType);
+  /**
+   * Maker Result panel's "Account Entries" buttons, emitted from `MakerPanelComponent`.
+   *
+   * Business-confirmed 2026-08-27 ("Transaction Status 與 Account Entries Status 必須保持一致") — was
+   * dropping `e.phase`, so the View Voucher dialog opened from A4's own MAKER RESULT panel kept showing
+   * "EARMARKED" for an in-progress A4 record even after the Status line right above the button had
+   * already been fixed — see `MakerPanelComponent.resultPhase`'s own doc comment. Now forwards it the
+   * same way `onInquireOpenAccountEntries()` below already does.
+   *
+   * Business-reported gap 2026-08-28 ("A6 Maker Account Entries 只顯示一套") — same root cause and same
+   * fix as the Checker's own pre-Release button (`openCheckerAccountEntryDialog()`'s own doc comment):
+   * `e.movement` is the raw `createMovement()` response, never a merged `InquiredEvent`. Delegates to the
+   * same shared `openAccountEntryDialogWithLinkedResolution()`.
+   */
+  onMakerOpenAccountEntries(e: { movement: BalanceMovement; instrumentType: InstrumentType | null; phase?: 'primary' | 'create' | 'finalize' | null }): void {
+    this.openAccountEntryDialogWithLinkedResolution(e.movement, e.instrumentType, e.phase ?? undefined);
   }
 
-  /** Inquire Events' own "Original Transaction Screen" Account Entries button, emitted from `InquireEventsComponent` — same convention as `onMakerOpenAccountEntries()` above. */
+  /** Inquire Events' own "Original Transaction Screen" Account Entries button, emitted from `InquireEventsComponent` — same convention as `onMakerOpenAccountEntries()` above. Forwards `e.linkedMovement` (A6's own cascade-linked second Account Entries set — see `InquiredEvent.linkedMovement`'s own doc comment) so the dialog can show both sets for one merged row. */
   onInquireOpenAccountEntries(e: InquireOpenAccountEntriesEvent): void {
-    this.openAccountEntryDialog(e.movement, e.instrumentType, e.phase);
+    this.openAccountEntryDialog(e.movement, e.instrumentType, e.phase, e.linkedMovement ?? null);
   }
 
   private describeApiError(err: any): string {
@@ -262,16 +281,110 @@ export class TransactionBuilderComponent {
     return displayMovementAmountShared(instrumentType, movementType, amount);
   }
 
-  openAccountEntryDialog(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined, phase?: 'primary' | 'create' | 'finalize'): void {
+  openAccountEntryDialog(
+    movement: BalanceMovement,
+    instrumentType: InstrumentType | null | undefined,
+    phase?: 'primary' | 'create' | 'finalize',
+    linkedMovement?: BalanceMovement | null,
+  ): void {
     this.accountEntryDialogMovement = movement;
     this.accountEntryDialogInstrumentType = instrumentType ?? null;
     this.accountEntryDialogPhase = phase ?? null;
+    this.accountEntryDialogLinkedMovement = linkedMovement ?? null;
+  }
+
+  /**
+   * A6/B4 Accounting Event Ownership Rule (business-reported gap 2026-08-28, "只看到一組 Account Entries
+   * for Acceptance. Where is the Account Entries (Pending) for reverse LC Balance?") — the Checker's own
+   * pre-Release "Account Entries" button has only the raw `selectedCheckerMovement`, never a merged
+   * `InquiredEvent` (no event list is loaded on this screen), so it could never carry a `linkedMovement`
+   * the way Inquire Events/Look Up's own merged rows do. Delegates to `openAccountEntryDialogWithLinkedResolution()`
+   * — see that method's own doc comment.
+   */
+  openCheckerAccountEntryDialog(): void {
+    const movement = this.selectedCheckerMovement;
+    if (!movement) return;
+    this.openAccountEntryDialogWithLinkedResolution(movement, this.selectedFunction?.instrumentType);
+  }
+
+  /**
+   * Opens the dialog immediately with what's already known (unchanged UX — no wait for a single-set
+   * view), then resolves the same `linkedMovement` a merged Inquire Events/Look Up row would already
+   * carry and fills it in once it arrives. Guarded against a stale response landing after the caller has
+   * already moved on to a different movement/closed the dialog. Shared by both `openCheckerAccountEntryDialog()`
+   * above and `onMakerOpenAccountEntries()` below — the SAME gap (only the raw movement, no merged event
+   * list) exists on both the Maker Result panel's and the Checker's own pre-Release screen (business-
+   * reported both 2026-08-28: the Checker case, then the Maker Result panel case immediately after — "A6
+   * Maker Account Entries 只顯示一套").
+   */
+  private openAccountEntryDialogWithLinkedResolution(
+    movement: BalanceMovement,
+    instrumentType: InstrumentType | null | undefined,
+    phase?: 'primary' | 'create' | 'finalize',
+  ): void {
+    this.openAccountEntryDialog(movement, instrumentType, phase);
+    this.resolveLinkedAccountingMovement(movement, instrumentType).subscribe((linked) => {
+      if (!linked || this.accountEntryDialogMovement?.movementId !== movement.movementId) return;
+      this.accountEntryDialogLinkedMovement = linked;
+    });
+  }
+
+  /**
+   * Mirrors `mergeAccountingEventRows()`'s own shapes (inquire-events.service.ts) plus one it deliberately
+   * does NOT cover, resolved on demand since neither the Checker's own screen nor the Maker Result panel
+   * ever has a merged event list to read a `linkedMovement` off of:
+   * - **A6** (`IPLC_ACCEPTANCE`, `referencedTransactionId`): the referenced UTILIZE lives on the PARENT
+   *   LC's own contract, resolved by natural key (`getContract()` for the Acceptance's own lcNumber, then
+   *   `resolveContract('IPLC_LC', ...)`, then `listMovements()` to find the exact referenced record) — no
+   *   "get movement by id" endpoint exists, so this is the only path.
+   * - **B4** (`EPLC_CONFIRMATION/ACCEPT` only — HONOUR's own second leg is an ON_BALANCE_ASSET instrument
+   *   with no contingentAccountEntry to link, same scoping `mergeAccountingEventRows()` already uses) and
+   *   **A3S** (`IPLC_LC/UTILIZE` with its own `businessEventId` set — plain A3/A4/A6-referenced UTILIZEs
+   *   never carry one, only A3S's own compound Submit does — and, viewed from the OTHER side, `SHGT/
+   *   FULL_REDEEM|PARTIAL_REDEEM`): all three share their own linked leg's `businessEventId`, resolved via
+   *   the existing `findByBusinessEventId()` (already used by `CheckerActionsService`'s own cross-session
+   *   release fix). A3S is deliberately NOT folded into one ROW by `mergeAccountingEventRows()` (its own
+   *   two legs are genuinely different real events, see that function's own doc comment) — this is a
+   *   narrower fix: a single Checker Release click genuinely approves BOTH legs at once for A3S too
+   *   (`CheckerActionsService.release()`'s own `documentArrivalWithSg` branch), so the same "見到帳再決定"
+   *   (F1 §14.4) principle applies to reviewing it beforehand, independent of the row-merge question.
+   *
+   * Works identically for A6 right after Submit (the Maker Result panel case, `businessEventId` unset —
+   * A6's own cascade always uses `referencedTransactionId`) and for B4/A3S right after Submit (their own
+   * `businessEventId` is already set by `MakerSubmitService`'s own compound-submit code at that point, so
+   * the SAME businessEventId branch below resolves it there too, no Maker-vs-Checker distinction needed).
+   *
+   * Resolves `null`, not an error, on any failure — the dialog simply stays single-set, no worse than
+   * before this fix.
+   */
+  private resolveLinkedAccountingMovement(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined): Observable<BalanceMovement | null> {
+    if (instrumentType === 'IPLC_ACCEPTANCE' && movement.referencedTransactionId) {
+      const referencedId = movement.referencedTransactionId;
+      return this.api.getContract(movement.balanceContractId).pipe(
+        switchMap((acceptanceContract) => this.api.resolveContract('IPLC_LC', { lcNumber: acceptanceContract.naturalKey.lcNumber })),
+        switchMap((lcContract) => this.api.listMovements(lcContract.balanceContractId)),
+        map((movements) => movements.find((m) => m.movementId === referencedId && m.status !== 'CANCELLED') ?? null),
+        catchError(() => of(null)),
+      );
+    }
+    const businessEventIdEligible =
+      (instrumentType === 'EPLC_CONFIRMATION' && movement.movementType === 'ACCEPT') ||
+      (instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE') ||
+      (instrumentType === 'SHGT' && (movement.movementType === 'FULL_REDEEM' || movement.movementType === 'PARTIAL_REDEEM'));
+    if (businessEventIdEligible && movement.businessEventId) {
+      return this.api.findByBusinessEventId(movement.businessEventId).pipe(
+        map((linked) => linked.find((m) => m.movementId !== movement.movementId && m.status !== 'CANCELLED' && m.contingentAccountEntry) ?? null),
+        catchError(() => of(null)),
+      );
+    }
+    return of(null);
   }
 
   closeAccountEntryDialog(): void {
     this.accountEntryDialogMovement = null;
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
+    this.accountEntryDialogLinkedMovement = null;
   }
 
   @HostListener('document:keydown.escape')
@@ -325,7 +438,7 @@ export class TransactionBuilderComponent {
     if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && this.isCheckerCompoundOwnSubmission) {
       return 'Release (Shipping Guarantee redemption)';
     }
-    if (this.isArrivalAcknowledgmentStep) return 'Approve (acknowledgment only)';
+    if (this.isArrivalAcknowledgmentStep) return 'Approve';
     return 'Release';
   }
 
@@ -501,6 +614,20 @@ export class TransactionBuilderComponent {
       return;
     this.actionBusy = true;
     this.checkerActions.deleteMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => {
+      this.actionBusy = false;
+      this.forwardOutcomeToMaker(outcome);
+    });
+  }
+
+  /** A4's own Delete Pending (see checkerActions.withdrawMakerPending()'s own doc comment) — same guard shape as deleteMakerPending() above. */
+  withdrawMakerPending(): void {
+    if (
+      !this.makerContext.submitResult?.movementId ||
+      (this.makerContext.submitResult.status !== 'PENDING' && this.makerContext.submitResult.status !== 'REJECTED')
+    )
+      return;
+    this.actionBusy = true;
+    this.checkerActions.withdrawMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => {
       this.actionBusy = false;
       this.forwardOutcomeToMaker(outcome);
     });

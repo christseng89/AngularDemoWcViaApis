@@ -213,7 +213,7 @@
                       <span class="tb-type-tag">{{ displayMovementType(e.contract.instrumentType, e.movement.movementType, e.movement.amount) }}</span>
                     </td>
                     <td class="tb-table__amount">{{ displayMovementAmount(e.contract.instrumentType, e.movement.movementType, e.movement.amount) }}</td>
-                    <td class="tb-table__ref">{{ e.movement.sourceTransactionRef || '—' }}</td>
+                    <td class="tb-table__ref">{{ inquireEvents.primaryReferenceFor(e) }}</td>
                     <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
                     <td>
                       <span
@@ -277,7 +277,7 @@
                   type="button"
                   class="tb-btn tb-btn--tiny"
                   *ngIf="sel.movement.contingentAccountEntry"
-                  (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase)"
+                  (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase, sel.linkedMovement)"
                 >
                   Account Entries
                 </button>

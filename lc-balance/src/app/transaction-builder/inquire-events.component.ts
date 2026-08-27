@@ -23,6 +23,8 @@ export interface InquireOpenAccountEntriesEvent {
   movement: BalanceMovement;
   instrumentType: InstrumentType | null | undefined;
   phase?: 'primary' | 'create' | 'finalize';
+  /** See `InquiredEvent.linkedMovement`'s own doc comment (inquire-events.service.ts) — A6's own cascade-linked second Account Entries set, carried through untouched. */
+  linkedMovement?: BalanceMovement | null;
 }
 
 /**
@@ -60,8 +62,13 @@ export class InquireEventsComponent {
   readonly displayMovementType = displayMovementTypeShared;
   readonly displayMovementAmount = displayMovementAmountShared;
 
-  openAccountEntryDialog(movement: BalanceMovement, instrumentType: InstrumentType | null | undefined, phase?: 'primary' | 'create' | 'finalize'): void {
-    this.openAccountEntries.emit({ movement, instrumentType, phase });
+  openAccountEntryDialog(
+    movement: BalanceMovement,
+    instrumentType: InstrumentType | null | undefined,
+    phase?: 'primary' | 'create' | 'finalize',
+    linkedMovement?: BalanceMovement | null,
+  ): void {
+    this.openAccountEntries.emit({ movement, instrumentType, phase, linkedMovement });
   }
 
   /** User-reported 2026-08-26 — the "IB Number" row label was hardcoded regardless of side; B3/B4's own live Maker Submit screen already calls this same value "EB Number" on the Export side (ibNumberLabel(), function-policy.ts). */

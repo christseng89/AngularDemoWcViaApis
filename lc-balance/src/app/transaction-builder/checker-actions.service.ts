@@ -80,7 +80,8 @@ export class CheckerActionsService {
 
     // A3S only: one Release click releases the SG's own redemption for real, THEN persists the Checker's
     // own acknowledgment on the LC's own UTILIZE (restored 2026-08-20, "A3 A3S 交易 Approve 過後 不要再顯示")
-    // — the Document Arrival itself stays PENDING (acknowledgment only) for A4/A6 to finalize later.
+    // — the Document Arrival itself stays PENDING, acknowledged but not genuinely released, for A4/A6 to
+    // finalize later.
     // arrivalSgRedeemMovementId is only populated in the same session that Submitted A3S, so a
     // cross-session Checker resolves it via businessEventId instead — see resolveLinkedMovementId.
     if (ctx.selectedFunction && deriveFunctionStrategy(ctx.selectedFunction).compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
@@ -153,6 +154,22 @@ export class CheckerActionsService {
     // release()'s A3S/B5 branches; falls back to submitResult for A6/B4's settlesDocumentArrival path.
     const movementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.reject(movementId!, 'checker1', 'MANUAL_TEST_REJECT').pipe(
+      switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
+      catchError((err) => this.fail(describeApiError(err))),
+    );
+  }
+
+  /**
+   * A4's own Delete Pending (business-confirmed 2026-08-27, "做 A4 或 A6 DELETE PENDING 後 交易退回到 A4
+   * 或 A6 SUBMIT 前即可") — A4 has no movement of its own (BAL-122: `releasesExistingMovementInPlace`),
+   * so `deleteMakerPending()` below (which cancels `ctx.submitResult`'s own movement) would destroy the
+   * upstream A3/A3S Document Arrival instead of just undoing A4's own Submit attempt. Routes to
+   * `withdrawMakerSubmit()` instead — see that API method's own doc comment for what it does server-side.
+   */
+  withdrawMakerPending(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
+    if (!ctx.createdBy) return this.fail('Cannot withdraw this Maker Submit — no Maker (createdBy) is known for it.');
+    if (!ctx.submitResult) return this.fail('Cannot withdraw this Maker Submit — no A4 submission is known for it.');
+    return this.api.withdrawMakerSubmit(ctx.submitResult.movementId, ctx.createdBy).pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
       catchError((err) => this.fail(describeApiError(err))),
     );

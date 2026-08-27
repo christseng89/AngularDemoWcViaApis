@@ -3911,6 +3911,61 @@ describe('MakerPanelComponent', () => {
       expect(c.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE')).toBe('EARMARKING');
       expect(c.displayStatus('PENDING', 'EPLC_EXAMINATION', 'CREATE')).toBe('EARMARKING');
     });
+
+    // Business-confirmed 2026-08-27 ("Transaction Status 與 Account Entries Status 必須保持一致") — once
+    // A4's own Maker Submit sets makerSubmittedAt, the MAKER RESULT panel must switch off A3/A3S's own
+    // EARMARKED vocabulary to A4's plain PENDING, same as Maker Queue/the Checker panel/Look Up Current
+    // Balance already do.
+    it('displayStatus switches to plain PENDING once A4 is selected and makerSubmittedAt is set (finalize phase)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedFunction = A4;
+      c.submitResult = { makerSubmittedAt: '2026-08-27T01:00:00.000Z' } as any;
+      expect(c.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE', '2026-08-27T00:00:00.000Z')).toBe('PENDING');
+    });
+
+    it('displayStatus still shows EARMARKED for the SAME acknowledged record before A4 Maker Submit (makerSubmittedAt not yet set)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedFunction = A4;
+      c.submitResult = { makerSubmittedAt: null } as any;
+      expect(c.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE', '2026-08-27T00:00:00.000Z')).toBe('EARMARKED');
+    });
+
+    it('displayStatus never applies the finalize override for a Function other than A4, even with makerSubmittedAt set', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedFunction = findFn(IMPORT_FUNCTIONS, 'A3');
+      c.submitResult = { makerSubmittedAt: '2026-08-27T01:00:00.000Z' } as any;
+      expect(c.displayStatus('PENDING', 'IPLC_LC', 'UTILIZE', '2026-08-27T00:00:00.000Z')).toBe('EARMARKED');
+    });
+  });
+
+  describe('resultPhase / openAccountEntries phase-threading (business-confirmed 2026-08-27, "Transaction Status 與 Account Entries Status 必須保持一致")', () => {
+    it('resultPhase is "finalize" once A4 is selected and submitResult.makerSubmittedAt is set', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedFunction = A4;
+      c.submitResult = { makerSubmittedAt: '2026-08-27T01:00:00.000Z' } as any;
+      expect(c.resultPhase).toBe('finalize');
+    });
+
+    it('resultPhase is null before A4 Maker Submit, and null for any other Function', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedFunction = A4;
+      c.submitResult = { makerSubmittedAt: null } as any;
+      expect(c.resultPhase).toBeNull();
+
+      c.selectedFunction = findFn(IMPORT_FUNCTIONS, 'A3');
+      c.submitResult = { makerSubmittedAt: '2026-08-27T01:00:00.000Z' } as any;
+      expect(c.resultPhase).toBeNull();
+    });
+
+    it('the "Account Entries" button forwards resultPhase, so the View Voucher dialog can never disagree with the Status line above it', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      c.selectedFunction = A4;
+      c.submitResult = { makerSubmittedAt: '2026-08-27T01:00:00.000Z', contingentAccountEntry: {} } as any;
+      const emitted: any[] = [];
+      c.openAccountEntries.subscribe((e: any) => emitted.push(e));
+      c.openAccountEntries.emit({ movement: c.submitResult!, instrumentType: 'IPLC_LC', phase: c.resultPhase });
+      expect(emitted[0].phase).toBe('finalize');
+    });
   });
 
   describe('arrivalSgRedeem* getters (A3S)', () => {

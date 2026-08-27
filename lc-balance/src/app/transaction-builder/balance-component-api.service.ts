@@ -235,6 +235,11 @@ export class BalanceComponentApiService {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/maker-submit`, { makerSubmittedBy });
   }
 
+  /** Business-confirmed 2026-08-27 ("做 A4 或 A6 DELETE PENDING 後 交易退回到 A4 或 A6 SUBMIT 前即可") — the inverse of submitByMaker() above; A4's own Delete Pending, undoing just the Maker Submit without cancelling the underlying A3/A3S UTILIZE or its Checker acknowledgment. */
+  withdrawMakerSubmit(movementId: string, withdrawnBy: string): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/withdraw-maker-submit`, { withdrawnBy });
+  }
+
   /**
    * @param includeAnyStatus opt-in (default false) — A10/B6 Close means a natural key can resolve to a
    *   CLOSED contract; every transaction-creating caller of this method must keep failing on one (the

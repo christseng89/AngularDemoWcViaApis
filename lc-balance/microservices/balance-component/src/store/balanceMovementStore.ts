@@ -258,6 +258,30 @@ export class BalanceMovementStore {
    * genuine server-side pagination (unlike listByContract() below, which is a single-contract, fully-
    * loaded list) — ordered by created_at DESC (most recent first — this is a worklist, not an audit
    * timeline, so a Maker wants their newest items first, the opposite of listByContract()'s ASC).
+   *
+   * Business-confirmed 2026-08-27 ("EARMARKED 等同 APPROVED 不要出現在 MAKER QUEUE 上") — a still-PENDING
+   * A3/A3S UTILIZE that has already been Checker-acknowledged (`acknowledged_at` set) but not yet
+   * Maker-Submitted into A4 (`maker_submitted_at` still null) displays as EARMARKED — the unified
+   * Earmarking model's own business-equivalent of APPROVED (see `balance-component.model.ts`'s
+   * `isEarmarkFunction()`), not a Maker-actionable PENDING item. Excluded here at the SQL/COUNT level
+   * (not a client-side post-filter) so `total`/pagination stay consistent with what's actually returned.
+   *
+   * Business-confirmed 2026-08-27 ("A6 · Acceptance (Usance) ... 應該是一個 U01 B01" — a duplicate row) —
+   * a SECOND exclusion, for A6's own referenced A3/A3S UTILIZE specifically: once A6 sets
+   * `maker_submitted_at` on it (`BalanceService.applyCreateSideEffects()`), the row above no longer
+   * excludes it (it's genuinely PENDING+Maker-Submitted now) — but A6's own separate `IPLC_ACCEPTANCE/
+   * CREATE` movement ALSO now appears in this same Maker's queue, both resolving to "A6" (one via
+   * `referencedTransactionId`, one directly) — the exact same business event shown twice. Excludes any
+   * movement that is itself the TARGET of another non-CANCELLED movement's own `referenced_transaction_id`
+   * — the referencing movement (A6's own CREATE, or B4's own HONOUR/ACCEPT, or B5's own SETTLE) is what
+   * the Maker now acts on; the referenced source (A3/A3S's UTILIZE, or B3's own CREATE) is superseded by
+   * it in this worklist specifically. Safe for B3/B4/B5 too even though they never reach this dual-PENDING
+   * shape in practice (B3 always releases before B4/B5 ever exist, so B3 itself is never PENDING/REJECTED
+   * by the time a referencing movement exists) — this is the general, always-correct invariant, not an
+   * A6-specific patch.
+   *
+   * This is the ONLY caller of this method (dedicated to the Maker Queue), so both exclusions are
+   * unconditional rather than an opt-in flag.
    */
   listByCreatedByAndStatus(params: { createdBy: string; statuses: MovementStatus[]; page: number; pageSize: number }): {
     items: BalanceMovement[];
@@ -265,14 +289,17 @@ export class BalanceMovementStore {
   } {
     const { createdBy, statuses, page, pageSize } = params;
     const placeholders = statuses.map(() => '?').join(', ');
+    const notYetActionableEarmark = `(status = 'PENDING' AND acknowledged_at IS NOT NULL AND maker_submitted_at IS NULL)`;
+    const supersededByAReferencingMovement = `EXISTS (SELECT 1 FROM balance_movements ref WHERE ref.referenced_transaction_id = balance_movements.movement_id AND ref.status != 'CANCELLED')`;
+    const exclusion = `AND NOT ${notYetActionableEarmark} AND NOT ${supersededByAReferencingMovement}`;
     const total = (
-      this.db.prepare(`SELECT COUNT(*) AS n FROM balance_movements WHERE created_by = ? AND status IN (${placeholders})`).get(createdBy, ...statuses) as {
+      this.db.prepare(`SELECT COUNT(*) AS n FROM balance_movements WHERE created_by = ? AND status IN (${placeholders}) ${exclusion}`).get(createdBy, ...statuses) as {
         n: number;
       }
     ).n;
     const offset = (page - 1) * pageSize;
     const rows = this.db
-      .prepare(`SELECT * FROM balance_movements WHERE created_by = ? AND status IN (${placeholders}) ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .prepare(`SELECT * FROM balance_movements WHERE created_by = ? AND status IN (${placeholders}) ${exclusion} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
       .all(createdBy, ...statuses, pageSize, offset) as unknown as MovementRow[];
     return { items: rows.map(rowToMovement), total };
   }
@@ -406,6 +433,19 @@ export class BalanceMovementStore {
   updateStatus(params: {
     movementId: string;
     status: MovementStatus;
+    /**
+     * Bug fix (BA code-review finding ahead of Balance-Component-DeletePending-TestPlan-zh.md §8 step 3,
+     * defect registered under that document's own §0.3 Test Governance Rule) — COALESCE(@releasedBy,
+     * released_by) / COALESCE(@releasedAt, released_at), same "don't touch unless the caller actually
+     * passes it" posture as reasonCode below. `reject()` writes its own Checker-rejection audit pair into
+     * these SAME two columns (there is no separate `rejected_by`/`rejected_at` pair — see reject()'s own
+     * call site); `cancel()` never supplies either (Delete Pending has its own dedicated
+     * cancelled_by/cancelled_at pair below), so a plain overwrite here silently erased the REJECTED audit
+     * trail's own actor/timestamp on every REJECTED -> Delete Pending -> CANCELLED transition (§0.2 P0:
+     * the three-point Acknowledge -> Reject -> Delete audit trail must all remain independently
+     * queryable — this call was the one already-shipped gap in reaching that). `release()` still writes
+     * its own real, non-null values here as before, unaffected by the change.
+     */
     releasedBy?: string | null;
     releasedAt?: string | null;
     /**
@@ -476,7 +516,8 @@ export class BalanceMovementStore {
     this.db
       .prepare(
         `UPDATE balance_movements
-         SET status = @status, released_by = @releasedBy, released_at = @releasedAt,
+         SET status = @status,
+             released_by = COALESCE(@releasedBy, released_by), released_at = COALESCE(@releasedAt, released_at),
              reason_code = COALESCE(@reasonCode, reason_code), remarks = @remarks,
              balance_before = @balanceBefore, balance_after = @balanceAfter,
              event_snapshot = COALESCE(@eventSnapshot, event_snapshot),
@@ -537,6 +578,20 @@ export class BalanceMovementStore {
     this.db
       .prepare('UPDATE balance_movements SET maker_submitted_by = @makerSubmittedBy, maker_submitted_at = @makerSubmittedAt WHERE movement_id = @movementId')
       .run(params);
+  }
+
+  /**
+   * Business-confirmed 2026-08-27 — the inverse of submitByMaker() above, A4's own Delete Pending. Nulls
+   * both columns back to their pre-Submit state; never touches acknowledged_at. `revertToPending` (true
+   * when the caller found this movement REJECTED) additionally flips status back to PENDING — "revert to
+   * before A4 Submit" must hold whether A4's own Checker rejected it or never decided — so a rejected A4
+   * attempt isn't stuck forever (submitByMaker() only ever accepts a PENDING movement); released_by/
+   * released_at (reject()'s own columns) are deliberately left as-is, same permanent-historical-fact
+   * posture as acknowledged_at.
+   */
+  withdrawMakerSubmit(movementId: string, revertToPending: boolean): void {
+    const statusClause = revertToPending ? `, status = 'PENDING'` : '';
+    this.db.prepare(`UPDATE balance_movements SET maker_submitted_by = NULL, maker_submitted_at = NULL${statusClause} WHERE movement_id = @movementId`).run({ movementId });
   }
 
   /**

@@ -131,6 +131,37 @@ describe('CheckerPanelComponent', () => {
     });
   });
 
+  // Business-reported gap 2026-08-27: this row-sub label was a hardcoded "earmarked" literal for every
+  // function, including A4/A6/B4 (Final-Processing, never Earmarking) — see CLAUDE.md's own "LC Balance
+  // Status Rules" entry for the underlying EARMARKING/EARMARKED-vs-PENDING/APPROVED rule this now follows.
+  describe('checkerRowVerb()', () => {
+    it('reads "earmarked" for an Earmarking Function\'s own shape (A3/A3S: IPLC_LC/UTILIZE)', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerContract = contract({ instrumentType: 'IPLC_LC' });
+      expect(c.checkerRowVerb('UTILIZE')).toBe('earmarked');
+    });
+
+    it('reads "earmarked" for B3\'s own shape (EPLC_EXAMINATION/CREATE)', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerContract = contract({ instrumentType: 'EPLC_EXAMINATION' });
+      expect(c.checkerRowVerb('CREATE')).toBe('earmarked');
+    });
+
+    it('reads "submitted" for a Final-Processing Function\'s own shape (A6: IPLC_ACCEPTANCE/CREATE) — the reported gap', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerContract = contract({ instrumentType: 'IPLC_ACCEPTANCE' });
+      expect(c.checkerRowVerb('CREATE')).toBe('submitted');
+    });
+
+    it('reads "submitted" for a plain function (A1: IPLC_LC/ISSUE) and handles a null checkerContract gracefully', () => {
+      const c = new CheckerPanelComponent(mockApi());
+      c.checkerContract = contract({ instrumentType: 'IPLC_LC' });
+      expect(c.checkerRowVerb('ISSUE')).toBe('submitted');
+      c.checkerContract = null;
+      expect(c.checkerRowVerb('UTILIZE')).toBe('submitted');
+    });
+  });
+
   describe('ngOnChanges()', () => {
     it('resetTrigger: does nothing on the first change (initial binding), calls resetPanel() on a later change', () => {
       const c = new CheckerPanelComponent(mockApi());

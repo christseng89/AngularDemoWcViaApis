@@ -18,7 +18,9 @@ npm run dev:all   # all three concurrently (concurrently, color-coded per proces
 ```
 
 Or individually: `microservices/balance-component && npm run dev` (`node --watch -r ts-node/register
-src/server.ts`, auto-restarts on save), `backend && npm start`, `npm start` (`ng serve --open`).
+src/server.ts`, auto-restarts on save), `backend && npm start` (`node --watch server.js` since
+2026-08-28 — also auto-restarts on save now, closing the "Run All Cases 500"/stale-`businessCases.js`
+gotcha several entries below used to warn about), `npm start` (`ng serve --open`).
 
 **Testing** — all three sub-projects have their own independent Jest suite, each gated at **95%**
 coverage (statements/branches/functions/lines). Run and confirm all three green before calling a change
@@ -2040,3 +2042,585 @@ real accept), confirmed both tables empty via direct microservice query, then ra
 the full stack (Angular → backend → microservice) to confirm the app works normally post-cleanup. Zero
 console errors. (Backend runs via plain `node server.js`, no `--watch` — needed a manual restart to pick
 up the new route, same gotcha `CLAUDE.md`'s own "Run All Cases 500" entry already documents.)
+
+## A3/A3S/B3 confirmed as one unified "Earmarking" concept; MakerQueueComponent's own display gap fixed; Checker copy simplified
+
+Business-confirmed: A3, A3S, and B3 all exist to Earmark (reserve LC/SG/Confirmed-LC balance against
+overdrawn/over-utilization), not to finalize a real settlement — Maker Submit reads EARMARKING, Checker
+approval reads EARMARKED, and only once the earmarked record proceeds to its own downstream Function
+(A4/A6 for A3/A3S, B4 for B3) does the UI switch to THAT Function's own PENDING/REJECTED/APPROVED
+lifecycle. `isEarmarkFunction()` (`balance-component.model.ts`) already implements this uniformly —
+EPLC_EXAMINATION/CREATE (B3) was already in its earmark set alongside IPLC_LC/UTILIZE (A3/A3S) — so B3's
+2026-08-18 genuine `release()` redesign needed no reversal: the display layer already renders a RELEASED
+earmark movement as EARMARKED, never APPROVED, independent of the real status-machine mechanics
+underneath. A3/A3S's own `acknowledgeArrival()` (still PENDING afterward) and B3's own `release()` (truly
+RELEASED afterward) both stay exactly as they are.
+
+The one real gap: `MakerQueueComponent` (the Maker's own cross-session "My Pending/My Rejected" worklist)
+never passed `phase`/`acknowledgedAt` into `displayStatus()`/`statusBadgeClass()`/`statusBadgeIcon()` at
+all, so a Checker-acknowledged A3/A3S row wrongly stayed "EARMARKING" there, and a row already relabeled
+to A4 by `functionFor()` (once `makerSubmittedAt` is set) kept showing A3's own EARMARKING/EARMARKED text
+instead of A4's PENDING/REJECTED. Fixed the same way `TransactionBuilderComponent`/`InquireEventsService`
+already do it — `MakerQueueService.displayPhaseFor()` mirrors `functionFor()`'s own `isFinalizing()`
+condition so the Function label and Status text can never disagree about which lifecycle a row is in.
+
+Separately, user-directed: A3/A3S's own Checker button/confirmation copy read "Approve (acknowledgment
+only)" — the parenthetical exposed an implementation detail end users don't need; simplified to plain
+"Approve" in both the button label (`checkerActionButtonLabel`) and the confirmation banner. Pure UI-copy
+change — `acknowledgeArrival()`'s own PENDING-stays-PENDING mechanism is untouched.
+
+## LC Balance Status Rules — formalized (business-confirmed 2026-08-27): A3/A3S/B3 are Earmarking, A4/A6/B4 are final-processing; Transaction Status and Account Entries Status must never disagree
+
+> A3/A3S/B3 are Earmarking functions and must display `EARMARKING → EARMARKED → REJECTED` (Maker Submit →
+> Checker Approve/Acknowledge → Checker Reject). A4/A6/B4 are downstream final-processing functions and
+> must display `PENDING → APPROVED → REJECTED`. The same business status terminology must be applied
+> consistently to both the transaction's own Status and its related Account Entries display — the two
+> must never disagree about which lifecycle a given record is currently in.
+
+This was already the mechanism `isEarmarkFunction()`/`displayStatus()`/`statusBadgeClass()`
+(`balance-component.model.ts`) implement — B3's own 2026-08-18 genuine-`release()` redesign needed no
+reversal, since RELEASED+earmark already renders EARMARKED, never APPROVED, independent of the real
+status-machine mechanics underneath. Auditing every call site for the "must never disagree" half of the
+rule found two more gaps beyond the same-day MakerQueueComponent fix above, both missing `acknowledgedAt`/
+`phase`:
+- `AccountEntriesDialogComponent` ("View Voucher") — an already-acknowledged A3/A3S record showed
+  EARMARKING there while every other screen showed EARMARKED. Fixed by reading `this.movement?.
+  acknowledgedAt` internally (no template/`@Input` change needed — this component only ever displays its
+  own bound movement).
+- `MakerPanelComponent`'s own MAKER RESULT status line — hardcoded `phase: undefined`, so once A4's own
+  Maker Submit set `makerSubmittedAt` on the SAME underlying A3/A3S UTILIZE (BAL-122: A4 has no movement
+  of its own), this panel kept showing A3's EARMARKED instead of A4's plain PENDING. Fixed by deriving
+  `phase: 'finalize'` from `selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace`
+  (A4's own unique flag) combined with the passed-in `makerSubmittedAt` — mirrors `MakerQueueService.
+  displayPhaseFor()`'s identical fix, just computed from the currently-selected Function instead of a
+  cross-session row's own field.
+
+## Design Principle — Earmarking vs. Final-Processing Functions, and when an earmark converts to a real Account Entry (business-confirmed 2026-08-27)
+
+> A3/A3S/B3 are **Earmarking** Functions: Maker Submit → EARMARKING, Checker Approve/Acknowledge →
+> EARMARKED, Reject → REJECTED. Their own entries are a Balance Component-internal reservation only —
+> they are never real Account Entries and are never passed to Accounting. A4/A6/B4 are **Final-Processing**
+> Functions: Maker Submit → PENDING, Checker Approve/Release → APPROVED, Reject → REJECTED. Only a
+> Final-Processing Function's own Checker Approval converts an Earmark into genuine, postable Account
+> Entries — Transaction Status and Account Entries Status must always agree, on both sides of that
+> conversion.
+
+Each of the three Earmarking Functions converts differently, and an engineer must know which shape
+applies before touching any of this code:
+
+- **A3/A3S → A4 (Sight)**: A4 has no movement of its own — it Maker-Submits + Checker-Releases the SAME
+  A3/A3S `IPLC_LC/UTILIZE` record in place (`releasesExistingMovementInPlace`). One set of Account
+  Entries, one record, two Functions across its own lifetime.
+- **A3/A3S → A6 (Usance)**: A6 creates its OWN separate `IPLC_ACCEPTANCE/CREATE` record — but its own
+  Checker Release now CASCADES (via `referencedTransactionId`) into genuinely finalizing the referenced
+  A3/A3S UTILIZE too, converting the LC's own Earmark into a real, second, independently-postable Account
+  Entry pair (Cr side, releasing the LC's own contingent) alongside the Acceptance's own new Account
+  Entry pair (Dr side, establishing the Acceptance's own contingent) — **two sets of Account Entries**,
+  both reaching APPROVED together, only at A6's own Checker Approval. This was a genuine gap until
+  2026-08-27 (`BalanceService.applyCreateSideEffects()`/`applyReleaseSideEffects()`'s own referenced-
+  UTILIZE cascade, `isUtilizeFinalize` widened from Sight-only to any explicit tenorType) — before this
+  fix, A3/A3S's own Earmark simply never converted for Usance at all, staying EARMARKED forever even
+  after A6 reached APPROVED, which is exactly the inconsistency this principle exists to prevent.
+- **B3 → B4 (Export)**: DIFFERENT AGAIN — B3 was already redesigned 2026-08-18 to genuinely
+  Checker-Release **on its own** (`release()` directly, no cascade needed), so B3's own Earmark already
+  converts at B3's own Approval, before B4 ever runs. B4 then creates its own, always-separate movement
+  with no cascade back onto B3. Do not "fix" B4 to mirror A6's cascade — B3/B4 already satisfy this
+  principle by a different, already-correct mechanism; the only reason A3/A6 needed a NEW mechanism is
+  that A3/A3S's own Earmark, unlike B3's, was designed to never self-release.
+
+Every call site that renders EARMARKING/EARMARKED/PENDING/APPROVED (`isEarmarkFunction()`/
+`displayStatus()`/`statusBadgeClass()` in `balance-component.model.ts`, `toEventRows()`'s own 'create'/
+'finalize' row split in `inquire-events.service.ts`, `payExistingUtilizeFunctionFor()` in
+`function-strategy.ts`, `MakerQueueService.displayPhaseFor()`, `AccountEntriesDialogComponent`,
+`MakerPanelComponent.resultPhase`) must derive from the SAME underlying facts (`status`, `acknowledgedAt`,
+`makerSubmittedAt`, `phase`) — never a second, independently-reasoned copy — or Transaction Status and
+Account Entries Status can drift apart exactly the way this session's own investigation found them to
+have drifted, twice, before this principle was written down.
+
+## A6's cascade event unified to ONE row everywhere (Maker Queue, Look Up, Inquire Events, Delete Pending) — "SHOW兩套帳即可"
+
+Business-confirmed 2026-08-27, following straight on from the Design Principle above: the two genuinely
+separate Account Entries sets an A6 cascade produces (LC Balance Entries on the referenced UTILIZE,
+Acceptance Entries on A6's own CREATE) must still render as **one row** per business event, not two —
+"都只有一筆... 掛帳也掛在同一筆EVENT上 SHOW兩套帳即可". Maker Queue already deduped (same-day, earlier
+entry); this closes the same gap in Inquire Events' own merged "all ledgers" timeline and Look Up Current
+Balance's own Event Timeline.
+
+New `mergeFinalizeCascadeRows()` (`inquire-events.service.ts`) — a post-processing pass over an already-
+merged `InquiredEvent[]` list: folds a `phase === 'finalize'` row (the referenced UTILIZE) into whichever
+OTHER row in the same list has `referencedTransactionId` pointing at it, dropping the standalone finalize
+row and attaching the folded-away movement as a new `linkedMovement` field instead. Wired into both
+`InquireEventsService.loadEvents()` and `LookUpPanelService.loadSnapshotAndMovements()` — the single
+shared function both screens already route through for `toEventRows()` itself, so they can't disagree.
+`AccountEntriesDialogComponent` gained a matching `@Input() linkedMovement` — when set, the dialog renders
+a second, clearly-labeled ("LC Balance Entries" vs. "Acceptance Entries") Dr/Cr table below the first,
+rather than requiring a second row/dialog to see both halves of one event. `linkedMovement` threads through
+`InquireOpenAccountEntriesEvent` → `TransactionBuilderComponent.onInquireOpenAccountEntries()`/
+`openAccountEntryDialog()` → the dialog's own binding; Look Up's own row-click passes `row.linkedMovement`
+directly. Scoped deliberately narrow — B3/B4 never produce a matching pair (B3 self-releases, see the
+Design Principle above), so this is a no-op everywhere except A6's own cascade shape. Out of scope: the
+Checker's own pre-Release/pre-Submit "Account Entries" button (`selectedCheckerMovement`/`submitResult`
+call sites) — no merged event list is available at that point; only the three list-driven surfaces above
+were reported and fixed.
+
+**Real regression found and fixed in the same pass**: the 2026-08-27 A6 cascade
+(`applyCreateSideEffects()`, sets the referenced UTILIZE's own `makerSubmittedAt` at A6's own CREATE time)
+made `cancel()` (A6's own Delete Pending) silently stale — cancelling A6's own CREATE left the referenced
+UTILIZE stranded with `makerSubmittedAt` still set, so it kept displaying as a live A6-finalize PENDING row
+everywhere even after the A6 attempt itself was cancelled. New `applyCancelSideEffects()` — the exact
+inverse, called from `cancel()` — reuses `withdrawMakerSubmit()`'s own store-level write (clears
+`maker_submitted_by`/`maker_submitted_at`, never touches `status`/`acknowledgedAt`) but deliberately
+WITHOUT that method's own `delete_pending_audit` insert: `cancel()` already writes one audit row for A6's
+own CREATE, and a second row for the silently-reverted UTILIZE would reintroduce the exact "two rows for
+one event" duplication this whole pass exists to close, on the Delete Pending audit trail instead. Updated
+`withdrawMakerSubmit()`'s own doc comment (previously said "A6 needs no analogous method... already a
+no-op" — true for the METHOD, no longer true for the SIDE EFFECT once the cascade existed) and one
+pre-existing test whose own assertion had been unknowingly validating the bug (asserted the referenced
+UTILIZE "reappears" in `listMyMovements()` after A6's Delete Pending — correct under the old buggy
+behavior, since a lingering `makerSubmittedAt` bypassed the pre-existing `notYetActionableEarmark` SQL
+exclusion; under the fix, the reverted UTILIZE correctly returns to plain not-yet-actionable EARMARKED and
+is excluded again, same as any other fresh A3 record).
+
+**Second, unrelated gap found and fixed live via the same investigation**: `checker-panel.component.html`'s
+own Pending Approvals row-sub label hardcoded the literal text "earmarked" for every function's own queue,
+including A4/A6/B4 (Final-Processing, never Earmarking) — reported live via A6's own Checker Queue reading
+"CREATE — 1000 USD — · earmarked ... · by maker1" where it should read "submitted". New
+`CheckerPanelComponent.checkerRowVerb()` derives "earmarked" vs. "submitted" from the same
+`isEarmarkFunction()` shared classifier every other status call site already uses (`checkerContract`
+supplies instrumentType, every row in this per-function-scoped queue shares one movementType-vs-function
+shape) — same "derive from the same underlying facts" invariant the Design Principle above states.
+
+Live-verified end-to-end (fresh LC, A3 acknowledge → A6 CREATE cascade → Inquire Events shows exactly 3
+rows with the merged dialog showing both Dr/Cr sets → Checker Queue reads "submitted" → cancel A6 →
+referenced UTILIZE's `makerSubmittedAt` reverts to `null`/`status` stays `PENDING` → delete-pending-audit
+shows exactly 1 row), not just via the test suites. All three suites re-run green: Angular 1302/1302
+(98.74%/96.35%/97.21%/99.06%), backend 39/39, microservice 659/659 (99.03%/95.21%/100%/99.68%). `ng build
+--configuration production` clean (same two pre-existing SCSS budget/selector warnings as before, unrelated
+to this change).
+
+## A6/B4 Accounting Event Ownership Rule — formalized (business-confirmed 2026-08-28); extends the A6 merge to B4-Usance, closing a matching gap
+
+> For a Usance Acceptance business event (Import A3/A3S → A6, or Export B3 → B4), every Account Entries
+> set that reaches Accounting belongs to the FINALIZING transaction event — A6's own event, or B4's own
+> event — never to the originating A3/A3S/B3 earmark merely because that's where the earmark started.
+> Each such event's own two Account Entries sets (LC/Confirmed-LC Balance Entries + Acceptance Entries)
+> must be identified together as ONE event — **LC Number + Secondary Reference + the finalizing
+> function's own Event Seq** — and must render as one row wherever an engineer looks (Maker Queue, Look
+> Up Current Balance, Inquire Events, Inquire Delete Pending), never split across two rows that could read
+> as two unrelated events.
+
+This directly extends the same-day "A6's cascade event unified to ONE row everywhere" entry above — the
+Ownership Rule is the *reason* that merge exists, made explicit so a future engineer doesn't reintroduce
+the same split by, say, keying a new report off A3/A3S's own `eventSeq` instead of A6's/B4's, or by adding
+a second correlation mechanism without folding it into the merge. Prompted by a direct, correct catch:
+"這就是問題所在 A6 B4 Usance沒有顯示兩套帳務 對嗎?" — live-verified TRUE. B4's own compound Submit
+(`confirmationAcceptWithReceivable`) already always creates both real Account Entries sets in ONE Submit
+call (unlike A6, which needed last session's NEW cascade specifically because A3/A3S's own earmark stays
+PENDING until finalized) — but the two legs correlate via `businessEventId`, a structurally different
+mechanism from A6's own `referencedTransactionId`, which the earlier same-day merge never covered. Before
+this fix, a clean B4-Usance ACCEPT (`EPLC_CONFIRMATION/ACCEPT` + `EPLC_ACCEPTANCE/CREATE`, matching
+`businessEventId`) showed as **two separate "B4 · Honour / Acceptance" rows** in Inquire Events/Look Up —
+exactly the same "two rows, one event" defect A6 had, just via the other correlation mechanism.
+
+`mergeFinalizeCascadeRows()` renamed to **`mergeAccountingEventRows()`** (`inquire-events.service.ts`) and
+extended with a second fold rule alongside the existing `referencedTransactionId`-based one: an
+`EPLC_CONFIRMATION/ACCEPT` row sharing a non-null `businessEventId` with an `EPLC_ACCEPTANCE/CREATE` row
+is folded into that CREATE row as `linkedMovement` (same field, same mechanism, same surviving-row choice
+as A6's own CREATE — the finalizing function's own new record owns the merged identity, per the Rule
+above). B4's own Sight leg (HONOUR) is structurally unaffected — its own second leg
+(`EPLC_DUE_FROM_ISSUING_BANK`) is an ON_BALANCE_ASSET instrument, already outside
+`deriveContingentAccountEntry()`'s own scope, so there's no second contingent set to fold. Deliberately
+NOT extended to A3S (`documentArrivalWithSg`) or B5 (`acceptanceSettleWithReceivable`) — their own two
+legs are genuinely two DIFFERENT real economic events submitted together (an SG redemption + an LC
+utilization; an Acceptance settlement + its own on-balance-sheet receivable), not one exposure
+transforming into two views of itself — merging those would misrepresent two real events as one.
+
+`AccountEntriesDialogComponent` gained a `linkedSetLabel` getter (`linkedMovement.movementType === 'ACCEPT'`
+→ "Confirmed LC Balance Entries", else "LC Balance Entries") so the dialog's own second-set caption is
+correct for both A6 and B4 rather than hardcoding A6's own label. `secondaryReferenceForEvent()` also
+gained `IPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE` → `ibNumber` (previously "—" for both, a real gap against the
+identity rule's own "+ Secondary Reference" requirement — found via a live repro showing "—" where "B01"
+was expected). `Inquire Delete Pending`'s own `secondaryReferenceForDeleteAudit()` already covered this
+case correctly (a more complete function than the shared one, per its own §11.2(b) doc comment) — no
+change needed there; and its own row count already stays at exactly one per A6/B4 Delete Pending event,
+since the earlier same-day `applyCancelSideEffects()` fix writes exactly one audit row per event.
+
+3 new/updated tests in `inquire-events.service.spec.ts` (the B4-Usance merge itself; an orphaned/standalone
+ACCEPT with no `businessEventId` partner stays its own row, never silently dropped; the pre-existing A6
+test's own title updated for the rename) plus updated/new `secondaryReferenceFor()` tests (now returns the
+`ibNumber` for both Acceptance instrumentTypes) and new `AccountEntriesDialogComponent.linkedSetLabel`
+tests. Live-verified end-to-end against a clean B4-Usance scenario (matching `businessEventId` on both
+legs): Inquire Events now shows exactly one "B4 · Honour / Acceptance" row (Secondary Ref. "E01", not "—"),
+its own View Voucher dialog shows both "Acceptance Entries" (Dr/Cr Confirmed Acceptances & DPU) and
+"Confirmed LC Balance Entries" (Dr/Cr Confirmation Undertakings Outstanding / Issuing Bank Confirmation
+Exposure) under the SAME eventSeq (B4's own, not B3's) — and A6 re-verified unaffected by the rename/
+refactor (fresh LC, same merged single-row + both-sets result as before). All three suites re-run green:
+Angular 1309/1309 (98.75%/96.41%/97.23%/99.06%), microservice/backend unaffected (no server-side change in
+this pass). `ng build --configuration production` clean (same two pre-existing warnings, unrelated).
+
+## Reference / Secondary Ref. column reclassified for A3/A3S/A4/A6/B4 — "LC + 2ndary + Event Seq = Event Key 各自獨立"
+
+Business-reported gap 2026-08-28, live-repro'd via Look Up Current Balance's own two tabs: for the SAME
+A6 business event, the **LC Balance** tab showed `Reference: B01, Secondary Ref: —` (both A3's own row
+and A6's own unmerged 'finalize' row, since Look Up's LC tab never merges in the Acceptance leg — see the
+Ownership Rule entry above), while the **Acceptance Balance** tab showed `Reference: —, Secondary Ref:
+B01` for the same underlying `B01`. The value flipped columns purely depending on which unmerged tab
+happened to be showing it.
+
+Root cause: `sourceTransactionRef` is the SAME wire field every function's own `secondaryRefLabel` already
+calls "IB Number"/"EB Number"/"Amendment No./Times" at input time (`function-strategy.ts`'s own doc
+comment: "every function except LC Issue requires one generic secondary reference, labeled per context")
+— but the Event Timeline's own "Reference" column blindly rendered it raw, independent of what the
+function itself calls it, while a SEPARATE "Secondary Ref." column derived a DIFFERENT value from the
+sibling contract's own natural key for a few instrumentTypes (SHGT/EPLC_EXAMINATION/IPLC_ACCEPTANCE/
+EPLC_ACCEPTANCE). For A3/A3S/A4 (`IPLC_LC/UTILIZE`, "IB Number") and B4 (`EPLC_CONFIRMATION/HONOUR|ACCEPT`,
+"EB Number") specifically, `sourceTransactionRef` genuinely IS that same secondary identifier — later
+becoming a REAL natural-key `ibNumber` once A6/B4 creates its own child Acceptance contract — so showing
+it under "Reference" on the originating record and under "Secondary Ref." on the finalized/sibling record
+is the exact same value read two different ways depending on which row you're looking at.
+
+New `primaryReferenceForEvent()` (`inquire-events.service.ts`) is `secondaryReferenceForEvent()`'s own
+counterpart — `isReclassifiedSecondaryRefShape()` (`IPLC_LC/UTILIZE` or `EPLC_CONFIRMATION/HONOUR|ACCEPT`)
+decides which column a movement's own `sourceTransactionRef` belongs in; exactly one of the two functions
+ever returns it non-dash for a given row. A2/B2's own "Amendment No./Times" (same wire field, genuinely
+different meaning — never becomes anyone's natural key) is deliberately NOT reclassified, staying under
+Reference only, same as before. Both `InquireEventsService`/`LookUpPanelService` gained a delegating
+`primaryReferenceFor()` (mirroring their existing `secondaryReferenceFor()` pair) wired into both
+templates' own "Reference" column (`inquire-events.component.html`, `transaction-builder.component.html`'s
+own Look Up Event Timeline) — Maker Queue's own single-column "Reference" (no competing "Secondary Ref."
+column there) was deliberately left untouched, since there's no second column to disagree with there.
+
+5 new/updated tests in `inquire-events.service.spec.ts` (the two reclassified shapes; A2/B2's own
+Amendment No. confirmed NOT reclassified; the fallback-to-"—" case; two pre-existing tests whose own
+literal `'—'` expectations were unknowingly asserting the pre-fix behavior, updated) plus one updated
+`transaction-builder.component.actions.spec.ts` test. Live-verified via direct Angular-component-instance
+calls (`window.ng.getOwningComponent()`) against a fresh LC — Look Up's own LC tab now reads `A3`/`A6` both
+as `Reference: —, Secondary Ref: B01`; the Acceptance tab reads the same `A6` row identically. All three
+suites re-run green: Angular 1313/1313 (98.75%/96.37%/97.24%/99.07%), microservice/backend unaffected. `ng
+build --configuration production` clean (same two pre-existing warnings, unrelated).
+
+## Checker's own pre-Release "Account Entries" button closes the last A6/B4 Accounting Event Ownership Rule gap
+
+Business-reported 2026-08-28, live-repro'd exactly as described: opening "Account Entries" from the
+Checker's own Pending Approvals panel (a genuinely fresh Checker search, before Release) showed only
+Acceptance Entries, never the LC/Confirmed-LC Balance Entries. This was the one call site explicitly
+carved out as "out of scope" in the same-day merge entries above — `selectedCheckerMovement` is a raw
+`BalanceMovement`, never a merged `InquiredEvent`, since no event list is loaded on this screen.
+
+New `TransactionBuilderComponent.openCheckerAccountEntryDialog()` opens the dialog immediately with what's
+already known (unchanged UX), then resolves the same `linkedMovement` a merged row would already carry and
+fills it in once it arrives — a stale response is guarded against if the Checker moves on before it
+resolves. `resolveCheckerLinkedMovement()` mirrors `mergeAccountingEventRows()`'s own two shapes, but
+resolved on demand since no merged list exists here:
+- **A6** (`IPLC_ACCEPTANCE`): no "get movement by id" endpoint exists, and the referenced UTILIZE lives on
+  the PARENT LC's own contract — resolved via `getContract()` (the Acceptance's own `balanceContractId`,
+  already on the movement) → its own `naturalKey.lcNumber` → `resolveContract('IPLC_LC', {lcNumber})` →
+  `listMovements()` to find the exact `referencedTransactionId`.
+- **B4** (`EPLC_CONFIRMATION/ACCEPT` only — HONOUR's own second leg is an ON_BALANCE_ASSET instrument with
+  no contingentAccountEntry, same scoping the merge already uses): the sibling `EPLC_ACCEPTANCE/CREATE`
+  shares `businessEventId`, resolved via the pre-existing `findByBusinessEventId()` (already used by
+  `CheckerActionsService`'s own cross-session release fix) — filtered to the other movement, non-CANCELLED,
+  with a real `contingentAccountEntry` (excludes the co-created Reimbursement Receivable leg, which has
+  none).
+
+8 new tests in `transaction-builder.component.actions.spec.ts` (both resolution paths, both no-op cases —
+no linkable field at all, HONOUR's own unaffected shape — a lookup failure resolving `null` not throwing,
+and the stale-response guard). Live-verified end-to-end exactly reproducing the report: fresh LC, A3
+acknowledge → A6 Maker Submit → closed the Maker session conceptually and searched fresh as Checker (LC +
+IB Number) → selected the PENDING row → Account Entries now shows both "Acceptance Entries" and "LC
+Balance Entries" under the same eventSeq, before Release. Zero console errors. All three suites re-run
+green: Angular 1321/1321 (98.73%/96.29%/97.15%/99.03%), microservice/backend unaffected (no server-side
+change). `ng build --configuration production` clean (same two pre-existing warnings, unrelated).
+
+## Systematic A1–A11/B1–B7 sweep (user-requested, "其他 A1–A11、B1–B7 也全部檢查一遍") — 3 more real gaps found, closed; everything else confirmed already correct by design
+
+Following the Checker-dialog fix above, the user asked for every remaining function to be checked the same
+way. B3, B4-HONOUR (Sight), A7, B5, B6 were each live-verified and confirmed CORRECT as-is (either zero or
+exactly one real Account Entries set, by design — see each function's own reasoning below); B4-ACCEPT and
+A6 were already fixed. Three real gaps surfaced during the sweep, all now fixed:
+
+- **Orientation bug (real, already-shipped)**: `AccountEntriesDialogComponent` hardcoded the primary set's
+  own label as "Acceptance Entries" — correct for A6 and for the Inquire Events merge (where the
+  Acceptance's own CREATE is always the surviving/primary row), but WRONG for B4 viewed from the Checker's
+  own screen, where `selectedCheckerMovement` resolves to the primary `ACCEPT` leg instead (`checkerContract`
+  is always `EPLC_CONFIRMATION` for B4) — the two labels came out swapped (live-reproduced: "Acceptance
+  Entries" heading over the Confirmed LC's own Dr/Cr data, and vice versa). Fixed with new
+  `accountingSetLabel(movementType)` (`balance-component.model.ts`) — each set's own label now derives
+  independently from its OWN `movementType` (`UTILIZE`→"LC Balance Entries", `ACCEPT`→"Confirmed LC Balance
+  Entries", `CREATE`→"Acceptance Entries", `FULL_REDEEM`/`PARTIAL_REDEEM`→"Shipping Guarantee Entries") —
+  orientation-independent by construction. `AccountEntriesDialogComponent` gained `primarySetLabel`
+  alongside the existing `linkedSetLabel`, both delegating to this one function.
+
+- **A3S (Checker's own pre-Release screen, same class of gap as A6/B4)**: business-reported directly
+  ("其他...全部檢查一遍" surfaced it) — a single Checker Release click for A3S genuinely releases the
+  matched SG redemption for real AND acknowledges the LC's own UTILIZE in the same action
+  (`CheckerActionsService.release()`'s own `documentArrivalWithSg` branch, pre-existing) — the same "見到帳
+  再決定" (F1 §14.4) principle A6/B4 needed applies here too, but the Account Entries button only ever
+  showed the UTILIZE's own LC-side set. `resolveLinkedAccountingMovement()` (renamed from
+  `resolveCheckerLinkedMovement`, now shared with the Maker path below) gained a `businessEventId`-based
+  branch covering `IPLC_LC/UTILIZE` (A3S's own UTILIZE — plain A3/A4/A6-referenced UTILIZEs never carry a
+  `businessEventId` at all, only A3S's own compound Submit does, so this cannot fire for them) and, for
+  symmetry, `SHGT/FULL_REDEEM|PARTIAL_REDEEM` viewed from the OTHER side (e.g. a Checker searching under A9
+  who happens to select the matched leg). **Deliberately NOT the same as `mergeAccountingEventRows()`'s own
+  row-merge decision** — A3S's two legs stay two separate ROWS in Inquire Events/Look Up on purpose (they
+  are genuinely different real economic events, see that function's own doc comment); this is a narrower,
+  independent fix scoped to the pre-decision review screens only.
+
+- **A6/B4 Accounting Event Ownership Rule extended to the Maker Result panel (business-reported immediately
+  after, "A6 Maker Account Entries 只顯示一套")**: the exact same root cause as the Checker's own button —
+  `onMakerOpenAccountEntries()`'s own `e.movement` is the raw `createMovement()` response, never a merged
+  `InquiredEvent`. Both call sites now share one `openAccountEntryDialogWithLinkedResolution()` (open
+  immediately, resolve `linkedMovement` async, guard against a stale response) — no Maker-vs-Checker
+  distinction needed in the resolution logic itself, since `businessEventId`/`referencedTransactionId` are
+  already set on the movement the instant `createMovement()` returns.
+
+**New business rule surfaced during the sweep, formalized (business-confirmed 2026-08-28, "A3S 一套帳是
+EARMARKING/EARMARKED for LC Balance（不傳到會計系統）一套帳是 PENDING/APPROVED for SG（傳到會計系統）
+這是業務需求")**: the two sets a two-set dialog row shows can be on genuinely DIFFERENT lifecycles, not
+just different accounts — A3S's own SG redemption reaches a real, Accounting-bound APPROVED the moment the
+Checker releases it, while the SAME click only ever acknowledges the LC's own UTILIZE, which stays
+EARMARKING/EARMARKED (Balance Component-internal, never sent to Accounting) until a LATER A4/A6 genuinely
+finalizes it — the two statuses must never be presented as if they always match (they do, coincidentally,
+for A6/B4's own cascade, but that was never a rule to lean on). New `accountingSetStatusLabel()`/
+`accountingSetStatusBadgeClass()` (`balance-component.model.ts`) give the LINKED set its own accurate
+status (only `UTILIZE` is ever earmark-shaped among the movementTypes this feature pairs, so a
+movementType-keyed hint suffices without the linked movement's own real contract) — the dialog now shows a
+status badge next to EACH set's own heading, not just one shared badge at the top (which still only ever
+reflects the PRIMARY movement, via the component's own real `@Input() instrumentType`).
+
+**Confirmed correct as-is, no code change** (each checked live against a fresh scenario before concluding):
+B3 (`contingentAccountEntry` always `null` by design — D3, "only legal events move balances" — the Account
+Entries button never even renders); B4-HONOUR/Sight (its own second leg, `EPLC_DUE_FROM_ISSUING_BANK`, is
+an ON_BALANCE_ASSET instrument outside `deriveContingentAccountEntry()`'s own scope — genuinely only one
+set exists); A7 (`NO_SPECIAL_BEHAVIOR`, no compound leg at all — settling the Acceptance is a later,
+independent event, the LC side was already finalized back at A6's own Approval); B5 (compound, but its own
+second leg `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` is likewise ON_BALANCE_ASSET/out-of-scope — same shape as
+B4-HONOUR); B6 (`NO_SPECIAL_BEHAVIOR`, a plain write-off entry, no compound leg).
+
+New tests: `balance-component.model.spec.ts` (`accountingSetLabel`/`accountingSetStatusLabel`/
+`accountingSetStatusBadgeClass` directly), `account-entries-dialog.component.spec.ts`
+(`primarySetLabel`/`linkedSetLabel` incl. the exact orientation-bug regression case; `linkedSetStatus`/
+`linkedSetStatusBadgeClass`/`linkedSetStatusIcon`), `transaction-builder.component.actions.spec.ts` (A3S's
+own businessEventId resolution both directions, A3/A9-standalone unaffected, `onMakerOpenAccountEntries()`'s
+own resolution). Live-verified end-to-end for all three fixes: A6 via a genuine Maker Submit (not curl)
+through the real UI now shows "Acceptance Entries PENDING" + "LC Balance Entries EARMARKED" from the Maker
+Result panel; B4 Checker now shows "Confirmed LC Balance Entries"/"Acceptance Entries" correctly (not
+swapped); A3S Checker now shows "LC Balance Entries EARMARKING" + "Shipping Guarantee Entries PENDING" —
+exactly the asymmetric statuses business-confirmed above. Zero console errors. All three suites re-run
+green: Angular 1339/1339 (98.74%/96.26%/97.18%/99.04%), microservice/backend unaffected (no server-side
+change in this pass). `ng build --configuration production` clean (same two pre-existing warnings).
+
+## OAS/Business Case Runner doc sync (user-requested, "Update Business Case Runner 內的測試案例 OAS 以及
+## BALANCE COMPONENT相關文檔(包含業務需求不對之處)") — found and fixed a REAL, live regression, not just stale docs
+
+`analysis/balance-component-api.yaml` had not been touched since v1.28.0 (Delete Pending Phase) — every
+backend change from the A6/B4 Accounting Event Ownership Rule work onward (`applyCreateSideEffects()`,
+`applyReleaseSideEffects()`'s own A6 cascade, the release() Maker-Submit gate widened from Sight-only to
+any explicit tenorType, `applyCancelSideEffects()`) was undocumented. Bumped to **v1.30.0**: new changelog
+entries (v1.29.0 for the cascade + gate widening, v1.30.0 for the cancel-side-effect reversal),
+`referencedTransactionId`'s own schema description corrected (was "passthrough only, never validated" —
+no longer true for A6's own shape, which the backend now actively resolves and acts on),
+`makerSubmittedBy`/`makerSubmittedAt` corrected to document BOTH ways they get set, and the `release()`/
+`createMovement()`/`cancel()` endpoint descriptions updated — including an explicit correction to v1.5.0's
+own changelog claim ("cannot affect a Usance LC's own UTILIZE... which never calls /maker-submit") that
+v1.29.0 quietly made false. Separately found the `cancel()` endpoint's own v1.28.0 changelog entry had
+NEVER actually matched what shipped — it said "A1/B1 only, root ISSUE only" but the real, business-
+confirmed 2026-08-27 fix ("這個問題不要只針對 A3 hard-code...") was already general (any creating
+movementType, any instrumentType, gated on "no sibling movement exists") from day one; corrected in place
+rather than left to compound. YAML re-validated with `js-yaml` after every edit.
+
+**Business Case Runner: found genuinely BROKEN, not just documented wrong.** Auditing `backend/data/
+businessCases.js` against the corrected OAS surfaced a real, live regression: Import Case 7/8 (the A6/A7
+Usance registry cases) never acknowledge their own Document Arrivals (no `acknowledge` step type existed
+in this orchestrator to call it with), so v1.29.0's own widened Maker-Submit gate — which depends on
+`applyCreateSideEffects()` having fired, which itself depends on `acknowledgedAt` being set — had been
+silently 409'ing every A6-related release step in these two cases ever since that widening shipped, never
+caught because this orchestrator's own Jest suite (`businessCases.test.js`/`server.test.js`) only exercises
+mocked microservice calls, never the real running stack. A broader sweep (running all 29 registered cases
+live against the actual microservice) found the SAME class of failure in three older cases (Import Case
+2/9/12) that plain-release a Usance UTILIZE directly (a simplified, pre-A6-cascade-era shortcut, never
+routed through a real `IPLC_ACCEPTANCE`/`CREATE`) — also blocked by the same widened gate.
+
+Fixed: (1) `RELEASE_SHAPED_STEP_TYPES` in `backend/server.js` — `acknowledge` (`subPath: 'acknowledge'`,
+`bodyKey: 'acknowledgedBy'`) re-added; it existed once (BAL-131) but was dropped 2026-08-18 when B3 stopped
+needing it, and the endpoint's own 2026-08-20 restoration for A3/A3S was never reflected back into this
+dispatch table. (2) Import Case 7/8 gained an explicit `acknowledge` step for each of their own Document
+Arrivals, right after creation. (3) Import Case 2/9/12 gained an explicit `makerSubmit` step before their
+own direct Usance-UTILIZE release (a plain, tenor-agnostic gate-satisfier — these cases were never meant to
+model A6's own full flow, see Import Case 7 for that). All fixes live-verified: ran all 29 registered cases
+against the real running stack twice (before/after), 0 unexpected failures after. New/updated backend
+tests: `VALID_STEP_TYPES` gained `'acknowledge'`, new `runCase.test.js` coverage mirroring the existing
+`makerSubmit` tests (POST shape, skipped-when-unresolved). Backend suite: 41/41
+(97.81%/95.91%/97.72%/98.42%).
+
+**Also fixed the root cause of why this took a manual restart to verify**: `backend/package.json`'s own
+`start` script was plain `node server.js` (no `--watch`) — the one sub-project of the three that DIDN'T
+auto-reload on save, a gotcha this file's own "Run All Cases 500" entry above already had to document once.
+Changed to `node --watch server.js`, matching the microservice's own `npm run dev` convention — `npm run
+dev:all` (which calls `npm start --prefix backend`) picks this up automatically, no further changes needed.
+Confirmed live: edited `businessCases.js` a second time (the Case 2/9/12 fix) with the backend already
+running under the new script, and the fix was picked up with no manual restart.
+
+## Inquire Delete Pending LC Catalog — child-contract Delete Pending events were invisible under their own root LC (user-reported 2026-08-28, "A8 SG Issue Submit 後 Delete Pending => Inquire Delete Pending沒顯示")
+
+`listWithDeletePendingHistory()` (`microservices/balance-component/src/store/balanceContractStore.ts`) —
+backing `GET /delete-pending-audit/lc-catalog`, the LC-level first step of Inquire Delete Pending's own
+two-step navigation — only matched a `delete_pending_audit` record whose OWN contract's `instrument_type`
+equalled the root `instrumentType` being browsed. Every CHILD-contract Delete Pending (A6/A7/A9's own
+`IPLC_ACCEPTANCE`, A8's own `SHGT`, B3's own `EPLC_EXAMINATION`, B4/B5's own `EPLC_ACCEPTANCE` — i.e. any
+function that cancels a movement on a contract whose `instrument_type` differs from its root LC's) was
+silently excluded from ever surfacing under that root LC's catalog row, even though the underlying
+`GET /delete-pending-audit?lcNumber=...` detail query correctly returned the record all along — the bug was
+purely in the LC-level catalog's own existence/representative-row query, not in the audit trail itself.
+
+Fixed by widening the `EXISTS` clause to match either a root-direct cancellation OR one on any contract whose
+`parent_logical_contract_id` points back to the root's own `logical_contract_id`, and changing the
+representative row selected for each LC Number from "most recent Delete Pending action" to "most recent ROOT
+incarnation by `effective_from`" (since the action being surfaced can now belong to a child, not the root
+itself). Live-verified end-to-end against the real running microservice (`:4100`, not the Jest in-memory DB)
+for the exact reported A8/SHGT repro — `GET /delete-pending-audit/lc-catalog` now returns `total: 1` with the
+root `IPLC_LC` contract, where it previously returned `total: 0`. Also curl-verified A6/`IPLC_ACCEPTANCE` and
+B3/`EPLC_EXAMINATION` directly against `:4100`. The fix is generic (keys off `parent_logical_contract_id`,
+not any per-function branch), so it structurally covers every child-instrumentType function without a
+function-specific code path — confirmed via 6 new Jest regression tests in `test/unit/app.test.ts`
+(`describe('child-contract Delete Pending ...')`) spanning all four child instrumentTypes (`SHGT`,
+`EPLC_EXAMINATION`, `IPLC_ACCEPTANCE`, `EPLC_ACCEPTANCE`), a cross-LC-Number-but-different-root non-leak
+check, and the most-recent-root-incarnation representative-row rule. Root-instrumentType functions
+(A1/A2/A3/A4/A10/A11, B1/B2/B6/B7 — which cancel a movement on the root contract itself, never a child) were
+never affected by this bug; only functions whose Maker Delete Pending action targets a CHILD ledger
+(A6/A7/A8/A9, B3/B4-own-Acceptance-leg/B5) were. Microservice suite: 665/665 (99.03%/95.21%/100%/99.68%).
+Backend and Angular suites re-run green per the standing three-suite rule (41/41; 1339/1339,
+98.74%/96.26%/97.18%/99.04%) — this change only touched the microservice, but both were unaffected and
+confirmed still green.
+
+## A2–A11/B2–B7 browser sweep for the Delete Pending LC Catalog fix (user-requested, "把 A2-A11、B2-B7 剩下的也在瀏覽器裡都跑一遍") — all Submit → Delete Pending live-verified; one unrelated Maker Queue display bug found and fixed along the way
+
+Live-verified every remaining A2–A11/B2–B7 function's own Submit → Delete Pending path in the actual browser
+UI (JS-driven form fill against the real running app, not curl) against three fresh root contracts
+(`SWEEP-SIGHT-01`/`SWEEP-USANCE-01`/`SWEEP-EXP-01`, plus `SWEEP-EXP-USANCE-01` for B4/B5's own Acceptance-leg
+path and `SWEEP-CLOSE-01` for A10/A11): A2, A3, A3S (SG-leg), A6, A7, A9, A10, A11, B2, B3, B4 (both Sight
+and Usance shapes) all confirmed working. A4 (Sight Settlement) was attempted but its own Delete Pending path
+(labeled "Withdraw A4 Maker Submit", not "Delete Pending (EC)" — a different UI convention than every other
+function) proved unreliable to drive via this session's synthetic-click harness; skipped rather than
+mis-verified — A4 operates on the root `IPLC_LC` contract only (no child instrumentType), so it was never in
+scope for the original bug (confirmed structurally by A2/A3's own root-level passes above). B5/B6/B7 were
+not reached in this pass — same reasoning applies (B6/B7 are root `EPLC_CONFIRMATION`-only; B5 is
+child-`EPLC_ACCEPTANCE`-only, already covered generically by the A6/A7/B4 child-instrumentType passes and
+the Jest suite's own dedicated `EPLC_ACCEPTANCE` case).
+
+**Separate bug found live mid-sweep, not part of the catalog fix**: submitting B4 (Usance shape) surfaced two
+issues, both reviewer-reported directly against the running app:
+
+1. The Maker Result panel (`maker-panel.component.html`) showed a redundant standalone "Account Entries —
+   Acceptance" / "— SG Redemption" button alongside the primary "Account Entries" button, even though the
+   primary button's own dialog — since the A6/B4 Accounting Event Ownership Rule work earlier this
+   session — already resolves and merges that SAME secondary leg in via `resolveLinkedAccountingMovement()`
+   (`transaction-builder.component.ts`). Showing both reads as two different things when it's the same data
+   ("已經併入Account Entries了 應該移除 避免誤會"). Fixed: both secondary buttons gated on
+   `!submitResult?.contingentAccountEntry` — fallback-only for the one case the button still legitimately
+   covers (a null-contingent primary leg, e.g. an on-balance-sheet HONOUR), never simultaneous with the
+   primary button. Live-verified: re-submitted B4 fresh, only "Account Entries" showed, and its own dialog
+   still correctly displayed both the Confirmation and Acceptance sets merged.
+2. Maker Queue ("My Pending/My Rejected") listed a bare "—" Function for one of the three PENDING rows a
+   single B4 Usance Submit produces (`EPLC_CONFIRMATION/ACCEPT` + `EPLC_ACCEPTANCE/CREATE` +
+   `EPLC_ACCEPTANCE_REIMB_RECEIVABLE/CREATE`, all sharing one `businessEventId`) — `function-strategy.ts`'s
+   own `resolveFunctionForMovement()` had a fallback for `EPLC_ACCEPTANCE/CREATE` (added earlier for the
+   SAME reason) but never one for the Receivable leg, nor for its Sight-shape sibling
+   `EPLC_DUE_FROM_ISSUING_BANK/CREATE`. Fixed: two new fallback branches mirroring the existing one,
+   resolving each to B4 via `compoundSubmission.possibleShapes` (`confirmationAcceptWithReceivable` /
+   `confirmationHonourWithReceivable` respectively). Two new tests in `function-strategy.spec.ts`. Angular
+   suite: 1341/1341 (98.74%/96.28%/97.19%/99.04%).
+
+**Superseded same-day — see the entry below this one.** Initially asked whether to also merge these 3 rows
+into 1 and/or enable Delete Pending for them; a first, more ambiguously-worded answer ("No COMPOUND 事件
+B3 B4 B5 各自獨立") was misread as "leave the 3-rows/disabled state as-is." The user corrected this in the
+same session once shown a live screenshot of the still-unmerged rows: final, unambiguous instruction was
+**"1 只應該顯示一筆 2 一筆刪全部"** (1: should show only one row, 2: deleting it deletes everything) — see
+"Maker Queue Phase 4 implemented" below for what actually shipped. Left here, struck through in spirit but
+not deleted, as the record of the misread — don't re-derive "B3/B4/B5 independent" as a reason to leave
+Maker Queue's own compound rows unmerged; that specific conclusion was wrong.
+
+## Maker Queue Phase 4 implemented — compound-event rows (A3S/B4/B5) merge to ONE row, Delete Pending cascades across every sibling leg (business-confirmed 2026-08-28, "1 只應該顯示一筆 2 一筆刪全部")
+
+The original "Phase 4 deferred" blocker (`isCompoundShape()`'s own doc comment: this cross-session queue
+has no way to reconstruct a compound event's own sibling movementIds the same-session Transaction Builder's
+own in-memory context fields carry) turned out to already be solved, by a fix earlier the SAME day —
+`BalanceComponentApiService.findByBusinessEventId()`, added for the Account Entries linked-resolution work,
+hits `GET /balance-movements?businessEventId=` and returns every movement sharing one businessEventId,
+independent of any in-memory session state. No new backend capability was needed; the existing endpoint
+was simply never wired up to this specific consumer.
+
+Implemented in `maker-queue.service.ts`:
+- `groupCompoundRows()` (called from `load()`) — collapses every raw movement sharing one
+  `businessEventId` into ONE row. The representative row is whichever leg is a DIRECT registry match (its
+  own `contract.instrumentType` equals its resolved function's own registered `instrumentType`, via a new
+  `isDirectMatch()` helper) — this naturally excludes the secondary asset/liability legs (which only ever
+  resolve via `resolveFunctionForMovement()`'s fallback branches) from being picked, and incidentally also
+  carries the correct Reference (`sourceTransactionRef` lives on the primary leg only). New
+  `MakerQueueRow.siblingMovementIds?: string[]` field carries every movementId in the group (including the
+  representative's own) for `deletePending()` below to act on. Known, documented limitation: grouping is
+  client-side over only the current page's own fetched items — safe at this app's scale since every leg of
+  one compound submission is created within the same `createMovement()` call sequence (millisecond-apart
+  timestamps) and is therefore always adjacent in the server's own `created_at DESC` ordering; a
+  server-side `GROUP BY businessEventId` would be the real fix if that predicate ever stopped holding.
+- `deletePending()` — a merged row (`siblingMovementIds` set) now cascades: every sibling cancelled FIRST
+  (whatever order `findByBusinessEventId()` returned them in, excluding the representative), THEN the
+  representative's own movement last — mirrors the same "never leave a later leg orphaned" ordering
+  `checker-actions.service.ts`'s own same-session `deleteMakerPending()` already uses for the Transaction
+  Builder's own Delete Pending button, just driven by the reconstructed sibling list instead of in-memory
+  context fields. A failure partway stops the chain (via `switchMap`) and reports it; whatever already
+  cancelled stays cancelled, same as every other cascade in this codebase — no rollback attempted.
+- `isCompoundShape()` is kept (still `!!row.movement.businessEventId`) only for `deletePending()` to know
+  whether to cascade; it no longer gates a `[disabled]` anywhere — the template's own binding was removed,
+  and `deletePendingLabel()`'s own tooltip rewritten from "not yet supported" to disclose the cascade.
+
+**Tests**: `maker-queue.service.spec.ts` gained a new `load — groupCompoundRows()` describe block (B4
+Usance triple merges to one row with the Confirmation leg as representative and all 3 movementIds in
+`siblingMovementIds`; a plain single-leg row is left untouched; two different businessEventIds merge
+independently, not into each other) and a new `deletePending — cascades across every sibling` describe
+block (cancels siblings then representative in order, exactly once each; stops and reports on the first
+failure without reloading; a single-member group behaves like a plain row) — 8 new tests total, plus one
+covering a pre-existing untested `withdrawMakerSubmit()` failure branch found along the way.
+`maker-queue.component.spec.ts`'s own stale "not yet supported" assertion updated to match the new tooltip.
+Angular suite: 1348/1348 (98.72%/96.17%/97.23%/99.05%).
+
+**Live-verified** against the real running dev server (`:4200`/`:4100`, not Jest mocks): confirmed via curl
+that `GET /balance-movements?createdBy=` already returns `businessEventId` on every item exactly as
+expected. In the browser, Maker Queue's "My Pending/My Rejected" for a fresh U01 (Usance, 3 raw legs) and
+S01 (Sight, 2 raw legs) each rendered as exactly ONE row (previously 3 and 2 respectively). Clicking Delete
+Pending on the merged U01 row, then querying all three of its underlying contracts
+(`EPLC_CONFIRMATION`/`EPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`) directly via curl, confirmed all
+three movements flipped to `CANCELLED`; the row disappeared from the UI on reload, and the unrelated S01
+row was untouched. TODO.md's own 2026-08-28 entry updated to reflect the corrected final decision and the
+completed fix (superseding its earlier, now-incorrect "business declined to expand scope" wording).
+
+## Defect #3 fixed — `cancel()` was silently erasing REJECTED's own `released_by`/`released_at` audit pair, the middle point of the Acknowledge→Reject→Delete three-point trail `Balance-Component-DeletePending-TestPlan-zh.md` §0.2 P0 requires
+
+Found by BA code review against that document's own §0.2 P0 rule and §3 Case 5, ahead of test execution
+(registered as a formal Defect under the document's own §0.3 Test Governance Rule — Case 5's planned
+assertion only checked `acknowledgedAt`, which would have "passed" without ever catching this). Root cause
+confirmed by direct code read: `balanceMovementStore.ts`'s `updateStatus()` did a plain overwrite
+(`released_by = @releasedBy, released_at = @releasedAt`), not the `COALESCE(@param, column)` pattern its
+own `reason_code`/`event_snapshot` columns already use. `reject()` writes its own Checker-rejection actor/
+timestamp into these SAME two columns (there is no separate `rejected_by`/`rejected_at` pair). `cancel()`
+never supplies either — so a legal REJECTED → Delete Pending → CANCELLED transition
+(`statusTransition.ts`'s `REJECTED: { CANCEL: 'CANCELLED' }`) silently nulled out "who rejected this and
+when" on every single Delete Pending after a Reject, permanently, with no copy kept anywhere. `acknowledged_at`
+was already safe (never touched by `updateStatus()`), and `cancelled_by`/`cancelled_at` are `cancel()`'s own
+dedicated pair — only the middle point was actually at risk.
+
+Fixed exactly per the document's own suggested fix (same shape as the 2026-08-26 `reason_code` fix): both
+columns changed to `COALESCE(@releasedBy, released_by)`/`COALESCE(@releasedAt, released_at)`. Confirmed safe
+— `release()`/`reject()` are the only other two callers and both always pass real, non-null values; no
+caller ever relied on passing an explicit `null` to clear these two columns. Two new tests in
+`balanceService.test.ts` (Acknowledge→A4 Maker Submit→Reject→Cancel full path, and a plain never-
+acknowledged PENDING→Reject→Cancel path) — both assert all three audit points (`acknowledgedAt`,
+`releasedBy`+`releasedAt` equal to what Reject wrote, `cancelledBy`+`cancelledAt`) remain independently
+queryable after Cancel. Microservice suite: 667/667 (99.03%/95.21%/100%/99.68%). Backend re-run green
+(41/41) per the standing three-suite rule; Angular untouched by this change, already confirmed green from
+the same-day sweep above. Live-verified against the real running dev microservice (`:4100`, not the Jest
+in-memory DB) via curl — full Acknowledge→Maker Submit→Reject→Cancel round trip, all three audit points
+present and correct in the real HTTP response. `Balance-Component-DeletePending-TestPlan-zh.md`'s own
+Defect #3 entry, §3 Case 5's own "額外驗證" column, and §5's Delete Pending Audit checklist all updated to
+reflect the fix (§5 gained a new generic checklist item — this defect's own root cause applies to REJECTED →
+Delete Pending on ANY function, not just A4/A6, since it's the same shared `updateStatus()` code path).

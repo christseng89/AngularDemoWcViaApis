@@ -36,9 +36,19 @@
             <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
             <td class="tb-table__amount">{{ row.movement.amount }} {{ row.movement.currency }}</td>
             <td class="tb-table__status">
-              <span class="tb-status-badge" [ngClass]="statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType)"
-                ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType))"></app-tb-icon
-                >{{ displayStatus(row.movement.status, row.contract.instrumentType, row.movement.movementType) }}</span
+              <span
+                class="tb-status-badge"
+                [ngClass]="statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType, makerQueue.displayPhaseFor(row), row.movement.acknowledgedAt)"
+                ><app-tb-icon
+                  [name]="
+                    statusBadgeIcon(
+                      statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType, makerQueue.displayPhaseFor(row), row.movement.acknowledgedAt)
+                    )
+                  "
+                ></app-tb-icon
+                >{{
+                  displayStatus(row.movement.status, row.contract.instrumentType, row.movement.movementType, makerQueue.displayPhaseFor(row), row.movement.acknowledgedAt)
+                }}</span
               >
             </td>
             <td class="tb-table__time">{{ row.movement.createdAt | date: 'short' }}</td>
@@ -46,12 +56,13 @@
               <!-- Fix Pending itself is Phase 3, not yet approved (awaiting business's written
                  confirmation of the editable-field scope — see the proposal doc's own status block) —
                  only Delete Pending is wired up in this Phase 2 pass. Compound submissions (A3S/B4/B5)
-                 are excluded, see MakerQueueService.isCompoundShape()'s own doc comment. -->
+                 are shown as ONE merged row and cascade-delete every sibling leg together (business-
+                 confirmed 2026-08-28, see MakerQueueService.isCompoundShape()'s own updated doc comment)
+                 — no longer disabled here. -->
               <button
                 type="button"
                 class="tb-btn tb-btn--tiny tb-btn--danger-outline"
                 [title]="deletePendingLabel(row)"
-                [disabled]="makerQueue.isCompoundShape(row)"
                 (click)="makerQueue.deletePending(row)"
               >
                 Delete Pending

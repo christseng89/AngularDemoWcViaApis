@@ -57,7 +57,7 @@
           <span class="tb-row-primary"
             >{{ displayMovementType(m.movementType, m.amount) }} — {{ displayMovementAmount(m.movementType, m.amount) }} {{ m.currency }}</span
           >
-          <span class="tb-row-sub">{{ m.sourceTransactionRef || '—' }} · earmarked {{ m.createdAt | date: 'short' }} · by {{ m.createdBy }}</span>
+          <span class="tb-row-sub">{{ m.sourceTransactionRef || '—' }} · {{ checkerRowVerb(m.movementType) }} {{ m.createdAt | date: 'short' }} · by {{ m.createdBy }}</span>
         </ng-template>
       </app-index-picker>
 

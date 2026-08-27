@@ -39,6 +39,15 @@ export interface InquiredEvent {
   eventStatus: BalanceMovement['status'];
   /** 'primary' — the movement's only real-world event. 'create'/'finalize' — A4 finalizing an existing A3/A3S row, one movement spanning two independently-timed business actions. */
   phase: 'primary' | 'create' | 'finalize';
+  /**
+   * A6/B4 Accounting Event Ownership Rule (business-confirmed 2026-08-27/28, see CLAUDE.md's own entry
+   * of the same name) — set only by `mergeAccountingEventRows()` below, only on the ONE surviving row for
+   * an A6 or B4-Usance business event: the OTHER half of that event's own two Account Entries sets is
+   * folded INTO this row rather than shown as a separate one, and its own `contingentAccountEntry` rides
+   * along here so `AccountEntriesDialogComponent` can show BOTH sets for this single row — never present
+   * on any other row shape.
+   */
+  linkedMovement?: BalanceMovement;
 }
 
 /**
@@ -58,7 +67,7 @@ export interface InquiredEvent {
 export function functionForEvent(event: InquiredEvent): TransactionFunction | undefined {
   const { movement, contract } = event;
   return (
-    (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType) : undefined) ??
+    (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType, contract.tenorType) : undefined) ??
     resolveFunctionForMovement(contract.instrumentType, movement.movementType)
   );
 }
@@ -74,6 +83,29 @@ export function systemLabelForEvent(event: InquiredEvent): string | null {
 }
 
 /**
+ * A6/B4 Accounting Event Ownership Rule's own identity triple is **LC Number + Secondary Reference +
+ * Event Seq, each independent** (business-confirmed 2026-08-28, "LC + 2ndary + Event Seq = Event Key
+ * 各自獨立") — `sourceTransactionRef` on an `IPLC_LC/UTILIZE` (A3/A3S/A4/A6's shared record) or an
+ * `EPLC_CONFIRMATION/HONOUR|ACCEPT` (B4's own primary leg) is semantically the IB/EB Number every one of
+ * those functions' own `secondaryRefLabel` already calls it at INPUT time — never a free-text audit note
+ * the way A2/B2's own "Amendment No./Times" (same wire field, different function, different meaning) is.
+ * `secondaryReferenceForEvent()`/`primaryReferenceForEvent()` below are the two halves of one
+ * reclassification: the value moves from the Reference column to the Secondary Ref. column for exactly
+ * these two shapes, so the SAME IB/EB Number reads identically as "Secondary Ref." everywhere — the
+ * merged A6/B4 row, Look Up's own per-tab LC/Confirmed-LC view, and (via the same UTILIZE record) A4's
+ * finalize row too — rather than flipping between "Reference" and "Secondary Ref." depending on which
+ * tab or row happens to carry it. Business-reported gap 2026-08-28 (Look Up's own LC Balance tab showed
+ * "Reference: B01, Secondary Ref: —" for both A3 and A6's finalize row, while the Acceptance Balance tab
+ * showed "Reference: —, Secondary Ref: B01" for the SAME event — same value, two different columns
+ * depending on which unmerged tab a reader happened to be looking at).
+ */
+function isReclassifiedSecondaryRefShape(event: InquiredEvent): boolean {
+  if (event.contract.instrumentType === 'IPLC_LC' && event.movement.movementType === 'UTILIZE') return true;
+  if (event.contract.instrumentType === 'EPLC_CONFIRMATION' && (event.movement.movementType === 'HONOUR' || event.movement.movementType === 'ACCEPT')) return true;
+  return false;
+}
+
+/**
  * Module-level function, not a private method — LookUpPanelService's own Event Timeline reuses the
  * exact same mapping rather than a second copy (user instruction 2026-08-21, "Lookup 除了 REFERENCE
  * 還要有 SECONDARY REF"). Shared with `InquireEventsService.secondaryReferenceFor()` below, which
@@ -82,12 +114,31 @@ export function systemLabelForEvent(event: InquiredEvent): string | null {
  *
  * EPLC_EXAMINATION's own `ibNumber` (B3's EB Number) is the same value B4's Honour/Accept later carries
  * as `sourceTransactionRef` — shown bare ("E01") so a reader can connect the two rows. SHGT's `sgNumber`
- * is shown prefixed ("SG G01"). Every other instrumentType returns "—".
+ * is shown prefixed ("SG G01"). IPLC_ACCEPTANCE/EPLC_ACCEPTANCE's own `ibNumber` completes the A6/B4
+ * Accounting Event Ownership Rule's own identity triple (LC Number + Secondary Reference + the
+ * finalizing function's own eventSeq, see CLAUDE.md) — added 2026-08-28, business-reported gap (a merged
+ * A6/B4 row's own Secondary Ref. column read "—" even though the identity requires it). A3/A3S/A4's own
+ * `IPLC_LC/UTILIZE` and B4's own `EPLC_CONFIRMATION/HONOUR|ACCEPT` are reclassified here too (see
+ * `isReclassifiedSecondaryRefShape()`'s own doc comment above) — every other instrumentType returns "—".
  */
 export function secondaryReferenceForEvent(event: InquiredEvent): string {
   if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
   if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
+  if (event.contract.instrumentType === 'IPLC_ACCEPTANCE' || event.contract.instrumentType === 'EPLC_ACCEPTANCE') return event.contract.naturalKey.ibNumber ?? '—';
+  if (isReclassifiedSecondaryRefShape(event)) return event.movement.sourceTransactionRef ?? '—';
   return '—';
+}
+
+/**
+ * The Reference column's own counterpart to `secondaryReferenceForEvent()` above — every call site that
+ * renders a raw `event.movement.sourceTransactionRef` as "Reference" must route through this instead, so
+ * the two columns can never both claim the same IB/EB Number (see `isReclassifiedSecondaryRefShape()`'s
+ * own doc comment). Every other movementType (A2/B2's own Amendment No., etc.) is unaffected — still
+ * shown here exactly as before.
+ */
+export function primaryReferenceForEvent(event: InquiredEvent): string {
+  if (isReclassifiedSecondaryRefShape(event)) return '—';
+  return event.movement.sourceTransactionRef ?? '—';
 }
 
 /**
@@ -129,23 +180,113 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
   // only by `status`), so `status !== 'PENDING'` wrongly matched a REJECTED movement too — a rejected
   // Sight Document Arrival was split into a phantom 'create'/'finalize' pair (two REJECTED rows) even
   // though A4 never finalized it. Narrowed to the actual RELEASED transition this split exists for.
-  const isFinalizedSightUtilize =
-    contract.instrumentType === 'IPLC_LC' &&
-    movement.movementType === 'UTILIZE' &&
-    contract.tenorType === 'SIGHT' &&
-    movement.status === 'RELEASED' &&
-    !!movement.releasedAt;
-  if (!isFinalizedSightUtilize) {
+  //
+  // Widened 2026-08-27 (business-confirmed, "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure") from
+  // Sight-only to any explicit tenorType — the backend's own `isUtilizeFinalize` (balanceService.ts's
+  // release()) now genuinely finalizes a Usance UTILIZE too, via A6's own cascade (see
+  // BalanceService.applyReleaseSideEffects()'s own doc comment), so this display-layer split must
+  // recognize BOTH: A4 (Sight) directly, A6 (Usance) via the SAME underlying UTILIZE record.
+  // `contract.tenorType != null` (not `=== 'SIGHT'`) — still excludes a legacy null-tenorType contract
+  // (the Business Case Runner's own older Import Case #1/#3/#4/#5), which release a UTILIZE directly
+  // with no maker-submit/finalize concept at all and must keep showing a single plain row, unaffected.
+  //
+  // Widened AGAIN 2026-08-27 (business-confirmed, "A6 Submit 時應該出兩套帳 但現在只出一套帳(ACCEPTANCE)")
+  // from `status === 'RELEASED'` to `!!movement.makerSubmittedAt` — the split must happen the MOMENT
+  // A4/A6 is Maker-Submitted, not only once genuinely Released: `MakerQueueService.isFinalizing()`/
+  // `MakerPanelComponent.resultPhase` already key off `makerSubmittedAt` alone (a still-PENDING A4/A6
+  // attempt already shows "PENDING" there, not "EARMARKED") — this was the one remaining call site still
+  // gated on RELEASED, so the LC's own Event Timeline/Account Entries kept showing only A3/A3S's own
+  // EARMARKED row (and, for A6, only the separate Acceptance's own PENDING entry) until Checker Approval,
+  // instead of splitting into A3(EARMARKED, historical)/A4-or-A6(PENDING, in progress) immediately —
+  // i.e. only ONE set of books instead of two. `makerSubmittedAt` also survives a Checker Reject (reject()
+  // never clears it, same "unified logic" ruling `MakerQueueService.isWithdrawMakerSubmitCase()` already
+  // relies on), so a rejected A4/A6 attempt correctly still splits and shows REJECTED on the finalize row
+  // — consistent with Maker Queue, which already shows a rejected A4/A6 row the same way. The ORIGINAL
+  // "S05 -> APPROVE... Checker Reject 為何出現兩筆REJECTED" bug this replaced is naturally still avoided:
+  // that was A3's OWN Checker rejecting A3 itself, before A4/A6 was ever attempted — makerSubmittedAt is
+  // never set in that case, so this condition is still false and no split happens.
+  const isFinalizing = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType != null && !!movement.makerSubmittedAt;
+  if (!isFinalizing) {
     return [{ movement, contract, eventTime: effectiveEventTime(movement), eventStatus: movement.status, phase: 'primary' }];
   }
-  // A4's own pre-existing 'create'/'finalize' split is a narrower, already-proven instance of the SAME
-  // rule above — 'finalize' already used releasedAt before this change, unaffected; 'create' deliberately
-  // stays createdAt (the real historical A3/A3S submission moment), not effectiveEventTime(), as this
-  // assessment's own §6.4 concluded.
+  // A4's own pre-existing 'create'/'finalize' split (now also A6's) is a narrower, already-proven
+  // instance of the SAME rule above — 'finalize' already used releasedAt before this change, unaffected;
+  // 'create' deliberately stays createdAt (the real historical A3/A3S submission moment), not
+  // effectiveEventTime(), as this assessment's own §6.4 concluded. The finalize row's own eventTime now
+  // falls back to `makerSubmittedAt` while still PENDING (no releasedAt exists yet) — the real moment
+  // THIS business event (A4/A6's own Submit) happened.
   return [
     { movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'create' },
-    { movement, contract, eventTime: movement.releasedAt as string, eventStatus: movement.status, phase: 'finalize' },
+    { movement, contract, eventTime: (movement.releasedAt ?? movement.makerSubmittedAt ?? movement.createdAt) as string, eventStatus: movement.status, phase: 'finalize' },
   ];
+}
+
+/**
+ * **A6/B4 Accounting Event Ownership Rule** (business-confirmed 2026-08-27/28 — do not re-litigate
+ * without new information; see CLAUDE.md's own entry of the same name for the full write-up).
+ *
+ * A Usance Acceptance business event — Import A3/A3S → A6, or Export B3 → B4 — always posts TWO
+ * genuinely separate, independently-postable Account Entries sets ("LC Balance Entries" / "Confirmed
+ * LC Balance Entries" and "Acceptance Entries") once both reach APPROVED. Both sets belong to the SAME
+ * transaction event and must be identified together (LC/Confirmed-LC Number + Secondary Reference +
+ * the FINALIZING function's own `eventSeq` — A6's or B4's, never A3/A3S's/B3's own historical
+ * `eventSeq`, merely because the earmark originated there) — never split across two rows that could
+ * read as two unrelated events, and never captioned as if they still belonged to the originating A3/A3S
+ * earmark. This function is the single mechanical enforcement of that rule for every merged, all-ledgers
+ * event list (`InquireEventsService.loadEvents()`; `LookUpPanelService`'s own Export LC tab, which
+ * already merges `EPLC_EXAMINATION` the same way) — it folds the SECOND record of each such pair into
+ * the FIRST as a new `linkedMovement` field, so the Account Entries dialog can show both sets while only
+ * one row (identified by the finalizing function's own facts) ever renders.
+ *
+ * Two structurally different correlation mechanisms, same outcome:
+ * - **A6 (Usance)** — `referencedTransactionId`. The referenced A3/A3S `IPLC_LC/UTILIZE`'s own
+ *   'finalize' row (`toEventRows()`, keyed off `makerSubmittedAt`) is folded INTO A6's own separate
+ *   `IPLC_ACCEPTANCE/CREATE` row (the finalizing function's own new record — kept as the surviving row's
+ *   own identity, per the Ownership Rule above).
+ * - **B4 (Usance ACCEPT)** — `businessEventId`. Both legs of B4's own compound Submit
+ *   (`confirmationAcceptWithReceivable`) share one `businessEventId`: the primary `EPLC_CONFIRMATION/
+ *   ACCEPT` (finalizing the root Confirmed LC's own exposure — B3/`EPLC_EXAMINATION` never carried a
+ *   contingentAccountEntry of its own to begin with, "MEMO_ONLY", so there is nothing analogous to A3's
+ *   own earmark to fold FROM here) is folded INTO the secondary `EPLC_ACCEPTANCE/CREATE` (the finalizing
+ *   function's own new Acceptance liability record — again kept as the surviving row, matching A6's own
+ *   choice of which side owns the merged identity). B4's own Sight leg (HONOUR) is structurally
+ *   unaffected — its own second leg (`EPLC_DUE_FROM_ISSUING_BANK`) is an ON_BALANCE_ASSET instrument,
+ *   already outside `deriveContingentAccountEntry()`'s own scope (returns `null`), so there is no second
+ *   contingent set to merge.
+ *
+ * Deliberately NOT extended to A3S (`documentArrivalWithSg`) or B5 (`acceptanceSettleWithReceivable`) —
+ * their own two legs are genuinely TWO DIFFERENT real economic events submitted together (redeeming an
+ * SG vs. utilizing the LC; settling an Acceptance vs. its own on-balance-sheet receivable), not one
+ * exposure transforming into two simultaneously-visible views of itself — merging those would misrepresent
+ * two real events as one. The `phase === 'finalize'`-vs-`referencedTransactionId` branch above already
+ * naturally excludes A4 (no separate referencing movement exists to fold into) and B3/every other
+ * function (never produces a matching pair at all).
+ */
+export function mergeAccountingEventRows(events: readonly InquiredEvent[]): InquiredEvent[] {
+  const cascadeOwnerOf = (finalizeMovementId: string): InquiredEvent | undefined =>
+    events.find((e) => e.movement.referencedTransactionId === finalizeMovementId);
+  const isConfirmationAccept = (e: InquiredEvent) => e.contract.instrumentType === 'EPLC_CONFIRMATION' && e.movement.movementType === 'ACCEPT';
+  const isAcceptanceCreate = (e: InquiredEvent) => e.contract.instrumentType === 'EPLC_ACCEPTANCE' && e.movement.movementType === 'CREATE';
+  const b4PartnerOf = (event: InquiredEvent): InquiredEvent | undefined => {
+    if (!isConfirmationAccept(event) || !event.movement.businessEventId) return undefined;
+    return events.find((e) => isAcceptanceCreate(e) && e.movement.businessEventId === event.movement.businessEventId);
+  };
+
+  return events
+    .filter((event) => {
+      if (event.phase === 'finalize' && cascadeOwnerOf(event.movement.movementId)) return false; // A6's own shape
+      if (isConfirmationAccept(event) && b4PartnerOf(event)) return false; // B4's own shape
+      return true;
+    })
+    .map((event) => {
+      const linkedFinalize = events.find((e) => e.phase === 'finalize' && event.movement.referencedTransactionId === e.movement.movementId);
+      if (linkedFinalize) return { ...event, linkedMovement: linkedFinalize.movement };
+      if (isAcceptanceCreate(event) && event.movement.businessEventId) {
+        const linkedAccept = events.find((e) => isConfirmationAccept(e) && e.movement.businessEventId === event.movement.businessEventId);
+        if (linkedAccept) return { ...event, linkedMovement: linkedAccept.movement };
+      }
+      return event;
+    });
 }
 
 /** One contract's movements, flattened via toEventRows() — the shared base both loadEvents() and LookUpPanelService's Export Confirmed LC merge build on. */
@@ -416,6 +557,11 @@ export class InquireEventsService {
     return secondaryReferenceForEvent(event);
   }
 
+  /** Delegates to the same `primaryReferenceForEvent()` free function `LookUpPanelService.primaryReferenceFor()` uses — the Reference column's own counterpart to `secondaryReferenceFor()` above. */
+  primaryReferenceFor(event: InquiredEvent): string {
+    return primaryReferenceForEvent(event);
+  }
+
   search(): void {
     this.clearResults();
     const lcNumber = this.lcNumber.trim();
@@ -441,7 +587,7 @@ export class InquireEventsService {
     forkJoin([movementsOf$(this.api, root), ...childTypes.map((childType) => childMovementsOf$(this.api, childType, root.naturalKey.lcNumber))]).subscribe(
       (groups) => {
         this.eventsLoading = false;
-        this.events = groups.flat().sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
+        this.events = mergeAccountingEventRows(groups.flat()).sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime());
         this.eventsPaging.total = this.events.length;
         this.eventsPaging.page = 1;
       },

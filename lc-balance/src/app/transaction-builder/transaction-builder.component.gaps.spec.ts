@@ -289,7 +289,7 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c4.selectFunction(fn('A3'));
       c4.selectedCheckerMovement = movement({ movementId: 'm-4', movementType: 'UTILIZE' });
       expect(c4.isArrivalAcknowledgmentStep).toBe(true);
-      expect(c4.checkerActionButtonLabel).toBe('Approve (acknowledgment only)');
+      expect(c4.checkerActionButtonLabel).toBe('Approve');
 
       // Neither deferSettlement nor documentArrivalWithSg set (A1) -> false, even with UTILIZE.
       const c5 = new TransactionBuilderComponent(mockApi());
@@ -336,6 +336,27 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       expect(c.accountEntryDialogInstrumentType).toBeNull();
       c.openAccountEntryDialog(movement(), 'EPLC_EXAMINATION');
       expect(c.accountEntryDialogInstrumentType).toBe('EPLC_EXAMINATION');
+    });
+
+    // Business-confirmed 2026-08-27 ("Transaction Status 與 Account Entries Status 必須保持一致") —
+    // onMakerOpenAccountEntries() used to drop the emitted event's own `phase`, so the View Voucher
+    // dialog opened from A4's own MAKER RESULT panel button couldn't apply the same finalize-phase
+    // override MakerPanelComponent.resultPhase already derives for the Status line right above it.
+    it('onMakerOpenAccountEntries forwards the emitted event\'s phase through to accountEntryDialogPhase', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      const m = movement({ movementId: 'mv-a4' });
+      c.onMakerOpenAccountEntries({ movement: m, instrumentType: 'IPLC_LC', phase: 'finalize' });
+      expect(c.accountEntryDialogMovement).toBe(m);
+      expect(c.accountEntryDialogPhase).toBe('finalize');
+    });
+
+    it('onMakerOpenAccountEntries defaults accountEntryDialogPhase to null when phase is omitted/null (every non-A4 case)', () => {
+      const c = new TransactionBuilderComponent(mockApi());
+      c.onMakerOpenAccountEntries({ movement: movement(), instrumentType: 'IPLC_LC', phase: null });
+      expect(c.accountEntryDialogPhase).toBeNull();
+
+      c.onMakerOpenAccountEntries({ movement: movement(), instrumentType: 'IPLC_LC' });
+      expect(c.accountEntryDialogPhase).toBeNull();
     });
 
     it('closeAccountEntryDialog resets both accountEntryDialogMovement and accountEntryDialogInstrumentType to null', () => {

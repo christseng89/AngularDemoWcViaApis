@@ -61,12 +61,23 @@ async function resolveLogicalContractId(captured, ref) {
 //
 // 'acknowledge' (added 2026-08-17 BAL-131 for B3's own former Present-Docs Checker acknowledgment) was
 // REMOVED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易" — every transaction must
-// genuinely RELEASE before the next step in the flow can act on it) — the /acknowledge endpoint itself
-// no longer exists server-side; B3 now uses the standard 'release' step type directly, same as every
-// other function. See businessCases.js's own Export Case #6/#7 for the updated step sequence.
+// genuinely RELEASE before the next step in the flow can act on it) — B3 now uses the standard 'release'
+// step type directly, same as every other function; see businessCases.js's own Export Case #6/#7 for that
+// updated step sequence.
+//
+// RESTORED 2026-08-28 — the /acknowledge endpoint itself came back 2026-08-20, RE-PURPOSED for A3/A3S's
+// own Checker acknowledgment on IPLC_LC/UTILIZE (business instruction, "A3 A3S 交易 Approve 過後
+// 不要再顯示"), but this dispatch table was never updated to match, leaving no orchestrator-level way to
+// reach it. That gap only became a REAL, live failure once A6's own createMovement()/release() cascade
+// (analysis/balance-component-api.yaml v1.29.0) started REQUIRING the referenced UTILIZE's own
+// `acknowledgedAt` before it will set `makerSubmittedAt`/allow Release — found live 2026-08-28 running
+// Import Case 7/8 (Usance A6/A7), which never acknowledge their own Document Arrivals and had silently
+// been failing every A6-related release step with 409 ILLEGAL_STATE_TRANSITION ever since v1.29.0 shipped.
+// Same single-bodyKey shape as release/makerSubmit, so it fits this table unchanged.
 const RELEASE_SHAPED_STEP_TYPES = {
   release: { subPath: 'release', bodyKey: 'releasedBy' },
   makerSubmit: { subPath: 'maker-submit', bodyKey: 'makerSubmittedBy' },
+  acknowledge: { subPath: 'acknowledge', bodyKey: 'acknowledgedBy' },
 };
 
 /** Runs one business case's step list against the microservice, returning a full trace for the UI. */

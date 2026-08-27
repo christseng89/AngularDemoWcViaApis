@@ -821,4 +821,66 @@ export function displayMovementAmount(
   return amount ?? '';
 }
 
+/**
+ * A6/B4/A3S Accounting Event Ownership Rule — "Set" label for `AccountEntriesDialogComponent`'s own
+ * two-set case, derived independently from EACH movement's own `movementType` rather than from its
+ * position (primary vs. linked). Bug found live 2026-08-28: the dialog originally hardcoded "Acceptance
+ * Entries" for whichever movement happened to be passed as the primary `@Input()` — correct for A6 and
+ * for the Inquire Events merge (where the Acceptance's own CREATE is always kept as the surviving/primary
+ * row, see `mergeAccountingEventRows()`), but WRONG for B4 viewed from the Checker's own screen, where
+ * `selectedCheckerMovement` resolves to the primary `ACCEPT` leg instead (`checkerContract` is always
+ * `EPLC_CONFIRMATION` for B4) — the two labels came out swapped. Deriving each set's own label from its
+ * own `movementType` instead makes the labeling correct regardless of which side happens to be primary.
+ * Scoped to exactly the movementTypes this two-set feature ever actually pairs (see CLAUDE.md's own
+ * entries) — anything else falls back to a generic label, never actually shown in practice since no other
+ * shape ever reaches this component with `linkedMovement` set.
+ */
+export function accountingSetLabel(movementType: string | null | undefined): string {
+  switch (movementType) {
+    case 'UTILIZE':
+      return 'LC Balance Entries';
+    case 'ACCEPT':
+      return 'Confirmed LC Balance Entries';
+    case 'CREATE':
+      return 'Acceptance Entries';
+    case 'FULL_REDEEM':
+    case 'PARTIAL_REDEEM':
+      return 'Shipping Guarantee Entries';
+    default:
+      return 'Account Entries';
+  }
+}
+
+/**
+ * Business-confirmed 2026-08-28 ("A3S 一套帳是 EARMARKING/EARMARKED for LC Balance（不傳到會計系統）一套帳是
+ * PENDING/APPROVED for SG（傳到會計系統）") — the two sets a two-set dialog row shows can be on genuinely
+ * DIFFERENT lifecycles, not just different accounts: A3S's own matched SG redemption reaches a real,
+ * Accounting-bound APPROVED the moment the Checker releases it, while the SAME click only ever
+ * acknowledges the LC's own UTILIZE, which stays EARMARKING/EARMARKED (Balance Component-internal,
+ * never sent to Accounting) until a LATER A4/A6 genuinely finalizes it — the two statuses are not
+ * interchangeable and must never be presented as if they always match (they do, coincidentally, for A6/
+ * B4's own cascade, but that is not a rule to lean on here). `AccountEntriesDialogComponent`'s own single
+ * top-level status badge only ever reflects the PRIMARY movement (using its own real `@Input()
+ * instrumentType` via `displayStatus()`/`statusBadgeClass()` directly) — these two exist so the LINKED
+ * movement, which carries no contract/instrumentType of its own in this dialog, gets its OWN accurate
+ * status too, not a borrowed one.
+ *
+ * Only `UTILIZE` is ever earmark-shaped among the movementTypes this two-set feature ever pairs (`ACCEPT`/
+ * `CREATE`/`FULL_REDEEM`/`PARTIAL_REDEEM` are never earmark-shaped regardless of which exact instrumentType
+ * they actually carry — `isEarmarkFunction()`'s own condition only matches `IPLC_LC/UTILIZE` or
+ * `EPLC_EXAMINATION/CREATE`, and B3 never reaches this dialog at all, see `accountingSetLabel()`'s own
+ * scope), so a plain movementType-keyed hint is sufficient here without needing the linked movement's own
+ * real contract.
+ */
+export function accountingSetStatusLabel(movement: { movementType: string | null | undefined; status: string; acknowledgedAt?: string | null } | null | undefined): string {
+  if (!movement) return '';
+  return displayStatus(movement.status, movement.movementType === 'UTILIZE' ? 'IPLC_LC' : undefined, movement.movementType, null, movement.acknowledgedAt);
+}
+
+/** Badge-class counterpart to `accountingSetStatusLabel()` immediately above — same reasoning, same scope. */
+export function accountingSetStatusBadgeClass(movement: { movementType: string | null | undefined; status: string; acknowledgedAt?: string | null } | null | undefined): string {
+  if (!movement) return '';
+  return statusBadgeClass(movement.status, movement.movementType === 'UTILIZE' ? 'IPLC_LC' : undefined, movement.movementType, null, movement.acknowledgedAt);
+}
+
 // payExistingUtilizeFunctionFor() relocated to function-strategy.ts too, same circular-import reason.

@@ -162,6 +162,19 @@ describe('resolveFunctionForMovement', () => {
     expect(resolveFunctionForMovement('EPLC_ACCEPTANCE', 'FULL_SETTLE')?.code).toBe('B5');
   });
 
+  // Bug fixed 2026-08-28 (reviewer-reported live in Maker Queue — "只是一筆EVENT 為何出現2 筆" / a bare
+  // "—" Function on a real PENDING row): a single B4 Submit creates a THIRD-instrumentType asset-side
+  // secondary leg beyond EPLC_ACCEPTANCE/CREATE above, in the SAME businessEventId — EPLC_ACCEPTANCE_
+  // REIMB_RECEIVABLE/CREATE (Usance shape) or EPLC_DUE_FROM_ISSUING_BANK/CREATE (Sight shape) — neither
+  // had a fallback registered, so Maker Queue's own functionFor() rendered a bare "—" for that row.
+  it("resolves EPLC_ACCEPTANCE_REIMB_RECEIVABLE/CREATE (B4's own Usance Reimbursement Receivable compound leg) to B4, via compoundSubmission.possibleShapes including confirmationAcceptWithReceivable", () => {
+    expect(resolveFunctionForMovement('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', 'CREATE')?.code).toBe('B4');
+  });
+
+  it("resolves EPLC_DUE_FROM_ISSUING_BANK/CREATE (B4's own Sight Due-from-Issuing-Bank compound leg) to B4, via compoundSubmission.possibleShapes including confirmationHonourWithReceivable", () => {
+    expect(resolveFunctionForMovement('EPLC_DUE_FROM_ISSUING_BANK', 'CREATE')?.code).toBe('B4');
+  });
+
   it("known limitation, explicitly accepted (see the function's own doc comment): IPLC_LC/UTILIZE is produced by BOTH A3 and A3S (both literal movementType: 'UTILIZE') — the resolver deterministically returns the first registry match, A3, since it's declared first", () => {
     expect(resolveFunctionForMovement('IPLC_LC', 'UTILIZE')?.code).toBe('A3');
   });
@@ -183,12 +196,26 @@ describe('resolveFunctionForMovement', () => {
 // InquireEventsService uses this instead of resolveFunctionForMovement() for the LATER (Release) half
 // of a finalized Sight Document Arrival, since the generic resolver always returns A3 for that pair.
 describe('payExistingUtilizeFunctionFor', () => {
-  it('resolves IPLC_LC to A4 — the one function in the registry with releasesExistingMovementInPlace set', () => {
-    expect(payExistingUtilizeFunctionFor('IPLC_LC')?.code).toBe('A4');
+  it('resolves IPLC_LC + Sight to A4 — the one function in the registry with releasesExistingMovementInPlace set', () => {
+    expect(payExistingUtilizeFunctionFor('IPLC_LC', 'SIGHT')?.code).toBe('A4');
+  });
+
+  // Business-confirmed 2026-08-27 ("A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure") — A6 finalizes
+  // the SAME referenced UTILIZE for Usance, via its own release() cascade rather than a direct in-place
+  // release; settlesDocumentArrival && !sourceAlreadyReleasedBeforePick picks out A6 specifically (B4
+  // also sets settlesDocumentArrival, but its own referenced B3 is already released before pick).
+  it('resolves IPLC_LC + either Usance tenor to A6', () => {
+    expect(payExistingUtilizeFunctionFor('IPLC_LC', 'SELLERS_USANCE')?.code).toBe('A6');
+    expect(payExistingUtilizeFunctionFor('IPLC_LC', 'BUYERS_USANCE')?.code).toBe('A6');
+  });
+
+  it('returns undefined when tenorType is omitted/null — a legacy null-tenorType contract has no finalizing Function at all', () => {
+    expect(payExistingUtilizeFunctionFor('IPLC_LC')).toBeUndefined();
+    expect(payExistingUtilizeFunctionFor('IPLC_LC', null)).toBeUndefined();
   });
 
   it('returns undefined for any instrumentType with no matching function of its own (e.g. SHGT, EPLC_CONFIRMATION — no Export equivalent exists)', () => {
-    expect(payExistingUtilizeFunctionFor('SHGT')).toBeUndefined();
-    expect(payExistingUtilizeFunctionFor('EPLC_CONFIRMATION')).toBeUndefined();
+    expect(payExistingUtilizeFunctionFor('SHGT', 'SIGHT')).toBeUndefined();
+    expect(payExistingUtilizeFunctionFor('EPLC_CONFIRMATION', 'SIGHT')).toBeUndefined();
   });
 });

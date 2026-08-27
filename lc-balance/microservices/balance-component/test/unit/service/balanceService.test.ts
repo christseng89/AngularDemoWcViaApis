@@ -12,8 +12,9 @@
 import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { InvalidMonetaryAmountError } from '../../../src/money';
-import { CurrencyMismatchError, IllegalStateTransitionError, NaturalKeyAlreadyExistsError } from '../../../src/errors';
+import { CurrencyMismatchError, IllegalStateTransitionError, NaturalKeyAlreadyExistsError, RequestValidationError } from '../../../src/errors';
 import { DeletePendingAuditStore } from '../../../src/store/deletePendingAuditStore';
+import { BalanceMovementStore } from '../../../src/store/balanceMovementStore';
 
 describe('BalanceService.createMovement — parseMonetaryAmount enforcement at the service layer (BAL-115)', () => {
   test('AMEND_DECREASE with a malformed amount throws InvalidMonetaryAmountError, not a silent NaN comparison', () => {
@@ -1117,7 +1118,7 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
     expect(service.getBalanceSnapshot(confirmation.balanceContractId).presentDocsEarmarkApproved).toBe('0');
   });
 
-  test("releasing A6's own linked Acceptance CREATE (referencedTransactionId -> an IPLC_LC/UTILIZE, Import side) never triggers the B3-consume side effect — scoped to EPLC_EXAMINATION only", () => {
+  test("releasing A6's own linked Acceptance CREATE (referencedTransactionId -> an IPLC_LC/UTILIZE, Import side) never touches presentDocsConsumedAt — that side effect stays scoped to EPLC_EXAMINATION only; the UTILIZE itself is genuinely finalized by a DIFFERENT side effect instead (business-confirmed 2026-08-27, see the dedicated describe block below for the full behavior)", () => {
     const service = new BalanceService(createDb(':memory:'));
     const lcIssue = service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -1147,7 +1148,7 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
       createdBy: 'maker1',
     });
     if (!arrival.created) throw new Error('expected a new movement');
-    service.release(arrival.movement.movementId, 'checker1');
+    service.acknowledgeArrival(arrival.movement.movementId, 'checker1');
 
     const acceptance = service.createMovement({
       instrumentType: 'IPLC_ACCEPTANCE',
@@ -1163,10 +1164,13 @@ describe('BalanceService.release — B3 (EPLC_EXAMINATION/CREATE) now genuinely 
     });
     if (!acceptance.created) throw new Error('expected a new movement');
 
-    // Must not throw and must not attempt to touch the (already-RELEASED, plain IPLC_LC/UTILIZE)
-    // referenced movement's own presentDocsConsumedAt — it isn't an EPLC_EXAMINATION/CREATE at all, so
-    // the auto-consume side effect's own type/instrumentType guard must correctly skip it.
+    // Must not throw, and the referenced UTILIZE (now genuinely finalized, not an EPLC_EXAMINATION/CREATE
+    // at all) must never have its presentDocsConsumedAt touched — that side effect's own type check must
+    // correctly skip it.
     expect(() => service.release(acceptance.movement.movementId, 'checker1')).not.toThrow();
+    const finalizedUtilize = service.listMovements(lc.balanceContractId).find((m) => m.movementId === arrival.movement.movementId)!;
+    expect(finalizedUtilize.status).toBe('RELEASED');
+    expect((finalizedUtilize as any).presentDocsConsumedAt ?? null).toBeNull();
   });
 });
 
@@ -1232,6 +1236,592 @@ describe('BalanceService.listMyMovements — Fix Pending/Delete Pending Phase 2 
     const service = new BalanceService(createDb(':memory:'));
     const page = service.listMyMovements({ createdBy: 'nobody-has-submitted-anything' });
     expect(page).toEqual({ items: [], total: 0, page: 1, pageSize: 10 });
+  });
+});
+
+describe('BalanceService.listMyMovements — EARMARKED (acknowledged, not yet Maker-Submitted into A4) is excluded (business-confirmed 2026-08-27, "EARMARKED 等同 APPROVED 不要出現在 MAKER QUEUE 上")', () => {
+  function issueSightLcAndUtilize(service: BalanceService, lcNumber: string, createdBy: string) {
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy,
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'IB-001',
+      createdBy,
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    return utilize.movement;
+  }
+
+  test('a plain PENDING (never acknowledged, EARMARKING) A3 row still appears', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const utilize = issueSightLcAndUtilize(service, 'MQ-EARMARK-1', 'maker1');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).toContain(utilize.movementId);
+  });
+
+  test('an acknowledged-but-not-yet-Maker-Submitted (EARMARKED) A3 row is excluded', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const utilize = issueSightLcAndUtilize(service, 'MQ-EARMARK-2', 'maker1');
+    service.acknowledgeArrival(utilize.movementId, 'checker1');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).not.toContain(utilize.movementId);
+    expect(page.total).toBe(0);
+  });
+
+  test('once Maker-Submitted into A4, the SAME row reappears (genuinely actionable PENDING again)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const utilize = issueSightLcAndUtilize(service, 'MQ-EARMARK-3', 'maker1');
+    service.acknowledgeArrival(utilize.movementId, 'checker1');
+    service.submitByMaker(utilize.movementId, 'maker1');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).toContain(utilize.movementId);
+    expect(page.total).toBe(1);
+  });
+
+  test('a REJECTED A4 attempt (acknowledged + makerSubmitted, then Checker-rejected) still appears', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const utilize = issueSightLcAndUtilize(service, 'MQ-EARMARK-4', 'maker1');
+    service.acknowledgeArrival(utilize.movementId, 'checker1');
+    service.submitByMaker(utilize.movementId, 'maker1');
+    service.reject(utilize.movementId, 'checker1', 'SETTLEMENT_DECLINED');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).toContain(utilize.movementId);
+  });
+
+  test('total/pagination stay consistent with the exclusion (no off-by-one from a naive client-side filter)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const earmarking = issueSightLcAndUtilize(service, 'MQ-EARMARK-5', 'maker9');
+    const earmarked = issueSightLcAndUtilize(service, 'MQ-EARMARK-6', 'maker9');
+    service.acknowledgeArrival(earmarked.movementId, 'checker1');
+
+    const page = service.listMyMovements({ createdBy: 'maker9', page: 1, pageSize: 10 });
+
+    expect(page.total).toBe(1);
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.movement.movementId).toBe(earmarking.movementId);
+  });
+});
+
+describe('BalanceService.listMyMovements — A6\'s own referenced A3/A3S UTILIZE is excluded once superseded by A6\'s own separate CREATE (business-confirmed 2026-08-27, "應該是一個 U01 B01" — a duplicate-row defect)', () => {
+  function issueUsanceLcAndUtilize(service: BalanceService, lcNumber: string, createdBy: string) {
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
+      createdBy,
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy,
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.acknowledgeArrival(utilize.movement.movementId, 'checker1');
+    const lcContract = service.resolveContract('IPLC_LC', { lcNumber });
+    if (!lcContract) throw new Error('expected the just-issued LC to resolve');
+    return { lc: lcContract, utilize: utilize.movement };
+  }
+
+  test('before A6 exists, the referenced UTILIZE alone appears once it is Maker-Submitted (e.g. via direct API)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { utilize } = issueUsanceLcAndUtilize(service, 'MQ-A6-DUP-1', 'maker1');
+    service.submitByMaker(utilize.movementId, 'maker1');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).toEqual([utilize.movementId]);
+  });
+
+  test('once A6 creates its own separate CREATE (referencedTransactionId -> the UTILIZE), ONLY A6\'s own row appears — the referenced UTILIZE is excluded, not duplicated', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'MQ-A6-DUP-2', 'maker1');
+    const acceptance = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'MQ-A6-DUP-2', ibNumber: 'B01' },
+      movementType: 'CREATE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.logicalContractId,
+      referencedTransactionId: utilize.movementId,
+      createdBy: 'maker1',
+    });
+    if (!acceptance.created) throw new Error('expected a new movement');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).toEqual([acceptance.movement.movementId]);
+    expect(page.total).toBe(1);
+  });
+
+  test('if A6\'s own CREATE is later Delete-Pending\'d (CANCELLED), the referenced UTILIZE does NOT reappear — Delete Pending\'s own applyCancelSideEffects() (see the dedicated describe block below) reverts it to plain not-yet-actionable EARMARKED, the same "notYetActionableEarmark" state a fresh A3 record is already excluded in', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'MQ-A6-DUP-3', 'maker1');
+    const acceptance = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'MQ-A6-DUP-3', ibNumber: 'B01' },
+      movementType: 'CREATE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.logicalContractId,
+      referencedTransactionId: utilize.movementId,
+      createdBy: 'maker1',
+    });
+    if (!acceptance.created) throw new Error('expected a new movement');
+    service.cancel(acceptance.movement.movementId, 'maker1', 'MAKER_EC');
+
+    const page = service.listMyMovements({ createdBy: 'maker1' });
+
+    expect(page.items.map((r) => r.movement.movementId)).not.toContain(utilize.movementId);
+  });
+});
+
+describe('BalanceService.cancel — A6 Delete Pending reverses the referenced UTILIZE\'s own Maker-Submit gate (business-confirmed 2026-08-27, "都只有一筆... 掛帳也掛在同一筆EVENT上")', () => {
+  function issueUsanceLcAndUtilize(service: BalanceService, lcNumber: string, createdBy: string) {
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
+      createdBy,
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy,
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.acknowledgeArrival(utilize.movement.movementId, 'checker1');
+    const lcContract = service.resolveContract('IPLC_LC', { lcNumber });
+    if (!lcContract) throw new Error('expected the just-issued LC to resolve');
+    return { lc: lcContract, utilize: utilize.movement };
+  }
+
+  test('cancelling A6\'s own CREATE clears the referenced UTILIZE\'s own makerSubmittedAt (revert to before A6 Submit) — no orphaned finalize row left behind', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'CANCEL-A6-REVERT-1', 'maker1');
+    const acceptance = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'CANCEL-A6-REVERT-1', ibNumber: 'B01' },
+      movementType: 'CREATE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.logicalContractId,
+      referencedTransactionId: utilize.movementId,
+      createdBy: 'maker1',
+    });
+    if (!acceptance.created) throw new Error('expected a new movement');
+    const findUtilize = () => service.listMovements(lc.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    // applyCreateSideEffects() already set this — sanity-check the precondition before reversing it.
+    expect(findUtilize().makerSubmittedAt).toBeTruthy();
+
+    service.cancel(acceptance.movement.movementId, 'maker1', 'MAKER_EC');
+
+    const reverted = findUtilize();
+    expect(reverted.makerSubmittedAt).toBeNull();
+    expect(reverted.makerSubmittedBy).toBeNull();
+    expect(reverted.status).toBe('PENDING');
+    expect(reverted.acknowledgedAt).toBeTruthy(); // A3/A3S's own Checker acknowledgment is a permanent historical fact, untouched.
+  });
+
+  test('cancelling A6\'s own CREATE writes exactly ONE delete_pending_audit row — the reversed UTILIZE gets no second row', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'CANCEL-A6-REVERT-2', 'maker1');
+    const acceptance = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'CANCEL-A6-REVERT-2', ibNumber: 'B01' },
+      movementType: 'CREATE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.logicalContractId,
+      referencedTransactionId: utilize.movementId,
+      createdBy: 'maker1',
+    });
+    if (!acceptance.created) throw new Error('expected a new movement');
+
+    service.cancel(acceptance.movement.movementId, 'maker1', 'MAKER_EC');
+
+    const audit = service.listDeletePendingAudit({ lcNumber: 'CANCEL-A6-REVERT-2' });
+    expect(audit.items.map((r) => r.movementId)).toEqual([acceptance.movement.movementId]);
+  });
+
+  test('a standalone cancel() with no referencedTransactionId (e.g. plain A3 Delete Pending) is unaffected — applyCancelSideEffects() no-ops', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'CANCEL-A6-REVERT-3', 'maker1');
+
+    expect(() => service.cancel(utilize.movementId, 'maker1', 'MAKER_EC')).not.toThrow();
+    const cancelled = service.listMovements(lc.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    expect(cancelled.status).toBe('CANCELLED');
+  });
+
+  test('a referencedTransactionId pointing at a movement that no longer resolves (raw API edge case) is a silent no-op, never a throw', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CANCEL-A6-REVERT-4' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const acceptance = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'CANCEL-A6-REVERT-4', ibNumber: 'B01' },
+      movementType: 'CREATE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.movement.balanceContractId,
+      referencedTransactionId: 'does-not-exist',
+      createdBy: 'maker1',
+    });
+    if (!acceptance.created) throw new Error('expected a new movement');
+
+    expect(() => service.cancel(acceptance.movement.movementId, 'maker1', 'MAKER_EC')).not.toThrow();
+  });
+
+  test('a referencedTransactionId pointing at a movement whose own shape doesn\'t match A6\'s cascade (e.g. movementType !== UTILIZE, or already not makerSubmitted) is unaffected — each `&&` guard clause independently no-ops', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'CANCEL-A6-REVERT-5', 'maker1');
+    // Points at the LC's own ISSUE (RELEASED, movementType 'ISSUE') instead of the UTILIZE — a raw API
+    // caller's referencedTransactionId is never validated against a real A6 cascade shape.
+    const issueMovement = service.listMovements(lc.balanceContractId).find((m) => m.movementType === 'ISSUE')!;
+    const bogusReferencing = service.createMovement({
+      instrumentType: 'IPLC_ACCEPTANCE',
+      naturalKey: { lcNumber: 'CANCEL-A6-REVERT-5', ibNumber: 'B02' },
+      movementType: 'CREATE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '1000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      parentLogicalContractId: lc.logicalContractId,
+      referencedTransactionId: issueMovement.movementId,
+      createdBy: 'maker1',
+    });
+    if (!bogusReferencing.created) throw new Error('expected a new movement');
+
+    expect(() => service.cancel(bogusReferencing.movement.movementId, 'maker1', 'MAKER_EC')).not.toThrow();
+    // The real UTILIZE (never referenced by anything here) is completely untouched.
+    const utilizeStillIntact = service.listMovements(lc.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    expect(utilizeStillIntact.makerSubmittedAt).toBeNull();
+    expect(utilizeStillIntact.status).toBe('PENDING');
+  });
+});
+
+describe('BalanceService.withdrawMakerSubmit — A4 Delete Pending reverts to before A4 Submit (business-confirmed 2026-08-27)', () => {
+  function issueSightLcAcknowledgedAndSubmitted(lcNumber: string) {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'IB-001',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.acknowledgeArrival(utilize.movement.movementId, 'checker1');
+    service.submitByMaker(utilize.movement.movementId, 'maker1');
+    return { service, movement: utilize.movement };
+  }
+
+  test('from still-PENDING (A4 awaiting Checker): clears makerSubmittedAt, keeps status PENDING and acknowledgedAt intact', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-1');
+
+    const withdrawn = service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    expect(withdrawn.status).toBe('PENDING');
+    expect(withdrawn.makerSubmittedAt).toBeNull();
+    expect(withdrawn.makerSubmittedBy).toBeNull();
+    expect(withdrawn.acknowledgedAt).toBeTruthy();
+    expect(withdrawn.acknowledgedBy).toBe('checker1');
+  });
+
+  test('after withdrawing from PENDING, the Maker can submitByMaker() (attempt A4) again', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-2');
+    service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    const resubmitted = service.submitByMaker(movement.movementId, 'maker1');
+
+    expect(resubmitted.makerSubmittedAt).toBeTruthy();
+  });
+
+  test('unified logic — from REJECTED (A4\'s own Checker already rejected it): clears makerSubmittedAt AND reverts status back to PENDING', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-3');
+    const rejected = service.reject(movement.movementId, 'checker1', 'SETTLEMENT_DECLINED');
+    expect(rejected.status).toBe('REJECTED');
+
+    const withdrawn = service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    expect(withdrawn.status).toBe('PENDING');
+    expect(withdrawn.makerSubmittedAt).toBeNull();
+    expect(withdrawn.acknowledgedAt).toBeTruthy();
+  });
+
+  test('after withdrawing from REJECTED, the Maker can submitByMaker() (attempt A4) again and it can Release through to completion', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-4');
+    service.reject(movement.movementId, 'checker1', 'SETTLEMENT_DECLINED');
+    service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    const resubmitted = service.submitByMaker(movement.movementId, 'maker1');
+    expect(resubmitted.makerSubmittedAt).toBeTruthy();
+    const released = service.release(movement.movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+  });
+
+  test('rejects a movement that was never Maker-Submitted (still A3\'s own EARMARKED business)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'WD-5' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'IB-001',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.acknowledgeArrival(utilize.movement.movementId, 'checker1');
+
+    expect(() => service.withdrawMakerSubmit(utilize.movement.movementId, 'maker1')).toThrow(IllegalStateTransitionError);
+  });
+
+  test('rejects a RELEASED movement', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-6');
+    service.release(movement.movementId, 'checker1');
+
+    expect(() => service.withdrawMakerSubmit(movement.movementId, 'maker1')).toThrow(IllegalStateTransitionError);
+  });
+
+  test('rejects a non-IPLC_LC/UTILIZE movement', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const cnf = service.createMovement({
+      instrumentType: 'EPLC_CONFIRMATION',
+      naturalKey: { lcNumber: 'WD-7' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '50000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!cnf.created) throw new Error('expected a new movement');
+
+    expect(() => service.withdrawMakerSubmit(cnf.movement.movementId, 'maker1')).toThrow(RequestValidationError);
+  });
+
+  test('business-confirmed 2026-08-27 ("DELETE 後要記錄在 Inquire Delete Pending 內") — writes a delete_pending_audit row with statusBefore=PENDING, visible via Inquire Delete Pending', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-8');
+
+    service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    const audit = service.listDeletePendingAudit({ lcNumber: 'WD-8' });
+    expect(audit.items).toHaveLength(1);
+    expect(audit.items[0]).toMatchObject({
+      movementId: movement.movementId,
+      movementType: 'UTILIZE',
+      statusBefore: 'PENDING',
+      cancelledBy: 'maker1',
+      reasonCode: 'MAKER_EC',
+    });
+  });
+
+  test('a REJECTED A4 attempt writes an audit row with statusBefore=REJECTED', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-9');
+    service.reject(movement.movementId, 'checker1', 'SETTLEMENT_DECLINED');
+
+    service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    const audit = service.listDeletePendingAudit({ lcNumber: 'WD-9' });
+    expect(audit.items).toHaveLength(1);
+    expect(audit.items[0]?.statusBefore).toBe('REJECTED');
+  });
+
+  test('a second withdraw-then-resubmit-then-withdraw cycle produces two independent audit rows sharing the same natural-key delete-seq chain', () => {
+    const { service, movement } = issueSightLcAcknowledgedAndSubmitted('WD-10');
+    service.withdrawMakerSubmit(movement.movementId, 'maker1');
+    service.submitByMaker(movement.movementId, 'maker1');
+
+    service.withdrawMakerSubmit(movement.movementId, 'maker1');
+
+    const audit = service.listDeletePendingAudit({ lcNumber: 'WD-10' });
+    expect(audit.items).toHaveLength(2);
+    expect(audit.items.map((a) => a.deleteSeq).sort()).toEqual([1, 2]);
+  });
+});
+
+// Defect fix (BA code-review finding ahead of Balance-Component-DeletePending-TestPlan-zh.md §8 step 3,
+// registered under that document's own §0.3 Test Governance Rule as the defect blocking §3 Case 5) —
+// updateStatus()'s own released_by/released_at previously did a plain overwrite; cancel() never supplies
+// either, so a REJECTED -> Delete Pending -> CANCELLED transition (statusTransition.ts's own REJECTED:
+// { CANCEL: 'CANCELLED' }) silently erased reject()'s own audit pair (there is no separate
+// rejected_by/rejected_at column — reject() writes into these same two). §0.2's own P0 rule requires all
+// three points of the Acknowledge -> Reject -> Delete audit trail to remain independently queryable after
+// the Delete; this closes the one already-shipped gap in reaching that.
+describe('BalanceService.cancel — REJECTED -> Delete Pending preserves the prior Reject\'s own released_by/released_at (Balance-Component-DeletePending-TestPlan-zh.md §0.2 P0, §3 Case 5)', () => {
+  function issueSightLcAcknowledgedSubmittedAndRejected(lcNumber: string) {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'IB-001',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.acknowledgeArrival(utilize.movement.movementId, 'checker1');
+    service.submitByMaker(utilize.movement.movementId, 'maker1');
+    const rejected = service.reject(utilize.movement.movementId, 'checker1', 'SETTLEMENT_DECLINED');
+    return { service, rejected };
+  }
+
+  test('Cancel after Reject keeps released_by/released_at exactly as Reject wrote them, alongside its own cancelled_by/cancelled_at and the original acknowledgedAt — all three audit points independently queryable', () => {
+    const { service, rejected } = issueSightLcAcknowledgedSubmittedAndRejected('REJ-CANCEL-1');
+    expect(rejected.status).toBe('REJECTED');
+    expect(rejected.releasedBy).toBe('checker1');
+    expect(rejected.releasedAt).toBeTruthy();
+    const rejectedAt = rejected.releasedAt;
+
+    const cancelled = service.cancel(rejected.movementId, 'maker1', 'MAKER_EC');
+
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(cancelled.acknowledgedAt).toBeTruthy(); // point 1: Acknowledge — untouched by any updateStatus() call.
+    expect(cancelled.releasedBy).toBe('checker1'); // point 2: Reject — must survive Cancel's own updateStatus() call.
+    expect(cancelled.releasedAt).toBe(rejectedAt);
+    expect(cancelled.cancelledBy).toBe('maker1'); // point 3: Delete Pending — cancel()'s own dedicated pair.
+    expect(cancelled.cancelledAt).toBeTruthy();
+  });
+
+  test('a plain (never-acknowledged) PENDING -> Reject -> Cancel path gets the same released_by/released_at preservation, with acknowledgedAt staying null throughout', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const created = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'REJ-CANCEL-2' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '50000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!created.created) throw new Error('expected a new movement');
+    const rejected = service.reject(created.movement.movementId, 'checker1', 'DOC_DISCREPANCY');
+
+    const cancelled = service.cancel(rejected.movementId, 'maker1', 'MAKER_EC');
+
+    expect(cancelled.releasedBy).toBe('checker1');
+    expect(cancelled.releasedAt).toBe(rejected.releasedAt);
+    expect(cancelled.acknowledgedAt).toBeNull();
   });
 });
 
@@ -1351,7 +1941,7 @@ describe('BalanceService.cancel — Delete Pending on a root A1/B1 ISSUE frees t
     ).toThrow(NaturalKeyAlreadyExistsError);
   });
 
-  test('does NOT cancel the contract for a CHILD instrumentType\'s own ISSUE (SHGT/A8 — literally the same "ISSUE" movementType string, but not a root contract)', () => {
+  test('DOES cancel the contract for a CHILD instrumentType\'s own ISSUE (SHGT/A8) when it was the only movement on it, freeing the SG Number for reuse', () => {
     const service = new BalanceService(createDb(':memory:'));
     const lcIssue = issueRoot(service, 'IPLC_LC', 'REUSE-004');
     service.release(lcIssue.movementId, 'checker1');
@@ -1371,12 +1961,59 @@ describe('BalanceService.cancel — Delete Pending on a root A1/B1 ISSUE frees t
 
     service.cancel(sgIssue.movement.movementId, 'maker1', 'MAKER_EC');
 
-    // The SG's own natural key (LC + SG Number) must still be blocked from a fresh SHGT ISSUE — this
-    // fix is scoped to root A1/B1 only, not child-creating functions (A6/A7/A8/B3).
+    // Same SG Number under the same LC, fresh Submit — must now succeed as a genuinely new contract.
+    const secondAttempt = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'REUSE-004', sgNumber: 'G01' },
+      parentLogicalContractId: lc.logicalContractId,
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '20000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    expect(secondAttempt.created).toBe(true);
+    if (!secondAttempt.created) return;
+    expect(secondAttempt.movement.balanceContractId).not.toBe(sgIssue.movement.balanceContractId);
+  });
+
+  test('does NOT cancel a CHILD contract when a sibling movement already exists on it (only reachable via a direct, non-UI API call)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lcIssue = issueRoot(service, 'IPLC_LC', 'REUSE-005');
+    service.release(lcIssue.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber: 'REUSE-005' });
+    if (!lc) throw new Error('expected the just-issued LC to resolve');
+    const sgIssue = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'REUSE-005', sgNumber: 'G01' },
+      parentLogicalContractId: lc.logicalContractId,
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!sgIssue.created) throw new Error('expected a new movement');
+    // A sibling movement reaching PENDING on the same still-un-Released SG (bypassing every Maker-action
+    // picker's own requireIssueReleased filter) — a direct-API-only edge case, see cancel()'s own doc
+    // comment for why the contract must be left ACTIVE rather than retired in this shape.
+    const sibling = service.createMovement({
+      instrumentType: 'SHGT',
+      balanceContractId: sgIssue.movement.balanceContractId,
+      movementType: 'FULL_REDEEM',
+      eventSeq: Date.now() + Math.random(),
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!sibling.created) throw new Error('expected a new movement');
+
+    service.cancel(sgIssue.movement.movementId, 'maker1', 'MAKER_EC');
+
     expect(() =>
       service.createMovement({
         instrumentType: 'SHGT',
-        naturalKey: { lcNumber: 'REUSE-004', sgNumber: 'G01' },
+        naturalKey: { lcNumber: 'REUSE-005', sgNumber: 'G01' },
         parentLogicalContractId: lc.logicalContractId,
         movementType: 'ISSUE',
         eventSeq: Date.now() + Math.random(),
@@ -1385,6 +2022,88 @@ describe('BalanceService.cancel — Delete Pending on a root A1/B1 ISSUE frees t
         createdBy: 'maker1',
       }),
     ).toThrow(NaturalKeyAlreadyExistsError);
+  });
+});
+
+describe('BalanceService.createMovement — sourceTransactionRef reuse after Delete Pending (business-confirmed 2026-08-27, live-reproduced on A3/S01/B04)', () => {
+  function issueSightLc(service: BalanceService, lcNumber: string) {
+    const result = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!result.created) throw new Error('expected a new movement');
+    service.release(result.movement.movementId, 'checker1');
+    return result.movement;
+  }
+
+  function submitUtilize(service: BalanceService, balanceContractId: string, sourceTransactionRef: string) {
+    const result = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '10000',
+      currency: 'USD',
+      sourceTransactionRef,
+      createdBy: 'maker1',
+    });
+    if (!result.created) throw new Error('expected a new movement');
+    return result.movement;
+  }
+
+  test('A3: Submit -> Delete Pending -> same IB Number (B04) -> Submit again succeeds', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueSightLc(service, 'S01-SRC-REUSE-1');
+    const first = submitUtilize(service, lc.balanceContractId, 'B04');
+
+    service.cancel(first.movementId, 'maker1', 'MAKER_EC');
+
+    expect(() => submitUtilize(service, lc.balanceContractId, 'B04')).not.toThrow();
+  });
+
+  test('A3: Submit -> Reject -> Delete Pending -> same IB Number (B04) -> Submit again succeeds', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueSightLc(service, 'S01-SRC-REUSE-2');
+    const first = submitUtilize(service, lc.balanceContractId, 'B04');
+    service.reject(first.movementId, 'checker1', 'DOCS_DISCREPANCY');
+
+    service.cancel(first.movementId, 'maker1', 'MAKER_EC');
+
+    expect(() => submitUtilize(service, lc.balanceContractId, 'B04')).not.toThrow();
+  });
+
+  test('the original CANCELLED movement itself is left untouched (still readable, still carries B04, still in Inquire Delete Pending) — only the duplicate check is narrowed', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueSightLc(service, 'S01-SRC-REUSE-3');
+    const first = submitUtilize(service, lc.balanceContractId, 'B04');
+    service.cancel(first.movementId, 'maker1', 'MAKER_EC');
+
+    const second = submitUtilize(service, lc.balanceContractId, 'B04');
+
+    const all = service.listMovements(lc.balanceContractId);
+    const cancelledOriginal = all.find((m) => m.movementId === first.movementId);
+    expect(cancelledOriginal?.status).toBe('CANCELLED');
+    expect(cancelledOriginal?.sourceTransactionRef).toBe('B04');
+    expect(second.status).toBe('PENDING');
+    expect(second.sourceTransactionRef).toBe('B04');
+
+    const audit = service.listDeletePendingAudit({ lcNumber: 'S01-SRC-REUSE-3' });
+    expect(audit.items.map((a) => a.movementId)).toContain(first.movementId);
+  });
+
+  test('a still-PENDING (never cancelled) duplicate sourceTransactionRef is still rejected — the fix only excludes CANCELLED, not every status', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueSightLc(service, 'S01-SRC-REUSE-4');
+    submitUtilize(service, lc.balanceContractId, 'B04');
+
+    expect(() => submitUtilize(service, lc.balanceContractId, 'B04')).toThrow(RequestValidationError);
   });
 });
 
@@ -1665,5 +2384,55 @@ describe('BalanceService.cancel — delete_pending_audit (Fix Pending/Delete Pen
 
     expect(store.listByMovement('no-such-movement')).toEqual([]);
     expect(store.listByContract('no-such-contract')).toEqual([]);
+  });
+});
+
+describe('BalanceMovementStore.listShgtMovementsForParents — two children under the SAME parent', () => {
+  test('groups multiple SG contracts\' own movements under one parentLogicalContractId key (branch-coverage gap: the second row for an already-seen parent must push onto the existing list, not overwrite it)', () => {
+    const db = createDb(':memory:');
+    const service = new BalanceService(db);
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'SHGT-SIBLINGS-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const lcContract = service.resolveContract('IPLC_LC', { lcNumber: 'SHGT-SIBLINGS-001' });
+    if (!lcContract) throw new Error('expected the just-issued LC to resolve');
+
+    const sg1 = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'SHGT-SIBLINGS-001', sgNumber: 'SG01' },
+      movementType: 'ISSUE',
+      eventSeq: 2,
+      amount: '1000',
+      currency: 'USD',
+      parentLogicalContractId: lcContract.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!sg1.created) throw new Error('expected a new movement');
+    const sg2 = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber: 'SHGT-SIBLINGS-001', sgNumber: 'SG02' },
+      movementType: 'ISSUE',
+      eventSeq: 3,
+      amount: '2000',
+      currency: 'USD',
+      parentLogicalContractId: lcContract.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!sg2.created) throw new Error('expected a new movement');
+
+    const byParent = new BalanceMovementStore(db).listShgtMovementsForParents([lcContract.logicalContractId]);
+
+    const movements = byParent.get(lcContract.logicalContractId) ?? [];
+    expect(movements.map((m) => m.movementId).sort()).toEqual([sg1.movement.movementId, sg2.movement.movementId].sort());
   });
 });

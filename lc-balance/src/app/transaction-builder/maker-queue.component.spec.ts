@@ -65,11 +65,25 @@ describe('MakerQueueComponent', () => {
       expect(c.deletePendingLabel(row)).toBe('Delete Pending');
     });
 
-    it('returns an explanatory tooltip for a compound-submission row (businessEventId set)', () => {
+    // Business-confirmed 2026-08-28 ("1 只應該顯示一筆 2 一筆刪全部") — cascade-deletes every sibling
+    // leg together now, rather than being disabled; this tooltip discloses that before the Maker clicks.
+    it('returns an explanatory cascade-delete tooltip for a compound-submission row (businessEventId set)', () => {
       const c = new MakerQueueComponent();
       c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
       const row = { movement: makeMovement({ businessEventId: 'be-1' }), contract: makeContract() };
-      expect(c.deletePendingLabel(row)).toMatch(/not yet supported here for compound submissions/);
+      expect(c.deletePendingLabel(row)).toMatch(/cancels all of them together/);
+    });
+
+    // Business-confirmed 2026-08-27 ("改成 Delete Pending 統一名稱") — the button text itself is always
+    // plain "Delete Pending" (hardcoded in the template); this tooltip is the only place an A4 row still
+    // discloses that it routes to withdrawMakerSubmit() rather than a full cancel().
+    it('returns an A4-specific tooltip for a finalizing row (makerSubmittedAt set), whether PENDING or REJECTED', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+      const pendingRow = { movement: makeMovement({ movementType: 'UTILIZE', makerSubmittedAt: '2026-08-27T01:00:00.000Z', status: 'PENDING' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const rejectedRow = { movement: makeMovement({ movementType: 'UTILIZE', makerSubmittedAt: '2026-08-27T01:00:00.000Z', status: 'REJECTED' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      expect(c.deletePendingLabel(pendingRow)).toMatch(/Delete Pending \(A4\)/);
+      expect(c.deletePendingLabel(rejectedRow)).toMatch(/Delete Pending \(A4\)/);
     });
   });
 });

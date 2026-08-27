@@ -25,9 +25,19 @@ export class MakerQueueComponent {
   readonly statusBadgeClass = statusBadgeClassShared;
   readonly statusBadgeIcon = statusBadgeIconShared;
 
+  /**
+   * Business-confirmed 2026-08-27 ("改成 Delete Pending 統一名稱") — the visible button text is always
+   * plain "Delete Pending" (see the template), regardless of which action it routes to underneath
+   * (withdrawMakerSubmit() for an A4 row vs. a full cancel() otherwise, MakerQueueService.deletePending()'s
+   * own doc comment) — this tooltip is the only place that still discloses which one, for anyone who
+   * wants to know before clicking.
+   */
   deletePendingLabel(row: MakerQueueRow): string {
-    return this.makerQueue.isCompoundShape(row)
-      ? 'Delete Pending not yet supported here for compound submissions (A3S/B4/B5) — use the original Submit session\'s own Delete Pending button.'
+    if (this.makerQueue.isCompoundShape(row)) {
+      return 'Delete Pending (compound) — this row represents every leg of the same Business Event (A3S/B4/B5); deleting it cancels all of them together, not just this one.';
+    }
+    return this.makerQueue.isWithdrawMakerSubmitCase(row)
+      ? 'Delete Pending (A4) — returns this record to A3/A3S\'s own Checker-acknowledged (EARMARKED) state, ready to Maker-Submit A4 again. Does not cancel the underlying Document Arrival.'
       : 'Delete Pending';
   }
 }

@@ -107,5 +107,15 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     res.json(service.submitByMaker(req.params.movementId, makerSubmittedBy));
   });
 
+  // POST /balance-movements/:movementId/withdraw-maker-submit — business-confirmed 2026-08-27 ("做 A4
+  // 或 A6 DELETE PENDING 後 交易退回到 A4 或 A6 SUBMIT 前即可"), A4's own Delete Pending: undoes
+  // /maker-submit above without cancelling the underlying A3/A3S UTILIZE or its Checker acknowledgment
+  // (see service.withdrawMakerSubmit()'s own doc comment).
+  router.post('/balance-movements/:movementId/withdraw-maker-submit', (req, res) => {
+    const { withdrawnBy } = req.body as { withdrawnBy?: string };
+    if (!withdrawnBy) throw new RequestValidationError('withdrawnBy is required.');
+    res.json(service.withdrawMakerSubmit(req.params.movementId, withdrawnBy));
+  });
+
   return router;
 }

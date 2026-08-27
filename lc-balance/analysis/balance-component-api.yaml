@@ -412,8 +412,9 @@ info:
     the sign of `amount`) previously ran NO sufficiency check at all in its Decrease direction, unlike
     `IPLC_LC`'s own `AMEND_DECREASE` — now shares that same floor check. (2) RESTORES
     `POST /balance-movements/{movementId}/acknowledge` (removed v1.12.0 for B3) — re-purposed for A3/A3S's
-    own `IPLC_LC`/`UTILIZE` instead: the Checker's "Approve (acknowledgment only)" step on a Document
-    Arrival still deliberately never transitions `status` (A4/A6 remains the sole real finalization), but
+    own `IPLC_LC`/`UTILIZE` instead: the Checker's "Approve" step on a Document Arrival is deliberately
+    acknowledgment-only under the hood — it still never transitions `status` (A4/A6 remains the sole real
+    finalization), but
     is now genuinely persisted again (`acknowledgedBy`/`acknowledgedAt`, no longer historical-only) so a
     Checker Queue listing can filter an already-approved item out instead of it reappearing as PENDING
     forever.
@@ -782,7 +783,59 @@ info:
         previously only `businessEventId` was ever accepted and required).
       - ADDED: `DeletePendingAuditRecord` schema (always returned already-joined with its own contract's
         natural key — see the schema's own description).
-  version: "1.28.0"
+
+
+    v1.29.0 (2026-08-27, business-confirmed — "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure";
+    see `lc-balance/CLAUDE.md`'s own "Design Principle — Earmarking vs. Final-Processing Functions" entry
+    for the full accounting rationale): A3/A3S's own Usance earmark (`IPLC_LC`/`UTILIZE`) is a Balance
+    Component-internal Balance Reservation only — it never reaches Accounting on its own (Design doc §5.x)
+    — but was never actually CONVERTED into a real, second Account Entries set once A6 later Approved,
+    leaving it EARMARKED forever even after the Acceptance it supposedly became was fully posted. Fixed
+    with a genuine cascade, both directions:
+      - CHANGED: `POST /balance-movements` — a new `IPLC_ACCEPTANCE`/`CREATE` (A6) whose
+        `referencedTransactionId` points at a still-PENDING, already-acknowledged, not-yet-Maker-Submitted
+        `IPLC_LC`/`UTILIZE` now ALSO sets that referenced UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt`
+        as a side effect of THIS call — mirroring what `POST .../maker-submit` does explicitly for A4, since
+        A6 (unlike A4) has no separate "Maker Submit" step of its own to hang this on. Best-effort/silent
+        no-op for any other shape (e.g. a raw caller supplying an unrelated or already-submitted
+        `referencedTransactionId`) — never a validation error.
+      - CHANGED: `POST /balance-movements/{movementId}/release` — releasing that same A6 `CREATE`
+        recursively releases the referenced UTILIZE too (an internal call to this same endpoint's own
+        logic) — converting A3/A3S's own earmark into a SECOND, genuinely posted, independently-postable
+        Account Entries set (the LC's own `contingentAccountEntry`, Cr side — releasing the LC's own
+        contingent) alongside the Acceptance's own new set (Dr side — establishing the Acceptance's own
+        contingent). Both reach RELEASED together, from one Checker action, matching the same "one Release
+        click does BOTH" shape this document's own top-level description already established for other
+        compound functions.
+      - CHANGED: the v1.5.0 Maker-Submit gate (`POST .../release` returns `409` for an un-Maker-Submitted
+        `IPLC_LC`/`UTILIZE`) is WIDENED from Sight-tenor-only to ANY explicit `tenorType` — a Usance LC's
+        own UTILIZE (A6) now also requires `makerSubmittedAt` before release, automatically satisfied by
+        the CREATE-time side effect above. **Corrects v1.5.0's own changelog claim** ("why it cannot
+        affect a Usance LC's own UTILIZE... which never calls `/maker-submit`") — that was true before
+        this version; it is no longer true after it. A contract with no explicit `tenorType` at all (the
+        pre-existing backward-compatibility carve-out, e.g. the reference Business Case Runner's own older
+        cases) remains unaffected either way.
+      - CHANGED: `BalanceMovement.referencedTransactionId` — no longer universally "passthrough only,
+        never validated to resolve to a real movement" for the A6 shape specifically; see that field's own
+        corrected description below.
+
+
+    v1.30.0 (2026-08-28, business-confirmed — "都只有一筆... 掛帳也掛在同一筆EVENT上"): a REAL regression
+    in v1.29.0 above, found live the same review pass that formalized the A6/B4 Accounting Event Ownership
+    Rule (display-layer only — see `lc-balance/CLAUDE.md`'s own entry of that name; not otherwise
+    reflected in this contract) — cancelling A6's own `CREATE` left the referenced UTILIZE permanently
+    stranded with `makerSubmittedAt` still set from v1.29.0's own side effect, even though the A6 attempt
+    that set it had just been withdrawn.
+      - CHANGED: `POST /balance-movements/{movementId}/cancel` — cancelling an `IPLC_ACCEPTANCE`/`CREATE`
+        (A6) whose `referencedTransactionId` points at a still-PENDING `IPLC_LC`/`UTILIZE` with
+        `makerSubmittedAt` set (i.e. set by v1.29.0's own CREATE-time side effect) now ALSO clears that
+        UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` — "revert to before A6 Submit," the exact same
+        state `POST .../withdraw-maker-submit` restores for A4. Deliberately does NOT write a second
+        `DeletePendingAuditRecord` for the reverted UTILIZE — the one row this call already writes for
+        A6's own cancelled `CREATE` is the single audit record of this whole two-record business event; a
+        second row would reintroduce the identical "two records for one event" duplication the Design
+        Principle above exists to prevent, on the Delete Pending audit trail instead of the Event Timeline.
+  version: "1.30.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1191,6 +1244,15 @@ paths:
         zero, never negative); the same eligibility and exact-amount checks are re-run at
         `POST /balance-movements/{id}/release` before actually flipping status — see that endpoint's own
         description.
+
+
+        v1.29.0 — a new `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own `referencedTransactionId` points at a
+        still-PENDING, already-acknowledged, not-yet-Maker-Submitted `IPLC_LC`/`UTILIZE` (A3/A3S's own
+        earmark) ALSO sets that referenced UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` as a side
+        effect of THIS call — see `BalanceMovement.makerSubmittedBy`'s own description for the full
+        mechanism and why (A6 has no separate "Maker Submit" step of its own to set it from otherwise).
+        Best-effort/silent — an unrelated or already-submitted `referencedTransactionId` (e.g. from a raw
+        API caller) is simply ignored, never a validation error.
       requestBody:
         required: true
         content:
@@ -1240,6 +1302,19 @@ paths:
         Function/LC Number/Secondary Reference client-side without a second round trip, same posture as
         `GET /delete-pending-audit` below. `createdBy` is required to select this shape; `businessEventId`
         and `createdBy` are mutually exclusive — supplying neither is a `400`.
+
+
+        Shape (b)'s own PENDING/REJECTED result additionally excludes two kinds of row that would
+        otherwise be technically-PENDING noise, not genuinely actionable work items:
+        (1) an `IPLC_LC`/`UTILIZE` that is PENDING, already-acknowledged, but not yet Maker-Submitted (a
+        plain EARMARKED A3/A3S record with nothing outstanding for THIS Maker until they begin A4/A6);
+        (2) v1.28.0/v1.30.0 — any movement that is currently the target of another, still-live (non-
+        CANCELLED) movement's own `referencedTransactionId` — i.e. an A3/A3S UTILIZE already superseded by
+        its own A6's separate `CREATE` (business-confirmed 2026-08-27, "應該是一個 U01 B01" — without this,
+        the SAME A6 business event appeared as two independent worklist rows). If that superseding A6
+        `CREATE` is later Delete-Pending'd (v1.30.0), the underlying UTILIZE correctly reverts to case (1)
+        above and stays excluded — it does NOT reappear as its own row (the withdrawn A6 attempt reverted
+        it to a genuinely not-yet-actionable state, not a newly-actionable one).
       parameters:
         - name: businessEventId
           in: query
@@ -1339,7 +1414,7 @@ paths:
         v1.5.0 (2026-08-17, Quality-report-balance.md BAL-123, reviewer-found):
         for a Sight-tenor IPLC_LC's own UTILIZE movement specifically (A4 —
         Sight Settlement — the only function that plain-releases this
-        combination), this call now requires
+        combination, AT THAT TIME — see the v1.29.0 correction below), this call now requires
         `makerSubmittedAt` to already be set — i.e.
         `POST /balance-movements/{id}/maker-submit` must be called first —
         returning 409 otherwise. This closes a real 4-eyes integrity gap:
@@ -1348,14 +1423,13 @@ paths:
         caller could release an A4-type UTILIZE that was never
         Maker-submitted. Scoped narrowly by the movement's own parent
         contract `tenorType === 'SIGHT'`, not just
-        instrumentType/movementType, so a Usance LC's own UTILIZE (released
-        through this exact same endpoint via A6's compound
-        `referencedTransactionId` flow, which never calls `/maker-submit`
-        by design) is completely unaffected — and a movement whose parent
-        contract never declared an explicit `tenorType` at all (e.g. an
-        older caller that predates `tenorType` being required) is likewise
-        unaffected, so this is purely additive for genuine Sight LCs, never
-        a behavior change for anything that isn't one.
+        instrumentType/movementType — **this Sight-only scoping, and the claim two paragraphs below that a
+        Usance LC's own UTILIZE is "completely unaffected," were both SUPERSEDED by v1.29.0** (a Usance
+        LC's own UTILIZE now requires `makerSubmittedAt` too, automatically satisfied by A6's own CREATE-time
+        side effect — see that changelog entry). A movement whose parent contract never declared an
+        explicit `tenorType` at all (e.g. an older caller that predates `tenorType` being required) remains
+        unaffected either way, so this is still purely additive for genuine Sight/Usance LCs, never a
+        behavior change for anything that isn't one.
 
 
         v1.12.0 (2026-08-18): this endpoint is now B3's own genuine Checker
@@ -1368,6 +1442,19 @@ paths:
         (`presentDocsConsumedAt`/`presentDocsConsumedBy`) as a side effect —
         it does NOT re-release it (already `RELEASED` by then; attempting to
         would 409 — see the response below).
+
+
+        v1.29.0 (2026-08-27, business-confirmed, "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure"):
+        when the RELEASED movement is instead an `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own
+        `referencedTransactionId` points at a still-PENDING `IPLC_LC`/`UTILIZE`, this call ALSO
+        recursively releases that referenced UTILIZE (an internal call to this same endpoint's own logic,
+        not a re-implementation) — converting A3/A3S's own Balance Reservation-only earmark into a SECOND,
+        genuinely posted Account Entries set at the exact moment the Acceptance's own liability is
+        approved, both from the ONE Checker action on the A6 `CREATE` alone (the underlying UTILIZE is
+        never separately targeted by the caller). See `referencedTransactionId`'s and
+        `makerSubmittedBy`'s own schema descriptions for the full mechanism, and
+        `POST /balance-movements/{id}/cancel`'s own v1.30.0 entry for how this is cleanly reversed if the
+        A6 `CREATE` is instead Delete-Pending'd before Release.
 
 
         v1.16.0 (A10/B6 Close): releasing a `CLOSE` movement re-runs the SAME eligibility check
@@ -1406,12 +1493,16 @@ paths:
           description: >-
             Movement is not PENDING — illegal state transition, rejected
             explicitly rather than silently accepted (Design doc §8). Also
-            returned (v1.5.0) for a Sight-tenor IPLC_LC's own UTILIZE that
-            has not yet been Maker-submitted via
-            `POST /balance-movements/{id}/maker-submit`, and (v1.16.0) for a
-            `CLOSE` movement whose eligibility no longer holds or whose own
-            frozen amount no longer matches the contract's current Confirmed
-            Balance — see this endpoint's own description above.
+            returned (v1.5.0, widened v1.29.0 from Sight-only to any explicit
+            tenorType) for an IPLC_LC's own UTILIZE that has not yet been
+            Maker-submitted — explicitly via
+            `POST /balance-movements/{id}/maker-submit` (A4), or implicitly by
+            an A6 `CREATE` referencing it never having been Submitted either
+            (see `POST /balance-movements`'s own v1.29.0 entry) — and
+            (v1.16.0) for a `CLOSE` movement whose eligibility no longer holds
+            or whose own frozen amount no longer matches the contract's
+            current Confirmed Balance — see this endpoint's own description
+            above.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1595,11 +1686,34 @@ paths:
         below; a compound function's own cascade (A3S/B4/B5, each leg
         cancelled via its own separate call to this endpoint) naturally
         produces one audit row per leg, no special-casing needed. (2) when
-        the cancelled movement is the root ISSUE of `IPLC_LC`/`EPLC_LC`/
-        `EPLC_CONFIRMATION` (A1/B1 only — never a child CREATE/ISSUE sharing
-        the same `movementType` string), the owning `BalanceContract` is
-        ALSO marked `CANCELLED` — see `ContractStatus`'s own description for
-        the safety argument and why this frees the natural key for reuse.
+        the cancelled movement is a "creating" movementType (`ISSUE` or
+        `CREATE`) AND it is the ONLY movement its own `BalanceContract` has
+        ever had (no sibling movement of any status remains), that contract
+        is ALSO marked `CANCELLED` — see `ContractStatus`'s own description
+        for the safety argument and why this frees the natural key for
+        reuse. **CORRECTION, same day**: this was originally scoped to "the
+        root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` (A1/B1) only" —
+        business-confirmed the same day that the identical gap existed for
+        every OTHER creating movementType's own secondary Natural Key too
+        ("這個問題不要只針對 A3 hard-code。應檢查 A1–A11 / B1–B7 所有具有
+        Natural Key / Secondary Reference uniqueness validation 的功能") —
+        A6 (`IPLC_ACCEPTANCE`/`CREATE`), A8 (`SHGT`/`ISSUE`), B3
+        (`EPLC_EXAMINATION`/`CREATE`) all had the same bug for their own
+        IB/SG Number, permanently blocking a re-Submit under the same
+        secondary reference. The rule shipped is the general, always-safe
+        one above (any creating movementType, any instrumentType, gated only
+        by "no sibling movement exists") — the A1/B1-only, root-contract-only
+        wording never actually matched what was implemented, in any version.
+
+
+        v1.30.0 (2026-08-28, business-confirmed, "都只有一筆... 掛帳也掛在同一筆EVENT上"): cancelling an
+        `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own `referencedTransactionId` points at a still-PENDING
+        `IPLC_LC`/`UTILIZE` with `makerSubmittedAt` already set (by `POST /balance-movements`'s own
+        v1.29.0 side effect) now ALSO clears that UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` —
+        "revert to before A6 Submit," the same end state `POST .../withdraw-maker-submit` restores for A4.
+        Deliberately does NOT write a second `delete_pending_audit` record for the reverted UTILIZE — the
+        one row this call already writes for A6's own cancelled `CREATE` (side effect (1) above) remains
+        the single audit record of the whole two-record business event.
       parameters:
         - name: movementId
           in: path
@@ -2064,8 +2178,22 @@ components:
             Arrival/Present Docs" picked at submission time. Distinct from businessEventId (which only
             ever links movements created TOGETHER in the same submission): the source record here
             predates this one and never shares a businessEventId with it, so this field is the only
-            server-side correlation between them. Passthrough only, same posture as
-            sourceTransactionRef/businessEventId — never validated to resolve to a real movement.
+            server-side correlation between them.
+
+
+            B4's own reference (an already-RELEASED `EPLC_EXAMINATION`/`CREATE` — B3 self-releases before
+            B4 ever picks it) stays passthrough only, same posture as sourceTransactionRef/businessEventId
+            — never validated to resolve to a real movement, beyond the one existing side effect of
+            marking that B3 record's own `presentDocsConsumedAt`/`presentDocsConsumedBy` (v1.12.0).
+
+
+            v1.29.0 — A6's own reference is DIFFERENT and genuinely NOT passthrough-only: when this field
+            points at a still-PENDING `IPLC_LC`/`UTILIZE`, both `POST /balance-movements` (this
+            record's own creation) and `POST /balance-movements/{id}/release` (this record's own release)
+            actively resolve it and act on it as a real side effect — see those two endpoints' own
+            descriptions, and `makerSubmittedBy`/`makerSubmittedAt` below, for the full mechanism. This
+            is the one shape where `referencedTransactionId` drives real backend behavior rather than
+            existing purely for the caller's own correlation/audit convenience.
         balanceBefore: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
         balanceAfter: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
         createdBy: { type: string }
@@ -2112,13 +2240,28 @@ components:
           type: string
           nullable: true
           description: >
-            v1.4.0, IPLC_LC/UTILIZE only — set by
-            POST /balance-movements/{id}/maker-submit, A4 (Sight
-            Settlement)'s own real Maker action on the PRE-EXISTING UTILIZE
-            A3/A3S already earmarked (A4 creates no movement of its own).
-            Distinct from createdBy (the ORIGINAL A3/A3S submission) and
-            from releasedBy/releasedAt: submitting never transitions status
-            — the movement stays PENDING until the Checker's own /release.
+            v1.4.0, IPLC_LC/UTILIZE only. Set TWO different ways, both meaning the same real-world fact
+            ("this UTILIZE's own A4-or-A6 Maker action has happened") — a reader must not assume it only
+            ever came from the explicit endpoint:
+
+
+            (1) POST /balance-movements/{id}/maker-submit — A4 (Sight Settlement)'s own real Maker
+            action on the PRE-EXISTING UTILIZE A3/A3S already earmarked (A4 creates no movement of its
+            own).
+
+
+            (2) v1.29.0 — as a SIDE EFFECT of POST /balance-movements creating a NEW `IPLC_ACCEPTANCE`/
+            `CREATE` (A6) whose own `referencedTransactionId` points at this UTILIZE — A6 has no separate
+            "Maker Submit" step of its own to call (1) from, so its own createMovement() call sets this
+            directly instead. Reversed (v1.30.0) by POST /balance-movements/{id}/cancel when that SAME A6
+            CREATE is later Delete-Pending'd — see `referencedTransactionId`'s own description for the
+            full mechanism.
+
+
+            Distinct from createdBy (the ORIGINAL A3/A3S submission) and from releasedBy/releasedAt:
+            submitting never transitions status — the movement stays PENDING until the Checker's own
+            /release (which, for shape (2), is itself triggered as a cascade from releasing the A6
+            CREATE — see POST .../release's own description).
         makerSubmittedAt: { type: string, format: date-time, nullable: true }
         eventSnapshot:
           allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]

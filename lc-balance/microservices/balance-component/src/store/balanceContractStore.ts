@@ -368,11 +368,26 @@ export class BalanceContractStore {
    * Proposal-zh.md §11, business-directed 2026-08-27, "只有被 DELETE PENDING 過的才顯示") — unlike
    * `listCatalog()` above (every contract of the given instrumentType), this returns only one row per
    * distinct LC Number that has AT LEAST ONE `delete_pending_audit` record, ordered by LC Number to match
-   * the same "ORDER BY LC Number" convention this business requirement specifies. A1/B1's own LC-reuse fix
-   * (§9.3) means one LC Number can span multiple `balance_contracts` rows (a fresh one per Resubmit cycle)
-   * — the representative row returned for each LC Number is the one tied to its MOST RECENT Delete
-   * Pending action (`ORDER BY d.cancelled_at DESC, d.audit_id DESC LIMIT 1`), so Tenor Type/Currency/Face
-   * Amount reflect that latest incarnation, not an arbitrary one.
+   * the same "ORDER BY LC Number" convention this business requirement specifies.
+   *
+   * Bug fixed 2026-08-28 (business-reported live, "A8 SG Issue Submit 後 Delete Pending =>
+   * Inquire Delete Pending沒顯示"): the original query only matched a `delete_pending_audit` record whose
+   * OWN contract's `instrument_type` equals the root `@instrumentType` being Browse-d (`IPLC_LC` for
+   * Import, `EPLC_CONFIRMATION` for Export) — but A6/A8/A9's own Delete Pending (Import) and B3/B4/B5's
+   * own (Export) all cancel a CHILD contract (`SHGT`/`IPLC_ACCEPTANCE`/`EPLC_EXAMINATION`/`EPLC_ACCEPTANCE`),
+   * never the root LC itself, so those records were silently invisible from this Catalog no matter how
+   * many times the same LC was Delete-Pending'd at the child level. Same class of gap Inquire Events/Look
+   * Up already solved for their own merged timelines via `childInstrumentTypesOf()` — this now also counts
+   * a child contract's own Delete Pending record as long as that child's `parent_logical_contract_id`
+   * resolves back to THIS specific root incarnation (`c.logical_contract_id`), not merely a same-named
+   * LC Number on an unrelated contract.
+   *
+   * A1/B1's own LC-reuse fix (§9.3) means one LC Number can span multiple `balance_contracts` rows (a
+   * fresh one per Resubmit cycle) — the representative row returned for each LC Number is now the MOST
+   * RECENT root incarnation (`ORDER BY effective_from DESC`), independent of whether that specific
+   * incarnation (vs. an earlier one, or one of its own children) was the one actually Delete-Pending'd —
+   * a simpler, still-correct rule now that "most recent Delete Pending action" can legitimately belong to
+   * a child contract instead of the root.
    */
   listWithDeletePendingHistory(filter: { instrumentType: InstrumentType; q?: string; page?: number; pageSize?: number }): CatalogPage {
     const clauses = ['c.instrument_type = @instrumentType'];
@@ -382,10 +397,18 @@ export class BalanceContractStore {
       whereParams.q = `%${filter.q}%`;
     }
     const where = clauses.join(' AND ');
+    const hasDeletePendingHistory = `
+      EXISTS (
+        SELECT 1 FROM delete_pending_audit d
+        JOIN balance_contracts dc ON dc.balance_contract_id = d.balance_contract_id
+        WHERE dc.lc_number = c.lc_number
+          AND (dc.instrument_type = @instrumentType OR dc.parent_logical_contract_id = c.logical_contract_id)
+      )
+    `;
 
-    const totalRow = this.db
-      .prepare(`SELECT COUNT(DISTINCT c.lc_number) AS n FROM delete_pending_audit d JOIN balance_contracts c ON c.balance_contract_id = d.balance_contract_id WHERE ${where}`)
-      .get(whereParams) as { n: number } | undefined;
+    const totalRow = this.db.prepare(`SELECT COUNT(DISTINCT c.lc_number) AS n FROM balance_contracts c WHERE ${where} AND ${hasDeletePendingHistory}`).get(whereParams) as
+      | { n: number }
+      | undefined;
     const total = totalRow?.n ?? 0;
 
     const page = filter.page && filter.page > 0 ? filter.page : 1;
@@ -394,15 +417,13 @@ export class BalanceContractStore {
 
     const rows = this.db
       .prepare(
-        `SELECT DISTINCT c.* FROM balance_contracts c
-         JOIN delete_pending_audit d ON d.balance_contract_id = c.balance_contract_id
-         WHERE ${where}
+        `SELECT c.* FROM balance_contracts c
+         WHERE ${where} AND ${hasDeletePendingHistory}
            AND c.balance_contract_id = (
-             SELECT d2.balance_contract_id
-             FROM delete_pending_audit d2
-             JOIN balance_contracts c2 ON c2.balance_contract_id = d2.balance_contract_id
+             SELECT c2.balance_contract_id
+             FROM balance_contracts c2
              WHERE c2.lc_number = c.lc_number AND c2.instrument_type = @instrumentType
-             ORDER BY d2.cancelled_at DESC, d2.audit_id DESC
+             ORDER BY c2.effective_from DESC
              LIMIT 1
            )
          ORDER BY c.lc_number ASC
@@ -453,13 +474,13 @@ export class BalanceContractStore {
   /**
    * Fix Pending/Delete Pending — Delete Pending on a root A1/B1 ISSUE (analysis/Balance-Component-
    * FixPending-DeletePending-Proposal-zh.md) — mirrors markClosed()/markExpired()'s own shape. Called
-   * ONLY when the movement being cancelled is the ISSUE itself on a root (IPLC_LC/EPLC_LC/
-   * EPLC_CONFIRMATION) contract — assertRootIssueReleased()'s own guard (service/balanceService.ts)
-   * guarantees no other movement can exist on that contract while its ISSUE is still un-Released, so
-   * cancelling it always means "this contract never became real," safe to retire the same way. Frees the
-   * natural key for a fresh ISSUE (resolveOrCreateContract() only matches on ACTIVE via
-   * findActiveByNaturalKey()) — the new ISSUE creates a genuinely new, independent contract row, not a
-   * revival of this one.
+   * when the movement being cancelled is the ISSUE/CREATE that originally created this contract (any
+   * instrumentType — root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION via A1/B1, or a child SHGT/IPLC_ACCEPTANCE/
+   * EPLC_EXAMINATION via A8/A6/B3), AND it was the only movement this contract ever had — see
+   * `BalanceService.cancel()`'s own doc comment for why that "no sibling movement" check is what makes
+   * this safe generically, not an instrumentType-specific argument. Frees the natural key for a fresh
+   * ISSUE/CREATE (resolveOrCreateContract() only matches on ACTIVE via findActiveByNaturalKey()) — the
+   * new one creates a genuinely new, independent contract row, not a revival of this one.
    */
   markCancelled(balanceContractId: string, effectiveTo: string): void {
     this.db.prepare(`UPDATE balance_contracts SET status = 'CANCELLED', effective_to = @effectiveTo WHERE balance_contract_id = @balanceContractId`).run({

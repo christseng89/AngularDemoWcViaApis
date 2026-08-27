@@ -755,7 +755,7 @@
     type="button"
     class="tb-btn tb-btn--outline mt-2"
     *ngIf="submitResult?.contingentAccountEntry"
-    (click)="openAccountEntries.emit({ movement: submitResult!, instrumentType: model.instrumentType ?? null })"
+    (click)="openAccountEntries.emit({ movement: submitResult!, instrumentType: model.instrumentType ?? null, phase: resultPhase })"
   >
     Account Entries
   </button>
@@ -766,11 +766,22 @@
              liability leg (acceptanceMovement below); both now get their own button. arrivalSgRedeemMovement
              is always SHGT (A3S's own SG leg); acceptanceMovement is always EPLC_ACCEPTANCE (B4 Usance's own
              Acceptance-liability leg) — both instrumentTypes are fixed by which field they are, not read off
-             the movement itself. -->
+             the movement itself.
+
+             Fallback-only, gated on `!submitResult?.contingentAccountEntry` (fixed 2026-08-28, reviewer-
+             reported "Account Entries — Acceptance 已經併入Account Entries了 應該移除 避免誤會"): once the
+             primary "Account Entries" button above exists, its own dialog already resolves and shows this
+             SAME leg merged alongside the primary one (`openAccountEntryDialogWithLinkedResolution()` /
+             `resolveLinkedAccountingMovement()` in transaction-builder.component.ts, added earlier the same
+             day for the identical "A6 Maker Account Entries 只顯示一套" gap) — showing a second, standalone
+             button for a leg the first button's dialog already covers reads as two different things when
+             it is the same data. Kept as a fallback for the case the primary button's own doc comment
+             already documents (a null submitResult.contingentAccountEntry, e.g. an on-balance-sheet primary
+             leg) — there the primary button never renders at all, so this remains the only way to open it. -->
   <button
     type="button"
     class="tb-btn tb-btn--outline mt-2"
-    *ngIf="compoundLegs.arrivalSgRedeemMovement?.contingentAccountEntry"
+    *ngIf="compoundLegs.arrivalSgRedeemMovement?.contingentAccountEntry && !submitResult?.contingentAccountEntry"
     (click)="openAccountEntries.emit({ movement: compoundLegs.arrivalSgRedeemMovement!, instrumentType: 'SHGT' })"
   >
     Account Entries — SG Redemption
@@ -778,7 +789,7 @@
   <button
     type="button"
     class="tb-btn tb-btn--outline mt-2"
-    *ngIf="compoundLegs.acceptanceMovement?.contingentAccountEntry"
+    *ngIf="compoundLegs.acceptanceMovement?.contingentAccountEntry && !submitResult?.contingentAccountEntry"
     (click)="openAccountEntries.emit({ movement: compoundLegs.acceptanceMovement!, instrumentType: 'EPLC_ACCEPTANCE' })"
   >
     Account Entries — Acceptance
@@ -797,9 +808,9 @@
              submitResult?.status === 'PENDING', true for A4's own submitResult), so clicking it called
              deleteMakerPending() -> api.cancel(submitResult.movementId, ...) against A3/A3S's own
              Document Arrival — silently destroying upstream work under a label ("Delete Pending") that,
-             for every OTHER function, means "withdraw only my own just-created record". A4 offers no
-             correct "delete my own pending thing" action at all (there is no such record), so hiding it
-             is the fix, not relabeling it.
+             for every OTHER function, means "withdraw only my own just-created record". Excluded here via
+             releasesExistingMovementInPlace (A4's own flag) — see the SEPARATE A4-only button just below
+             for the correct action, added once withdrawMakerSubmit() existed to provide one.
 
              Widened to also cover REJECTED (Fix Pending/Delete Pending Phase 1, analysis/Balance-
              Component-FixPending-DeletePending-Proposal-zh.md §2.4) — "Checker Reject 不代表交易已
@@ -817,5 +828,24 @@
     [disabled]="actionBusy"
   >
     <span class="tb-spinner" aria-hidden="true" *ngIf="actionBusy"></span>{{ actionBusy ? 'Working…' : 'Delete Pending (EC)' }}
+  </button>
+  <!-- A4's own Delete Pending (business-confirmed 2026-08-27, "做 A4 或 A6 DELETE PENDING 後 交易退回到
+             A4 或 A6 SUBMIT 前即可") — routes to withdrawMakerPendingRequested (checkerActions.
+             withdrawMakerPending() -> api.withdrawMakerSubmit()) instead of the generic button above:
+             undoes just A4's own Maker Submit (makerSubmittedAt/By cleared, REJECTED reverted to PENDING)
+             without ever cancelling the underlying A3/A3S Document Arrival or its Checker acknowledgment
+             — the record lands back in EARMARKED, eligible for A4 picking again. -->
+  <button
+    type="button"
+    class="tb-btn tb-btn--danger-outline mt-2"
+    *ngIf="
+      (submitResult?.status === 'PENDING' || submitResult?.status === 'REJECTED') &&
+      selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace
+    "
+    (click)="withdrawMakerPendingRequested.emit()"
+    [disabled]="actionBusy"
+    title="Withdraw A4 Maker Submit — returns this record to A3/A3S's own Checker-acknowledged (EARMARKED) state, ready to Maker-Submit A4 again. Does not cancel the underlying Document Arrival."
+  >
+    <span class="tb-spinner" aria-hidden="true" *ngIf="actionBusy"></span>{{ actionBusy ? 'Working…' : 'Delete Pending' }}
   </button>
 </div>

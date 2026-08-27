@@ -196,6 +196,142 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter });
     });
 
+    /**
+     * Business-confirmed 2026-08-27 ("A6應該也只有一筆" / "都在同一筆A6 EVENT上 保持數據一致性" / "SHOW兩套帳即可")
+     * — reproduces LC U01's own reported shape: A1, A3(create, EARMARKED), then A6's own separate
+     * IPLC_ACCEPTANCE/CREATE — WITHOUT this merge, the referenced UTILIZE's own 'finalize' row (A6, on the
+     * LC ledger) and A6's own CREATE row (on the Acceptance ledger) would both appear, reading as two rows
+     * for one business event.
+     */
+    it('mergeAccountingEventRows() folds the UTILIZE\'s own finalize row into A6\'s own referencing CREATE row — ONE row for the cascade event, carrying the UTILIZE\'s own contingentAccountEntry as linkedMovement', () => {
+      const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE', naturalKey: { lcNumber: 'U01' } });
+      const acceptance = makeContract({ balanceContractId: 'bc-acc', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01' } });
+      const issueMovement = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-27T15:00:00.000Z' });
+      const lcEntry = { drAccount: 'Documentary Credits Outstanding — Seller\'s Usance', crAccount: 'Customers\' Liability under DC — Seller\'s Usance', currency: 'USD', amount: '1000' };
+      const utilizeMovement = makeMovement({
+        movementId: 'mv-utilize',
+        balanceContractId: 'bc-lc',
+        movementType: 'UTILIZE',
+        status: 'PENDING',
+        amount: '1000',
+        sourceTransactionRef: 'B01',
+        createdAt: '2026-08-27T15:00:10.000Z',
+        acknowledgedBy: 'checker1',
+        acknowledgedAt: '2026-08-27T15:00:20.000Z',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-27T15:22:00.000Z',
+        contingentAccountEntry: lcEntry,
+      });
+      const acceptanceEntry = { drAccount: "Acceptances & DPU — Customers' Liability (memo)", crAccount: 'Acceptances & DPU — Outstanding (memo)', currency: 'USD', amount: '1000' };
+      const acceptanceMovement = makeMovement({
+        movementId: 'mv-acceptance',
+        balanceContractId: 'bc-acc',
+        movementType: 'CREATE',
+        status: 'PENDING',
+        amount: '1000',
+        createdAt: '2026-08-27T15:22:00.000Z',
+        referencedTransactionId: 'mv-utilize',
+        contingentAccountEntry: acceptanceEntry,
+      });
+
+      const api = makeApi({
+        resolveContract: jest.fn(() => of(root)),
+        listMovements: jest.fn((contractId: string) => of(contractId === 'bc-lc' ? [issueMovement, utilizeMovement] : contractId === 'bc-acc' ? [acceptanceMovement] : [])),
+        catalog: jest.fn((instrumentType: string) => of(instrumentType === 'IPLC_ACCEPTANCE' ? { items: [acceptance], total: 1, page: 1, pageSize: 50 } : emptyCatalog())),
+      });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'U01';
+      svc.search();
+
+      // 3 rows, not 4 — A1, A3(create, historical), A6(the Acceptance's own CREATE, carrying linkedMovement). No standalone 'finalize' row.
+      expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-issue', 'mv-utilize', 'mv-acceptance']);
+      expect(svc.events.map((e) => e.phase)).toEqual(['primary', 'create', 'primary']);
+      expect(svc.events.some((e) => e.phase === 'finalize')).toBe(false);
+
+      const a6Row = svc.events.find((e) => e.movement.movementId === 'mv-acceptance')!;
+      expect(a6Row.linkedMovement).toBe(utilizeMovement);
+      expect(a6Row.movement.contingentAccountEntry).toEqual(acceptanceEntry);
+      expect(a6Row.linkedMovement!.contingentAccountEntry).toEqual(lcEntry);
+
+      // The 'create' (A3) row is untouched — still its own separate, historical, EARMARKED-shaped row.
+      const a3Row = svc.events.find((e) => e.phase === 'create')!;
+      expect(a3Row.linkedMovement).toBeUndefined();
+    });
+
+    /**
+     * Business-reported gap 2026-08-28 ("A6 B4 Usance沒有顯示兩套帳務 對嗎?") — live-verified to still show
+     * TWO separate "B4 · Honour / Acceptance" rows even after the A6 fix above, since B4's own compound
+     * pair correlates via `businessEventId`, a structurally different mechanism from A6's own
+     * `referencedTransactionId` cascade. Reproduces the live repro exactly: B1, B3(EARMARKED), then B4's
+     * own two `businessEventId`-linked legs (EPLC_CONFIRMATION/ACCEPT + EPLC_ACCEPTANCE/CREATE).
+     */
+    it('mergeAccountingEventRows() ALSO folds B4\'s own primary EPLC_CONFIRMATION/ACCEPT leg into its businessEventId-linked EPLC_ACCEPTANCE/CREATE leg — same Ownership Rule, different correlation mechanism', () => {
+      const root = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE', naturalKey: { lcNumber: 'B4-01' } });
+      const acceptance = makeContract({ balanceContractId: 'bc-acc', instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'B4-01', ibNumber: 'E01' } });
+      const issueMovement = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-cnf', movementType: 'ISSUE', createdAt: '2026-08-28T00:00:00.000Z' });
+      const cnfEntry = { drAccount: 'Confirmation Undertakings Outstanding — Usance', crAccount: 'Issuing Bank Confirmation Exposure — Usance', currency: 'USD', amount: '1000' };
+      const acceptMovement = makeMovement({
+        movementId: 'mv-accept',
+        balanceContractId: 'bc-cnf',
+        movementType: 'ACCEPT',
+        status: 'PENDING',
+        amount: '1000',
+        sourceTransactionRef: 'E01',
+        createdAt: '2026-08-28T00:00:10.000Z',
+        businessEventId: 'be-1',
+        contingentAccountEntry: cnfEntry,
+      });
+      const acceptanceEntry = { drAccount: "Confirmed Acceptances & DPU — Customers' Liability (memo)", crAccount: 'Confirmed Acceptances & DPU — Outstanding (memo)', currency: 'USD', amount: '1000' };
+      const acceptanceCreate = makeMovement({
+        movementId: 'mv-acceptance-create',
+        balanceContractId: 'bc-acc',
+        movementType: 'CREATE',
+        status: 'PENDING',
+        amount: '1000',
+        createdAt: '2026-08-28T00:00:10.000Z',
+        businessEventId: 'be-1',
+        contingentAccountEntry: acceptanceEntry,
+      });
+
+      const api = makeApi({
+        resolveContract: jest.fn(() => of(root)),
+        listMovements: jest.fn((contractId: string) => of(contractId === 'bc-cnf' ? [issueMovement, acceptMovement] : contractId === 'bc-acc' ? [acceptanceCreate] : [])),
+        catalog: jest.fn((instrumentType: string) => of(instrumentType === 'EPLC_ACCEPTANCE' ? { items: [acceptance], total: 1, page: 1, pageSize: 50 } : emptyCatalog())),
+      });
+
+      const svc = new InquireEventsService(api);
+      svc.side = 'EXPORT';
+      svc.lcNumber = 'B4-01';
+      svc.search();
+
+      // 2 rows, not 3 — B1, then ONE B4 row (the Acceptance's own CREATE, carrying the ACCEPT leg as linkedMovement).
+      expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-issue', 'mv-acceptance-create']);
+
+      const b4Row = svc.events.find((e) => e.movement.movementId === 'mv-acceptance-create')!;
+      expect(b4Row.linkedMovement).toBe(acceptMovement);
+      expect(b4Row.movement.contingentAccountEntry).toEqual(acceptanceEntry);
+      expect(b4Row.linkedMovement!.contingentAccountEntry).toEqual(cnfEntry);
+    });
+
+    it('mergeAccountingEventRows() leaves an orphaned/standalone EPLC_CONFIRMATION/ACCEPT (no matching businessEventId partner) as its own row — never silently dropped', () => {
+      const root = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'B4-02' } });
+      const acceptMovement = makeMovement({ movementId: 'mv-accept-orphan', balanceContractId: 'bc-cnf', movementType: 'ACCEPT', status: 'PENDING' });
+
+      const api = makeApi({
+        resolveContract: jest.fn(() => of(root)),
+        listMovements: jest.fn((contractId: string) => of(contractId === 'bc-cnf' ? [acceptMovement] : [])),
+      });
+
+      const svc = new InquireEventsService(api);
+      svc.side = 'EXPORT';
+      svc.lcNumber = 'B4-02';
+      svc.search();
+
+      expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-accept-orphan']);
+      expect(svc.events[0].linkedMovement).toBeUndefined();
+    });
+
     /** Reproduces the reviewer-reported bug verbatim: "A1 ISSUE S05 -> APPROVE. A3 S05 B01 -> Submit, Checker Reject 為何出現兩筆REJECTED?" */
     it('does NOT split a REJECTED Sight IPLC_LC/UTILIZE into 2 rows — reject() sets releasedAt/releasedBy too, but this is never a real A4 finalize', () => {
       const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SIGHT', naturalKey: { lcNumber: 'S05' } });
@@ -230,6 +366,8 @@ describe('InquireEventsService', () => {
         status: 'RELEASED',
         sourceTransactionRef: 'B01',
         createdAt: '2026-08-26T09:00:00.000Z',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-26T09:03:00.000Z',
         releasedBy: 'checker1',
         releasedAt: '2026-08-26T09:05:00.000Z',
       });
@@ -303,7 +441,15 @@ describe('InquireEventsService', () => {
 
     it("a 'finalize' row falls back to eventSnapshot when finalizeEventSnapshot is null (a movement created before that field existed)", () => {
       const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
-      const utilizeMovement = makeMovement({ movementType: 'UTILIZE', status: 'RELEASED', releasedAt: '2026-08-17T15:00:00.000Z', eventSnapshot: makeSnapshot({ confirmedBalance: '55555' }), finalizeEventSnapshot: null });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'RELEASED',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-17T14:00:00.000Z',
+        releasedAt: '2026-08-17T15:00:00.000Z',
+        eventSnapshot: makeSnapshot({ confirmedBalance: '55555' }),
+        finalizeEventSnapshot: null,
+      });
       const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([utilizeMovement])) });
 
       const svc = new InquireEventsService(api);
@@ -315,8 +461,83 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toEqual(makeSnapshot({ confirmedBalance: '55555' }));
     });
 
-    it('does NOT split a Usance-tenor Document Arrival — it stays a single primary row (A6 always creates its own separate Acceptance movement instead)', () => {
+    // Widened 2026-08-27 (business-confirmed, "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure") — a
+    // Usance UTILIZE that has genuinely been RELEASED (via A6's own release() cascade, see
+    // BalanceService.applyReleaseSideEffects()'s own doc comment) now splits into 'create'(A3)/
+    // 'finalize'(A6) rows too, same as Sight/A4 already did — it is no longer "always a single row".
+    it('DOES split a genuinely RELEASED Usance-tenor UTILIZE into create(A3)/finalize(A6) rows, same as Sight/A4', () => {
       const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'BUYERS_USANCE' });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'RELEASED',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-17T14:00:00.000Z',
+        releasedAt: '2026-08-17T15:00:00.000Z',
+      });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([utilizeMovement])) });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+
+      expect(svc.events.length).toBe(2);
+      expect(svc.events.map((e) => e.phase).sort()).toEqual(['create', 'finalize']);
+      expect(svc.events.find((e) => e.phase === 'finalize')?.eventTime).toBe('2026-08-17T15:00:00.000Z');
+    });
+
+    // Business-confirmed 2026-08-27 ("A6 Submit 時應該出兩套帳 但現在只出一套帳(ACCEPTANCE)... 出在同一個
+    // 交易") — the split must fire the MOMENT A6 is Maker-Submitted, not only once genuinely RELEASED:
+    // before this fix, a still-PENDING A6-in-progress UTILIZE showed as one plain "EARMARKED" row, so
+    // only the Acceptance's own separate PENDING entry was visible — one set of books instead of two.
+    it('splits a still-PENDING Usance UTILIZE into create(EARMARKED)/finalize(PENDING) rows the moment A6 is Maker-Submitted, before Checker Release', () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'PENDING',
+        acknowledgedAt: '2026-08-27T13:00:00.000Z',
+        acknowledgedBy: 'checker1',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-27T14:00:00.000Z',
+        releasedAt: null,
+      });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([utilizeMovement])) });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+
+      expect(svc.events.length).toBe(2);
+      const createRow = svc.events.find((e) => e.phase === 'create')!;
+      const finalizeRow = svc.events.find((e) => e.phase === 'finalize')!;
+      expect(createRow.eventStatus).toBe('PENDING');
+      expect(finalizeRow.eventStatus).toBe('PENDING');
+      // finalize row falls back to makerSubmittedAt for its own eventTime — releasedAt doesn't exist yet.
+      expect(finalizeRow.eventTime).toBe('2026-08-27T14:00:00.000Z');
+    });
+
+    it('a REJECTED A4/A6 attempt still splits (makerSubmittedAt survives reject()) — consistent with Maker Queue, which already shows a rejected A4/A6 row the same way', () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'REJECTED',
+        acknowledgedAt: '2026-08-27T13:00:00.000Z',
+        makerSubmittedBy: 'maker1',
+        makerSubmittedAt: '2026-08-27T14:00:00.000Z',
+        releasedBy: 'checker1',
+        releasedAt: '2026-08-27T15:00:00.000Z',
+      });
+      const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([utilizeMovement])) });
+
+      const svc = new InquireEventsService(api);
+      svc.lcNumber = 'S001';
+      svc.search();
+
+      expect(svc.events.length).toBe(2);
+      expect(svc.events.find((e) => e.phase === 'finalize')?.eventStatus).toBe('REJECTED');
+    });
+
+    it('still does NOT split a Usance UTILIZE whose parent contract never declared an explicit tenorType (null) — legacy Business Case Runner state', () => {
+      const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: null });
       const utilizeMovement = makeMovement({ movementType: 'UTILIZE', status: 'RELEASED', releasedAt: '2026-08-17T15:00:00.000Z' });
       const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([utilizeMovement])) });
 
@@ -1189,16 +1410,29 @@ describe('InquireEventsService', () => {
       expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement(), contract: examContract }))).toBe('—');
     });
 
-    it('returns "—" for every other instrumentType, including the root EPLC_CONFIRMATION and a later HONOUR event that already carries E01 via the existing Reference column', () => {
+    it('returns "—" for the root EPLC_CONFIRMATION\'s own ISSUE — HONOUR is covered by the reclassification tests further below, not "—" any more (2026-08-28)', () => {
       const svc = new InquireEventsService(makeApi());
       const cnfContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'U02' } });
       expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE' }), contract: cnfContract }))).toBe('—');
-      expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'HONOUR', sourceTransactionRef: 'E01' }), contract: cnfContract }))).toBe('—');
     });
 
-    it('returns "—" for an IPLC_ACCEPTANCE event — not asked for yet, unlike EPLC_EXAMINATION/SHGT', () => {
+    // A6/B4 Accounting Event Ownership Rule (2026-08-28) — completes the LC Number + Secondary Reference +
+    // eventSeq identity triple for A6/B4's own merged row (see CLAUDE.md's own entry of the same name).
+    it('returns the ibNumber for an IPLC_ACCEPTANCE event (A6)', () => {
       const svc = new InquireEventsService(makeApi());
       const acceptanceContract = makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S01', ibNumber: 'IB01' } });
+      expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement(), contract: acceptanceContract }))).toBe('IB01');
+    });
+
+    it('returns the ibNumber for an EPLC_ACCEPTANCE event (B4)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const acceptanceContract = makeContract({ instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'B4-01', ibNumber: 'E01' } });
+      expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement(), contract: acceptanceContract }))).toBe('E01');
+    });
+
+    it('returns "—" for an IPLC_ACCEPTANCE/EPLC_ACCEPTANCE event with no ibNumber recorded (should not happen in practice, but stays non-throwing)', () => {
+      const svc = new InquireEventsService(makeApi());
+      const acceptanceContract = makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S01' } });
       expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement(), contract: acceptanceContract }))).toBe('—');
     });
 
@@ -1213,6 +1447,46 @@ describe('InquireEventsService', () => {
       const svc = new InquireEventsService(makeApi());
       const sgContract = makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S01' } });
       expect(svc.secondaryReferenceFor(makeEvent({ movement: makeMovement(), contract: sgContract }))).toBe('—');
+    });
+
+    // Business-reported gap 2026-08-28 ("LC Balance 顯示 Reference=B01, Secondary Ref=— ; Acceptance
+    // Balance 顯示 Reference=—, Secondary Ref=B01" for the SAME A6 event — "LC + 2ndary + Event Seq =
+    // Event Key 各自獨立"). A3/A3S/A4's own IPLC_LC/UTILIZE (secondaryRefLabel: "IB Number") and B4's own
+    // EPLC_CONFIRMATION/HONOUR|ACCEPT (secondaryRefLabel: "EB Number") are reclassified: the value now
+    // reads under Secondary Ref., never Reference, matching the sibling Acceptance/Examination contract's
+    // own natural key ibNumber for the SAME business identifier.
+    it('reclassifies an IPLC_LC/UTILIZE\'s own sourceTransactionRef (A3/A3S/A4\'s "IB Number") as Secondary Ref., not Reference', () => {
+      const svc = new InquireEventsService(makeApi());
+      const lcContract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'U01' } });
+      const event = makeEvent({ movement: makeMovement({ movementType: 'UTILIZE', sourceTransactionRef: 'B01' }), contract: lcContract });
+      expect(svc.secondaryReferenceFor(event)).toBe('B01');
+      expect(svc.primaryReferenceFor(event)).toBe('—');
+    });
+
+    it('reclassifies an EPLC_CONFIRMATION/ACCEPT\'s own sourceTransactionRef (B4\'s "EB Number") as Secondary Ref., not Reference — same rule for HONOUR', () => {
+      const svc = new InquireEventsService(makeApi());
+      const cnfContract = makeContract({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'B4-01' } });
+      const acceptEvent = makeEvent({ movement: makeMovement({ movementType: 'ACCEPT', sourceTransactionRef: 'E01' }), contract: cnfContract });
+      expect(svc.secondaryReferenceFor(acceptEvent)).toBe('E01');
+      expect(svc.primaryReferenceFor(acceptEvent)).toBe('—');
+      const honourEvent = makeEvent({ movement: makeMovement({ movementType: 'HONOUR', sourceTransactionRef: 'E02' }), contract: cnfContract });
+      expect(svc.secondaryReferenceFor(honourEvent)).toBe('E02');
+      expect(svc.primaryReferenceFor(honourEvent)).toBe('—');
+    });
+
+    it('does NOT reclassify A2/B2\'s own Amendment No. (same sourceTransactionRef wire field, different meaning) — stays under Reference only', () => {
+      const svc = new InquireEventsService(makeApi());
+      const lcContract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'U01' } });
+      const amendEvent = makeEvent({ movement: makeMovement({ movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD-1' }), contract: lcContract });
+      expect(svc.primaryReferenceFor(amendEvent)).toBe('AMD-1');
+      expect(svc.secondaryReferenceFor(amendEvent)).toBe('—');
+    });
+
+    it('primaryReferenceFor() falls back to "—" for a reclassified shape with no sourceTransactionRef recorded, and passes every unreclassified shape through unchanged', () => {
+      const svc = new InquireEventsService(makeApi());
+      const lcContract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'U01' } });
+      expect(svc.primaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE' }), contract: lcContract }))).toBe('—');
+      expect(svc.primaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE', sourceTransactionRef: 'REF-1' }), contract: lcContract }))).toBe('REF-1');
     });
   });
 

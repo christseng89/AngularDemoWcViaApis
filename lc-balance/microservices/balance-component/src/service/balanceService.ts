@@ -1239,22 +1239,23 @@ export class BalanceService {
    * requirement, "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變"). Resolves ONCE, up front,
    * which persisted-snapshot columns a release() call should write the captureSnapshotBundle() result
    * into — replacing four separate inline ternaries scattered across the updateStatus() call (Fowler,
-   * "Replace Flag Argument with Resolved Policy Object"). Only a Sight-tenor IPLC_LC/UTILIZE (A4
-   * finalizing A3/A3S) routes to the finalize* columns; every other release() call uses the plain ones.
-   * rootEventSnapshot has no finalize variant — it is always (re)written into the same column, see
-   * release()'s own call site.
+   * "Replace Flag Argument with Resolved Policy Object"). Only an IPLC_LC/UTILIZE genuinely finalizing an
+   * earlier A3/A3S submission (A4 for Sight, A6 for Usance — see `isUtilizeFinalize`'s own doc comment)
+   * routes to the finalize* columns; every other release() call uses the plain ones. rootEventSnapshot
+   * has no finalize variant — it is always (re)written into the same column, see release()'s own call
+   * site.
    *
-   * Reviewer-noted (2026-08-20): takes the already-computed `isSightUtilizeFinalize` rather than
-   * re-deriving it from `movement`/`contract` itself — release() also needs the same boolean for its own
-   * BAL-123 Maker-Submit gate check, earlier in the method; computing it once and passing it through
-   * avoids evaluating the identical `movementType`/`instrumentType`/`tenorType` expression twice.
+   * Reviewer-noted (2026-08-20): takes the already-computed `isUtilizeFinalize` rather than re-deriving
+   * it from `movement`/`contract` itself — release() also needs the same boolean for its own BAL-123
+   * Maker-Submit gate check, earlier in the method; computing it once and passing it through avoids
+   * evaluating the identical `movementType`/`instrumentType` expression twice.
    */
-  private resolveSnapshotWriteTarget(isSightUtilizeFinalize: boolean): {
+  private resolveSnapshotWriteTarget(isUtilizeFinalize: boolean): {
     eventSnapshotField: 'eventSnapshot' | 'finalizeEventSnapshot';
     acceptanceSnapshotField: 'acceptanceEventSnapshot' | 'finalizeAcceptanceEventSnapshot';
     sgSnapshotField: 'sgEventSnapshot' | 'finalizeSgEventSnapshot';
   } {
-    return isSightUtilizeFinalize
+    return isUtilizeFinalize
       ? {
           eventSnapshotField: 'finalizeEventSnapshot',
           acceptanceSnapshotField: 'finalizeAcceptanceEventSnapshot',
@@ -1299,7 +1300,10 @@ export class BalanceService {
    * Angular-side, per-row action-eligibility concern (Delete Pending's own compound-shape exclusion,
    * §2.5), not a data-access one; this method just answers "what's PENDING/REJECTED under this
    * createdBy". Pairs each movement with its own contract so the caller can resolve LC Number/
-   * instrumentType/function without a second round trip per row.
+   * instrumentType/function without a second round trip per row. See
+   * `BalanceMovementStore.listByCreatedByAndStatus()`'s own doc comment for the EARMARKED exclusion —
+   * an acknowledged-but-not-yet-Maker-Submitted A3/A3S row is business-equivalent to APPROVED, not a
+   * Maker-actionable PENDING item, so it's excluded from this worklist entirely.
    */
   listMyMovements(params: { createdBy: string; statuses?: MovementStatus[]; page?: number; pageSize?: number }): {
     items: Array<{ movement: BalanceMovement; contract: BalanceContract }>;
@@ -1676,8 +1680,16 @@ export class BalanceService {
     // granularity as the eventSeq idempotency key (Design doc §8) — reusing
     // a reference number silently on a second, genuinely different event
     // would make the audit trail unable to tell the two apart.
+    //
+    // Business-confirmed defect 2026-08-27 (live-reproduced: "A3 / B04 Submit -> EARMARKING -> Delete
+    // Pending -> CANCELLED -> re-Submit same LC/same IB Number B04 -> wrongly rejected") — Delete Pending
+    // preserves the CANCELLED record for audit purposes (still readable via Inquire Delete Pending,
+    // never modified), but must release its own sourceTransactionRef for legitimate re-creation of the
+    // same business transaction. Excluding CANCELLED here is the general fix: EVERY Function that ever
+    // sets sourceTransactionRef (A2/A3/A3S/B2/B4, SECONDARY_REF_REQUIRED_MOVEMENT_TYPES above) shares
+    // this one check, so this one exclusion covers all of them uniformly — not an A3-specific patch.
     if (req.sourceTransactionRef) {
-      const duplicateRef = existingMovements.find((m) => m.sourceTransactionRef === req.sourceTransactionRef);
+      const duplicateRef = existingMovements.find((m) => m.sourceTransactionRef === req.sourceTransactionRef && m.status !== 'CANCELLED');
       if (duplicateRef) {
         throw new RequestValidationError(
           `sourceTransactionRef "${req.sourceTransactionRef}" is already used by movement ${duplicateRef.movementId} ` +
@@ -1790,7 +1802,63 @@ export class BalanceService {
 
     const result = this.movements.insert(movement);
     if (!result.created) return { created: false, existing: result.existing };
+    this.applyCreateSideEffects(movement);
     return { created: true, movement };
+  }
+
+  /**
+   * createMovement()'s own post-write side effect — currently just A6's own Maker Submit gate on the
+   * referenced A3/A3S UTILIZE (business-confirmed 2026-08-27, "A6 Maker Submit -> LC Balance Actual
+   * Entries Status = PENDING"). Mirrors `submitByMaker()`'s own persistence write exactly (same
+   * `maker_submitted_by`/`maker_submitted_at` columns) — A4 reaches that same state via its own explicit
+   * `/maker-submit` call, made by the client as a SEPARATE step after A3's own Submit; A6 has no
+   * equivalent second step (there is no pre-existing A6 record to "submit" — this createMovement() call
+   * IS A6's own Maker Submit), so the referenced UTILIZE's own Maker-Submit gate is set here instead, at
+   * the moment A6's own record is created. Guarded so this can only ever fire for the exact shape A6
+   * produces (best-effort, no throw on a mismatch — a raw API caller supplying an unrelated
+   * referencedTransactionId, or one already Maker-Submitted, silently no-ops rather than corrupting an
+   * unrelated record): the referenced movement must be a still-PENDING, already-acknowledged, not-yet-
+   * Maker-Submitted IPLC_LC/UTILIZE — i.e. exactly the EARMARKED state A6's own picker only ever offers.
+   */
+  private applyCreateSideEffects(movement: BalanceMovement): void {
+    if (!movement.referencedTransactionId) return;
+    const referenced = this.movements.findById(movement.referencedTransactionId);
+    if (!referenced) return;
+    const referencedContract = this.contracts.findById(referenced.balanceContractId);
+    if (
+      referencedContract?.instrumentType === 'IPLC_LC' &&
+      referenced.movementType === 'UTILIZE' &&
+      referenced.status === 'PENDING' &&
+      referenced.acknowledgedAt &&
+      !referenced.makerSubmittedAt
+    ) {
+      this.movements.submitByMaker({ movementId: referenced.movementId, makerSubmittedBy: movement.createdBy, makerSubmittedAt: movement.createdAt });
+    }
+  }
+
+  /**
+   * cancel()'s own post-write side effect — the inverse of applyCreateSideEffects() above. Business-
+   * confirmed 2026-08-27 ("都只有一筆... 掛帳也掛在同一筆EVENT上"): A6's own Delete Pending must revert
+   * the referenced A3/A3S UTILIZE's own Maker-Submit gate it silently set at A6's own createMovement()
+   * time — otherwise the UTILIZE is left stranded with `makerSubmittedAt` set (still displaying as a
+   * live A6-finalize PENDING row everywhere, Maker Queue/Inquire Events/Look Up alike) even though the
+   * A6 attempt that set it was just cancelled. Mirrors `withdrawMakerSubmit()`'s own store-level write
+   * (`this.movements.withdrawMakerSubmit(id, false)` — never flips status, the UTILIZE is not itself
+   * being cancelled) but deliberately WITHOUT that method's own `delete_pending_audit` insert: the one
+   * audit row `cancel()` already writes for A6's own CREATE below is the single record of this whole
+   * business event — a second row for the silently-reverted UTILIZE would resurrect exactly the
+   * "two rows for one A6 event" duplication this session's own Inquire Events/Maker Queue fixes just
+   * closed, on the Delete Pending audit trail instead. Same best-effort/no-throw guard shape as
+   * applyCreateSideEffects() — a raw API caller's unrelated referencedTransactionId silently no-ops.
+   */
+  private applyCancelSideEffects(movement: BalanceMovement): void {
+    if (!movement.referencedTransactionId) return;
+    const referenced = this.movements.findById(movement.referencedTransactionId);
+    if (!referenced) return;
+    const referencedContract = this.contracts.findById(referenced.balanceContractId);
+    if (referencedContract?.instrumentType === 'IPLC_LC' && referenced.movementType === 'UTILIZE' && referenced.status === 'PENDING' && referenced.makerSubmittedAt) {
+      this.movements.withdrawMakerSubmit(referenced.movementId, false);
+    }
   }
 
   release(movementId: string, releasedBy: string): BalanceMovement {
@@ -1801,18 +1869,24 @@ export class BalanceService {
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
     // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found) / 2026-08-18 (reused again below,
-    // for the eventSnapshot-preservation fix) — identifies a Sight-tenor IPLC_LC/UTILIZE, i.e. this
-    // release() call is A4 (Sight Settlement) finalizing an EXISTING A3/A3S Document Arrival. Scoped to
-    // Sight-tenor IPLC_LC/UTILIZE ONLY — checking contract.tenorType, not just instrumentType/
-    // movementType — because a Usance LC's own UTILIZE is released through the EXACT SAME endpoint via
-    // A6's own compound flow (referencedTransactionId-based), which never calls submitByMaker() and was
-    // never meant to: A4's gate is Sight-only by design (catalogTenorFilter: 'SIGHT' on the client,
-    // mirrored here). A blanket "any IPLC_LC/UTILIZE" rule would incorrectly match every Usance
-    // Acceptance release too; this narrower check cannot, since contract.tenorType is never 'SIGHT' for
-    // a Usance LC. Movements whose parent contract never declared an explicit tenorType (e.g. the
-    // Business Case Runner's own older Import Case #1/#3/#4/#5) are also unaffected —
-    // `contract.tenorType === 'SIGHT'` is false for `null` too.
-    const isSightUtilizeFinalize = movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType === 'SIGHT';
+    // for the eventSnapshot-preservation fix) — identifies an IPLC_LC/UTILIZE genuinely finalizing an
+    // EXISTING A3/A3S Document Arrival: A4 (Sight Settlement) reaches this release() call DIRECTLY (the
+    // client calls /release on the UTILIZE's own movementId, gated by its own `makerSubmittedAt` set via
+    // `submitByMaker()`). A6 (Acceptance, Usance) reaches it via CASCADE instead — business-confirmed
+    // 2026-08-27 ("A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure"): `applyReleaseSideEffects()`
+    // below calls `release()` recursively on the referenced UTILIZE once A6's own Checker releases its
+    // own `IPLC_ACCEPTANCE/CREATE`, using this SAME direct-call code path (movementId = the UTILIZE's own
+    // id either way). Widened 2026-08-27 from Sight-only to "any explicit tenorType" (still excluding
+    // `null`) — `contract.tenorType != null` rather than dropping the tenor check entirely, to preserve
+    // the ORIGINAL backward-compatibility carve-out this gate has always had: the Business Case Runner's
+    // own older Import Case #1/#3/#4/#5 release a UTILIZE directly with no maker-submit step at all, and
+    // their contracts never declared a tenorType in the first place — hard-requiring makerSubmittedAt
+    // there would break that already-working, separately-tested flow for no benefit (see
+    // `assertReleaseSubmitGuards()`'s own submitByMaker() doc comment for the same carve-out already
+    // established for A4). `makerSubmittedAt` gates both the A4 and A6 paths identically (see the BAL-123
+    // check below) — A6's own createMovement() now sets it on the referenced UTILIZE at Submit time, the
+    // exact same field `submitByMaker()` sets for A4.
+    const isUtilizeFinalize = movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType != null;
 
     // SUPERSEDED 2026-08-18 (business instruction, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3
     // must genuinely RELEASE before B4, the next step, can act on it). This release() call used to be
@@ -1836,7 +1910,7 @@ export class BalanceService {
     // (kept inline — it's the one truly sequential, non-reorderable part), and the post-write side
     // effects (AMEND_EXPIRY_DATE kept as its own method, since it's a self-contained sub-state-machine —
     // Extension vs. plain amendment — not a single side-effect call like its siblings).
-    this.assertReleaseSubmitGuards(movement, contract, isSightUtilizeFinalize);
+    this.assertReleaseSubmitGuards(movement, contract, isUtilizeFinalize);
 
     const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
     this.assertReleaseEligibility(movement, contract, before);
@@ -1869,19 +1943,19 @@ export class BalanceService {
     // 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變" / "SNAP SHOT保留當時 LC,
     // SG, ACCEPTANCE BALANCE 不會因為後續交易改變") — for every OTHER movement this release-time bundle
     // overwrites eventSnapshot/acceptanceEventSnapshot/sgEventSnapshot directly (whatever
-    // createMovement() originally captured). But for a Sight-tenor IPLC_LC/UTILIZE
-    // (isSightUtilizeFinalize — this release() call IS A4 finalizing A3's own earlier submission), those
+    // createMovement() originally captured). But for an IPLC_LC/UTILIZE genuinely finalizing (
+    // isUtilizeFinalize — this release() call IS A4/A6 finalizing A3/A3S's own earlier submission), those
     // three must instead stay frozen at Create-time — Inquire Events' own 'create' row reads them
     // directly (reproduces LC S01 exactly: SG G01 didn't exist yet when A3 was submitted, so its own
-    // sgEventSnapshot was correctly null then; without this, A4's own much-later Release would silently
-    // overwrite that correct "didn't exist yet" picture with SG G01's by-then-existing balance) — so
-    // this release-time bundle goes into the finalize* columns instead. See
+    // sgEventSnapshot was correctly null then; without this, A4/A6's own much-later Release would
+    // silently overwrite that correct "didn't exist yet" picture with SG G01's by-then-existing balance)
+    // — so this release-time bundle goes into the finalize* columns instead. See
     // resolveSnapshotWriteTarget()'s own doc comment, and types.ts's BalanceMovement.eventSnapshot/
     // finalizeEventSnapshot doc comments. rootEventSnapshot has no finalize variant — it is always
     // (re)written here just like every other child-ledger movement, not discarded (B3/EPLC_EXAMINATION's
     // own former special-case here was SUPERSEDED 2026-08-18 — its own release() call is now its own
     // genuine finalization event, so "Confirmed LC Balance" as of THIS Release is correctly captured).
-    const snapshotTarget = this.resolveSnapshotWriteTarget(isSightUtilizeFinalize);
+    const snapshotTarget = this.resolveSnapshotWriteTarget(isUtilizeFinalize);
     const snapshotFields: Partial<UpdateMovementStatusParams> = {};
     snapshotFields[snapshotTarget.eventSnapshotField] = JSON.stringify(snapshotBundle.eventSnapshot);
     // acceptanceEventSnapshot/sgEventSnapshot use presence-based (not COALESCE) column writes in
@@ -1916,7 +1990,7 @@ export class BalanceService {
    * out of release() (BAL-142-style decomposition, 2026-08-26, SonarQube-scan-report.md) — verbatim
    * logic/messages/order preserved.
    */
-  private assertReleaseSubmitGuards(movement: BalanceMovement, contract: BalanceContract, isSightUtilizeFinalize: boolean): void {
+  private assertReleaseSubmitGuards(movement: BalanceMovement, contract: BalanceContract, isUtilizeFinalize: boolean): void {
     // Re-check (not just at Submit) — see assertValidAmount()'s own doc comment for why. Uses the
     // movement's own already-persisted amount, unchanged since Submit (movements are immutable once
     // created); this is a pure defense-in-depth backstop, not expected to ever actually fire for a
@@ -1964,12 +2038,15 @@ export class BalanceService {
 
     // BAL-123's own Maker/Checker 4-eyes gate — introduced with submitByMaker() itself — used to be
     // enforced ONLY by the reference Transaction Builder client's own checkerAct(), never here, so any
-    // other caller (curl, a future second UI, an integration test) could release an A4-type UTILIZE
-    // that was never Maker-submitted, defeating the whole point of the gate.
-    if (isSightUtilizeFinalize && !movement.makerSubmittedAt) {
+    // other caller (curl, a future second UI, an integration test) could release an A4/A6-type UTILIZE
+    // that was never Maker-submitted, defeating the whole point of the gate. Widened 2026-08-27 to cover
+    // A6's own cascade release too — `makerSubmittedAt` on the UTILIZE is now set by A4's submitByMaker()
+    // OR by A6's own createMovement() (see applyCreateSideEffects()), so this single check already covers
+    // both without needing to know which Function is actually releasing it.
+    if (isUtilizeFinalize && !movement.makerSubmittedAt) {
       throw new IllegalStateTransitionError(
-        `Cannot release movement ${movement.movementId} — A4 (Sight Settlement) requires a Maker Submit ` +
-          `(POST /balance-movements/${movement.movementId}/maker-submit) before the Checker can Release it.`,
+        `Cannot release movement ${movement.movementId} — A4 (Sight Settlement) or A6 (Acceptance) requires ` +
+          `a Maker Submit before the Checker can Release it.`,
       );
     }
   }
@@ -2090,14 +2167,28 @@ export class BalanceService {
     // computePresentDocsEarmark doc comment for why `status === 'RELEASED'` alone isn't enough: a
     // RELEASED-but-not-yet-consumed presentation must still count, or the bank could over-commit beyond
     // the LC's real capacity in the window between B3's own Release and B4's actual Honour/Accept
-    // decision). Scoped to the REFERENCED movement's own contract/movementType, not this movement's own —
-    // safe for A6's own referencedTransactionId use too (Import side, its own source is always an
-    // IPLC_LC/UTILIZE, never EPLC_EXAMINATION, so this branch can never fire there).
+    // decision). Scoped to the REFERENCED movement's own contract/movementType, not this movement's own.
+    //
+    // Business-confirmed 2026-08-27 ("A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure") — a SECOND
+    // referencedTransactionId branch, for A6's own IPLC_ACCEPTANCE/CREATE releasing against its own
+    // referenced A3/A3S IPLC_LC/UTILIZE: unlike B4->B3 (which only marks B3 "consumed" — B3 already
+    // genuinely released on its own, earlier, via its own standalone Checker action), A3/A3S's own UTILIZE
+    // NEVER releases on its own for Usance — A6 is the ONLY event that ever finalizes it. So this branch
+    // calls the full `release()` recursively on the referenced UTILIZE itself, reusing the exact same
+    // `isUtilizeFinalize` machinery A4's own DIRECT release() call already exercises (frozen 'create'-row
+    // snapshots, the BAL-123 Maker-Submit gate — already satisfied here, since `applyCreateSideEffects()`
+    // set it when A6 itself was Submitted) — A4 and A6 end up producing byte-for-byte the same shape of
+    // finalization, just reached via a different caller. Guarded to only ever fire once (a referenced
+    // UTILIZE already RELEASED — e.g. a hypothetical direct-API release beat A6 to it — is left alone
+    // rather than re-released, which would throw via applyStatusTransition's own LEGAL_TRANSITIONS check).
     if (movement.referencedTransactionId) {
       const referenced = this.movements.findById(movement.referencedTransactionId);
       const referencedContract = referenced ? this.contracts.findById(referenced.balanceContractId) : undefined;
       if (referenced && referencedContract?.instrumentType === 'EPLC_EXAMINATION' && referenced.movementType === 'CREATE') {
         this.movements.markPresentDocsConsumed({ movementId: referenced.movementId, presentDocsConsumedBy: releasedBy, presentDocsConsumedAt: releasedAt });
+      }
+      if (referenced && referencedContract?.instrumentType === 'IPLC_LC' && referenced.movementType === 'UTILIZE' && referenced.status === 'PENDING') {
+        this.release(referenced.movementId, releasedBy);
       }
     }
 
@@ -2291,15 +2382,32 @@ export class BalanceService {
       reasonCode: reasonCode ?? 'MAKER_EC',
       remarks: remarks ?? null,
     });
+    this.applyCancelSideEffects(movement);
     // Fix Pending/Delete Pending — Delete Pending on a root A1/B1 ISSUE (analysis/Balance-Component-
     // FixPending-DeletePending-Proposal-zh.md, user-directed follow-up) — "同一個 LC number必須可以重復
     //使用": without this, the contract this ISSUE created stays ACTIVE forever (cancel() only ever
     // touched the movement), permanently blocking the same natural key via resolveOrCreateContract()'s
-    // own re-ISSUE guard (findActiveByNaturalKey()). Safe by construction: assertRootIssueReleased()
-    // guarantees no other movement can exist on a root contract while its own ISSUE is still
-    // un-Released, so cancelling it always means this contract never became real.
-    if (movement.movementType === 'ISSUE' && ROOT_INSTRUMENT_TYPES.has(contract.instrumentType)) {
-      this.contracts.markCancelled(movement.balanceContractId, cancelledAt);
+    // own re-ISSUE guard (findActiveByNaturalKey()).
+    //
+    // Business-confirmed defect 2026-08-27 ("這個問題不要只針對 A3 hard-code。應檢查 A1–A11 / B1–B7 所有
+    // 具有 Natural Key / Secondary Reference uniqueness validation 的功能") — widened from "ISSUE against
+    // a ROOT_INSTRUMENT_TYPES contract" to any `isCreating` movementType (ISSUE or CREATE) against ANY
+    // contract: A6 (IPLC_ACCEPTANCE CREATE)/A8 (SHGT ISSUE)/B3 (EPLC_EXAMINATION CREATE) had the identical
+    // bug for their own secondary Natural Key (IB/SG Number) — the child contract never got marked
+    // CANCELLED, permanently blocking a re-Submit under the same IB/SG Number. A root contract's own
+    // safety argument ("assertRootIssueReleased() guarantees no other movement can exist while its own
+    // ISSUE is still un-Released") doesn't automatically transfer to every child instrumentType, so this
+    // checks the general, always-safe condition directly instead: this cancelled ISSUE/CREATE must be the
+    // ONLY movement this contract ever had (no sibling movement — PENDING, RELEASED, or otherwise —
+    // exists on it). If some other movement DOES exist (only reachable via a non-UI direct API call,
+    // since every Maker-action picker already excludes an unreleased child via
+    // CatalogFilter.requireIssueReleased), the contract is left ACTIVE rather than risk retiring one with
+    // real, non-abandoned history.
+    if (this.movementTypeRegistry[movement.movementType]?.isCreating) {
+      const siblingMovements = this.movements.listByContract(movement.balanceContractId).filter((m) => m.movementId !== movementId);
+      if (siblingMovements.length === 0) {
+        this.contracts.markCancelled(movement.balanceContractId, cancelledAt);
+      }
     }
     return this.movements.findById(movementId)!;
   }
@@ -2375,6 +2483,76 @@ export class BalanceService {
       alreadyDoneBy: (movement) => movement.makerSubmittedBy,
       persist: (id, now) => this.movements.submitByMaker({ movementId: id, makerSubmittedBy, makerSubmittedAt: now }),
     });
+  }
+
+  /**
+   * Business-confirmed 2026-08-27 ("做 A4 或 A6 DELETE PENDING 後 交易退回到 A4 或 A6 SUBMIT 前即可") —
+   * A4's own Delete Pending. A4 has no movement of its own (submitByMaker() above); undoing its Submit
+   * means undoing exactly that call — clearing makerSubmittedBy/At — never cancelling the underlying
+   * A3/A3S UTILIZE or its Checker acknowledgment (`acknowledgedAt`/`acknowledgedBy` are left untouched,
+   * same "permanent historical fact" posture used elsewhere in this file). The record lands back in
+   * EXACTLY the state it was in right after A3/A3S's own Checker Approve — EARMARKED, ready for the
+   * Maker to submitByMaker() (attempt A4) again — which is also why a REJECTED A4 attempt is reverted
+   * to PENDING here rather than left stuck (submitByMaker() only ever accepts a PENDING movement, and
+   * "revert to before A4 Submit" must hold whether A4's own Checker rejected it or never decided yet).
+   * `releasedBy`/`releasedAt` (which reject() itself writes, sharing release()'s own columns) are
+   * deliberately left as-is — reused, not scrubbed, same posture as acknowledgedAt.
+   *
+   * Business-confirmed 2026-08-27 ("改成 Delete Pending 統一名稱。而且 DELETE 後要記錄在 Inquire Delete
+   * Pending 內") — unified under the same "Delete Pending" name/audit trail as `cancel()` above, even
+   * though the movement itself survives (reverts to PENDING/EARMARKED rather than CANCELLED): a
+   * `delete_pending_audit` row is written the same way, same `nextDeleteSeq()` grouping key, so this
+   * action is fully visible in Inquire Delete Pending too. `status_before` records A4's own PENDING/
+   * REJECTED state (not the underlying A3/A3S UTILIZE's), since it's A4's own attempt being withdrawn.
+   *
+   * A6 needs no analogous METHOD (it creates its own genuinely separate `IPLC_ACCEPTANCE`/CREATE
+   * movement, never shares A3S's own UTILIZE, so "A6 Delete Pending" is already exactly the plain
+   * `cancel()` above) — but as of the 2026-08-27 A6 cascade (`applyCreateSideEffects()`), cancelling
+   * A6's own attempt is NO LONGER a no-op on the referenced UTILIZE: `cancel()`'s own
+   * `applyCancelSideEffects()` reverses that exact same Maker-Submit gate this method reverses here,
+   * via the identical store-level write, just without a second audit row (see that method's own doc
+   * comment for why one shared audit row is correct for this two-record business event).
+   */
+  withdrawMakerSubmit(movementId: string, withdrawnBy: string): BalanceMovement {
+    const movement = this.movements.findById(movementId);
+    if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+    const contract = this.contracts.findById(movement.balanceContractId);
+    if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+      throw new RequestValidationError(
+        `withdrawMakerSubmit() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
+          `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+      );
+    }
+    if (movement.status !== 'PENDING' && movement.status !== 'REJECTED') {
+      throw new IllegalStateTransitionError(`Cannot withdraw Maker Submit for movement ${movementId} — its status is ${movement.status}, not PENDING or REJECTED.`);
+    }
+    if (!movement.makerSubmittedAt) {
+      throw new IllegalStateTransitionError(`Movement ${movementId} was never Maker-Submitted (A4) — nothing to withdraw.`);
+    }
+    const statusBefore = movement.status;
+    const withdrawnAt = this.now();
+    this.movements.withdrawMakerSubmit(movementId, movement.status === 'REJECTED');
+    const deleteSeq = this.deletePendingAudit.nextDeleteSeq(
+      contract.instrumentType,
+      contract.naturalKey.lcNumber,
+      contract.naturalKey.ibNumber ?? null,
+      contract.naturalKey.sgNumber ?? null,
+    );
+    this.deletePendingAudit.insert({
+      auditId: randomUUID(),
+      deleteSeq,
+      movementId,
+      balanceContractId: movement.balanceContractId,
+      eventSeq: movement.eventSeq,
+      movementType: movement.movementType,
+      sourceTransactionRef: movement.sourceTransactionRef ?? null,
+      statusBefore,
+      cancelledBy: withdrawnBy,
+      cancelledAt: withdrawnAt,
+      reasonCode: 'MAKER_EC',
+      remarks: null,
+    });
+    return this.movements.findById(movementId)!;
   }
 
   /**

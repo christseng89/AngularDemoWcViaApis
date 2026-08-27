@@ -163,10 +163,17 @@ export class MakerPanelComponent implements OnChanges {
   @Output() contextChanged = new EventEmitter<MakerCheckerContext>();
   /** See `MakerSyncRequest`'s own doc comment. */
   @Output() syncRequested = new EventEmitter<MakerSyncRequest>();
-  /** MAKER RESULT panel's 3 "Account Entries" buttons — `accountEntryDialogMovement`/`Instrumenttype`/`AccountEntriesDialogComponent` all stay parent-owned. */
-  @Output() openAccountEntries = new EventEmitter<{ movement: BalanceMovement; instrumentType: InstrumentType | null }>();
+  /**
+   * MAKER RESULT panel's 3 "Account Entries" buttons — `accountEntryDialogMovement`/`Instrumenttype`/
+   * `AccountEntriesDialogComponent` all stay parent-owned. `phase` (business-confirmed 2026-08-27) is
+   * only ever non-null for the first (`submitResult`) button — see `resultPhase`'s own doc comment; the
+   * other two always pass a genuinely separate compound-leg movement that needs no override.
+   */
+  @Output() openAccountEntries = new EventEmitter<{ movement: BalanceMovement; instrumentType: InstrumentType | null; phase?: 'primary' | 'create' | 'finalize' | null }>();
   /** MAKER RESULT panel's "Delete Pending (EC)" button — `deleteMakerPending()` itself stays parent-owned (same Checker-action-layer boundary as `release()`/`reject()`). */
   @Output() deletePendingRequested = new EventEmitter<void>();
+  /** A4's own "Delete Pending" — `withdrawMakerPending()` (checkerActions.withdrawMakerPending()) stays parent-owned, same boundary as deletePendingRequested above. See the button's own doc comment in the template for why A4 needs a separate event. */
+  @Output() withdrawMakerPendingRequested = new EventEmitter<void>();
 
   form = new FormGroup({});
   model: BuilderModel = { currency: 'USD', createdBy: 'maker1', eventSeq: Date.now() };
@@ -331,9 +338,28 @@ export class MakerPanelComponent implements OnChanges {
     return policy.contextSecondaryRef(this.contextRefState);
   }
 
+  /**
+   * A4's own "this record has moved on to A4's own PENDING/APPROVED/REJECTED lifecycle" signal for the
+   * MAKER RESULT panel's own `submitResult` — the SAME `phase: 'finalize'` override
+   * `MakerQueueService.displayPhaseFor()` derives for Maker Queue, computed here from the currently
+   * selected Function instead of a cross-session row's own field.
+   *
+   * Business-confirmed 2026-08-27 ("Transaction Status 與 Account Entries Status 必須保持一致") —
+   * originally computed inline inside `displayStatus()` below only, so the "Account Entries" button
+   * (`openAccountEntries.emit()`, a SEPARATE call site) never got this override at all — the View Voucher
+   * dialog kept showing "EARMARKED" for an A4-in-progress record even after the Status line above it had
+   * already been fixed to show "PENDING". Extracted to one shared getter so `displayStatus()` and
+   * `openAccountEntries.emit()` can never diverge on this question again.
+   * `releasesExistingMovementInPlace` is A4's own unique strategy flag — true only while A4 itself is
+   * selected, so this can't misfire for any other Function's own submitResult.
+   */
+  get resultPhase(): 'finalize' | null {
+    return this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace && this.submitResult?.makerSubmittedAt ? 'finalize' : null;
+  }
+
   /** `displayStatus()` thin delegation — duplicated on this component the same way `AccountEntriesDialogComponent` carries its own copy, since Emulated view encapsulation scopes a template's binding surface to its own component. */
   displayStatus(status: string, instrumentType?: InstrumentType | string | null, movementType?: string | null, acknowledgedAt?: string | null): string {
-    return displayStatusShared(status, instrumentType, movementType, undefined, acknowledgedAt);
+    return displayStatusShared(status, instrumentType, movementType, this.resultPhase, acknowledgedAt);
   }
 
   movementTypeChecksAvailableBalance(movementType?: string | null): boolean {

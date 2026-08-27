@@ -79,6 +79,7 @@
           (syncRequested)="onMakerSyncRequested($event)"
           (openAccountEntries)="onMakerOpenAccountEntries($event)"
           (deletePendingRequested)="deleteMakerPending()"
+          (withdrawMakerPendingRequested)="withdrawMakerPending()"
         ></app-maker-panel>
 
         <!-- ══════════════════════════ CHECKER ══════════════════════════ -->
@@ -139,7 +140,7 @@
               arrivalAlreadyApproved
             "
           >
-            ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved (acknowledgment only)<span
+            ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved<span
               *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"
             >
               — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date: 'short' }}</span
@@ -173,7 +174,7 @@
                   : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
                       selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
                       !isCheckerCompoundOwnSubmission
-                    ? 'Approve (acknowledgment only)'
+                    ? 'Approve'
                     : 'Release'
               }}
             </button>
@@ -186,12 +187,7 @@
                component's own class doc comment for why the action layer stays here, not on
                CheckerPanelComponent), gated the same way Maker's own button is (contingentAccountEntry
                present — null for an out-of-contingent-scope instrumentType). -->
-            <button
-              type="button"
-              class="tb-btn tb-btn--outline"
-              *ngIf="selectedCheckerMovement?.contingentAccountEntry"
-              (click)="openAccountEntryDialog(selectedCheckerMovement!, selectedFunction.instrumentType)"
-            >
+            <button type="button" class="tb-btn tb-btn--outline" *ngIf="selectedCheckerMovement?.contingentAccountEntry" (click)="openCheckerAccountEntryDialog()">
               Account Entries
             </button>
           </div>
@@ -389,7 +385,7 @@
                      voucher pop-up) already reconstructs the full Dr/Cr detail per event; this table's
                      own job is overview/navigation, not carrying full audit-trail responsibility itself,
                      so the redundant per-row movementType badge was dropped. -->
-                    <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase)">
+                    <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase, row.linkedMovement)">
                       <td>
                         <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
                         <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && lookUp.systemLabelFor(row) as sysLabel">{{ sysLabel }}</span>
@@ -401,7 +397,7 @@
                           >(ceiling {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount) }})</span
                         >
                       </td>
-                      <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
+                      <td class="tb-table__ref">{{ lookUp.primaryReferenceFor(row) }}</td>
                       <td class="tb-table__ref">{{ lookUp.secondaryReferenceFor(row) }}</td>
                       <td class="tb-table__status">
                         <span
@@ -520,6 +516,7 @@
     [movement]="accountEntryDialogMovement"
     [instrumentType]="accountEntryDialogInstrumentType"
     [phase]="accountEntryDialogPhase"
+    [linkedMovement]="accountEntryDialogLinkedMovement"
     (closed)="closeAccountEntryDialog()"
   ></app-account-entries-dialog>
 

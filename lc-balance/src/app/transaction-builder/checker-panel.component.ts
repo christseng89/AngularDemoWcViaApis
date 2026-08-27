@@ -10,6 +10,7 @@ import {
   TransactionFunction,
   displayMovementType as displayMovementTypeRule,
   displayMovementAmount as displayMovementAmountRule,
+  isEarmarkFunction,
 } from './balance-component.model';
 import { describeApiError as describeApiErrorShared } from './api-error';
 import * as policy from './function-policy';
@@ -110,6 +111,19 @@ export class CheckerPanelComponent implements OnChanges {
 
   displayMovementAmount(movementType: string | null | undefined, amount: string | null | undefined): string {
     return displayMovementAmountRule(this.checkerContract?.instrumentType, movementType, amount);
+  }
+
+  /**
+   * Business-reported gap 2026-08-27 (A6's own Pending Approvals row read "· earmarked ..." even though
+   * A6 is a Final-Processing Function, not an Earmarking one — see CLAUDE.md's own "LC Balance Status
+   * Rules" entry) — this row-sub label was a hardcoded literal, unlike every other status text in this
+   * app, which already derives from `isEarmarkFunction()`. Every row in this queue shares the one
+   * resolved `checkerContract`/`selectedFunction` (per-function-scoped Checker Queue, see CLAUDE.md), so
+   * this only needs the row's own `movementType`, not a full phase/acknowledgedAt lookup — a raw queue
+   * row is never itself a 'finalize'-phase split.
+   */
+  checkerRowVerb(movementType: string | null | undefined): string {
+    return isEarmarkFunction(this.checkerContract?.instrumentType, movementType) ? 'earmarked' : 'submitted';
   }
 
   get checkerSecondaryField(): 'ibNumber' | 'sgNumber' | null {

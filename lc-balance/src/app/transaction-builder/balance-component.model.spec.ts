@@ -35,6 +35,9 @@
   isReopenMovement,
   isBatchActor,
   systemMovementLabel,
+  accountingSetLabel,
+  accountingSetStatusLabel,
+  accountingSetStatusBadgeClass,
 } from './balance-component.model';
 
 // The 10 InstrumentType values, per src/types.ts / the CLAUDE.md domain-model section. This is the
@@ -1000,5 +1003,53 @@ describe('balance-component.model data invariants', () => {
       expect(contractStatusLabel('ACTIVE', false)).toBe('ACTIVE');
       expect(contractStatusLabel('ACTIVE')).toBe('ACTIVE');
     });
+  });
+});
+
+// A6/B4/A3S Accounting Event Ownership Rule (2026-08-28) — see CLAUDE.md's own entry of the same name.
+describe('accountingSetLabel', () => {
+  it('maps each movementType this two-set feature ever pairs to its own label', () => {
+    expect(accountingSetLabel('UTILIZE')).toBe('LC Balance Entries');
+    expect(accountingSetLabel('ACCEPT')).toBe('Confirmed LC Balance Entries');
+    expect(accountingSetLabel('CREATE')).toBe('Acceptance Entries');
+    expect(accountingSetLabel('FULL_REDEEM')).toBe('Shipping Guarantee Entries');
+    expect(accountingSetLabel('PARTIAL_REDEEM')).toBe('Shipping Guarantee Entries');
+  });
+
+  it('falls back to a generic label for anything else, or null/undefined', () => {
+    expect(accountingSetLabel('ISSUE')).toBe('Account Entries');
+    expect(accountingSetLabel(null)).toBe('Account Entries');
+    expect(accountingSetLabel(undefined)).toBe('Account Entries');
+  });
+});
+
+describe('accountingSetStatusLabel / accountingSetStatusBadgeClass', () => {
+  it('resolves null for a null/undefined movement, without throwing', () => {
+    expect(accountingSetStatusLabel(null)).toBe('');
+    expect(accountingSetStatusBadgeClass(undefined)).toBe('');
+  });
+
+  it('UTILIZE is the only movementType this feature pairs that is ever earmark-shaped — EARMARKING/EARMARKED, never PENDING/APPROVED', () => {
+    expect(accountingSetStatusLabel({ movementType: 'UTILIZE', status: 'PENDING', acknowledgedAt: null })).toBe('EARMARKING');
+    expect(accountingSetStatusLabel({ movementType: 'UTILIZE', status: 'PENDING', acknowledgedAt: '2026-08-28T00:00:00.000Z' })).toBe('EARMARKED');
+    expect(accountingSetStatusLabel({ movementType: 'UTILIZE', status: 'RELEASED' })).toBe('EARMARKED');
+    expect(accountingSetStatusBadgeClass({ movementType: 'UTILIZE', status: 'PENDING', acknowledgedAt: '2026-08-28T00:00:00.000Z' })).toBe('tb-status-badge--earmark');
+  });
+
+  // The exact business scenario that prompted this: A3S's own matched SG redemption reaches a real
+  // Accounting-bound APPROVED the moment the Checker releases it, independent of the LC/UTILIZE side
+  // staying EARMARKED forever until a later A4/A6 — "一套帳是 EARMARKING/EARMARKED... 一套帳是 PENDING/APPROVED".
+  it('ACCEPT/CREATE/FULL_REDEEM/PARTIAL_REDEEM are never earmark-shaped — plain PENDING/APPROVED, even though UTILIZE (its own linked pair-mate) is', () => {
+    expect(accountingSetStatusLabel({ movementType: 'FULL_REDEEM', status: 'PENDING' })).toBe('PENDING');
+    expect(accountingSetStatusLabel({ movementType: 'FULL_REDEEM', status: 'RELEASED' })).toBe('APPROVED');
+    expect(accountingSetStatusLabel({ movementType: 'ACCEPT', status: 'PENDING' })).toBe('PENDING');
+    expect(accountingSetStatusLabel({ movementType: 'ACCEPT', status: 'RELEASED' })).toBe('APPROVED');
+    expect(accountingSetStatusLabel({ movementType: 'CREATE', status: 'RELEASED' })).toBe('APPROVED');
+    expect(accountingSetStatusBadgeClass({ movementType: 'FULL_REDEEM', status: 'RELEASED' })).toBe('tb-status-badge--approved');
+  });
+
+  it('REJECTED passes through unchanged for either shape', () => {
+    expect(accountingSetStatusLabel({ movementType: 'UTILIZE', status: 'REJECTED' })).toBe('REJECTED');
+    expect(accountingSetStatusLabel({ movementType: 'FULL_REDEEM', status: 'REJECTED' })).toBe('REJECTED');
   });
 });

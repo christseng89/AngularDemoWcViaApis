@@ -181,10 +181,11 @@ function importCase2(lc, ib) {
         },
         'Checker releases Amendment',
       ),
-      ...createAndRelease(
-        'Document Arrival 50,000 (Earmark)',
-        'utilize',
-        {
+      {
+        type: 'createMovement',
+        label: 'Document Arrival 50,000 (Earmark)',
+        captureAs: 'utilize',
+        request: {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'UTILIZE',
@@ -194,8 +195,14 @@ function importCase2(lc, ib) {
           sourceTransactionRef: 'B01',
           createdBy: MAKER,
         },
-        'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability',
-      ),
+      },
+      // Added 2026-08-28 — this case predates the A6 cascade design (analysis/balance-component-api.yaml
+      // v1.29.0) and directly plain-releases this Usance UTILIZE rather than going through a real A6
+      // IPLC_ACCEPTANCE/CREATE (see Import Case 7 for that fuller shape) — v1.29.0's own widened
+      // Maker-Submit gate (Sight-only -> any explicit tenorType) now requires this explicit step first;
+      // without it, the release two steps below 409s with ILLEGAL_STATE_TRANSITION.
+      { type: 'makerSubmit', label: 'Real Maker Submit before Accept', movementRef: 'utilize', makerSubmittedBy: MAKER },
+      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
       { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
       ...createAndRelease(
         'Create Acceptance 50,000 (carved out of the LC, linked call)',
@@ -516,10 +523,22 @@ function importCase5(lc) {
 // (2026-08-16 redesign — "Add real Maker Submit, then have Checker to Release it") on THREE Document
 // Arrivals, two of them A3S-matched against a Shipping Guarantee (one exact/FULL_REDEEM, one
 // partial/PARTIAL_REDEEM). Case #7 exercises A6/A7 (Usance Acceptance + Settlement) instead, since a
-// Usance LC's own UTILIZE settles via A6, never A4 — makerSubmit is IPLC_LC/UTILIZE-scoped at the
-// SERVICE layer, but A6's own referencedTransactionId-based compound release (not a maker-submit gate)
-// is what actually finalizes a Usance Document Arrival, matching the live data exactly (no
-// makerSubmittedBy on either UTILIZE under U01).
+// Usance LC's own UTILIZE settles via A6, never A4 — no separate `makerSubmit` step is ever run against
+// either UTILIZE below, matching the live U01 data this case was transcribed from exactly.
+//
+// CORRECTED 2026-08-28 (business-confirmed, "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure" — see
+// `lc-balance/CLAUDE.md`'s own "Design Principle" and `analysis/balance-component-api.yaml`'s own v1.29.0
+// entry): this comment previously said "A6's own referencedTransactionId-based compound release (not a
+// maker-submit gate) is what actually finalizes a Usance Document Arrival" and that neither UTILIZE below
+// ever gets `makerSubmittedBy` set. That was true when this comment was written, but is NO LONGER true —
+// `POST /balance-movements` creating A6's own `IPLC_ACCEPTANCE`/`CREATE` (the "Create Acceptance ... (A6
+// — references the Document Arrival)" steps below) now sets the referenced UTILIZE's own
+// `makerSubmittedBy`/`makerSubmittedAt` as a side effect, and `POST .../release` on that same A6 `CREATE`
+// now requires it (widened from Sight-only). So as of today, running THIS case DOES leave
+// `makerSubmittedBy` set on both UTILIZEs under U01 — the live data this case was originally transcribed
+// from (captured 2026-08-16, before the cascade existed) is simply older than the current business rule;
+// the case's own steps are still correct (they still reproduce the real U01 lifecycle), only this
+// comment's claim about the resulting `makerSubmittedBy` field was stale.
 //
 // Note (2026-08-24, post-Business-Case-Runner-inventory): same PARTIAL_REDEEM/UI-lock caveat as
 // importCase4() above — this case's own partial-match SG redemption is still correct at the API level,
@@ -718,6 +737,11 @@ function importCase7(lc) {
           createdBy: MAKER,
         },
       },
+      // Added 2026-08-28 — real regression found live: A6's own createMovement()/release() cascade
+      // (balance-component-api.yaml v1.29.0) requires the referenced UTILIZE's own `acknowledgedAt` before
+      // it will set `makerSubmittedAt`/allow Release; without this step, both A6 steps below 409 with
+      // ILLEGAL_STATE_TRANSITION. See CLAUDE.md's own decision-log entry for the full incident.
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B01 (A3)', movementRef: 'utilizeB01', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'Shipping Guarantee 20,000 (G01)',
         'sg1',
@@ -749,6 +773,10 @@ function importCase7(lc) {
           createdBy: MAKER,
         },
       },
+      // Added 2026-08-28 — same fix as B01 above; the real Angular Checker's own A3S compound release()
+      // acknowledges this UTILIZE as part of releasing the matched SG redemption, but this orchestrator's
+      // own plain `release` step against `redeemSg1` below does not — needs its own explicit step.
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B02 (A3S)', movementRef: 'utilizeB02', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
         'redeemSg1',
@@ -905,6 +933,11 @@ function importCase8(lc) {
           createdBy: MAKER,
         },
       },
+      // Added 2026-08-28 — real regression found live: A6's own createMovement()/release() cascade
+      // (balance-component-api.yaml v1.29.0) requires the referenced UTILIZE's own `acknowledgedAt` before
+      // it will set `makerSubmittedAt`/allow Release; without this step, both A6 steps below 409 with
+      // ILLEGAL_STATE_TRANSITION. See CLAUDE.md's own decision-log entry for the full incident.
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B01 (A3)', movementRef: 'utilizeB01', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'Shipping Guarantee 20,000 (G01)',
         'sg1',
@@ -936,6 +969,10 @@ function importCase8(lc) {
           createdBy: MAKER,
         },
       },
+      // Added 2026-08-28 — same fix as B01 above; the real Angular Checker's own A3S compound release()
+      // acknowledges this UTILIZE as part of releasing the matched SG redemption, but this orchestrator's
+      // own plain `release` step against `redeemSg1` below does not — needs its own explicit step.
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B02 (A3S)', movementRef: 'utilizeB02', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
         'redeemSg1',
@@ -1098,10 +1135,11 @@ function importCase9(lc, ib) {
         },
         'Checker releases Amendment',
       ),
-      ...createAndRelease(
-        'Document Arrival 50,000 (Earmark)',
-        'utilize',
-        {
+      {
+        type: 'createMovement',
+        label: 'Document Arrival 50,000 (Earmark)',
+        captureAs: 'utilize',
+        request: {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'UTILIZE',
@@ -1111,8 +1149,14 @@ function importCase9(lc, ib) {
           sourceTransactionRef: 'B01',
           createdBy: MAKER,
         },
-        'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability',
-      ),
+      },
+      // Added 2026-08-28 — this case predates the A6 cascade design (analysis/balance-component-api.yaml
+      // v1.29.0) and directly plain-releases this Usance UTILIZE rather than going through a real A6
+      // IPLC_ACCEPTANCE/CREATE (see Import Case 7 for that fuller shape) — v1.29.0's own widened
+      // Maker-Submit gate (Sight-only -> any explicit tenorType) now requires this explicit step first;
+      // without it, the release two steps below 409s with ILLEGAL_STATE_TRANSITION.
+      { type: 'makerSubmit', label: 'Real Maker Submit before Accept', movementRef: 'utilize', makerSubmittedBy: MAKER },
+      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
       { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
       ...createAndRelease(
         'Create Acceptance 50,000 (carved out of the LC, linked call)',
@@ -1348,10 +1392,11 @@ function importCase12(lc, ib) {
         },
         'Checker releases LC Issue',
       ),
-      ...createAndRelease(
-        'Document Arrival 50,000 (Earmark)',
-        'utilize',
-        {
+      {
+        type: 'createMovement',
+        label: 'Document Arrival 50,000 (Earmark)',
+        captureAs: 'utilize',
+        request: {
           instrumentType: 'IPLC_LC',
           balanceContractIdRef: 'lc',
           movementType: 'UTILIZE',
@@ -1361,8 +1406,10 @@ function importCase12(lc, ib) {
           sourceTransactionRef: 'B01',
           createdBy: MAKER,
         },
-        'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability',
-      ),
+      },
+      // Added 2026-08-28 — same fix as Import Case 2/9, see that comment for the full explanation.
+      { type: 'makerSubmit', label: 'Real Maker Submit before Accept', movementRef: 'utilize', makerSubmittedBy: MAKER },
+      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
       { type: 'snapshot', label: 'LC Balance after Accept (expect 50,000 — 100,000 minus 50,000 utilized)', contractRef: 'lc' },
       ...createAndRelease(
         'Create Acceptance 50,000 (carved out of the LC, linked call) — left outstanding, never settled',

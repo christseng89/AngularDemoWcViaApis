@@ -170,7 +170,7 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('throws "Unknown step type" for a step.type outside note/createMovement/release/makerSubmit/snapshot', async () => {
+    it('throws "Unknown step type" for a step.type outside note/createMovement/release/makerSubmit/acknowledge/snapshot', async () => {
       global.fetch = jest.fn();
 
       const businessCase = {
@@ -226,6 +226,61 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       expect(trace[0]).toEqual({
         type: 'makerSubmit',
         label: 'A4 real Maker Submit',
+        skipped: true,
+        reason: expect.stringContaining('No movementId captured under "never-captured"'),
+      });
+    });
+
+    // RESTORED 2026-08-28 — see RELEASE_SHAPED_STEP_TYPES's own doc comment in server.js: this dispatch
+    // table entry existed once (BAL-131) but was dropped 2026-08-18 when B3 stopped needing it, then the
+    // /acknowledge endpoint itself came back 2026-08-20 for A3/A3S without this table being updated to
+    // match — a real, live-reproduced gap (Import Case 7/8 silently 409'd on every A6 release step once
+    // v1.29.0's own Maker-Submit gate widened to Usance) closed by re-adding it. Same shape/coverage
+    // pattern as the makerSubmit tests immediately above.
+    it('acknowledge step: POSTs to .../acknowledge with acknowledgedBy, distinct from release/makerSubmit', async () => {
+      const businessCase = {
+        id: 'synthetic-acknowledge',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Document Arrival',
+            captureAs: 'utilize',
+            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1000' },
+          },
+          { type: 'acknowledge', label: 'Checker acknowledges Document Arrival (A3)', movementRef: 'utilize', acknowledgedBy: 'checker1' },
+        ],
+      };
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockImplementationOnce(async (url, opts) => {
+          expect(url).toMatch(/\/balance-movements\/mv-1\/acknowledge$/);
+          expect(JSON.parse(opts.body)).toEqual({ acknowledgedBy: 'checker1' });
+          return jsonResponse(200, { status: 'PENDING', acknowledgedBy: 'checker1' });
+        });
+
+      const trace = await runCase(businessCase);
+
+      expect(trace).toHaveLength(2);
+      expect(trace[1]).toMatchObject({ type: 'acknowledge', label: 'Checker acknowledges Document Arrival (A3)', ok: true, status: 200 });
+      expect(trace[1].response).toEqual({ status: 'PENDING', acknowledgedBy: 'checker1' });
+    });
+
+    it('acknowledge step: marks itself skipped (no fetch call) when the referenced createMovement returned no movementId', async () => {
+      global.fetch = jest.fn();
+
+      const businessCase = {
+        id: 'synthetic-acknowledge-skipped',
+        steps: [{ type: 'acknowledge', label: 'Checker acknowledges Document Arrival (A3)', movementRef: 'never-captured', acknowledgedBy: 'checker1' }],
+      };
+
+      const trace = await runCase(businessCase);
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(trace).toHaveLength(1);
+      expect(trace[0]).toEqual({
+        type: 'acknowledge',
+        label: 'Checker acknowledges Document Arrival (A3)',
         skipped: true,
         reason: expect.stringContaining('No movementId captured under "never-captured"'),
       });

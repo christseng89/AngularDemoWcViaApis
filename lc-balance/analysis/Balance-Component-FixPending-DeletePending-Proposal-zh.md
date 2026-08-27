@@ -1120,3 +1120,153 @@ IB-SG Number／Currency，其餘皆可修改；Currency 如需修正走 Delete P
 納入 §6.1／§7.2 訂出的兩項測試要求（`db.transaction()` 中途失敗一致性測試、SUPERSEDED 顯示驗證
 測試）。`structured-coalescing-quasar.md` 那份草稿**不採用**，若其中有任何工程隊認為值得保留的
 技術細節，請重新提出、走一次跟本文件同樣的 BA 複查流程，不要直接搬用未經覆核的舊草稿內容。
+
+
+## 17. BA Review（2026-08-27，Delete Pending「almost there」全面複查——三項新修法 + 測試計畫交叉核對，發現一項待修 Defect）
+
+使用者要求「Delete Pending Almost there, Review the Code and provide valuable comments」。複查範圍
+涵蓋兩部分：(a) `CLAUDE.md` 決策日誌記錄、但本文件 §1-§16 尚未收錄的三項最新修法；(b) 另一份獨立的
+`analysis/Balance-Component-DeletePending-TestPlan-zh.md`（v4，已獲「BA APPROVED — PROCEED WITH
+FULL TEST EXECUTION」，Final Review Score 9.97/10）與真實程式碼的交叉核對。
+
+### 17.1 三項新修法逐一複查——全部正確，予以核准
+
+1. **A1/B1 專屬的 LC-reuse 修法，泛化為任何 `isCreating` movementType（ISSUE/CREATE）＋「無
+   sibling movement」的通用條件**（`balanceService.ts:2406-2411`）：查證 `movementTypeRegistry`
+   裡標記 `isCreating: true` 的只有 `ISSUE`/`CREATE` 兩種 movementType，且逐行確認
+   `resolveOrCreateContract()` 唯一呼叫 `createContract()` 的路徑也是同一個 `isCreating` 判斷式
+   把關——這代表新的泛化邏輯**涵蓋了所有真正會建立新合約的路徑，沒有遺漏**。針對「子合約在自己的
+   ISSUE/CREATE 還沒 Release 前，理論上能不能有 sibling movement」這個安全性問題，逐步推導後確認：
+   能達到「這筆 ISSUE/CREATE 被 Cancel、且合約被標記 CANCELLED」這個狀態的唯一路徑，必然代表這筆
+   ISSUE/CREATE 從未被 Release 過（Cancel 只能發生在 PENDING/REJECTED），而 Release 是子合約被
+   建立後唯一可能有其他動作介入的前提（`assertRootIssueReleased()` 把關）——因此「無 sibling」的
+   假設在所有可達狀態下都成立，不存在文件裡沒提到、但實際可能觸發的邊界案例。測試
+   （`balanceService.test.ts:1746-1945`）涵蓋 A1/B1 原案例、A8(SHGT) 子合約案例、以及「已有
+   sibling 時刻意不 Cancel 合約」的防呆案例，覆蓋完整。**核准。**
+
+2. **`sourceTransactionRef` 重複檢查排除 CANCELLED 狀態**（`balanceService.ts:1691-1698`，
+   業務確認缺陷「A3/B04 Submit→Delete Pending→同一 IB Number 重新 Submit 被誤擋」）：
+   `duplicateRef` 判斷式加上 `&& m.status !== 'CANCELLED'`，讓 Delete Pending 後的舊記錄不再
+   佔用這個 2ndary Reference，同時原 CANCELLED 記錄本身完全不受影響（仍可在 Inquire Delete
+   Pending 查到，`sourceTransactionRef` 欄位保留原值不變）。測試
+   （`balanceService.test.ts:1946-2021`）確認：CANCELLED 後可重用、REJECTED-then-CANCELLED
+   後也可重用、原記錄本身保持不變可查、**仍在 PENDING 中的重複值繼續被擋**（只排除
+   CANCELLED，不是放寬全部狀態）——修法範圍精準，沒有過度放寬。**核准。**
+
+3. **Inquire Delete Pending LC Catalog 看不到子合約（A6/A8/B3/B4-B5）自己的 Delete Pending
+   記錄**（`CLAUDE.md` 2026-08-28 條目，`balanceContractStore.ts:400-407` 的
+   `hasDeletePendingHistory` EXISTS 子查詢）：原本的查詢只認「稽核記錄所屬合約的 instrument_type
+   等於正在瀏覽的 root type」，導致子合約（SHGT/Acceptance/EPLC_EXAMINATION 等 instrument_type
+   跟 root 不同）的 Delete Pending 完全無法從 LC Catalog 進入——**這正是我原本準備獨立指出的問題，
+   查證後發現工程隊已經在 CLAUDE.md 記錄的這一輪自行發現並修好了**，用
+   `dc.parent_logical_contract_id = c.logical_contract_id` 取代原本過窄的 instrument_type 比對，
+   同時把「代表列」的選取邏輯從「最近一次 Delete Pending 動作」改成「最近一次 ROOT 合約本身的
+   incarnation（`effective_from` 排序）」，因為現在要代表的動作可能發生在子合約上，不能再直接拿
+   稽核記錄本身的 `cancelled_at` 排序代表列。**額外自行推導的一個多重驗證**：如果同一個 LC
+   Number 曾經歷「A1 ISSUE 被 Release → 底下建立子合約 → 之後 A1 自己又被 Delete Pending 重新
+   開一輪」這種跨 incarnation 情境，子合約的 Delete Pending 紀錄會不會因為代表列選錯而消失？
+   推導後確認**這個情境結構上不可能發生**——因為子合約的建立前提是 root 的 ISSUE 已經
+   Release，而 Release 之後的 ISSUE 依狀態機無法再被 Cancel（`RELEASED: {}`），所以「已經生過
+   子合約的 incarnation」永遠不可能是之後被 Delete Pending 重開的那個 incarnation，不存在
+   查得到子合約卻選錯代表列的邊界案例。6 個新測試
+   （`app.test.ts:4146-4230`，涵蓋 SHGT/EPLC_EXAMINATION/IPLC_ACCEPTANCE/EPLC_ACCEPTANCE 四種
+   子類型、跨 Import/Export 不誤配、代表列規則）與 live 驗證（真實跑在 `:4100` 的微服務，不是
+   Jest in-memory DB）都到位。**核准，且工程隊這次的自我發現與修復品質值得肯定。**
+
+### 17.2 交叉核對獨立的 `Balance-Component-DeletePending-TestPlan-zh.md`（v4，已核准 9.97/10）——
+發現一項待修 Defect，已依該文件自己的 §0.3 Test Governance Rule 登記為 **Defect #3**
+
+這份測試計畫文件的 §0.2 P0 規則明訂：Delete Pending 必須讓「Checker acknowledged → A4/A6
+rejected → Maker deleted pending」三個時間點都可稽核追溯，§3 Case 5 是這條規則的具體測試案例
+（A4/A6 Checker Reject 後 Delete Pending，驗證方式寫的是「`acknowledgedAt` 保留原值不變」）。
+
+逐條對照真實程式碼後發現：**`acknowledgedAt` 確實會保留（`updateStatus()` 的 SQL 從未觸碰這個
+欄位），但「A4/A6 rejected」這個時間點本身存放的 `released_at`/`released_by`（`reject()` 就是
+寫進這兩欄）會被同一次 `cancel()` 呼叫直接覆寫成 `null`**——這正是我在另一份文件（Inquire
+Events Proposal §8）之前就發現、當時判斷為「不阻擋上線的邊緣情境技術債」的同一個
+`updateStatus()` 覆寫問題。但這次不一樣：**業務現在有了明確的書面規則（§0.2 P0）要求這個時間點
+必須可追溯**，而 §3 Case 5 目前寫的驗證方式剛好沒有斷言到 `released_at`/`released_by`，會讓這個
+測試「假通過」——測試計畫本身也因此有一個盲點，不只是程式碼有缺陷。已依該文件自己的 §0.3
+Test Governance Rule（「發現落差要登記為 Defect，不要回頭改 Expected Result 配合實作」）登記為
+**該文件 §9 的 Defect #3**，含根因、建議修法（比照 2026-08-26 `reason_code` 那次同手法的
+`COALESCE`）、建議補強的測試斷言。**建議在該文件 §8 執行順序第 3 步（Microservice special-state
+tests，含 Case 5）之前先修好，否則 Case 5 會用不完整的斷言方式通過，把三點稽核軌跡缺一點的事實
+掩蓋過去。**
+
+### 17.3 文件同步狀態的提醒（非程式碼問題，流程觀察）
+
+- `TODO.md` §10 目前仍停在 OAS v1.28.0／microservice 619/619 的快照，但 `CLAUDE.md` 決策日誌顯示
+  後續至少還有 A6/B4 Accounting Event Ownership Rule、OAS 補追到 v1.30.0、Business Case Runner
+  迴歸修復、本節的三項 Delete Pending 修法等多輪工作——**`TODO.md` 已經落後於實際進度**，建議
+  下次工程隊整理狀態時一併補上，避免換人接手時只看 `TODO.md` 會漏掉這幾輪。
+- `sourceTransactionRef` 排除 CANCELLED 這項修法（§17.1 第 2 點），查證後**沒有在 `CLAUDE.md`
+  留下對應的決策日誌條目**（另外兩項都有）——內容本身沒有問題，只是這一項的紀錄比較零散，建議
+  補記一筆，維持「單一事實來源」的一貫要求。
+- `Balance-Component-DeletePending-TestPlan-zh.md` 是一份獨立於本文件之外、另一輪 BA 覆核鏈
+  （v1→v4，9.97/10）產生的文件，本文件 §1-§16 先前完全沒有交叉引用過——這次一併讀過，確認其
+  範圍（純 Delete Pending，不含 Fix Pending）與本文件 §15 已核准的 Fix Pending 範圍（排除
+  Currency）不衝突，兩份文件可以並存，但建議之後任一份有重大進度時，在另一份留一行交叉引用，
+  避免換人接手時漏看其中一份。
+
+### 17.4 總結
+
+**三項新修法（LC-reuse 泛化、sourceTransactionRef 重用、子合約 Delete Pending 可見性）核准，
+沒有發現需要修正之處，其中子合約可見性那項工程隊自行發現並修復的品質值得肯定。** 唯一需要處理的
+是新登記的 **Defect #3**（REJECTED 的 `released_at`/`released_by` 被 Delete Pending 覆寫，
+與 §0.2 P0 的三點稽核要求有落差）——修法範圍小（比照既有 `reason_code` 的 COALESCE 手法），
+建議在測試計畫 §8 執行順序進到 Case 5 之前先處理，否則會產生一個「测試寫著 Pass、但稽核軌跡其實
+缺一角」的假象。
+
+
+## 18. BA Review（2026-08-27，複查 Defect #3 修復 + A2-A11/B2-B7 瀏覽器全掃描結果）
+
+使用者再次要求「Delete Pending Almost there, Review the Code and provide valuable comments」，本輪
+複查 §17.2 登記的 Defect #3 修復情況，以及 `CLAUDE.md` 記錄的 A2-A11/B2-B7 全功能瀏覽器掃描與過程中
+順手修復的兩個 Angular bug。
+
+### 18.1 Defect #3 修復——逐項核對，確認完整解決
+
+- `balanceMovementStore.ts:520` 確認 `released_by = COALESCE(@releasedBy, released_by), released_at
+  = COALESCE(@releasedAt, released_at)`——與 §17.2 建議的修法逐字相符。
+- 新測試（`balanceService.test.ts:1787` 起）逐一核對：(1) Acknowledge→A4 Maker Submit→Reject→
+  Cancel 全路徑，斷言 `acknowledgedAt`／`releasedBy`+`releasedAt`（等於 Reject 原值）／
+  `cancelledBy`+`cancelledAt` 三點全部獨立可查；(2) 從未 Acknowledge 過的一般 PENDING→Reject→
+  Cancel 路徑，同樣驗證保留、`acknowledgedAt` 全程為 `null`——兩個測試都對應正確的情境，斷言精準。
+- **測試計畫文件本身也同步更新**：§3 Case 5 的「額外驗證」欄已加入
+  `releasedBy`/`releasedAt` 等於 Reject 原值的斷言；§5 新增一條通用檢查項（不限 A4/A6，任何
+  Function 的 REJECTED→Delete Pending 都要驗證這三點）；§9 Defect #3 條目狀態改為「已修復」，
+  完整記錄了修法、測試、live curl 驗證——這是我目前見過對「發現→登記→修復→回頭更新原測試計畫」
+  這個閉環執行得最完整的一輪，沒有發現任何遺漏。
+- **核准**，§3 Case 5 現在可以安全採用完整三點斷言執行，不會再有「假通過」風險。
+
+### 18.2 A2-A11/B2-B7 瀏覽器全掃描——過程中順手修復的兩個 Angular bug，逐一核對
+
+1. **Maker Result 面板重複顯示 Account Entries 按鈕**（`maker-panel.component.html:757/784/792`）：
+   確認兩個次要按鈕都已加上 `!submitResult?.contingentAccountEntry` 條件——只有主按鈕的
+   `contingentAccountEntry` 為空時才會 fallback 顯示次要按鈕，不會兩者同時出現。核對屬實。
+2. **Maker Queue B4 Usance 的 Receivable/Due-from-Issuing-Bank 腳顯示空白 Function**
+   （`function-strategy.ts:280/283`）：確認新增了 `EPLC_ACCEPTANCE_REIMB_RECEIVABLE/CREATE` 與
+   `EPLC_DUE_FROM_ISSUING_BANK/CREATE` 兩個 fallback 分支，都正確解析為 B4；對應的
+   `function-strategy.spec.ts:170/174` 兩個新測試也確認存在且斷言正確。核對屬實。
+3. **業務確認「B3/B4/B5 各自獨立，不合併顯示」**：這是業務對「要不要把同一個 businessEventId 的
+   三筆 PENDING 記錄合併成一列」的明確回覆，記錄為既有設計、非缺陷——查證後這與
+   `MakerQueueService.isCompoundShape()` 現有的「Phase 4 延後」註解一致，Maker Queue 目前對複合
+   事件停用 Delete Pending 是因為這個跨-session 的 queue 沒有辦法重建同一 session 才有的
+   per-leg movementId 對照，這個技術限制本身沒有變，業務這次只是確認了「不合併顯示」這個獨立的
+   UI 呈現問題不需要處理，兩件事沒有混在一起，記錄方式正確。
+4. A4（Sight Settlement）與 B5/B6/B7 這次掃描未能覆蓋（A4 因這個 session 的合成點擊工具跟它「Withdraw
+   A4 Maker Submit」這個非慣例命名的 UI 元素相容性問題而跳過；B5/B6/B7 因結構性理由——B6/B7 只碰
+   root 合約、B5 只碰子合約 `EPLC_ACCEPTANCE`，都已經被 A6/A7/B4 的子合約掃描與既有 Jest 案例
+   間接覆蓋）——**這個「跳過」的理由本身經查證成立**（A4/B6/B7 確實只操作 root 合約，原本
+   Catalog 可見性缺陷的成因是「稽核記錄所屬合約 instrument_type 跟 root 不同」，root-only 的
+   Function 從一開始就不可能踩到這個問題），CLAUDE.md 也如實記錄了跳過的原因而不是隱瞞，符合本
+   專案一貫「不做的部分要講清楚，不能算已覆蓋」的紀律。
+
+### 18.3 總結
+
+**本輪沒有發現新的缺陷。** Defect #3 修復完整、測試與文件同步到位；瀏覽器全掃描過程中順手抓到的
+兩個 Angular bug 也都正確修復並有對應測試佐證。至此，Delete Pending（A1-A11/B1-B7）家族——Phase 1、
+Phase 2、A1/B1 LC 重複使用、`delete_pending_audit`／`delete_seq`、Inquire Delete Pending 畫面、
+三項最新修法（LC-reuse 泛化／sourceTransactionRef 重用／子合約可見性）、Defect #3——**BA 這端逐輪
+覆核下來沒有未解決的已知問題**，測試計畫（`Balance-Component-DeletePending-TestPlan-zh.md`）可以
+從 §8 執行順序第 3 步開始正式跑腳本化測試執行，沒有阻擋項。

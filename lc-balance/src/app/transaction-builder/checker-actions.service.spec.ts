@@ -38,6 +38,7 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
     reject: jest.fn(() => of({ movementId: 'rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'cancelled', status: 'CANCELLED' })),
     acknowledge: jest.fn(() => of({ movementId: 'acknowledged', status: 'PENDING' })),
+    withdrawMakerSubmit: jest.fn(() => of({ movementId: 'withdrawn', status: 'PENDING', makerSubmittedAt: null })),
     findByBusinessEventId: jest.fn(() => of([] as BalanceMovement[])),
     ...overrides,
   } as unknown as BalanceComponentApiService;
@@ -458,6 +459,59 @@ describe('CheckerActionsService.deleteMakerPending() — BAL-132 createdBy runti
     service.deleteMakerPending(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');
       expect(api.cancel).toHaveBeenCalledWith('mv-2', 'maker1', 'MAKER_EC');
+      done();
+    });
+  });
+});
+
+describe('CheckerActionsService.withdrawMakerPending() — A4\'s own Delete Pending (business-confirmed 2026-08-27)', () => {
+  it('fails cleanly, without calling the API, when createdBy is null', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: null, submitResult: makeMovement({ movementId: 'mv-1' }) });
+
+    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('no Maker (createdBy) is known');
+      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('fails cleanly, without calling the API, when submitResult is null', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: null });
+
+    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('no A4 submission is known');
+      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('routes to api.withdrawMakerSubmit (not cancel) with submitResult\'s own movementId and ctx.createdBy', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-2' }) });
+
+    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('released');
+      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-2', 'maker1');
+      expect(api.cancel).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('maps an API error to a failed outcome', (done) => {
+    const api = makeApi({ withdrawMakerSubmit: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))) });
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-2' }) });
+
+    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') expect(outcome.message).toBe('ILLEGAL_STATE_TRANSITION');
       done();
     });
   });

@@ -642,3 +642,24 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
   做完全相同處理，B4 必須路由至 `HONOUR`），目前只剩程式碼落實（該備忘錄行動項3）尚未完成——已更正為
   「決策已定案、純屬工程待辦」的定性，嚴重程度維持 High 不變。`TF-Balance-Component-BA-Review.docx`／
   `-zh.docx` 與本清單第2節、第4節該條目已同步更新。
+- **2026-08-28 發現並完整修復**：Maker Queue（「My Pending/My Rejected」）對 B4 Usance 的顯示有兩個問題，
+  reviewer 實測發現——(1) 同一次 B4 Submit 會在三個不同合約各建一筆 movement
+  （`EPLC_CONFIRMATION/ACCEPT`、`EPLC_ACCEPTANCE/CREATE`、`EPLC_ACCEPTANCE_REIMB_RECEIVABLE/CREATE`，
+  共用同一個 `businessEventId`），其中 Receivable 那筆因為 `function-strategy.ts` 的
+  `resolveFunctionForMovement()` 沒有替 `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/`EPLC_DUE_FROM_ISSUING_BANK`
+  這兩個 instrumentType 註冊 fallback，顯示成空白「—」Function——**已修復**（比照既有的
+  `EPLC_ACCEPTANCE/CREATE` fallback 案例）。(2) 這三筆原本是三個獨立列，且 compound 形狀（A3S/B4/B5）
+  的 Delete Pending 按鈕原本維持 disabled 設計（`maker-queue.service.ts`「Phase 4」註解：跨 session
+  這個 Maker Queue 沒辦法重建 compound 事件各 leg 的 movementId，delete 需要的 cascade 清理機制尚未
+  實作）——**業務最終裁示為「1 只應該顯示一筆 2 一筆刪全部」**（本清單先前記錄的「業務已拒絕擴大／
+  維持現狀」是對使用者稍早一則較模糊回覆的誤判，已由使用者本人在同一天當場更正；此處以使用者最終
+  明確裁示為準）。**已完整修復**：`Phase 4` 的原始技術阻礙（跨 session 無法重建 sibling movementId）
+  其實已在同一天稍早被 `findByBusinessEventId()`（為 Account Entries linked-resolution 修復而新增的
+  既有 API）解除，不需要新的後端能力——`MakerQueueService` 新增 `groupCompoundRows()`（載入時依
+  `businessEventId` 分組，每組合併成一列，代表列選取「與其所屬 Function 自己註冊的 instrumentType
+  直接相符」的那一腿，同時自然帶對 Reference）；`deletePending()` 對合併列改為級聯：先依序取消每個
+  sibling movement，最後才取消代表列自己的 movement（同 `checker-actions.service.ts` 同 session 版
+  `deleteMakerPending()` 的「secondary 先、primary 後」防孤兒順序）；範本移除 `[disabled]` 綁定。
+  Angular 全套 1348/1348 綠燈，四項覆蓋率皆 ≥95%。瀏覽器對真實 dev server 實測：U01（Usance）合併成
+  1 列、S01（Sight）合併成 1 列，點 U01 那列的 Delete Pending 後直接對 3 個底層合約各自的 movement
+  查證，全部變成 `CANCELLED`，UI 上該列也正確消失、S01 那列不受影響。
