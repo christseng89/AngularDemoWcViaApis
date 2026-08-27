@@ -749,7 +749,40 @@ info:
     (`assertExpiryDateIsBusinessDay()`) and the Checker's own `.../release` (defense-in-depth re-check
     against the already-persisted contract), plus a client-side mirror in submit-rules.ts — same
     three-layer convention as `expiryDate`/`reasonCode` (v1.24.0/v1.25.0).
-  version: "1.27.0"
+
+    v1.28.0 (2026-08-27, Fix Pending/Delete Pending Phase — `analysis/Balance-Component-
+    FixPending-DeletePending-Proposal-zh.md`, multiple rounds of BA/business review and live
+    verification; see that document's §9-§13 for the full decision record):
+      - CHANGED: `POST /balance-movements/{movementId}/cancel` (Delete Pending / Maker EC) gained two
+        always-on side effects — (1) writes one independent, append-only `DeletePendingAuditRecord`
+        per call (a compound function's own cascade, e.g. A3S/B4/B5, naturally produces one per leg);
+        (2) when the cancelled movement is the root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION`
+        (A1/B1 only), the owning contract is ALSO marked `ContractStatus.CANCELLED` — genuinely reachable
+        now, not merely reserved — freeing the natural key (`lcNumber`) for the same Maker to re-Submit
+        under. See `ContractStatus`'s own description for the full safety argument
+        (`assertRootIssueReleased()`'s existing guarantee is what makes this safe).
+      - ADDED: `GET /delete-pending-audit` — Inquire Delete Pending's own audit query, filtered by
+        lcNumber/deletedBy/date range, paginated. Independent of Inquire Events, which now EXCLUDES every
+        CANCELLED movement from its own merged Events timeline (a CANCELLED movement never had any real
+        RELEASED impact, so surfacing it there was pure noise) — Delete Pending history lives exclusively
+        in this new endpoint.
+      - ADDED: `GET /delete-pending-audit/lc-catalog` — the LC Catalog step backing Inquire Delete
+        Pending's own two-layer Import/Export -> LC Catalog -> drill-down navigation (mirroring Inquire
+        Events' own UX). Unlike `GET /balance-contracts/catalog`, returns only DISTINCT LC Numbers that
+        have at least one Delete Pending record, deduplicated even across A1/B1's own multi-contract
+        Resubmit chains (§1 above) — the representative row is always the MOST RECENT cycle.
+      - ADDED: `GET /balance-contracts/{balanceContractId}` — resolves a contract directly by ID, no
+        natural key required (a `DeletePendingAuditRecord` only ever carries `balanceContractId`).
+      - ADDED: `GET /balance-contracts/catalog` gained `excludeCancelled` (opt-in) — excludes a
+        Delete-Pending'd root contract from Inquire Events' own LC Master Records Index; every other
+        existing caller is unaffected (omits the new parameter, unchanged default `false`).
+      - CHANGED: `GET /balance-movements` gained a second, mutually-exclusive query shape —
+        `createdBy`/`status`/`page`/`pageSize` (Maker Queue, Fix Pending/Delete Pending Phase 2) alongside
+        the existing `businessEventId` shape. One of the two is now required (400 if neither is supplied,
+        previously only `businessEventId` was ever accepted and required).
+      - ADDED: `DeletePendingAuditRecord` schema (always returned already-joined with its own contract's
+        natural key — see the schema's own description).
+  version: "1.28.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -853,6 +886,10 @@ paths:
         - name: requireIssueReleased
           in: query
           description: v1.16.0 — opt-in, previously live but undocumented (business-reported gap 2026-08-18, "S10 still shown in A4 function which is wrong" — S10's own ISSUE was still PENDING). Excludes a candidate whose own root ISSUE/CREATE is not yet RELEASED. Applied by every Maker-ACTION picker; omitted by inquiry-only contexts and B4's own Present Docs search, whose candidates are legitimately PENDING.
+          schema: { type: boolean, default: false }
+        - name: excludeCancelled
+          in: query
+          description: v1.28.0 — opt-in (business-reported gap, "CANCELLED 不應該顯示在 INQUIRE EVENTS CATALOG 上"). Excludes a contract whose root ISSUE was Delete-Pending'd (see `ContractStatus`'s own description). Inquire Events' own LC Master Records Index passes `true`; every other caller (including this endpoint's own Maker-ACTION pickers, which already imply this via their default `status=ACTIVE`) omits it. Deliberately NOT applied by `GET /delete-pending-audit/lc-catalog` below, whose entire purpose is surfacing exactly this kind of contract.
           schema: { type: boolean, default: false }
         - name: page
           in: query
@@ -974,6 +1011,36 @@ paths:
                   pageSize: { type: integer }
         '400':
           description: instrumentType is missing, or is not one of IPLC_LC/EPLC_LC/EPLC_CONFIRMATION.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{balanceContractId}:
+    get:
+      tags: [BalanceContracts]
+      summary: Resolve one contract version directly by ID — no natural key required
+      description: >
+        v1.28.0 — Inquire Delete Pending's own View action (Fix Pending/
+        Delete Pending Phase). A `delete_pending_audit` record (see
+        `GET /delete-pending-audit` below) only ever carries
+        `balanceContractId`, not the natural key `GET /balance-contracts`
+        (the plain, no-path-param form) requires — this endpoint resolves
+        directly by ID instead. Registered server-side AFTER `/catalog`,
+        `/close-eligible`, `/reopen-eligible` (this single-segment path would
+        otherwise shadow those more specific ones).
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The contract version, whatever its current status (ACTIVE/CLOSED/CANCELLED/SUPERSEDED/EXPIRED — no status filter, unlike the natural-key form's own ACTIVE-only default).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceContract' }
+        '404':
+          description: No contract with this balanceContractId.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1153,9 +1220,9 @@ paths:
 
     get:
       tags: [BalanceMovements]
-      summary: Every movement sharing a businessEventId, across contracts
+      summary: Either (a) every movement sharing a businessEventId, across contracts, or (b) one Maker's own worklist by createdBy/status — two mutually exclusive query shapes on one path
       description: >
-        v1.2.0 — bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG
+        Shape (a), v1.2.0 — bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG
         entries was not shown"): lets a caller independently resolve the linked leg(s) of a compound
         submission (A3S's SG redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement
         Receivable REIMBURSE) by their shared businessEventId, without needing to have been the same
@@ -1164,21 +1231,61 @@ paths:
         balanceContractId differs from the LC's) — businessEventId is the only correlation the two
         linked legs actually share server-side. Returns every movement carrying this businessEventId,
         oldest first (creation order), or an empty array if none do — never 404.
+
+
+        Shape (b), v1.28.0 — Maker Queue (Fix Pending/Delete Pending Phase 2): a Maker's own cross-session
+        "My Pending/My Rejected" worklist, since Delete Pending after Checker Reject only stays reachable
+        via the SAME browser session's own in-memory Submit result otherwise. Returns each movement paired
+        with its own owning contract (unlike shape (a)'s bare movement array) so a caller can derive
+        Function/LC Number/Secondary Reference client-side without a second round trip, same posture as
+        `GET /delete-pending-audit` below. `createdBy` is required to select this shape; `businessEventId`
+        and `createdBy` are mutually exclusive — supplying neither is a `400`.
       parameters:
         - name: businessEventId
           in: query
-          required: true
+          description: Selects shape (a). Mutually exclusive with createdBy.
           schema: { type: string, format: uuid }
+        - name: createdBy
+          in: query
+          description: Selects shape (b) — the Maker whose own worklist to return. Mutually exclusive with businessEventId.
+          schema: { type: string }
+        - name: status
+          in: query
+          description: "Shape (b) only. Comma-separated MovementStatus values, e.g. \"PENDING,REJECTED\". Defaults to PENDING,REJECTED when omitted."
+          schema: { type: string }
+        - name: page
+          in: query
+          description: Shape (b) only.
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          description: Shape (b) only.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
       responses:
         '200':
-          description: Every movement sharing this businessEventId, oldest first (possibly empty).
+          description: Shape (a) — every movement sharing this businessEventId, oldest first (possibly empty). Shape (b) — one page of {movement, contract} pairs, newest createdAt first.
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/BalanceMovement' }
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/BalanceMovement' }
+                  - type: object
+                    required: [items, total, page, pageSize]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          required: [movement, contract]
+                          properties:
+                            movement: { $ref: '#/components/schemas/BalanceMovement' }
+                            contract: { $ref: '#/components/schemas/BalanceContract' }
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
         '400':
-          description: businessEventId query parameter is missing.
+          description: Neither businessEventId nor createdBy was supplied.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1479,6 +1586,20 @@ paths:
         JSON body, not the `DELETE .../{movementId}?reasonCode=` shape an
         earlier draft of this file described — that shape was never
         implemented.
+
+
+        v1.28.0 — two additional, always-on side effects (Fix Pending/Delete
+        Pending Phase, `analysis/Balance-Component-FixPending-DeletePending-
+        Proposal-zh.md`): (1) every call writes one independent, append-only
+        `delete_pending_audit` record — see `GET /delete-pending-audit`
+        below; a compound function's own cascade (A3S/B4/B5, each leg
+        cancelled via its own separate call to this endpoint) naturally
+        produces one audit row per leg, no special-casing needed. (2) when
+        the cancelled movement is the root ISSUE of `IPLC_LC`/`EPLC_LC`/
+        `EPLC_CONFIRMATION` (A1/B1 only — never a child CREATE/ISSUE sharing
+        the same `movementType` string), the owning `BalanceContract` is
+        ALSO marked `CANCELLED` — see `ContractStatus`'s own description for
+        the safety argument and why this frees the natural key for reuse.
       parameters:
         - name: movementId
           in: path
@@ -1502,6 +1623,103 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: Movement is not in a cancellable state (already RELEASED/CANCELLED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /delete-pending-audit:
+    get:
+      tags: [BalanceMovements]
+      summary: Inquire Delete Pending — every Delete Pending action ever recorded, filtered/paginated
+      description: >
+        v1.28.0, Fix Pending/Delete Pending Phase — a dedicated, read-only audit query surface over
+        `delete_pending_audit`, independent of Inquire Events (a CANCELLED movement is deliberately
+        excluded from every merged-events view this contract exposes — Delete Pending history is queried
+        exclusively here). All query parameters are optional filters. Function (A1-A11/B1-B7) is
+        deliberately NOT a filter parameter — it has no column of its own; it is a display-layer concept a
+        caller derives client-side from `instrumentType`+`movementType` (same convention already used for
+        the Maker Queue shape of `GET /balance-movements` above).
+      parameters:
+        - name: lcNumber
+          in: query
+          schema: { type: string }
+        - name: deletedBy
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          description: Inclusive lower bound on cancelledAt.
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: Inclusive upper bound on cancelledAt.
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of matching Delete Pending audit records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DeletePendingAuditRecord' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+
+  /delete-pending-audit/lc-catalog:
+    get:
+      tags: [BalanceContracts]
+      summary: Inquire Delete Pending's own LC Catalog step — only LC Numbers with at least one Delete Pending record
+      description: >
+        v1.28.0, Fix Pending/Delete Pending Phase (business-directed, "只有被 DELETE PENDING 過的才顯示")
+        — unlike `GET /balance-contracts/catalog`, which lists every contract of the given instrumentType,
+        this returns exactly one row per DISTINCT LC Number that has ≥1 `delete_pending_audit` record,
+        ordered by LC Number ascending. A1/B1's own LC-reuse side effect (see `ContractStatus`'s CANCELLED
+        description) means one LC Number can span multiple `balance_contracts` rows over time — the
+        representative row returned for each LC Number is the one tied to its MOST RECENT Delete Pending
+        action, so Tenor Type/Currency reflect that latest incarnation rather than an arbitrary one.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: q
+          in: query
+          description: Free-text substring filter against lcNumber, same convention as GET /balance-contracts/catalog.
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of distinct LC Numbers with Delete Pending history.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '400':
+          description: instrumentType is missing.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1554,6 +1772,23 @@ components:
         may transition back to ACTIVE or EXPIRED via Reopen
         (`movementType: 'REOPEN'`, A11/B7) — see the v1.19.0/v1.20.0
         changelog entries for the full mechanism.
+
+
+        CANCELLED (v1.28.0) is likewise now genuinely reachable, not merely
+        reserved: a side effect of `POST /balance-movements/{movementId}/
+        cancel` (Delete Pending / Maker EC) ONLY when the cancelled movement
+        is the root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` — i.e.
+        A1/B1's own opening ISSUE, never a child CREATE/ISSUE (SHGT/
+        Acceptance/Present Docs) even though those share the same
+        `movementType: 'ISSUE'` string. `assertRootIssueReleased()`'s own
+        existing guarantee (no other movement can exist on a root contract
+        while its own ISSUE is un-Released) is what makes this safe: a
+        Delete-Pending'd root ISSUE, by construction, means this contract
+        version never became real, so retiring it frees the natural key
+        (`lcNumber`) for the same Maker to re-Submit under — see
+        `GET /balance-contracts/catalog`'s own `excludeCancelled` param and
+        `GET /delete-pending-audit/lc-catalog` below for how a CANCELLED
+        contract stays queryable without polluting normal LC browsing.
       enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED]
 
     MovementStatus:
@@ -2035,6 +2270,51 @@ components:
         cancelledBy: { type: string }
         reasonCode: { type: string, nullable: true }
         remarks: { type: string, nullable: true }
+
+    DeletePendingAuditRecord:
+      type: object
+      description: >
+        v1.28.0, Fix Pending/Delete Pending Phase — one independent, append-only record of a single
+        Delete Pending action, written as a side effect of every `POST /balance-movements/{movementId}/
+        cancel` call across all A1-A11/B1-B7 (see that endpoint's own description). Deliberately NOT a
+        replacement for `BalanceMovement.cancelledBy`/`cancelledAt` (those stay, unchanged on the movement
+        itself) — this is an ADDITIONAL, purpose-built audit trail so "every Delete Pending that ever
+        happened" is queryable in one place, and so the same natural key can be traced across repeated
+        Delete Pending -> Resubmit cycles even though each cycle is a genuinely separate
+        `BalanceMovement` row (and, for A1/B1, a genuinely separate `BalanceContract` row too — see
+        `deleteSeq` below). No update/delete operation exists for this record type; it is insert-only.
+        Always returned already-joined with the owning contract's own natural key
+        (instrumentType/lcNumber/ibNumber/sgNumber below) — every endpoint returning this shape does the
+        join server-side so a caller never needs a second round trip just to derive Function/Secondary
+        Reference client-side.
+      properties:
+        auditId: { type: string, format: uuid }
+        deleteSeq:
+          type: integer
+          description: >
+            System-generated, 1-based sequence — NOT caller-supplied. Grouped by the owning contract's
+            own natural key (instrumentType + lcNumber + ibNumber + sgNumber), deliberately NOT by
+            balanceContractId: A1/B1's own LC-reuse side effect (see `ContractStatus`'s CANCELLED
+            description) means every Resubmit-after-Delete-Pending cycle gets a brand new
+            balanceContractId while the natural key stays constant — grouping by contract id would
+            incorrectly reset every such cycle back to 1 instead of counting the true chain (1, 2, 3, ...).
+        movementId: { type: string, format: uuid }
+        balanceContractId: { type: string, format: uuid }
+        eventSeq: { type: integer }
+        movementType: { type: string }
+        sourceTransactionRef: { type: string, nullable: true }
+        statusBefore:
+          type: string
+          enum: [PENDING, REJECTED]
+          description: The movement's own status immediately before this Delete Pending — Phase 1 widened Delete Pending to cover both, not just PENDING.
+        cancelledBy: { type: string }
+        cancelledAt: { type: string, format: date-time }
+        reasonCode: { type: string, nullable: true }
+        remarks: { type: string, nullable: true }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        lcNumber: { type: string }
+        ibNumber: { type: string, nullable: true }
+        sgNumber: { type: string, nullable: true }
 
     BalanceSnapshot:
       type: object

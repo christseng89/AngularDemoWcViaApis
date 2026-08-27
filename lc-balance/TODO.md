@@ -573,10 +573,45 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
      `computeLcIndexRow()`，兩邊共用同一份 Tenor Type/Currency/Face Amount/Last Event Date 計算邏輯。
   5. **過程中發現並修復一個真實 UI bug**：切換 Function 篩選時，先前開著的 View 明細面板沒有跟著
      清除，顯示過期資料——已修正（`[ngModel]`+`(ngModelChange)` 展開語法，一併呼叫 `closeView()`）。
-  三套件全綠：Angular 1254/1254、backend 39/39、microservice 619/619，覆蓋率四項皆過 95%。已透過
+  6. **業務指示微調**：Delete Pending 記錄表格的「View」按鈕移除，改成點擊整列開啟（跟 Inquire
+     Events 既有的 Row-click 慣例一致），`.tb-table` 既有的 `cursor: pointer` 樣式已內建，不需要
+     額外補樣式。
+  7. **過程中順手修復第二個真實 bug（橫跨全專案的共用函式）**：`describeApiError()`（`api-error.ts`）
+     原本對連線層級的 HTTP 失敗（伺服器一時連不上、CORS、DNS 等）只認得伺服器 JSON 錯誤格式
+     （`err.error.message`），退回 `String(err)` 會印出無意義的「[object Object]」——已修正為優先
+     讀取 `HttpErrorResponse` 自帶的 `.message` 欄位；新增這個函式先前完全沒有的專屬測試
+     （`api-error.spec.ts`，5 筆）。`CheckerActionsService`、`MakerQueueService` 等所有既有呼叫端
+     都受益，不是 Inquire Delete Pending 專屬的修復。
+  三套件全綠：Angular 1259/1259、backend 39/39、microservice 619/619，覆蓋率四項皆過 95%。已透過
   curl（確認 12 個曾 Delete Pending 過的 LC 各自只出現一次）與完整瀏覽器操作（LC Catalog → 選 LC →
-  查看該 LC 的 Delete Pending 記錄，Delete Sequence 依自然鍵正確分組 → View → 切換 Function 篩選確認
-  View 自動關閉）live 驗證，全程無 Console 錯誤。**仍未 commit**，等候使用者「commit and push」指示。
+  查看該 LC 的 Delete Pending 記錄，Delete Sequence 依自然鍵正確分組 → 點擊整列開啟 View → 切換
+  Function 篩選確認 View 自動關閉）live 驗證，全程無 Console 錯誤。
+- [x] **已 commit 並 push**（commit `9242f0c`，2026-08-27）——上述 Phase 1-3 全部項目（含 §13 的
+  Inquire Delete Pending 畫面、兩個順手修復的 bug）已進 `main` 分支。
+- [x] **API OAS 文件已同步更新**——`analysis/balance-component-api.yaml` bump 到 **v1.28.0**（新增
+  `GET /delete-pending-audit`、`GET /delete-pending-audit/lc-catalog`、
+  `GET /balance-contracts/{balanceContractId}`；`GET /balance-contracts/catalog` 新增
+  `excludeCancelled`；`GET /balance-movements` 記錄新的 `createdBy`/`status` 查詢分支；
+  `ContractStatus.CANCELLED`／`cancel()` 的兩個新副作用補上說明；新增 `DeletePendingAuditRecord`
+  schema），`analysis/balance-component-channel-api.yaml` 同步 bump 到 **v1.6.0**（`.../cancel`
+  補充說明，副作用透過 passthrough 一併生效，此 channel 層不額外開放稽核查詢端點）。兩份 YAML 皆
+  已用 `js-yaml` 驗證語法正確。**此次 OAS 更新尚未 commit**，等候下一次「commit and push」指示。
+- [x] **業務書面確認 Phase 3（Fix Pending）前置條件 (a)，並修正欄位範圍——排除 Currency**（文件
+  §15，2026-08-27）：「Currency 的 FIX PENDING 不許修改。A1、A2 要修改，先 Delete Pending 重新輸入。」
+  最終範圍＝除 LC Number／IB-SG Number／**Currency** 外皆可修改（比 §2.3 原先「含 Currency」的口頭
+  轉述更窄）；Currency 如需修正一律走 Delete Pending＋重新 Submit，不走 Fix Pending 就地編輯——同時
+  解掉 §5.4 當初對 Currency 連動 `ceilingAmount`/`contingentAccountEntry`/GL 分錄幣別的風險疑慮，
+  Fix Pending 驗證邏輯不需處理這個分支。至此 §5.4/§6.3/§7.4/§8/§14 逐輪覆核的四項前置條件
+  (a)(b)(c)(d) **全部解除**。
+- [x] **BA 正式指示：Fix Pending（C項）實作唯一依據＝本文件 §2.2＋§15，舊草稿
+  `structured-coalescing-quasar.md` 不採用**（文件 §16.3）。該草稿是另一個 session 的暫存草稿，從未
+  進這個 repo、也早於 §5-§15 這輪 BA↔工程覆核，最關鍵的是它必然沒反映 Currency 排除這條最終定案——
+  照舊草稿做很可能做出「允許改 Currency」的錯誤版本。工程隊若認為舊草稿某些技術細節值得保留，須重新
+  提出、走一次跟本文件同樣的 BA 複查流程，不得直接搬用。
+- [ ] **Phase 3（Fix Pending）尚未動工**——前置條件已全部解除（見上兩條），可以開始實作。依 §2.2
+  （新記錄＋舊記錄標記 SUPERSEDED＋`db.transaction()` 包裝）與 §15（欄位範圍）進行，驗收標準納入
+  §6.1（`db.transaction()` 中途失敗一致性測試）與 §7.2（Inquire Events 對 SUPERSEDED 記錄的顯示
+  驗證測試——顯示鏈路已存在，只需補測試）。
 
 ---
 

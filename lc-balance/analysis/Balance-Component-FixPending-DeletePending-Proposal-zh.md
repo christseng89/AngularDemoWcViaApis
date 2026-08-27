@@ -919,3 +919,204 @@ Live 測試 LC Catalog 載入時偶發顯示一個沒有意義的錯誤訊息「
 `err.error.message` 這個形狀，沒有依賴舊的 `String(err)` 兜底行為）。**這是一個橫跨全專案的共用
 函式修復，不是 Inquire Delete Pending 專屬的**——`CheckerActionsService`、`MakerQueueService`
 等所有既有呼叫端都受益。
+
+
+## 14. BA Review（2026-08-27，複查 §13「INQUIRE DELETE PENDING」畫面實作）
+
+依專案慣例逐項對照真實程式碼複查 §13 宣稱完成的實作。**結論：核對下來全部屬實，這項新畫面可以視為
+完成，沒有發現需要修正的錯誤。**這也是使用者要求的「A/B（Delete Pending 相關的新增功能，含本次
+Inquire Delete Pending 畫面）最終複查」的範圍。
+
+### 14.1 微服務複查
+
+- 路由 `GET /delete-pending-audit/lc-catalog?instrumentType=&q=&page=&pageSize=`（`routes/
+  deletePendingAudit.ts:14`）確認存在，`instrumentType` 缺漏會擲出 `RequestValidationError`——核對
+  屬實。
+- `BalanceContractStore.listWithDeletePendingHistory()`（`balanceContractStore.ts:377-408`）逐行核對
+  SQL：外層 `SELECT DISTINCT c.*` 加上 `c.balance_contract_id = (相關子查詢 ORDER BY d2.cancelled_at
+  DESC, d2.audit_id DESC LIMIT 1)`，確保同一個 LC Number（即使像 A1/B1 那樣橫跨多張
+  `balance_contract_id`）只回傳一列，且該列固定是「最近一次 Delete Pending」對應的那張合約——邏輯
+  正確，`COUNT(DISTINCT c.lc_number)` 與分頁查詢的過濾條件（`instrument_type`/`q`）也一致，沒有
+  發現會導致總數與實際回傳筆數對不上的邊界情況。
+
+### 14.2 Angular 複查
+
+- `LcCatalogIndexService`（新檔案，97 行）核對其 `fetchPage`/`decorate` 兩個建構子參數確實可替換，
+  `InquireDeletePendingService` 建構子（line 71-78）正確傳入 `catalogWithDeletePendingHistory()` 作為
+  自訂 `fetchPage`、`computeLcIndexRow()` 作為 `decorate`——與 §13.1 描述一致。
+- `computeLcIndexRow()`／`LcIndexRow`（`inquire-events.service.ts:174/238`）確認為模組層級匯出函式，
+  原本的私有方法 `loadIndexRow()` 已不存在（`grep` 找不到殘留）——確認是乾淨的搬移，不是留下重複的
+  兩份邏輯。
+- `InquireEventsService` 本身核對確實沒有被一併改成使用 `LcCatalogIndexService`——與 §13.1 誠實揭露
+  的範圍一致，屬於刻意保留的後續建議項目，不是遺漏。
+- §13.2 UI bug 修法：`inquire-delete-pending.component.html:94` 確認
+  `[ngModel]="service.functionFilter" (ngModelChange)="service.functionFilter = $event;
+  service.closeView()"`——核對屬實，切換 Function 篩選會正確關閉已開啟的 View。
+- §13.4 Row-click 修法：`inquire-delete-pending.component.html:140` 確認
+  `<tr *ngFor="let row of service.filteredItems" (click)="service.view(row)">`，Action 欄位/按鈕已
+  移除——核對屬實。
+- §13.5 `describeApiError()` 修法：`api-error.ts:16-19` 確認 `shaped?.error?.message ??
+  shaped?.message ?? String(err)`，在退回 `String(err)` 之前多檢查一層 `HttpErrorResponse` 自帶的
+  `.message`——核對屬實，且這是橫跨全專案共用的函式，`CheckerActionsService`/`MakerQueueService`
+  等既有呼叫端會一併受益，不會有既有測試因為呼叫形狀改變而壞掉（原本都是用
+  `err.error.message` 這個形狀）。
+
+### 14.3 測試複查
+
+- 微服務 `test/unit/app.test.ts:3841` 起確認存在
+  `describe('HTTP integration — GET /delete-pending-audit/lc-catalog ...')` 區塊，逐一核對 6 個
+  情境（400 缺 instrumentType、從未 Delete Pending 過不出現、單次出現一次、跨合約多次仍只出現一次、
+  Import/Export 分流、分頁）與 §13.3 描述完全一致。
+- Angular `api-error.spec.ts`（5 筆）、`lc-catalog-index.service.spec.ts`（12 筆）、
+  `inquire-delete-pending.service.spec.ts`（現有 29 筆，與「+9」的說法量級相符，惟因未取得變更前的
+  基準行數，無法逐一核對新增的確切 9 筆是哪幾筆，只能確認測試檔案存在且涵蓋範圍與描述相符）——
+  與 §13.3 描述一致。
+- **一點工具限制，非程式碼缺陷**：本次嘗試直接在裝置端 shell 執行 `jest`（微服務端）驗證測試實際
+  通過，遇到 `Preset ts-jest not found relative to rootDir` 的環境錯誤（`node_modules/ts-jest`
+  確實存在，研判是這台橋接用 Linux VM 掛載檔案系統對 `node_modules` 內符號連結解析方式的既有限制，
+  非本次程式碼的問題）。因此本輪對測試「確實會通過」這一點，改採**逐行核對測試案例內容與程式邏輯是否
+  吻合**的方式查證（如上），而非重新執行整個套件取得通過筆數；§13.3 宣稱的三套件全綠（Angular
+  1259/1259、backend 39/39、microservice 619/619）本身無法在本輪由 BA 這端獨立重新執行驗證，
+  記錄於此供留意，但不影響上述逐項程式碼核對的結論。
+
+### 14.4 總結
+
+**核准**：§13「INQUIRE DELETE PENDING」畫面（LC Catalog 層＋稽核記錄層＋View 原始交易畫面）、
+連同 §13.2/§13.4/§13.5 三個過程中發現並修復的 UI/共用函式 bug，逐項核對程式碼後**沒有發現問題**。
+至此，Delete Pending 相關的整個功能族群（Phase 1 REJECTED Delete Pending、Phase 2 Maker Queue、
+A1/B1 LC 重複使用修法、`delete_pending_audit` 稽核表與 `delete_seq`、Inquire Delete Pending 查詢
+畫面）皆已複查完成、全數核准，可以視為這一輪需求的完整交付。
+
+---
+
+**業務詢問（2026-08-27）：「如果沒問題 可以讓工程隊做C項 (FIX PENDING) 了嗎?」——BA 答覆：暫時還不行。**
+
+Delete Pending 全部項目（A/B）核准完成，但 Fix Pending（Phase 3，本文件裡的「C項」）**還有一個從
+§5.4 第一次提出、§6.3／§7.4／§8 每一輪都重複確認、至今仍未解除的前置條件尚未滿足**：
+
+> Phase 3 前置條件 (a)：取得業務對「除 Primary/2ndary Key（LC Number／IB-SG Number）之外皆可修改，
+> 包含 Currency」這句可修改欄位範圍的**書面確認**——§2.3 原文引用的是「2026-08-26 業務口頭確認」，
+> 這件事從 §5.4 起就被標記為「無法對照書面紀錄查證，不建議僅憑口頭轉述拍板」，工程部門在 §6.3 也已
+> 接受把這條範圍改列為「待業務書面確認」，但複查至 §13 為止，本文件中**沒有出現過這句書面確認**。
+
+其餘三項前置條件（(b) `db.transaction()` 中途失敗一致性測試、(c) Inquire Events 對 SUPERSEDED 記錄
+的顯示驗證測試——已在 §7.2 更正為「只需補測試，不需新增顯示程式碼」、(d) 新欄位暫不加 REFERENCES
+約束）都已在 §6-§8 之間確認為工程部門的既定共識，不是問題。
+
+**建議做法**：請業務針對「Fix Pending 可修改欄位範圍＝除 LC Number／IB-SG Number 外皆可修改，
+包含 Currency」這句話，用文字（哪怕只是一則訊息）正式確認一次，附加於此文件或原始需求文件末端；
+確認到位後，Phase 3（Fix Pending / C項）即可請工程隊動工，其餘技術面前置條件已經備妥。
+
+
+## 15. 業務書面確認：Fix Pending 可修改欄位範圍——排除 Currency（2026-08-27）
+
+業務對 Phase 3 前置條件 (a)（§5.4 提出、§6.3/§7.4/§8/§14 每輪覆核都標記為「唯一尚待書面確認」）
+正式回覆，**修正了 §2.3 原先「含 Currency」的口頭轉述**：
+
+> 「Currency 的 FIX PENDING 不許修改。A1、A2 要修改 [Currency]，先 Delete Pending 重新輸入。」
+
+### 15.1 BA 解讀與確認範圍
+
+逐字對照業務原文，正式規則定義為：
+
+- **Currency 全面排除在 Fix Pending 可修改欄位範圍之外**——不論哪一個功能（不只 A1/A2，業務是舉
+  Import LC 的 Issue／Amendment 為例，但規則本身是針對「Currency 這個欄位」，不是針對特定功能代碼
+  才排除，其餘會出現 Currency 欄位的功能同樣適用）。
+- 若一筆 PENDING／REJECTED 交易的 Currency 真的需要修正，**正確路徑是 Delete Pending 該筆交易後
+  重新 Submit（等同重新輸入一次）**，而不是透過 Fix Pending 就地編輯。
+- 除 Currency 之外，§2.3 原先「除 Primary/2ndary Key（LC Number／IB-SG Number）之外皆可修改」的
+  範圍維持不變——**這次修正只縮小了範圍（拿掉 Currency），沒有再放寬其他欄位**。
+
+### 15.2 BA 複查——這個決定同時解掉了 §5.3／§5.4 當初的風險提示
+
+回顧 §5.4：BA 當時就指出「Currency 是否真的可以在 Fix Pending 時修改，影響層面不小
+（`ceilingAmount`/`contingentAccountEntry`/GL 分錄幣別都跟著變動）」，建議業務書面確認、不要僅憑
+口頭轉述拍板。**業務這次的書面決定，實質上是把最高風險的那個欄位直接排除在 Fix Pending 範圍外**，
+連帶結果：
+
+- Fix Pending 的欄位驗證邏輯不需要處理「Currency 改變後，`ceilingAmount`/`contingentAccountEntry`/
+  GL 分錄幣別要不要跟著連動」這個原本最複雜的分支——因為 Currency 根本不會透過這個路徑改變，範圍
+  比原本規劃的還單純。
+- Currency 真的要改時走「Delete Pending＋重新 Submit」，等同於這筆交易從未存在過、重新走一次完整
+  的 Maker Submit 流程——所有跟 Currency 相關的欄位（ceilingAmount 等）自然會用新的 Currency 從頭
+  正確計算，不存在「半套」風險。
+
+**結論**：業務這次的書面確認不只是「補齊前置條件 (a)」，還實質降低了 Phase 3 的技術風險與工作量。
+沒有發現與既有程式碼/設計衝突之處。
+
+### 15.3 Phase 3 前置條件——全部解除，C 項（Fix Pending）可以請工程隊動工
+
+```text
+Phase 3 前置條件最終狀態：
+  (a) [已解除，2026-08-27] 業務書面確認可修改欄位範圍 = 除 LC Number／IB-SG Number／Currency
+      外皆可修改；Currency 如需修正，走 Delete Pending＋重新 Submit，不走 Fix Pending。
+  (b) [已於 §6.1 確認] db.transaction() 包裝的中途失敗一致性測試，納入正式驗收標準。
+  (c) [已於 §7.2 修正並確認] Inquire Events 對 SUPERSEDED 記錄的顯示——顯示鏈路已存在，只需新增
+      一筆驗證測試，不需新增顯示程式碼。
+  (d) [已於 §6.4 確認] 新增 superseded_by_movement_id 欄位暫不加 REFERENCES 約束，降低本階段
+      遷移複雜度。
+```
+
+四項前置條件全部解除。**BA 答覆：可以請工程隊開始動工 Phase 3（Fix Pending，即業務所稱的「C項」）**，
+請工程隊依 §2.2（技術做法：新記錄＋舊記錄標記 SUPERSEDED＋db.transaction() 包裝）與本節最終確認的
+欄位範圍（排除 LC Number／IB-SG Number／Currency，其餘欄位皆可修改）進行實作，驗收標準比照
+(b)(c)(d) 三項納入正式測試範圍。
+
+
+## 16. BA 覆核 TODO.md §10 更新 + 方向指示（2026-08-27）——OAS 文件版本 bump 與「下一步做什麼」
+
+### 16.1 複查 TODO.md §10 這次的更新內容
+
+逐項對照真實檔案，核實如下：
+
+- `analysis/balance-component-api.yaml:785`／`analysis/balance-component-channel-api.yaml:160`
+  ——`version` 欄位確認分別為 `"1.28.0"`／`"1.6.0"`，與回報一致。
+- 用 Python `yaml.safe_load()` 獨立重新驗證兩份 YAML（不依賴回報所稱的 `js-yaml` 驗證結果），
+  **兩份皆能正確解析，沒有語法錯誤**。
+- `analysis/balance-component-api.yaml:1630`（`/delete-pending-audit`）、`:1679`
+  （`/delete-pending-audit/lc-catalog`）、`:2274`（`DeletePendingAuditRecord` schema）、`:890`
+  （`excludeCancelled` 參數）——確認新增的路徑/schema 都真的存在於文件裡，不是空頭支票。
+- `commit 9242f0c` 的部分——**這一項本輪 BA 無法從目前可存取的環境獨立查證**：這個掛載路徑下沒有
+  `.git` 目錄（`git status`/`git log` 皆回報 "not a git repository"），推測是這個掛載點本身不包含
+  版控後設資料（例如是使用者手動同步出來的一份工作副本，而不是完整 clone）。**不是質疑這句話不實**，
+  只是誠實記錄「這一點目前無法由 BA 這端驗證，需要信任工程隊自己的 git 操作紀錄」，比照本專案一貫
+  「凡是無法查證的都要明講」的紀律。
+
+**結論**：TODO.md §10 這次的更新內容核對下來屬實（除了 commit hash 這點因環境限制無法查證），可以
+接受。
+
+### 16.2 業務詢問「OAS/TODO 文檔改動要不要 commit」——BA 建議：可以 commit，但請由您（業務/PM）
+親自下達「commit and push」指示
+
+這批改動是純文件（TODO.md + 兩份 OAS YAML），內容已經過本節重新驗證語法正確、內容與程式碼路由/
+schema 相符，風險低，沒有理由不 commit。**但本文件從 §9 開始就白紙黑字記著「不要 COMMIT」是
+使用者本人的明確指示，「等候另外的 commit and push 指示」——這件事的性質是專案流程控管，不是程式碼
+正確性判斷，不屬於 BA 職權範圍內可以代為拍板的事項。**
+
+**BA 建議**：內容沒問題，可以 commit；但請您本人明確說一聲「commit and push」，而不是由 BA 這端
+自行解讀「沒問題」就等於「可以 commit」。
+
+### 16.3 業務詢問「可以繼續推進 Fix Pending 完整編輯功能嗎，要用哪一份計畫？」——BA 指示：以本文件
+§1–§15 為唯一依據，`structured-coalescing-quasar.md` 不採用
+
+查證後發現：全 repo（含 git 歷史，雖然本掛載點沒有 `.git`，但 `find` 遍歷工作目錄）都找不到名為
+`structured-coalescing-quasar.md` 的檔案——這類「形容詞-形容詞-名詞」風格的檔名，是 Claude
+Code/Agent 工具自動產生的暫存草稿檔常見命名方式，研判是**另一個 session 的暫存草稿**，從未進入這個
+repo、從未經過這一連串 BA↔工程 的複查與修正流程，不是本文件正式追蹤的交付物。
+
+**即使那份草稿本身內容合理，也不應該作為 Fix Pending 實作的依據**，理由：
+
+1. 它是「Option B（`delete_pending_audit`）之前的設計討論產物」——時間點早於本文件 §5-§8 那一連串
+   BA↔工程往返修正（包含：拆穿「既有已驗證模式」其實是從未使用過的地基／SUPERSEDED 顯示鏈路其實
+   已經完整存在不需新增程式碼／`superseded_by_movement_id` 遷移成本的提醒），這些修正沒有機會反映
+   進那份草稿。
+2. **最關鍵**：它必然沒有反映 §15 業務剛剛才拍板的欄位範圍最終定案——**Currency 排除在 Fix Pending
+   可修改範圍外**。如果工程隊照舊草稿實作，很可能會做出允許修改 Currency 的版本，之後還要再改一次。
+
+**BA 正式指示**：Fix Pending（C項）的實作**唯一依據**是
+`analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md` 本文件的 §2.2（技術做法：
+新記錄＋舊記錄標記 SUPERSEDED＋`db.transaction()` 包裝）與 §15（最終欄位範圍：排除 LC Number／
+IB-SG Number／Currency，其餘皆可修改；Currency 如需修正走 Delete Pending＋重新 Submit），驗收標準
+納入 §6.1／§7.2 訂出的兩項測試要求（`db.transaction()` 中途失敗一致性測試、SUPERSEDED 顯示驗證
+測試）。`structured-coalescing-quasar.md` 那份草稿**不採用**，若其中有任何工程隊認為值得保留的
+技術細節，請重新提出、走一次跟本文件同樣的 BA 複查流程，不要直接搬用未經覆核的舊草稿內容。

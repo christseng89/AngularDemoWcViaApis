@@ -148,7 +148,16 @@ info:
     channel contract). No schema shape changed here — `reasonCode` was already a generic passthrough field
     on the Microservice API's own request shape, this pass only documents that it is now conditionally
     mandatory for these four functionCodes specifically.
-  version: "1.5.0"
+
+    v1.6.0 (2026-08-27, Fix Pending/Delete Pending Phase — see the Microservice API's own v1.28.0
+    changelog entry for the full decision record): `/channel/transactions/{transactionId}/cancel` gained a
+    description note only — no request/response shape changed here. Both of the underlying microservice
+    endpoint's new side effects (an independent audit record per call; an A1/B1 root ISSUE cancellation
+    also freeing its LC Number for reuse) apply transitively through this passthrough proxy. This channel
+    layer does not expose the new `GET /delete-pending-audit`/`GET /delete-pending-audit/lc-catalog` audit
+    query surface — same "this channel layer does not implement its own Checker action, cancel() suffices
+    for the Maker side" posture already documented at the top of this file for `.../release`/`.../reject`.
+  version: "1.6.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -524,6 +533,13 @@ paths:
     post:
       tags: [Transactions]
       summary: Maker cancels their own still-PENDING (or already-REJECTED) submission
+      description: >
+        v1.6.0 — this channel endpoint proxies straight through to the microservice's own
+        `POST /balance-movements/{movementId}/cancel`, so both of that endpoint's v1.28.0 side effects
+        (see the microservice contract's own changelog) apply transitively here too: an independent audit
+        record is written for every call, and a Delete-Pending'd A1/B1 root ISSUE also frees its LC Number
+        for reuse. This channel layer exposes no separate query surface for that audit trail — a caller
+        needing it uses the microservice's own `GET /delete-pending-audit` directly.
       parameters:
         - name: transactionId
           in: path
