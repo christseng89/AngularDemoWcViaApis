@@ -1270,3 +1270,109 @@ Phase 2、A1/B1 LC 重複使用、`delete_pending_audit`／`delete_seq`、Inquir
 三項最新修法（LC-reuse 泛化／sourceTransactionRef 重用／子合約可見性）、Defect #3——**BA 這端逐輪
 覆核下來沒有未解決的已知問題**，測試計畫（`Balance-Component-DeletePending-TestPlan-zh.md`）可以
 從 §8 執行順序第 3 步開始正式跑腳本化測試執行，沒有阻擋項。
+
+
+## 19. 業務裁示反轉：Fix Pending 不綁定原 Maker、Event Seq 沿用原值不變（2026-08-27）——修正 §2.2 的原前提，並提出一項需要一併處理的技術落差
+
+業務對 Fix Pending 的既有前提提出正式反轉，原文如下（逐字保留）：
+
+> **Fix Pending — BA Decision**
+>
+> 1. **Ownership Check** — Fix Pending 不限制只能由 original Maker 處理。任何具備適當 Maker 權限的
+>    使用者都可以接手 Fix Pending，以支援實際作業情境，例如原 Maker 請假、離席或無法繼續處理。但系統
+>    必須完整保留 Audit Trail：Original `createdBy`／Current `editedBy`／Edited Date/Time／Modified
+>    fields (Before & After values)。
+> 2. **Event Seq** — Fix Pending 不產生新的 Event Seq。Event Seq 是原 Business Event 的唯一識別
+>    Key，Fix Pending 只是修正並重新提交同一筆 Event，因此必須沿用原 Event Seq，不得因 Fix Pending
+>    產生新的 Event Seq，也不得把它當成新的 Business Event。
+>
+> 核心原則：**Fix Pending changes the content and processing status of the same Business Event, not
+> its identity.**
+
+### 19.1 BA 對兩項業務規則本身的判斷——同意，理由成立
+
+1. **不綁定原 Maker**：查證後這是標準銀行 Maker/Checker 實務——`statusTransition.ts` 現有的
+   4-eyes 分離設計（`assertMakerCheckerSeparation()`）只要求 RELEASE/REJECT 的 Checker 不能是同一個
+   Maker，從未要求「同一筆交易的所有 Maker 動作都必須是同一人」；`cancel()`（Delete Pending）自己
+   的既有註解也明講「`cancelledBy` is audit metadata, not an ownership check」——可見 Delete Pending
+   從一開始就沒有「只有原 Maker」這條限制，Fix Pending 採同一立場，內部一致。查證全部文件（本文件
+   §1-§18、原始需求文件、`CLAUDE.md`），**沒有找到「Fix Pending 只能原 Maker 處理」這條規則曾經被
+   正式寫下來過**——這次是第一次把這一點正式落成文字，不是推翻某份文件裡白紙黑字的舊結論，而是把
+   先前僅止於口頭的立場定案，性質上比較接近「補記」而非「反轉」，但既然使用者用「反轉」一詞描述，
+   在此如實記錄兩種可能性都提及。
+2. **Event Seq 沿用原值**：這一點**確實直接反轉了 §2.2 已核准的原前提**——§2.2 原文寫「舊記錄標記
+   SUPERSEDED＋新記錄」是為了「不牴觸 eventSeq（Maker Submit 當下產生、之後不可變）的既有設計」，
+   語意上預設新記錄會在 Fix Pending 這次的 Maker Submit 時間點產生一個新的 eventSeq 值。業務這次的
+   論述（Event Seq 是 Business Event 的身分識別，Fix Pending 修正的是同一個 Event，不是建立新
+   Event）在概念上是對的，也與本文件從一開始就採用的 `effectiveEventTime()`／SUPERSEDED 顯示鏈路等
+   設計精神一致——**同意這個修正方向**。
+
+### 19.2 技術查證——Event Seq 沿用原值，會直接撞上既有的冪等機制，需要明確的技術調整，不是免費的文件變更
+
+這是本次查證中新發現、業務與工程都還沒討論到的實際落差，必須在拍板前一併處理，否則工程隊照原
+§2.2 的技術路線（新記錄 INSERT）直接套用「沿用原 Event Seq」會直接踩雷：
+
+1. **資料庫層級**：`db/schema.ts` 現有 `CREATE UNIQUE INDEX idx_movements_idempotency ON
+   balance_movements(balance_contract_id, event_seq)`——這是一個**沒有 WHERE 條件、涵蓋全部狀態**
+   的 UNIQUE INDEX（不像 `idx_contracts_one_active` 那樣是 `WHERE status = 'ACTIVE'` 的
+   partial index）。如果 Fix Pending 的新記錄跟被取代的舊記錄（SUPERSEDED）落在同一個
+   `balance_contract_id` 且刻意使用同一個 `event_seq`，這筆 INSERT 會直接違反這個既有的 UNIQUE
+   約束。
+2. **應用層級，問題更隱蔽**：`BalanceService.createMovement()`（`balanceService.ts:1658`）在真正
+   INSERT 之前，會先呼叫 `this.movements.findByContractAndEventSeq(contract.balanceContractId,
+   req.eventSeq)`——這個查詢**沒有排除任何狀態**，一旦查到同一個 key 底下已經有記錄（哪怕那筆是
+   SUPERSEDED），就會直接回傳 `{ created: false, existing: <舊的 SUPERSEDED 記錄> }`，**不會拋出
+   錯誤，而是直接把舊的、已作廢的記錄原樣交回去**——這是這整個機制原本設計成「同一個 idempotency
+   key 代表同一個請求被重送，直接回傳先前結果」的正常行為（給重試用的），但用在 Fix Pending
+   這種「刻意沿用舊 key 建立一筆全新記錄」的情境下，會變成**靜默失敗**：呼叫端以為 Fix Pending
+   成功了，實際上系統背地裡只是把舊的、已作廢的 SUPERSEDED 記錄原封不動還回來，新的修正內容根本
+   沒有被寫進去——比丟出例外還危險，因為表面上看起來像是成功的。
+3. **`store` 層的 catch 區塊也是同一個假設**：`balanceMovementStore.ts` 對 UNIQUE 違反的例外處理
+   同樣是「凡是撞到這個 key，一律當作重送、回傳既有記錄」，跟第 2 點是同一套邏輯，寫在兩個地方。
+
+**結論**：業務這條規則在概念上正確，但**不能只改文件、不動程式碼的冪等機制**，否則 Fix Pending
+上線後第一次真正測試就會發現「明明送出了修正，畫面卻還是顯示舊資料」，而且不會有任何錯誤訊息可以
+追——這正是本專案一貫要求「先查證技術可行性，才能拍板範圍」的情境。
+
+### 19.3 建議的技術處理方向（供工程隊評估，不預設唯一解法）
+
+- **資料庫**：`idx_movements_idempotency` 改為排除 SUPERSEDED 的 partial index，例如
+  `WHERE status != 'SUPERSEDED'`——這只是**改索引本身**，不涉及欄位新增或既有欄位補約束，SQLite
+  可以直接 `DROP INDEX` + 重建，不需要比照 2026-08-21 那次「補 REFERENCES 約束」的 12 步驟表格
+  重建流程，成本低。
+- **應用層**：Fix Pending 的新記錄寫入路徑，不能直接沿用 `createMovement()` 現有的
+  `findByContractAndEventSeq()` 前置檢查與 UNIQUE 例外處理邏輯（兩者都會把「同 key 已有記錄」
+  解讀成「這是重送，回傳舊記錄」）——需要一個 Fix Pending 專屬的寫入方法，明確排除 SUPERSEDED
+  狀態才算「衝突」，或者乾脆不透過這個共用的冪等檢查路徑，直接在 `db.transaction()`
+  （§2.2 已規劃的交易包裝）裡先執行 `markSuperseded()` 再執行一個不經過這層冪等前置檢查的專屬
+  INSERT。
+- **建議驗收標準新增一項**：Fix Pending 的測試必須包含「新記錄的 `event_seq` 確實等於原記錄的
+  `event_seq`、且兩筆記錄可以在同一個 `balance_contract_id` 下同時查到（一筆 SUPERSEDED、一筆
+  PENDING）」，而不是只驗證欄位內容有沒有改到——這個冪等機制的細節如果沒有專屬測試，很容易被
+  忽略過去。
+
+### 19.4 修正後的 Fix Pending 正式規則（取代 §2.2／§2.3 對應前提，本節之後以此為準）
+
+```text
+Fix Pending — 正式規則（取代 §2.2 原前提，2026-08-27）
+
+1. Ownership：不限定原 Maker，任何具備 Maker 權限者皆可接手處理。
+   Audit Trail 必須完整保留：Original createdBy／Current editedBy／Edited Date-Time／
+   Modified fields (Before & After values)。
+
+2. Event Seq：Fix Pending 沿用原 Event Seq，不產生新值，不視為新的 Business Event。
+   （技術影響：idx_movements_idempotency 需改為排除 SUPERSEDED 的 partial index；
+   createMovement() 現有的冪等前置檢查與 UNIQUE 例外處理都需要為 Fix Pending 專屬路徑
+   另外處理，不能原樣套用——見 §19.2/§19.3。）
+
+核心原則：Fix Pending changes the content and processing status of the same Business Event,
+not its identity。
+```
+
+### 19.5 結論
+
+**業務兩項規則本身核准**：不綁定原 Maker（Audit Trail 完整保留）、Event Seq 沿用原值。**建議把
+§19.2 的技術落差與 §19.3 的處理方向一併正式納入需求文檔**（已在本節記錄），讓工程隊在動工 Phase 3
+時一次到位，不要等實作到一半才發現冪等機制擋路。除此之外，§2.2 其餘技術路線（新記錄＋舊記錄標記
+SUPERSEDED＋`db.transaction()` 包裝）與 §15 已核准的欄位範圍（排除 LC Number／IB-SG Number／
+Currency）維持不變，不受本次修正影響。
