@@ -2594,6 +2594,63 @@ three movements flipped to `CANCELLED`; the row disappeared from the UI on reloa
 row was untouched. TODO.md's own 2026-08-28 entry updated to reflect the corrected final decision and the
 completed fix (superseding its earlier, now-incorrect "business declined to expand scope" wording).
 
+## Defect #4 fixed — `cancel()` had no guard against Delete Pending on an already Checker-acknowledged A3/A3S earmark (Test Plan §3 Cases 3/4)
+
+`Balance-Component-DeletePending-TestPlan-zh.md`'s §3 six-state matrix (A3/A3S → A4/A6) found live: `cancel()`
+had zero check for `acknowledgedAt`/`makerSubmittedAt` — a Maker could Delete Pending an A3/A3S UTILIZE the
+Checker had already acknowledged (EARMARKED, still PENDING), silently destroying the earmark regardless of
+whether A4/A6 had gone on to Maker-Submit against it too. New guard: `if (movement.acknowledgedAt &&
+movement.status === 'PENDING') throw new IllegalStateTransitionError(...)` (409). Scoped precisely —
+`acknowledgedAt` is set only by A3/A3S's own `IPLC_LC UTILIZE` (never A6/A7/A8/A9/B-series); gated on
+`status === 'PENDING'` so Case 5 (A4/A6 Reject → `status` becomes REJECTED) still Delete-Pendings normally
+per §0.2 P0's "Reject re-enables Delete Pending" rule. 6 new tests (one per §3 case) plus a fix to a
+pre-existing test whose own helper incidentally called `acknowledgeArrival()` as boilerplate, now
+incompatible with the new guard. Microservice suite: 673/673 (99.03%/95.23%/100%/99.68%). Live-verified
+against the real dev server: Case 3→4→5 reproduced in sequence (Acknowledge→409→A4 Maker Submit→409→A4
+Reject→200/CANCELLED with all 3 audit points intact).
+
+## Defect #5 — compound Delete Pending (A3S/B3/B4/B5) has no shared transaction across its legs; disposed as a known limitation (Option C), not fixed
+
+Found during Test Plan §6.3.1 Atomic Failure Test: `cancel()`'s two legs of a compound Delete Pending
+(e.g. A3S's SG REDEEM + LC UTILIZE, both sharing one `businessEventId`) are two independent HTTP calls with
+no shared `db.transaction()` — if the second leg fails after the first already committed CANCELLED (live-
+reproduced: SG leg CANCELLED, LC leg 409 from Defect #4's own new guard), the first leg is never
+compensated back, leaving a permanent mixed CANCELLED/PENDING state. `checker-actions.service.ts`'s
+`deleteMakerPending()` reports the failure honestly but performs no rollback. Applies structurally to every
+compound Delete Pending shape (A3S, B3's Honour+DueFromIssuingBank, B4 Usance's 3-leg Accept+Acceptance+
+Receivable, B5), not just A3S.
+
+**Disposition (2026-08-28, business-confirmed): Option C — record as a known limitation, do not fix now**,
+same precedent as BAL-102 (SQLite whole-file locking). Two other directions (a single transactional
+Delete-Pending endpoint; caller-side compensating rollback) are documented in the Test Plan's own §9 Defect
+#5 entry for future reference if this is revisited during a larger consistency pass (e.g. alongside a
+PostgreSQL migration). No code change made for this Defect.
+
+## Delete Pending Test Plan §2/§2.1 — all 18 A1–A11/B1–B7 Functions' full lifecycle live-verified
+
+Direct curl against the running microservice (`:4100`), not just Jest — Submit→Reject→Delete Pending→
+Re-Submit (same natural key)→Release for every Function, including A3S/B4's own multi-leg cascade Delete/
+Re-Submit/Release. 18/18 Pass, zero new deviations; A4/A6 rows independently reconfirm §3's six-state
+matrix and the A6/B4 Accounting Event Ownership Rule end-to-end. Full evidence in
+`Balance-Component-DeletePending-TestPlan-zh.md` §2.1.1.
+
+## Defect #6 — `cancel()` has no ownership (Maker) or role (Maker/Checker) check on `cancelledBy` at all; disposed as a known limitation (Option C), same pattern as Defect #5
+
+Found during Test Plan §6.5 Negative/Authorization Tests: `cancel()` never compares `cancelledBy` against
+`movement.createdBy`, and there is no role/entitlement concept anywhere in this service to distinguish a
+Maker-labeled actor from a Checker-labeled one. Live-reproduced: `cancelledBy: 'maker2'` successfully
+cancels a PENDING movement `maker1` created (200); `cancelledBy: 'checker1'` succeeds identically. Same
+root cause as `assertMakerCheckerSeparation()`'s own deliberate CANCEL exemption (see the
+`MakerCheckerConflictError` entry below) — that exemption's own reasoning ("CANCEL is a Maker's own Error
+Correction on their OWN still-PENDING entry") only covers the same-actor case, never addressed a genuinely
+different actor cancelling someone else's record.
+
+**Disposition (2026-08-28, business-confirmed): Option C — record as a known limitation, do not fix now**,
+same precedent as Defect #5/BAL-102 — tied to the broader BAL-001 (no authentication/authorization layer
+at all, already disclosed and deliberately deferred) gap; revisit once BAL-001 lands. Two other directions
+(add an explicit ownership check now; leave entirely folded into BAL-001) are documented in the Test Plan's
+own §9 Defect #6 entry. No code change made for this Defect.
+
 ## Defect #3 fixed — `cancel()` was silently erasing REJECTED's own `released_by`/`released_at` audit pair, the middle point of the Acknowledge→Reject→Delete three-point trail `Balance-Component-DeletePending-TestPlan-zh.md` §0.2 P0 requires
 
 Found by BA code review against that document's own §0.2 P0 rule and §3 Case 5, ahead of test execution

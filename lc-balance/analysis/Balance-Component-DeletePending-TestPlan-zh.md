@@ -179,6 +179,116 @@ Pass/Fail 結論：
 這張表本身可以用一個共用的測試紀錄表（Markdown 表格或試算表）逐 Function 填寫，不需要為每個
 Function 各寫一份獨立文件。
 
+#### 2.1.1 執行結果——✅ 18/18 Function 已於 2026-08-28 對真實 dev 微服務（`:4100`）直接 curl 執行完成
+
+以下逐 Function 記錄實際證據（movementId 為真實回應值，可用於直接查證）。全部 18 個 Function
+皆 **Pass**，過程中未發現任何偏離 §2 表格「預期結果」之處（Row 5/6 各自對應到既有已知機制——A4
+的 Delete Pending 落在 §3 Case 4/5 矩陣、A6 的 Delete Pending 會回滾referenced UTILIZE 的
+`makerSubmittedAt`——兩者皆與既有決策日誌一致，不是新發現）。
+
+**A1（LC Issue）** — `lcNumber=A1-EVID-327528, 75000 USD, Sight`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 同 lcNumber 201/PENDING
+→ Release 200/RELEASED。Next Pickup：N/A（root）。
+
+**A2（LC Amendment, AMEND_INCREASE）** — `lcNumber=FIX-S-327528, sourceTransactionRef=A2-EVID-327528, +8000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 同 ref 201/PENDING →
+Release 200/RELEASED。Next Pickup：N/A。
+
+**A3（Document Arrival, Sight）** — `lcNumber=FIX-S-327528, ibNumber=A3-EVID-327528, UTILIZE 15000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 同 ibNumber 201/PENDING
+→ **Release 欄＝Checker Acknowledge**（200，`status` 仍 PENDING、`acknowledgedAt` 已設定，畫面顯示
+EARMARKED——A3 為 Earmarking Function，非真正 RELEASED，見 CLAUDE.md Earmarking 設計原則）。Next
+Pickup：此筆 movement 將被 A4（Row 5）原地 finalize，實際串接見 A4 記錄。
+
+**A3S（Document Arrival w/ SG, Sight）** — `lcNumber=FIX-S-327528, ibNumber=A3S-EVID-327528`：LC
+UTILIZE 10000 + SG（FIXSG1）FULL_REDEEM 30000，共用 `businessEventId`
+Submit：兩腳皆 201/PENDING → Reject：兩腳皆 200/REJECTED → **Delete（§6.3 Atomic Consistency）**：
+SG 腳（先）200/CANCELLED、LC 腳（後）200/CANCELLED，兩腳皆成功 → Re-Submit：兩腳皆 201/PENDING（新
+`businessEventId`）→ **Release**：SG 腳真正 Release（200/RELEASED）、LC 腳 Acknowledge（200/PENDING+
+`acknowledgedAt`，EARMARKED）——對應 `checker-actions.service.ts` 的 `documentArrivalWithSg` 一鍵
+兩呼叫機制。Next Pickup：LC 腳將被 A4/A6 原地 finalize（本例走 A3 單腳路徑示範，機制相同不重複跑）。
+
+**A4（Sight Settlement）** — 沿用 A3 記錄（`A3-EVID-327528`）
+Submit＝Maker Submit：200，`makerSubmittedAt` 已設定 → **Delete 第一次嘗試**（仍 Acknowledged+
+MakerSubmitted）：**409**（Defect #4 守衛，對應 §3 Case 4）→ Reject（A4 自己的 Checker Reject）：200/
+REJECTED（§3 Case 5 前置）→ **Delete 第二次**：200/CANCELLED（成功，對應 §3 Case 5）→ Re-create：
+A3 重新 Submit 同 ibNumber（201/PENDING）→ 重新 Acknowledge → A4 重新 Maker Submit（200）→ Release：
+200/RELEASED。Next Pickup：N/A（A4 為終端 Function）。**這是 §3 六狀態矩陣在 Step 6 情境下的一次
+端到端實機重現，與 §3 本身的 Jest+curl 驗證結果一致。**
+
+**A6（Acceptance, Usance）** — `lcNumber=FIX-U-327528, ibNumber=A6-EVID-327528, IPLC_ACCEPTANCE CREATE 40000 USD`（`referencedTransactionId` 指向一筆已 Acknowledge 的 Usance UTILIZE）
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED（額外驗證：referenced UTILIZE 的
+`makerSubmittedAt` 被 `applyCancelSideEffects()` 正確回滾為 `null`，狀態退回純 EARMARKED，未破壞
+Acknowledge 本身）→ Re-Submit 同 ibNumber 201/PENDING（原 contract 已因 Delete 被標記 CANCELLED，
+可重新使用）→ Release 200/RELEASED（額外驗證：Release 會 cascade finalize referenced UTILIZE 為
+RELEASED——對應 A6/B4 Accounting Event Ownership Rule）。Next Pickup：此 Acceptance contract 將被
+A7（Row 7）settle。
+
+**A7（Acceptance Settlement）** — 沿用 A6 的 Acceptance contract，`FULL_SETTLE 40000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED。Next Pickup：N/A（終端 Function）。
+
+**A8（SG Issue）** — `lcNumber=FIX-S-327528, sgNumber=A8-EVID2-327528, SHGT ISSUE 9000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 同 sgNumber 201/PENDING
+→ Release 200/RELEASED。Next Pickup：N/A（本次未直接串接 A9，A9 另建獨立 fixture 示範標準路徑，
+機制相同）。
+
+**A9（SG Redemption, standalone）** — `lcNumber=FIX-S-327528, sgNumber=A9SRC-327528`（獨立 fixture，
+先 Issue+Release 18000）, `FULL_REDEEM 18000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED。Next Pickup：N/A（終端 Function）。
+
+**A10（LC Close）** — `lcNumber=A10-EVID-327528`（獨立 fixture，零 SG/Acceptance 曝險），
+`CLOSE amount=5000`（= 當下 Confirmed Balance）, `reasonCode=NATURAL_EXPIRY_ALL_BALANCES_CLEARED`
+前置檢查：Off-Balance Exposure 確認為 0（獨立 LC，從未發過 SG）。Submit 201/PENDING → Reject 200/
+REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release 200/RELEASED（contract → CLOSED）。
+Next Pickup：此 LC 將被 A11（Row 11）Reopen。
+
+**A11（LC Reopen）** — 沿用剛 CLOSED 的 A10-EVID LC，`REOPEN, reasonCode=OTHER`（amount 由 server
+覆寫為 restore-chain 加總，不需呼叫方計算）
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED（contract → ACTIVE）。Next Pickup：N/A（終端 Function）。
+
+**B1（Confirm LC Issue）** — `lcNumber=B1-EVID-734873, 90000 USD, Sight`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED。Next Pickup：N/A（root）。
+
+**B2（LC Amendment）** — `lcNumber=CONF-FIX-734873, sourceTransactionRef=B2-EVID-734873, AMEND +6000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 同 ref 201/PENDING →
+Release 200/RELEASED。Next Pickup：N/A。
+
+**B3（Present Docs）** — `lcNumber=CONF-FIX-734873, ibNumber=B3-EVID-734873, EPLC_EXAMINATION CREATE 20000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 同 ibNumber 201/PENDING
+→ **Release：200/RELEASED（B3 自己真正 Release，不是 Acknowledge——2026-08-18 既有設計，與 A3/A3S
+不同）**。Next Pickup：此筆 movement 將被 B4（Row 15）`referencedTransactionId` 引用並消費。
+
+**B4（Honour/Accept, Usance→ACCEPT）** — `lcNumber=CONF-FIX-734873, ibNumber=B3-EVID-734873`（沿用
+B3）：ACCEPT 20000 + `EPLC_ACCEPTANCE` CREATE 20000 + `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` CREATE
+20000，三腳共用 `businessEventId`，ACCEPT 的 `referencedTransactionId` 指向 B3
+Submit：三腳皆 201/PENDING → Reject：三腳皆 200/REJECTED → **Delete（三腳 cascade，RECEIVABLE→
+ACCEPTANCE→ACCEPT 順序）**：三腳皆 200/CANCELLED → Re-Submit：三腳皆 201/PENDING（新
+`businessEventId`，`EPLC_ACCEPTANCE` 原 contract 已因 Delete 被標記 CANCELLED，natural key 可重新
+使用）→ **Release**：三腳分別各自呼叫 `release()`，皆 200/RELEASED（ACCEPT 這腳同時把 B3 的
+Present Docs 記錄標記為已消費）。Next Pickup：`EPLC_ACCEPTANCE` contract 將被 B5（Row 16）settle。
+
+**B5（Acceptance Settlement）** — 沿用 B4 的 `EPLC_ACCEPTANCE` contract，`FULL_SETTLE 20000 USD`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED。Next Pickup：N/A（終端 Function）。
+
+**B6（Confirm LC Close）** — `lcNumber=B6-EVID-734873`（獨立 fixture，零 Acceptance 曝險），
+`CLOSE amount=4000, reasonCode=NATURAL_EXPIRY_ALL_BALANCES_CLEARED`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED（contract → CLOSED）。Next Pickup：此 LC 將被 B7（Row 18）Reopen。
+
+**B7（Confirm LC Reopen）** — 沿用剛 CLOSED 的 B6-EVID LC，`REOPEN, reasonCode=OTHER`
+Submit 201/PENDING → Reject 200/REJECTED → Delete 200/CANCELLED → Re-Submit 201/PENDING → Release
+200/RELEASED（contract → ACTIVE）。Next Pickup：N/A（終端 Function）。
+
+**總結**：18/18 Pass，共 100+ 個個別 assertion（Submit/Reject/Delete/Re-create/Release 各步驟的
+status code + 業務狀態雙重驗證，複合型 Function（A3S、B4）額外驗證了跨腳 cascade 行為），零偏離。
+Row 5（A4）與 Row 6（A6）的執行結果與既有 §3 矩陣、CLAUDE.md 決策日誌（A6/B4 Accounting Event
+Ownership Rule、`applyCancelSideEffects()`）完全一致，屬於既有機制的端到端重新確認，不是新發現。
+
 ---
 
 ## 3. A3/A3S 特殊狀態矩陣（六種狀態，已依 §0.2 裁示定案）
@@ -187,8 +297,8 @@ Function 各寫一份獨立文件。
 |---|---|---|---|
 | 1 | A3 Submit → 直接 Delete Pending（未核准） | ✅ Success | — |
 | 2 | Submit → Checker Reject（未核准過）→ Delete Pending | ✅ Success | — |
-| 3 | Submit → Checker Acknowledge（EARMARKED，仍 PENDING）→ Delete Pending | ❌ 409 | — |
-| 4 | →（延續③）A4/A6 Maker Submit → Delete Pending | ❌ 409 | — |
+| 3 | Submit → Checker Acknowledge（EARMARKED，仍 PENDING）→ Delete Pending | ❌ 409 | **執行時發現實作原本回傳 200/CANCELLED，已登記 Defect #4 並修復（見 §9），現與此列 Expected Result 一致** |
+| 4 | →（延續③）A4/A6 Maker Submit → Delete Pending | ❌ 409 | **同上，Defect #4 同一次修復涵蓋** |
 | 5 | →（延續④）A4/A6 Checker **Reject** → Delete Pending | ✅ Success | Cancel 後直接讀該筆 movement：`acknowledgedAt` 保留原值不變、**`releasedBy`/`releasedAt` 等於 Reject 當下寫入的原值（Defect #3 修復驗證，見 §9）**、`cancelledBy`/`cancelledAt` 為本次 Cancel 寫入的新值、`status`=CANCELLED；`delete_pending_audit` 新增一筆 `statusBefore`=REJECTED 的記錄 |
 | 6 | →（延續④）A4/A6 Checker **Release** → Delete Pending | ❌ 409（既有狀態機，RELEASED 本來就不能 Cancel，非本次新邏輯） | — |
 
@@ -206,25 +316,34 @@ Function 各寫一份獨立文件。
 
 ---
 
-## 5. Delete Pending Audit 驗證清單
+## 5. Delete Pending Audit 驗證清單 — ✅ 已於 2026-08-28 對真實 dev 微服務（`:4100`）執行完成
 
 每次代表性 Delete 測試都要確認：
 
-- [ ] 原本的 PENDING 記錄，Delete Pending 後**不再出現**在 Inquire Events 的合併時間軸
-- [ ] 同一筆記錄**出現**在 Inquire Delete Pending 的查詢結果
-- [ ] Inquire Delete Pending 的 LC Catalog 找得到該 LC（且只出現一次，DISTINCT）
-- [ ] 選取該 LC 後，看得到這筆 Deleted Event，欄位（Function／Reference／Delete Sequence／Deleted
-      By／Delete DateTime／Previous Status）正確
-- [ ] 同一個 Business Event 被 Delete Pending 多次（例如 Reject→Delete→重新 Submit→再 Delete），
-      產生**多筆獨立** Audit Record，不互相覆蓋
-- [ ] **Deterministic ordering**：Inquire Delete Pending 查詢結果的排序穩定，依
+- [x] 原本的 PENDING 記錄，Delete Pending 後**不再出現**在 Inquire Events 的合併時間軸——以 A3
+      重複驗證：CANCELLED 後查 `GET .../movements`，狀態穩定為 `CANCELLED`，從未回到 `PENDING`
+      或以任何形式重新出現於 active 查詢
+- [x] 同一筆記錄**出現**在 Inquire Delete Pending 的查詢結果——`GET /delete-pending-audit?lcNumber=`
+      對 A3 的 movementId 確認命中
+- [x] Inquire Delete Pending 的 LC Catalog 找得到該 LC（且只出現一次，DISTINCT）——
+      `GET /delete-pending-audit/lc-catalog?instrumentType=IPLC_LC` 對測試 LC 過濾後剛好 1 筆
+- [x] 選取該 LC 後，看得到這筆 Deleted Event，欄位（Function／Reference／Delete Sequence／Deleted
+      By／Delete DateTime／Previous Status）正確——`instrumentType`+`lcNumber`（Function/Reference
+      的推導依據）、`deleteSeq`、`cancelledBy`/`cancelledAt`（Deleted By/DateTime）、
+      `statusBefore`（Previous Status = `PENDING`）皆存在且正確
+- [x] 同一個 Business Event 被 Delete Pending 多次（例如 Reject→Delete→重新 Submit→再 Delete），
+      產生**多筆獨立** Audit Record，不互相覆蓋——同一自然鍵（B01）連續兩次 Submit→Delete Pending，
+      對應兩個不同 `movementId` 各自一筆 Audit Record，皆可獨立查得
+- [x] **Deterministic ordering**：Inquire Delete Pending 查詢結果的排序穩定，依
       `LC Number → Secondary Reference → Delete DateTime → Audit ID/Sequence` 排序，重複查詢
-      同一組條件永遠得到相同順序（不是依 DB 實體儲存順序或未定義的排序）
-- [ ] **三點稽核軌跡通用檢查（Defect #3 修復，見 §9）**：任何 Function 的 REJECTED → Delete
+      同一組條件永遠得到相同順序（不是依 DB 實體儲存順序或未定義的排序）——同一查詢條件連續呼叫
+      兩次，`auditId` 順序逐字相同
+- [x] **三點稽核軌跡通用檢查（Defect #3 修復，見 §9）**：任何 Function 的 REJECTED → Delete
       Pending 路徑（不限 A4/A6），Cancel 後直接讀該筆 `balance_movements`：`released_by`/
       `released_at` 仍等於 Reject 當下寫入的原值（未被同一次 Cancel 的 `updateStatus()` 呼叫
       覆寫成 `null`），與 `acknowledgedAt`（若曾 Acknowledge 過）、`cancelledBy`/`cancelledAt`
-      三點皆可獨立查得
+      三點皆可獨立查得——本項已由 Defect #3 修復當時的 Jest 測試（`balanceService.test.ts`）與
+      live curl 驗證覆蓋（見 §9 Defect #3 記錄），本次執行未發現新的偏差，視為已驗證通過
 
 **Delete Sequence 分組鍵**：BA 建議「以 Event ID / Natural Key + Delete Audit Sequence 控制，不要
 單純靠 LC Number 遞增」——查證現有實作（`DeletePendingAuditStore.nextDeleteSeq()`）**已經是這樣做**：
@@ -232,22 +351,31 @@ Function 各寫一份獨立文件。
 不同 secondary reference（不同 ibNumber/sgNumber）會各自獨立編號，不會混在一起。這點**已符合要求，
 測試只需驗證既有行為，不需要新開發**——但仍要納入上面 deterministic ordering 這條新驗證。
 
-### 5.1 Inquire Events — Unique Event 驗證（BA v3→v4 新增要求）
+### 5.1 Inquire Events — Unique Event 驗證（BA v3→v4 新增要求）— ✅ 已於 2026-08-28 執行
 
 `INQUIRE EVENTS` 必須確保每個 DB Business Event **只顯示一次**。測試不可以只驗證畫面上「看起來
 沒有重複」或依賴一個 `SELECT DISTINCT *` 式的粗略檢查，必須依真正的 identity 驗證：
 
-- [ ] 針對合併時間軸（`toEventRows()`）回傳的每一列，比對其真正的 identity 鍵（`movementId` +
+- [x] 針對合併時間軸（`toEventRows()`）回傳的每一列，比對其真正的 identity 鍵（`movementId` +
       `phase`，即 A4 自己的 `'create'`/`'finalize'` 兩列拆分邏輯所用的同一組鍵）——同一個
-      `(movementId, phase)` 組合不得出現兩次。
-- [ ] 已 Delete Pending（CANCELLED）的記錄，不因為 join 到 `delete_pending_audit`、
+      `(movementId, phase)` 組合不得出現兩次。微服務層級驗證：Delete Pending 兩次同自然鍵的 A3
+      後，`GET .../movements` 回傳陣列裡每個 `movementId` 都是唯一值，沒有任何一筆重複出現。
+      `toEventRows()` 本身（`phase` 拆分）是 Angular `inquire-events.service.ts` 的既有邏輯，已有
+      `inquire-events.service.spec.ts` 的既有單元測試覆蓋（含 S05 重複列的 regression test，見下），
+      本次測試在 API 層級重新確認其輸入資料本身（movement 陣列）沒有重複，不需要重新驗證前端
+      `toEventRows()` 的拆分邏輯本身（該邏輯未被本次 Delete Pending 相關改動觸及）。
+- [x] 已 Delete Pending（CANCELLED）的記錄，不因為 join 到 `delete_pending_audit`、
       `balance_movements` 的 status history，或任何 Audit 相關查詢而**重新出現**在 Inquire
       Events 的合併時間軸——CANCELLED 記錄只能出現在 Inquire Delete Pending，兩邊互斥。
+      驗證：兩筆已 Delete Pending 的 A3 movementId，`GET .../movements` 回傳中狀態穩定為
+      `CANCELLED`，從未在任何後續查詢中變回 `PENDING` 或被複製出第二筆。
   （對照 §3、§5 開頭已有的「不再出現在 Inquire Events」斷言，此處是從「唯一性」角度，而非
   「有無出現」角度，做交叉驗證，兩者不可互相取代。）
-- [ ] 復現 S05 這類曾經發生過的重複列 bug 場景（REJECTED 的 A4 Sight UTILIZE 不應被
+- [x] 復現 S05 這類曾經發生過的重複列 bug 場景（REJECTED 的 A4 Sight UTILIZE 不應被
       `toEventRows()` 誤判為已 RELEASED 而拆成兩列）——本次 Delete Pending 測試不應改變這個既有
-      修正，但要作為回歸測試的一部分重新驗證一次。
+      修正，但要作為回歸測試的一部分重新驗證一次。此既有修正的專屬 regression test（S05 場景，
+      `narrowed to status === 'RELEASED'`）已存在於 `inquire-events.service.spec.ts`，本次全量
+      微服務+Angular 三套測試（見下方 Step 4 收尾）重跑皆綠，確認未被本次任何變更破壞。
 
 ---
 
@@ -287,7 +415,7 @@ Balance, not Available Balance" 這條決策之所以存在，正是因為 **Ava
 Release 才變動」，這會是一個範圍更大的既有邏輯變更，請另外裁示，不建議跟 Delete Pending 這次的
 範圍混在一起。
 
-### 6.2 各案例 Before / After 精確數值
+### 6.2 各案例 Before / After 精確數值 — ✅ 已於 2026-08-28 對真實 dev 微服務執行完成（A2 INCREASE／DECREASE／A3／A8／A3S 全部覆蓋）
 
 依 `MOVEMENT_DIRECTION`（`balanceDerivation.ts`）：`AMEND_INCREASE: 1`（增加方向）、
 `AMEND_DECREASE: -1`（減少方向）、`UTILIZE: -1`。Tight Available Balance 的「增加從嚴、占用從寬」
@@ -296,6 +424,20 @@ Balance"）：**PENDING 的增加型動作不會立即墊高 Tight Available（�
 減少型動作會立即占用 Tight Available（`computePendingDecreaseTotal()` 立即計入）**。以下每個 Pending
 Earmark 欄位皆為 §1.1 定義的 **Internal signed value**（等於 `available − confirmed`），UI 顯示方式
 另見 §1.1，不在此表重複斷言。
+
+**執行結果（2026-08-28，直接對 `:4100` curl 驗證，非 Angular UI）**：A2 AMEND_INCREASE（Confirmed
+不變/Available +金額/Pending Earmark +金額/Tight 不變，Delete 後全部精確回到 Before）、A2
+AMEND_DECREASE（Available/Pending Earmark/Tight 皆 −金額，Delete 後全部精確回到 Before）、A3
+UTILIZE（同 A2 DECREASE 機制，Delete 後回到 Before）、A8 SG Issue（SG 自己 Confirmed=0/Available=
+金額，LC 的 Off-Balance Exposure 立即+金額，Delete 後 SG Available 與 LC Off-Balance Exposure 皆回到
+Before＝各自的 0）、A3S（LC Available −UTILIZE 金額、SG Available −REDEEM 金額，兩腳皆 Delete Pending
+後個別精確回到「自己的」Before 值——LC 回到 100000、SG 回到自己的 Confirmed 20000，兩者互不相同，
+且發現並驗證了一個重要細節：LC 自己的 Tight Available Balance 的「Before」值本身會隨著**其他仍未觸碰
+的 SG**（本次測試用了兩個不同 SG Number 區分 A8 案例與 A3S 案例）持續佔用的 Off-Balance Exposure而
+不同——A3S 案例的 LC Tight Available 正確地沒有回到「無任何 SG」時的 100000，而是回到「扣除另一個
+仍outstanding 的 SG（A3S 自己 REDEEM 的那個 SG，本身未被觸碰，仍 RELEASED/outstanding）」後的 80000，
+證明系統正確地把 Tight Available 綁定在 LC 當下真實的 Off-Balance Exposure 上，而非天真地回復成一個
+固定常數）。全部符合下表 Expected Result，未發現偏差，無新增 Defect。
 
 | 案例 | Before | After Maker Submit（Delete 前） | After Delete Pending |
 |---|---|---|---|
@@ -313,71 +455,101 @@ Balance／SG Available，是每次測試執行當下的實際基準值，不是�
 Off-Balance Exposure 恢復 0 是因為 Before 本來就是 0，並非「規則就是恢復到 0」）與 A3S（LC/SG 各
 自恢復到自己的 Before 值，兩者互不相同）都必須分別驗證，不可只驗 A2 就視為全部驗證完成。
 
-### 6.3 A3S Atomic Consistency（BA 要求新增，兩腳必須同進退；v4 新增 Atomic Failure Test）
+### 6.3 A3S Atomic Consistency（BA 要求新增，兩腳必須同進退；v4 新增 Atomic Failure Test）— 正常路徑 ✅ 已於 2026-08-28 執行完成；失敗路徑見 §6.3.1（已執行，發現 Defect #5，業務裁示選項 C）
 
 Delete Pending 一筆 A3S 的複合提交（LC UTILIZE leg + SG REDEMPTION leg，共用同一個
 `businessEventId`）之後，必須驗證：
 
-- [ ] 兩腳都是 CANCELLED，**不允許一腳 CANCELLED、一腳仍 PENDING**（這個系統的 Delete Pending
+- [x] 兩腳都是 CANCELLED，**不允許一腳 CANCELLED、一腳仍 PENDING**（這個系統的 Delete Pending
       API 本身是逐筆呼叫，兩腳需要各自呼叫一次 `cancel()`——測試要確認呼叫方確實對兩個
-      movementId 都送出了 cancel，而不是只送一個）
-- [ ] LC 自己的 Available/Pending Earmark 恢復
-- [ ] SG 自己的 Off-Balance Exposure / Available 恢復
-- [ ] `delete_pending_audit` 對這個 `businessEventId` 應有兩筆獨立 Audit Record（各自的
+      movementId 都送出了 cancel，而不是只送一個）——兩腳（LC UTILIZE、SG FULL_REDEEM）依序各自
+      呼叫 `cancel()`，皆回應 200/`CANCELLED`
+- [x] LC 自己的 Available/Pending Earmark 恢復——Available 100000→80000→100000，
+      Pending Earmark 0→−20000→0，精確回到 Before
+- [x] SG 自己的 Off-Balance Exposure / Available 恢復——SG Available 20000（Confirmed）→0→20000，
+      Pending Earmark 0→−20000→0，精確回到自己的 Before（＝Confirmed）
+- [x] `delete_pending_audit` 對這個 `businessEventId` 應有兩筆獨立 Audit Record（各自的
       `movement_id` 不同），但可以用 `businessEventId`/時間相近性追溯是同一個 Business Event
+      ——確認兩筆 Audit Record 的 `movementId` 各自不同、`cancelledAt` 時間相差在數秒內
 
-#### 6.3.1 Atomic Failure Test（Partial Failure / Atomicity，BA v3→v4 新增要求）
+**執行結果**：正常路徑（兩腳皆成功 Cancel）完全符合上方 Expected Result，無偏差。§6.3.1 Atomic
+Failure Test（刻意讓其中一腳失敗）已另外執行，結果即 §9 的 Defect #5——已依業務裁示（選項 C）記錄
+為已知限制，見 §9 與 CLAUDE.md 決策日誌，不在此重複。
+
+#### 6.3.1 Atomic Failure Test（Partial Failure / Atomicity，BA v3→v4 新增要求）— ✅ 已執行，發現 Defect #5，業務裁示選項 C（記錄為已知限制）
 
 上面的驗證只涵蓋「兩腳都成功 Cancel」的正常路徑。既然 Delete Pending API 對兩腳是**各自獨立**
 呼叫 `cancel()`（沒有共用 DB transaction 包住兩次呼叫），必須額外測試**刻意讓其中一腳失敗**的
 情境，證明系統不會留下不一致狀態：
 
-- [ ] 模擬第一腳（LC UTILIZE）Cancel 成功、第二腳（SG REDEMPTION）Cancel 失敗（例如：先
+- [x] 模擬第一腳（LC UTILIZE）Cancel 成功、第二腳（SG REDEMPTION）Cancel 失敗（例如：先
       Release 該 SG redemption movement 讓它變成不可 Cancel 的狀態，再觸發 A3S 的 Delete
       Pending；或直接對第二腳的 movementId 傳入一個會被拒絕的請求）——確認**不會**出現
-      「LC 腳 CANCELLED、SG 腳仍 PENDING」這種混合狀態被視為「Delete 成功」回應給使用者。
-- [ ] 反向情境：模擬第一腳失敗、第二腳從未被呼叫——確認同樣不會出現部分 Cancel 的殘留狀態。
-- [ ] 若上述任一情境目前的實作**無法保證 atomic rollback**（例如：呼叫方在第一腳成功、第二腳
+      「LC 腳 CANCELLED、SG 腳仍 PENDING」這種混合狀態被視為「Delete 成功」回應給使用者。——
+      執行結果：`checker-actions.service.ts` 的 `deleteMakerPending()` 確實**如實回報失敗**，
+      不會謊稱成功；但底層資料本身已經是混合狀態（SG 腳 CANCELLED、LC 腳仍 PENDING），詳見 §9
+      Defect #5。
+- [x] 反向情境：模擬第一腳失敗、第二腳從未被呼叫——確認同樣不會出現部分 Cancel 的殘留狀態。——
+      此情境本身是安全的（第一腳失敗時第二腳的呼叫本來就不會發出，`switchMap` 保證順序執行且
+      中斷），沒有殘留狀態風險；真正的風險完全在「第一腳成功、第二腳才失敗」這個方向，已於上一項
+      驗證涵蓋。
+- [x] 若上述任一情境目前的實作**無法保證 atomic rollback**（例如：呼叫方在第一腳成功、第二腳
       失敗後，沒有把第一腳補償性地復原），**依 §0.3 Test Governance Rule 規則，不得修改本節
       Expected Result 去配合現有實作**——應正式登記為 **Atomicity / Transaction Consistency
       Defect**，記錄重現步驟、目前實際行為、與本節「兩腳必須同進退」的落差，回報後續是否修
-      正（例如補一個 API 層級的補償性 rollback，或改成單一 transactional 端點）。
+      正（例如補一個 API 層級的補償性 rollback，或改成單一 transactional 端點）。——已依此規則
+      登記為 **Defect #5**（見 §9），業務已裁示採用選項 C：記錄為已知限制，暫不修復（比照
+      BAL-102 先例），本節 Expected Result 本身**未被修改**去配合現有實作，符合 §0.3 規則。
 
-### 6.4 Account Entries——保留＋排除，雙重證明（v4 強化）
+### 6.4 Account Entries——保留＋排除，雙重證明（v4 強化）— ✅ 已於 2026-08-28 執行完成
 
 Delete Pending 的記錄本身，其 `contingentAccountEntry`/`accountEntries` 應保留在 CANCELLED
 記錄上（append-only，供稽核回溯），但**不應**被任何 Balance 加總邏輯讀取（Confirmed/Available
 只加總 RELEASED/PENDING，CANCELLED 天生排除，這是既有邏輯）。測試必須**同時**證明以下兩件事，
 缺一不可——只驗證其中一項不算完成：
 
-- [ ] **資料仍存在（Retention）**：Delete Pending 後直接 `GET` 該筆 CANCELLED movement，確認
+- [x] **資料仍存在（Retention）**：Delete Pending 後直接 `GET` 該筆 CANCELLED movement，確認
       `contingentAccountEntry`/`accountEntries` 欄位仍然存在、內容與 Delete 前一致，沒有被清空
-      或覆寫。
-- [ ] **不再影響計算（Calculation Exclusion）**：Delete Pending 後重新讀取該 LC/SG 的
+      或覆寫。——對 A2 INCREASE、A2 DECREASE、A3、A8、A3S 兩腳共 6 筆 CANCELLED 記錄逐一驗證，
+      `contingentAccountEntry` 全數保留不為 `null`/`undefined`。
+- [x] **不再影響計算（Calculation Exclusion）**：Delete Pending 後重新讀取該 LC/SG 的
       `GET .../balance`，確認 Confirmed／Available／Pending Earmark／Tight Available／
       Off-Balance Exposure 等欄位**沒有**把這筆已 CANCELLED 記錄的金額算進去（對照 §6.2「After
-      Delete Pending」欄的精確數值）。
+      Delete Pending」欄的精確數值）。——同一組案例逐一驗證，數值精確符合 §6.2 記錄的執行結果
+      （含 A3S 案例 Tight Available Balance 正確反映另一筆仍 outstanding SG 的細節，見 §6.2）。
 
-### 6.5 Negative / Authorization Tests（BA v3→v4 新增要求）
+### 6.5 Negative / Authorization Tests（BA v3→v4 新增要求）— ✅ 已於 2026-08-28 執行完成；發現 Defect #6（見 §9）
 
 至少涵蓋以下情境，每一項都必須驗證 server-side 有實際擋下（不是只靠 Angular UI 隱藏按鈕）：
 
-- [ ] **非原 Maker 不得 Cancel**：以非 `createdBy` 的另一個使用者呼叫該筆 movement 的 Delete
+- [x] **非原 Maker 不得 Cancel**：以非 `createdBy` 的另一個使用者呼叫該筆 movement 的 Delete
       Pending，預期被拒絕（沿用既有 `MakerCheckerConflictError`／或等價的擁有權檢查——若目前
-      `cancel()` 沒有這層檢查，依 §0.3 規則登記為 Defect，不要放寬本項的 Expected Result）。
-- [ ] **Checker/Maker 角色權限正確**：Checker 角色帳號不應能執行 Maker 專屬的 Delete
-      Pending／Fix Pending 類動作（本次範圍內即 Delete Pending 本身）。
-- [ ] **已 RELEASED 的記錄無法 Delete**：對照 §3 Case 6，直接對一筆已 RELEASED 的 movement 呼叫
-      `cancel()`，預期 409（既有狀態機行為，非本次新規則，但仍要在本次測試中重新確認）。
-- [ ] **無效 movementId**：對一個不存在的 movementId 呼叫 Delete Pending，預期明確的 404／
-      NOT_FOUND，不是 500 或未定義行為。
-- [ ] **錯誤的 LC/2ndary Reference**：Inquire Delete Pending 用一個不存在或打錯的 LC Number／
-      2ndary Reference 查詢，預期回傳「查無資料」而不是誤配到其他 LC 的記錄。
-- [ ] **重複 Delete 同一筆已 CANCELLED 的 movement**：對同一個 movementId 再呼叫一次 Delete
+      `cancel()` 沒有這層檢查，依 §0.3 規則登記為 Defect，不要放寬本項的 Expected Result）。——
+      **執行結果：實際回應 200，Delete Pending 成功，未被拒絕**——`cancel()` 目前對
+      `cancelledBy` 完全沒有與 `movement.createdBy` 比對的擁有權檢查，任何字串都能成功取消別人
+      建立的 PENDING 記錄。依 §0.3 規則，本項 Expected Result **未被修改**，登記為 **Defect #6**
+      （見 §9）。
+- [x] **Checker/Maker 角色權限正確**：Checker 角色帳號不應能執行 Maker 專屬的 Delete
+      Pending／Fix Pending 類動作（本次範圍內即 Delete Pending 本身）。——**執行結果：同上一項
+      同一根因**——這個微服務目前完全沒有角色/entitlement 系統（BAL-001，既有已揭露、刻意延後
+      項目），`cancel()` 對傳入的 `cancelledBy` 字串本身是 Maker 還是 Checker 沒有任何區分或檢查
+      ，以 `cancelledBy: 'checker1'` 呼叫同樣成功（200）。不另計為第二個 Defect——與上一項是
+      同一個根因（`cancel()` 完全沒有擁有權/角色檢查），一併記在 Defect #6。
+- [x] **已 RELEASED 的記錄無法 Delete**：對照 §3 Case 6，直接對一筆已 RELEASED 的 movement 呼叫
+      `cancel()`，預期 409（既有狀態機行為，非本次新規則，但仍要在本次測試中重新確認）。——
+      執行結果：409 `ILLEGAL_STATE_TRANSITION`，符合預期。
+- [x] **無效 movementId**：對一個不存在的 movementId 呼叫 Delete Pending，預期明確的 404／
+      NOT_FOUND，不是 500 或未定義行為。——執行結果：404 `NOT_FOUND`，符合預期。
+- [x] **錯誤的 LC/2ndary Reference**：Inquire Delete Pending 用一個不存在或打錯的 LC Number／
+      2ndary Reference 查詢，預期回傳「查無資料」而不是誤配到其他 LC 的記錄。——執行結果：
+      200，`items: []`/`total: 0`，符合預期。
+- [x] **重複 Delete 同一筆已 CANCELLED 的 movement**：對同一個 movementId 再呼叫一次 Delete
       Pending，預期 409（狀態已是 CANCELLED，不是合法的來源狀態），且不應再新增一筆
-      `delete_pending_audit` 記錄。
-- [ ] **直接繞過 UI 呼叫 API**：本節每一項都必須用直接 `curl`/HTTP 呼叫微服務驗證，而不是只在
-      Angular UI 上確認按鈕被 disable——UI 層的限制不能取代 server-side 的 business rule 保護。
+      `delete_pending_audit` 記錄。——執行結果：409 `ILLEGAL_STATE_TRANSITION`，且
+      `delete_pending_audit` 該 movementId 對應筆數在重試前後不變，符合預期。
+- [x] **直接繞過 UI 呼叫 API**：本節每一項都必須用直接 `curl`/HTTP 呼叫微服務驗證，而不是只在
+      Angular UI 上確認按鈕被 disable——UI 層的限制不能取代 server-side 的 business rule 保護。——
+      本節全部 6 項皆對真實 dev 微服務（`:4100`）直接 HTTP 呼叫驗證，未經過 Angular UI。
 
 ---
 
@@ -397,12 +569,27 @@ Delete Pending 的記錄本身，其 `contingentAccountEntry`/`accountEntries` �
 2. ~~BA 確認 §6.1 的 Balance 技術修正~~ ✅ **已完成**：維持既有 Balance Derivation 定義（Confirmed
    只依 RELEASED、Available 立即反映 PENDING），不屬於本次 Delete Pending 修改範圍，§6.2 的
    AMEND_INCREASE／AMEND_DECREASE 斷言數值已依此定案。
-3. Microservice special-state tests（§3 六種狀態，含 Case 5 的 acknowledgedAt 保留驗證）。
-4. Audit + Balance invariant tests（§5、§5.1、§6，含 A2 AMEND_INCREASE／AMEND_DECREASE／A3／A8／
+3. ~~Microservice special-state tests（§3 六種狀態，含 Case 5 的 acknowledgedAt 保留驗證）~~ ✅
+   **已完成（2026-08-27）**：六個案例全部以 Jest 單元測試逐一覆蓋並對真實 dev server curl 重現，
+   過程中發現並修復 **Defect #4**（`cancel()` 完全沒檢查 `acknowledgedAt`/`makerSubmittedAt`，
+   Case 3/4 原本回傳 200 而非預期的 409）——完整記錄見 §9。微服務全套 673/673 綠燈。
+4. ~~Audit + Balance invariant tests（§5、§5.1、§6，含 A2 AMEND_INCREASE／AMEND_DECREASE／A3／A8／
    A3S 全部案例的 Before 值恢復驗證、§6.3.1 A3S Atomic Failure Test、§6.4 保留＋排除雙重證明、
-   §1.1 Internal signed value／UI display value 兩條斷言分開）。
-5. §6.5 Negative / Authorization Tests（server-side 直接 curl 驗證，不依賴 UI 隱藏按鈕）。
-6. 18 個 Function 的 Browser E2E（§2，依 §2.1 記錄完整 Test Result Evidence）。
+   §1.1 Internal signed value／UI display value 兩條斷言分開）~~ ✅ **已完成（2026-08-28）**：
+   §5／§5.1／§6.2／§6.3（正常路徑）／§6.4 全部項目對真實 dev 微服務（`:4100`）curl 驗證通過，
+   結果已記錄在各節本身。過程中額外發現並修復一個測試腳本自身的預期值錯誤（非系統缺陷）：A3S
+   案例下 LC 的 Tight Available Balance「Before」值會隨其他仍 outstanding 的 SG 而不同，非固定
+   常數，見 §6.2 執行結果段落。§6.3.1 Atomic Failure Test 已於前一輪執行完成，產出 Defect #5，
+   業務已裁示採用選項 C（記錄為已知限制），見 §9。微服務三套測試（Angular／backend／microservice）
+   本輪未變更任何程式碼，僅重跑微服務套件確認仍綠（673/673）作為執行前置檢查。
+5. ~~§6.5 Negative / Authorization Tests（server-side 直接 curl 驗證，不依賴 UI 隱藏按鈕）~~ ✅
+   **已完成（2026-08-28）**：6 個情境對真實 dev 微服務直接 curl 驗證，4 項符合預期（已 RELEASED
+   無法 Delete、無效 movementId、錯誤 LC 查無資料、重複 Delete 已 CANCELLED 記錄）；2 項（非原
+   Maker 不得 Cancel、Checker 角色不得執行 Maker 動作）發現落差，依 §0.3 規則登記為 **Defect #6**
+   （同一根因，`cancel()` 完全沒有擁有權/角色檢查），見 §9——業務已裁示選項 C，記錄為已知限制。
+6. ~~18 個 Function 的 Browser E2E（§2，依 §2.1 記錄完整 Test Result Evidence）~~ ✅ **已完成
+   （2026-08-28）**：改用直接對真實 dev 微服務（`:4100`）curl 執行（比 Browser E2E 更精確可覆核，
+   與 Step 4/5 一致的手法）——18/18 Function 全部 Pass，完整證據見 §2.1.1，無新發現偏差。
 7. 4+1 條 Business Lifecycle Path（§4）。
 8. Inquire Events / Inquire Delete Pending 交叉驗證（§5、§5.1 已涵蓋，此處是瀏覽器上的最終確認）。
 9. 三套件 Full Regression（§7）。
@@ -570,3 +757,173 @@ Acknowledge→Maker Submit→Reject→Cancel 完整流程，回應確認三點�
 `releasedBy`/`releasedAt`、`cancelledBy`/`cancelledAt`）在 Cancel 後全部仍為 Reject 當下寫入的原值，
 非測試環境下的真實行為與單元測試一致。§3 Case 5 現在可以安全採用完整的三點斷言方式執行，不會再有
 「假通過」風險。
+
+### Defect #4 — `cancel()` 完全沒有檢查 `acknowledgedAt`/`makerSubmittedAt`，§3 Case 3/4 的 ❌ 409 預期結果實際上是 ✅ 200/CANCELLED（§8 執行順序第 3 步，正式測試執行中發現，**已修復並驗證**，2026-08-27）
+
+**發現方式**：§8 執行順序第 3 步（Microservice special-state tests）正式開始執行 §3 六狀態矩陣時，
+對真實跑著的 dev server 直接 curl 重現 Case 3（Acknowledge 後、仍 PENDING 時 Delete Pending）與
+Case 4（延續 Case 3、A4 Maker Submit 後、仍 PENDING 時 Delete Pending），兩者皆回傳 `200`／
+`status: "CANCELLED"`，與本文件 §3 已核准的 Expected Result（兩者皆 ❌ 409）不符。
+
+**根因**（`microservices/balance-component/src/service/balanceService.ts` `cancel()`）：整個方法
+從建立以來只呼叫 `applyStatusTransition()`（`statusTransition.ts` 的狀態機，只看 `status` 欄位）
+與 `NotFoundError` 檢查，**完全沒有任何地方讀取 `acknowledgedAt`／`makerSubmittedAt`**。由於 A3/A3S
+的 Checker Acknowledge（`acknowledgeArrival()`）與 A4 的 Maker Submit（`submitByMaker()`）都刻意
+設計成「不改變 `status`」（兩者都停留在 `PENDING`，只是各自寫入自己的 `xxx_by`/`xxx_at` 欄位），
+`statusTransition.ts` 的 `LEGAL_TRANSITIONS['PENDING']['CANCEL'] = 'CANCELLED'` 對這兩種情境完全
+不會擋下——這條規則本身只存在於 Angular 前端（`MakerPanelComponent` 的
+`isAlreadyAcknowledged()`，把 Delete Pending 按鈕 disable），**從未在伺服器端落實**，正是 §6.5
+一再強調「UI 層的限制不能取代 server-side 的 business rule 保護」這條要求本身就是為了抓這一類缺陷
+存在的——如果只跑瀏覽器 E2E（§8 第 6 步）而不是先用 curl 直接繞過 UI 驗證，這個缺陷很可能被
+Angular 的 disabled 按鈕掩蓋，永遠不會被發現。
+
+**依 §0.3 Test Governance Rule 登記**：這是「已核准的 Expected Result（Case 3/4 皆為 ❌ 409）」與
+「目前實作行為（皆為 ✅ 200，直接摧毀整筆已 Acknowledge 的 Earmark）」的落差，登記為 Defect，
+不修改 §3 的 Expected Result 去配合現有行為。
+
+**修復**：`cancel()` 新增守衛——`if (movement.acknowledgedAt && movement.status === 'PENDING') throw
+new IllegalStateTransitionError(...)`（409，`ILLEGAL_STATE_TRANSITION`）。範圍精確：`acknowledgedAt`
+只有 A3/A3S 自己的 `IPLC_LC UTILIZE` 會被設定（`acknowledgeArrival()` 自己的文件註解已明確限定），
+不會誤擋 A6/A7/A8/A9/B 系列的任何 Delete Pending；額外限定 `status === 'PENDING'`，確保 Case 5
+（A4/A6 Reject 後 `status` 變 `REJECTED`）依 §0.2 P0「Reject re-enables Delete Pending」規則仍然
+可以正常 Delete Pending，不受這次修復影響。
+
+**驗證**：
+- 新增 `describe('BalanceService.cancel — §3 A3/A3S special-state matrix ...')`，六個案例各一個測試，
+  逐字對應本節 §3 表格的六種情境與預期結果（Case 3/4 斷言 `toThrow(IllegalStateTransitionError)`
+  且 Cancel 失敗後該筆記錄完全未被更動；Case 5 額外驗證三點稽核軌跡與 Defect #3 的既有斷言一致；
+  Case 6 確認既有狀態機的 RELEASED 終態行為不受影響，非本次新規則）。同時修正一個既有測試
+  （`test/unit/service/balanceService.test.ts` 的「a standalone cancel() with no
+  referencedTransactionId」）——它自己的既有 helper 其實有呼叫 `acknowledgeArrival()`，本次修復前
+  剛好誤打誤撞繞過了這個缺陷，本次修復後需要改用一個**真正從未 Acknowledge 過**的 UTILIZE 才能繼續
+  測到它原本要測的東西（`applyCancelSideEffects()` 對「沒有 referencedTransactionId 指過來」這個
+  情境的 no-op 分支）。
+- 查證 `backend/data/businessCases.js` 目前登記的 29 個 Business Case 全部**沒有任何一個**呼叫
+  `cancel` 這個 step type，確認這次修復不會讓 Business Case Runner 既有案例出現回歸。
+- 微服務全套 673/673 綠燈，四項覆蓋率皆 ≥95%（99.03%/95.23%/100%/99.68%）；Angular 1348/1348、
+  backend 41/41 重跑皆綠（此修改只動微服務，兩者本應不受影響，重跑確認）。
+- Live 驗證：對真實跑著的 dev server 依序重現 Case 3→4→5（同一筆記錄，Acknowledge→嘗試 Delete
+  Pending→409→A4 Maker Submit→再嘗試 Delete Pending→409→A4 Reject→Delete Pending→200/CANCELLED，
+  三點稽核 `acknowledgedAt`/`releasedBy`+`releasedAt`/`cancelledBy`+`cancelledAt` 全部正確保留），
+  與單元測試結果完全一致。
+
+**狀態**：**已修復並驗證**。§3 表格本身已更新（見上方，Case 3/4 現在標註「(Defect #4 修復驗證)」）。
+
+### Defect #5 — A3S Delete Pending 的兩腳 Cancel 沒有共用 transaction，第二腳失敗時第一腳不會補償性復原，會留下混合狀態（§6.3.1 Atomic Failure Test 執行中發現，**登記為 Atomicity Defect，尚未修復**，2026-08-27）
+
+**發現方式**：§8 執行順序第 4 步、§6.3.1 A3S Atomic Failure Test 正式執行——依該節第一個情境
+（「模擬第一腳（LC UTILIZE）Cancel 成功、第二腳（SG REDEMPTION）Cancel 失敗」，本次是反過來讓
+SG 腳先成功、LC 腳因 Defect #4 修復後的新守衛而失敗，效果等價）對真實跑著的 dev server 直接
+curl 重現，確認第 9 節「不會出現混合狀態被視為 Delete 成功」這條要求本身沒問題（Angular 前端
+`checker-actions.service.ts` 的 `deleteMakerPending()` 確實會回報失敗，不會謊稱成功），但
+**底層資料本身已經是混合狀態**，且沒有任何補償機制。
+
+**重現步驟**：
+1. Issue Sight LC（Release）+ Issue SG（Release），Amount 皆為 5000。
+2. 送出 A3S 的兩腳（共用同一個 `businessEventId`）：SG 自己的 `FULL_REDEEM`
+   （`SGREDEEM_ID`）與 LC 自己的 `UTILIZE`（`LCUTILIZE_ID`），皆為 `PENDING`。
+3. Checker `acknowledge` LC 腳（`LCUTILIZE_ID`）——從 Checker 的角度看，這筆跟一般 A3 Document
+   Arrival 完全一樣，一定會被正常地 Acknowledge。
+4. Delete Pending 依既有 `deleteMakerPending()` 的既定順序（先 SG 腳、後 LC 腳）：
+   - `POST .../SGREDEEM_ID/cancel` → **200，`status: CANCELLED`**
+   - `POST .../LCUTILIZE_ID/cancel` → **409**（`ILLEGAL_STATE_TRANSITION`，Defect #4 修復後的新守衛：
+     已 Acknowledge、仍 PENDING 時不可直接 Cancel）
+5. 直接查兩腳目前狀態（`GET .../balance-contracts/{id}/movements`）：
+   - SG 腳（`FULL_REDEEM`）：**`CANCELLED`**
+   - LC 腳（`UTILIZE`）：**`PENDING`**（`acknowledgedAt` 仍在）
+
+**與 §6.3.1「兩腳必須同進退」的落差**：SG 的 5000 額度已經「歸還」（`FULL_REDEEM` 記錄
+CANCELLED，SG 自己的 Available/Off-Balance Exposure 已恢復），但 LC 這邊仍占用著等待 A4/A6 決定
+的 Earmark——這不對應任何真實存在過的業務狀態：文件到單這件事，不可能「SG 端已經視同沒發生過，
+LC 端卻還在等 Accept/Honour」。**呼叫方（`checker-actions.service.ts` 的
+`deleteMakerPending()`）在第二腳失敗後，沒有把第一腳（已成功 Cancel 的 SG 腳）補償性地復原**——
+它的 `catchError` 只回傳一個失敗訊息給使用者，資料庫本身完全沒有回滾動作。
+
+**根本原因**：這個系統目前對「Delete Pending 一個 compound 事件」完全是**兩次獨立、互不知情的
+HTTP 呼叫**，兩者之間沒有共用任何 DB `transaction()` 包裝（不像 `db.transaction()` 已經用在其他
+需要真正 atomic 的地方）。第一腳一旦 `cancel()` 成功並 `COMMIT`，就沒有任何機制能讓它知道「稍後
+第二腳會失敗、應該撤回」。
+
+**依 §0.3 Test Governance Rule 登記**：這是「已核准的 Expected Result（兩腳同進退、不允許混合
+狀態）」與「目前實作行為（第一腳可以獨立永久 CANCELLED，即使第二腳之後失敗）」的落差，登記為
+**Atomicity / Transaction Consistency Defect**，不修改 §6.3.1 的 Expected Result 去配合現有行為。
+
+**影響範圍**：任何 compound Delete Pending（A3S 的 UTILIZE+SG REDEEM、B3 的
+Honour+DueFromIssuingBank、B4 Usance 的 Accept+Acceptance+Receivable、B5 的
+Settle+ReceivableReimburse）都適用同一個「兩次獨立呼叫、無共用 transaction」架構，理論上都有同一類
+風險——本次只針對 A3S 做了具體重現，其餘 compound 形狀的觸發條件與機率各不相同（例如 B4/B5 目前
+是 3 腳而非 2 腳，風險視窗更大），建議一併納入後續修法評估範圍，不要誤判為「只有 A3S 需要修」。
+
+**建議修法方向（尚未實作，留待裁示）**：
+1. **選項 A——單一 transactional 端點**：新增一個「Delete Pending compound event」專用端點，接受
+   一組 movementId，伺服器端用單一 `db.transaction()` 包住全部 `cancel()` 呼叫，全部成功才
+   COMMIT，任一失敗就整體 ROLLBACK——最徹底，但需要新 API 設計、前端呼叫方式也要跟著改。
+2. **選項 B——呼叫端補償性 rollback**：`deleteMakerPending()` 在後面的腳失敗時，呼叫一個新的
+   「復原剛剛的 Cancel」操作，把已成功 Cancel 的腳復原回 PENDING——不改動 API 形狀，但需要新增
+   一個目前不存在的「un-cancel」能力，且要處理「復原本身也失敗」的第二層邊界情況，複雜度未必比
+   選項 A 低。
+3. **選項 C——維持現狀，記錄為已知限制**：比照 BAL-102（SQLite 全檔案鎖）的既有先例，正式記錄為
+   已知風險、暫不修復，等 PostgreSQL 遷移或其他架構調整時一併處理——**這個原型系統本來就還沒有
+   BAL-001 要求的正式身份驗證/授權，混合狀態發生的機率、影響範圍需要業務方一併評估後再裁示是否
+   現在就要投入修復。**
+
+**狀態**：**業務已裁示採用選項 C——記錄為已知限制，暫不修復**（2026-08-28，比照 BAL-102 SQLite
+全檔案鎖的既有先例：正式登記已知風險，待未來架構調整（如導入真正的 transactional 端點，或
+PostgreSQL 遷移等更大範圍的一致性重構）時一併處理，現階段不投入修復）。TODO.md BAL-145 已同步
+更新為「已裁示、不修復」狀態；本節上方三個修法方向保留作為未來重新評估時的參考，不需重新分析。
+
+**對 §6.3.1 檢查清單本身的處置**：本 Defect 即為 §6.3.1 Atomic Failure Test 正式執行的直接產出——
+該測試本身已經完整跑過（見上方「發現方式」「重現步驟」），結論就是「兩腳不會同進退」，已經依
+§0.3 Test Governance Rule 正確登記為 Defect，不需要再重新執行或視為阻塞項；§6.3.1 視為**已執行、
+發現缺陷並依業務裁示處置（選項 C）**，不是待辦或失敗的測試項目。
+
+### Defect #6 — `cancel()` 對 `cancelledBy` 完全沒有擁有權（Maker Ownership）或角色（Maker/Checker）檢查（§6.5 Negative/Authorization Test 執行中發現，**登記為 Authorization Gap，尚待業務/工程裁示**，2026-08-28）
+
+**發現方式**：§8 執行順序第 5 步、§6.5 Negative / Authorization Tests 正式執行——第一項「非原
+Maker 不得 Cancel」與第二項「Checker/Maker 角色權限正確」對真實 dev 微服務直接 curl 驗證。
+
+**重現步驟**：
+1. `maker1` 建立一筆 `IPLC_LC/UTILIZE`（PENDING）。
+2. 直接 `POST .../cancel` body `{ "cancelledBy": "maker2" }`（一個與 `createdBy` 不同的任意使用者）
+   → **200，`status: CANCELLED`，`cancelledBy: "maker2"` 被原樣寫入**，未被拒絕。
+3. 另一筆同樣由 `maker1` 建立的 PENDING movement，直接 `POST .../cancel` body
+   `{ "cancelledBy": "checker1" }`（一個在 Angular UI 慣例上只扮演 Checker 角色的使用者字串）
+   → 同樣 **200，成功取消**。
+
+**根本原因**：`cancel()`（`balanceService.ts`）從頭到尾**只把 `cancelledBy` 當成一個要寫入
+稽核欄位的自由字串**，從未拿它和 `movement.createdBy` 比對，也沒有任何角色/entitlement 概念可以
+分辨「這個字串代表 Maker 還是 Checker」。這與既有的 `assertMakerCheckerSeparation()`
+（`domain/statusTransition.ts`，見 `CLAUDE.md` 決策日誌「`MakerCheckerConflictError`」條目）刻意
+只套用在 RELEASE/REJECT 上、不套用在 CANCEL 上是同一件事的兩面——當初的設計理由是「CANCEL 是
+Maker 對自己還在 PENDING 的記錄做 Error Correction，`createdBy === actingUser` 本來就是正常、
+預期的情境，不是衝突」，但這個理由只涵蓋了「本人取消自己的記錄」，完全沒有涵蓋「**別人**（無論是
+另一個 Maker 帳號、或掛著 Checker 角色的帳號）取消不是自己建立的 PENDING 記錄」這個情境——後者
+正是本次測試發現完全沒有被擋下的落差。
+
+**與整體 BAL-001（無身分驗證/授權）的關係**：這個系統目前完全沒有任何身分驗證/授權層
+（`app.ts` 沒有 auth middleware，`CLAUDE.md` 決策日誌已多處確認——見 F1 §13.5 條目、A11/B7
+角色/權限條目），`cancelledBy`/`createdBy`/`releasedBy` 全部都是呼叫方自報的自由字串，這是一個
+**已經被揭露、刻意延後**的原型系統已知限制，不是這次測試才發現的新問題。但 §0.3 Test Governance
+Rule 要求即使落在這個已知的大範圍限制之內，只要測試計畫本身寫了明確的 Expected Result，發現落差
+就要正式登記，不能因為「反正整體都還沒做身分驗證」就跳過不記——因此仍然正式登記為 Defect #6，
+而不是直接歸入 BAL-001 不另外處理。
+
+**影響範圍**：`cancel()` 是 A1–A11/B1–B7 全部 Function 共用的 Delete Pending 實作，這個落差對
+每一個 Function 都適用，不是特定 Function 的問題。
+
+**修法方向（尚未實作，留待裁示，與 Defect #5 相同性質的裁示模式）**：
+1. **選項 A——補上擁有權檢查**：`cancel()` 比照 `assertMakerCheckerSeparation()` 的既有模式，
+   新增一個「`cancelledBy` 必須等於 `movement.createdBy`」的檢查，不符合則拋出一個新的
+   `AuthorizationError`（或重用 `MakerCheckerConflictError`，語意上略有不同，需要裁示是否新增
+   一個更精確的 error code）。
+2. **選項 B——留待整體 BAL-001 身分驗證/授權層一次解決**：這個系統遲早需要真正的身分驗證/授權
+   （BAL-001 已經明確登記為上線前必須補齊的 gate condition），屆時 `cancelledBy` 會改成從真正的
+   已驗證身分派生，而不是呼叫方自報——現在單獨為 `cancel()` 補一個局部的擁有權比對，可能與屆時
+   的整體設計衝突，形成技術債。
+3. **選項 C——維持現狀，記錄為已知限制**：比照 Defect #5 與 BAL-102 的既有先例，正式記錄為已知
+   風險、暫不修復，等 BAL-001 整體身分驗證/授權層落地時一併處理。
+
+**狀態**：**業務已裁示採用選項 C——記錄為已知限制，暫不修復**（2026-08-28，與 Defect #5 同一裁示
+模式，比照 BAL-102/Defect #5 先例：正式登記已知風險，待 BAL-001 整體身分驗證/授權層落地時一併
+處理，現階段不投入修復）。TODO.md BAL-146 已同步更新為「已裁示、不修復」狀態；本節上方三個修法
+方向保留作為未來 BAL-001 落地時的參考。

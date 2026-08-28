@@ -1501,12 +1501,42 @@ describe('BalanceService.cancel — A6 Delete Pending reverses the referenced UT
     expect(audit.items.map((r) => r.movementId)).toEqual([acceptance.movement.movementId]);
   });
 
-  test('a standalone cancel() with no referencedTransactionId (e.g. plain A3 Delete Pending) is unaffected — applyCancelSideEffects() no-ops', () => {
+  // Deliberately does NOT use this describe block's own issueUsanceLcAndUtilize() helper (it calls
+  // acknowledgeArrival() as part of its standard A6 setup) — the defect fix below (§3 Cases 3/4, "cancel()
+  // now 409s an Acknowledged-and-still-PENDING A3/A3S UTILIZE") means an acknowledged UTILIZE is no longer
+  // a legal target for a bare cancel() at all, so this test's own point (proving
+  // applyCancelSideEffects() no-ops when nothing references the cancelled movement) needs a genuinely
+  // never-acknowledged UTILIZE to actually reach that code path.
+  test('a standalone cancel() with no referencedTransactionId (e.g. plain, never-acknowledged A3 Delete Pending) is unaffected — applyCancelSideEffects() no-ops', () => {
     const service = new BalanceService(createDb(':memory:'));
-    const { lc, utilize } = issueUsanceLcAndUtilize(service, 'CANCEL-A6-REVERT-3', 'maker1');
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'CANCEL-A6-REVERT-3' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SELLERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
 
-    expect(() => service.cancel(utilize.movementId, 'maker1', 'MAKER_EC')).not.toThrow();
-    const cancelled = service.listMovements(lc.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    expect(() => service.cancel(utilize.movement.movementId, 'maker1', 'MAKER_EC')).not.toThrow();
+    const cancelled = service.listMovements(lc.movement.balanceContractId).find((m) => m.movementId === utilize.movement.movementId)!;
     expect(cancelled.status).toBe('CANCELLED');
   });
 
@@ -1740,6 +1770,114 @@ describe('BalanceService.withdrawMakerSubmit — A4 Delete Pending reverts to be
     const audit = service.listDeletePendingAudit({ lcNumber: 'WD-10' });
     expect(audit.items).toHaveLength(2);
     expect(audit.items.map((a) => a.deleteSeq).sort()).toEqual([1, 2]);
+  });
+});
+
+// Balance-Component-DeletePending-TestPlan-zh.md §3 — the A3/A3S special-state matrix, all 6 cases.
+// Uses the Sight/A3->A4 path as the representative walkthrough (A3S/Usance->A6 share the exact same
+// acknowledgeArrival()/submitByMaker()/reject()/cancel() code paths — tenor/A3S-vs-A3 only changes which
+// contract owns the UTILIZE, never the state-machine logic under test here).
+//
+// Defect #4 found executing this matrix (BA-directed §8 execution, 2026-08-27): cancel() had NO check at
+// all for acknowledgedAt/makerSubmittedAt — calling it directly (bypassing the Angular UI's own
+// disabled-button posture, which §6.5 explicitly says must not be the only guard) on an Acknowledged
+// (EARMARKED, still PENDING) A3/A3S UTILIZE silently cancelled the whole earmark, contradicting §3 Cases
+// 3/4's own approved Expected Result (❌ 409). Live-reproduced via curl against the real running
+// microservice before fixing (both cases returned 200/CANCELLED). Fixed: cancel() now throws
+// IllegalStateTransitionError (409) when `acknowledgedAt` is set AND `status === 'PENDING'` — scoped
+// correctly since acknowledgedAt is only ever set on A3/A3S's own UTILIZE (acknowledgeArrival()'s own doc
+// comment), and gated on status===PENDING specifically so Case 5 (post-Reject, status flips to REJECTED)
+// still works per §0.2 P0's own "Reject re-enables Delete Pending" rule.
+describe('BalanceService.cancel — §3 A3/A3S special-state matrix (Balance-Component-DeletePending-TestPlan-zh.md §3, 6 cases)', () => {
+  function issueSightLcAndUtilize(lcNumber: string) {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lc.created) throw new Error('expected a new movement');
+    service.release(lc.movement.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    return { service, movementId: utilize.movement.movementId };
+  }
+
+  test('Case 1 — A3 Submit -> Delete Pending directly (never approved): Success', () => {
+    const { service, movementId } = issueSightLcAndUtilize('MATRIX-1');
+    const cancelled = service.cancel(movementId, 'maker1', 'MAKER_EC');
+    expect(cancelled.status).toBe('CANCELLED');
+  });
+
+  test('Case 2 — Submit -> Checker Reject (never approved) -> Delete Pending: Success', () => {
+    const { service, movementId } = issueSightLcAndUtilize('MATRIX-2');
+    service.reject(movementId, 'checker1', 'DOC_DISCREPANCY');
+    const cancelled = service.cancel(movementId, 'maker1', 'MAKER_EC');
+    expect(cancelled.status).toBe('CANCELLED');
+  });
+
+  test('Case 3 — Submit -> Checker Acknowledge (EARMARKED, still PENDING) -> Delete Pending: 409 (Defect #4 fix)', () => {
+    const { service, movementId } = issueSightLcAndUtilize('MATRIX-3');
+    service.acknowledgeArrival(movementId, 'checker1');
+    expect(() => service.cancel(movementId, 'maker1', 'MAKER_EC')).toThrow(IllegalStateTransitionError);
+    const untouched = service.listMovements(service.resolveContract('IPLC_LC', { lcNumber: 'MATRIX-3' })!.balanceContractId).find((m) => m.movementId === movementId)!;
+    expect(untouched.status).toBe('PENDING'); // the rejected cancel() attempt must leave the earmark completely untouched.
+    expect(untouched.acknowledgedAt).toBeTruthy();
+  });
+
+  test('Case 4 — (continuing 3) A4 Maker Submit -> Delete Pending: 409 (Defect #4 fix)', () => {
+    const { service, movementId } = issueSightLcAndUtilize('MATRIX-4');
+    service.acknowledgeArrival(movementId, 'checker1');
+    service.submitByMaker(movementId, 'maker1');
+    expect(() => service.cancel(movementId, 'maker1', 'MAKER_EC')).toThrow(IllegalStateTransitionError);
+    const untouched = service.listMovements(service.resolveContract('IPLC_LC', { lcNumber: 'MATRIX-4' })!.balanceContractId).find((m) => m.movementId === movementId)!;
+    expect(untouched.status).toBe('PENDING');
+    expect(untouched.makerSubmittedAt).toBeTruthy();
+  });
+
+  test('Case 5 — (continuing 4) A4 Checker Reject -> Delete Pending: Success, all three audit points (Acknowledge/Reject/Delete) independently queryable', () => {
+    const { service, movementId } = issueSightLcAndUtilize('MATRIX-5');
+    service.acknowledgeArrival(movementId, 'checker1');
+    service.submitByMaker(movementId, 'maker1');
+    const rejected = service.reject(movementId, 'checker1', 'SETTLEMENT_DECLINED');
+    expect(rejected.status).toBe('REJECTED');
+
+    const cancelled = service.cancel(movementId, 'maker1', 'MAKER_EC');
+
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(cancelled.acknowledgedAt).toBeTruthy();
+    expect(cancelled.releasedBy).toBe('checker1');
+    expect(cancelled.releasedAt).toBe(rejected.releasedAt);
+    expect(cancelled.cancelledBy).toBe('maker1');
+    expect(cancelled.cancelledAt).toBeTruthy();
+    const audit = service.listDeletePendingAudit({ lcNumber: 'MATRIX-5' });
+    expect(audit.items).toHaveLength(1);
+    expect(audit.items[0]!.statusBefore).toBe('REJECTED');
+  });
+
+  test('Case 6 — (continuing 4) A4 Checker Release -> Delete Pending: 409 (existing state machine, RELEASED is terminal — not a new rule)', () => {
+    const { service, movementId } = issueSightLcAndUtilize('MATRIX-6');
+    service.acknowledgeArrival(movementId, 'checker1');
+    service.submitByMaker(movementId, 'maker1');
+    const released = service.release(movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+
+    expect(() => service.cancel(movementId, 'maker1', 'MAKER_EC')).toThrow(IllegalStateTransitionError);
   });
 });
 

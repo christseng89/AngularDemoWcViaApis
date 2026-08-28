@@ -2341,6 +2341,23 @@ export class BalanceService {
   cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): BalanceMovement {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+    // Defect fix (BA code review during Balance-Component-DeletePending-TestPlan-zh.md §8 execution,
+    // §3 Cases 3/4 — found live-reproduced: this method had NO check at all for acknowledgedAt/
+    // makerSubmittedAt, so calling it directly (bypassing the Angular UI's own disabled-button posture,
+    // which §6.5 explicitly says server-side must not rely on) on an A3/A3S UTILIZE that a Checker has
+    // already Acknowledged — EARMARKED, `status` still PENDING per acknowledgeArrival()'s own design —
+    // silently destroyed the whole earmark, whether or not A4/A6 had gone on to Maker-Submit against it
+    // too. `acknowledgedAt` is scoped exclusively to A3/A3S's own IPLC_LC UTILIZE (acknowledgeArrival()'s
+    // own doc comment) — no other movementType ever sets it, so this guard can never affect A6/A7/A8/A9/
+    // B-series or a plain not-yet-acknowledged A3/A3S record (§3 Cases 1/2, unaffected). Deliberately
+    // gated on `status === 'PENDING'` too — once A4/A6 Reject flips status to REJECTED (§3 Case 5),
+    // Delete Pending must work again per §0.2 P0's own "Reject re-enables Delete Pending" rule; only the
+    // PENDING window between Acknowledge and a final A4/A6 decision is blocked.
+    if (movement.acknowledgedAt && movement.status === 'PENDING') {
+      throw new IllegalStateTransitionError(
+        `Cannot Delete Pending ${movementId} — already Checker-acknowledged (EARMARKED) and still awaiting a final A4/A6 decision. Reject it via A4/A6 first (re-enables Delete Pending), then retry.`,
+      );
+    }
     applyStatusTransition({ currentStatus: movement.status, action: 'CANCEL', createdBy: movement.createdBy, actingUser: cancelledBy });
     // applyStatusTransition() above only allows CANCEL from PENDING/REJECTED (statusTransition.ts's own
     // LEGAL_TRANSITIONS table) — movement.status is one of those two here, by construction.

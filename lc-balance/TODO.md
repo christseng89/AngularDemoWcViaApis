@@ -118,7 +118,7 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
 
 ## 3. 次要但仍開著的項目
 
-- [ ] **BAL-143**（🔵 Minor，既有缺陷，非本次排序需求引入，不擋上線）— REJECTED 交易被 EC/Cancel 後，
+- [x] ~~**BAL-143**（🔵 Minor，既有缺陷，非本次排序需求引入，不擋上線）— REJECTED 交易被 EC/Cancel 後，
   Reject 當下的 `released_at`/`released_by` 稽核時間被靜默覆寫成 Cancel 的值，Inquire Events 只看得到
   最後一次 EC，Reject 這個稽核事實消失
   完整查證過程、程式碼引用、建議修法方向已記錄於
@@ -154,7 +154,46 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   **建議測試補強點**：微服務新增一個「Reject 後再 Cancel」的整合測試，斷言 Cancel 後
   `released_at`/`released_by` 仍是 Reject 當下寫入的值（不是 null），`cancelled_at`/`cancelled_by`
   才是新值；`inquire-events.service.spec.ts` 補一個對應案例，確認這個複合情境下 Inquire Events 顯示的
-  時間與 `reasonCode` 都完整反映兩段歷史，而不是只剩最後一次 EC。
+  時間與 `reasonCode` 都完整反映兩段歷史，而不是只剩最後一次 EC。~~ — **2026-08-27 已修復**（同一個
+  根因，這次是在 BA 針對 `analysis/Balance-Component-DeletePending-TestPlan-zh.md` §0.2 P0 三點稽核
+  規則的正式 code review 中被獨立發現、登記為該文件自己的「Defect #3」——兩份文件描述的其實是同一段
+  程式碼、同一個缺陷）。`updateStatus()` 的 `released_by`/`released_at` 已依上方建議改成
+  `COALESCE(@releasedBy, released_by)`/`COALESCE(@releasedAt, released_at)`，確認過 `release()`/
+  `reject()` 兩個呼叫端都只傳真值、從未依賴傳 `null` 來清空這兩欄，故修改不影響其既有覆寫行為。
+  `balanceService.test.ts` 新增 2 個測試（Reject 後 Cancel 的完整路徑、含 Acknowledge 前置狀態與不含
+  兩種情境），微服務全套 667/667 綠燈，四項覆蓋率皆 ≥95%；另對真實 dev server 直接 curl 重現
+  Acknowledge→Maker Submit→Reject→Cancel，確認三點稽核（Acknowledge/Reject/Delete）全部保留。完整
+  細節見 `CLAUDE.md` 決策日誌「Defect #3 fixed」條目與 `analysis/Balance-Component-DeletePending-
+  TestPlan-zh.md` 本身的 Defect #3 記錄。
+
+- [x] ~~**BAL-144**（🟠 Major，Delete Pending Test Plan §3 Case 3/4 執行中發現）— `cancel()`
+  完全沒檢查 `acknowledgedAt`/`makerSubmittedAt`，可以直接繞過 UI 摧毀一筆已 Checker Acknowledge
+  的 A3/A3S Earmark~~ — **2026-08-27 已修復**（`Balance-Component-DeletePending-TestPlan-zh.md`
+  §9 Defect #4）。`cancel()` 新增守衛：`acknowledgedAt` 已設定且 `status` 仍 `PENDING` 時擋下
+  （409 `ILLEGAL_STATE_TRANSITION`），範圍精確限定在 A3/A3S 自己的 `IPLC_LC UTILIZE`（不影響
+  A6/A7/A8/A9/B 系列），且限定 `status === 'PENDING'`（A4/A6 Reject 後 `status` 變 REJECTED 仍可
+  正常 Delete Pending，符合 §0.2 P0）。§3 六狀態矩陣全部補上對應 Jest 測試，微服務全套 673/673
+  綠燈；對真實 dev server 依序重現 Case 3→4→5 curl 驗證行為一致。
+
+- [x] ~~**BAL-145**（🟠 Major，Atomicity Defect，Delete Pending Test Plan §6.3.1 執行中發現）—
+  compound Delete Pending（A3S 的 UTILIZE+SG REDEEM，理論上也適用 B3/B4/B5 的其他 compound 形狀）
+  的兩腳 `cancel()` 呼叫互相獨立、沒有共用 DB transaction，第一腳成功後第二腳失敗時，第一腳不會
+  補償性地復原，會留下永久的混合狀態（一腳 CANCELLED、另一腳仍 PENDING）——已對真實 dev server
+  重現（SG 腳 CANCELLED、LC 腳因 BAL-144 修復後的新守衛而 409、最終停在 PENDING）~~ —
+  **2026-08-28 業務已裁示：採用選項 C，記錄為已知限制，暫不修復**（比照 BAL-102 SQLite 全檔案鎖
+  先例）。三個修法方向（單一 transactional 端點／呼叫端補償性 rollback／記錄為已知限制）已列在
+  `Balance-Component-DeletePending-TestPlan-zh.md` §9 Defect #5，留待未來架構調整（如
+  transactional 端點設計或 PostgreSQL 遷移）時一併重新評估，現階段不投入修復。
+
+- [x] ~~**BAL-146**（🟠 Major，Authorization Gap，Delete Pending Test Plan §6.5 Negative/Authorization
+  Test 執行中發現）— `cancel()`（Delete Pending，A1–A11/B1–B7 共用）對 `cancelledBy` 完全沒有
+  擁有權（與 `movement.createdBy` 比對）或角色（Maker/Checker）檢查——已對真實 dev server 直接
+  curl 重現：以 `cancelledBy: 'maker2'` 取消 `maker1` 建立的 PENDING 記錄、以及以
+  `cancelledBy: 'checker1'` 呼叫，皆回應 200 成功取消，未被擋下~~ — **2026-08-28 業務已裁示：
+  採用選項 C，記錄為已知限制，暫不修復**（與 BAL-001 無身分驗證/授權層同一根因，比照 Defect #5
+  同一裁示模式）。三個修法方向（補上擁有權檢查／留待 BAL-001 整體身分驗證層一次解決／記錄為
+  已知限制）已列在 `Balance-Component-DeletePending-TestPlan-zh.md` §9 Defect #6，留待 BAL-001
+  整體身分驗證/授權層落地時一併重新評估，現階段不投入修復。
 
 - [x] ~~**BAL-129**（🔵 Minor，Test Gap）— BAL-117 修的「泛用 500 handler 不外洩內部錯誤訊息」本身沒有測試覆蓋~~
   — **2026-08-25 已修復**。`test/unit/app.test.ts` 新增一則測試：`jest.spyOn` 讓 `service.resolveContract()`
