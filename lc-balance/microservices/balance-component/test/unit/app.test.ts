@@ -2019,6 +2019,34 @@ describe('POST /admin/reset-database — dev-only Business Case Runner "Cleanup 
     expect((db.prepare('SELECT COUNT(*) AS n FROM balance_contracts').get() as { n: number }).n).toBe(0);
     expect((db.prepare('SELECT COUNT(*) AS n FROM balance_movements').get() as { n: number }).n).toBe(0);
   });
+
+  // Same class of regression as delete_pending_audit above, found live 2026-08-29 (real dev DB, real
+  // "Cleanup Database Tables" click, 500 FK constraint failure) — fix_pending_audit (added for the Fix
+  // Pending §19 redesign) has the exact same FK shape and was missed when this route was first written,
+  // since it postdates delete_pending_audit's own fix here.
+  test('also wipes fix_pending_audit — a prior Fix Pending Save must not 500 this route (FK constraint regression)', async () => {
+    const db = createDb(':memory:');
+    const app = createApp(db);
+
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'RESET-003' }, movementType: 'ISSUE', expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1' })
+      .expect(201);
+
+    await request(app)
+      .post(`/balance-movements/${created.body.movementId}/edit`)
+      .send({ amount: '2000', editedBy: 'maker2' })
+      .expect(200);
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM fix_pending_audit').get() as { n: number }).n).toBe(1);
+
+    const res = await request(app).post('/admin/reset-database').expect(200);
+    expect(res.body).toEqual({ status: 'ok' });
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM fix_pending_audit').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_contracts').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_movements').get() as { n: number }).n).toBe(0);
+  });
 });
 
 describe('HTTP integration — app.ts bootstrap: /healthz and request-layer amount validation', () => {
@@ -3738,6 +3766,120 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
     });
   });
 
+  // User-directed 2026-08-28 ("A1 B1 A2 B2, LC Balance = Amount * (1 + Tolerance%) 帳務是用LC Balance
+  // 出帳") — the booked Dr/Cr voucher amount must be the Ceiling-level figure (movement.ceilingAmount),
+  // not the face-level amount a Maker typed. Every test above this point used no tolerancePct, so
+  // ceilingAmount === amount there and those assertions are unaffected by this rule; these tests are the
+  // ones that actually exercise a non-trivial conversion.
+  test('A1 (ISSUE) with tolerancePct — contingentAccountEntry books the Ceiling amount (LC Balance), not the face amount', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'CAE-LC2' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tolerancePct: '10',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(issue.body.ceilingAmount).toBe('110000');
+    expect(issue.body.contingentAccountEntry).toEqual({
+      drAccount: "Customers' Liability under DC — Sight",
+      crAccount: 'Documentary Credits Outstanding — Sight',
+      currency: 'USD',
+      amount: '110000', // LC Balance = 100000 × 1.10, not the face amount 100000
+    });
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const increase = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: 2,
+        amount: '5000',
+        currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(increase.body.ceilingAmount).toBe('5500');
+    expect(increase.body.contingentAccountEntry).toEqual({
+      drAccount: "Customers' Liability under DC — Sight",
+      crAccount: 'Documentary Credits Outstanding — Sight',
+      currency: 'USD',
+      amount: '5500', // A2 (AMEND_INCREASE) — LC Balance = 5000 × 1.10
+    });
+
+    // SHGT never applies Tolerance (domain/tolerance.ts's own TOLERANCE_APPLICABLE_INSTRUMENT_TYPES) even
+    // against a parent LC that itself carries one — locks in that this fix is a genuine no-op outside
+    // A1/B1/A2/B2, not an accidental blanket switch to ceilingAmount everywhere.
+    const parentLc = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'CAE-LC2' }).expect(200);
+    const sg = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'SHGT',
+        naturalKey: { lcNumber: 'CAE-LC2', sgNumber: 'CAE-SG2' },
+        parentLogicalContractId: parentLc.body.logicalContractId,
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '15000',
+        currency: 'USD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(sg.body.ceilingAmount).toBe('15000');
+    expect(sg.body.contingentAccountEntry.amount).toBe('15000'); // unconverted — SG's own face amount, not the parent LC's own Tolerance
+  });
+
+  test('B2 (EPLC_CONFIRMATION AMEND, negative amount = Decrease) with tolerancePct — contingentAccountEntry books the Ceiling-converted magnitude, direction still correct', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'CAE-CNF3' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '80000',
+        currency: 'USD',
+        tolerancePct: '10',
+        tenorType: 'SELLERS_USANCE',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(issue.body.ceilingAmount).toBe('88000');
+    expect(issue.body.contingentAccountEntry.amount).toBe('88000'); // B1 (ISSUE)
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const decrease = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'AMEND',
+        eventSeq: 2,
+        amount: '-5000',
+        currency: 'USD',
+        sourceTransactionRef: 'AMD-001',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(decrease.body.ceilingAmount).toBe('-5500'); // sign preserved through computeCeilingAmount()
+    expect(decrease.body.contingentAccountEntry).toEqual({
+      drAccount: 'Confirmation Undertakings Outstanding — Usance', // Decrease direction — same as the no-tolerance B2 test above, unaffected by this fix
+      crAccount: 'Issuing Bank Confirmation Exposure — Usance',
+      currency: 'USD',
+      amount: '5500', // magnitude only — B2 (AMEND, Decrease) — LC Balance = 5000 × 1.10, not the face amount 5000
+    });
+  });
+
   test("EPLC_DUE_FROM_ISSUING_BANK (on-balance-sheet asset) — contingentAccountEntry is null, both at creation and via the Event Timeline, per the ledger's own Scope boundary", async () => {
     const cnf = await request(app)
       .post('/balance-movements')
@@ -3895,7 +4037,7 @@ describe('HTTP integration — GET /balance-movements?createdBy= (Fix Pending/De
 
     const res = await request(app).get('/balance-movements').query({ createdBy: 'maker1' }).expect(200);
 
-    expect(res.body.total).toBe(2);
+    expect(res.body.items).toHaveLength(2);
     const movementIds = res.body.items.map((r: { movement: { movementId: string } }) => r.movement.movementId);
     expect(movementIds).toContain(pending.body.movementId);
     expect(movementIds).toContain(rejectedSource.body.movementId);
@@ -3904,7 +4046,10 @@ describe('HTTP integration — GET /balance-movements?createdBy= (Fix Pending/De
     expect(rejectedRow.contract.naturalKey.lcNumber).toBe('MYMV-HTTP-002');
   });
 
-  test('status= filters to a single status, and page/pageSize are honored', async () => {
+  // User-directed 2026-08-28 ("page"/"pageSize" removed from this query shape — see
+  // BalanceMovementStore.listByCreatedByAndStatus()'s own doc comment for why pagination moved
+  // client-side; this now only covers status= and q=.
+  test('status= filters to a single status; q= narrows by a substring LIKE match on LC Number', async () => {
     for (let i = 0; i < 3; i++) {
       await request(app)
         .post('/balance-movements')
@@ -3923,14 +4068,14 @@ describe('HTTP integration — GET /balance-movements?createdBy= (Fix Pending/De
     }
 
     const filtered = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'REJECTED' }).expect(200);
-    expect(filtered.body.total).toBe(0);
     expect(filtered.body.items).toEqual([]);
 
-    const page1 = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'PENDING', page: 1, pageSize: 2 }).expect(200);
-    expect(page1.body.total).toBe(3);
-    expect(page1.body.items).toHaveLength(2);
-    const page2 = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'PENDING', page: 2, pageSize: 2 }).expect(200);
-    expect(page2.body.items).toHaveLength(1);
+    const all = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'PENDING' }).expect(200);
+    expect(all.body.items).toHaveLength(3);
+
+    const narrowed = await request(app).get('/balance-movements').query({ createdBy: 'maker-http-paging', status: 'PENDING', q: 'PAGE-1' }).expect(200);
+    expect(narrowed.body.items).toHaveLength(1);
+    expect(narrowed.body.items[0].contract.naturalKey.lcNumber).toBe('MYMV-HTTP-PAGE-1');
   });
 });
 
@@ -4579,5 +4724,119 @@ describe('Generic 500 handler (Quality-report-balance.md BAL-117/BAL-129) — a 
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.objectContaining({ message: distinctiveDetail }));
 
     consoleErrorSpy.mockRestore();
+  });
+});
+
+// Fix Pending POST /balance-movements/:movementId/edit (analysis/Balance-Component-FixPending-
+// DeletePending-Proposal-zh.md §2.2/§15/§19, 2026-08-27) — HTTP-level coverage for
+// editMovementRequestSchema's own `.strict()` field-protection behavior and the route itself; the
+// service-layer mechanics (SUPERSEDED/eventSeq reuse/transaction consistency/ownership) already have
+// dedicated coverage in balanceService.test.ts's own `editPending` describe block.
+describe('POST /balance-movements/:movementId/edit — Fix Pending', () => {
+  async function issueSightLc(app: import('express').Express, lcNumber: string) {
+    const res = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        expiryDate: '2099-12-31',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    return res.body;
+  }
+
+  test('happy path — 200/201 with the corrected amount, PENDING, same eventSeq, same movementId (in-place correction)', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-001');
+
+    const editRes = await request(app)
+      .post(`/balance-movements/${issue.movementId}/edit`)
+      .send({ amount: '130000', editedBy: 'maker2' });
+
+    expect(editRes.status).toBe(200);
+    expect(editRes.body.amount).toBe('130000');
+    expect(editRes.body.status).toBe('PENDING');
+    expect(editRes.body.eventSeq).toBe(issue.eventSeq);
+    expect(editRes.body.movementId).toBe(issue.movementId);
+
+    const movements = await request(app).get(`/balance-contracts/${issue.balanceContractId}/movements`).expect(200);
+    expect(movements.body).toHaveLength(1); // exactly one row for this event — no second row left behind
+    expect(movements.body[0].status).toBe('PENDING');
+    expect(movements.body[0].amount).toBe('130000');
+  });
+
+  test('a locked field (e.g. currency) in the request body -> 400, rejected by the .strict() schema itself, never reaches the service', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-002');
+
+    const res = await request(app)
+      .post(`/balance-movements/${issue.movementId}/edit`)
+      .send({ amount: '130000', editedBy: 'maker2', currency: 'EUR' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
+
+    const movements = await request(app).get(`/balance-contracts/${issue.balanceContractId}/movements`).expect(200);
+    expect(movements.body).toHaveLength(1); // rejected at the schema layer — no row was ever touched
+    expect(movements.body[0].status).toBe('PENDING');
+  });
+
+  test('naturalKey/sourceTransactionRef/movementType/instrumentType are likewise rejected by the same .strict() schema', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-003');
+
+    for (const lockedField of [{ naturalKey: { lcNumber: 'SNEAKY' } }, { sourceTransactionRef: 'SNEAKY' }, { movementType: 'AMEND_INCREASE' }, { instrumentType: 'EPLC_LC' }]) {
+      const res = await request(app)
+        .post(`/balance-movements/${issue.movementId}/edit`)
+        .send({ amount: '130000', editedBy: 'maker2', ...lockedField });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  test('missing amount/editedBy -> 400', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-004');
+
+    await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ editedBy: 'maker2' }).expect(400);
+    await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ amount: '130000' }).expect(400);
+  });
+
+  test('a malformed amount (fails MONETARY_AMOUNT_PATTERN) -> 400 at the schema layer', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-005');
+
+    const res = await request(app)
+      .post(`/balance-movements/${issue.movementId}/edit`)
+      .send({ amount: 'not-a-number', editedBy: 'maker2' });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('editing an already-RELEASED movement -> 409', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-006');
+    await request(app).post(`/balance-movements/${issue.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const res = await request(app)
+      .post(`/balance-movements/${issue.movementId}/edit`)
+      .send({ amount: '130000', editedBy: 'maker2' });
+
+    expect(res.status).toBe(409);
+  });
+
+  test('editing a non-existent movementId -> 404', async () => {
+    const app = createApp(createDb(':memory:'));
+
+    const res = await request(app)
+      .post('/balance-movements/00000000-0000-0000-0000-000000000000/edit')
+      .send({ amount: '1', editedBy: 'maker2' });
+
+    expect(res.status).toBe(404);
   });
 });

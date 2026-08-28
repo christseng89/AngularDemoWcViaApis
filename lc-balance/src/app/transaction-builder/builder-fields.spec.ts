@@ -110,6 +110,24 @@ describe('builder-fields', () => {
       expect(amount.props?.label).toBe('Amount (carried from the Document Arrival, protected)');
     });
 
+    // 2026-08-28 ("A4 銀幕改成配置方式") — A4 (releasesExistingMovementInPlace) shares the exact same
+    // "carried from the picked pay movement" shape A6 already has, via the SAME amountFromDocArrival
+    // derivation — previously A4 had no equivalent here at all (its own template duplicated this fact in
+    // a bespoke, non-Formly readout instead).
+    it('is ALSO locked and labeled "carried from the Document Arrival" for A4 (releasesExistingMovementInPlace) once a pay movement is picked', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A4'), model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' }, selectedPayMovement: { movementId: 'mv-1' } as any });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.props?.disabled).toBe(true);
+      expect(amount.props?.label).toBe('Amount (carried from the Document Arrival, protected)');
+    });
+
+    it('stays editable/face-level for A4 before a pay movement has been picked (boundary — the flag alone is not enough)', () => {
+      const ctx = baseCtx({ selectedFunction: fn('A4'), model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' }, selectedPayMovement: null });
+      const amount = fieldByKey(buildFields(ctx), 'amount');
+      expect(amount.props?.disabled).toBe(false);
+      expect(amount.props?.label).toBe('Amount (face-level, per Design doc §6.2)');
+    });
+
     it('is locked and labeled "Full Settle — carried..." when movementType is FULL_SETTLE with a resolved snapshot', () => {
       const ctx = baseCtx({ model: { instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }, selectedContractSnapshot: snapshot() });
       const amount = fieldByKey(buildFields(ctx), 'amount');
@@ -126,7 +144,7 @@ describe('builder-fields', () => {
       const amount = fieldByKey(buildFields(ctx), 'amount');
       expect(amount.props?.disabled).toBe(true);
       expect(amount.props?.max).toBeUndefined();
-      expect(amount.props?.label).toContain("Shipping Guarantee's Available Balance");
+      expect(amount.props?.label).toContain("SG's Available Balance");
       expect(amount.props?.label).toContain('protected');
     });
 
@@ -375,6 +393,49 @@ describe('builder-fields', () => {
       const tolerance = fieldByKey(buildFields(baseCtx({ model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' } })), 'tolerancePct');
       expect(tolerance.hide).toBe(true);
     });
+
+    // 2026-08-28: deliberate exception to the shared contractLevelEditable Fix Pending lock — see
+    // deriveFixPendingLockFlags()'s own doc comment. A patched tolerancePct on a non-creating edit
+    // (A2/B2 Increase/Decrease) only affects THIS movement's own ceiling/contingentAccountEntry, never
+    // the contract's own stored tolerancePct (buildEditedRequest()'s updateIssueFields() write-back
+    // stays gated to creating edits only) — so it's safe to unlock even though tenorType/tenorDays/
+    // expiryDate stay locked for the exact same A2 context.
+    it('stays editable during Fix Pending for a non-creating, tolerance-applicable movement (A2 AMEND_INCREASE)', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' },
+        fixPendingMode: true,
+      });
+      const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
+      expect(tolerance.props?.disabled).toBe(false);
+      expect(tolerance.props?.label).toBe('Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)');
+    });
+
+    it('stays editable during Fix Pending for A2 AMEND_DECREASE too', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_DECREASE' },
+        fixPendingMode: true,
+      });
+      const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
+      expect(tolerance.props?.disabled).toBe(false);
+    });
+
+    it('stays LOCKED during Fix Pending when tolerance is not applicable to this movement (A3 UTILIZE, boundary — also Fix-Pending-enabled, unlike A6)', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A3'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' },
+        fixPendingMode: true,
+      });
+      const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
+      expect(tolerance.props?.disabled).toBe(true);
+    });
+
+    it('stays editable during Fix Pending for a CREATING tolerance-applicable movement too (A1 ISSUE, unaffected by the exception)', () => {
+      const ctx = baseCtx({ fixPendingMode: true });
+      const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
+      expect(tolerance.props?.disabled).toBe(false);
+    });
   });
 
   describe('Reference No. (secondaryRef) field', () => {
@@ -390,6 +451,27 @@ describe('builder-fields', () => {
       expect(secondaryRef.props?.required).toBe(true);
       expect(secondaryRef.props?.label).toBe('Amendment No.');
     });
+
+    // Widened 2026-08-29 (user-directed, "A3 交易 2NDARY REF加大加粗明顯 並檢查所有交易 2NDARY REF
+    // 加大加粗明顯") from review-mode-only to unconditional — every Function sharing this field gets the
+    // same bold/enlarged treatment as the protected LC Number readout, any time it's genuinely shown.
+    it('gains the tb-natural-key--emphasized class whenever visible — a normal Submit (A3/A2/etc.), not just Fix/Delete Pending review', () => {
+      const secondaryRef = fieldByKey(buildFields(baseCtx({ dynamicSecondaryRefLabel: 'IB Number' })), 'secondaryRef');
+      expect(secondaryRef.className).toContain('tb-natural-key--emphasized');
+    });
+
+    it('gains the tb-natural-key--emphasized class during Fix Pending review too', () => {
+      const secondaryRef = fieldByKey(
+        buildFields(baseCtx({ dynamicSecondaryRefLabel: 'Amendment No.', fixPendingMode: true })),
+        'secondaryRef',
+      );
+      expect(secondaryRef.className).toContain('tb-natural-key--emphasized');
+    });
+
+    it('has no tb-natural-key--emphasized class when hidden (no dynamicSecondaryRefLabel)', () => {
+      const secondaryRef = fieldByKey(buildFields(baseCtx({ fixPendingMode: true })), 'secondaryRef');
+      expect(secondaryRef.className ?? '').not.toContain('tb-natural-key--emphasized');
+    });
   });
 
   describe('Tenor Type / Tenor Days fields', () => {
@@ -397,6 +479,37 @@ describe('builder-fields', () => {
       const ctx = baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND' } });
       expect(fieldByKey(buildFields(ctx), 'tenorType').hide).toBe(true);
       expect(fieldByKey(buildFields(ctx), 'tenorDays').hide).toBe(true);
+    });
+
+    // 2026-08-28, "Tenor Type 改的不對 應該跟Currency欄位一樣 是輸入欄位但是PROTECTED for B2-B7 A2 - A11" —
+    // supersedes an earlier, incorrect read-only-card-only attempt at the same requirement. Tenor Days is
+    // deliberately NOT part of this — only Tenor Type itself was requested, and Tenor Days has no
+    // equivalent "genuinely carried, once shown always meaningful" story for non-tenorTypeOptions
+    // functions (it stays hidden here, same as before).
+    it('shows Tenor Type as a carried, protected select once MakerPanelComponent.applyCarriedContractFields() has written model.tenorType, for a function with no tenorTypeOptions of its own (A2)', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', tenorType: 'SELLERS_USANCE' },
+        selectedContract: contract({ instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE' }),
+      });
+      const tenorType = fieldByKey(buildFields(ctx), 'tenorType');
+      expect(tenorType.hide).toBe(false);
+      expect(tenorType.type).toBe('select');
+      expect(tenorType.props?.disabled).toBe(true);
+      expect(tenorType.props?.label).toBe('Tenor Type (carried from the existing record, protected)');
+      expect(tenorType.props?.options).toEqual([{ value: 'SELLERS_USANCE', label: "Seller's Usance" }]);
+      // Tenor Days stays hidden/untouched — this requirement is Tenor Type only.
+      expect(fieldByKey(buildFields(ctx), 'tenorDays').hide).toBe(true);
+    });
+
+    it('formats the carried Tenor Type via the Export-side label table for a B-series function (B2)', () => {
+      const ctx = baseCtx({
+        selectedFunction: fn('B2'),
+        model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', tenorType: 'SELLERS_USANCE' },
+        selectedContract: contract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE' }),
+      });
+      const tenorType = fieldByKey(buildFields(ctx), 'tenorType');
+      expect(tenorType.props?.options).toEqual([{ value: 'SELLERS_USANCE', label: 'Usance' }]); // Export side labels SELLERS_USANCE as plain "Usance"
     });
 
     it('are visible and editable for A1 before a parent/tenor is resolved', () => {

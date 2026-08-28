@@ -16,6 +16,7 @@ import { deriveFunctionStrategy } from './function-strategy';
  */
 
 const A6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6')!;
+const A4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!;
 const B4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4')!;
 const B5 = EXPORT_FUNCTIONS.find((f) => f.code === 'B5')!;
 
@@ -146,7 +147,11 @@ describe('PickerSelectionService', () => {
   });
 
   describe('loadPayableMovements — B4 cross-contract, no matching child contracts at all', () => {
-    it('clears payableMovements and does not attempt to fetch any movements when the catalog search returns zero candidates', () => {
+    // Bug fixed 2026-08-29 ("B4 還可以選同一筆 再SUBMIT") — the parent Confirmation's own movements are
+    // now ALWAYS fetched in parallel with the child catalog search (needed to know which B3 candidates
+    // already have a live PENDING B4 attempt referencing them), so listMovementsSpy IS called once now —
+    // for the parent contractId — even when the child catalog search itself returns zero candidates.
+    it('clears payableMovements when the catalog search returns zero candidates, still fetching the parent\'s own movements for the referenced-candidate exclusion', () => {
       const listMovementsSpy = jest.fn(() => of([] as BalanceMovement[]));
       const svc = new PickerSelectionService(
         makeApi({
@@ -166,7 +171,8 @@ describe('PickerSelectionService', () => {
       });
       expect(svc.payableMovementsLoading).toBe(false);
       expect(svc.payableMovements).toEqual([]);
-      expect(listMovementsSpy).not.toHaveBeenCalled();
+      expect(listMovementsSpy).toHaveBeenCalledWith('confirmation-1');
+      expect(listMovementsSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -211,6 +217,69 @@ describe('PickerSelectionService', () => {
       expect(svc.payableMovements[0].sourceTransactionRef).toBe('E03');
       expect(captured).not.toBeNull();
       expect(captured!.selectedPayMovement?.movementId).toBe('mv-genuine');
+    });
+
+    // Bug fixed 2026-08-29 (live-reported, "B4 S02 E01 Submit -> Maker Queue (看不到) -> B4 還可以選同一筆
+    // 再SUBMIT sourceTransactionRef 'E01' is already used...") — unlike A4/A6 (excluded via their own
+    // makerSubmittedAt on the SAME referenced movement), B4's own HONOUR/ACCEPT is a separate movement
+    // referencing the B3 CREATE via referencedTransactionId; a still-PENDING (not yet Released/Rejected/
+    // Cancelled) prior B4 attempt left the SAME B3 presentation fully re-pickable, so a second Submit hit
+    // the server's own duplicate-sourceTransactionRef guard.
+    it('excludes a B3 presentation already referenced by a still-PENDING parent movement (a prior unresolved B4 attempt)', () => {
+      const alreadyAttempted = contract({ balanceContractId: 'exam-attempted', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E01' } });
+      const genuine = contract({ balanceContractId: 'exam-genuine', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E02' } });
+      const svc = new PickerSelectionService(
+        makeApi({
+          catalog: jest.fn(() => of({ items: [alreadyAttempted, genuine], total: 2, page: 1, pageSize: 50 })),
+          listMovements: jest.fn((contractId: string) => {
+            if (contractId === 'confirmation-1') {
+              // The parent Confirmation's own movements — a still-PENDING HONOUR already references
+              // 'mv-attempted' (the B3 CREATE under exam-attempted/E01).
+              return of([movement({ movementId: 'mv-honour-pending', movementType: 'HONOUR', status: 'PENDING', referencedTransactionId: 'mv-attempted' })]);
+            }
+            if (contractId === 'exam-attempted') {
+              return of([movement({ movementId: 'mv-attempted', movementType: 'CREATE', status: 'RELEASED', sourceTransactionRef: null })]);
+            }
+            return of([movement({ movementId: 'mv-genuine', movementType: 'CREATE', status: 'RELEASED', sourceTransactionRef: null })]);
+          }) as any,
+        }),
+      );
+      svc.loadPayableMovements({
+        contractId: 'confirmation-1',
+        lcNumber: 'S001',
+        selectedFunction: B4,
+        selectedFunctionStrategy: deriveFunctionStrategy(B4),
+        onAutoPicked: () => {
+          throw new Error('should not auto-pick — more than one candidate remains only if the exclusion failed');
+        },
+      });
+      expect(svc.payableMovements.map((m) => m.movementId)).toEqual(['mv-genuine']);
+    });
+
+    it('does NOT exclude a B3 presentation whose prior B4 attempt was REJECTED/CANCELLED — re-picking after Delete Pending must keep working', () => {
+      const retried = contract({ balanceContractId: 'exam-retried', instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'S001', ibNumber: 'E01' } });
+      const svc = new PickerSelectionService(
+        makeApi({
+          catalog: jest.fn(() => of({ items: [retried], total: 1, page: 1, pageSize: 50 })),
+          listMovements: jest.fn((contractId: string) => {
+            if (contractId === 'confirmation-1') {
+              // The prior B4 attempt was Delete-Pending'd (CANCELLED) — no longer PENDING, so it must not block a re-pick.
+              return of([movement({ movementId: 'mv-honour-cancelled', movementType: 'HONOUR', status: 'CANCELLED', referencedTransactionId: 'mv-retried' })]);
+            }
+            return of([movement({ movementId: 'mv-retried', movementType: 'CREATE', status: 'RELEASED', sourceTransactionRef: null })]);
+          }) as any,
+        }),
+      );
+      let captured: ReturnType<PickerSelectionService['selectPayMovement']> | null = null;
+      svc.loadPayableMovements({
+        contractId: 'confirmation-1',
+        lcNumber: 'S001',
+        selectedFunction: B4,
+        selectedFunctionStrategy: deriveFunctionStrategy(B4),
+        onAutoPicked: (outcome) => (captured = outcome),
+      });
+      expect(svc.payableMovements.map((m) => m.movementId)).toEqual(['mv-retried']);
+      expect(captured).not.toBeNull();
     });
   });
 
@@ -345,6 +414,39 @@ describe('PickerSelectionService', () => {
         },
       });
       expect(svc.payableMovements).toEqual([]);
+    });
+  });
+
+  // Bug fixed 2026-08-28 (live-reported, "A4 沒抓到2ndary number(IB number?)" — the protected-natural-key
+  // card's new A4-only IB Number line showed "—" instead of the picked record's own reference): before
+  // this fix, `selectPayMovement()`'s field-population block was gated on `settlesDocumentArrival` only
+  // (A6/B4) — A4's own `releasesExistingMovementInPlace` shape fell through to ONLY `clearsSubmitResult`,
+  // never populating `modelAmount`/`modelSecondaryRef` at all. Masked previously because A4's own template
+  // read `pickerSelection.selectedPayMovement` directly, bypassing `model` — once that bespoke readout was
+  // replaced with the generic, `model`-driven Amount field + protected-card IB Number line (same session,
+  // "A4 銀幕改成配置方式"), the gap became visible.
+  describe('A4 (releasesExistingMovementInPlace) — selectPayMovement() now populates modelAmount/modelSecondaryRef', () => {
+    it('sets modelAmount/modelSecondaryRef (but NOT naturalKeyIbNumber, which only A6/B4 need) even with no secondaryRefLabel at all', () => {
+      const svc = new PickerSelectionService(
+        makeApi({
+          listMovements: jest.fn(() => of([movement({ movementId: 'only-one', sourceTransactionRef: 'B01', amount: '30000', acknowledgedAt: '2026-08-20T00:00:00.000Z' })])),
+        }),
+      );
+      let captured: ReturnType<PickerSelectionService['selectPayMovement']> | null = null;
+      svc.loadPayableMovements({
+        contractId: 'lc-1',
+        lcNumber: 'S04',
+        selectedFunction: A4,
+        selectedFunctionStrategy: deriveFunctionStrategy(A4),
+        onAutoPicked: (outcome) => (captured = outcome),
+      });
+      expect(captured).not.toBeNull();
+      expect(captured!.selectedPayMovement?.movementId).toBe('only-one');
+      expect(captured!.modelAmount).toBe('30000');
+      expect(captured!.modelSecondaryRef).toBe('B01');
+      expect(captured!.naturalKeyIbNumber).toBeUndefined(); // A4 creates nothing — no natural key of its own to populate
+      expect(captured!.needsRebuildFields).toBe(true);
+      expect(captured!.clearsSubmitResult).toBe(true);
     });
   });
 

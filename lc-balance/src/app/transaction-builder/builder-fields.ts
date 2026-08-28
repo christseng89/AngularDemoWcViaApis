@@ -1,8 +1,8 @@
 import { FormlyFieldConfig } from '@ngx-formly/core';
 import { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
-import { CURRENCY_OPTIONS, TransactionFunction, decimalPlacesForCurrency } from './balance-component.model';
+import { CURRENCY_OPTIONS, TransactionFunction, decimalPlacesForCurrency, tenorTypeLabel } from './balance-component.model';
 import { BuilderModel, carriedCurrency, hasParent, isCreatingMovement, toleranceApplicable } from './function-policy';
-import { deriveFunctionStrategy } from './function-strategy';
+import { FixPendingEditableField, deriveFunctionStrategy, functionSupportsFixPending } from './function-strategy';
 
 /**
  * BAL-003 (God Component) — the Transaction Builder's own Formly field factory, extracted from
@@ -19,6 +19,87 @@ export interface BuilderFieldsContext {
   selectedContractSnapshot: BalanceSnapshot | null;
   selectedParent: BalanceContract | null;
   dynamicSecondaryRefLabel: string | null;
+  /**
+   * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+   * 2026-08-27; UX redesign per direct user feedback; shared-derivation redesign 2026-08-28, "頁面配置檔
+   * 原先輸入或FIX PENDING可共用" — user-confirmed SOLID/DRY direction) — true while
+   * `MakerPanelComponent.fixPendingMode` is showing this same screen in an editable state for an
+   * existing PENDING/REJECTED record, rather than a fresh Submit. `secondaryRef`/`currency` are ALWAYS
+   * force-disabled while this is true, unconditionally — per §15, the movement's own business "2ndary
+   * Key" (`secondaryRef`) and Currency can never be changed via Fix Pending by ANY Function, so neither
+   * is even expressible in `FixPendingEditableField` (`function-strategy.ts`) at all. Every other
+   * Fix-Pending-relevant field (`amount`/`tolerancePct`/`tenorType`/`tenorDays`/`expiryDate`/
+   * `newExpiryDate`/`reasonCode`) is instead gated per-field via `deriveFixPendingLockFlags()`/
+   * `isFixPendingFieldEditable()` below — DERIVED from the SAME lock flags this function already
+   * computes for a fresh Submit (`amountLocked`/`tenorLocked`), not a second, separately-declared list —
+   * see those functions' own doc comments for the two Fix-Pending-specific facts layered on top.
+   */
+  fixPendingMode?: boolean;
+}
+
+/**
+ * Fix Pending field-level editability (2026-08-28, "頁面配置檔原先輸入或FIX PENDING可共用" — shares the
+ * exact same lock flags `buildFields()` already computes for a fresh Submit, rather than maintaining a
+ * second, independently-declared per-Function list): a field locked/carried at original Submit
+ * (`amountLocked`/`tenorLocked`) stays locked in Fix Pending too, and a field free-typed/shown at
+ * original Submit becomes Fix-Pending-editable automatically — extending Fix Pending to a new Function's
+ * already-correct Submit-time field behavior therefore needs zero change here. `reasonCode`/
+ * `newExpiryDate` similarly reuse `requiresReasonCode`/`isAmendExpiryDate` — the exact conditions
+ * `buildFields()` already uses to decide whether those two fields are even SHOWN at original Submit (a
+ * field never shown at Submit has nothing for Fix Pending to correct either). Two Fix-Pending-SPECIFIC
+ * facts have no original-Submit equivalent to derive from, so they're layered on top explicitly: (1)
+ * `functionSupportsFixPending()` — the trial-scope opt-in gate (`FunctionStrategy.fixPendingEnabled`,
+ * A1/A2/A3/B1 today — widened from A1/A3 2026-08-28, "把這A1 A3 修改要求放置B1 A2試試看", zero
+ * derivation change needed here, only the per-Function registry flag itself); (2) the 4 CONTRACT-level
+ * fields (`tolerancePct`/`tenorType`/`tenorDays`/`expiryDate`)
+ * additionally require `isCreatingMovement(model)` — §19: a still-PENDING/REJECTED CREATING movement
+ * owns the contract it just created exclusively (see `BalanceContractStore.updateIssueFields()`'s own
+ * doc comment on the microservice side), a non-creating movement's contract is shared history it never
+ * owned, so those 4 fields stay locked regardless of whether they'd otherwise derive as free-typed.
+ */
+function deriveFixPendingLockFlags(
+  ctx: BuilderFieldsContext,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+  amountLocked: boolean,
+  tenorLocked: boolean,
+  requiresReasonCode: boolean,
+  isAmendExpiryDate: boolean,
+): Record<FixPendingEditableField, boolean> {
+  const fixPendingModeOn = !!ctx.fixPendingMode;
+  const enabled = fixPendingModeOn && functionSupportsFixPending(strategy);
+  const contractLevelEditable = enabled && isCreatingMovement(ctx.model);
+  return {
+    amount: enabled && amountLocked,
+    // tolerancePct is a deliberate exception to the shared contractLevelEditable rule below (2026-08-28,
+    // "A2 Tolerance % FIX PENDING INCREASE/DECREASE時准許修改") — unlike tenorType/tenorDays/expiryDate,
+    // Tolerance is ALSO genuinely applicable to a non-creating AMEND_INCREASE/AMEND_DECREASE/AMEND edit
+    // (toleranceApplicable(ctx.model), the SAME check already gating whether this field is even SHOWN —
+    // see that field's own `hide` a few lines below), not exclusively a creating-movement-owns-the-
+    // contract fact. User-confirmed scope: the edited value only affects THIS movement's own
+    // ceilingAmount/contingentAccountEntry, never the contract's own stored tolerancePct — see
+    // balanceService.ts's own buildEditedRequest() doc comment for the server-side half of this.
+    tolerancePct: enabled && !toleranceApplicable(ctx.model),
+    tenorType: enabled && (tenorLocked || !contractLevelEditable),
+    tenorDays: enabled && (tenorLocked || !contractLevelEditable),
+    expiryDate: enabled && !contractLevelEditable,
+    newExpiryDate: fixPendingModeOn && (!enabled || !isAmendExpiryDate),
+    reasonCode: fixPendingModeOn && (!enabled || !requiresReasonCode),
+  };
+}
+
+/**
+ * Public entry point for a caller outside `buildFields()` itself (`MakerPanelComponent.
+ * confirmFixPending()`, deciding which fields to include in the outgoing Fix Pending patch) that needs
+ * to know whether ONE field is currently Fix-Pending-editable, without duplicating
+ * `deriveFixPendingLockFlags()`'s own derivation logic.
+ */
+export function isFixPendingFieldEditable(ctx: BuilderFieldsContext, field: FixPendingEditableField): boolean {
+  const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
+  const { amountLocked } = deriveAmountLockFlags(ctx, strategy);
+  const tenorLocked = !!ctx.selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(ctx.model) && hasParent(ctx.model) && !!ctx.selectedParent;
+  const requiresReasonCode = !!ctx.selectedFunction?.requiresCloseEligibility || !!ctx.selectedFunction?.requiresReopenEligibility;
+  const isAmendExpiryDate = ctx.model.movementType === 'AMEND_EXPIRY_DATE';
+  return !deriveFixPendingLockFlags(ctx, strategy, amountLocked, tenorLocked, requiresReasonCode, isAmendExpiryDate)[field];
 }
 
 /**
@@ -36,7 +117,15 @@ function deriveAmountLockFlags(ctx: BuilderFieldsContext, strategy: ReturnType<t
   // `movementType: 'FULL_SETTLE'` only as a placeholder (the real value is DERIVED at submit() time,
   // same as A9's `autoRedeemType`) — without this exclusion the shared literal wrongly matched B5 too,
   // locking its Amount field and pre-empting the correct amountCappedAtAcceptance rule below.
-  const amountFromDocArrival = !!strategy?.checkerRelease.settlesDocumentArrival && !!ctx.selectedPayMovement;
+  //
+  // 2026-08-28 ("A4 銀幕改成配置方式" — mirror A1/A2's own config-driven screen) — also covers A4
+  // (`releasesExistingMovementInPlace`): A4's own Amount is likewise carried from the SAME picked
+  // `ctx.selectedPayMovement` (via `applyPayMovementOutcome()`'s `modelAmount` assignment, shared code
+  // with A6) — it had never been folded into this shared derivation before, so A4's own template used to
+  // duplicate this exact same "carried from the Document Arrival, protected" fact in a bespoke
+  // `tb-balance-box` readout instead of the generic Amount field every other carried-Amount Function uses.
+  const amountFromDocArrival =
+    (!!strategy?.checkerRelease.settlesDocumentArrival || !!strategy?.checkerRelease.releasesExistingMovementInPlace) && !!ctx.selectedPayMovement;
   const amountFromFullSettle =
     strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
   // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
@@ -83,7 +172,7 @@ function amountFieldLabel(
 ): string {
   if (flags.amountFromFullSettle) return "Amount (Full Settle — carried from the Acceptance's Available Balance, protected)";
   if (flags.amountFromSgRedeem) {
-    return "Amount (Full Redeem only — carried from the Shipping Guarantee's Available Balance, protected; Partial Redeem is no longer supported here)";
+    return "Amount (Full Redeem — carried from the SG's Available Balance, protected)";
   }
   if (flags.amountCappedAtAcceptance) {
     return "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)";
@@ -113,10 +202,29 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // captured server-side from config, never a client-side field.
   const showsExpiryDateInput = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
   const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
+  // 2026-08-28, "Tenor Type 改的不對 應該跟Currency欄位一樣 是輸入欄位但是PROTECTED for B2-B7 A2 - A11" —
+  // every Function WITHOUT tenorTypeOptions of its own (A1/B1 choose it freely; A6 has its own dedicated
+  // tenorLocked-driven field above) now also shows Tenor Type, carried from the resolved contract
+  // (MakerPanelComponent.applyCarriedContractFields() writes it into model.tenorType at the same call
+  // sites carriedCurrency already fires from — this function just reads it, same as Currency).
+  const tenorTypeCarried = !tenorLocked && !selectedFunction?.tenorTypeOptions?.length && !!model.tenorType;
   // A1/B1 = Input; every other function = carry from A1/B1 + protected — see carriedCurrency (function-policy.ts).
   const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
   // A1/B1 only — the only functions where Currency is actually being chosen (currencyLocked is always false for them).
   const currencyIsDropdown = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
+  // secondaryRef/currency are unconditionally locked whenever Fix Pending is active, regardless of which
+  // Function is selected — see BuilderFieldsContext.fixPendingMode's own doc comment (§15: never
+  // expressible in FixPendingEditableField at all). Every other Fix-Pending-relevant field below instead
+  // reads deriveFixPendingLockFlags()'s own per-field result, shared with isFixPendingFieldEditable().
+  const fixPendingLocked = !!ctx.fixPendingMode;
+  const fixPendingFlags = deriveFixPendingLockFlags(ctx, strategy, amountLocked, tenorLocked, requiresReasonCode, isAmendExpiryDate);
+  const amountFixPendingLocked = fixPendingFlags.amount;
+  const tolerancePctFixPendingLocked = fixPendingFlags.tolerancePct;
+  const tenorTypeFixPendingLocked = fixPendingFlags.tenorType;
+  const tenorDaysFixPendingLocked = fixPendingFlags.tenorDays;
+  const expiryDateFixPendingLocked = fixPendingFlags.expiryDate;
+  const newExpiryDateFixPendingLocked = fixPendingFlags.newExpiryDate;
+  const reasonCodeFixPendingLocked = fixPendingFlags.reasonCode;
 
   const fields: FormlyFieldConfig[] = [
     // Must be the first field on the entry screen (Amendment No. for A2/B2, IB Number for A3/A3S, EB
@@ -124,17 +232,37 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
     {
       key: 'secondaryRef',
       type: 'input',
-      props: { label: ctx.dynamicSecondaryRefLabel ?? 'Reference No.', required: !!ctx.dynamicSecondaryRefLabel },
+      // 2026-08-28, "2NDARY NUMBER在FIX PENDING or DELETE PENDING顯示要求與LC NUMBER一樣" — same bold/
+      // enlarged emphasis the protected LC Number/2ndary readout (maker-panel.component.html) gives
+      // every other function's own natural key, applied here too since THIS field is the "2ndary Ref"
+      // for a Function that doesn't use the two-field-search natural key (A2/B2 Amendment No., A3/A3S
+      // IB Number, B4 EB Number, etc.) — already genuinely protected either way (toReadOnlyFields()
+      // forces every field disabled whenever fieldsLocked, independent of this field's own `disabled`
+      // prop below), this only adds the matching visual treatment.
+      //
+      // Widened 2026-08-29 (user-directed, "A3 交易 2NDARY REF加大加粗明顯") from review-mode-only to
+      // unconditional — same "genuinely typed natural-key input gets this treatment always, not just
+      // during Fix/Delete Pending review" posture A1/B1's own LC Number input already has. Config-driven
+      // (`ctx.dynamicSecondaryRefLabel` alone, not per-function), so every Function sharing this field
+      // (A2/A3/A3S/B2/B4/etc.) gets it uniformly.
+      className: ctx.dynamicSecondaryRefLabel ? 'tb-natural-key--emphasized' : undefined,
+      props: {
+        label: fixPendingLocked ? `${ctx.dynamicSecondaryRefLabel ?? 'Reference No.'} (locked — Fix Pending cannot change the 2ndary Key)` : (ctx.dynamicSecondaryRefLabel ?? 'Reference No.'),
+        required: !!ctx.dynamicSecondaryRefLabel,
+        disabled: fixPendingLocked,
+      },
       hide: !ctx.dynamicSecondaryRefLabel,
     },
     {
       key: 'amount',
       type: 'input',
       props: {
-        label: amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
+        label: amountFixPendingLocked
+          ? 'Amount (not editable via Fix Pending for this Function)'
+          : amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
         required: !isAmendExpiryDate && !amountFromFixed,
         type: 'number',
-        disabled: amountLocked,
+        disabled: amountLocked || amountFixPendingLocked,
         max: amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
         // Smallest representable positive value for the typed Currency — refuses 0/negative before the
         // real submit-time backstop (validateSubmit()'s "Amount must be greater than 0.").
@@ -164,7 +292,12 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // (see BalanceComponentApiService.CreateMovementRequest.newExpiryDate's own doc comment).
       key: 'newExpiryDate',
       type: 'input',
-      props: { label: 'New Expiry Date', type: 'date', required: isAmendExpiryDate },
+      props: {
+        label: newExpiryDateFixPendingLocked ? 'New Expiry Date (not editable via Fix Pending for this Function)' : 'New Expiry Date',
+        type: 'date',
+        required: isAmendExpiryDate,
+        disabled: newExpiryDateFixPendingLocked,
+      },
       hide: !isAmendExpiryDate,
     },
     // F1 — A1/B1 only. The LC's own UCP 600 Art.6(d) expiry/validity date; mailFloatGraceDays itself is
@@ -176,7 +309,12 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
     {
       key: 'expiryDate',
       type: 'input',
-      props: { label: 'Expiry Date (UCP 600 Art.6(d))', type: 'date', required: showsExpiryDateInput },
+      props: {
+        label: expiryDateFixPendingLocked ? 'Expiry Date (not editable via Fix Pending for this Function)' : 'Expiry Date (UCP 600 Art.6(d))',
+        type: 'date',
+        required: showsExpiryDateInput,
+        disabled: expiryDateFixPendingLocked,
+      },
       hide: !showsExpiryDateInput,
     },
     {
@@ -187,7 +325,11 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // reaches this UI at all.
       key: 'reasonCode',
       type: 'input',
-      props: { label: 'Reason Code', required: requiresReasonCode },
+      props: {
+        label: reasonCodeFixPendingLocked ? 'Reason Code (not editable via Fix Pending for this Function)' : 'Reason Code',
+        required: requiresReasonCode,
+        disabled: reasonCodeFixPendingLocked,
+      },
       hide: !requiresReasonCode,
     },
     {
@@ -195,37 +337,71 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // Reuses the same Formly `type: 'select'` pattern the Tenor Type field uses below.
       type: currencyIsDropdown ? 'select' : 'input',
       props: {
-        label: currencyLocked ? 'Currency (carried from the existing record, protected)' : 'Currency',
+        label: fixPendingLocked
+          ? 'Currency (locked — Fix Pending can never change Currency, see §15)'
+          : currencyLocked
+            ? 'Currency (carried from the existing record, protected)'
+            : 'Currency',
         required: true,
-        disabled: currencyLocked,
+        disabled: currencyLocked || fixPendingLocked,
         ...(currencyIsDropdown ? { options: CURRENCY_OPTIONS } : {}),
       },
     },
     {
       key: 'tolerancePct',
       type: 'input',
-      props: { label: 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)', type: 'number' },
+      props: {
+        label: tolerancePctFixPendingLocked
+          ? 'Tolerance % (not editable via Fix Pending for this Function)'
+          : 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)',
+        type: 'number',
+        disabled: tolerancePctFixPendingLocked,
+      },
       hide: !toleranceApplicable(model),
     },
     {
       key: 'tenorType',
+      // Always rendered as a `select` — even the carried (non-tenorTypeOptions) case, since Tenor Type's
+      // own raw enum values ('SELLERS_USANCE' etc.) aren't human-readable on their own the way Currency's
+      // ISO codes already are; a single-option select shows the real formatted label instead.
       type: 'select',
       props: {
-        label: tenorLocked ? 'Tenor Type (carried from the parent LC, protected)' : 'Tenor Type (Design doc §7 Tenor Type Routing)',
+        label: tenorTypeFixPendingLocked
+          ? 'Tenor Type (not editable via Fix Pending for this Function)'
+          : tenorLocked
+            ? 'Tenor Type (carried from the parent LC, protected)'
+            : tenorTypeCarried
+              ? 'Tenor Type (carried from the existing record, protected)'
+              : 'Tenor Type (Design doc §7 Tenor Type Routing)',
         required: !!selectedFunction?.tenorTypeOptions?.length,
-        options: selectedFunction?.tenorTypeOptions ?? [],
-        disabled: tenorLocked,
+        options: selectedFunction?.tenorTypeOptions?.length
+          ? selectedFunction.tenorTypeOptions
+          : model.tenorType
+            ? [{ value: model.tenorType, label: tenorTypeLabel(model.tenorType, selectedFunction?.side ?? 'IMPORT') }]
+            : [],
+        disabled: tenorLocked || tenorTypeFixPendingLocked || tenorTypeCarried,
       },
-      hide: !selectedFunction?.tenorTypeOptions?.length,
+      hide: !selectedFunction?.tenorTypeOptions?.length && !tenorTypeCarried,
     },
     {
       key: 'tenorDays',
       type: 'input',
-      props: { label: tenorLocked ? 'Tenor Days (carried from the parent LC, protected)' : 'Tenor Days', type: 'number', disabled: tenorLocked },
+      props: {
+        label: tenorDaysFixPendingLocked
+          ? 'Tenor Days (not editable via Fix Pending for this Function)'
+          : tenorLocked
+            ? 'Tenor Days (carried from the parent LC, protected)'
+            : 'Tenor Days',
+        type: 'number',
+        disabled: tenorLocked || tenorDaysFixPendingLocked,
+      },
       hide: !selectedFunction?.tenorTypeOptions?.length,
       // A1/B1: Sight => Tenor Days = 0, protected; not Sight => must be > 0. Uses Formly's live
-      // `expressions` rather than a full field rebuild, to avoid input-focus loss.
-      ...((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !tenorLocked
+      // `expressions` rather than a full field rebuild, to avoid input-focus loss. Excluded (same as
+      // the existing !tenorLocked guard) when tenorDaysFixPendingLocked — a live `props.disabled`
+      // expression re-evaluates every change-detection cycle and would otherwise fight/override the
+      // static `disabled: true` set above.
+      ...((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !tenorLocked && !tenorDaysFixPendingLocked
         ? {
             expressions: {
               'props.disabled': (f: any) => f.model?.tenorType === 'SIGHT',

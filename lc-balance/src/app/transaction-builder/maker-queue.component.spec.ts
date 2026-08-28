@@ -86,4 +86,38 @@ describe('MakerQueueComponent', () => {
       expect(c.deletePendingLabel(rejectedRow)).toMatch(/Delete Pending \(A4\)/);
     });
   });
+
+  // 2026-08-28, "Maker Queue Need to provide Fix Pending button as well" — this @Output() itself has no
+  // gating logic of its own (that lives in MakerQueueService.fixPendingSupported(), already covered by
+  // maker-queue.service.spec.ts); the template's own `*ngIf` wiring is verified via `ng build`'s strict-
+  // template check plus a live pass. This just proves the emitter carries the clicked row through intact.
+  describe('fixPendingRequested', () => {
+    it('emits the exact row it was given', () => {
+      const c = new MakerQueueComponent();
+      const row = { movement: makeMovement(), contract: makeContract() };
+      let emitted: unknown = null;
+      c.fixPendingRequested.subscribe((r) => (emitted = r));
+
+      c.fixPendingRequested.emit(row);
+
+      expect(emitted).toBe(row);
+    });
+  });
+
+  // 2026-08-28, "Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否" — clicking Delete Pending no
+  // longer calls MakerQueueService.deletePending() directly (see the template's own updated doc comment);
+  // it now emits the row for the parent to open a review screen with. Same shape/reasoning as
+  // fixPendingRequested above.
+  describe('deletePendingRequested', () => {
+    it('emits the exact row it was given', () => {
+      const c = new MakerQueueComponent();
+      const row = { movement: makeMovement(), contract: makeContract() };
+      let emitted: unknown = null;
+      c.deletePendingRequested.subscribe((r) => (emitted = r));
+
+      c.deletePendingRequested.emit(row);
+
+      expect(emitted).toBe(row);
+    });
+  });
 });

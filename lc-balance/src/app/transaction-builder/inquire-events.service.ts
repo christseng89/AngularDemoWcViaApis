@@ -367,6 +367,21 @@ function deriveLcAmount(rootEvents: readonly InquiredEvent[]): string {
 }
 
 /**
+ * Inquire Delete Pending's own "LC Amount" (business-directed 2026-08-29, "比較USER FRIENDLY") — the
+ * typed/input face amount of the contract's own root/creating movement (`ISSUE`), unconditional on
+ * status. `deriveLcAmount()` above is RELEASED-only, correct for Inquire Events (reflects confirmed
+ * exposure) but wrong for Delete Pending's own catalog: its whole point is a transaction that was
+ * CANCELLED before ever being released, so the RELEASED-only figure is always `"0"` there — telling a
+ * reviewer nothing about what was actually typed. A contract has exactly one creating movement
+ * (`ISSUE`, for both IPLC_LC/EPLC_LC and EPLC_CONFIRMATION) — its own `amount` is genuinely what the
+ * Maker typed. Falls back to `"0"` only if no ISSUE is found at all (should not happen in practice —
+ * every contract this catalog lists was created by one).
+ */
+function deriveLcInputAmount(rootMovements: readonly BalanceMovement[]): string {
+  return rootMovements.find((m) => m.movementType === 'ISSUE')?.amount ?? '0';
+}
+
+/**
  * One catalog row's own Face Amount/Available Balance/Last Event Date (+ closingPending) — module-level,
  * not a private method, so `InquireDeletePendingService`'s own LC Catalog step (via
  * `LcCatalogIndexService`'s `decorate` hook) can share this exact computation instead of duplicating it
@@ -375,21 +390,53 @@ function deriveLcAmount(rootEvents: readonly InquiredEvent[]): string {
  * template only displays a subset of this shape's fields (LC Number/Tenor Type/Currency/LC Amount/Last
  * Event Date/Time — no Available Balance/Status/closingPending) — cheaper to share one computation than
  * maintain two overlapping ones for a screen that just ignores the fields it doesn't need.
+ *
+ * `amountSource` (business-directed 2026-08-29, "比較USER FRIENDLY") — the one field whose semantics
+ * genuinely diverge between the two callers: `'released'` (default, InquireEventsService's own catalog)
+ * sums only confirmed/RELEASED face amount via `deriveLcAmount()`; `'input'`
+ * (InquireDeletePendingService) shows the typed/input amount via `deriveLcInputAmount()` instead, since
+ * a Delete Pending row's whole point is a transaction cancelled before ever being released — the
+ * RELEASED-only figure is always `"0"` there.
  */
-export function computeLcIndexRow(api: BalanceComponentApiService, contract: BalanceContract, side: 'IMPORT' | 'EXPORT'): Observable<LcIndexRow> {
+export function computeLcIndexRow(
+  api: BalanceComponentApiService,
+  contract: BalanceContract,
+  side: 'IMPORT' | 'EXPORT',
+  amountSource: 'released' | 'input' = 'released',
+): Observable<LcIndexRow> {
   const childTypes = childInstrumentTypesOf(contract.instrumentType);
   return forkJoin({
     snapshot: api.getSnapshot(contract.balanceContractId).pipe(catchError(() => of(null))),
-    root: movementsOf$(api, contract),
+    rootMovements: api.listMovements(contract.balanceContractId).pipe(catchError(() => of([] as BalanceMovement[]))),
     children: childTypes.length
       ? forkJoin(childTypes.map((childType) => childMovementsOf$(api, childType, contract.naturalKey.lcNumber)))
       : of([] as InquiredEvent[][]),
   }).pipe(
-    map(({ snapshot, root, children }) => {
+    map(({ snapshot, rootMovements, children }) => {
+      const root = rootMovements.flatMap((movement) => toEventRows(movement, contract));
       const allEvents = [...root, ...children.flat()];
-      const lastEventAt = allEvents.length
+      const displayLastEventAt = allEvents.length
         ? allEvents.reduce((latest, e) => (new Date(e.eventTime).getTime() > new Date(latest).getTime() ? e.eventTime : latest), allEvents[0].eventTime)
         : null;
+      // Inquire Delete Pending's own LC Catalog (via this same shared function) passes contracts whose
+      // ONLY activity is a CANCELLED root movement — toEventRows() deliberately excludes CANCELLED from
+      // the true Event Timeline (see its own doc comment), which would otherwise leave `root`/`allEvents`
+      // empty and Last Event Date/Time blank even though a real Delete Pending action clearly happened.
+      // Falls back to the raw movement list's own timestamp (never filtered by toEventRows()) so this
+      // column is never blank for a contract this specific catalog exists to surface. A no-op for every
+      // OTHER caller (InquireEventsService's own catalog never passes a CANCELLED contract to begin with).
+      const rawLastEventAt = rootMovements.length
+        ? rootMovements.reduce((latest: string, m) => {
+            const t = m.cancelledAt ?? m.releasedAt ?? m.createdAt;
+            return new Date(t).getTime() > new Date(latest).getTime() ? t : latest;
+          }, rootMovements[0]!.cancelledAt ?? rootMovements[0]!.releasedAt ?? rootMovements[0]!.createdAt)
+        : null;
+      const lastEventAt =
+        displayLastEventAt && rawLastEventAt
+          ? new Date(displayLastEventAt).getTime() >= new Date(rawLastEventAt).getTime()
+            ? displayLastEventAt
+            : rawLastEventAt
+          : (displayLastEventAt ?? rawLastEventAt);
       // A10/B6 Close is always a ROOT-level movement (see closeEligibility.ts — only IPLC_LC/EPLC_LC/
       // EPLC_CONFIRMATION are eligible) — checking `root` alone, not `allEvents`, is correct and cheaper.
       const closingPending = root.some((e) => e.movement.movementType === 'CLOSE' && e.eventStatus === 'PENDING');
@@ -397,7 +444,7 @@ export function computeLcIndexRow(api: BalanceComponentApiService, contract: Bal
         contract,
         currency: contract.currency,
         tenorType: tenorTypeLabel(contract.tenorType, side),
-        lcAmount: deriveLcAmount(root),
+        lcAmount: amountSource === 'input' ? deriveLcInputAmount(rootMovements) : deriveLcAmount(root),
         availableBalance: snapshot ? snapshot.availableBalance : '—',
         status: contract.status,
         lastEventAt,

@@ -206,7 +206,6 @@ describe('TransactionBuilderComponent', () => {
       const { comp } = makeComponent();
       expect(comp.displayStatus('REJECTED', 'IPLC_LC', 'UTILIZE')).toBe('REJECTED');
       expect(comp.displayStatus('CANCELLED')).toBe('CANCELLED');
-      expect(comp.displayStatus('SUPERSEDED')).toBe('SUPERSEDED');
     });
 
     // A split UTILIZE's 'create' (A3) and 'finalize' (A4) rows share the same (instrumentType,
@@ -253,11 +252,10 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.statusBadgeClass('PENDING', 'IPLC_LC', 'UTILIZE')).toBe('tb-status-badge--pending');
     });
 
-    it('returns the negative class for REJECTED/CANCELLED and the neutral class for SUPERSEDED', () => {
+    it('returns the negative class for REJECTED/CANCELLED', () => {
       const { comp } = makeComponent();
       expect(comp.statusBadgeClass('REJECTED')).toBe('tb-status-badge--negative');
       expect(comp.statusBadgeClass('CANCELLED')).toBe('tb-status-badge--negative');
-      expect(comp.statusBadgeClass('SUPERSEDED')).toBe('tb-status-badge--neutral');
     });
   });
 

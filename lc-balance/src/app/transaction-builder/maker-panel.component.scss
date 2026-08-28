@@ -188,6 +188,98 @@
   }
 }
 
+// Fix Pending's own prominent mode banner (UX redesign per direct user feedback — the Maker must never
+// mistake the reconstructed original-event screen for a fresh new Submit). Amber, not the existing
+// blue/green/red palette — a genuinely distinct "you're editing, not creating" signal, same left-accent-
+// bar convention .tb-input--required already uses for emphasis.
+.tb-fix-pending-banner {
+  font-size: 13px;
+  color: var(--amber-dark);
+  background: var(--amber-bg);
+  border-left: 4px solid var(--amber);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.tb-fix-pending-actions {
+  display: flex;
+  gap: 8px;
+}
+
+// LC Number / 2ndary natural-key emphasis (`.tb-natural-key--emphasized`) moved to the global
+// src/styles.scss (next to `.tb-spinner`/`.tb-icon`) — it must reach into a `ngx-formly`-rendered
+// `.form-control` (the secondaryRef field, builder-fields.ts) whose DOM sits under a DIFFERENT
+// component's own Angular ViewEncapsulation `_ngcontent` attribute than this one, which a
+// component-scoped rule here can never match.
+
+// The protected LC Number / 2ndary readout that replaces the interactive Step 1/Step 2 pickers once a
+// Function's own target is resolved (see MakerPanelComponent.naturalKeyLocked's own doc comment) — a
+// visually distinct card (not just bold text) so it reads as "this is now fixed," not merely disabled.
+.tb-protected-natural-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  background: var(--blue-bg-soft);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+
+.tb-protected-natural-key__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tb-protected-natural-key__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-muted);
+}
+
+.tb-protected-natural-key__value {
+  // font-size/weight/color already come from the shared .tb-natural-key--emphasized class above.
+}
+
+// Wraps the MAKER RESULT panel's Delete Pending (EC) / Fix Pending / A4's own Delete Pending buttons —
+// `.tb-btn` is `inline-flex` with no horizontal margin of its own, so two rendered side by side (A1/A3)
+// sat flush against each other with only incidental HTML whitespace between them. Same gap convention as
+// `.tb-fix-pending-actions` above and `.tb-checker-actions` (checker-panel.component.scss).
+.tb-maker-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+// User-directed 2026-08-28 ("Account Entries + Spaces + Fix Pending 同一行 字體放大加粗醒目") — bolds/
+// enlarges the two primary Maker Result actions. Plain template markup rendered directly by THIS
+// component (not a Formly-generated subtree), so a component-scoped rule is safe here, unlike
+// `.tb-natural-key--emphasized`'s own global-styles.scss placement for the same reason.
+.tb-maker-result-actions--emphasized .tb-btn {
+  font-weight: 700;
+  font-size: 15px;
+  padding: 8px 18px;
+}
+
+// Maker Queue's own Delete Pending review screen (2026-08-28) — same left-accent-bar convention as
+// `.tb-fix-pending-banner` above, but red/danger-toned (matches `.tb-btn--danger-outline`'s own palette)
+// rather than amber, since this is a destructive action under review, not an edit.
+.tb-delete-pending-review-banner {
+  font-size: 13px;
+  color: var(--red-dark);
+  background: var(--red-bg-soft);
+  border-left: 4px solid var(--red);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.tb-delete-pending-review-actions {
+  display: flex;
+  gap: 8px;
+}
+
 // Same required-field treatment, applied to the Formly-rendered fields (amount/currency/tenorType/
 // eventSeq/createdBy/…) via the className: 'tb-field--required' set in rebuildFields(). formly-field
 // is a child component's host element, outside this component's own template, so ::ng-deep is needed

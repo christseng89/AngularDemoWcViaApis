@@ -1,5 +1,5 @@
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
-import { FUNCTION_STRATEGIES, deriveFunctionStrategy, resolveFunctionForMovement, payExistingUtilizeFunctionFor } from './function-strategy';
+import { FUNCTION_STRATEGIES, deriveFunctionStrategy, functionSupportsFixPending, resolveFunctionForMovement, payExistingUtilizeFunctionFor } from './function-strategy';
 
 /**
  * Equivalence proof for `FUNCTION_STRATEGIES` — a derived projection over the registry, not a second
@@ -217,5 +217,46 @@ describe('payExistingUtilizeFunctionFor', () => {
   it('returns undefined for any instrumentType with no matching function of its own (e.g. SHGT, EPLC_CONFIRMATION — no Export equivalent exists)', () => {
     expect(payExistingUtilizeFunctionFor('SHGT', 'SIGHT')).toBeUndefined();
     expect(payExistingUtilizeFunctionFor('EPLC_CONFIRMATION', 'SIGHT')).toBeUndefined();
+  });
+});
+
+// Fix Pending trial (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+// 2026-08-27; shared-derivation redesign 2026-08-28, "頁面配置檔原先輸入或FIX PENDING可共用") —
+// `fixPendingEnabled` is now the ONLY Fix-Pending-specific fact this registry declares (the trial-scope
+// opt-in gate); WHICH fields are genuinely editable once entered is derived elsewhere
+// (builder-fields.ts's own deriveFixPendingLockFlags()/isFixPendingFieldEditable(), covered by that
+// file's own spec) from the same lock flags a fresh Submit already computes, not declared here.
+describe('FunctionStrategy.fixPendingEnabled / functionSupportsFixPending', () => {
+  // Widened 2026-08-28 ("把這A1 A3 修改要求放置B1 A2試試看") from the original A1/A3-only trial —
+  // A2 (non-creating, same isCreatingMovement(model)-derived field shape as A3) and B1 (creating, same
+  // shape as A1) needed zero change to deriveFixPendingLockFlags() itself, only this registry flag.
+  // Widened again the SAME day ("使用同樣方式處理A3 A35 A4 & B2") — B2 (same shape as A2) and A3S (Phase
+  // 4, the one compound shape scoped/implemented — see BalanceService.applyArrivalWithSgCompoundEdit()
+  // and MakerQueueService.fixPendingSupported()'s own doc comments); A4 stays deliberately excluded
+  // (structurally has no movement of its own to edit — flipping this flag for it would be a no-op).
+  // Widened again ("更正: A8 A9 A10 A11 B6 B7 加上FIX PENDING功能") — A8 (plain creating ISSUE, same
+  // shape as A1/B1), A10/A11/B6/B7 (Amount fully locked, but Reason Code — F1 §13.1 mandatory for
+  // Close/Reopen — is the genuinely editable target). A9 deliberately excluded (user-confirmed via
+  // AskUserQuestion) — every field on its own screen is already locked at fresh Submit.
+  // Widened once more same day ("Use the same method for B3 with Fix Pending") — B3 (plain creating
+  // CREATE, same shape as A8, its own Export counterpart, simply not included in the original batch).
+  it('functionSupportsFixPending is true for exactly A1/A2/A3/A3S/A8/A10/A11/B1/B2/B3/B6/B7 (the current trial scope) and false for every other registered function', () => {
+    const supported = Object.values(FUNCTION_STRATEGIES)
+      .filter((s) => functionSupportsFixPending(s))
+      .map((s) => s.code)
+      .sort();
+    expect(supported).toEqual(['A1', 'A10', 'A11', 'A2', 'A3', 'A3S', 'A8', 'B1', 'B2', 'B3', 'B6', 'B7']);
+  });
+
+  it('functionSupportsFixPending is false for null/undefined (no Function selected)', () => {
+    expect(functionSupportsFixPending(null)).toBe(false);
+    expect(functionSupportsFixPending(undefined)).toBe(false);
+  });
+
+  it('deriveFunctionStrategy() carries fixPendingEnabled through into a fresh object, not just the registry literal', () => {
+    const a1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1')!;
+    const a4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!; // still outside the trial scope — releasesExistingMovementInPlace, no movement of its own to fix
+    expect(functionSupportsFixPending(deriveFunctionStrategy(a1))).toBe(true);
+    expect(functionSupportsFixPending(deriveFunctionStrategy(a4))).toBe(false);
   });
 });

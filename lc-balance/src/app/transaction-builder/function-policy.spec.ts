@@ -6,6 +6,7 @@ import {
   checkerSecondaryLabel,
   contextLcNumber,
   contextSecondaryRef,
+  contextTenorType,
   hasParent,
   ibNumberLabel,
   isCreatingMovement,
@@ -221,6 +222,19 @@ describe('function-policy', () => {
       expect(contextLcNumber(s)).toBe('PARENT-LC');
     });
 
+    // Bug fix, live-reproduced 2026-08-28 ("Maker Queue -> 選一筆A8交易 Fix Pending... LC Number —"): Fix
+    // Pending's own screen reconstruction never re-resolves selectedParent (no Parent LC picker
+    // interaction happens during review), only naturalKey.lcNumber itself.
+    it('contextLcNumber falls back to naturalKey.lcNumber when lcNumberFromParent but selectedParent is null (A8/B3-shape, Fix Pending review)', () => {
+      const s = state({
+        model: { instrumentType: 'SHGT', movementType: 'ISSUE' },
+        naturalKey: { lcNumber: 'FIXPENDING-LC', ibNumber: '', sgNumber: 'G01' },
+        selectedParent: null,
+        selectedFunction: fn('A8'),
+      });
+      expect(contextLcNumber(s)).toBe('FIXPENDING-LC');
+    });
+
     it('contextLcNumber reads from naturalKey.lcNumber when creating without a parent (A1-shape)', () => {
       const s = state({
         model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE' },
@@ -290,6 +304,27 @@ describe('function-policy', () => {
         selectedFunction: fn('A6'),
       });
       expect(contextSecondaryRef(s)).toBe('IB-FROM-CONTRACT');
+    });
+
+    // 2026-08-28, "A2 - A11, B2 - B7 display the Tenor Type as protected field".
+    it('contextTenorType prefers selectedContract over selectedParent (A7-shape, the Acceptance record itself carries its own Tenor Type)', () => {
+      const s = state({
+        selectedParent: contract({ naturalKey: { lcNumber: 'PARENT-LC' }, tenorType: 'SELLERS_USANCE' }),
+        selectedContract: contract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'PARENT-LC', ibNumber: 'B01' }, tenorType: 'SELLERS_USANCE' }),
+      });
+      expect(contextTenorType(s)).toBe('SELLERS_USANCE');
+    });
+
+    it('contextTenorType falls back to selectedParent when selectedContract carries no tenorType of its own (A9-shape — SHGT contracts have none)', () => {
+      const s = state({
+        selectedParent: contract({ naturalKey: { lcNumber: 'PARENT-LC' }, tenorType: 'SIGHT' }),
+        selectedContract: contract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'PARENT-LC', sgNumber: 'G01' } }),
+      });
+      expect(contextTenorType(s)).toBe('SIGHT');
+    });
+
+    it('contextTenorType is null when neither selectedContract nor selectedParent has resolved yet (boundary)', () => {
+      expect(contextTenorType(state())).toBeNull();
     });
 
     it('contextSecondaryRef prefers selectedContract, falls back to searchNaturalKey, for a two-field search (A7-shape)', () => {

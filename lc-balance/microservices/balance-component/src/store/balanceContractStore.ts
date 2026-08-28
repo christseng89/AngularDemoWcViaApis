@@ -490,6 +490,45 @@ export class BalanceContractStore {
   }
 
   /**
+   * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+   * 2026-08-27; extended per direct user feedback — "為什麼只有amount可以改... Expiry Date, Tenor
+   * Type etc.?") — `BalanceService.editPending()`'s own contract-level counterpart to the movement-level
+   * fields it already patches. Only ever called for a CREATING movementType's own PENDING/REJECTED
+   * record (ISSUE/CREATE — the contract this movement created has had zero downstream activity yet:
+   * `assertRootIssueReleased()` blocks any OTHER movement against it until this ISSUE itself Releases,
+   * so nothing else could have already relied on the pre-edit tolerancePct/tenorType/tenorDays/
+   * expiryDate/mailFloatGraceDays values) — safe to update in place, unlike every other contract field
+   * (naturalKey/currency/instrumentType), which stay genuinely immutable forever. Each param is
+   * `undefined` (not just falsy) when the caller's own patch omitted that key — COALESCE preserves the
+   * existing value for exactly those, same "don't touch unless actually supplied" posture
+   * `balanceMovementStore.ts`'s own `updateStatus()` already established for `reason_code`/
+   * `event_snapshot`, so a caller correcting only Amount (nothing contract-level) is a safe no-op here.
+   */
+  updateIssueFields(
+    balanceContractId: string,
+    fields: { tolerancePct?: string | null; tenorType?: string | null; tenorDays?: number | null; expiryDate?: string | null; mailFloatGraceDays?: number | null },
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE balance_contracts
+         SET tolerance_pct = COALESCE(@tolerancePct, tolerance_pct),
+             tenor_type = COALESCE(@tenorType, tenor_type),
+             tenor_days = COALESCE(@tenorDays, tenor_days),
+             expiry_date = COALESCE(@expiryDate, expiry_date),
+             mail_float_grace_days = COALESCE(@mailFloatGraceDays, mail_float_grace_days)
+         WHERE balance_contract_id = @balanceContractId`,
+      )
+      .run({
+        balanceContractId,
+        tolerancePct: fields.tolerancePct ?? null,
+        tenorType: fields.tenorType ?? null,
+        tenorDays: fields.tenorDays ?? null,
+        expiryDate: fields.expiryDate ?? null,
+        mailFloatGraceDays: fields.mailFloatGraceDays ?? null,
+      });
+  }
+
+  /**
    * F1 (external BA review) §8/§9 — Expiry Extension Amendment (EXPIRED -> ACTIVE) and A11/B7 Reopen
    * (CLOSED -> ACTIVE or EXPIRED, see §9.1/§9.2) both reactivate a contract's own row, and — only for
    * Extension — persist the new `expiry_date` the Checker just approved. `newExpiryDate` is omitted for

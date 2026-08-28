@@ -1326,6 +1326,7 @@ describe('MakerPanelComponent', () => {
       acknowledge: jest.fn(() => of({})),
       submitByMaker: jest.fn(() => of({ movementId: 'M1', status: 'PENDING' })),
       createMovement: jest.fn(() => of({ body: { movementId: 'NEW1' } })),
+      getContract: jest.fn(() => of(makeContract())),
     };
     return { ...defaults, ...overrides } as unknown as BalanceComponentApiService;
   }
@@ -4285,6 +4286,58 @@ describe('MakerPanelComponent', () => {
       c5.selectedContract = contract({ naturalKey: { lcNumber: 'S001', ibNumber: 'IB-FALLBACK' } });
       expect(c5.contextSecondaryRef).toBe('IB-FALLBACK');
     });
+
+    // 2026-08-28, "Tenor Type 改的不對 應該跟Currency欄位一樣 是輸入欄位但是PROTECTED for B2-B7 A2 - A11" —
+    // same "carried into model.tenorType, genuine Formly field, protected" mechanism carriedCurrency
+    // already uses (superseded a first, incorrect read-only-card-only attempt at the same requirement).
+    it('carriedTenorType: null before a contract resolves, then the raw carried value once one does (A2)', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A2'));
+      c.subChoiceValue = 'AMEND_INCREASE';
+      c.onSubChoice();
+      expect(c.carriedTenorType).toBeNull();
+      c.selectedContract = contract({ naturalKey: { lcNumber: 'S001' }, tenorType: 'SELLERS_USANCE' });
+      expect(c.carriedTenorType).toBe('SELLERS_USANCE');
+    });
+  });
+
+  describe('applyCarriedContractFields() — Tenor Type now carries into model.tenorType alongside Currency (2026-08-28)', () => {
+    it('onSelectContract (A2, flat catalog) writes model.tenorType from the resolved contract', () => {
+      const foundContract = contract({ naturalKey: { lcNumber: 'S001' }, currency: 'EUR', tenorType: 'SELLERS_USANCE' });
+      const api = mockApiD({ getSnapshot: jest.fn(() => of(snapshot())) as any });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A2'));
+      c.subChoiceValue = 'AMEND_INCREASE';
+      c.onSubChoice();
+      c.catalogPicker.contracts = [foundContract];
+      c.onSelectContract(foundContract.balanceContractId);
+      expect(c.model.currency).toBe('EUR');
+      expect(c.model.tenorType).toBe('SELLERS_USANCE');
+    });
+
+    it('is a no-op for a Function with its own tenorTypeOptions (A6) — its own dedicated onSelectParent() block carries it instead, not this method', () => {
+      const parentContract = contract({ naturalKey: { lcNumber: 'S001' }, currency: 'USD', tenorType: 'BUYERS_USANCE', tenorDays: 90 });
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A6'));
+      c.parentPicker.contracts = [parentContract];
+      c.onSelectParent(parentContract.balanceContractId);
+      // Both mechanisms agree here (same source value) — the real assertion is that onSelectParent()'s
+      // own dedicated tenorTypeOptions-gated block (not applyCarriedContractFields()) is what set it,
+      // proven by tenorDays also being carried — applyCarriedContractFields() never touches tenorDays.
+      expect(c.model.tenorType).toBe('BUYERS_USANCE');
+      expect(c.model.tenorDays).toBe(parentContract.tenorDays);
+    });
+
+    it('onSelectIbIndex (two-field search, A7) writes model.tenorType from the resolved Acceptance record', () => {
+      const foundContract = contract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S001', ibNumber: 'B01' }, currency: 'USD', tenorType: 'SELLERS_USANCE' });
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A7'));
+      c.subChoiceValue = 'FULL_SETTLE';
+      c.onSubChoice();
+      c.ibIndexPicker.contracts = [foundContract];
+      c.onSelectIbIndex(foundContract.balanceContractId);
+      expect(c.model.tenorType).toBe('SELLERS_USANCE');
+    });
   });
 
   describe('remaining small default-value (??/||) branch gaps found in the full combined coverage run', () => {
@@ -4589,6 +4642,579 @@ describe('MakerPanelComponent', () => {
       c.onSelectIbIndex('ib1');
       expect(c.searchNaturalKey.ibNumber).toBe('');
       expect(c.searchNaturalKey.sgNumber).toBe('SG01');
+    });
+  });
+
+  describe('naturalKeyLocked / isExternalReviewMode (2026-08-28, "A2 - A11 B2-B7 無須再選LC NUMBER AND 2NDARY REF... 加粗放大+鮮明")', () => {
+    it('isExternalReviewMode is true for fixPendingMode, true for deletePendingReviewMode, false otherwise', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      expect(comp.isExternalReviewMode).toBe(false);
+
+      comp.fixPendingMode = true;
+      expect(comp.isExternalReviewMode).toBe(true);
+      comp.fixPendingMode = false;
+
+      comp.deletePendingReviewMode = true;
+      expect(comp.isExternalReviewMode).toBe(true);
+    });
+
+    it('naturalKeyLocked is always false for A1 (requiresEligibleTarget is false — no pre-existing target to protect)', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      expect(comp.naturalKeyLocked).toBe(false);
+
+      comp.fixPendingMode = true;
+      expect(comp.naturalKeyLocked).toBe(false); // still false — A1 has no target-selection concept at all
+    });
+
+    it('naturalKeyLocked is false for A3 before any target is picked and outside review mode', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      expect(comp.selectedContract).toBeNull();
+      expect(comp.naturalKeyLocked).toBe(false);
+    });
+
+    it('naturalKeyLocked becomes true the moment a target is picked in a normal, still-in-progress Submit — not only during Fix Pending/Delete Pending review', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+
+      expect(comp.hasEligibleTargetSelected).toBe(true);
+      expect(comp.isExternalReviewMode).toBe(false);
+      expect(comp.naturalKeyLocked).toBe(true);
+    });
+
+    it('naturalKeyLocked is true during Fix Pending review even before hasEligibleTargetSelected would independently be true', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1' });
+      comp.startFixPending();
+
+      expect(comp.fixPendingMode).toBe(true);
+      expect(comp.naturalKeyLocked).toBe(true);
+    });
+
+    it('naturalKeyLocked is true during Delete Pending review', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1' });
+      comp.startDeletePendingReview();
+
+      expect(comp.deletePendingReviewMode).toBe(true);
+      expect(comp.naturalKeyLocked).toBe(true);
+    });
+  });
+
+  describe('Fix Pending trial (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19; UX redesign — returns to the real original-event screen, not a separate mini-form) — A1/A3', () => {
+    it('startFixPending() (A1 — no selectedContract yet) fetches the contract via api.getContract(), reconstructs the model, and enters edit mode', () => {
+      const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
+      const comp = makeComponentB(getFn('A1'), api);
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+
+      comp.startFixPending();
+
+      expect(api.getContract).toHaveBeenCalledWith('C1');
+      expect(comp.fixPendingMode).toBe(true);
+      expect(comp.model.amount).toBe('80000');
+      expect(comp.selectedContract?.balanceContractId).toBe('C1');
+    });
+
+    it('startFixPending() (A3 — selectedContract already matches) skips the getContract round trip entirely', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A3'), api);
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.submitResult = makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', amount: '20000', movementType: 'UTILIZE', sourceTransactionRef: 'B01' });
+
+      comp.startFixPending();
+
+      expect(api.getContract).not.toHaveBeenCalled();
+      expect(comp.fixPendingMode).toBe(true);
+      expect(comp.model.amount).toBe('20000');
+      expect(comp.model.secondaryRef).toBe('B01');
+    });
+
+    it('startFixPending() is a no-op when there is no submitResult', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = null;
+
+      comp.startFixPending();
+
+      expect(comp.fixPendingMode).toBe(false);
+    });
+
+    it('cancelFixPending() exits edit mode and re-reconstructs the model from submitResult (discards any in-progress edit)', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.startFixPending();
+      comp.model.amount = '999999'; // an in-progress, uncommitted edit
+
+      comp.cancelFixPending();
+
+      expect(comp.fixPendingMode).toBe(false);
+      expect(comp.model.amount).toBe('80000'); // reverted, not the uncommitted '999999'
+    });
+
+    it('cancelFixPending() unconditionally emits fixPendingCancelled', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.startFixPending();
+      let emitted = false;
+      comp.fixPendingCancelled.subscribe(() => (emitted = true));
+
+      comp.cancelFixPending();
+
+      expect(emitted).toBe(true);
+    });
+
+    // User-directed 2026-08-28 ("Direction * 顯示出來當初選的 不可以改") — startFixPending()/
+    // startDeletePendingReview() never called onSubChoice() itself, so without this reconstruction the
+    // Direction dropdown showed a blank "— select —" during review instead of what was actually
+    // submitted (live-reported bug: "A2 Direction為空?").
+    describe('reconstructSubChoiceValue (via startFixPending())', () => {
+      it('A2 AMEND_INCREASE — subChoiceValue reads straight off the reconstructed movementType (subChoice.key === "movementType")', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '3000', movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD01' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('AMEND_INCREASE');
+      });
+
+      it('A2 AMEND_DECREASE — same movementType-key derivation', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '-2000', movementType: 'AMEND_DECREASE', sourceTransactionRef: 'AMD02' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('AMEND_DECREASE');
+      });
+
+      it('A2 AMEND_EXPIRY_DATE — needs no movementTypeOverride at all (A2\'s own third option\'s own value IS "AMEND_EXPIRY_DATE" directly, unlike B2\'s "EXPIRY_DATE"+override pair below) — still resolves via the plain movementType-key branch', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '0', movementType: 'AMEND_EXPIRY_DATE', newExpiryDate: '2028-12-28' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('AMEND_EXPIRY_DATE');
+      });
+
+      it('B2 AMEND with a positive amount — derives INCREASE via displayMovementType(), also sets amendDirection', () => {
+        const comp = makeComponentB(getFn('B2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '4000', movementType: 'AMEND', sourceTransactionRef: 'AMD03' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('INCREASE');
+        expect(comp.amendDirection).toBe('INCREASE');
+      });
+
+      it('B2 AMEND with a negative amount — derives DECREASE via displayMovementType(), strips the shared AMEND_ prefix', () => {
+        const comp = makeComponentB(getFn('B2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '-1500', movementType: 'AMEND', sourceTransactionRef: 'AMD04' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('DECREASE');
+        expect(comp.amendDirection).toBe('DECREASE');
+      });
+
+      it('B2 AMEND_EXPIRY_DATE — matches movementTypeOverride the same way A2 does, bypassing the amendDirection branch entirely', () => {
+        const comp = makeComponentB(getFn('B2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '0', movementType: 'AMEND_EXPIRY_DATE', newExpiryDate: '2028-12-28' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('EXPIRY_DATE');
+      });
+
+      it('a Function with no subChoice at all (e.g. A1) leaves subChoiceValue blank', () => {
+        const comp = makeComponentB(getFn('A1'), makeApi());
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+
+        comp.startFixPending();
+
+        expect(comp.subChoiceValue).toBe('');
+      });
+
+      it('also reconstructs correctly for Delete Pending review (startDeletePendingReview()), not just Fix Pending', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
+        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '3000', movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD01' });
+
+        comp.startDeletePendingReview();
+
+        expect(comp.subChoiceValue).toBe('AMEND_INCREASE');
+      });
+    });
+
+    // User-directed 2026-08-28 ("A2 Fix Pending... NOTE: INCREASE DECREASE AMOUNT必填", "用配置設定") —
+    // the Save button's own readiness must derive from the SAME isAmendExpiryDate switch builder-fields.ts
+    // already uses to decide which field is shown/required, not a single hardcoded field name.
+    describe('fixPendingSaveReady', () => {
+      it('is false when model.amount is blank for a plain (non-AMEND_EXPIRY_DATE) Fix Pending, e.g. A2 AMEND_INCREASE', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.model.movementType = 'AMEND_INCREASE';
+        comp.model.amount = '';
+        expect(comp.fixPendingSaveReady).toBe(false);
+      });
+
+      it('is true once model.amount is filled for AMEND_INCREASE/AMEND_DECREASE', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.model.movementType = 'AMEND_INCREASE';
+        comp.model.amount = '3000';
+        expect(comp.fixPendingSaveReady).toBe(true);
+      });
+
+      it('is false when model.newExpiryDate is blank for AMEND_EXPIRY_DATE, even though model.amount holds the fixed "0" placeholder', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.model.movementType = 'AMEND_EXPIRY_DATE';
+        comp.model.amount = '0';
+        comp.model.newExpiryDate = '';
+        expect(comp.fixPendingSaveReady).toBe(false);
+      });
+
+      it('is true once model.newExpiryDate is filled for AMEND_EXPIRY_DATE, regardless of model.amount', () => {
+        const comp = makeComponentB(getFn('A2'), makeApi());
+        comp.model.movementType = 'AMEND_EXPIRY_DATE';
+        comp.model.amount = '0';
+        comp.model.newExpiryDate = '2028-12-28';
+        expect(comp.fixPendingSaveReady).toBe(true);
+      });
+    });
+
+    it('confirmFixPending() emits fixPendingRequested with the movementId + the model\'s own (edited) amount — A3 declares amount only, so no other field is sent', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.submitResult = makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', amount: '20000' });
+      comp.startFixPending();
+      comp.model.amount = '25000';
+      let emitted: (Record<string, unknown> & { movementId: string }) | null = null;
+      comp.fixPendingRequested.subscribe((e) => (emitted = e));
+
+      comp.confirmFixPending();
+
+      expect(emitted).toEqual({ movementId: 'mv-2', amount: '25000' });
+    });
+
+    it('頁面配置檔 — confirmFixPending() for A1 (declares amount + all 4 contract-level fields) sends the full patch', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.startFixPending();
+      comp.model.amount = '90000';
+      comp.model.tolerancePct = '5';
+      comp.model.tenorType = 'SIGHT';
+      comp.model.tenorDays = 0;
+      comp.model.expiryDate = '2027-01-01';
+      let emitted: (Record<string, unknown> & { movementId: string }) | null = null;
+      comp.fixPendingRequested.subscribe((e) => (emitted = e));
+
+      comp.confirmFixPending();
+
+      expect(emitted).toEqual({
+        movementId: 'mv-1',
+        amount: '90000',
+        tolerancePct: '5',
+        tenorType: 'SIGHT',
+        tenorDays: 0,
+        expiryDate: '2027-01-01',
+      });
+    });
+
+    it('confirmFixPending() coerces a number-typed tolerancePct to a string — Angular\'s NumberValueAccessor coerces the bound value on this Formly `type: \'number\'` field to a real JS number, which the backend\'s z.string() schema rejects ("Expected string, received number") unless coerced back, same trap amount\'s own submit-rules.ts coercion already guards against', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.startFixPending();
+      (comp.model as unknown as { tolerancePct: number }).tolerancePct = 5; // simulates Formly's real runtime value, not the TS-declared `string` type
+      let emitted: (Record<string, unknown> & { movementId: string }) | null = null;
+      comp.fixPendingRequested.subscribe((e) => (emitted = e));
+
+      comp.confirmFixPending();
+
+      expect(emitted!['tolerancePct']).toBe('5');
+      expect(typeof emitted!['tolerancePct']).toBe('string');
+    });
+
+    it('confirmFixPending() is a no-op when there is no submitResult', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = null;
+      let emitted: unknown = null;
+      comp.fixPendingRequested.subscribe((e) => (emitted = e));
+
+      comp.confirmFixPending();
+
+      expect(emitted).toBeNull();
+    });
+
+    it('confirmFixPending() is a no-op when the model has no amount', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1' });
+      comp.model.amount = undefined;
+      let emitted: unknown = null;
+      comp.fixPendingRequested.subscribe((e) => (emitted = e));
+
+      comp.confirmFixPending();
+
+      expect(emitted).toBeNull();
+    });
+
+    it('resetForFunction() (via resetTrigger) clears fixPendingMode, same as submitResult', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.startFixPending();
+      expect(comp.fixPendingMode).toBe(true);
+
+      triggerSelectFunction(comp, getFn('A1'));
+
+      expect(comp.fixPendingMode).toBe(false);
+    });
+
+    it('a successful ("released") externalCheckerOutcome — e.g. the Fix Pending result coming back — closes edit mode and updates submitResult to the replacement movement', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.startFixPending();
+
+      comp.externalCheckerOutcome = { kind: 'released', result: makeMovement({ movementId: 'mv-2', amount: '95000', status: 'PENDING' }) };
+      comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
+
+      expect(comp.fixPendingMode).toBe(false);
+      expect(comp.submitResult?.movementId).toBe('mv-2');
+      expect(comp.submitResult?.amount).toBe('95000');
+    });
+
+    it('externalFixPendingRequest (Maker Queue\'s own Fix Pending entry point, 2026-08-28) sets submitResult and starts Fix Pending — same reconstructed-screen mechanism the in-session button already drives', () => {
+      const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
+      const comp = makeComponentB(getFn('A1'), api);
+      const movement = makeMovement({ movementId: 'mv-ext-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.externalFixPendingRequest = movement;
+
+      comp.ngOnChanges({ externalFixPendingRequest: makeChange(null, movement) } as any);
+
+      expect(api.getContract).toHaveBeenCalledWith('C1');
+      expect(comp.submitResult).toBe(movement);
+      expect(comp.fixPendingMode).toBe(true);
+      expect(comp.model.amount).toBe('80000');
+    });
+
+    // Bug fix, live-reproduced 2026-08-28 ("Maker Queue -> 選一筆A8交易 Fix Pending... LC Number —") — A8
+    // (lcNumberFromParent: hasParent + creating) never re-resolves selectedParent during this Maker-Queue-
+    // originated reconstruction (no Parent LC picker interaction happens during review), so the protected
+    // card's own contextLcNumber used to read null. reconstructScreenForSubmitResult() DOES correctly
+    // populate naturalKey.lcNumber from the fetched contract regardless of Function shape — contextLcNumber
+    // now falls back to it.
+    it('externalFixPendingRequest for A8 (lcNumberFromParent) resolves contextLcNumber via naturalKey.lcNumber, not selectedParent (which stays null throughout this reconstruction)', () => {
+      const api = makeApi({
+        getContract: jest.fn(() =>
+          of(makeContract({ balanceContractId: 'C1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: 'G01' } })),
+        ),
+      });
+      const comp = makeComponentB(getFn('A8'), api);
+      const movement = makeMovement({ movementId: 'mv-a8-1', balanceContractId: 'C1', movementType: 'ISSUE', amount: '2' });
+      comp.externalFixPendingRequest = movement;
+
+      comp.ngOnChanges({ externalFixPendingRequest: makeChange(null, movement) } as any);
+
+      expect(comp.selectedParent).toBeNull();
+      expect(comp.naturalKeyLocked).toBe(true);
+      expect(comp.contextLcNumber).toBe('U01');
+    });
+
+    // Bug fix, found live 2026-08-28 auditing the same "Maker Queue -> Fix Pending -> Save" flow: a
+    // successful Fix Pending Save (routed through applyCheckerOutcome() via externalCheckerOutcome) used
+    // to leave `this.fields` exactly as `startFixPending()` last built it — stale Fix-Pending-mode field
+    // configs (e.g. Currency's own "locked — Fix Pending can never change Currency" label) survived even
+    // after `fixPendingMode` flipped back to `false`. Functionally harmless (`displayFields`'s own
+    // `toReadOnlyFields()` wrapper already force-disables everything via `fieldsLocked` regardless), but
+    // the rendered LABEL text stayed misleading. `cancelFixPending()` already rebuilds in the equivalent
+    // spot; `applyCheckerOutcome()` was simply missing the same call.
+    it("a successful Fix Pending Save (externalCheckerOutcome 'released') rebuilds fields — Currency's own label no longer stays stuck on the Fix-Pending wording", () => {
+      const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
+      const comp = makeComponentB(getFn('A2'), api);
+      const original = makeMovement({ movementId: 'mv-orig', balanceContractId: 'C1', movementType: 'AMEND_INCREASE', currency: 'USD' });
+      comp.externalFixPendingRequest = original;
+      comp.ngOnChanges({ externalFixPendingRequest: makeChange(null, original) } as any);
+      expect(comp.fixPendingMode).toBe(true);
+      // Genuinely stale before the fix — this.fields was last built while fixPendingMode was true.
+      expect(comp.fields.find((f: any) => f.key === 'currency')?.props?.label).toContain('Fix Pending');
+
+      comp.externalCheckerOutcome = { kind: 'released', result: makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', movementType: 'AMEND_INCREASE', currency: 'USD', status: 'PENDING' }) };
+      comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
+
+      expect(comp.fixPendingMode).toBe(false);
+      const currencyField = comp.fields.find((f: any) => f.key === 'currency');
+      expect(currencyField?.props?.label).not.toContain('Fix Pending');
+    });
+
+    it('live bug found via browser verification, fixed same day — emits contextChanged with the new submitResult, so the parent\'s own makerContext mirror (which selectFunction() just reset to submitResult: null) is up to date BEFORE the Maker clicks Save Fix Pending; without this, TransactionBuilderComponent.fixPending()\'s own movementId guard silently no-ops the whole save', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      const movement = makeMovement({ movementId: 'mv-ext-3', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      comp.externalFixPendingRequest = movement;
+      let emitted: any = null;
+      comp.contextChanged.subscribe((ctx) => (emitted = ctx));
+
+      comp.ngOnChanges({ resetTrigger: makeChange(0, 1), externalFixPendingRequest: makeChange(null, movement) } as any);
+
+      expect(emitted?.submitResult).toBe(movement);
+    });
+
+    it('externalFixPendingRequest arriving in the SAME ngOnChanges() call as a resetTrigger bump (TransactionBuilderComponent.onMakerQueueFixPending() calls selectFunction() first, in the same synchronous handler) is applied AFTER the reset, not clobbered by it', () => {
+      const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
+      const comp = makeComponentB(getFn('A1'), api);
+      const movement = makeMovement({ movementId: 'mv-ext-2', balanceContractId: 'C1', amount: '70000', movementType: 'ISSUE' });
+      comp.externalFixPendingRequest = movement;
+
+      comp.ngOnChanges({ resetTrigger: makeChange(0, 1), externalFixPendingRequest: makeChange(null, movement) } as any);
+
+      expect(comp.fixPendingMode).toBe(true);
+      expect(comp.submitResult).toBe(movement);
+    });
+
+    it('is a no-op when externalFixPendingRequest changes to null (the @Input()\'s own default, never itself a trigger)', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+
+      comp.ngOnChanges({ externalFixPendingRequest: makeChange(null, null) } as any);
+
+      expect(comp.submitResult).toBeNull();
+      expect(comp.fixPendingMode).toBe(false);
+    });
+
+    describe('externalDeletePendingReviewRequest / Delete Pending review screen (2026-08-28, "Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否")', () => {
+      it('sets submitResult, emits contextChanged, and reconstructs the screen read-only (deletePendingReviewMode, not fixPendingMode)', () => {
+        const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
+        const comp = makeComponentB(getFn('A1'), api);
+        const movement = makeMovement({ movementId: 'mv-del-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+        comp.externalDeletePendingReviewRequest = movement;
+        let emittedContext: any = null;
+        comp.contextChanged.subscribe((ctx) => (emittedContext = ctx));
+
+        comp.ngOnChanges({ externalDeletePendingReviewRequest: makeChange(null, movement) } as any);
+
+        expect(api.getContract).toHaveBeenCalledWith('C1');
+        expect(comp.submitResult).toBe(movement);
+        expect(comp.deletePendingReviewMode).toBe(true);
+        expect(comp.fixPendingMode).toBe(false);
+        expect(comp.model.amount).toBe('80000');
+        expect(emittedContext?.submitResult).toBe(movement);
+      });
+
+      it('all fields stay protected — fieldsLocked is true and displayFields is the read-only projection, unlike Fix Pending', () => {
+        const comp = makeComponentB(getFn('A1'), makeApi());
+        const movement = makeMovement({ movementId: 'mv-del-2', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+        comp.externalDeletePendingReviewRequest = movement;
+
+        comp.ngOnChanges({ externalDeletePendingReviewRequest: makeChange(null, movement) } as any);
+
+        expect(comp.fieldsLocked).toBe(true);
+        expect(comp.displayFields).not.toBe(comp.fields); // toReadOnlyFields(fields), not the live editable array
+      });
+
+      it('externalDeletePendingReviewRequest arriving in the SAME ngOnChanges() call as a resetTrigger bump is applied AFTER the reset, not clobbered by it', () => {
+        const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
+        const comp = makeComponentB(getFn('A1'), api);
+        const movement = makeMovement({ movementId: 'mv-del-3', balanceContractId: 'C1', amount: '70000', movementType: 'ISSUE' });
+        comp.externalDeletePendingReviewRequest = movement;
+
+        comp.ngOnChanges({ resetTrigger: makeChange(0, 1), externalDeletePendingReviewRequest: makeChange(null, movement) } as any);
+
+        expect(comp.deletePendingReviewMode).toBe(true);
+        expect(comp.submitResult).toBe(movement);
+      });
+
+      it('is a no-op when externalDeletePendingReviewRequest changes to null', () => {
+        const comp = makeComponentB(getFn('A1'), makeApi());
+
+        comp.ngOnChanges({ externalDeletePendingReviewRequest: makeChange(null, null) } as any);
+
+        expect(comp.submitResult).toBeNull();
+        expect(comp.deletePendingReviewMode).toBe(false);
+      });
+
+      it('confirmDeletePendingReview() closes the review mode and emits deletePendingReviewConfirmed — never calls any delete API itself', () => {
+        const api = makeApi();
+        const comp = makeComponentB(getFn('A1'), api);
+        const movement = makeMovement({ movementId: 'mv-del-4', balanceContractId: 'C1' });
+        comp.externalDeletePendingReviewRequest = movement;
+        comp.ngOnChanges({ externalDeletePendingReviewRequest: makeChange(null, movement) } as any);
+        let confirmed = false;
+        comp.deletePendingReviewConfirmed.subscribe(() => (confirmed = true));
+
+        comp.confirmDeletePendingReview();
+
+        expect(comp.deletePendingReviewMode).toBe(false);
+        expect(confirmed).toBe(true);
+        expect(api.cancel).not.toHaveBeenCalled();
+      });
+
+      it('cancelDeletePendingReview() closes the review mode and emits deletePendingReviewCancelled', () => {
+        const comp = makeComponentB(getFn('A1'), makeApi());
+        const movement = makeMovement({ movementId: 'mv-del-5', balanceContractId: 'C1' });
+        comp.externalDeletePendingReviewRequest = movement;
+        comp.ngOnChanges({ externalDeletePendingReviewRequest: makeChange(null, movement) } as any);
+        let cancelled = false;
+        comp.deletePendingReviewCancelled.subscribe(() => (cancelled = true));
+
+        comp.cancelDeletePendingReview();
+
+        expect(comp.deletePendingReviewMode).toBe(false);
+        expect(cancelled).toBe(true);
+      });
+
+      it('resetForFunction() (via resetTrigger) also clears deletePendingReviewMode, same as fixPendingMode', () => {
+        const comp = makeComponentB(getFn('A1'), makeApi());
+        const movement = makeMovement({ movementId: 'mv-del-6', balanceContractId: 'C1' });
+        comp.externalDeletePendingReviewRequest = movement;
+        comp.ngOnChanges({ externalDeletePendingReviewRequest: makeChange(null, movement) } as any);
+        expect(comp.deletePendingReviewMode).toBe(true);
+
+        triggerSelectFunction(comp, getFn('A1'));
+
+        expect(comp.deletePendingReviewMode).toBe(false);
+      });
+    });
+
+    it('fixPendingMode makes fieldsLocked false — the reconstructed form is genuinely editable, not forced read-only by formLocked', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+      expect(comp.formLocked).toBe(true); // submitResult already set — normally locks the form
+      expect(comp.fieldsLocked).toBe(true);
+
+      comp.startFixPending();
+
+      expect(comp.fieldsLocked).toBe(false);
+      expect(comp.displayFields).toBe(comp.fields); // NOT toReadOnlyFields(fields)
+    });
+
+    it('rebuildFields() passes fixPendingMode through to buildFields() — A1 declares amount + all 4 contract-level fields editable, so only Currency/2ndary Key stay forced disabled (§15, never expressible in FixPendingEditableField at all)', () => {
+      const comp = makeComponentB(getFn('A1'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
+
+      comp.startFixPending();
+
+      const byKey = (key: string) => comp.fields.find((f) => f.key === key);
+      expect(byKey('amount')?.props?.disabled).toBeFalsy();
+      expect(byKey('currency')?.props?.disabled).toBe(true);
+      expect(byKey('tolerancePct')?.props?.disabled).toBeFalsy();
+      expect(byKey('tenorType')?.props?.disabled).toBeFalsy();
+      expect(byKey('tenorDays')?.props?.disabled).toBeFalsy();
+      expect(byKey('expiryDate')?.props?.disabled).toBeFalsy();
+    });
+
+    it('頁面配置檔 — A3 declares amount only, so its own (hidden, N/A) contract-level fields would be forced disabled if ever shown; Amount itself stays enabled', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.submitResult = makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', amount: '20000', movementType: 'UTILIZE', sourceTransactionRef: 'B01' });
+
+      comp.startFixPending();
+
+      const byKey = (key: string) => comp.fields.find((f) => f.key === key);
+      expect(byKey('amount')?.props?.disabled).toBeFalsy();
+      expect(byKey('currency')?.props?.disabled).toBe(true);
+      expect(byKey('tolerancePct')?.props?.disabled).toBe(true);
+      expect(byKey('tenorType')?.props?.disabled).toBe(true);
+      expect(byKey('tenorDays')?.props?.disabled).toBe(true);
+      expect(byKey('expiryDate')?.props?.disabled).toBe(true);
     });
   });
 });

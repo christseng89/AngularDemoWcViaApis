@@ -72,14 +72,18 @@
           [activeFunctionSide]="activeFunctionSide"
           [resetTrigger]="checkerResetNonce"
           [externalCheckerOutcome]="makerOutcomeSignal"
+          [externalFixPendingRequest]="externalFixPendingRequest"
+          [externalDeletePendingReviewRequest]="externalDeletePendingReviewRequest"
           [refreshRequested]="refreshNonce"
           [actionBusy]="actionBusy"
           [releaseSuccessHint]="releaseSuccessHint"
           (contextChanged)="onMakerContextChanged($event)"
           (syncRequested)="onMakerSyncRequested($event)"
           (openAccountEntries)="onMakerOpenAccountEntries($event)"
-          (deletePendingRequested)="deleteMakerPending()"
-          (withdrawMakerPendingRequested)="withdrawMakerPending()"
+          (fixPendingRequested)="fixPending($event)"
+          (fixPendingCancelled)="onFixPendingCancelled()"
+          (deletePendingReviewConfirmed)="onDeletePendingReviewConfirmed()"
+          (deletePendingReviewCancelled)="onDeletePendingReviewCancelled()"
         ></app-maker-panel>
 
         <!-- ══════════════════════════ CHECKER ══════════════════════════ -->
@@ -108,7 +112,14 @@
            action block below is projected INTO it (ng-content), since it's gated by the SAME
            checkerContractId condition the child now owns internally — see checker-panel.component.ts's
            own class doc comment for why the action layer itself stayed here. -->
+        <!-- Hidden during Maker Queue's own Delete Pending review (2026-08-28, "DELETE PENDING 交易畫面
+           不需要CHECKER") — this screen is a pure review-then-confirm/cancel action, not a Maker/Checker
+           workflow interaction; pendingMakerQueueDeleteRow is non-null for exactly the review's own
+           window (set by onMakerQueueDeletePendingReview(), cleared by onDeletePendingReviewConfirmed()'s
+           own settle callback / onDeletePendingReviewCancelled()). -->
         <app-checker-panel
+          #checkerPanelEl
+          *ngIf="!pendingMakerQueueDeleteRow"
           [selectedFunction]="selectedFunction"
           [syncSignal]="checkerSyncSignal"
           [resetTrigger]="checkerResetNonce"
@@ -494,7 +505,12 @@
   ></app-inquire-events>
 
   <!-- ══════════════════════════ MAKER QUEUE (Fix Pending/Delete Pending Phase 2) ══════════════════════════ -->
-  <app-maker-queue *ngIf="activeMode === 'MAKER_QUEUE'" [makerQueue]="makerQueue"></app-maker-queue>
+  <app-maker-queue
+    *ngIf="activeMode === 'MAKER_QUEUE'"
+    [makerQueue]="makerQueue"
+    (fixPendingRequested)="onMakerQueueFixPending($event)"
+    (deletePendingRequested)="onMakerQueueDeletePendingReview($event)"
+  ></app-maker-queue>
 
   <!-- ══════════════════════════ INQUIRE DELETE PENDING (§11) ══════════════════════════ -->
   <app-inquire-delete-pending *ngIf="activeMode === 'DELETE_PENDING_AUDIT'" [service]="inquireDeletePending"></app-inquire-delete-pending>

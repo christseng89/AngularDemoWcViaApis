@@ -64,6 +64,8 @@ describe('A10 — Import LC Close', () => {
     });
     if (!close.created) throw new Error('expected a new movement');
     expect(close.movement.status).toBe('PENDING');
+    expect(close.movement.contingentAccountEntry).not.toBeNull();
+    expect(close.movement.contingentAccountEntry?.amount).toBe('10000');
 
     const released = service.release(close.movement.movementId, 'checker1');
     expect(released.status).toBe('RELEASED');
@@ -85,6 +87,48 @@ describe('A10 — Import LC Close', () => {
     const history = service.listMovements(lc.balanceContractId);
     const closeRow = history.find((m) => m.movementId === close.movement.movementId);
     expect(closeRow?.reasonCode).toBe('TEST_CLOSE_REASON');
+  });
+
+  // User-directed 2026-08-28 ("A10 and A11 if Tight Available Balance = 0 then no entries should be
+  // generated. Refer to S01 for Import") — an LC already at Confirmed Balance 0 (fully utilized, nothing
+  // left to write off) can still legitimately Close (closeShaped only requires ceilingAmount to equal the
+  // CURRENT Confirmed Balance exactly — 0 equals 0), but the resulting write-off amount is genuinely 0;
+  // deriveContingentAccountEntry() now returns null for this case rather than a zero-value Dr/Cr pair.
+  test('Confirmed Balance already 0 at Close — no contingentAccountEntry is generated (a zero-value voucher carries no real accounting information)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueImportLc(service, 'CLOSE-A10-ZERO-001');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+      sourceTransactionRef: 'B01',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.submitByMaker(utilize.movement.movementId, 'maker1'); // BAL-123 — a Sight-tenor UTILIZE requires Maker Submit before Release
+    service.release(utilize.movement.movementId, 'checker1');
+    expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('0');
+
+    const close = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'CLOSE',
+      eventSeq: 3,
+      amount: '0',
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
+    });
+    if (!close.created) throw new Error('expected a new movement');
+    expect(close.movement.ceilingAmount).toBe('0');
+    expect(close.movement.contingentAccountEntry).toBeNull();
+
+    const released = service.release(close.movement.movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+    expect(released.contingentAccountEntry).toBeNull();
   });
 
   test('F1 proposal §13.1 item 4 (BA-ratified 2026-08-25): rejects a Submit with no reasonCode, even against an otherwise-eligible ACTIVE contract', () => {
@@ -383,6 +427,39 @@ describe('A10 — Import LC Close', () => {
         reasonCode: 'TEST_CLOSE_REASON',
       }),
     ).toThrow(InsufficientBalanceError);
+  });
+
+  // Live-reported 2026-08-28 ("A10 FIX PENDING then SAVE => get error Cannot Close IPLC_LC ... One or
+  // more Events under this LC ... are not yet fully resolved") — closeShaped's own eligibility check
+  // (evaluateContractCloseEligibility()) re-queries the contract's own movement tree from the DB rather
+  // than reading ctx.existingMovements, so it always saw the very PENDING CLOSE movement being edited as
+  // an "open event" and self-rejected every Fix Pending Save. Fixed via MovementSufficiencyContext's own
+  // new excludeMovementId (applyEditToMovement() now passes old.movementId through).
+  test('Fix Pending on a still-PENDING CLOSE movement itself does not self-reject via the "open Events" eligibility scan', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueImportLc(service, 'CLOSE-A10-FIXPENDING-001');
+
+    const close = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'CLOSE',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'ORIGINAL_REASON',
+    });
+    if (!close.created) throw new Error('expected a new movement');
+
+    const corrected = service.editPending(close.movement.movementId, { amount: close.movement.amount, reasonCode: 'CORRECTED_REASON', editedBy: 'maker1' });
+    expect(corrected.status).toBe('PENDING');
+    expect(corrected.reasonCode).toBe('CORRECTED_REASON');
+    expect(corrected.movementId).toBe(close.movement.movementId); // same identity — an in-place correction
+
+    const released = service.release(corrected.movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+    expect(released.reasonCode).toBe('CORRECTED_REASON');
+    expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('0');
   });
 });
 

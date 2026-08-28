@@ -99,7 +99,7 @@ describe('TransactionBuilderComponent — Inquire Events wiring', () => {
 
       expect(c.activeMode).toBe('MAKER_QUEUE');
       expect(c.accountEntryDialogMovement).toBeNull();
-      expect(listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], page: 1, pageSize: 10 });
+      expect(listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], q: undefined });
     });
 
     it('selectMode(PROCESSING)/(INQUIRE) do not touch the Maker Queue', () => {

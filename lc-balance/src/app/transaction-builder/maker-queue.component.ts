@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TbIconComponent } from '../tb-icon.component';
@@ -19,6 +19,25 @@ import { displayStatus as displayStatusShared, statusBadgeClass as statusBadgeCl
 })
 export class MakerQueueComponent {
   @Input() makerQueue!: MakerQueueService;
+  /**
+   * Fix Pending has no self-contained action here (unlike Delete Pending, a plain API call) — it needs
+   * the full "return to the real original-event screen" UX only `MakerPanelComponent`/`buildFields()`
+   * can provide, so this row is bubbled up to `TransactionBuilderComponent`, which switches to
+   * Transaction Processing, selects this row's own resolved Function, and feeds the movement into
+   * `MakerPanelComponent`'s own `externalFixPendingRequest` — the same mechanism the in-session button
+   * already drives, never a second, separately-built edit UI inside this table.
+   */
+  @Output() fixPendingRequested = new EventEmitter<MakerQueueRow>();
+  /**
+   * Delete Pending (2026-08-28, "Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否") — same "no
+   * self-contained action here" reasoning as `fixPendingRequested` above: clicking this button no longer
+   * deletes immediately. It bubbles the row up to `TransactionBuilderComponent`, which switches to
+   * Transaction Processing, selects the row's own resolved Function, and feeds the movement into
+   * `MakerPanelComponent`'s own `externalDeletePendingReviewRequest` — a read-only reconstruction of the
+   * real screen, with its own Confirm/Cancel buttons. The actual `MakerQueueService.deletePending()` call
+   * (cascade-aware for a compound row) only ever fires once the Maker explicitly confirms there.
+   */
+  @Output() deletePendingRequested = new EventEmitter<MakerQueueRow>();
 
   /** Thin delegations to the same pure shared functions the rest of this sub-project uses for status display. */
   readonly displayStatus = displayStatusShared;
@@ -30,7 +49,7 @@ export class MakerQueueComponent {
    * plain "Delete Pending" (see the template), regardless of which action it routes to underneath
    * (withdrawMakerSubmit() for an A4 row vs. a full cancel() otherwise, MakerQueueService.deletePending()'s
    * own doc comment) — this tooltip is the only place that still discloses which one, for anyone who
-   * wants to know before clicking.
+   * wants to know before clicking "Confirm Delete Pending" on the review screen this button now opens.
    */
   deletePendingLabel(row: MakerQueueRow): string {
     if (this.makerQueue.isCompoundShape(row)) {

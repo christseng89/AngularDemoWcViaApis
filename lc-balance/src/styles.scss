@@ -356,6 +356,33 @@ pre.step-detail {
   vertical-align: -1.5px;
 }
 
+// ── LC Number / 2ndary natural-key emphasis (2026-08-28, "加粗放大+鮮明" — bold, enlarged, and
+// visually distinct) ──────────────────────────────────────────────────────
+// Global, not per-component (same reasoning as `.tb-spinner`/`.tb-icon` above): shared by A1/B1's own
+// typed LC Number input, the protected readout card every other function shows once its own target is
+// picked (`.tb-protected-natural-key`, maker-panel.component.scss), AND the `ngx-formly`-rendered
+// secondaryRef field's own `.form-control` (`className`, builder-fields.ts) — that last one is the reason
+// this can't be component-scoped at all: Formly's dynamically-created `<formly-field>` subtree carries a
+// DIFFERENT component's own Angular ViewEncapsulation `_ngcontent` attribute than `MakerPanelComponent`,
+// so a rule written in `maker-panel.component.scss` can target the literal template markup (the raw
+// input, the readout `<span>`s) but can never match anything inside that Formly subtree — confirmed live
+// (the class was present in the DOM, with zero visible effect) before moving here. `--blue-dark`/
+// `--blue-border` are the SAME "important identifier" palette `.tb-type-tag` already uses elsewhere,
+// kept deliberately distinct from the amount/currency figures' own `--navy` so an LC Number is never
+// mistaken for a monetary value at a glance.
+.tb-natural-key--emphasized,
+.tb-natural-key--emphasized .form-control {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: var(--blue-dark) !important;
+  letter-spacing: 0.01em;
+}
+
+input.tb-natural-key--emphasized,
+.tb-natural-key--emphasized input.form-control {
+  font-family: var(--font-mono);
+}
+
 // ── Balance-box title + action row (Event Details 60/40 split, 2026-08-21) ──────────────
 // Global, not per-component: `transaction-builder.component.scss` already sits at the
 // `anyComponentStyle` 12kb budget ceiling (see `.tb-spinner`/`.tb-icon` above for the same reasoning) —

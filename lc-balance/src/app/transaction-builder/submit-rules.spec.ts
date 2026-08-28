@@ -683,6 +683,35 @@ describe('submit-rules', () => {
     });
   });
 
+  describe('validateSubmit — Tolerance % must not be negative (user-directed 2026-08-28, "Tolerance MUST >= 0")', () => {
+    it('rejects a negative tolerancePct for A1 (ISSUE, tolerance-applicable)', () => {
+      const result = validateSubmit(ctx({ model: { tolerancePct: '-5' } }));
+      expect(result.error).toBe('Tolerance % must not be negative.');
+    });
+
+    it('passes for a positive tolerancePct and for a zero tolerancePct', () => {
+      expect(validateSubmit(ctx({ model: { tolerancePct: '10' } })).error).toBeNull();
+      expect(validateSubmit(ctx({ model: { tolerancePct: '0' } })).error).toBeNull();
+    });
+
+    it('a null/empty tolerancePct (not applicable, or genuinely optional) is untouched', () => {
+      expect(validateSubmit(ctx({ model: { tolerancePct: undefined } })).error).toBeNull();
+      expect(validateSubmit(ctx({ model: { tolerancePct: '' } })).error).toBeNull();
+    });
+
+    it('is a no-op for a function tolerance never applies to (e.g. A8, Shipping Guarantee Issue) — a negative value there is simply never checked', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A8'),
+          model: { instrumentType: 'SHGT', movementType: 'ISSUE', amount: '1000', currency: 'USD', createdBy: 'maker1', tolerancePct: '-5' },
+          selectedParent: contract(),
+          selectedContract: contract(),
+        }),
+      );
+      expect(result.error).not.toBe('Tolerance % must not be negative.');
+    });
+  });
+
   describe('validateSubmit — Expiry Date mandatory for A1/B1 (user-directed 2026-08-26, "A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理")', () => {
     it('rejects A1 (LC Issue) with no Expiry Date, even when every other mandatory field is filled', () => {
       const result = validateSubmit(
@@ -933,11 +962,24 @@ describe('submit-rules', () => {
       expect(hasEligibleTargetSelected({ ...base, selectedParent: contract() })).toBe(true);
     });
 
+    // Bug fix, live-reproduced 2026-08-28 ("Maker Queue -> Fix Pending -> Save... 不得再次要求使用者選擇
+    // LC / Index Record"): A8/B3's own Fix Pending reconstruction (reconstructScreenForSubmitResult())
+    // sets selectedContract but never selectedParent — once Fix Pending Save completes (fixPendingMode
+    // flips back to false, no longer masking this via isExternalReviewMode), this check alone used to
+    // report "no target selected" again and re-show the LC Index picker for a record that was never
+    // actually un-selected. selectedContract alone (with selectedParent still null) must also satisfy it.
+    it('A8 — selectedContract alone (selectedParent still null, the exact post-Fix-Pending-Save shape) also satisfies this check', () => {
+      const model: Partial<BuilderModel> = { instrumentType: 'SHGT', movementType: 'ISSUE' };
+      const base = ctx({ selectedFunction: fn('A8'), model, selectedParent: null, selectedContract: contract() });
+      expect(hasEligibleTargetSelected(base)).toBe(true);
+    });
+
     it('B3 (creating + hasParent, no other Strategy flags, post-2026-08-18 redesign) — same shape as A8', () => {
       const model: Partial<BuilderModel> = { instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE' };
       const base = ctx({ selectedFunction: fn('B3'), model, naturalKey: { lcNumber: 'S001', ibNumber: 'E01', sgNumber: '' } });
       expect(hasEligibleTargetSelected(base)).toBe(false);
       expect(hasEligibleTargetSelected({ ...base, selectedParent: contract() })).toBe(true);
+      expect(hasEligibleTargetSelected({ ...base, selectedParent: null, selectedContract: contract() })).toBe(true);
     });
 
     it('A4 (releasesExistingMovementInPlace) — false without selectedPayMovement even with selectedContract, true once the specific record is picked', () => {

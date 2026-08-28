@@ -6,15 +6,16 @@ import type { MakerCheckerContext } from './maker-panel.component';
 
 /**
  * Covers: approveArrival(), arrivalAlreadyApproved, lookUp.syncFrom(), release(), reject(),
- * deleteMakerPending(), checkerAct(), onCheckerMovementPicked(), onCheckerQueueReloaded()/
+ * checkerAct(), onCheckerMovementPicked(), onCheckerQueueReloaded()/
  * onCheckerQueueLoadSucceeded(), runLookup(), selectLookupTab(), pagedLookupMovements/
  * lookupMovementsPaging, selectLookupSg(), selectLookupAcceptance() — the Checker-side release/reject
  * flow plus the Look Up Current Balance panel, still parent-owned after the MakerPanelComponent
  * extraction. submit() and its compound shapes moved to MakerPanelComponent — see
- * maker-panel.component.spec.ts.
+ * maker-panel.component.spec.ts. (deleteMakerPending()/withdrawMakerPending() removed 2026-08-28 —
+ * Delete Pending is Maker Queue-only now, see maker-panel.component.html's own doc comment.)
  *
  * Maker context setup goes through `setMakerContext(comp, {...})`, which replaces the parent's private
- * `makerContext` mirror — the field release()/reject()/deleteMakerPending()/checkerAct() read via
+ * `makerContext` mirror — the field release()/reject()/checkerAct() read via
  * buildCheckerActionContext().
  *
  * Direct instantiation (no TestBed).
@@ -84,12 +85,17 @@ function makeApi() {
     cancel: jest.fn(() => of({ movementId: 'mv-cancelled', status: 'CANCELLED' })),
     acknowledge: jest.fn(() => of({ movementId: 'mv-acknowledged', status: 'PENDING' })),
     withdrawMakerSubmit: jest.fn(() => of({ movementId: 'mv-withdrawn', status: 'PENDING', makerSubmittedAt: null })),
+    editPending: jest.fn(() => of({ movementId: 'mv-edited', status: 'PENDING', amount: '999' })),
     resolveContract: jest.fn(() => of(makeContract())),
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(() => of(makeSnapshot())),
     getContract: jest.fn(() => of(makeContract())),
     listMovements: jest.fn(() => of([] as any[])),
     findByBusinessEventId: jest.fn(() => of([] as any[])),
+    // MakerQueueService (constructed with this same mock via TransactionBuilderComponent's own default
+    // param) calls this internally after a successful deletePending()/withdrawMakerSubmit() — needed for
+    // onDeletePendingReviewConfirmed()'s own tests below, harmless default for every other test here.
+    listMyMovements: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
   };
 }
 
@@ -255,6 +261,40 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.release();
 
       expect(syncFromSpy).not.toHaveBeenCalled();
+    });
+
+    // 2026-08-28 (live-reported, "A3交易 SUBMIT後 CHECKER沒顯示" → "不只a3 所有交易submit 或 sAVE fIX
+    // PENDING都不出現 checker畫面") — the Checker panel was always correctly populated, just positioned
+    // below the fold on a normal viewport; onMakerSyncRequested() now scrolls it into view on the SAME
+    // alsoSyncLookup signal that already means "a genuine Submit/Fix Pending Save/Release/Reject just
+    // succeeded".
+    describe('onMakerSyncRequested() — scrolls the Checker panel into view', () => {
+      it('scrolls #checkerPanelEl into view when alsoSyncLookup is true', () => {
+        const { comp } = setup();
+        const scrollIntoView = jest.fn();
+        (comp as any).checkerPanelEl = { nativeElement: { scrollIntoView } };
+
+        comp.onMakerSyncRequested({ lcNumber: 'LC-1', secondaryRef: null, alsoSyncLookup: true, instrumentType: 'IPLC_LC' });
+
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      });
+
+      it('does NOT scroll on a mere selection pick (alsoSyncLookup: false)', () => {
+        const { comp } = setup();
+        const scrollIntoView = jest.fn();
+        (comp as any).checkerPanelEl = { nativeElement: { scrollIntoView } };
+
+        comp.onMakerSyncRequested({ lcNumber: 'LC-1', secondaryRef: null, alsoSyncLookup: false, instrumentType: 'IPLC_LC' });
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
+      });
+
+      it('is a harmless no-op when the Checker panel is not currently rendered (checkerPanelEl undefined — e.g. Maker Queue Delete Pending review)', () => {
+        const { comp } = setup();
+        (comp as any).checkerPanelEl = undefined;
+
+        expect(() => comp.onMakerSyncRequested({ lcNumber: 'LC-1', secondaryRef: null, alsoSyncLookup: true, instrumentType: 'IPLC_LC' })).not.toThrow();
+      });
     });
 
     it('plain path: derives checker2 when createdBy is not maker1', () => {
@@ -718,267 +758,281 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   // ---------------------------------------------------------------------
-  // deleteMakerPending() — Maker EC / Cancel, distinct from reject()
+  // fixPending() — Fix Pending trial (analysis/Balance-Component-FixPending-DeletePending-
+  // Proposal-zh.md §2.2/§15/§19), A1/A3
   // ---------------------------------------------------------------------
-  describe('deleteMakerPending()', () => {
-    it('no-ops when there is no submitResult, or status is not PENDING/REJECTED', () => {
+  describe('fixPending()', () => {
+    it('no-ops when there is no submitResult, when the movementId does not match, or when status is not PENDING/REJECTED', () => {
       const { comp, api } = setup();
-      comp.deleteMakerPending();
-      expect(api.cancel).not.toHaveBeenCalled();
 
-      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'RELEASED' }) });
-      comp.deleteMakerPending();
-      expect(api.cancel).not.toHaveBeenCalled();
-    });
+      comp.fixPending({ movementId: 'mv-1', amount: '999' });
+      expect(api.editPending).not.toHaveBeenCalled();
 
-    // Fix Pending/Delete Pending Phase 1 (analysis/Balance-Component-FixPending-DeletePending-
-    // Proposal-zh.md §2.4) — "Checker Reject 不代表交易已取消或刪除": a REJECTED movement must still
-    // be Delete-Pending-able, same as PENDING. Backend already allows REJECTED -> CANCELLED
-    // (statusTransition.ts); this was purely a front-end/component guard gap.
-    it('REJECTED path: calls api.cancel with createdBy/MAKER_EC, same as PENDING', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A2);
-      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'REJECTED' }) });
-      api.cancel.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'CANCELLED' }) as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledWith('mv-1', 'maker1', 'MAKER_EC');
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'CANCELLED' } });
-    });
-
-    it('plain path: calls api.cancel with createdBy/MAKER_EC, distinct from reject()', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A2);
-      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
-      api.cancel.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'CANCELLED' }) as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledWith('mv-1', 'maker1', 'MAKER_EC');
-      expect(api.reject).not.toHaveBeenCalled();
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'CANCELLED' } });
-      expect(comp.actionBusy).toBe(false);
-    });
-
-    it('plain path: a failed cancel sets submitError', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A2);
       setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
-      api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.deleteMakerPending();
-
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
-    });
-
-    it('A3S: cancels the linked SG redemption FIRST, then the primary Document Arrival', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A3S);
-      setMakerContext(comp, {
-        createdBy: 'maker1',
-        arrivalSgRedeemMovementId: 'mv-sg-redeem',
-        submitResult: makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' }),
-      });
-      api.cancel
-        .mockReturnValueOnce(of({ movementId: 'mv-sg-redeem', status: 'CANCELLED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'CANCELLED' }) as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenNthCalledWith(1, 'mv-sg-redeem', 'maker1', 'MAKER_EC');
-      expect(api.cancel).toHaveBeenNthCalledWith(2, 'mv-doc-arrival', 'maker1', 'MAKER_EC');
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-doc-arrival', status: 'CANCELLED' } });
-    });
-
-    it('A3S: a failed SG cancel leaves the primary un-cancelled', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(A3S);
-      setMakerContext(comp, { arrivalSgRedeemMovementId: 'mv-sg-redeem', submitResult: makeMovement({ movementId: 'mv-doc-arrival', status: 'PENDING' }) });
-      api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.makerOutcomeSignal).toEqual({
-        kind: 'failed',
-        message: 'Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    it('B4 Sight (createsIssuingBankReceivableOnHonour): cancels the asset FIRST, then the primary HONOUR', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        createdBy: 'maker1',
-        dueFromIssuingBankMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }),
-      });
-      api.cancel
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'CANCELLED' }) as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenNthCalledWith(1, 'mv-receivable', 'maker1', 'MAKER_EC');
-      expect(api.cancel).toHaveBeenNthCalledWith(2, 'mv-honour', 'maker1', 'MAKER_EC');
-    });
-
-    it('B4 Sight: a failed asset cancel leaves the Confirmation Honour un-cancelled', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, { dueFromIssuingBankMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }) });
-      api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.makerOutcomeSignal).toEqual({
-        kind: 'failed',
-        message: 'Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    it('B4 Usance: cancels the Receivable, THEN the Acceptance, THEN the primary ACCEPT, in reverse-creation order', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        createdBy: 'maker1',
-        acceptanceMovementId: 'mv-acceptance',
-        acceptanceReimbReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
-      });
-      api.cancel
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'CANCELLED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'CANCELLED' }) as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenNthCalledWith(1, 'mv-receivable', 'maker1', 'MAKER_EC');
-      expect(api.cancel).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'maker1', 'MAKER_EC');
-      expect(api.cancel).toHaveBeenNthCalledWith(3, 'mv-accept', 'maker1', 'MAKER_EC');
-    });
-
-    it('B4 Usance: a failed Receivable cancel never attempts the Acceptance/primary cancel', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        acceptanceMovementId: 'mv-acceptance',
-        acceptanceReimbReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
-      });
-      api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.makerOutcomeSignal).toEqual({
-        kind: 'failed',
-        message: 'Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    it('B4 Usance: Receivable cancel succeeds but Acceptance cancel fails', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        acceptanceMovementId: 'mv-acceptance',
-        acceptanceReimbReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
-      });
-      api.cancel
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
-        .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledTimes(2);
-      expect(comp.makerOutcomeSignal).toEqual({
-        kind: 'failed',
-        message: 'Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    it('B5 settlesAcceptanceOnMature: cancels the matching Receivable FIRST, then the primary Settle', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      setMakerContext(comp, {
-        createdBy: 'maker1',
-        matchedReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }),
-      });
-      api.cancel
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'CANCELLED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'CANCELLED' }) as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenNthCalledWith(1, 'mv-receivable', 'maker1', 'MAKER_EC');
-      expect(api.cancel).toHaveBeenNthCalledWith(2, 'mv-settle', 'maker1', 'MAKER_EC');
-    });
-
-    it('B5: a failed Receivable cancel leaves the primary Settle un-cancelled', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
-      api.cancel.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.deleteMakerPending();
-
-      expect(api.cancel).toHaveBeenCalledTimes(1);
-      expect(comp.makerOutcomeSignal).toEqual({
-        kind: 'failed',
-        message: 'Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-  });
-
-  // ---------------------------------------------------------------------
-  // withdrawMakerPending() — A4's own Delete Pending (business-confirmed 2026-08-27)
-  // ---------------------------------------------------------------------
-  describe('withdrawMakerPending()', () => {
-    it('no-ops when there is no submitResult, or status is not PENDING/REJECTED', () => {
-      const { comp, api } = setup();
-      comp.withdrawMakerPending();
-      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+      comp.fixPending({ movementId: 'mv-OTHER', amount: '999' });
+      expect(api.editPending).not.toHaveBeenCalled();
 
       setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'RELEASED' }) });
-      comp.withdrawMakerPending();
-      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+      comp.fixPending({ movementId: 'mv-1', amount: '999' });
+      expect(api.editPending).not.toHaveBeenCalled();
     });
 
-    it('PENDING path: calls api.withdrawMakerSubmit with submitResult\'s movementId/createdBy, not api.cancel', () => {
+    it('PENDING path: calls api.editPending with the movementId + patched amount, forwards a "released" outcome to Maker', () => {
       const { comp, api } = setup();
       setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
-      api.withdrawMakerSubmit.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'PENDING', makerSubmittedAt: null }) as any);
+      api.editPending.mockReturnValueOnce(of({ movementId: 'mv-edited', status: 'PENDING', amount: '95000' }) as any);
 
-      comp.withdrawMakerPending();
+      comp.fixPending({ movementId: 'mv-1', amount: '95000' });
 
-      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-1', 'maker1');
-      expect(api.cancel).not.toHaveBeenCalled();
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'released', result: { movementId: 'mv-1', status: 'PENDING', makerSubmittedAt: null } });
+      expect(api.editPending).toHaveBeenCalledWith('mv-1', { amount: '95000', editedBy: 'maker1' });
+      // secondary: {} — no businessEventId on the edited movement here, so
+      // CheckerActionsService.resolveArrivalSgLegAfterEdit() short-circuits without a lookup (see the
+      // Phase 4 compound-cascade test below for the non-empty case).
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'released',
+        result: { movementId: 'mv-edited', status: 'PENDING', amount: '95000' },
+        secondary: {},
+      });
       expect(comp.actionBusy).toBe(false);
+    });
+
+    // Phase 4 (2026-08-28, "使用同樣方式處理A3 A35 A4 & B2") — an A3S compound Fix Pending edit's own
+    // resolved SG leg reaches the Maker panel via `secondary`.
+    it('compound (A3S) PENDING path: resolves the SG leg via findByBusinessEventId and includes it in the forwarded outcome\'s own secondary', () => {
+      const { comp, api } = setup();
+      setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-utilize', status: 'PENDING' }) });
+      const editedUtilize = makeMovement({ movementId: 'mv-utilize-edited', status: 'PENDING', amount: '8000', businessEventId: 'be-a3s' });
+      api.editPending.mockReturnValueOnce(of(editedUtilize) as any);
+      const rejectedOther = makeMovement({ movementId: 'mv-sg-rejected', movementType: 'PARTIAL_REDEEM', status: 'REJECTED', businessEventId: 'be-a3s' });
+      const newSg = makeMovement({ movementId: 'mv-sg-new', movementType: 'PARTIAL_REDEEM', status: 'PENDING', businessEventId: 'be-a3s' });
+      api.findByBusinessEventId.mockReturnValueOnce(of([rejectedOther, editedUtilize, newSg]) as any);
+
+      comp.fixPending({ movementId: 'mv-utilize', amount: '8000' });
+
+      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-a3s');
+      expect(comp.makerOutcomeSignal).toEqual({
+        kind: 'released',
+        result: editedUtilize,
+        secondary: { arrivalSgRedeemMovementId: 'mv-sg-new', arrivalSgRedeemMovement: newSg },
+      });
     });
 
     it('REJECTED path: same call shape as PENDING', () => {
       const { comp, api } = setup();
       setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1', status: 'REJECTED' }) });
-      api.withdrawMakerSubmit.mockReturnValueOnce(of({ movementId: 'mv-1', status: 'PENDING', makerSubmittedAt: null }) as any);
 
-      comp.withdrawMakerPending();
+      comp.fixPending({ movementId: 'mv-1', amount: '30000' });
 
-      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-1', 'maker1');
+      expect(api.editPending).toHaveBeenCalledWith('mv-1', { amount: '30000', editedBy: 'maker1' });
     });
 
-    it('a failed withdraw sets submitError via makerOutcomeSignal', () => {
+    it('a failed Fix Pending sets submitError via makerOutcomeSignal', () => {
       const { comp, api } = setup();
       setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-1', status: 'PENDING' }) });
-      api.withdrawMakerSubmit.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
+      api.editPending.mockReturnValueOnce(apiErr('INSUFFICIENT_AVAILABLE_BALANCE') as any);
 
-      comp.withdrawMakerPending();
+      comp.fixPending({ movementId: 'mv-1', amount: '999999999' });
 
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'INSUFFICIENT_AVAILABLE_BALANCE' });
+    });
+  });
+
+  describe('onMakerQueueFixPending() (2026-08-28, "Maker Queue Need to provide Fix Pending button as well")', () => {
+    it('no-ops when the row\'s own Function cannot be resolved at all', () => {
+      const { comp } = setup();
+      const row = { movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueFixPending(row as any);
+
+      expect(comp.selectedFunction).toBeNull();
+      expect(comp.externalFixPendingRequest).toBeNull();
+    });
+
+    it('switches to Transaction Processing, selects the row\'s own resolved Function (A1), and feeds a fresh copy of the movement into externalFixPendingRequest', () => {
+      const { comp } = setup();
+      comp.activeMode = 'MAKER_QUEUE';
+      const movement = makeMovement({ movementId: 'mv-9', movementType: 'ISSUE', businessEventId: null });
+      const row = { movement, contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueFixPending(row as any);
+
+      expect(comp.activeMode).toBe('PROCESSING');
+      expect(comp.selectedFunction?.code).toBe('A1');
+      expect(comp.externalFixPendingRequest).toEqual(movement);
+      expect(comp.externalFixPendingRequest).not.toBe(movement); // fresh object — see this method's own doc comment on why ngOnChanges() needs a reference change every click
+    });
+
+    it('resolves A3 for a plain (non-compound) UTILIZE row', () => {
+      const { comp } = setup();
+      const movement = makeMovement({ movementId: 'mv-10', movementType: 'UTILIZE', businessEventId: null, makerSubmittedAt: null });
+      const row = { movement, contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueFixPending(row as any);
+
+      expect(comp.selectedFunction?.code).toBe('A3');
+    });
+
+    it('a second click on the same still-loaded row (same movement object reference) still assigns a genuinely fresh externalFixPendingRequest object each time', () => {
+      const { comp } = setup();
+      const movement = makeMovement({ movementType: 'ISSUE', businessEventId: null });
+      const row = { movement, contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueFixPending(row as any);
+      const first = comp.externalFixPendingRequest;
+      comp.onMakerQueueFixPending(row as any);
+      const second = comp.externalFixPendingRequest;
+
+      expect(first).not.toBe(second);
+      expect(first).toEqual(second);
+    });
+  });
+
+  describe('onMakerQueueDeletePendingReview() / onDeletePendingReviewConfirmed() / onDeletePendingReviewCancelled() (2026-08-28, "Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否")', () => {
+    it('onMakerQueueDeletePendingReview() no-ops when the row\'s own Function cannot be resolved at all', () => {
+      const { comp } = setup();
+      const row = { movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueDeletePendingReview(row as any);
+
+      expect(comp.selectedFunction).toBeNull();
+      expect(comp.externalDeletePendingReviewRequest).toBeNull();
+      expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+    });
+
+    it('onMakerQueueDeletePendingReview() switches to Transaction Processing, selects the resolved Function, keeps the original row, and feeds a fresh copy of the movement into externalDeletePendingReviewRequest', () => {
+      const { comp } = setup();
+      comp.activeMode = 'MAKER_QUEUE';
+      const movement = makeMovement({ movementId: 'mv-del-1', movementType: 'ISSUE', businessEventId: null });
+      const row = { movement, contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueDeletePendingReview(row as any);
+
+      expect(comp.activeMode).toBe('PROCESSING');
+      expect(comp.selectedFunction?.code).toBe('A1');
+      expect(comp.pendingMakerQueueDeleteRow).toBe(row); // the ORIGINAL row (with any siblingMovementIds), not a copy
+      expect(comp.externalDeletePendingReviewRequest).toEqual(movement);
+      expect(comp.externalDeletePendingReviewRequest).not.toBe(movement); // fresh object, same reasoning as onMakerQueueFixPending()
+    });
+
+    it('onDeletePendingReviewConfirmed() no-ops when there is no pending row', () => {
+      const { comp, api } = setup();
+      comp.pendingMakerQueueDeleteRow = null;
+
+      comp.onDeletePendingReviewConfirmed();
+
+      expect(api.cancel).not.toHaveBeenCalled();
+      expect(comp.actionBusy).toBe(false);
+    });
+
+    it('onDeletePendingReviewConfirmed() calls MakerQueueService.deletePending() with the ORIGINAL row (cascade-aware), is already busy by the time the call settles, then clears the pending row and returns to Maker Queue', () => {
+      const { comp, api } = setup();
+      const row = { movement: makeMovement({ movementId: 'mv-del-2', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }), siblingMovementIds: ['mv-del-2', 'mv-sibling'] };
+      comp.pendingMakerQueueDeleteRow = row as any;
+      comp.activeMode = 'PROCESSING';
+      let wasBusyDuringCall = false;
+      const deleteSpy = jest.spyOn(comp.makerQueue, 'deletePending').mockImplementation((_r, onSettled) => {
+        wasBusyDuringCall = comp.actionBusy; // captured mid-call, before the (synchronous, of()-based) mock's own onSettled fires
+        onSettled?.(true);
+      });
+
+      comp.onDeletePendingReviewConfirmed();
+
+      expect(wasBusyDuringCall).toBe(true); // actionBusy was set BEFORE deletePending() was even called
+      expect(deleteSpy).toHaveBeenCalledWith(row, expect.any(Function));
+      expect(comp.actionBusy).toBe(false); // settled synchronously (of()-based mocks) by this point
+      expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+      expect(comp.activeMode).toBe('MAKER_QUEUE');
+    });
+
+    it('onDeletePendingReviewCancelled() discards the pending row and returns to Maker Queue without ever calling the delete API', () => {
+      const { comp, api } = setup();
+      const row = { movement: makeMovement({ movementId: 'mv-del-3' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      comp.pendingMakerQueueDeleteRow = row as any;
+      comp.activeMode = 'PROCESSING';
+
+      comp.onDeletePendingReviewCancelled();
+
+      expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+      expect(comp.activeMode).toBe('MAKER_QUEUE');
+      expect(api.cancel).not.toHaveBeenCalled();
+    });
+
+    // Real bug found live 2026-08-28 ("✎ FIX PENDING... 🗑 DELETE PENDING — REVIEW..." both banners shown
+    // together for the SAME movement) — see selectMode()'s own doc comment for the root cause
+    // (`<app-maker-panel>` is destroyed on leaving 'PROCESSING' and recreated fresh on return, so a
+    // stale non-null `externalFixPendingRequest`/`externalDeletePendingReviewRequest` left over from an
+    // earlier click would silently re-fire alongside a genuinely new one).
+    it('a Fix Pending review followed by a Delete Pending review for a DIFFERENT row never leaves externalFixPendingRequest stale — only one of the two external-request signals is ever non-null at a time', () => {
+      const { comp } = setup();
+      const fixRow = { movement: makeMovement({ movementId: 'mv-fix-1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const deleteRow = { movement: makeMovement({ movementId: 'mv-del-9', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueFixPending(fixRow as any);
+      expect(comp.externalFixPendingRequest).not.toBeNull();
+
+      // Leaving Transaction Processing (e.g. navigating back to Maker Queue) is exactly the point that
+      // destroys <app-maker-panel> — selectMode() itself is the fix under test here.
+      comp.selectMode('MAKER_QUEUE');
+      expect(comp.externalFixPendingRequest).toBeNull();
+      expect(comp.externalDeletePendingReviewRequest).toBeNull();
+
+      comp.onMakerQueueDeletePendingReview(deleteRow as any);
+
+      expect(comp.externalFixPendingRequest).toBeNull(); // the stale Fix Pending signal must NOT survive into this fresh instance's own ngOnChanges()
+      expect(comp.externalDeletePendingReviewRequest).toEqual(deleteRow.movement);
+    });
+
+    it('the reverse order (Delete Pending review, then Fix Pending for a different row) is equally safe', () => {
+      const { comp } = setup();
+      const deleteRow = { movement: makeMovement({ movementId: 'mv-del-10', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const fixRow = { movement: makeMovement({ movementId: 'mv-fix-2', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+
+      comp.onMakerQueueDeletePendingReview(deleteRow as any);
+      expect(comp.externalDeletePendingReviewRequest).not.toBeNull();
+
+      comp.selectMode('MAKER_QUEUE');
+      comp.onMakerQueueFixPending(fixRow as any);
+
+      expect(comp.externalDeletePendingReviewRequest).toBeNull();
+      expect(comp.externalFixPendingRequest).toEqual(fixRow.movement);
+    });
+
+    it('selectMode() leaves both external-request signals untouched while staying in/entering PROCESSING (only a genuine exit clears them)', () => {
+      const { comp } = setup();
+      const movement = makeMovement({ movementId: 'mv-stay', movementType: 'ISSUE', businessEventId: null });
+      comp.externalFixPendingRequest = movement;
+
+      comp.selectMode('PROCESSING');
+
+      expect(comp.externalFixPendingRequest).toBe(movement);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // onFixPendingCancelled() (2026-08-28, "FIX PENDING OR DELETE PENDING 按CANCEL 回到原來的MAKER QUEUE畫面")
+  // ---------------------------------------------------------------------
+  describe('onFixPendingCancelled()', () => {
+    it('navigates back to Maker Queue and clears externalFixPendingRequest when Fix Pending was Maker-Queue-originated', () => {
+      const { comp } = setup();
+      const row = { movement: makeMovement({ movementId: 'mv-fix-cancel-1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      comp.onMakerQueueFixPending(row as any);
+      expect(comp.externalFixPendingRequest).not.toBeNull();
+      comp.activeMode = 'PROCESSING';
+
+      comp.onFixPendingCancelled();
+
+      expect(comp.externalFixPendingRequest).toBeNull();
+      expect(comp.activeMode).toBe('MAKER_QUEUE');
+    });
+
+    it('is a no-op when Fix Pending was started in-session (not via Maker Queue) — stays on the current screen', () => {
+      const { comp } = setup();
+      comp.externalFixPendingRequest = null;
+      comp.activeMode = 'PROCESSING';
+
+      comp.onFixPendingCancelled();
+
+      expect(comp.activeMode).toBe('PROCESSING');
     });
   });
 
@@ -1778,6 +1832,41 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.getContract).not.toHaveBeenCalled();
     });
 
+    // Bug fixed 2026-08-29 (live-reported, "A4 Checker View Voucher shows EARMARKED 不對 應該是PENDING") —
+    // never passed `phase` at all, so a still-PENDING A4-in-progress record (the SAME underlying A3/A3S
+    // UTILIZE row) fell back to A3's own EARMARKING label. Same derivation rule as
+    // MakerPanelComponent.resultPhase's own doc comment already established for the Maker Result panel.
+    it('A4 (releasesExistingMovementInPlace, own Maker Submit already done): derives phase "finalize" so the dialog shows PENDING, not EARMARKING', () => {
+      const { comp } = setup();
+      comp.selectedFunction = A4;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', makerSubmittedAt: '2026-08-29T00:00:00.000Z', referencedTransactionId: null, businessEventId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(comp.accountEntryDialogPhase).toBe('finalize');
+    });
+
+    it('A4 whose own Maker Submit has NOT happened yet stays phase null (still genuinely A3\'s own EARMARKING territory)', () => {
+      const { comp } = setup();
+      comp.selectedFunction = A4;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', makerSubmittedAt: null, referencedTransactionId: null, businessEventId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(comp.accountEntryDialogPhase).toBeNull();
+    });
+
+    it('a non-A4 Function (e.g. A3) never gets phase "finalize" even with makerSubmittedAt set on the record', () => {
+      const { comp } = setup();
+      const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
+      comp.selectedFunction = A3;
+      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', makerSubmittedAt: '2026-08-29T00:00:00.000Z', referencedTransactionId: null, businessEventId: null });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(comp.accountEntryDialogPhase).toBeNull();
+    });
+
     it('A6 (IPLC_ACCEPTANCE): resolves the referenced UTILIZE via getContract -> resolveContract(IPLC_LC) -> listMovements, and fills in linkedMovement', () => {
       const { comp, api } = setup();
       comp.selectedFunction = A6;
@@ -1854,6 +1943,21 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-a3s');
       expect(comp.accountEntryDialogLinkedMovement).toBe(sgRedeem);
+    });
+
+    // 2026-08-28 (live-reported, "S01 A35 已經把SG的帳沖掉了 所以A4 不需再冲SG的帳 只要冲LC的帳即可") —
+    // once A3S's own Checker has acknowledged the UTILIZE (the SG leg is ALREADY independently, for-real
+    // RELEASED at that point — "already 沖帳"), the SAME record's own Account Entries view (now A4's own
+    // business, not A3S's) must NOT merge the SG leg back in — it belongs to an already-closed event.
+    it('A3S UTILIZE that has ALREADY been acknowledged (A3S Checker already Released — SG leg already booked) does NOT merge the SG leg — this is now A4\'s own business, not A3S\'s', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A3S;
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', businessEventId: 'be-a3s', acknowledgedAt: '2026-08-28T00:00:00.000Z' });
+
+      comp.openCheckerAccountEntryDialog();
+
+      expect(api.findByBusinessEventId).not.toHaveBeenCalled();
+      expect(comp.accountEntryDialogLinkedMovement).toBeNull();
     });
 
     it('A3 (plain, not A3S): IPLC_LC/UTILIZE with NO businessEventId — no lookup attempted, unaffected by the A3S fix', () => {

@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
-import { BalanceComponentApiService, BalanceMovement } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceMovement, EditMovementRequest } from './balance-component-api.service';
 import { TransactionFunction } from './balance-component.model';
 import { describeApiError } from './api-error';
 import { deriveFunctionStrategy } from './function-strategy';
+import { MakerSubmitSecondary } from './maker-submit.service';
 
 /**
  * Owns Checker release/reject/cancel API orchestration — which call to make, in what order, under what
@@ -32,7 +33,14 @@ export interface CheckerActionContext {
 }
 
 export type CheckerActionOutcome =
-  | { kind: 'released'; result: BalanceMovement }
+  /**
+   * `secondary` (2026-08-28, Phase 4) — populated ONLY by `editPending()` below, and only when the edited
+   * movement's own `businessEventId` resolves a linked SG redemption leg (A3S's own compound cascade);
+   * every other `'released'` producer (`release()`/`reject()`/the plain single-leg `editPending()` path)
+   * leaves it `undefined`, same "only present when a flow actually resolved it" convention
+   * `MakerSubmitSecondary` itself already establishes for `maker-submit.service.ts`'s own compound Submit.
+   */
+  | { kind: 'released'; result: BalanceMovement; secondary?: MakerSubmitSecondary }
   /** A3S's own acknowledgment-only path (releaseArrivalDocument's old shape) — no API call, no `result`. */
   | { kind: 'documentArrivalAcknowledged' }
   | { kind: 'failed'; message: string };
@@ -160,83 +168,52 @@ export class CheckerActionsService {
   }
 
   /**
-   * A4's own Delete Pending (business-confirmed 2026-08-27, "做 A4 或 A6 DELETE PENDING 後 交易退回到 A4
-   * 或 A6 SUBMIT 前即可") — A4 has no movement of its own (BAL-122: `releasesExistingMovementInPlace`),
-   * so `deleteMakerPending()` below (which cancels `ctx.submitResult`'s own movement) would destroy the
-   * upstream A3/A3S Document Arrival instead of just undoing A4's own Submit attempt. Routes to
-   * `withdrawMakerSubmit()` instead — see that API method's own doc comment for what it does server-side.
+   * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+   * 2026-08-27; per-field config 2026-08-28, "頁面配置檔 for A1-A11/B1-B7"; widened A1/A3 → A1/A2/A3/B1
+   * same day, "把這A1 A3 修改要求放置B1 A2試試看"; A3S/B2 widened further the same day, "使用同樣方式處理
+   * A3 A35 A4 & B2") — corrects `ctx.submitResult`'s own PENDING/REJECTED movement in place of a Delete
+   * Pending + full re-Submit. `api.editPending()` is generic across every movementType/compound shape
+   * already (the microservice's own `BalanceService.editPending()` decides internally whether a compound
+   * A3S cascade applies) — this method's only own job beyond the plain pass-through is resolving the SG
+   * leg's own FRESH replacement afterward (`resolveArrivalSgLegAfterEdit()` below) so the caller's own
+   * `compoundLegs.arrivalSgRedeemMovement` doesn't keep pointing at the replaced predecessor SG row — same
+   * "re-resolve via businessEventId, never trust stale in-memory state" convention
+   * `resolveLinkedAccountingMovement()` (`transaction-builder.component.ts`) already established for the
+   * Account Entries dialog. `patch` carries whichever fields `MakerPanelComponent.confirmFixPending()`
+   * decided to send, per the current Function's own `fixPendingEditableFields` set — this service is a
+   * pure pass-through, it never re-derives which fields are editable itself. Reuses the `'released'`
+   * outcome kind — a generic "successful mutation, here's the resulting movement to display" signal, not
+   * literally "released" in the Checker sense (same convention `release()`/`reject()` above already
+   * establish).
    */
-  withdrawMakerPending(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
-    if (!ctx.createdBy) return this.fail('Cannot withdraw this Maker Submit — no Maker (createdBy) is known for it.');
-    if (!ctx.submitResult) return this.fail('Cannot withdraw this Maker Submit — no A4 submission is known for it.');
-    return this.api.withdrawMakerSubmit(ctx.submitResult.movementId, ctx.createdBy).pipe(
-      switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
+  editPending(ctx: CheckerActionContext, patch: Omit<EditMovementRequest, 'editedBy'>): Observable<CheckerActionOutcome> {
+    if (!ctx.submitResult) return this.fail('Cannot Fix Pending — no submission is known for it.');
+    const editedBy = ctx.createdBy || 'maker1';
+    return this.api.editPending(ctx.submitResult.movementId, { ...patch, editedBy }).pipe(
+      switchMap((res) => this.resolveArrivalSgLegAfterEdit(res).pipe(map((secondary) => ({ kind: 'released' as const, result: res, secondary })))),
       catchError((err) => this.fail(describeApiError(err))),
     );
   }
 
   /**
-   * Maker-initiated withdrawal of their own just-submitted item while still PENDING, via /cancel
-   * (distinct from /reject's Checker-side decline). For A3S/B3/B4-usance/B5, cancels the linked
-   * secondary/asset leg(s) FIRST (reverse creation order) so an EC never leaves a later leg orphaned.
+   * Best-effort refresh of an A3S compound edit's own linked SG redemption leg — `res.businessEventId`
+   * is non-null ONLY for a compound-shaped movement (A3S's UTILIZE, or a passthrough test value; either
+   * way a harmless no-sibling-found `{}` for anything that isn't genuinely A3S's own matched pair). A
+   * lookup failure here does NOT fail the edit itself — the edit already succeeded server-side by the
+   * time this runs; `compoundLegs` simply stays whatever it was, same as it always has for every OTHER
+   * Fix Pending edit before this one existed.
    */
-  deleteMakerPending(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
-    // Runtime guard rather than a non-null assertion — submit() already requires model.createdBy before
-    // a Maker submission can exist to delete, but this proves it rather than assuming it.
-    if (!ctx.createdBy) return this.fail('Cannot delete this Maker submission — no Maker (createdBy) is known for it.');
-    const cancelledBy = ctx.createdBy;
-    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
-    const cancelPrimary = (): Observable<CheckerActionOutcome> =>
-      this.api.cancel(ctx.submitResult!.movementId, cancelledBy, 'MAKER_EC').pipe(
-        switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
-        catchError((err) => this.fail(describeApiError(err))),
-      );
-
-    if (ctx.selectedFunction && deriveFunctionStrategy(ctx.selectedFunction).compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && ctx.arrivalSgRedeemMovementId) {
-      return this.api.cancel(ctx.arrivalSgRedeemMovementId, cancelledBy, 'MAKER_EC').pipe(
-        switchMap(() => cancelPrimary()),
-        catchError((err) => this.fail(`Could not delete the Shipping Guarantee redemption — Document Arrival NOT deleted: ${describeApiError(err)}`)),
-      );
-    }
-
-    // B3 (createsIssuingBankReceivableOnHonour) — cancel the linked Due from Issuing Bank asset FIRST,
-    // so an EC on the Confirmation Honour never leaves it orphaned.
-    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && ctx.dueFromIssuingBankMovementId) {
-      return this.api.cancel(ctx.dueFromIssuingBankMovementId, cancelledBy, 'MAKER_EC').pipe(
-        switchMap(() => cancelPrimary()),
-        catchError((err) => this.fail(`Could not delete the Due from Issuing Bank asset — Confirmation Honour NOT deleted: ${describeApiError(err)}`)),
-      );
-    }
-
-    // B4's Usance/ACCEPT branch (createsAcceptanceReimbReceivableOnCreate) — reverse creation order:
-    // cancel the Reimbursement Receivable asset FIRST, then the Acceptance liability, THEN the primary
-    // Confirmation ACCEPT.
-    if (strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && ctx.acceptanceReimbReceivableMovementId && ctx.acceptanceMovementId) {
-      return this.api.cancel(ctx.acceptanceReimbReceivableMovementId, cancelledBy, 'MAKER_EC').pipe(
-        switchMap(() =>
-          this.api.cancel(ctx.acceptanceMovementId!, cancelledBy, 'MAKER_EC').pipe(
-            switchMap(() => cancelPrimary()),
-            catchError((err) =>
-              this.fail(
-                `Reimbursement Receivable deleted, but the Acceptance liability could not be — Confirmation Accept NOT deleted: ${describeApiError(err)}`,
-              ),
-            ),
-          ),
-        ),
-        catchError((err) => this.fail(`Could not delete the Reimbursement Receivable asset — Acceptance NOT deleted: ${describeApiError(err)}`)),
-      );
-    }
-
-    // B5's Usance/CNF_MATURE branch (settlesAcceptanceOnMature) — cancel the matching Reimbursement
-    // Receivable's REIMBURSE FIRST, then the primary Acceptance FULL_SETTLE/PARTIAL_SETTLE.
-    if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && ctx.matchedReceivableMovementId) {
-      return this.api.cancel(ctx.matchedReceivableMovementId, cancelledBy, 'MAKER_EC').pipe(
-        switchMap(() => cancelPrimary()),
-        catchError((err) => this.fail(`Could not delete the matching Reimbursement Receivable — Acceptance Settle NOT deleted: ${describeApiError(err)}`)),
-      );
-    }
-
-    return cancelPrimary();
+  private resolveArrivalSgLegAfterEdit(res: BalanceMovement): Observable<MakerSubmitSecondary> {
+    if (!res.businessEventId) return of<MakerSubmitSecondary>({});
+    return this.api.findByBusinessEventId(res.businessEventId).pipe(
+      map((movements) => {
+        // findByBusinessEventId() returns every movement sharing this businessEventId — status: 'PENDING'
+        // picks the genuine SG redeem leg, not one that (independently) already RELEASED/REJECTED.
+        const sg = movements.find((m) => m.status === 'PENDING' && (m.movementType === 'FULL_REDEEM' || m.movementType === 'PARTIAL_REDEEM'));
+        return sg ? { arrivalSgRedeemMovementId: sg.movementId, arrivalSgRedeemMovement: sg } : {};
+      }),
+      catchError(() => of<MakerSubmitSecondary>({})),
+    );
   }
 
   /** B5's Usance/CNF_MATURE branch only — second leg, releasing the matching Reimbursement Receivable's REIMBURSE after the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE was already released above. */

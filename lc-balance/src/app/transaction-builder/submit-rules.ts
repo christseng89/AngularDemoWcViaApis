@@ -106,6 +106,12 @@ function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boo
   if (model.movementType !== 'CLOSE' && model.movementType !== 'REOPEN' && !isAmendExpiryDate && Number(model.amount) <= 0) {
     return 'Amount must be greater than 0.';
   }
+  // User-directed 2026-08-28 ("Tolerance MUST >= 0") — mirrors the microservice's own
+  // BalanceService.assertToleranceNonNegative(); empty/absent is untouched (Tolerance stays optional even
+  // where applicable, see builder-fields.ts's own tolerancePct field) — this only rejects a typed negative.
+  if (toleranceApplicable(model) && model.tolerancePct != null && model.tolerancePct !== '' && Number(model.tolerancePct) < 0) {
+    return 'Tolerance % must not be negative.';
+  }
   return null;
 }
 
@@ -331,8 +337,21 @@ export function hasEligibleTargetSelected(ctx: SubmitRulesContext): boolean {
   if (!selectedFunction) return false;
   if (isCreatingMovement(model) && !hasParent(model)) return true; // A1/B1 — requirement doesn't apply
   const strategy = deriveFunctionStrategy(selectedFunction);
-  // A6/A8/B3 (creating + hasParent) — the Parent LC itself must be picked first.
-  if (lcNumberFromParent(model) && !ctx.selectedParent) return false;
+  // A6/A8/B3 (creating + hasParent) — the Parent LC itself must be picked first. `selectedContract` is
+  // also accepted (not just `selectedParent`) — bug found live 2026-08-28 ("Maker Queue -> Fix Pending
+  // -> Save... 不得再次要求使用者選擇 LC / Index Record"): A8/B3's own Fix Pending reconstruction
+  // (`reconstructScreenForSubmitResult()`) sets `selectedContract` but never `selectedParent` (no Parent
+  // LC picker interaction happens during a Fix-Pending-driven screen), so once Fix Pending Save completes
+  // (`fixPendingMode` flips back to `false`, no longer masking this via `isExternalReviewMode`), this
+  // check alone would have re-reported "no target selected" and re-shown the LC Index picker for a
+  // record that was never actually un-selected. Safe to accept `selectedContract` here for this
+  // shape specifically — `onSelectParent()`'s own existing alias (`this.selectedContract =
+  // this.selectedParent`, the same A8/B3-only shape documented on that assignment) already means the two
+  // agree throughout a normal live flow too, so this never accepts a genuinely different target. A6
+  // (the other lcNumberFromParent function, not Fix-Pending-enabled) is unaffected — its own
+  // `settlesDocumentArrival` check right below still requires a real `selectedPayMovement`, and its own
+  // `selectedContract` is never set before `selectedParent` in the first place.
+  if (lcNumberFromParent(model) && !ctx.selectedParent && !ctx.selectedContract) return false;
   // A4 — the specific still-PENDING record to finalize, not just the LC it lives on.
   if (strategy.checkerRelease.releasesExistingMovementInPlace && !ctx.selectedPayMovement) return false;
   // A6/B4 — the specific PENDING Document Arrival / Present Docs record to convert.

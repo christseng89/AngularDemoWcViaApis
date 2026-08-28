@@ -30,17 +30,18 @@ import {
   TransactionFunction,
   amountExceedsCurrencyDecimals,
   decimalPlacesForCurrency,
+  displayMovementType,
   displayStatus as displayStatusShared,
   groupThousands,
 } from './balance-component.model';
-import { buildFields, toReadOnlyFields } from './builder-fields';
+import { BuilderFieldsContext, buildFields, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
 import {
   SubmitRulesContext,
   buildSubmitRequest as buildSubmitRequestRules,
   hasEligibleTargetSelected as hasEligibleTargetSelectedRule,
   validateSubmit as validateSubmitRules,
 } from './submit-rules';
-import { deriveFunctionStrategy } from './function-strategy';
+import { FixPendingEditableField, deriveFunctionStrategy, functionSupportsFixPending } from './function-strategy';
 import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
 
@@ -109,8 +110,8 @@ export interface MakerSyncRequest {
  * `submitResult`/`submitError` — plus every picker/selection/validation/submit method built on them,
  * including the "MAKER RESULT" panel.
  *
- * `submit()` (Maker) and the Checker's own `release()`/`reject()`/`deleteMakerPending()` (still
- * parent-owned) both write into `submitResult`/`arrivalApproved`/the compound-leg fields — a real
+ * `submit()` (Maker) and the Checker's own `release()`/`reject()` (still parent-owned) both write into
+ * `submitResult`/`arrivalApproved`/the compound-leg fields — a real
  * shared-state case. Resolved via an `@Input()` signal object (`externalCheckerOutcome`, fresh reference
  * per emission — the object itself is the trigger, not only its contents), applied in `ngOnChanges()`.
  * The parent keeps `checkerBusy`/`checkerError`/`checkerId`/`actionBusy`/`selectedCheckerMovement`/
@@ -158,6 +159,26 @@ export class MakerPanelComponent implements OnChanges {
   @Input() actionBusy = false;
   /** Parent-owned (set by `release()`'s success path) — read here only to render the brief post-Release confirmation hint at the top of this panel's own template. */
   @Input() releaseSuccessHint: string | null = null;
+  /**
+   * Maker Queue's own Fix Pending entry point (2026-08-28, "Maker Queue Need to provide Fix Pending
+   * button as well") — a fresh-object-per-emission signal (same convention as `externalCheckerOutcome`)
+   * carrying the movement a cross-session Maker Queue row picked. `ngOnChanges()` sets it as
+   * `submitResult` and calls `startFixPending()` — the exact same "return to the real original-event
+   * screen" mechanism the in-session button already drives (`selectedFunction` must already be the
+   * matching Function by the time this arrives; `TransactionBuilderComponent.onMakerQueueFixPending()`
+   * calls `selectFunction()` first, in the same synchronous handler, so both land in one `ngOnChanges()`
+   * — see that method's own doc comment).
+   */
+  @Input() externalFixPendingRequest: BalanceMovement | null = null;
+  /**
+   * Maker Queue's own Delete Pending review entry point (2026-08-28, "Maker Queue Delete Pending 也要
+   * 顯示交易畫面 確認刪除與否") — same fresh-object-per-emission convention as `externalFixPendingRequest`,
+   * carrying the movement a cross-session Maker Queue row picked for a Delete Pending REVIEW (not an
+   * immediate delete). `ngOnChanges()` sets it as `submitResult` and calls `startDeletePendingReview()`,
+   * which reconstructs the same real original-event screen Fix Pending uses but never unlocks it — see
+   * that method's own doc comment for why `fieldsLocked` needs no extra logic to stay read-only here.
+   */
+  @Input() externalDeletePendingReviewRequest: BalanceMovement | null = null;
 
   /** See `MakerCheckerContext`'s own doc comment. */
   @Output() contextChanged = new EventEmitter<MakerCheckerContext>();
@@ -170,10 +191,32 @@ export class MakerPanelComponent implements OnChanges {
    * other two always pass a genuinely separate compound-leg movement that needs no override.
    */
   @Output() openAccountEntries = new EventEmitter<{ movement: BalanceMovement; instrumentType: InstrumentType | null; phase?: 'primary' | 'create' | 'finalize' | null }>();
-  /** MAKER RESULT panel's "Delete Pending (EC)" button — `deleteMakerPending()` itself stays parent-owned (same Checker-action-layer boundary as `release()`/`reject()`). */
-  @Output() deletePendingRequested = new EventEmitter<void>();
-  /** A4's own "Delete Pending" — `withdrawMakerPending()` (checkerActions.withdrawMakerPending()) stays parent-owned, same boundary as deletePendingRequested above. See the button's own doc comment in the template for why A4 needs a separate event. */
-  @Output() withdrawMakerPendingRequested = new EventEmitter<void>();
+  /**
+   * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+   * 2026-08-27; per-field config 2026-08-28) — MAKER RESULT panel's "Fix Pending" entry point, gated
+   * on `fixPendingSupported` (derived from the current Function's own
+   * `FunctionStrategy.fixPendingEditableFields` — see that type's doc comment in `function-strategy.ts`
+   * for the full "頁面配置檔 for A1-A11/B1-B7" per-Function editable-field table). `editPending()`
+   * itself stays parent-owned, same Checker-action-layer boundary `release()`/`reject()` already use;
+   * this panel owns the "return to original screen" reconstruction (`fixPendingMode`,
+   * `reconstructOriginalModel()` via `rebuildFields()`) and builds the patch payload from whichever of
+   * `this.model`'s fields the current Function's `fixPendingEditableFields` set actually declares
+   * editable — never a fixed field list.
+   */
+  @Output() fixPendingRequested = new EventEmitter<Record<string, unknown> & { movementId: string }>();
+  /** Emitted unconditionally by `cancelFixPending()` — see that method's own doc comment for why the parent, not this panel, decides whether "cancelled" means "navigate back to Maker Queue" or "just stay here." */
+  @Output() fixPendingCancelled = new EventEmitter<void>();
+  /**
+   * Maker Queue's own Delete Pending review screen (2026-08-28) — emitted from `confirmDeletePendingReview()`
+   * once the Maker confirms, after already reviewing the record read-only. Carries no payload: the parent
+   * (`TransactionBuilderComponent.onDeletePendingReviewConfirmed()`) already holds the original
+   * `MakerQueueRow` it navigated here with (including `siblingMovementIds` for a compound row) and calls
+   * `MakerQueueService.deletePending()` directly with it — this panel never re-derives that cascade
+   * information itself, it only ever requested the review.
+   */
+  @Output() deletePendingReviewConfirmed = new EventEmitter<void>();
+  /** The Maker reviewed and declined — no delete call was made. The parent decides where to navigate next (back to Maker Queue). */
+  @Output() deletePendingReviewCancelled = new EventEmitter<void>();
 
   form = new FormGroup({});
   model: BuilderModel = { currency: 'USD', createdBy: 'maker1', eventSeq: Date.now() };
@@ -196,6 +239,21 @@ export class MakerPanelComponent implements OnChanges {
   submitError: string | null = null;
   /** A3 only — set by `approveArrival()` via `externalCheckerOutcome`'s `documentArrivalAcknowledged` kind. Not displayed here — kept because it's part of the same outcome-application state machine as `submitResult`. */
   arrivalApproved = false;
+
+  /**
+   * Fix Pending's own edit-mode flag (UX redesign per direct user feedback — the Maker returns to the
+   * REAL original-event screen, `reconstructOriginalModel()` + the same `buildFields()`/`displayFields`
+   * every Submit uses, not a separate mini-form). See `startFixPending()`/`confirmFixPending()`/
+   * `cancelFixPending()` below.
+   */
+  fixPendingMode = false;
+
+  /**
+   * Maker Queue's own Delete Pending review screen (2026-08-28) — true while this panel is showing a
+   * Maker-Queue-originated record read-only for the Maker to confirm or cancel deletion, rather than a
+   * fresh Submit or an in-session Fix Pending edit. See `startDeletePendingReview()`'s own doc comment.
+   */
+  deletePendingReviewMode = false;
 
   /** See `CompoundLegState`'s own doc comment for why these 7 fields (A3S/A6/B4/B5's own multi-leg submissions) are grouped here rather than left flat. */
   compoundLegs: CompoundLegState = { ...EMPTY_COMPOUND_LEGS };
@@ -224,6 +282,41 @@ export class MakerPanelComponent implements OnChanges {
     return this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
   }
 
+  /** Template-friendly wrapper around `functionSupportsFixPending()` (the single derived source of truth — see `FunctionStrategy.fixPendingEditableFields`'s own doc comment). */
+  get fixPendingSupported(): boolean {
+    return functionSupportsFixPending(this.selectedFunctionStrategy);
+  }
+
+  /**
+   * True while this panel is showing a reconstructed, already-fully-resolved record — Fix Pending or
+   * Delete Pending review — rather than a fresh Submit still in progress. Drives the two banners; see
+   * `naturalKeyLocked` below for the broader "hide the picker, show a protected readout instead" rule
+   * this also feeds into.
+   */
+  get isExternalReviewMode(): boolean {
+    return this.fixPendingMode || this.deletePendingReviewMode;
+  }
+
+  /**
+   * True once this Function's own target natural key (LC Number, plus IB/SG/EB Number for a
+   * two-field-search function) is fixed and can never usefully be re-picked — 2026-08-28, "A2 - A11
+   * B2-B7 無須再選LC NUMBER AND 2NDARY REF。因為已經PROTECTED了" then "如果交易輸入或選取2NDARY REF 也是
+   * 加粗放大 選取的LC NUMBER and 2NDARY NUMBER不准輸入(PROTECTED)" — extends the SAME rule to a normal,
+   * still-in-progress Submit the moment a target is actually picked (`hasEligibleTargetSelected`), not
+   * only to Fix Pending/Delete Pending review (`isExternalReviewMode`) — matching the already-established
+   * "locks the moment selectedContract/selectedParent resolves, not just at Submit" convention the
+   * free-text natural-key fallback fields already use (see their own doc comment). `requiresEligibleTarget`
+   * already reads `false` for A1/B1 (the one shape with no pre-existing target to protect at all — they
+   * create a brand-new LC/Confirmation each time), so this naturally excludes them without a separate
+   * check. Once true: the interactive Step 1/Step 2 index pickers and the free-text "Search Existing
+   * Contract" fallback are hidden entirely (re-picking can never change anything once resolved — a
+   * genuine change means Delete Pending + a fresh Submit, never an in-place re-pick), replaced by a
+   * prominent, protected LC Number/2ndary readout — see that template block's own doc comment.
+   */
+  get naturalKeyLocked(): boolean {
+    return this.requiresEligibleTarget && (this.hasEligibleTargetSelected || this.isExternalReviewMode);
+  }
+
   /**
    * Each `@Input()` is a plain "something happened, react to it" signal, converted here into an
    * imperative call — testable via `new MakerPanelComponent(mockApi)` + `ngOnChanges({...})`, no
@@ -235,6 +328,28 @@ export class MakerPanelComponent implements OnChanges {
     if (changes['refreshRequested'] && !changes['refreshRequested'].firstChange) {
       this.refreshSelectedContractSnapshot();
       this.emitCheckerAndLookupSync();
+    }
+    // Runs AFTER resetForFunction() above — a fresh Function selection from Maker Queue's own
+    // selectFunction() call arrives in the SAME ngOnChanges(), and must not be clobbered by the reset.
+    // emitContext() is required here (unlike the in-session button's own startFixPending() call, which
+    // never needs it — a real submit() already emitted the matching context earlier): selectFunction()
+    // just reset the parent's own makerContext mirror to submitResult: null, and startFixPending() alone
+    // never emits — TransactionBuilderComponent.fixPending()'s own guard reads THAT mirror, not this
+    // component's local submitResult, so without this the Save Fix Pending button would silently no-op
+    // (confirmFixPending() still emits fine, but the parent's guard fails and drops it on the floor).
+    if (changes['externalFixPendingRequest'] && this.externalFixPendingRequest) {
+      this.submitResult = this.externalFixPendingRequest;
+      this.emitContext();
+      this.startFixPending();
+    }
+    // Same reasoning as externalFixPendingRequest above — runs after resetForFunction(), keeps the
+    // parent's own makerContext mirror accurate via emitContext() (not strictly required for the
+    // Delete Pending review flow itself, since the parent already holds the original MakerQueueRow it
+    // navigated here with, but keeps this panel's own state consistent regardless).
+    if (changes['externalDeletePendingReviewRequest'] && this.externalDeletePendingReviewRequest) {
+      this.submitResult = this.externalDeletePendingReviewRequest;
+      this.emitContext();
+      this.startDeletePendingReview();
     }
   }
 
@@ -336,6 +451,37 @@ export class MakerPanelComponent implements OnChanges {
   }
   get contextSecondaryRef(): string | null {
     return policy.contextSecondaryRef(this.contextRefState);
+  }
+  /**
+   * 2026-08-28, "Tenor Type 改的不對 應該跟Currency欄位一樣 是輸入欄位但是PROTECTED" — same "carried,
+   * genuine Formly field, protected" mechanism `carriedCurrency` already uses, not a separate read-only
+   * card entry (an earlier, corrected attempt at this same requirement). Written into `model.tenorType`
+   * at the same call sites `carriedCurrency` already fires from, then `buildFields()` renders it as a
+   * disabled field, same as Currency.
+   */
+  get carriedTenorType(): string | null {
+    return policy.contextTenorType(this.contextRefState);
+  }
+
+  /**
+   * Carries Currency (existing) and Tenor Type (new) into the model together, once `selectedContract`/
+   * `selectedParent` resolves — called from every one of `carriedCurrency`'s own pre-existing call sites,
+   * so Tenor Type carries everywhere Currency already does without a second, separately-maintained list
+   * of call sites. Tenor Type is skipped when the Function has `tenorTypeOptions` of its own (A1/B1's free
+   * choice, A6's own dedicated tenorTypeOptions-driven carry a few lines below in `onSelectParent()`) —
+   * this method's own Tenor Type branch is then simply a no-op for them.
+   */
+  private applyCarriedContractFields(): void {
+    let changed = false;
+    if (this.carriedCurrency) {
+      this.model.currency = this.carriedCurrency;
+      changed = true;
+    }
+    if (this.carriedTenorType && !this.selectedFunction?.tenorTypeOptions?.length) {
+      this.model.tenorType = this.carriedTenorType as BuilderModel['tenorType'];
+      changed = true;
+    }
+    if (changed) this.rebuildFields();
   }
 
   /**
@@ -475,6 +621,8 @@ export class MakerPanelComponent implements OnChanges {
     this.arrivalApproved = false;
     this.submitResult = null;
     this.submitError = null;
+    this.fixPendingMode = false;
+    this.deletePendingReviewMode = false;
     this.pickerSelection.sgsForArrival = [];
     this.pickerSelection.arrivalSgPaging.reset();
     this.pickerSelection.selectedArrivalSg = null;
@@ -806,10 +954,7 @@ export class MakerPanelComponent implements OnChanges {
     if (this.selectedFunctionStrategy?.movementDerivation.derivesMovementTypeFromTenor && this.selectedContract) {
       this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT';
     }
-    if (this.carriedCurrency) {
-      this.model.currency = this.carriedCurrency;
-      this.rebuildFields();
-    }
+    this.applyCarriedContractFields();
     // A11/B7 (Reopen, F1) only — a harmless '0' placeholder set immediately on selection, purely because
     // the wire schema requires SOME valid MonetaryAmount string; the Amount field itself is hidden (see
     // builder-fields.ts's own amountFromFixed) since the server computes and substitutes the real
@@ -1003,20 +1148,14 @@ export class MakerPanelComponent implements OnChanges {
                 return;
               }
               this.selectedContract = contract;
-              if (this.carriedCurrency) {
-                this.model.currency = this.carriedCurrency;
-                this.rebuildFields();
-              }
+              this.applyCarriedContractFields();
               this.refreshSelectedContractSnapshot();
               this.emitCheckerAndLookupSync();
             });
             return;
           }
           this.selectedContract = contract;
-          if (this.carriedCurrency) {
-            this.model.currency = this.carriedCurrency;
-            this.rebuildFields();
-          }
+          this.applyCarriedContractFields();
           this.refreshSelectedContractSnapshot();
           this.emitCheckerAndLookupSync();
         },
@@ -1030,10 +1169,7 @@ export class MakerPanelComponent implements OnChanges {
 
   onSelectParent(contractId: string): void {
     this.selectedParent = this.parentPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
-    if (this.carriedCurrency) {
-      this.model.currency = this.carriedCurrency;
-      this.rebuildFields();
-    }
+    this.applyCarriedContractFields();
     if (this.isCreatingMovement && this.selectedParent) {
       this.naturalKey.lcNumber = this.selectedParent.naturalKey.lcNumber;
     }
@@ -1122,10 +1258,7 @@ export class MakerPanelComponent implements OnChanges {
     if (!outcome) return;
     this.model.instrumentType = outcome.instrumentType;
     this.selectedContract = outcome.contract;
-    if (this.carriedCurrency) {
-      this.model.currency = this.carriedCurrency;
-      this.rebuildFields();
-    }
+    this.applyCarriedContractFields();
     this.searchNaturalKey.ibNumber = outcome.ibNumber;
     this.refreshSelectedContractSnapshot();
     this.emitCheckerAndLookupSync();
@@ -1153,16 +1286,14 @@ export class MakerPanelComponent implements OnChanges {
       this.searchNaturalKey.ibNumber = this.selectedContract.naturalKey.ibNumber ?? '';
       this.searchNaturalKey.sgNumber = this.selectedContract.naturalKey.sgNumber ?? '';
     }
-    if (this.carriedCurrency) {
-      this.model.currency = this.carriedCurrency;
-      this.rebuildFields();
-    }
+    this.applyCarriedContractFields();
     this.refreshSelectedContractSnapshot();
     this.emitCheckerAndLookupSync();
   }
 
-  private rebuildFields(): void {
-    this.fields = buildFields({
+  /** Shared with confirmFixPending() below — one assembly of everything buildFields()/isFixPendingFieldEditable() read, so the two can never disagree about the current Function/model state. */
+  private buildFieldsContext(): BuilderFieldsContext {
+    return {
       model: this.model,
       selectedFunction: this.selectedFunction,
       selectedPayMovement: this.pickerSelection.selectedPayMovement,
@@ -1170,12 +1301,24 @@ export class MakerPanelComponent implements OnChanges {
       selectedContractSnapshot: this.selectedContractSnapshot,
       selectedParent: this.selectedParent,
       dynamicSecondaryRefLabel: this.dynamicSecondaryRefLabel,
-    });
+      fixPendingMode: this.fixPendingMode,
+    };
+  }
+
+  private rebuildFields(): void {
+    this.fields = buildFields(this.buildFieldsContext());
   }
 
   get formLocked(): boolean {
     return !!this.submitResult;
   }
+
+  /**
+   * Fix Pending's own reconstructed form must be genuinely editable, not forced read-only by
+   * `formLocked` (`submitResult` still holds the record being corrected while this is open) — the
+   * natural-key pickers/inputs stay locked regardless (they're bound to `formLocked` directly in the
+   * template, not this getter), only the Formly-rendered fields below unlock.
+   */
 
   get requiresEligibleTarget(): boolean {
     return !!this.selectedFunction && !(policy.isCreatingMovement(this.model) && !policy.hasParent(this.model));
@@ -1229,6 +1372,7 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   get fieldsLocked(): boolean {
+    if (this.fixPendingMode) return false; // see startFixPending()'s own doc comment
     return this.formLocked || (this.requiresEligibleTarget && !this.hasEligibleTargetSelected);
   }
 
@@ -1337,8 +1481,200 @@ export class MakerPanelComponent implements OnChanges {
       return;
     }
     this.submitResult = outcome.result;
+    // Phase 4 (2026-08-28) — an A3S compound Fix Pending edit's own resolved SG leg (see
+    // CheckerActionsService.editPending()'s own doc comment); every other 'released' outcome producer
+    // leaves `secondary` undefined, same "safe as a plain merge-spread" reasoning
+    // applyMakerSubmitOutcome() already documents for the analogous fresh-Submit case.
+    if ('secondary' in outcome && outcome.secondary) this.compoundLegs = { ...this.compoundLegs, ...outcome.secondary };
+    this.fixPendingMode = false; // closes Fix Pending's own edit mode once its outcome (success or otherwise routed here) lands — model already holds the accepted edited values
+    // Bug fix, found live 2026-08-28 auditing the "Maker Queue -> Fix Pending -> Save" flow: this used to
+    // leave `this.fields` exactly as `startFixPending()` last built it (Fix-Pending-mode field configs —
+    // e.g. Currency's own label reading "locked — Fix Pending can never change Currency, see §15") even
+    // after `fixPendingMode` flips back to `false` here. `displayFields`'s own `toReadOnlyFields()`
+    // wrapper already forces every field functionally disabled via `fieldsLocked` regardless, so this was
+    // never a REAL edit-after-Save bug — but the rendered LABEL text stayed stale/misleading, implying
+    // Fix Pending was still active when it wasn't. `cancelFixPending()` already rebuilds in the equivalent
+    // spot; this path was simply missing the same call.
+    this.rebuildFields();
     this.refreshSelectedContractSnapshot();
     this.emitCheckerAndLookupSync();
     this.emitContext();
+  }
+
+  /**
+   * Reverse of `onSubChoice()` — reconstructs `subChoiceValue`/`amendDirection` from the just-loaded
+   * `submitResult`, so the Fix Pending／Delete Pending review screen shows the ORIGINALLY-selected
+   * Direction instead of a blank "— select —" (user-directed 2026-08-28, "Direction * 顯示出來當初選的
+   * 不可以改" — an explicit correction of an earlier same-day "hide it entirely" instruction; see the
+   * Direction `<select>`'s own template comment). `onSubChoice()` itself is never called on this
+   * reconstruction path, so without this, neither field would otherwise be populated. Mirrors
+   * `onSubChoice()`'s own three branches in reverse: a matching `movementTypeOverride` wins first
+   * (Expiry Date, A2/B2 alike); otherwise `'movementType'` (A2/A7) reads straight off the reconstructed
+   * `model.movementType`; otherwise `'amendDirection'` (B2) derives via the SAME `displayMovementType()`
+   * this app already uses elsewhere to show B2's own signed `AMEND` as `AMEND_INCREASE`/`AMEND_DECREASE`,
+   * then strips the shared `'AMEND_'` prefix down to this dropdown's own `INCREASE`/`DECREASE` option
+   * values — reusing the existing display derivation rather than a second, independently-invented one.
+   */
+  private reconstructSubChoiceValue(): void {
+    const subChoice = this.selectedFunction?.subChoice;
+    if (!subChoice || !this.submitResult) {
+      this.subChoiceValue = '';
+      return;
+    }
+    const overrideMatch = subChoice.options.find((o) => o.movementTypeOverride === this.model.movementType);
+    if (overrideMatch) {
+      this.subChoiceValue = overrideMatch.value;
+      return;
+    }
+    if (subChoice.key === 'movementType') {
+      this.subChoiceValue = this.model.movementType ?? '';
+      return;
+    }
+    const displayed = displayMovementType(this.model.instrumentType, this.model.movementType, this.submitResult.amount);
+    this.subChoiceValue = displayed.replace('AMEND_', '');
+    this.amendDirection = this.subChoiceValue === 'DECREASE' ? 'DECREASE' : 'INCREASE';
+  }
+
+  /**
+   * Shared by `startFixPending()` and `startDeletePendingReview()` — both need the exact same "return to
+   * the real original-event screen" reconstruction (`reconstructOriginalModel()`, the same exhaustive
+   * `BuilderModel` source table Inquire Events' own Original Transaction Screen already uses); they only
+   * differ in what mode flag they flip once it's ready (`onReady`), since Fix Pending's own screen must
+   * end up editable and Delete Pending's own review screen must not.
+   */
+  private reconstructScreenForSubmitResult(onReady: () => void, errorMessage: string): void {
+    if (!this.submitResult) return;
+    const apply = (contract: BalanceContract) => {
+      this.selectedContract = contract;
+      this.naturalKey = { lcNumber: contract.naturalKey.lcNumber, ibNumber: contract.naturalKey.ibNumber ?? '', sgNumber: contract.naturalKey.sgNumber ?? '' };
+      this.model = reconstructOriginalModel(this.submitResult!, contract);
+      this.reconstructSubChoiceValue();
+      onReady();
+      this.rebuildFields();
+    };
+    // A3 already has its own contract selected (it requires picking an existing LC before Submit); A1
+    // never does (it creates a brand-new one) — fetch it fresh rather than assume either shape.
+    if (this.selectedContract?.balanceContractId === this.submitResult.balanceContractId) {
+      apply(this.selectedContract);
+      return;
+    }
+    this.api.getContract(this.submitResult.balanceContractId).subscribe({
+      next: (contract) => apply(contract),
+      error: () => {
+        this.submitError = errorMessage;
+      },
+    });
+  }
+
+  /**
+   * "Save Fix Pending" button readiness (user-directed 2026-08-28, "A2 Fix Pending... NOTE: INCREASE
+   * DECREASE AMOUNT必填" — verifying this live surfaced a real gap, "用配置設定" not a hardcoded field
+   * name). The button's own `[disabled]` used to check `!model.amount` unconditionally — correct for
+   * every Fix-Pending-enabled Function's Increase/Decrease-shaped movementTypes (A1/A2/A3/B1), but A2/B2's
+   * own third subChoice (`AMEND_EXPIRY_DATE`) hides Amount entirely and requires `newExpiryDate` instead
+   * (`builder-fields.ts`'s own `hide: isAmendExpiryDate`/`required: isAmendExpiryDate` on those two
+   * fields) — a hardcoded `!model.amount` check would have stayed silently enabled with a blank New
+   * Expiry Date. Mirrors `builder-fields.ts`'s own `isAmendExpiryDate` derivation (`model.movementType
+   * === 'AMEND_EXPIRY_DATE'`) — the SAME existing switch that already decides which of the two fields is
+   * shown/required at the form level, not a second, independently-invented rule.
+   */
+  get fixPendingSaveReady(): boolean {
+    if (this.model.movementType === 'AMEND_EXPIRY_DATE') return !!this.model.newExpiryDate;
+    return !!this.model.amount;
+  }
+
+  /**
+   * Fix Pending (UX redesign per direct user feedback, "回到原EVENT輸入畫面，放開可以修改的欄位讓用戶修改
+   * 後重新SUBMIT") — reconstructs the SAME screen the Maker originally used to Submit, then flips
+   * `fixPendingMode` so `fieldsLocked`/`displayFields` render it genuinely editable instead of read-only.
+   * `buildFields()` itself keeps LC Number/2ndary Reference/Currency (and every other field this
+   * component's own `EditMovementRequest` doesn't yet support editing) disabled even in this mode — see
+   * that function's own `fixPendingMode` handling for the exact field-by-field breakdown.
+   */
+  startFixPending(): void {
+    this.reconstructScreenForSubmitResult(() => {
+      this.fixPendingMode = true;
+    }, 'Could not load this record\'s own contract — Fix Pending cannot proceed.');
+  }
+
+  /**
+   * Discards any in-progress edit and returns to the read-only display of the record as it currently
+   * stands (re-reconstructed from `submitResult`, the authoritative source — not whatever the Maker was
+   * mid-typing). Also emits `fixPendingCancelled` unconditionally (2026-08-28, "FIX PENDING OR DELETE
+   * PENDING 按CANCEL 回到原來的MAKER QUEUE畫面") — a cheap "cancel happened" signal the parent can act on
+   * or ignore: `TransactionBuilderComponent.onFixPendingCancelled()` only navigates back to Maker Queue
+   * when THIS Fix Pending session actually originated there (`externalFixPendingRequest` still set); the
+   * in-session button's own Cancel (opened from the Maker Result panel after a normal same-session
+   * Submit, nothing to "return" to) stays exactly as it always has — reverting to the read-only display
+   * in place, never navigating anywhere.
+   */
+  cancelFixPending(): void {
+    this.fixPendingMode = false;
+    if (this.submitResult && this.selectedContract) this.model = reconstructOriginalModel(this.submitResult, this.selectedContract);
+    this.rebuildFields();
+    this.fixPendingCancelled.emit();
+  }
+
+  /**
+   * Maker Queue's own Delete Pending review screen (2026-08-28, "Maker Queue Delete Pending 也要顯示交易
+   * 畫面 確認刪除與否" — "CLICK DELETE PENDING BUTTON -> 顯示交易畫面 (ALL FIELDS PROTECTED) + Confirm /
+   * Cancel Button"). Reuses the exact same "return to the real original-event screen" reconstruction Fix
+   * Pending already uses, but deliberately never unlocks the fields — `deletePendingReviewMode` doesn't
+   * touch `fixPendingMode`, so `fieldsLocked` stays `true` (its own existing default whenever
+   * `submitResult` is set) with zero extra logic needed there: the Maker reviews the real record read-only,
+   * then explicitly confirms or cancels via the two buttons this mode's own template block renders.
+   */
+  startDeletePendingReview(): void {
+    this.reconstructScreenForSubmitResult(() => {
+      this.deletePendingReviewMode = true;
+    }, 'Could not load this record\'s own contract — Delete Pending review cannot proceed.');
+  }
+
+  /** Reports "confirmed" up to the parent, which owns the actual delete call (`MakerQueueService.deletePending()` — cascade-aware for a compound row via its own server-reconstructed `siblingMovementIds`) — this panel only ever requested a review, never the deletion itself. */
+  confirmDeletePendingReview(): void {
+    this.deletePendingReviewMode = false;
+    this.deletePendingReviewConfirmed.emit();
+  }
+
+  /** No delete call was ever made — just closes the review screen. The parent decides where to navigate next (back to Maker Queue). */
+  cancelDeletePendingReview(): void {
+    this.deletePendingReviewMode = false;
+    this.deletePendingReviewCancelled.emit();
+  }
+
+  /**
+   * Builds the Fix Pending patch by asking `isFixPendingFieldEditable()` (`builder-fields.ts`) about
+   * each field individually — the SAME per-field derivation `buildFields()` itself used to decide which
+   * fields render disabled (2026-08-28, "頁面配置檔原先輸入或FIX PENDING可共用" — shared, not a second
+   * independently-declared list). `amount` is always sent (the backend's own `EditMovementRequest.amount`
+   * is unconditionally required, and a Function that doesn't derive it as editable leaves it disabled in
+   * `buildFields()`, so `this.model.amount` still holds the original, unchanged value in that case);
+   * every other field is included ONLY when this exact derivation says so, so a Function that never
+   * derives e.g. `tolerancePct` as editable never even sends it.
+   */
+  private static readonly FIX_PENDING_PATCH_FIELDS: readonly Exclude<FixPendingEditableField, 'amount'>[] = [
+    'tolerancePct',
+    'tenorType',
+    'tenorDays',
+    'expiryDate',
+    'newExpiryDate',
+    'reasonCode',
+  ];
+
+  confirmFixPending(): void {
+    if (!this.submitResult || !this.model.amount) return;
+    const ctx = this.buildFieldsContext();
+    const patch: Record<string, unknown> = { movementId: this.submitResult.movementId, amount: String(this.model.amount) };
+    for (const field of MakerPanelComponent.FIX_PENDING_PATCH_FIELDS) {
+      if (!isFixPendingFieldEditable(ctx, field)) continue;
+      const value = this.model[field];
+      // tolerancePct is typed `string` on BuilderModel, but its own Formly field is `type: 'number'` —
+      // Angular's NumberValueAccessor coerces the bound value to a real JS number at runtime (same trap
+      // amount's own submit-rules.ts coercion already guards against), which the backend's `EditMovement
+      // RequestSchema` (z.string()) rejects with "Expected string, received number". tenorDays is the
+      // one other numeric field here, but its own schema genuinely expects z.number() — left uncoerced.
+      patch[field] = field === 'tolerancePct' && value != null ? String(value) : (value ?? null);
+    }
+    this.fixPendingRequested.emit(patch as Record<string, unknown> & { movementId: string });
   }
 }

@@ -14,11 +14,12 @@
  */
 import { randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
-import { parseMonetaryAmount } from '../money';
+import { describeAmountScaleViolation, parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
 import { BalanceContractStore, CatalogFilter, CatalogPage } from '../store/balanceContractStore';
 import { BalanceMovementStore } from '../store/balanceMovementStore';
 import { DeletePendingAuditStore } from '../store/deletePendingAuditStore';
+import { FixPendingAuditStore } from '../store/fixPendingAuditStore';
 import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { computeCeilingAmount } from '../domain/tolerance';
@@ -60,6 +61,7 @@ import type {
   BalanceSnapshot,
   DeletePendingAuditWithContract,
   ExposureNature,
+  FixPendingAuditRecord,
   InstrumentType,
   MovementStatus,
   MovementWarning,
@@ -89,6 +91,15 @@ interface MovementSufficiencyContext {
   availableBalance: Decimal;
   ceilingAmount: Decimal;
   req: CreateMovementRequest;
+  /**
+   * `editPending()`'s own re-check (`applyEditToMovement()`) passes the movement being edited here — at
+   * that point it is STILL PENDING (its own replacement write hasn't happened yet), so a self-referential
+   * "open event" scan (closeShaped/reopenShaped, both via gatherEventTree()) would otherwise always see
+   * itself and self-reject every Fix Pending Save for A10/B6/A11/B7 — same reason
+   * evaluateContractCloseEligibility()'s own `excludeMovementId` param exists for release()'s re-check.
+   * createMovement() never sets this (the new movement isn't inserted yet at that point).
+   */
+  excludeMovementId?: string;
 }
 
 /** Discriminated union (2026-08-20, reviewer-directed) — see domain/tenorRouting.ts's AcceptanceTenorCheckResult own doc comment for why. */
@@ -260,20 +271,92 @@ export interface CreateMovementRequest {
 
 export type CreateMovementResult = { created: true; movement: BalanceMovement } | { created: false; existing: BalanceMovement };
 
+/**
+ * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+ * 2026-08-27) — `editPending()`'s own request shape. Deliberately an ALLOWLIST, not
+ * `Partial<CreateMovementRequest>`: any field genuinely locked per §15 (`naturalKey`/`balanceContractId`/
+ * `instrumentType`/`movementType`/`currency`/`eventSeq`/`createdBy`) or treated as the movement's own
+ * business "2ndary Key" (`sourceTransactionRef` — Amendment No./IB/EB Number, same exclusion §15
+ * intends for LC Number/IB-SG Number) is simply absent from this type, so a caller cannot even
+ * ATTEMPT to change one — `requestSchema.ts`'s own `.strict()` schema rejects any such key outright,
+ * there is no runtime "if changed, reject" branch to keep in sync with this list.
+ *
+ * `tolerancePct`/`tenorType`/`tenorDays`/`expiryDate`/`mailFloatGraceDays` (2026-08-28, per direct user
+ * feedback — "為什麼只有amount可以改... Expiry Date, Tenor Type etc.?") are CONTRACT-level fields
+ * (`balance_contracts`, not `balance_movements`) — `editPending()` only honors them when the movement
+ * being edited is itself a CREATING movementType (ISSUE/CREATE), via `BalanceContractStore.
+ * updateIssueFields()` in the same transaction; see that method's own doc comment for why this is safe
+ * (the contract has had zero downstream activity while its own creating movement is still PENDING/
+ * REJECTED). Silently ignored (not rejected) when supplied against a non-creating movementType's own
+ * edit — those movements don't own a contract's fields to begin with, same as `sourceTransactionRef`
+ * being locked for a different reason above; the Angular client never sends them in that case (see
+ * `builder-fields.ts`'s own `isCreatingMovement()`-gated field visibility).
+ */
+export interface EditMovementRequest {
+  amount: string;
+  legRef?: string | null;
+  accountEntries?: AccountEntry[] | null;
+  businessEventId?: string | null;
+  exposureNature?: ExposureNature;
+  newExpiryDate?: string | null;
+  transactionDate?: string | null;
+  businessDate?: string | null;
+  valueDate?: string | null;
+  sourceModule?: string | null;
+  sourceFunction?: string | null;
+  referencedTransactionId?: string | null;
+  reasonCode?: string | null;
+  amendmentApproved?: boolean | null;
+  amendmentEffective?: string | null;
+  consentStatus?: 'NOT_REQUIRED' | 'OBTAINED' | null;
+  tolerancePct?: string | null;
+  tenorType?: TenorType | null;
+  tenorDays?: number | null;
+  expiryDate?: string | null;
+  mailFloatGraceDays?: number | null;
+  editedBy: string;
+}
+
+/**
+ * `buildEditedRequest()`'s own shared rule for every CONTRACT-level field
+ * (`tolerancePct`/`tenorType`/`tenorDays`/`expiryDate`) — declaratively "this field is only patchable
+ * for a CREATING movementType's own edit, else always carried over from the contract unchanged" (2026-08-28,
+ * per direct user feedback pushing back on per-field hardcoding — "如果把各交易欄位放到配置檔... 就可以
+ * 共用?"). One small typed function instead of a `isCreatingEdit ? (patch.x ?? contract.x) : contract.x`
+ * ternary repeated at every call site — the RULE lives here once; each field's own key is still spelled
+ * out at its own call site only because TypeScript has no reflection-based way to iterate a record's own
+ * keys while preserving each one's own distinct type.
+ */
+function creatingOnly<T>(isCreatingEdit: boolean, patched: T | null | undefined, existing: T | null | undefined): T | null | undefined {
+  return isCreatingEdit ? (patched ?? existing) : existing;
+}
+
 export class BalanceService {
   private readonly contracts: BalanceContractStore;
   private readonly movements: BalanceMovementStore;
   private readonly deletePendingAudit: DeletePendingAuditStore;
+  private readonly fixPendingAudit: FixPendingAuditStore;
   private readonly movementTypeRegistry: Readonly<Record<string, MovementTypeDescriptor>>;
   private readonly newContractSufficiencyRegistry: Readonly<Record<string, (req: CreateMovementRequest) => void>>;
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — `editPending()` is the first caller in this service that
+   * needs a real BEGIN/COMMIT/ROLLBACK transaction (writing the audit row and correcting the movement's
+   * own row in place must be atomic). `node:sqlite`'s `DatabaseSync` has no `.transaction()` convenience
+   * method the way better-sqlite3 does — only `.exec()`/`.prepare()` — so this is kept as a raw
+   * reference for `editPending()` to wrap its own `db.exec('BEGIN')`/`COMMIT`/`ROLLBACK` around, not
+   * a general-purpose escape hatch for other methods to reach into the store layer's own SQL directly.
+   */
+  private readonly db: Db;
 
   constructor(
     db: Db,
     private readonly now: () => string = () => new Date().toISOString(),
   ) {
+    this.db = db;
     this.contracts = new BalanceContractStore(db);
     this.movements = new BalanceMovementStore(db);
     this.deletePendingAudit = new DeletePendingAuditStore(db);
+    this.fixPendingAudit = new FixPendingAuditStore(db);
     this.movementTypeRegistry = this.buildMovementTypeRegistry();
     this.newContractSufficiencyRegistry = this.buildNewContractSufficiencyRegistry();
   }
@@ -348,7 +431,7 @@ export class BalanceService {
           error: `Close only applies to a root LC/Confirmation (IPLC_LC/EPLC_LC/EPLC_CONFIRMATION) — ${ctx.contract.instrumentType} is not eligible.`,
         };
       }
-      const eligibility = this.evaluateContractCloseEligibility(ctx.contract);
+      const eligibility = this.evaluateContractCloseEligibility(ctx.contract, ctx.excludeMovementId);
       if (!eligibility.eligible) {
         return { ok: false, error: `Cannot Close ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — ${eligibility.reasons.join(' ')}` };
       }
@@ -461,7 +544,7 @@ export class BalanceService {
       if (ctx.contract.status !== 'CLOSED') {
         return { ok: false, error: `Cannot Reopen ${ctx.contract.instrumentType} ${ctx.contract.naturalKey.lcNumber} — current status is ${ctx.contract.status}, not CLOSED.` };
       }
-      const { hasOpenEvents } = this.gatherEventTree(ctx.contract);
+      const { hasOpenEvents } = this.gatherEventTree(ctx.contract, ctx.excludeMovementId);
       if (hasOpenEvents) {
         return { ok: false, error: 'Cannot Reopen — one or more Events under this LC (including child ledgers) are not yet fully resolved.' };
       }
@@ -1304,23 +1387,24 @@ export class BalanceService {
    * `BalanceMovementStore.listByCreatedByAndStatus()`'s own doc comment for the EARMARKED exclusion —
    * an acknowledged-but-not-yet-Maker-Submitted A3/A3S row is business-equivalent to APPROVED, not a
    * Maker-actionable PENDING item, so it's excluded from this worklist entirely.
+   *
+   * User-directed 2026-08-28 ("Order by Function ASC → LC Number ASC → Secondary Reference Number ASC")
+   * — `page`/`pageSize` REMOVED, this now returns every matching row unpaginated; see
+   * `listByCreatedByAndStatus()`'s own doc comment for why the true sort (and therefore true pagination)
+   * can only happen client-side once Function is resolved. `q` (renamed from `lcNumber`, now a substring
+   * LIKE filter, "支援 LIKE / Partial Match") is a thin pass-through to the same method.
    */
-  listMyMovements(params: { createdBy: string; statuses?: MovementStatus[]; page?: number; pageSize?: number }): {
+  listMyMovements(params: { createdBy: string; statuses?: MovementStatus[]; q?: string }): {
     items: Array<{ movement: BalanceMovement; contract: BalanceContract }>;
-    total: number;
-    page: number;
-    pageSize: number;
   } {
-    const page = params.page ?? 1;
-    const pageSize = params.pageSize ?? 10;
     const statuses = params.statuses ?? (['PENDING', 'REJECTED'] as MovementStatus[]);
-    const { items, total } = this.movements.listByCreatedByAndStatus({ createdBy: params.createdBy, statuses, page, pageSize });
+    const { items } = this.movements.listByCreatedByAndStatus({ createdBy: params.createdBy, statuses, q: params.q });
     const rows = items.map((movement) => {
       const contract = this.contracts.findById(movement.balanceContractId);
       if (!contract) throw new NotFoundError(`No BalanceContract ${movement.balanceContractId} (owner of movement ${movement.movementId})`);
       return { movement, contract };
     });
-    return { items: rows, total, page, pageSize };
+    return { items: rows };
   }
 
   /**
@@ -1336,6 +1420,14 @@ export class BalanceService {
     pageSize: number;
   } {
     return this.deletePendingAudit.search(filter);
+  }
+
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — thin pass-through to FixPendingAuditStore.listByMovement(),
+   * the only place a movement's pre-edit content survives once `editPending()` corrects it in place.
+   */
+  listFixPendingAudit(movementId: string): FixPendingAuditRecord[] {
+    return this.fixPendingAudit.listByMovement(movementId);
   }
 
   /**
@@ -1635,6 +1727,23 @@ export class BalanceService {
     }
   }
 
+  /**
+   * User-directed 2026-08-28 ("Tolerance MUST >= 0") — tolerancePct feeds computeCeilingAmount()'s own
+   * `1 + tolerancePct/100` factor (domain/tolerance.ts). A negative value would shrink ceilingAmount
+   * BELOW the face amount — the opposite of what Tolerance means (a Maximum Exposure basis buffer, never
+   * a discount) — and nothing in domain/tolerance.ts itself guards against this; it would just silently
+   * compute a smaller-than-face ceiling. null/undefined (not applicable, or genuinely omitted) is
+   * untouched — this only rejects a caller-supplied negative string. Called from both createMovement()
+   * (a fresh A1/B1 ISSUE) and editPending() (A1/B1's own Fix Pending, the only other place tolerancePct
+   * is ever caller-supplied — see buildEditedRequest()'s own `creatingOnly()` gate).
+   */
+  private assertToleranceNonNegative(tolerancePct: string | null | undefined): void {
+    if (tolerancePct == null) return;
+    if (new Decimal(tolerancePct).isNegative()) {
+      throw new RequestValidationError(`tolerancePct "${tolerancePct}" must not be negative.`);
+    }
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
     // Checked BEFORE resolveOrCreateContract() — a rejected ISSUE/CREATE must never leave an orphaned,
     // empty BalanceContract row behind (same "checked before createContract()" posture the SG/Present-
@@ -1652,6 +1761,7 @@ export class BalanceService {
     this.assertNaturalKeyFieldsRequired(req);
     this.assertSecondaryRefRequired(req);
     this.assertTenorRequired(req);
+    this.assertToleranceNonNegative(req.tolerancePct);
 
     const contract = this.resolveOrCreateContract(req);
 
@@ -1741,10 +1851,18 @@ export class BalanceService {
       if (originalDirection === 1 || originalDirection === -1) reversedDirection = originalDirection;
     }
 
+    // User-directed 2026-08-28 ("A1 B1 A2 B2, LC Balance = Amount * (1 + Tolerance%) 帳務是用LC Balance
+    // 出帳") — the booked Dr/Cr voucher amount must match the Ceiling-level figure actually applied
+    // against Confirmed Balance (movement.ceilingAmount below), not the face-level `req.amount` a Maker
+    // typed. `ceilingAmount` already equals `req.amount` unchanged for every instrumentType/movementType
+    // computeCeilingAmount() doesn't convert (everything except IPLC_LC/EPLC_LC/EPLC_CONFIRMATION's own
+    // ISSUE/AMEND_INCREASE/AMEND_DECREASE/AMEND — i.e. A1/B1/A2/B2 exactly), so this is a no-op for
+    // every other Function; sign is preserved (a negative B2 Decrease's own ceilingAmount stays
+    // negative), so netDirection below is unaffected.
     const contingentAccountEntry = deriveContingentAccountEntry({
       instrumentType: req.instrumentType,
       movementType: req.movementType,
-      amount: req.amount,
+      amount: ceilingAmount.toFixed(),
       currency: req.currency,
       tenorType: contract.tenorType,
       reversedDirection,
@@ -2009,6 +2127,10 @@ export class BalanceService {
     // and never change afterward, so re-validating them on every other movementType's own release() would
     // just needlessly re-check the same already-valid contract over and over.
     if (this.movementTypeRegistry[movement.movementType]?.isCreating) {
+      // Same defense-in-depth posture as assertValidAmount() above — re-checked against the contract's
+      // own already-persisted tolerancePct (set once at ISSUE, only ever re-patchable via this same
+      // movement's own Fix Pending — see assertToleranceNonNegative()'s own doc comment).
+      this.assertToleranceNonNegative(contract.tolerancePct);
       if (!contract.naturalKey.lcNumber) {
         throw new RequestValidationError(`naturalKey.lcNumber is required for ${movement.movementType} against ${contract.instrumentType}.`);
       }
@@ -2427,6 +2549,380 @@ export class BalanceService {
       }
     }
     return this.movements.findById(movementId)!;
+  }
+
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — corrects a PENDING/REJECTED movement IN PLACE (same
+   * movementId/eventSeq, no second row) WITHOUT re-typing it from scratch, atomically alongside a new
+   * `fix_pending_audit` row preserving the pre-edit content. Deliberately generic across every
+   * movementType already covered by `movementTypeRegistry`/`checkSufficiency` — Function-specific
+   * enablement lives entirely in the Angular registry (`fixPendingEnabled`), not here.
+   *
+   * Re-runs the SAME validation `createMovement()` itself applies to a fresh Submit (`assertValidAmount()`/
+   * `assertReasonCodeRequired()`/`assertTenorRequired()`/`assertToleranceNonNegative()`, `descriptor.checkSufficiency()`,
+   * `deriveContingentAccountEntry()`) — Fix Pending is "the same Business Event, corrected content",
+   * not a lighter-weight path that skips checks a genuine Submit would have applied. Three
+   * `createMovement()`-only checks are intentionally NOT re-run here:
+   * `assertNaturalKeyFieldsRequired()`/`assertExpiryDateRequired()`/`assertExpiryDateIsBusinessDay()`
+   * all concern resolving-or-creating a contract via `naturalKey`, which this method never does (it
+   * always operates against an already-resolved, already-existing `balanceContractId`) — genuinely
+   * inapplicable, not silently skipped coverage.
+   *
+   * Excludes the record's own PRE-EDIT content from every balance-relative computation below
+   * (`existingMovements`, confirmed/available balance) — this edit REPLACES the old exposure with the
+   * corrected one, it does not add a second one alongside it.
+   */
+  editPending(movementId: string, patch: EditMovementRequest): BalanceMovement {
+    const old = this.movements.findById(movementId);
+    if (!old) throw new NotFoundError(`No BalanceMovement ${movementId}`);
+
+    // §19.1 (BA-confirmed) — Fix Pending is NOT bound to the original Maker; applyStatusTransition()'s
+    // own EDIT action carries no assertMakerCheckerSeparation() check (statusTransition.ts), the same
+    // posture CANCEL already has and for the same reason (this is a Maker-side correction, not a
+    // Checker decision). This call's only real job here is the legal-transition guard itself
+    // (PENDING/REJECTED -> PENDING; anything else throws IllegalStateTransitionError).
+    applyStatusTransition({ currentStatus: old.status, action: 'EDIT', createdBy: old.createdBy, actingUser: patch.editedBy });
+
+    const contract = this.contracts.findById(old.balanceContractId);
+    if (!contract) throw new NotFoundError(`No BalanceContract ${old.balanceContractId} (owner of movement ${old.movementId})`);
+
+    // 2026-08-28, per direct user feedback ("為什麼只有amount可以改... Expiry Date, Tenor Type
+    // etc.?") — a CREATING movementType's own still-PENDING/REJECTED record owns the CONTRACT it
+    // created (contract.tolerancePct/tenorType/tenorDays/expiryDate/mailFloatGraceDays are genuinely
+    // this Business Event's own fields, not shared with anything else yet — see
+    // BalanceContractStore.updateIssueFields()'s own doc comment for why that's safe). A non-creating
+    // edit's contract is shared history the movement never owned in the first place, so those fields
+    // stay locked/carried-over exactly as before.
+    const isCreatingEdit = !!this.movementTypeRegistry[old.movementType]?.isCreating;
+
+    // Phase 4 (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.5, implemented
+    // 2026-08-28, "現在實作 Phase 4 compound cascade") — A3S's own documentArrivalWithSg compound shape:
+    // this UTILIZE's own PENDING record has a matched SHGT FULL_REDEEM/PARTIAL_REDEEM sibling sharing
+    // `businessEventId` (submitDocumentArrivalWithSg()'s own client-side pairing, Angular
+    // maker-submit.service.ts). A plain A3 UTILIZE never has a businessEventId at all, so this
+    // detection is unambiguous — see `applyArrivalWithSgCompoundEdit()`'s own doc comment for the full
+    // cascade mechanism. Every OTHER compound shape (B4's Honour/Accept-with-Receivable, B5's
+    // Acceptance-Settle-with-Receivable) is deliberately NOT included here — out of this pass's own
+    // scope, still excluded via `fixPendingEnabled: false` on their own Function registry entries.
+    const isArrivalWithSgCompound = contract.instrumentType === 'IPLC_LC' && old.movementType === 'UTILIZE' && !!old.businessEventId;
+
+    this.db.exec('BEGIN');
+    try {
+      const result = isArrivalWithSgCompound
+        ? this.applyArrivalWithSgCompoundEdit(old, contract, patch)
+        : this.applyEditToMovement(old, contract, patch, isCreatingEdit);
+      this.db.exec('COMMIT');
+      return result;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * `editPending()`'s own single-movement core — everything from validation through the actual
+   * audit-row-then-in-place-correction DB write, extracted (2026-08-28, Phase 4) so both the plain
+   * single-leg path and `applyArrivalWithSgCompoundEdit()`'s own second half (the LC's own UTILIZE leg)
+   * can share it unchanged. Deliberately carries NO `db.exec('BEGIN'/'COMMIT'/'ROLLBACK')` of its own —
+   * the caller (`editPending()` above) owns the transaction boundary, since the compound path needs BOTH
+   * this movement's own write AND the SG leg's own write inside the SAME transaction.
+   */
+  private applyEditToMovement(old: BalanceMovement, contract: BalanceContract, patch: EditMovementRequest, isCreatingEdit: boolean): BalanceMovement {
+    const merged = this.buildEditedRequest(old, contract, patch, isCreatingEdit);
+
+    this.assertValidAmount(merged.movementType, merged.amount);
+    // requestSchema.ts's own editMovementRequestSchema can't run this check itself — the edit payload
+    // never carries `currency` (locked, see EditMovementRequest's own doc comment), only this service
+    // layer knows the contract's real currency to validate the patched amount's decimal scale against.
+    const scaleViolation = describeAmountScaleViolation(merged.amount, contract.currency);
+    if (scaleViolation) throw new RequestValidationError(scaleViolation);
+    this.assertReasonCodeRequired(merged.movementType, merged.reasonCode);
+    this.assertTenorRequired(merged); // reflects the PATCHED tenorType/tenorDays when isCreatingEdit; trivially satisfied (carried-over, already-valid) otherwise
+    this.assertExpiryDateRequired(merged); // both already gate on movementType === 'ISSUE' internally — a no-op for a non-creating edit (e.g. A3's own UTILIZE) regardless of isCreatingEdit
+    this.assertExpiryDateIsBusinessDay(merged);
+    this.assertToleranceNonNegative(merged.tolerancePct); // reflects the PATCHED value when isCreatingEdit (A1/B1 only); carried-over/already-valid otherwise, same posture as assertTenorRequired() above
+
+    const ceilingAmount = computeCeilingAmount(merged.amount, merged.tolerancePct, merged.movementType, merged.instrumentType);
+    const existingMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== old.movementId);
+
+    // createMovement()'s own duplicate-sourceTransactionRef guard (§0.1's "same Function/same Natural
+    // Key" rule) has no equivalent needed here: sourceTransactionRef is locked/carried over unchanged
+    // by buildEditedRequest() (EditMovementRequest's own doc comment — it's this movement's business
+    // "2ndary Key", not editable), so it was already proven unique against every OTHER live movement
+    // on this contract at the point the OLD record itself was originally created —
+    // an edit can never introduce a NEW collision for a value it never changes.
+
+    const descriptor = this.movementTypeRegistry[merged.movementType];
+    if (!descriptor) throw new RequestValidationError(`Unrecognized movementType "${merged.movementType}" for instrumentType ${merged.instrumentType}.`);
+    const confirmed = computeConfirmedBalance(existingMovements);
+    const available = computeAvailableBalance(confirmed, existingMovements);
+    const sufficiency = descriptor.checkSufficiency({
+      contract,
+      existingMovements,
+      confirmedBalance: confirmed,
+      availableBalance: available,
+      ceilingAmount,
+      req: merged,
+      excludeMovementId: old.movementId,
+    });
+    if (sufficiency && !sufficiency.ok) throw new InsufficientBalanceError(sufficiency.error);
+    const warnings: MovementWarning[] | null = sufficiency?.warning ? [sufficiency.warning] : null;
+
+    // Same Ceiling-level booking rule as createMovement()'s own contingentAccountEntry — see that call
+    // site's own doc comment ("LC Balance = Amount * (1 + Tolerance%) 帳務是用LC Balance出帳").
+    const contingentAccountEntry = deriveContingentAccountEntry({
+      instrumentType: contract.instrumentType,
+      movementType: merged.movementType,
+      amount: ceilingAmount.toFixed(),
+      currency: contract.currency,
+      tenorType: merged.tenorType, // the PATCHED tenor when isCreatingEdit — a Sight->Usance Fix Pending edit must produce the correspondingly-worded Dr/Cr pair, not the pre-edit one
+    });
+
+    const editedAt = this.now();
+    const correction = {
+      businessEventId: merged.businessEventId ?? null,
+      exposureNature: merged.exposureNature ?? old.exposureNature,
+      amount: merged.amount,
+      ceilingAmount: ceilingAmount.toFixed(),
+      legRef: merged.legRef ?? null,
+      accountEntries: merged.exposureNature === 'MEMO' ? null : (merged.accountEntries ?? null),
+      contingentAccountEntry,
+      reasonCode: merged.reasonCode ?? null,
+      warnings,
+      newExpiryDate: merged.newExpiryDate ?? null,
+      transactionDate: merged.transactionDate ?? null,
+      businessDate: merged.businessDate ?? null,
+      valueDate: merged.valueDate ?? null,
+      sourceModule: merged.sourceModule ?? null,
+      sourceFunction: merged.sourceFunction ?? null,
+      referencedTransactionId: merged.referencedTransactionId ?? null,
+      amendmentApproved: merged.amendmentApproved ?? null,
+      amendmentEffective: merged.amendmentEffective ?? null,
+      consentStatus: merged.consentStatus ?? null,
+    };
+
+    // BEGIN/COMMIT/ROLLBACK now owned by the public `editPending()` above (2026-08-28, Phase 4) — this
+    // method may be called as the SECOND half of a larger compound transaction
+    // (`applyArrivalWithSgCompoundEdit()`), so it must never commit/rollback a transaction it doesn't
+    // own the boundary of.
+    if (isCreatingEdit) {
+      // Same transaction as the audit-row-then-correction write below — a failure on either side rolls
+      // both back together, never leaving the contract's own fields patched while the movement edit
+      // itself failed (or vice versa).
+      this.contracts.updateIssueFields(contract.balanceContractId, {
+        tolerancePct: merged.tolerancePct,
+        tenorType: merged.tenorType,
+        tenorDays: merged.tenorDays,
+        expiryDate: merged.expiryDate,
+        mailFloatGraceDays: patch.mailFloatGraceDays,
+      });
+    }
+
+    // Fix Pending §19 (redesigned 2026-08-29) — preserve the pre-edit content BEFORE overwriting it;
+    // FixPendingAuditStore is the only place it survives once applyFixPendingCorrection() below runs.
+    this.fixPendingAudit.insert({
+      auditId: randomUUID(),
+      editSeq: this.fixPendingAudit.nextEditSeq(old.movementId),
+      movementId: old.movementId,
+      balanceContractId: old.balanceContractId,
+      eventSeq: old.eventSeq,
+      originalCreatedBy: old.createdBy,
+      originalCreatedAt: old.createdAt,
+      statusBefore: old.status as 'PENDING' | 'REJECTED', // applyStatusTransition() above guarantees this
+      beforeSnapshot: old as unknown as Record<string, unknown>,
+      afterSnapshot: correction as unknown as Record<string, unknown>,
+      editedBy: patch.editedBy,
+      editedAt,
+    });
+    this.movements.applyFixPendingCorrection({
+      movementId: old.movementId,
+      ...correction,
+      createdBy: patch.editedBy,
+      createdAt: editedAt,
+      editedBy: patch.editedBy,
+      editedAt,
+    });
+
+    return this.movements.findById(old.movementId)!;
+  }
+
+  /**
+   * Phase 4 (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.5, 2026-08-28) — A3S's
+   * own `documentArrivalWithSg` compound Fix Pending cascade. Mirrors the ORIGINAL two-call create
+   * sequence `maker-submit.service.ts`'s `submitDocumentArrivalWithSg()` already uses (the SG's own
+   * redemption is corrected FIRST, still PENDING; the LC's own UTILIZE second) rather than inventing new
+   * netting logic: `checkUtilizeShapedSufficiency()`'s own matched-`businessEventId` exception (see that
+   * method's own doc comment) already nets a still-PENDING SG redemption sharing this UTILIZE's own
+   * `businessEventId` — by correcting the SG leg FIRST, in the SAME transaction/connection, the
+   * subsequent `applyEditToMovement()` call for the UTILIZE leg sees it via its own fresh
+   * `listShgtMovementsForParent()` query (SQLite read-your-own-writes within an open transaction).
+   *
+   * The SG's own redeem amount is never directly Fix-Pending-editable (same as at Submit — the Maker only
+   * ever types the Bill Amount) — recomputed here as `MIN(new Bill Amount, SG's own Confirmed Balance
+   * excluding the SG leg itself)`, the exact same formula `submitDocumentArrivalWithSg()` uses
+   * client-side, so a Fix Pending edit reproduces what a fresh Submit at the corrected amount would have
+   * produced. `FULL_REDEEM`/`PARTIAL_REDEEM` is a LOCKED field on `editMovementRequestSchema` (never
+   * client-patchable) — this internal cascade is not bound by that lock, since the Maker never directly
+   * edits the SG leg at all; movementType may genuinely flip either direction as the corrected Bill Amount
+   * changes how much of the SG's own outstanding balance it now clears.
+   */
+  private applyArrivalWithSgCompoundEdit(old: BalanceMovement, contract: BalanceContract, patch: EditMovementRequest): BalanceMovement {
+    const businessEventId = old.businessEventId!;
+    const siblings = this.movements
+      .findByBusinessEventId(businessEventId)
+      .filter((m) => m.movementId !== old.movementId && m.status === 'PENDING' && (m.movementType === 'FULL_REDEEM' || m.movementType === 'PARTIAL_REDEEM'));
+    if (siblings.length !== 1) {
+      throw new RequestValidationError(
+        `Fix Pending for this Document Arrival w/ Shipping Gtee (A3S) event expected exactly one linked, still-PENDING Shipping Guarantee redemption sharing businessEventId ${businessEventId} — found ${siblings.length}. This compound record cannot be safely Fix-Pending-edited.`,
+      );
+    }
+    const oldSg = siblings[0]!; // length check above guarantees exactly one element
+    const sgContract = this.contracts.findById(oldSg.balanceContractId);
+    if (!sgContract) throw new NotFoundError(`No BalanceContract ${oldSg.balanceContractId} (owner of linked SG redemption ${oldSg.movementId})`);
+
+    const newUtilizeAmount = parseMonetaryAmount(patch.amount ?? old.amount);
+    const sgExistingExcludingOld = this.movements.listByContract(sgContract.balanceContractId).filter((m) => m.movementId !== oldSg.movementId);
+    const sgConfirmed = computeConfirmedBalance(sgExistingExcludingOld);
+    const newSgRedeemAmount = Decimal.max(new Decimal(0), Decimal.min(newUtilizeAmount, sgConfirmed));
+    const newSgMovementType: 'FULL_REDEEM' | 'PARTIAL_REDEEM' = newSgRedeemAmount.greaterThanOrEqualTo(sgConfirmed) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM';
+
+    this.assertValidAmount(newSgMovementType, newSgRedeemAmount.toFixed());
+    const sgAvailable = computeAvailableBalance(sgConfirmed, sgExistingExcludingOld);
+    const sgCheck = checkRedeemSufficiency({ redeemAmount: newSgRedeemAmount, sgAvailableBalance: sgAvailable });
+    if (!sgCheck.ok) throw new InsufficientBalanceError(sgCheck.error);
+
+    const sgContingentEntry = deriveContingentAccountEntry({
+      instrumentType: 'SHGT',
+      movementType: newSgMovementType,
+      amount: newSgRedeemAmount.toFixed(),
+      currency: sgContract.currency,
+      tenorType: null,
+    });
+
+    const editedAt = this.now();
+    const sgCorrection = {
+      businessEventId, // oldSg was found VIA this exact non-null value (findByBusinessEventId), never a fallback
+      exposureNature: oldSg.exposureNature,
+      amount: newSgRedeemAmount.toFixed(),
+      ceilingAmount: newSgRedeemAmount.toFixed(), // SHGT is never tolerance-applicable — ceiling === amount, same as every other SHGT movement in this codebase
+      legRef: oldSg.legRef ?? null,
+      accountEntries: oldSg.accountEntries ?? null,
+      contingentAccountEntry: sgContingentEntry,
+      reasonCode: oldSg.reasonCode ?? null,
+      warnings: null as MovementWarning[] | null,
+      newExpiryDate: null,
+      transactionDate: oldSg.transactionDate ?? null,
+      businessDate: oldSg.businessDate ?? null,
+      valueDate: oldSg.valueDate ?? null,
+      sourceModule: oldSg.sourceModule ?? null,
+      sourceFunction: oldSg.sourceFunction ?? null,
+      referencedTransactionId: oldSg.referencedTransactionId ?? null,
+      amendmentApproved: oldSg.amendmentApproved ?? null,
+      amendmentEffective: oldSg.amendmentEffective ?? null,
+      consentStatus: oldSg.consentStatus ?? null,
+    };
+
+    // Movement changes movementType (FULL_REDEEM <-> PARTIAL_REDEEM can flip either way) but keeps its
+    // own identity (movementId/eventSeq) — mirrors the LC leg's own new-movementType-same-row shape;
+    // the newMovementType itself isn't part of applyFixPendingCorrection()'s own param surface (that
+    // store method never changes movement_type — no Fix Pending shape needs it to except this one), so
+    // it's applied via a direct follow-up UPDATE, same connection/transaction.
+    this.movements.setMovementType(oldSg.movementId, newSgMovementType);
+
+    this.fixPendingAudit.insert({
+      auditId: randomUUID(),
+      editSeq: this.fixPendingAudit.nextEditSeq(oldSg.movementId),
+      movementId: oldSg.movementId,
+      balanceContractId: oldSg.balanceContractId,
+      eventSeq: oldSg.eventSeq,
+      originalCreatedBy: oldSg.createdBy,
+      originalCreatedAt: oldSg.createdAt,
+      statusBefore: oldSg.status as 'PENDING' | 'REJECTED',
+      beforeSnapshot: oldSg as unknown as Record<string, unknown>,
+      afterSnapshot: { ...sgCorrection, movementType: newSgMovementType } as unknown as Record<string, unknown>,
+      editedBy: patch.editedBy,
+      editedAt,
+    });
+    this.movements.applyFixPendingCorrection({
+      movementId: oldSg.movementId,
+      ...sgCorrection,
+      createdBy: patch.editedBy,
+      createdAt: editedAt,
+      editedBy: patch.editedBy,
+      editedAt,
+    });
+
+    // The LC's own UTILIZE leg, via the exact same single-movement logic every other Fix Pending edit
+    // uses (isCreatingEdit is always false for UTILIZE) — the SG correction above is already applied
+    // in this same open transaction, so checkUtilizeShapedSufficiency()'s own listShgtMovementsForParent()
+    // query naturally sees it and nets it via the matched-businessEventId exception, no new logic needed.
+    return this.applyEditToMovement(old, contract, patch, false);
+  }
+
+  /**
+   * `editPending()`'s own request-merging step, factored out for testability/readability — combines
+   * the OLD movement's locked fields, the CONTRACT's own locked (v1: contract-level fields are all
+   * locked, see `EditMovementRequest`'s own doc comment) fields, and the caller's patch into the same
+   * `CreateMovementRequest` shape the rest of this service's existing validation/sufficiency machinery
+   * already understands — reuse, not reimplementation.
+   */
+  private buildEditedRequest(old: BalanceMovement, contract: BalanceContract, patch: EditMovementRequest, isCreatingEdit: boolean): CreateMovementRequest {
+    return {
+      instrumentType: contract.instrumentType,
+      balanceContractId: contract.balanceContractId,
+      movementType: old.movementType,
+      eventSeq: old.eventSeq,
+      amount: patch.amount,
+      currency: contract.currency,
+      legRef: patch.legRef,
+      accountEntries: patch.accountEntries,
+      // Bug fixed 2026-08-28 (found while scoping A3S's own Phase 4 compound Fix Pending cascade below —
+      // `old.businessEventId` was NEVER carried over here; a patch that omits it (every caller before A3S,
+      // since only A3S's own UTILIZE ever has one set) silently NULLED it on the replacement row, severing
+      // the link to its own matched SG redemption leg. Same "locked, carried-over-unless-explicitly-
+      // re-supplied" shape as `sourceTransactionRef` below, except businessEventId genuinely IS still
+      // client-patchable (see the `editMovementRequestSchema`'s own passthrough test) — `patch.
+      // businessEventId` wins when the caller supplies a real value, `old.businessEventId` is the fallback,
+      // not a forced null.
+      businessEventId: patch.businessEventId ?? old.businessEventId,
+      exposureNature: patch.exposureNature,
+      // Contract-level fields — see creatingOnly()'s own doc comment for the shared rule this applies.
+      // tolerancePct is a deliberate, user-confirmed EXCEPTION to that shared rule (2026-08-28, "A2
+      // Tolerance % FIX PENDING INCREASE/DECREASE時准許修改") — unlike tenorType/tenorDays/expiryDate
+      // below (still exclusively the creating movement's own contract-level facts), Tolerance is ALSO
+      // genuinely applicable to a non-creating AMEND_INCREASE/AMEND_DECREASE/AMEND edit (see domain/
+      // tolerance.ts's own TOLERANCE_APPLICABLE_MOVEMENT_TYPES — the same set `computeCeilingAmount()`
+      // below already gates on). User-confirmed scope is narrower than "treat it exactly like a creating
+      // edit": a patched Tolerance on a NON-creating edit affects only THIS movement's own
+      // `ceilingAmount`/`contingentAccountEntry` (computed from `merged.tolerancePct` a few lines below);
+      // it must NEVER be written back to the contract's own `tolerance_pct` column — `updateIssueFields()`
+      // stays gated on `isCreatingEdit` alone (unchanged, a few lines further down), so this is safe
+      // without an explicit `isCreatingEdit` branch here: `patch.tolerancePct ?? contract.tolerancePct`
+      // already produces the exact same result `creatingOnly(true, ...)` did for a creating edit, and the
+      // NEW desired result for a non-creating one — one expression correctly covers both cases. A patch
+      // supplied against a movementType Tolerance genuinely doesn't apply to (e.g. A3's own UTILIZE) is
+      // harmless either way — `computeCeilingAmount()`'s own internal applicability check ignores it,
+      // same posture every other "field accepted but inert for a non-applicable shape" case in this
+      // codebase already has (e.g. A2's own Submit-time Tolerance field before Fix Pending existed at all).
+      tolerancePct: patch.tolerancePct ?? contract.tolerancePct,
+      tenorType: creatingOnly(isCreatingEdit, patch.tenorType, contract.tenorType),
+      tenorDays: creatingOnly(isCreatingEdit, patch.tenorDays, contract.tenorDays),
+      expiryDate: creatingOnly(isCreatingEdit, patch.expiryDate, contract.expiryDate),
+      maturityDate: contract.maturityDate,
+      newExpiryDate: patch.newExpiryDate,
+      transactionDate: patch.transactionDate,
+      businessDate: patch.businessDate,
+      valueDate: patch.valueDate,
+      sourceModule: patch.sourceModule,
+      sourceFunction: patch.sourceFunction,
+      sourceTransactionRef: old.sourceTransactionRef,
+      referencedTransactionId: patch.referencedTransactionId,
+      reasonCode: patch.reasonCode,
+      amendmentApproved: patch.amendmentApproved,
+      amendmentEffective: patch.amendmentEffective,
+      consentStatus: patch.consentStatus,
+      createdBy: patch.editedBy,
+    };
   }
 
   /**

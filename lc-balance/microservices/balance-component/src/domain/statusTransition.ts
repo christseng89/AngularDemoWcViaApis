@@ -22,13 +22,17 @@ import type { MovementStatus } from '../types';
 
 export type MovementAction = 'RELEASE' | 'REJECT' | 'CANCEL' | 'EDIT';
 
-/** §4's state diagram, expressed as legal (fromStatus, action) -> toStatus pairs. */
+/**
+ * §4's state diagram, expressed as legal (fromStatus, action) -> toStatus pairs. EDIT (Fix Pending §19,
+ * redesigned 2026-08-29) always lands back at PENDING — the corrected record is ready for a fresh review
+ * cycle, regardless of whether the predecessor content was PENDING or REJECTED. This is a same-row
+ * correction (never mints a second row) — see `service/balanceService.ts`'s `editPending()`.
+ */
 const LEGAL_TRANSITIONS: Record<MovementStatus, Partial<Record<MovementAction, MovementStatus>>> = {
-  PENDING: { RELEASE: 'RELEASED', REJECT: 'REJECTED', CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },
-  REJECTED: { CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },
+  PENDING: { RELEASE: 'RELEASED', REJECT: 'REJECTED', CANCEL: 'CANCELLED', EDIT: 'PENDING' },
+  REJECTED: { CANCEL: 'CANCELLED', EDIT: 'PENDING' },
   RELEASED: {},
   CANCELLED: {},
-  SUPERSEDED: {},
 };
 
 export interface ApplyTransitionInput {

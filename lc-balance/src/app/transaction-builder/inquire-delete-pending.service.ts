@@ -58,9 +58,12 @@ export interface DeleteAuditView {
  * so only LC Numbers with at least one `delete_pending_audit` record ever appear here (deliberately the
  * OPPOSITE of `InquireEventsService.loadIndex()`'s own catalog, which now excludes exactly a CANCELLED
  * contract that's the kind of record this screen exists to surface); `decorate` reuses
- * `computeLcIndexRow()` (shared with `InquireEventsService`) for the Tenor Type/Currency/Face Amount/Last
- * Event Date columns, business-directed to match Inquire Events' own catalog columns minus Available
- * Balance/Status (this screen has no live-balance concern). `selectLcFromIndex()` scopes `search()` to
+ * `computeLcIndexRow()` (shared with `InquireEventsService`) for the Tenor Type/Currency/Last Event Date
+ * columns, business-directed to match Inquire Events' own catalog columns minus Available Balance/Status
+ * (this screen has no live-balance concern) — but with `amountSource: 'input'` (2026-08-29, "比較USER
+ * FRIENDLY"), since "LC Amount" here means the typed amount of a since-cancelled transaction, not a
+ * confirmed/RELEASED figure (which would always read `"0"` for exactly the rows this screen surfaces —
+ * see `computeLcIndexRow()`'s own doc comment). `selectLcFromIndex()` scopes `search()` to
  * exactly that LC and switches `indexView` to `'AUDIT'`; `backToIndex()` returns.
  *
  * `@Injectable()`, no `providedIn` — per-component-instance mutable state, same convention as
@@ -71,7 +74,7 @@ export class InquireDeletePendingService {
   constructor(private readonly api: BalanceComponentApiService) {
     this.catalogIndex = new LcCatalogIndexService<LcIndexRow>(
       api,
-      (contracts, side) => forkJoin(contracts.map((contract) => computeLcIndexRow(api, contract, side))),
+      (contracts, side) => forkJoin(contracts.map((contract) => computeLcIndexRow(api, contract, side, 'input'))),
       false,
       (side, search, page, pageSize) => api.catalogWithDeletePendingHistory(side === 'IMPORT' ? 'IPLC_LC' : 'EPLC_CONFIRMATION', search, page, pageSize),
     );

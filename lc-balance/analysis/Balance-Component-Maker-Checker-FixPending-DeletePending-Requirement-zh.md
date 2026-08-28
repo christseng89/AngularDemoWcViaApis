@@ -90,31 +90,24 @@
    `POST /balance-movements`（新建）、`.../release`、`.../reject`、`.../cancel`、`.../acknowledge`、
    `.../maker-submit`（這是 A4 專用的「finalize 既有 A3/A3S UTILIZE」動作，跟「修改內容後重新提交」
    完全是兩回事）——**沒有 `PUT`/`PATCH`，也沒有任何「edit」/「resubmit」字樣的路由**。
-2. **狀態機裡雖然預留了 `EDIT` 動作，但從未被呼叫**——`domain/statusTransition.ts:27-28`：
-   ```ts
-   PENDING:  { RELEASE: 'RELEASED', REJECT: 'REJECTED', CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },
-   REJECTED: { CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },
-   ```
-   `types.ts:51` 也有一行呼應的註解：「Maker action on their own not-yet-released record
-   (CANCELLED/SUPERSEDED)」——顯示這是工程部門過去就已經預想過「將來需要一個 Maker 編輯動作」而
-   預留的欄位／狀態值，但全庫搜尋 `action: 'EDIT'`／任何寫入 `status: 'SUPERSEDED'`（Movement 層級，
-   非 Contract 版本層級的 SUPERSEDED——兩者是不同的 enum，見下方 2.2.1）的呼叫點，**結果是零**——
-   這個分支從建立以來就沒有被任何 service 方法用過，是死程式碼／預留骨架，不是「已經做了一半」。
+2. **狀態機裡雖然預留了 `EDIT` 動作，但從未被呼叫**——`domain/statusTransition.ts:27-28` 當時的
+   `LEGAL_TRANSITIONS` 表格裡，`PENDING`/`REJECTED` 兩個來源狀態都有一個 `EDIT` 分支，但全庫搜尋
+   `action: 'EDIT'` 的呼叫點，**結果是零**——這個分支從建立以來就沒有被任何 service 方法用過，是死
+   程式碼／預留骨架，不是「已經做了一半」。（後續實作，Fix Pending 已定案為原地修正同一筆記錄，見
+   `Balance-Component-FixPending-DeletePending-Proposal-zh.md`。）
 3. **Angular 端沒有任何「編輯後重新送出」的 UI**——`maker-panel.component.ts`／`.html` 全文搜尋
    「Fix Pending」「edit」「resubmit」相關字樣，沒有對應的按鈕或表單邏輯。目前 Maker 若要修正一筆
    PENDING 或 REJECTED 交易，只能：先用 Delete Pending／Cancel 整筆作廢，再重新從空白表單開始填寫
    一次全新的交易——**沒有「帶入原內容，只改需要修正的欄位」這種體驗**。
 
-#### 2.2.1 附帶澄清：程式碼裡有兩種不同的「SUPERSEDED」，容易混淆
+#### 2.2.1 附帶澄清：`ContractStatus` 與 `MovementStatus` 是兩個完全獨立的 enum
 
-`ContractStatus`（LC/Confirmed LC 合約本身的版號狀態，`ACTIVE/SUPERSEDED/CLOSED/CANCELLED/EXPIRED`）
-與 `MovementStatus`（單筆交易分錄的狀態，`PENDING/RELEASED/REJECTED/CANCELLED/SUPERSEDED`）**是兩個
-完全獨立的 enum**，只是剛好共用同一個字串值。前者（Contract 版本 SUPERSEDED）**已經有實作**——
-`balanceContractStore.ts:349-354`，LC 修訂（Amendment）時把舊版本合約標記為 SUPERSEDED、指向新版本
-（`superseded_by_balance_contract_id`）；後者（Movement 層級 SUPERSEDED，本次業務要的 Fix Pending
-會用到的那個）則完全沒有實作，只是狀態機表格裡的一個保留分支。**這是一個現成、已經驗證過的設計先例
-——「舊記錄標記 SUPERSEDED＋指向新記錄」——工程部門評估 Fix Pending 的實作方式時，可以直接參考
-`balanceContractStore.ts` 這個既有模式，不需要從零設計。**
+`ContractStatus`（LC/Confirmed LC 合約本身的版號狀態）與 `MovementStatus`（單筆交易分錄的狀態）是兩個
+完全獨立的 enum，不要混為一談。`ContractStatus` 有一個保留但從未被任何業務功能觸發的
+`SUPERSEDED`／`markSuperseded()`（合約版本置換用），與本次業務要的 Fix Pending 無關。Fix Pending
+最終定案的做法，是直接原地修正 PENDING／REJECTED 記錄本身（同一筆 `movementId`／`eventSeq`，狀態
+回到 PENDING），修正前內容另存到獨立的稽核表，詳見
+`Balance-Component-FixPending-DeletePending-Proposal-zh.md`。
 
 ### 2.3 完全未實作的部分——Maker 事後查看／處理自己 PENDING／REJECTED 交易的畫面不存在
 
@@ -159,11 +152,10 @@ Delete Pending，是否也需要比照 `deleteMakerPending()` 既有的連動邏
 1. **Maker 待處理清單（新畫面，前提工作）**：是否新增一個「My Pending / My Rejected」清單畫面（比照
    既有 Checker Queue 的設計），讓 Maker 能在任何時間點找回自己名下 PENDING／REJECTED 狀態的交易？
    若不做這塊，Fix Pending／Reject 後 Delete Pending 在跨 session／跨天的實務情境下無法真正使用。
-2. **Fix Pending 的實作方式**：建議參考 `balanceContractStore.ts` 既有的「舊記錄標記
-   SUPERSEDED＋指向新記錄」模式（2.2.1），而非直接原地修改（in-place mutation）PENDING 記錄本身
-   ——原地修改會牴觸 `eventSeq`（Design doc §8 冪等鍵，Maker Submit 當下產生、之後不可變）的既有
-   設計；新建一筆記錄、舊記錄標記 SUPERSEDED 並指向新記錄，才能保持 `eventSeq`/冪等鍵設計不被打破。
-   請工程部門確認這個方向是否可行，或提出替代方案。
+2. **Fix Pending 的實作方式**：最終定案（見
+   `Balance-Component-FixPending-DeletePending-Proposal-zh.md`）為直接原地修正 PENDING/REJECTED
+   記錄本身——同一筆 `movementId`／`eventSeq`（不牴觸 Design doc §8 的冪等鍵設計，因為身份完全不變），
+   狀態回到 PENDING；修正前的內容另外存到獨立的稽核表，不與現行記錄混在一起。
 3. **Fix Pending 可修改的欄位範圍**：業務原文沒有界定「修正」的範圍是全部欄位，還是僅限特定欄位
    （例如金額、幣別、到期日）。請工程部門會同業務界定，這會直接影響表單設計與驗證邏輯的複雜度。
 4. **REJECTED 之後的 Delete Pending — UI 開放範圍**：後端 `/cancel` 本身已經允許
@@ -182,9 +174,9 @@ Status: Requirement Registered — Pending Engineering Scoping (NOT a small UI t
 Confirmed already correct today: Submit→PENDING, Release, Reject (does not delete the record),
                                   Delete Pending while still PENDING in the same Maker session
                                   (including multi-leg cascade for A3S/B3/B4-Usance/B5).
-Confirmed NOT implemented at all: Fix Pending (edit + resubmit) — no API, no UI, no wired EDIT/
-                                   SUPERSEDED logic anywhere (state machine has the enum values
-                                   reserved but never used). Maker's own persistent Pending/Rejected
+Confirmed NOT implemented at all: Fix Pending (edit + resubmit) — no API, no UI, no wired EDIT
+                                   logic anywhere (state machine has the enum value reserved
+                                   but never used). Maker's own persistent Pending/Rejected
                                    queue/inbox — no such screen exists; today's Delete Pending only
                                    works within the same browser session right after Submit.
 Flagged for engineering's own scoping: whether Reject should cascade to linked legs the way Cancel

@@ -75,6 +75,11 @@ describe('BalanceComponentApiService', () => {
     expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/withdraw-maker-submit', { withdrawnBy: 'maker1' });
   });
 
+  it('editPending() POSTs to the /edit sub-path with the raw request body (Fix Pending, §2.2/§15/§19)', () => {
+    service.editPending('MV-1', { amount: '95000', editedBy: 'maker2' });
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/edit', { amount: '95000', editedBy: 'maker2' });
+  });
+
   describe('resolveContract()', () => {
     it('GETs balance-contracts with only instrumentType + lcNumber when ibNumber/sgNumber are absent', () => {
       const nk: NaturalKey = { lcNumber: 'S001' };
@@ -246,22 +251,33 @@ describe('BalanceComponentApiService', () => {
     expect(result).toBe('OBS');
   });
 
-  describe('listMyMovements() — Fix Pending/Delete Pending Phase 2 Maker Queue worklist', () => {
-    it('GETs /balance-movements with only createdBy when statuses/page/pageSize are omitted', () => {
+  describe('listMyMovements() — Fix Pending/Delete Pending Phase 2 Maker Queue worklist (unpaginated, 2026-08-28)', () => {
+    it('GETs /balance-movements with only createdBy when statuses/q are omitted', () => {
       const result = service.listMyMovements({ createdBy: 'maker1' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', { params: { createdBy: 'maker1' } });
       expect(result).toBe('OBS');
     });
 
-    it('joins statuses with a comma and includes page/pageSize when supplied', () => {
-      service.listMyMovements({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], page: 2, pageSize: 5 });
+    it('joins statuses with a comma', () => {
+      service.listMyMovements({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'] });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', {
-        params: { createdBy: 'maker1', status: 'PENDING,REJECTED', page: 2, pageSize: 5 },
+        params: { createdBy: 'maker1', status: 'PENDING,REJECTED' },
       });
     });
 
     it('omits the status param for an empty statuses array', () => {
       service.listMyMovements({ createdBy: 'maker1', statuses: [] });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', { params: { createdBy: 'maker1' } });
+    });
+
+    // User-directed 2026-08-28 ("Maker Queue 提供 LC Number Search 功能", "支援 LIKE / Partial Match")
+    it('includes q when supplied', () => {
+      service.listMyMovements({ createdBy: 'maker1', q: 'S001' });
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', { params: { createdBy: 'maker1', q: 'S001' } });
+    });
+
+    it('omits q when blank/omitted', () => {
+      service.listMyMovements({ createdBy: 'maker1', q: '' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements', { params: { createdBy: 'maker1' } });
     });
   });

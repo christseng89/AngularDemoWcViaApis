@@ -121,7 +121,7 @@ export interface BalanceMovement {
   amount: string;
   ceilingAmount: string;
   currency: string;
-  status: 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED' | 'SUPERSEDED';
+  status: 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED';
   reasonCode?: string | null;
   remarks?: string | null;
   sourceTransactionRef?: string | null;
@@ -192,6 +192,37 @@ export interface BalanceMovement {
   finalizeAcceptanceEventSnapshot?: BalanceSnapshot | null;
   /** Same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee contract instead (Import-side only). */
   finalizeSgEventSnapshot?: BalanceSnapshot | null;
+  /** Fix Pending §19 (redesigned 2026-08-29) — who last corrected this record's content and when, via an in-place Fix Pending Save (same movementId/eventSeq). Null until ever Fix-Pending-edited. */
+  editedBy?: string | null;
+  editedAt?: string | null;
+}
+
+/**
+ * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+ * 2026-08-27) — the microservice's own `editMovementRequestSchema` is a `.strict()` allowlist; this
+ * mirrors it field-for-field. Deliberately does NOT extend/Partial<> CreateMovementRequest above — any
+ * locked field (naturalKey/balanceContractId/instrumentType/movementType/currency/eventSeq/createdBy)
+ * or the movement's own business "2ndary Key" (sourceTransactionRef) is simply absent from this type,
+ * same reasoning as the microservice's own EditMovementRequest doc comment.
+ */
+export interface EditMovementRequest {
+  amount: string;
+  editedBy: string;
+  reasonCode?: string | null;
+  businessEventId?: string | null;
+  referencedTransactionId?: string | null;
+  /**
+   * Contract-level fields (2026-08-28, per direct user feedback — "為什麼只有amount可以改... Expiry
+   * Date, Tenor Type etc.?"; per-Function config, "頁面配置檔 for A1-A11/B1-B7") — only ever sent when
+   * the current Function's own `FunctionStrategy.fixPendingEditableFields` (function-strategy.ts)
+   * declares the field editable; the server's own `isCreatingEdit` gate additionally silently ignores
+   * these for a non-creating movementType regardless of what's sent here.
+   */
+  tolerancePct?: string | null;
+  tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
+  tenorDays?: number | null;
+  expiryDate?: string | null;
+  newExpiryDate?: string | null;
 }
 
 /**
@@ -223,6 +254,16 @@ export class BalanceComponentApiService {
   /** Maker-initiated withdrawal of their own still-PENDING entry (EC), distinct from reject() (a Checker's 4-eyes decline). */
   cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): Observable<BalanceMovement> {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
+  }
+
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — corrects a PENDING/REJECTED movement IN PLACE (same
+   * movementId/eventSeq) instead of a Delete Pending + full re-Submit — see editPending()'s own doc
+   * comment on the microservice side for the full mechanism. Generic across every movementType the
+   * microservice already supports.
+   */
+  editPending(movementId: string, req: EditMovementRequest): Observable<BalanceMovement> {
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/edit`, req);
   }
 
   /** A3/A3S only. Restored 2026-08-20 — the Checker's own acknowledgment on the LC's own UTILIZE (status stays PENDING; A4/A6 finalizes for real later). B3's own Checker Release is still the standard release() above. */
@@ -362,13 +403,16 @@ export class BalanceComponentApiService {
    * Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
    * Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/My Rejected" worklist. A second, independent
    * query shape on the same `GET /balance-movements` route as findByBusinessEventId() above (mutually
-   * exclusive server-side), not a new endpoint.
+   * exclusive server-side), not a new endpoint. Returns every matching row unpaginated (user-directed
+   * 2026-08-28, "Order by Function ASC → LC Number ASC → Secondary Reference Number ASC") — Function has
+   * no server-side column, so the true sort (and therefore true pagination) is a `MakerQueueService`
+   * concern; see that service's own doc comment. `q` (renamed from a prior exact-match `lcNumber` param,
+   * "支援 LIKE / Partial Match") is an optional substring filter on LC Number.
    */
-  listMyMovements(filter: { createdBy: string; statuses?: string[]; page?: number; pageSize?: number }): Observable<MyMovementsPage> {
-    const params: Record<string, string | number> = { createdBy: filter.createdBy };
+  listMyMovements(filter: { createdBy: string; statuses?: string[]; q?: string }): Observable<MyMovementsPage> {
+    const params: Record<string, string> = { createdBy: filter.createdBy };
     if (filter.statuses?.length) params['status'] = filter.statuses.join(',');
-    if (filter.page) params['page'] = filter.page;
-    if (filter.pageSize) params['pageSize'] = filter.pageSize;
+    if (filter.q) params['q'] = filter.q;
     return this.http.get<MyMovementsPage>(`${this.base}/balance-movements`, { params });
   }
 
@@ -390,12 +434,9 @@ export class BalanceComponentApiService {
   }
 }
 
-/** One page of BalanceComponentApiService.listMyMovements()'s own result — mirrors the microservice's own `BalanceService.listMyMovements()` response shape. */
+/** BalanceComponentApiService.listMyMovements()'s own result — mirrors the microservice's own `BalanceService.listMyMovements()` response shape; unpaginated (2026-08-28) — see that service method's own doc comment. */
 export interface MyMovementsPage {
   items: Array<{ movement: BalanceMovement; contract: BalanceContract }>;
-  total: number;
-  page: number;
-  pageSize: number;
 }
 
 /** Mirrors the microservice's own `DeletePendingAuditWithContract` (src/types.ts) — one row per Delete Pending action, paired with the natural key of the contract it belongs to. */

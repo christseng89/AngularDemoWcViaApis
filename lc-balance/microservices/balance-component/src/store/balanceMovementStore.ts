@@ -66,6 +66,8 @@ interface MovementRow {
   amendment_approved: number | null;
   amendment_effective: string | null;
   consent_status: string | null;
+  edited_by: string | null;
+  edited_at: string | null;
 }
 
 function rowToMovement(row: MovementRow): BalanceMovement {
@@ -121,6 +123,8 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     amendmentApproved: row.amendment_approved === null ? null : row.amendment_approved === 1,
     amendmentEffective: row.amendment_effective,
     consentStatus: row.consent_status as BalanceMovement['consentStatus'],
+    editedBy: row.edited_by,
+    editedAt: row.edited_at,
   };
 }
 
@@ -254,17 +258,14 @@ export class BalanceMovementStore {
 
   /**
    * Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
-   * Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/My Rejected" worklist. Cross-contract,
-   * genuine server-side pagination (unlike listByContract() below, which is a single-contract, fully-
-   * loaded list) — ordered by created_at DESC (most recent first — this is a worklist, not an audit
-   * timeline, so a Maker wants their newest items first, the opposite of listByContract()'s ASC).
+   * Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/My Rejected" worklist. Cross-contract.
    *
    * Business-confirmed 2026-08-27 ("EARMARKED 等同 APPROVED 不要出現在 MAKER QUEUE 上") — a still-PENDING
    * A3/A3S UTILIZE that has already been Checker-acknowledged (`acknowledged_at` set) but not yet
    * Maker-Submitted into A4 (`maker_submitted_at` still null) displays as EARMARKED — the unified
    * Earmarking model's own business-equivalent of APPROVED (see `balance-component.model.ts`'s
-   * `isEarmarkFunction()`), not a Maker-actionable PENDING item. Excluded here at the SQL/COUNT level
-   * (not a client-side post-filter) so `total`/pagination stay consistent with what's actually returned.
+   * `isEarmarkFunction()`), not a Maker-actionable PENDING item. Excluded here at the SQL level (not a
+   * client-side post-filter) so `total` stays consistent with what's actually returned.
    *
    * Business-confirmed 2026-08-27 ("A6 · Acceptance (Usance) ... 應該是一個 U01 B01" — a duplicate row) —
    * a SECOND exclusion, for A6's own referenced A3/A3S UTILIZE specifically: once A6 sets
@@ -282,26 +283,49 @@ export class BalanceMovementStore {
    *
    * This is the ONLY caller of this method (dedicated to the Maker Queue), so both exclusions are
    * unconditional rather than an opt-in flag.
+   *
+   * User-directed 2026-08-28 ("Maker Queue Index 預設依以下順序排序: Order by Function ASC → LC Number
+   * ASC → Secondary Reference Number ASC" / "Search 後的結果必須維持與 Maker Queue 相同的排序規則") —
+   * `page`/`pageSize`/`LIMIT`/`OFFSET` REMOVED outright: "Function" has no column of its own (it's an
+   * Angular-side concept resolved from instrumentType+movementType+makerSubmittedAt — see
+   * `MakerQueueService.functionFor()`), so a true Function-first sort can only be applied client-side,
+   * AFTER every matching row is loaded — the same "Function is not a server-side concern" boundary
+   * `DeletePendingAuditStore.search()`'s own doc comment already draws (it filters client-side on a
+   * fetched page for the identical reason). Returns every matching row unpaginated; `MakerQueueService`
+   * now owns the actual page window (`PagedListState`, same "windowing an already-loaded array"
+   * convention `InquireEventsService.pagedEvents` already established) — as a side effect, this also
+   * resolves `groupCompoundRows()`'s own former "grouping is client-side, over only the CURRENT page's
+   * own fetched items" known limitation, since the full matching set is now always loaded at once.
+   *
+   * `q` (renamed from the prior exact-match `lcNumber` filter, "支援 LIKE / Partial Match") — substring
+   * LIKE, same `%@q%`/`q` naming convention `BalanceContractStore.listCatalog()`'s own `q` filter and
+   * `listWithDeletePendingHistory()`'s own `q` filter already use, rather than the DIFFERENT exact-match
+   * `lcNumber` convention `DeletePendingAuditStore.search()` uses (that one was never LIKE, so it kept
+   * its own name) — the two conventions in this codebase are conditioned on match type, not by caller.
+   *
+   * Requires a JOIN against `balance_contracts` for both the sort key and the filter — every previously-
+   * bare column reference in the exclusion subqueries now needs an explicit `bm.` alias, since
+   * `balance_contracts` has its own, different-meaning `status` column (`ContractStatus`) that would
+   * otherwise silently collide with `balance_movements.status` the instant the JOIN is introduced.
    */
-  listByCreatedByAndStatus(params: { createdBy: string; statuses: MovementStatus[]; page: number; pageSize: number }): {
+  listByCreatedByAndStatus(params: { createdBy: string; statuses: MovementStatus[]; q?: string }): {
     items: BalanceMovement[];
-    total: number;
   } {
-    const { createdBy, statuses, page, pageSize } = params;
+    const { createdBy, statuses, q } = params;
     const placeholders = statuses.map(() => '?').join(', ');
-    const notYetActionableEarmark = `(status = 'PENDING' AND acknowledged_at IS NOT NULL AND maker_submitted_at IS NULL)`;
-    const supersededByAReferencingMovement = `EXISTS (SELECT 1 FROM balance_movements ref WHERE ref.referenced_transaction_id = balance_movements.movement_id AND ref.status != 'CANCELLED')`;
-    const exclusion = `AND NOT ${notYetActionableEarmark} AND NOT ${supersededByAReferencingMovement}`;
-    const total = (
-      this.db.prepare(`SELECT COUNT(*) AS n FROM balance_movements WHERE created_by = ? AND status IN (${placeholders}) ${exclusion}`).get(createdBy, ...statuses) as {
-        n: number;
-      }
-    ).n;
-    const offset = (page - 1) * pageSize;
+    const notYetActionableEarmark = `(bm.status = 'PENDING' AND bm.acknowledged_at IS NOT NULL AND bm.maker_submitted_at IS NULL)`;
+    const supersededByAReferencingMovement = `EXISTS (SELECT 1 FROM balance_movements ref WHERE ref.referenced_transaction_id = bm.movement_id AND ref.status != 'CANCELLED')`;
+    const qClause = q ? `AND bc.lc_number LIKE ?` : '';
+    const exclusion = `AND NOT ${notYetActionableEarmark} AND NOT ${supersededByAReferencingMovement} ${qClause}`;
+    const queryParams = q ? [createdBy, ...statuses, `%${q}%`] : [createdBy, ...statuses];
     const rows = this.db
-      .prepare(`SELECT * FROM balance_movements WHERE created_by = ? AND status IN (${placeholders}) ${exclusion} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
-      .all(createdBy, ...statuses, pageSize, offset) as unknown as MovementRow[];
-    return { items: rows.map(rowToMovement), total };
+      .prepare(
+        `SELECT bm.* FROM balance_movements bm JOIN balance_contracts bc ON bc.balance_contract_id = bm.balance_contract_id
+         WHERE bm.created_by = ? AND bm.status IN (${placeholders}) ${exclusion}
+         ORDER BY bc.lc_number ASC, bm.created_at DESC`,
+      )
+      .all(...queryParams) as unknown as MovementRow[];
+    return { items: rows.map(rowToMovement) };
   }
 
   /** Design doc §3.3 — everything needed to derive Confirmed/Available Balance for one contract version. */
@@ -571,6 +595,95 @@ export class BalanceMovementStore {
         'UPDATE balance_movements SET present_docs_consumed_by = @presentDocsConsumedBy, present_docs_consumed_at = @presentDocsConsumedAt WHERE movement_id = @movementId',
       )
       .run(params);
+  }
+
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — A3S's own compound cascade is the only Fix Pending shape
+   * whose `movementType` can genuinely change (FULL_REDEEM <-> PARTIAL_REDEEM, as the corrected Bill
+   * Amount changes how much of the SG's own outstanding it clears) — a narrow, dedicated companion to
+   * `applyFixPendingCorrection()` below, called just before it in the same transaction.
+   */
+  setMovementType(movementId: string, movementType: string): void {
+    this.db.prepare('UPDATE balance_movements SET movement_type = @movementType WHERE movement_id = @movementId').run({ movementId, movementType });
+  }
+
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — `editPending()`'s own IN-PLACE correction of a
+   * PENDING/REJECTED row: every field a Fix Pending Save can change is overwritten, `status` lands back
+   * at `'PENDING'`, and `created_by`/`created_at` are updated to the editor/edit-time (same "the live
+   * row's own author/time reflect its CURRENT content" behavior the pre-redesign replacement row already
+   * had) — `movement_id`/`balance_contract_id`/`event_seq` never change, this is a same-identity
+   * correction, not a replacement. The pre-edit content is captured separately by the caller via
+   * `FixPendingAuditStore.insert()` BEFORE calling this. A dedicated method, not folded into
+   * `updateStatus()` above, on purpose — see that method's own large RELEASE/REJECT/CANCEL-shaped
+   * parameter surface vs. EDIT's genuinely different, simpler shape.
+   */
+  applyFixPendingCorrection(params: {
+    movementId: string;
+    businessEventId: string | null;
+    exposureNature: ExposureNature;
+    amount: string;
+    ceilingAmount: string;
+    legRef: string | null;
+    accountEntries: AccountEntry[] | null;
+    contingentAccountEntry: ContingentAccountEntry | null;
+    reasonCode: string | null;
+    warnings: MovementWarning[] | null;
+    newExpiryDate: string | null;
+    transactionDate: string | null;
+    businessDate: string | null;
+    valueDate: string | null;
+    sourceModule: string | null;
+    sourceFunction: string | null;
+    referencedTransactionId: string | null;
+    amendmentApproved: boolean | null;
+    amendmentEffective: string | null;
+    consentStatus: string | null;
+    createdBy: string;
+    createdAt: string;
+    editedBy: string;
+    editedAt: string;
+  }): void {
+    this.db
+      .prepare(
+        `UPDATE balance_movements
+         SET business_event_id = @businessEventId, exposure_nature = @exposureNature, amount = @amount,
+             ceiling_amount = @ceilingAmount, leg_ref = @legRef, account_entries = @accountEntries,
+             contingent_account_entry = @contingentAccountEntry, status = 'PENDING',
+             reason_code = @reasonCode, warnings = @warnings, new_expiry_date = @newExpiryDate,
+             transaction_date = @transactionDate, business_date = @businessDate, value_date = @valueDate,
+             source_module = @sourceModule, source_function = @sourceFunction,
+             referenced_transaction_id = @referencedTransactionId, amendment_approved = @amendmentApproved,
+             amendment_effective = @amendmentEffective, consent_status = @consentStatus,
+             created_by = @createdBy, created_at = @createdAt, edited_by = @editedBy, edited_at = @editedAt
+         WHERE movement_id = @movementId`,
+      )
+      .run({
+        movementId: params.movementId,
+        businessEventId: params.businessEventId,
+        exposureNature: params.exposureNature,
+        amount: params.amount,
+        ceilingAmount: params.ceilingAmount,
+        legRef: params.legRef,
+        accountEntries: params.accountEntries ? JSON.stringify(params.accountEntries) : null,
+        contingentAccountEntry: params.contingentAccountEntry ? JSON.stringify(params.contingentAccountEntry) : null,
+        reasonCode: params.reasonCode,
+        warnings: params.warnings ? JSON.stringify(params.warnings) : null,
+        newExpiryDate: params.newExpiryDate,
+        transactionDate: params.transactionDate,
+        businessDate: params.businessDate,
+        valueDate: params.valueDate,
+        sourceModule: params.sourceModule,
+        sourceFunction: params.sourceFunction,
+        referencedTransactionId: params.referencedTransactionId,
+        amendmentApproved: params.amendmentApproved === null ? null : params.amendmentApproved ? 1 : 0,
+        amendmentEffective: params.amendmentEffective,
+        consentStatus: params.consentStatus,
+        createdBy: params.createdBy,
+        createdAt: params.createdAt,
+        editedBy: params.editedBy,
+        editedAt: params.editedAt,
+      });
   }
 
   /** A4's own real Maker Submit (2026-08-16) — sets maker_submitted_by/maker_submitted_at only, never touches status. Mirrors markPresentDocsConsumed() above, on the Maker side. */

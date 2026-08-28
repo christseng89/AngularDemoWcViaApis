@@ -305,3 +305,61 @@
 .tb-muted {
   color: var(--gray-muted);
 }
+
+// Wraps the Action column's Fix Pending / Delete Pending buttons — `.tb-btn` is `inline-flex` with no
+// horizontal margin of its own, so two rendered side by side sat flush against each other with only
+// incidental HTML whitespace between them. Same gap convention as maker-panel.component.scss's own
+// `.tb-maker-result-actions`/`.tb-fix-pending-actions` and checker-panel.component.scss's own
+// `.tb-checker-actions`.
+.tb-maker-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+// Import LC／Export Confirmed side tabs (user-directed 2026-08-28, "Maker Queue進口 出口 分開 (similar as
+// Inquire Events)") — same disclosed, deliberate copy this file's own top comment already explains;
+// verbatim from inquire-events.component.scss's own `.tb-tabs`/`.tb-tab`/`.tb-tabs--side` rules (the
+// `.tb-tabs--side .tb-tab` variant — larger font/padding than the plain `.tb-tabs` this project also uses
+// elsewhere, e.g. Inquire Delete Pending's own Function filter tabs — is the one this component needs).
+.tb-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--gray-border);
+  padding-bottom: 0;
+}
+
+.tb-tab {
+  border: none;
+  background: transparent;
+  color: var(--gray-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover:not(.tb-tab--active) {
+    color: var(--blue);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+  }
+
+  &--active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+}
+
+.tb-tabs--side .tb-tab {
+  font-size: 14px;
+  padding: 8px 18px;
+}

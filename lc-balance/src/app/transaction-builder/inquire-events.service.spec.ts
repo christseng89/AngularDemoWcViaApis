@@ -1,5 +1,5 @@
 import { Subject, of, throwError } from 'rxjs';
-import { InquireEventsService, InquiredEvent } from './inquire-events.service';
+import { InquireEventsService, InquiredEvent, LcIndexRow, computeLcIndexRow } from './inquire-events.service';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 
 /** Mirrors checker-actions.service.spec.ts's own mock-factory convention (no TestBed). */
@@ -655,6 +655,75 @@ describe('InquireEventsService', () => {
       expect(row2.availableBalance).toBe('5000');
       expect(row2.tenorType).toBe('Sight');
       expect(row2.lastEventAt).toBe(issueS002.createdAt);
+    });
+
+    // Bug found live 2026-08-29 (user-reported, Inquire Delete Pending catalog showing "LC Amount 0 /
+    // Last Event Date/Time —" for a real cancelled LC) — a root ISSUE Delete-Pending'd (CANCELLED) before
+    // ever being Released is exactly the shape Inquire Delete Pending's own LC Catalog exists to surface
+    // (InquireEventsService's own catalog never passes a CANCELLED contract here at all, so this case was
+    // previously unexercised for computeLcIndexRow()). toEventRows() deliberately excludes CANCELLED from
+    // the true Event Timeline, which left `root`/`allEvents` empty — lastEventAt fell back to `null`
+    // ("—" in the template) even though a real Delete Pending action clearly happened.
+    it('computeLcIndexRow() (shared with Inquire Delete Pending): a contract whose ONLY movement is CANCELLED still shows a real Last Event Date/Time, not null — lcAmount correctly stays 0 (never confirmed)', () => {
+      const cancelledIssue = makeMovement({
+        movementId: 'mv-cancelled-issue',
+        balanceContractId: 'bc-s001',
+        movementType: 'ISSUE',
+        amount: '80000',
+        status: 'CANCELLED',
+        createdAt: '2026-08-01T00:00:00.000Z',
+        cancelledAt: '2026-08-01T01:00:00.000Z',
+      });
+      const api = makeApi({
+        catalog: jest.fn(() => of(emptyCatalog())), // no child SHGT contracts under this LC
+        listMovements: jest.fn(() => of([cancelledIssue])),
+        getSnapshot: jest.fn(() => of(null)),
+      });
+
+      let row: LcIndexRow | undefined;
+      computeLcIndexRow(api, s001(), 'IMPORT').subscribe((r) => (row = r));
+
+      expect(row!.lastEventAt).toBe('2026-08-01T01:00:00.000Z'); // NOT null — the Delete Pending action's own timestamp
+      expect(row!.lcAmount).toBe('0'); // 'released' (default) mode — still correctly excludes CANCELLED, nothing was ever confirmed
+    });
+
+    // User-directed follow-up 2026-08-29 ("是我看錯了 Inquire Delete Pending Amount 是當筆交易的輸入金額嗎"
+    // -> "YES 這會比較USER FRIENDLY一些") — the RELEASED-only figure above is always "0" for exactly the
+    // shape Inquire Delete Pending's own catalog surfaces, telling a reviewer nothing about what was
+    // actually typed. `amountSource: 'input'` shows the typed amount instead, regardless of status.
+    it("computeLcIndexRow(..., 'input'): Inquire Delete Pending's own amountSource shows the typed ISSUE amount even though it was CANCELLED, not the RELEASED-only 0", () => {
+      const cancelledIssue = makeMovement({
+        movementId: 'mv-cancelled-issue-2',
+        balanceContractId: 'bc-s001',
+        movementType: 'ISSUE',
+        amount: '80000',
+        status: 'CANCELLED',
+        createdAt: '2026-08-01T00:00:00.000Z',
+        cancelledAt: '2026-08-01T01:00:00.000Z',
+      });
+      const api = makeApi({
+        catalog: jest.fn(() => of(emptyCatalog())),
+        listMovements: jest.fn(() => of([cancelledIssue])),
+        getSnapshot: jest.fn(() => of(null)),
+      });
+
+      let row: LcIndexRow | undefined;
+      computeLcIndexRow(api, s001(), 'IMPORT', 'input').subscribe((r) => (row = r));
+
+      expect(row!.lcAmount).toBe('80000'); // the typed amount, unconditional on status
+    });
+
+    it("computeLcIndexRow(..., 'input') falls back to '0' when no ISSUE movement exists at all", () => {
+      const api = makeApi({
+        catalog: jest.fn(() => of(emptyCatalog())),
+        listMovements: jest.fn(() => of([])),
+        getSnapshot: jest.fn(() => of(null)),
+      });
+
+      let row: LcIndexRow | undefined;
+      computeLcIndexRow(api, s001(), 'IMPORT', 'input').subscribe((r) => (row = r));
+
+      expect(row!.lcAmount).toBe('0');
     });
 
     /** EPLC_CONFIRMATION has no AMEND_INCREASE/AMEND_DECREASE split — direction is the sign of AMEND's own amount. */

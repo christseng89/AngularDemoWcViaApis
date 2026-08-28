@@ -341,3 +341,80 @@ describe('tenorType/tenorDays mandatory (rule 5)', () => {
     expect(() => service.release(issue.movement.movementId, 'checker1')).toThrow(/tenorDays must be greater than 0 for SELLERS_USANCE/);
   });
 });
+
+// User-directed 2026-08-28 ("Tolerance MUST >= 0") — checked at createMovement() (Maker, A1/B1 ISSUE
+// only — the only place tolerancePct is ever caller-supplied), editPending() (Fix Pending, A1/B1's own
+// creating-edit only — see buildEditedRequest()'s own `creatingOnly()` gate), and release() (Checker,
+// defense-in-depth against a contract that reached the DB some other way).
+describe('tolerancePct must not be negative', () => {
+  test('rejects IPLC_LC ISSUE with a negative tolerancePct', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(() =>
+      service.createMovement({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'TOL-NEG-001' },
+        movementType: 'ISSUE',
+        eventSeq: 1,
+        amount: '10000',
+        currency: 'USD',
+        expiryDate: '2099-12-31',
+        tenorType: 'SIGHT',
+        tolerancePct: '-5',
+        createdBy: 'maker1',
+      }),
+    ).toThrow(/tolerancePct "-5" must not be negative/);
+  });
+
+  test('accepts a positive tolerancePct and a zero tolerancePct', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(() => issueImportLc(service, 'TOL-POS-001', { tolerancePct: '10' })).not.toThrow();
+    expect(() => issueImportLc(service, 'TOL-ZERO-001', { tolerancePct: '0' })).not.toThrow();
+  });
+
+  test('a null/omitted tolerancePct (not applicable, or genuinely optional) is untouched', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(() => issueImportLc(service, 'TOL-NULL-001')).not.toThrow();
+  });
+
+  test('Fix Pending (editPending) rejects patching an A1 ISSUE with a negative tolerancePct', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'TOL-FIXP-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
+      tolerancePct: '10',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    expect(() => service.editPending(issue.movement.movementId, { amount: '10000', tolerancePct: '-1', editedBy: 'maker1' })).toThrow(
+      /tolerancePct "-1" must not be negative/,
+    );
+  });
+
+  test('Checker release() re-checks tolerancePct against the already-persisted contract, defense-in-depth against a DB-bypass-created row', () => {
+    const db = createDb(':memory:');
+    const service = new BalanceService(db);
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'TOL-BYPASS-001' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '10000',
+      currency: 'USD',
+      expiryDate: '2099-12-31',
+      tenorType: 'SIGHT',
+      tolerancePct: '10',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    // Simulate a legacy/bypassed row whose tolerancePct went negative some other way than createMovement()
+    // or editPending() — the ONLY way to reach this state, since both already reject a negative value.
+    db.exec(`UPDATE balance_contracts SET tolerance_pct = '-10' WHERE balance_contract_id = '${issue.movement.balanceContractId}'`);
+    expect(() => service.release(issue.movement.movementId, 'checker1')).toThrow(/tolerancePct "-10" must not be negative/);
+  });
+});

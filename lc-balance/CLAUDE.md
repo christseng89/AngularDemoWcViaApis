@@ -256,8 +256,10 @@ Static checks (`tsc`, `ng build`) and a passing test suite are necessary but not
 - **`EPLC_EXAMINATION`** — `MEMO_ONLY` Present-Docs earmark (D3: only legal events move balances). CREATE
   at B3; B4 compound-releases that same PENDING CREATE; never posts `accountEntries`.
 - **`ContractStatus`**: `ACTIVE | SUPERSEDED | CLOSED | CANCELLED`.
-- **`MovementStatus`** (§4): `PENDING | RELEASED | REJECTED | CANCELLED | SUPERSEDED` — PENDING is
-  Maker-created; every other state is a Checker or Maker-on-own-record action.
+- **`MovementStatus`** (§4): `PENDING | RELEASED | REJECTED | CANCELLED` — PENDING is
+  Maker-created; every other state is a Checker or Maker-on-own-record action. Fix Pending §19
+  (redesigned 2026-08-29) corrects a PENDING/REJECTED record in place (same movementId/eventSeq,
+  landing back at PENDING) rather than transitioning through a distinct status of its own.
 - **`ExposureNature`**: `CONTINGENT | ACTUAL | MEMO` — `MEMO` is an Unconfirmed LC's issuing-bank-side
   obligation, receivable tracking only, never posts `accountEntries`.
 - **`TenorType`**: `SIGHT | BUYERS_USANCE | SELLERS_USANCE | DP | DA`.
@@ -2681,3 +2683,1211 @@ present and correct in the real HTTP response. `Balance-Component-DeletePending-
 Defect #3 entry, §3 Case 5's own "額外驗證" column, and §5's Delete Pending Audit checklist all updated to
 reflect the fix (§5 gained a new generic checklist item — this defect's own root cause applies to REJECTED →
 Delete Pending on ANY function, not just A4/A6, since it's the same shared `updateStatus()` code path).
+
+## `contingentAccountEntry.amount` now books the Ceiling amount (LC Balance), not the face amount, for A1/B1/A2/B2 — real bug, user-directed fix
+
+User-directed ("A1 B1 A2 B2, LC Balance = Amount * (1 + Tolerance%) 帳務是用LC Balance出帳"). `createMovement()`/
+`editPending()` both called `deriveContingentAccountEntry()` with `req.amount`/`merged.amount` (the caller's
+own face-level figure) instead of the already-computed `ceilingAmount` — the exact Tolerance-converted
+figure Confirmed/Available Balance are themselves derived from (`domain/tolerance.ts`'s own `ceilingAmount =
+amount × (1 + tolerancePct/100)`, applicable only to A1/B1 `ISSUE` and A2/B2 `AMEND_INCREASE`/
+`AMEND_DECREASE`/`AMEND`). The generated Dr/Cr voucher could silently disagree with the balance the same
+movement was actually posted against whenever `tolerancePct` was non-null — e.g. a 100,000/10% ISSUE booked
+a 100,000 voucher while posting 110,000 to Confirmed Balance.
+
+Fixed both call sites to pass `ceilingAmount.toFixed()` instead — a genuine no-op everywhere else
+(`computeCeilingAmount()` already returns the face amount unchanged for SHGT/Acceptance and every other
+movementType), confirmed by every pre-existing `contingentAccountEntry` assertion in the test suite (none of
+which combine a non-null `tolerancePct`) staying green with zero edits. B2's own negative-amount-as-Decrease
+sign convention is preserved through the swap (`computeCeilingAmount()` keeps a negative input negative).
+New regression tests added (not just the pre-existing suite staying green): `app.test.ts` (A1→A2 chain,
+ceiling-converted voucher amount at both steps, plus a same-parent SHGT proving the no-op scope; B1→B2
+chain with a negative-amount Decrease, magnitude ceiling-converted, direction unaffected) and
+`balanceService.test.ts` (the Fix Pending/`editPending()` path). OAS bumped to v1.31.0. Microservice suite:
+700/700 (99.07%/95.05%/100%/99.7%); backend re-run green (41/41, unaffected); Angular untouched (this field
+is server-generated and displayed as-is, no client-side re-derivation). Live-verified via direct curl
+against the running dev microservice (`:4100`): A1 ISSUE 100,000/10% now returns
+`contingentAccountEntry.amount: "110000"`, matching `ceilingAmount`.
+
+## Maker Queue's own Delete Pending now shows a read-only review screen with Confirm/Cancel before deleting — no longer an immediate one-click delete
+
+User-directed ("Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否" → "CLICK DELETE PENDING BUTTON ->
+顯示交易畫面 (ALL FIELDS PROTECTED) + Confirm / Cancel Button"). Reuses Fix Pending's own "return to the real
+original-event screen" mechanism (`reconstructOriginalModel()`), factored out of `startFixPending()` into a
+shared `reconstructScreenForSubmitResult()` — but never unlocks the fields (`deletePendingReviewMode` is a
+separate flag from `fixPendingMode`; `fieldsLocked` already defaults to `true` whenever `submitResult` is
+set, so no extra logic was needed to keep it read-only). New `MakerPanelComponent` `@Input()
+externalDeletePendingReviewRequest`/`@Output() deletePendingReviewConfirmed`/`deletePendingReviewCancelled`,
+mirroring `externalFixPendingRequest`/`fixPendingRequested`'s own convention. Clicking "Delete Pending" in
+Maker Queue no longer calls `MakerQueueService.deletePending()` directly — it emits the row for
+`TransactionBuilderComponent.onMakerQueueDeletePendingReview()` to navigate to Transaction Processing and
+open the review screen with. The Checker Pending Approvals panel is hidden during this review (user-
+confirmed "DELETE PENDING 交易畫面不需要CHECKER... Fix Pending 需要") — `<app-checker-panel>` gated on
+`!pendingMakerQueueDeleteRow`, a parent-level field non-null only for exactly the review's own window.
+
+Confirming routes through `MakerQueueService.deletePending()` (now widened with an optional `onSettled`
+callback, same "plain callback, no Observable" convention `pickerSelection.loadSgsForArrival()` already
+uses) with the ORIGINAL `MakerQueueRow` — deliberately NOT the generic same-session Checker-action deletion
+path (`checkerActions.deleteMakerPending()`), whose own cascade only works via in-memory compound-leg state
+this cross-session flow never has; `MakerQueueService`'s own cascade is already correct for a compound row
+via its server-reconstructed `siblingMovementIds`. Stays busy (spinner) until the delete call actually
+settles, then returns to Maker Queue either way — same "wait for the async result" convention `release()`
+already follows, not an optimistic immediate navigation.
+
+**Real bug found live during this same pass, fixed**: clicking Fix Pending then later Delete Pending (or
+vice versa) via Maker Queue showed BOTH banners/button-pairs simultaneously for the same movement.
+Root cause: `<app-maker-panel>` only exists in the DOM while `activeMode === 'PROCESSING'` — leaving that
+mode destroys the component instance entirely, so returning to it later creates a genuinely FRESH instance
+whose very first `ngOnChanges()` reports EVERY currently-bound `@Input()` as changed, not just the one the
+latest click meant to trigger. `externalFixPendingRequest`/`externalDeletePendingReviewRequest` are both
+parent-level fields that otherwise never got cleared, so a stale non-null value from an earlier click
+silently re-fired alongside a genuinely new one. Fixed in `selectMode()` — the one place every exit from
+'PROCESSING' funnels through — clearing both fields whenever `mode !== 'PROCESSING'`.
+
+New tests across `maker-panel.component.spec.ts` (external request handling, read-only rendering,
+confirm/cancel emit correctly and never call a delete API themselves, `resetForFunction()` also clears
+`deletePendingReviewMode`), `transaction-builder.component.actions.spec.ts` (navigation, cascade-aware
+confirm call, busy-state timing, the exact dual-banner regression scenario both directions), and
+`maker-queue.service.spec.ts`/`maker-queue.component.spec.ts` (the new `onSettled` callback on every
+success/failure path incl. the compound cascade; the renamed `deletePendingRequested` now carries the row
+instead of deleting directly). Angular suite: 1413/1413 (98.71%/96.22%/97.09%/99.02%). `ng build
+--configuration production` clean (same two pre-existing warnings). Live-verified end-to-end in the
+browser: A1 Submit → Maker Queue → Fix Pending (banner/buttons/Checker panel all correct) → back to Maker
+Queue → Delete Pending on the SAME row (only the Delete Pending banner/buttons show, Checker panel hidden,
+no leftover Fix Pending state) → Confirm Delete Pending → returned to Maker Queue → confirmed via direct
+microservice query that the contract's own `status` is `CANCELLED`. Microservice/backend unaffected (no
+server-side change in this pass).
+
+## Fix Pending/Delete Pending review — LC Number and 2ndary Number natural-key protection + emphasis; Cancel returns to Maker Queue when Maker-Queue-originated
+
+User-directed (2026-08-28): once a target is picked (A2–A11/B2–B7) or under Fix Pending/Delete Pending
+review, the natural key must be protected (no re-picking — genuinely changing the target means Delete
+Pending + a fresh Submit) and rendered bold/enlarged/vivid ("加粗放大+鮮明"), the same treatment applying to
+the 2ndary Number (`secondaryRef` — IB/EB/Amendment No.) as LC Number, and Cancel must return to Maker
+Queue when the Fix Pending/Delete Pending flow originated there.
+
+New `MakerPanelComponent.naturalKeyLocked` (`requiresEligibleTarget && (hasEligibleTargetSelected ||
+isExternalReviewMode)`) and `isExternalReviewMode` (`fixPendingMode || deletePendingReviewMode`) — both
+reuse EXISTING per-function config attributes (`requiresEligibleTarget`, already used for "No Eligible
+Records" messaging) rather than a new hardcoded function list; A1/B1 are naturally excluded since
+`requiresEligibleTarget` is false for them, not via a special case. Drives a new protected-readout card
+(`.tb-protected-natural-key`) that replaces the interactive Step 1/Step 2 pickers once locked. `secondaryRef`
+gained a `className` in `builder-fields.ts`, driven by a new `isReviewMode(ctx)` helper
+(`fixPendingMode || deletePendingReviewMode`) combined with the EXISTING `dynamicSecondaryRefLabel`
+attribute (null for functions with no secondary ref) — again config-driven, not per-function-code.
+
+**Real bug found live, fixed**: the protected-readout card initially read the plain `naturalKey.lcNumber`/
+`ibNumber`/`sgNumber` ngModel fields — but those are only ever populated by A1/B1's free-typed flow; every
+other function (flat-Catalog A2-A5, Parent-picker A6/A8, two-field-search A7/A9/B5) resolves its natural key
+through `selectedContract`/`selectedParent` instead, so the card showed "—" for every one of them despite a
+real target being selected. Fixed by switching the readout to the EXISTING `contextLcNumber`/
+`contextSecondaryRef` getters (`function-policy.ts`) — already built to resolve "whichever picker shape
+supplied it," previously only feeding the Checker queue's auto-fill and Look Up sync.
+
+**Second real bug found live, fixed**: `secondaryRef`'s new `className` had zero visible effect once
+applied — Formly's `FormlyFieldConfig.className` lands on the `<formly-field>` custom element wrapping the
+actual `.form-control` input, several DOM levels above it, and that Formly-rendered subtree carries a
+DIFFERENT component's own Angular ViewEncapsulation `_ngcontent` attribute than `MakerPanelComponent` — a
+rule in `maker-panel.component.scss` can style literal template markup (A1/B1's own raw input, the
+protected-readout `<span>`s) but can never reach inside a dynamically-created Formly field. Fixed by moving
+`.tb-natural-key--emphasized` to the global `src/styles.scss` (same "cross-cutting design-system atom"
+convention `.tb-spinner`/`.tb-icon` already established) with an added `.form-control` descendant-selector
+variant. Neither bug was catchable by this project's own no-TestBed unit-test convention (asserts the
+`FormlyFieldConfig` object / component getters, never renders the template) — both were found only via a
+live browser pass (`window.ng`/direct DOM inspection), confirming the project's own standing rule that a
+green suite is necessary but not sufficient.
+
+`cancelFixPending()` now unconditionally emits a new `fixPendingCancelled` output (previously silent);
+`TransactionBuilderComponent.onFixPendingCancelled()` checks whether `externalFixPendingRequest` is still
+non-null (the existing "came from Maker Queue" signal, same field the dual-banner fix above already reused)
+to decide navigation — reuses existing state rather than adding a new tracking field.
+
+Live-verified end-to-end: A1 Issue → A3 Document Arrival (protected LC Number card correctly showed the
+picked LC once the `contextLcNumber` fix landed) → Fix Pending via Maker Queue (IB Number field now bold/
+enlarged/blue/monospace, matching LC Number exactly) → Cancel → confirmed navigation back to Maker Queue
+with the row untouched. A2 (explicitly named) separately verified outside review mode: picking a target via
+the LC Index picker immediately hides the picker and shows the bold protected LC Number card, before any
+Submit. New tests in `builder-fields.spec.ts` (`secondaryRef`'s `className` under both review modes and
+its absence outside them / when hidden) and `maker-panel.component.spec.ts`
+(`naturalKeyLocked`/`isExternalReviewMode` across A1/A3/Fix Pending/Delete Pending);
+`transaction-builder.component.actions.spec.ts` gained `onFixPendingCancelled()` coverage (both the
+Maker-Queue-originated and in-session no-op branches). Angular suite: 1426/1426
+(98.72%/96.25%/97.1%/99.03%). `ng build --configuration production` clean (same two pre-existing warnings —
+`maker-panel.component.scss`'s own budget margin improved further from moving the CSS out). Microservice
+700/700, backend 41/41 — both unaffected (Angular-only pass), re-confirmed green per the standing rule.
+
+## `tolerancePct` must not be negative — `assertToleranceNonNegative()`, Maker + Checker + client
+
+User-directed ("Tolerance MUST >= 0"). A negative `tolerancePct` would shrink `computeCeilingAmount()`'s
+own `1 + tolerancePct/100` factor below 1, the opposite of what Tolerance means (a Maximum Exposure basis
+buffer, never a discount) — nothing previously guarded against it. New
+`BalanceService.assertToleranceNonNegative()`, called from `createMovement()` (A1/B1 ISSUE, the only place
+`tolerancePct` is ever caller-supplied), `editPending()` (A1/B1's own Fix Pending — the only OTHER place,
+gated by `buildEditedRequest()`'s own `creatingOnly()`), and `release()`'s `assertReleaseSubmitGuards()`
+(defense-in-depth against a contract that reached the DB some other way, re-checking the already-persisted
+`contract.tolerancePct`) — same three-layer pattern this file's own `assertValidAmount()`/
+`assertExpiryDateRequired()` already established. Client-side mirror in `submit-rules.ts`'s
+`validateMandatoryFields()`. New tests: `mandatoryFieldRules.test.ts` (Maker + Fix Pending + Checker
+DB-bypass), `submit-rules.spec.ts`. Microservice 710/710, Angular 1411/1411, backend 41/41.
+
+## Delete Pending removed from the Transaction Input Screen entirely — Maker Queue is now its only entry point; Fix Pending unaffected
+
+User-directed ("Transaction Input Screen → Submit... Transaction Input Screen 不顯示 Delete Pending
+Button；Delete Pending 統一由 Maker Queue 執行"). The Maker Result panel used to carry two Delete Pending
+buttons — a generic "Delete Pending (EC)" for every function except A4, and A4's own "Delete Pending"
+(withdrawing its Maker Submit instead of cancelling anything) — both calling straight through
+`checkerActions.deleteMakerPending()`/`withdrawMakerPending()` with no review step at all, immediate
+one-click delete. Both removed outright: `MakerPanelComponent`'s own `deletePendingRequested`/
+`withdrawMakerPendingRequested` outputs, `TransactionBuilderComponent.deleteMakerPending()`/
+`withdrawMakerPending()`, and — since nothing else called them — `CheckerActionsService.
+deleteMakerPending()`/`withdrawMakerPending()` themselves (including that method's own hand-rolled
+A3S/B3/B4/B5 compound-leg cascade) all deleted as genuinely dead code.
+
+No functionality lost: `MakerQueueService.deletePending()` (Maker Queue's own Delete Pending, already
+routed through a read-only review screen since the same-day "Maker Queue's own Delete Pending now shows a
+read-only review screen" entry above) already correctly special-cases an A4-shaped row via its own
+`isWithdrawMakerSubmitCase()` (`api.withdrawMakerSubmit()` instead of `api.cancel()`), and its own compound
+cascade (`siblingMovementIds`, server-reconstructed via `findByBusinessEventId()`) already subsumes what
+the deleted hand-rolled cascade did — Maker Queue's single review-then-confirm flow already covered both
+shapes the two removed buttons used to. This also fully resolves the earlier "Cancel Navigation Rule"
+question (Fix Pending Cancel → back to the screen it opened from; Delete Pending Cancel → Maker Queue) —
+Delete Pending now has exactly one possible origin (Maker Queue), so `onDeletePendingReviewCancelled()`'s
+existing unconditional "return to Maker Queue" behavior was already correct as-is, no further branching
+needed. Fix Pending is completely unaffected — still reachable in-session from the Maker Result panel,
+Save/Cancel exactly as before.
+
+Removed the now-purposeless test coverage for the deleted methods (`transaction-builder.component.
+actions.spec.ts`'s own `deleteMakerPending()`/`withdrawMakerPending()` describe blocks,
+`checker-actions.service.spec.ts`'s matching two describe blocks) rather than leaving them testing dead
+code. Angular suite: 1403/1403 (98.66%/96.14%/97.02%/98.97%). `ng build --configuration production` clean
+(same two pre-existing warnings). Microservice/backend unaffected, re-confirmed green.
+
+## Maker Queue Index — Function ASC → LC Number ASC → Secondary Reference Number ASC; LC Number Search widened to LIKE/partial match; pagination moved fully client-side
+
+User-directed, in three successive refinements the same day: first "Order by LC Number (Ascending)" +
+exact-match search, then widened to "Function ASC → LC Number ASC → Secondary Reference Number ASC" +
+"支援 LIKE / Partial Match", with the explicit requirement that Search results and the default Index share
+the exact same ordering.
+
+**Why this forced pagination off the server entirely**: "Function" (A1…A11/B1…B7) has no column of its
+own anywhere in the schema — it's resolved purely client-side from `instrumentType`+`movementType`+
+`makerSubmittedAt` (`MakerQueueService.functionFor()`, the same "Function is not a server-side concern"
+boundary `DeletePendingAuditStore.search()`/`InquireDeletePendingService` already established for the
+identical reason). A true Function-first sort — and therefore true pagination over that sort — can only
+happen once every matching row is loaded; `BalanceMovementStore.listByCreatedByAndStatus()`'s own
+`page`/`pageSize`/`LIMIT`/`OFFSET` were removed outright, it now returns every matching row (base order
+`bc.lc_number ASC, bm.created_at DESC` — a stable tiebreaker, not the authoritative sort). `BalanceService.
+listMyMovements()` and the `GET /balance-movements?createdBy=&status=&q=` route thinned to match — `q`
+(renamed from a prior exact-match `lcNumber` param) is a substring `LIKE '%@q%'`, same `q`/`%@q%` naming
+convention `BalanceContractStore.listCatalog()`'s own `q` filter already uses (a DIFFERENT, deliberate
+split from `DeletePendingAuditStore.search()`'s own exact-match `lcNumber` param — conditioned on match
+type, not by caller).
+
+`MakerQueueService.load()` now fetches the full set, `groupCompoundRows()`s it (as a side effect, this also
+resolves that method's own former "grouping only sees the current server page" known limitation — a
+compound event's legs can no longer land on different pages by construction), then a new `sortRows()`
+applies the 3-level comparator: Function ASC via a `FUNCTION_ORDER` array (`[...IMPORT_FUNCTIONS,
+...EXPORT_FUNCTIONS].map(f => f.code)` — registry position, NOT a lexicographic string compare, since
+`"A10" < "A2"` alphabetically would be wrong), then LC Number ASC, then `sourceTransactionRef` ASC (a
+row whose Function can't be resolved sorts last via `Number.MAX_SAFE_INTEGER`, never first). `paging`
+(`PagedListState`) now windows the already-loaded, already-sorted array — same "client-side pagination
+over an already-loaded array" convention `InquireEventsService.pagedEvents` already established — new
+`pagedItems` getter, `prevPage()`/`nextPage()` just move `paging.page` locally, no re-fetch.
+`load(resetToFirstPage = true)` — a genuinely new search (Load/Search buttons) resets to page 1; `
+deletePending()`'s own post-mutation refresh calls `load(false)`, staying on the same page. Because Search
+and the unfiltered default Index now run through this exact same `load()` → group → sort → window
+pipeline regardless of whether `q` is set, the two can never disagree on ordering by construction.
+
+`MyMovementsPage`'s own `total`/`page`/`pageSize` fields removed (now just `{items}}`) — `total` on the
+Angular side is derived as `items.length` after grouping.
+
+Extensive test rewrites: `balanceService.test.ts` (new `listMyMovements` tests — base LC Number order,
+substring `q` filter, same-LC secondary ordering) and `app.test.ts` (HTTP integration, `q=` substring), plus
+every pre-existing
+`listMyMovements`-touching test across both files updated off the removed `total`/`page`/`pageSize`
+response fields. `maker-queue.service.spec.ts` gained dedicated `paging`/sort-order describe blocks
+(registry-order Function sort, LC-Number tiebreak, secondary-ref tiebreak incl. the both-null edge case,
+unresolved-Function-sorts-last, search-shares-ordering-with-default) plus fixed the pre-existing
+`prevPage`/`nextPage`/`deletePending` tests for the new "no re-fetch, `resetToFirstPage` param" shape.
+`balance-component-api.service.spec.ts`/`transaction-builder.component.inquire.spec.ts` updated for the
+renamed `q` param and the removed `page`/`pageSize` request shape. Microservice 710/710
+(99.07%/95.06%/100%/99.7%), Angular 1422/1422 (98.77%/96.29%/97.04%/99.02%), backend 41/41. `ng build
+--configuration production` clean (same two pre-existing warnings). Live-verified in the browser: the
+default Maker Queue index groups by Function then LC Number ascending exactly as specified; searching "FIX"
+returns every PENDING/REJECTED row whose LC Number CONTAINS it (FIXTEST/MQFIX/MQFIX2/FIXP-UI/FIXP-UX),
+same Function-then-LC-Number ordering preserved; the Transaction Input Screen's own Maker Result panel now
+shows only "Fix Pending" after a Submit, Checker panel still present.
+
+## Fix Pending trial scope widened A1/A3 → A1/A2/A3/B1
+
+User-directed ("把這A1 A3 修改要求放置B1 A2試試看" — apply the A1/A3 changes to B1/A2 too). Confirmed the
+2026-08-28 "頁面配置檔原先輸入或FIX PENDING可共用" redesign already made this a one-line change per
+Function: `FunctionStrategy.fixPendingEnabled` is the ONLY Fix-Pending-specific fact declared in the
+registry (`function-strategy.ts`) — WHICH fields are genuinely editable is entirely DERIVED from the same
+lock flags a fresh Submit already computes (`builder-fields.ts`'s `deriveFixPendingLockFlags()`), so
+flipping the flag for A2 (non-creating, same shape as A3 — only Amount unlocks) and B1 (creating, same
+shape as A1 — Amount + the 4 contract-level fields unlock) needed zero derivation-logic change, only the
+two registry entries themselves. Updated 4 stale "A1/A3 today" doc-comment references
+(`builder-fields.ts`, `maker-panel.component.html`, `checker-actions.service.ts`) to the new scope.
+
+3 pre-existing tests asserting the old A1/A3-only scope updated (`function-strategy.spec.ts`'s own
+`functionSupportsFixPending` roster test and its `deriveFunctionStrategy()` fresh-object test now uses A4
+as the still-excluded example instead of A2; `maker-queue.service.spec.ts`'s own `fixPendingSupported()`
+false-case example swapped from A2 to A6). Angular suite: 1423/1423 (98.77%/96.29%/97.04%/99.02%). `ng
+build --configuration production` clean (same two pre-existing warnings). Microservice/backend unaffected
+— `editPending()` was already movementType-agnostic server-side; the only gate was ever the Angular
+registry flag.
+
+Live-verified end-to-end for both newly-widened Functions: **B1** (Confirm LC) — Submit → "Fix Pending"
+button appears → Save Fix Pending with a corrected Amount (40000 → 45000) → status back to PENDING,
+Checker panel present, same round trip A1 already had. **A2** (LC Amendment, AMEND_INCREASE) — picking a
+target LC live-shows the bold protected LC Number card before Submit (naturalKeyLocked's
+`hasEligibleTargetSelected` branch, unrelated to Fix Pending itself) → Submit → "Fix Pending" button
+appears → entering Fix Pending shows the Amendment No. (`secondaryRef`) field correctly BOTH emphasized
+(17px/700/blue, same `isReviewMode(ctx)` rule every other Function's 2ndary Ref already gets) AND locked
+(`disabled`, per §15's unconditional secondaryRef exclusion) while Amount stays editable → Cancel reverts
+to the same in-session screen, read-only, no navigation (same behavior A1/A3's own in-session Cancel
+already had).
+
+## Maker Queue — Import LC／Export Confirmed split, same tab convention as Inquire Events
+
+User-directed ("Maker Queue進口 出口 分開 (similar as Inquire Events)"). New `MakerQueueService.side:
+'IMPORT' | 'EXPORT'` + `selectSide()`, and a `.tb-tabs.tb-tabs--side` two-tab pair in `maker-queue.
+component.html` — visually and structurally the same convention `InquireEventsComponent`/`
+InquireEventsService.selectSide()` already established. The underlying mechanism is genuinely simpler
+than Inquire Events' own, though: Inquire Events' Index is a server-paginated browse of ROOT LC/
+Confirmation contracts, so its own side switch re-fetches via `defaultLcInstrumentTypeForSide()`. Maker
+Queue already loads and groups EVERY matching row up front (2026-08-28's own Function-ASC-sort rework),
+and every row already resolves a `TransactionFunction` carrying its own `side` field — so `selectSide()`
+is a PURE client-side filter over the already-loaded `items` array, never a re-fetch. New
+`sideFilteredItems` getter (`items.filter(row => functionFor(row)?.side === this.side)`); `pagedItems`
+now windows over `sideFilteredItems` instead of raw `items`; `load()`'s own `paging.total` now reflects
+the CURRENT side's count, not the combined total. A row whose Function can't be resolved (`functionFor()`
+returns `undefined` — the same rare/degenerate case the Function-ASC sort's own doc comment already
+flags) is invisible on BOTH tabs rather than guessed onto one.
+
+`.tb-tab`/`.tb-tabs`/`.tb-tabs--side` copied verbatim into `maker-queue.component.scss` from
+`inquire-events.component.scss` — same disclosed, deliberate per-component copy convention this file's
+own top comment already establishes (Angular view encapsulation means a class declared in one
+component's stylesheet never matches another component's own template). 8 new tests in
+`maker-queue.service.spec.ts` (defaults to IMPORT; `sideFilteredItems` splits correctly; an unresolvable
+row excluded from both sides; `selectSide()` never re-fetches; resets to page 1 and re-derives `paging.
+total`; `load()` itself sets `paging.total` to the current side's own count, not the combined one;
+`pagedItems` windows over the filtered set). Angular suite: 1430/1430 (98.77%/96.29%/97.05%/99.02%),
+`maker-queue.service.ts` 100% statements. `ng build --configuration production` clean (same two
+pre-existing warnings). Live-verified in the browser: Import LC tab shows only A-series rows, Export
+Confirmed shows only B-series rows (including the B1 rows created earlier this session), switching tabs
+correctly re-filters with no network request.
+
+## A2 Tolerance % editable during Fix Pending — Increase/Decrease only, scoped to the SAME toleranceApplicable() check that already gates the field's own visibility
+
+User-directed ("A2 Tolerance % FIX PENDING INCREASE/DECREASE時准許修改"). Discovered mid-investigation that
+a naive "just unlock the UI field" fix would have shipped a field that LOOKS editable but has ZERO real
+effect: `createMovement()`'s own `computeCeilingAmount()` call already used the contract's own stored
+`tolerancePct` for every non-creating movementType, completely ignoring whatever the Maker typed — so
+before touching any server code, used `AskUserQuestion` to get the user's explicit decision on intended
+semantics (3 structurally different options offered); confirmed answer: a patched Tolerance % on a
+non-creating edit affects ONLY that specific movement's own Ceiling, never the contract's own stored
+`tolerancePct`.
+
+Client (`builder-fields.ts`, `deriveFixPendingLockFlags()`): `tolerancePct` changed from
+`enabled && !contractLevelEditable` (the same lock every other contract-level field still uses) to
+`enabled && !toleranceApplicable(ctx.model)` — reuses the SAME check that already gates the field's own
+visibility (`TOLERANCE_APPLICABLE_INSTRUMENT_TYPES`/`TOLERANCE_APPLICABLE_MOVEMENT_TYPES`), so A1/B1
+(creating) and A2/B2 Increase/Decrease/plain AMEND (non-creating) all unlock uniformly with zero new
+per-function logic; `tenorType`/`tenorDays`/`expiryDate` stay exactly as they were (still
+`contractLevelEditable`-gated, still non-creating-locked).
+
+Server (`balanceService.ts`, `buildEditedRequest()`): `tolerancePct: creatingOnly(isCreatingEdit,
+patch.tolerancePct, contract.tolerancePct)` → `patch.tolerancePct ?? contract.tolerancePct` — a
+mathematically identical result for a creating edit, but now also accepts the patch for a non-creating
+one. Safe specifically because `updateIssueFields()`'s own contract write-back, a few lines below, stays
+gated `if (isCreatingEdit)` unchanged — a non-creating patch flows into `merged.tolerancePct` for THIS
+movement's own `ceilingAmount`/`contingentAccountEntry` only, never persisted back to the contract.
+`assertToleranceNonNegative()` (pre-existing) already re-validates the patched value inside `editPending()`
+with no further wiring.
+
+4 new tests: `builder-fields.spec.ts` (A2 AMEND_INCREASE/AMEND_DECREASE stay editable in Fix Pending; A3
+UTILIZE — Fix-Pending-enabled but not tolerance-applicable — stays locked, the real boundary case since A6
+isn't even Fix-Pending-enabled; A1 ISSUE unaffected by the exception). 2 new tests:
+`balanceService.test.ts` (A2 AMEND_INCREASE — patched tolerancePct changes the replacement movement's own
+ceilingAmount/contingentAccountEntry but the contract's own tolerancePct is genuinely untouched; omitting
+tolerancePct from the patch falls back to the contract's own current value via COALESCE). All three suites
+green: microservice 712/712 (99.07%/95.06%/100%/99.7%), Angular 1446/1446 (98.78%/96.25%/97.06%/99.02%),
+backend 41/41. Live-verified end-to-end against the real dev stack: issued+released an A1 LC at 5%
+Tolerance, submitted an A2 AMEND_INCREASE (20000, ceiling 21000 at the original 5%), entered Fix Pending,
+patched Tolerance % to 15 (confirmed genuinely editable, not merely displayed), Saved — the replacement
+PENDING movement's own `ceilingAmount`/`contingentAccountEntry.amount` both read `23000` (20000 × 1.15),
+while a direct `GET /balance-contracts/catalog` re-fetch of the same contract confirmed
+`tolerancePct: "5"`, unchanged.
+
+## Fix Pending trial scope widened further — B2 (mirrors A2), A3S Phase 4 compound cascade implemented, A4 confirmed structurally excluded (no code change)
+
+User-directed ("使用同樣方式處理A3 A35 A4 & B2"), scoped via `AskUserQuestion` into three separate
+decisions per Function: B2 implement now (low-risk, mirrors A2); A3S implement Phase 4 compound cascade
+now (the larger, previously-deferred engineering task); A4 confirm-and-document only (no code change —
+structurally has no movement of its own to Fix Pending on, flipping its own flag would be a no-op since
+the template already excludes it regardless via `releasesExistingMovementInPlace`).
+
+**B2** (`function-strategy.ts`): `fixPendingEnabled: true` — same shape as A2 (non-creating `AMEND`,
+`EPLC_CONFIRMATION` tolerance-applicable), zero new derivation logic. Live-verified: B2 AMEND_INCREASE
+Submit → Fix Pending correctly reconstructs Direction as `INCREASE` (proves `reconstructSubChoiceValue()`
+already generalizes to B2, not A2-specific) → edited Tolerance % 5→12 → Saved → replacement's own
+`ceilingAmount`/`contingentAccountEntry.amount` both `22400` (20000 × 1.12), contract's own `tolerancePct`
+re-fetched via API still `5`.
+
+**A3S Phase 4** (`documentArrivalWithSg` compound Fix Pending cascade) — the previously-deferred blocker:
+`editPending()` only ever corrected ONE movement, but A3S's own Submit creates TWO (the SG's own matched
+redemption + the LC's own UTILIZE, sharing `businessEventId`); single-leg-editing would silently desync
+them. Implemented in `balanceService.ts`:
+- `editPending()` refactored: its own single-movement core extracted into `applyEditToMovement()` (no
+  longer owns `db.exec('BEGIN'/'COMMIT'/'ROLLBACK')` itself — the transaction boundary moved to the public
+  `editPending()`, which now detects the compound shape (`contract.instrumentType === 'IPLC_LC' &&
+  old.movementType === 'UTILIZE' && !!old.businessEventId` — unambiguous, since a plain A3 UTILIZE never
+  has one) and dispatches to either the plain path or the new `applyArrivalWithSgCompoundEdit()`.
+- `applyArrivalWithSgCompoundEdit()` mirrors the ORIGINAL two-call create sequence
+  (`maker-submit.service.ts`'s `submitDocumentArrivalWithSg()`) rather than inventing new netting logic:
+  finds the one linked still-PENDING SG redemption via `businessEventId`, recomputes its own amount as
+  `MIN(new Bill Amount, SG's own Confirmed Balance excluding the old redemption)` — the exact client-side
+  formula a fresh Submit already uses — persists ITS OWN supersede+insert FIRST in the same open
+  transaction/connection, THEN calls `applyEditToMovement()` for the LC's own UTILIZE leg unchanged: its
+  own `checkUtilizeShapedSufficiency()` naturally sees the fresh SG replacement via a live
+  `listShgtMovementsForParent()` query (SQLite read-your-own-writes) and nets it through the SAME
+  matched-`businessEventId` exception a genuine two-call create already relies on — no new netting logic,
+  reuse only. `FULL_REDEEM`/`PARTIAL_REDEEM` may genuinely flip either direction as the corrected Bill
+  Amount changes how much of the SG's own outstanding it now clears (a locked field on the public
+  `editMovementRequestSchema`, but this internal cascade constructs the SG's own replacement directly, not
+  through that constrained single-movement path).
+- **Real pre-existing bug found and fixed in the same pass**: `buildEditedRequest()`'s own
+  `businessEventId: patch.businessEventId` never fell back to `old.businessEventId` — since no client
+  before A3S ever sent it in the patch, EVERY Fix Pending edit of a `businessEventId`-carrying movement
+  would have silently NULLED the link on its own replacement row (harmless until now, since no compound
+  Function was ever Fix-Pending-enabled before). Fixed to `patch.businessEventId ?? old.businessEventId`,
+  same "locked-unless-explicitly-resupplied" shape `sourceTransactionRef` already has.
+- Client side: `MakerQueueService.fixPendingSupported()`'s own blanket "exclude every compound
+  (`businessEventId`-carrying) row" gate narrowed to a new `isArrivalWithSgCompound()` exception (mirrors
+  the SAME server-side detection) — every OTHER compound shape (B4/B5) stays excluded.
+  `CheckerActionsService.editPending()` gained `resolveArrivalSgLegAfterEdit()` — after a successful edit,
+  re-resolves the fresh SG leg via `findByBusinessEventId()` (same "never trust stale in-memory state"
+  convention `resolveLinkedAccountingMovement()` already established for the Account Entries dialog) and
+  attaches it as `CheckerActionOutcome`'s new optional `secondary: MakerSubmitSecondary` field;
+  `MakerPanelComponent.applyCheckerOutcome()` merges it into `compoundLegs`, same "safe plain merge-spread"
+  reasoning `applyMakerSubmitOutcome()` already documents for the analogous fresh-Submit case.
+
+7 new microservice unit tests (Bill Amount down — SG stays PARTIAL_REDEEM, recomputed; Bill Amount up past
+SG outstanding — flips to FULL_REDEEM, capped; rejected when the corrected amount would need more SG
+capacity than Available, netting an unrelated PENDING redemption; rejected when the SG sibling is no
+longer PENDING, i.e. already Approved — found this is possible since `editPending()`'s EDIT transition has
+no `acknowledgedAt` guard, the same defect class as the already-fixed Defect #4 but for `cancel()` only —
+**not fixed here, flagged as a new known gap, out of this pass's own scope**; a plain non-compound A3
+UTILIZE unaffected; both defensive "insert collided"/"missing SG contract" branches). 4 new Angular tests
+(`function-strategy.spec.ts` roster; `maker-queue.service.spec.ts` compound-shape gate, both the new A3S
+TRUE case and a genuinely-different-compound-shape FALSE case; `transaction-builder.component.actions.spec.ts`
+compound `secondary` resolution). All three suites green: microservice 719/719 (99.09%/95.07%/100%/99.7%),
+Angular 1448/1448 (98.72%/96.1%/96.96%/98.99%), backend 41/41.
+
+Live-verified A3S end-to-end against the real dev stack (not just curl): issued+released an LC and its own
+SG (20000), submitted A3S with Bill Amount 15000 (SG redeem 15000, PARTIAL_REDEEM) via the actual browser
+UI, entered Fix Pending, changed Bill Amount to 8000, Saved — `compoundLegs.arrivalSgRedeemMovement`
+(read directly off the live component instance) showed the corrected SG leg (amount 8000, PARTIAL_REDEEM,
+PENDING, same `businessEventId`) with zero further clicks; a direct microservice query confirmed the
+correction landed, both legs sharing the same `businessEventId`. (This describes behavior under the
+pre-2026-08-29 design — see this file's own later entry for the redesign that superseded it.)
+
+**A4 — confirmed and documented as structurally excluded, no code change.** A4's own `checkerRelease.
+releasesExistingMovementInPlace: true` means it never creates a movement of its own — its own "Submit" is
+`POST .../maker-submit` against the ALREADY-EXISTING A3/A3S UTILIZE, so there is no PENDING/REJECTED
+record of A4's own for `editPending()` to ever act on; the template's own `fixPendingSupported` gate
+already reads `selectedFunctionStrategy.fixPendingEnabled` off `this.selectedFunction` directly (A4
+specifically, in-session) and would show nothing meaningful even if flipped, since `submitResult` for A4
+IS the underlying A3/A3S record — "fixing" it would silently reach back into A3/A3S's own Fix Pending path
+under A4's own UI, a confusing and unrequested behavior change. Left as `fixPendingEnabled: false`.
+
+**Separately, user-directed UI tweak** ("Account Entries + Spaces + Fix Pending 同一行 字體放大加粗醒目") —
+the primary "Account Entries" button moved out of its own standalone paragraph into the same
+`.tb-maker-result-actions` flex row as "Fix Pending" (already `display:flex; gap:10px`), with a new
+`.tb-maker-result-actions--emphasized` modifier (component-scoped CSS — plain template markup, not a
+Formly-generated subtree, so no ViewEncapsulation issue) bolding/enlarging both buttons
+(`font-weight:700; font-size:15px`). `ng build --configuration production` clean (same two pre-existing
+warnings, `maker-panel.component.scss` no longer even listed).
+
+## A4 screen made genuinely config-driven — its last bespoke (non-`buildFields()`) readout removed, plus a real data-population bug found live
+
+User-directed ("A4 銀幕改成配置方式" — mirror A1/A2's own config-driven screen; "A4 顯示LC NUMBER &
+2NDARY NUMBER (PROTECTED)"; "A4交易 再多加一各幣別金額欄位"). A4 was the one remaining Function whose
+"target picked, now show what was carried" state used its own hand-rolled `tb-balance-box` readout
+(`{{ pickerSelection.selectedPayMovement.amount }}`/`.sourceTransactionRef`) instead of the SAME
+`buildFields()`-driven Amount field + protected-natural-key card every other Function (A2-A11/B2-B7)
+already uses — a structural leftover from before that shared mechanism existed for this specific shape.
+
+Three changes, in dependency order:
+1. **`builder-fields.ts`**: `deriveAmountLockFlags()`'s `amountFromDocArrival` widened from
+   `settlesDocumentArrival`-only (A6/B4) to also cover `releasesExistingMovementInPlace` (A4) — the
+   pre-existing fallback label ("Amount (carried from the Document Arrival, protected)") already fit A4
+   verbatim, no new label needed.
+2. **`maker-panel.component.html`**: protected-natural-key card gained a new item, gated on
+   `releasesExistingMovementInPlace`, reading `model.secondaryRef` directly (NOT `contextSecondaryRef()` —
+   that function is driven by `NATURAL_KEY_FIELDS_BY_INSTRUMENT[instrumentType]`, a structurally different
+   question that's always empty for A4's own `IPLC_LC` target; A4's "2ndary Number" is the picked source
+   record's own `sourceTransactionRef`, carried into `model.secondaryRef` instead). A4's own subcard:
+   the 2ndary Index picker now hides once `naturalKeyLocked` (mirrors every other Function's own Step 1/
+   Step 2 pickers); the duplicate `tb-balance-box` IB Number/Amount readout removed entirely.
+3. **Real structural gap found live, fixed**: the ENTIRE generic Formly field array
+   (`<form><formly-form>...`) had been sitting inside the SAME `*ngIf="!releasesExistingMovementInPlace"`
+   guard as the generic Submit button — so step 1's own widened `amountFromDocArrival` computed the
+   correct field config, but the `<formly-form>` itself never reached the DOM for A4 at all (Amount,
+   Currency, Tolerance %, Event Seq, Created By — all of it). Live-reported directly ("A4 沒抓到2ndary
+   number(IB number?)" → confirmed via direct component-instance inspection that `model.secondaryRef`/
+   `model.amount`/`model.currency` were ALL already correct — the bug was purely "the form never renders",
+   not a data problem). Restructured: the `<form>` now renders unconditionally; only the generic Submit
+   button + Fix Pending/Delete Pending action buttons stay inside the exclusion (those still route through
+   `submit()`/`confirmFixPending()`, never `submitA4()`).
+4. **Second, deeper real bug found chasing #3, in `picker-selection.service.ts`**: `selectPayMovement()`'s
+   own field-population block (`modelAmount`/`modelSecondaryRef`) was gated on `settlesDocumentArrival`
+   only — A4's own `releasesExistingMovementInPlace` branch had NEVER populated either field, only
+   `clearsSubmitResult`. Invisible until now because A4's own template used to read
+   `pickerSelection.selectedPayMovement` directly, bypassing `model` entirely (see #2's own removed
+   readout) — once that bypass was removed in favor of the generic, `model`-driven fields, the underlying
+   gap surfaced. Widened to also populate for `releasesExistingMovementInPlace`; `naturalKeyIbNumber`
+   stays A6/B4-only (A4 creates no new contract, has no natural key of its own to populate).
+
+2 new tests in `builder-fields.spec.ts` (A4 locked/labeled once a pay movement is picked; stays
+face-level/editable before one is — boundary), 1 new test in `picker-selection.service.spec.ts` (A4's own
+`selectPayMovement()` now populates `modelAmount`/`modelSecondaryRef`, still omits `naturalKeyIbNumber`).
+`ng build --configuration production` clean throughout (no new budget/selector warnings). Angular suite:
+1451/1451 (98.72%/96.11%/96.96%/98.99%) — microservice/backend unaffected (Angular-only pass), both
+already confirmed green earlier the same session.
+
+Live-verified end-to-end against the real dev stack: issued a fresh Sight LC, created+acknowledged an A3
+UTILIZE (B01, 30000), picked it under A4 — protected card correctly showed "A4FIX5061 / B01", the generic
+Amount field showed "30000 (carried from the Document Arrival, protected)", Currency showed "USD (carried
+from the existing record, protected)", exactly one Submit button ("Submit A4", no duplicate generic
+Submit) — clicked it, confirmed `makerSubmittedAt` set via direct component-instance inspection. Also
+independently re-verified the Maker Queue Phase 4 A3S row from the earlier entry above (still correctly
+merged, 2 sibling movementIds, `fixPendingSupported: true`) — user-reported "A3S 沒有顯示在Maker Queue上"
+turned out to be a pre-existing, disclosed display simplification (`resolveFunctionForMovement()` always
+labels a merged A3S row "A3", since A3/A3S share the identical `IPLC_LC/UTILIZE` shape and the registry
+lookup takes the first match), not a regression — the row itself was present and fully functional the
+whole time.
+
+User-directed follow-up, same day ("A4 Submit A4 放到欄位顯示之後") — moved the "Submit A4" button from
+inside A4's own picker subcard (rendering BEFORE the generic Amount/Currency/etc. fields) to after the
+`<form><formly-form>` block, matching every other Function's own "fields first, action last" reading
+order. Pure template reordering, same `*ngIf`/`[disabled]` conditions carried over unchanged — Angular
+suite unaffected (1451/1451), `ng build --configuration production` clean. Live-verified: fields now
+render above the button, Submit still correctly sets `makerSubmittedAt`.
+
+## Checker panel auto-scrolls into view after a genuine Submit/Fix Pending Save — was never hidden, just below the fold
+
+User-reported live ("A3交易 SUBMIT後 CHECKER沒顯示" → "不只a3 所有交易submit 或 sAVE fIX PENDING都不出現
+checker畫面" → "為什麼checker畫面都不出現了? bug???"). Direct DOM inspection (both A3S and plain A3,
+reproduced fresh via the real UI, not curl) confirmed this was never a functional regression:
+`checkerItems`/`checkerContractId` were always correctly populated, and the Checker panel's own
+`textContent` always had the right row — it simply sits at the bottom of a fairly tall page (the whole
+Maker form + Maker Result panel above it), well below a typical viewport's fold, so a Maker had no way to
+discover a newly-actionable item without already knowing to scroll down.
+
+Fixed as a genuine UX improvement rather than arguing it wasn't a bug: `TransactionBuilderComponent` gained
+a `@ViewChild('checkerPanelEl')` (template ref added to `<app-checker-panel>`) and a new
+`scrollCheckerIntoView()`, called from `onMakerSyncRequested()` on the SAME `alsoSyncLookup` flag that
+already means "a genuine Submit/Fix Pending Save/Release/Reject just succeeded" (not a mere selection
+pick) — reuses the existing, already-correct signal rather than inventing a new one. Harmless no-op when
+the Checker panel isn't rendered at all (`pendingMakerQueueDeleteRow` — Maker Queue's own Delete Pending
+review) since the `@ViewChild` is then simply `undefined`; harmless (if slightly redundant) when triggered
+by a Checker's own Release/Reject, since they're already at/near the panel they just acted on.
+
+3 new tests in `transaction-builder.component.actions.spec.ts` (scrolls when `alsoSyncLookup: true`; does
+NOT scroll on a mere pick; no-op when `checkerPanelEl` is undefined). `ng build --configuration production`
+clean. Angular suite: 1454/1454 (98.79%/96.23%/97.09%/99.03%). Live-verified end-to-end: submitted a fresh
+A3 from the top of the page — the page automatically scrolled down to the Checker panel, landing the
+"Pending Approvals" section and its own newly-EARMARKING row in view with no manual scrolling.
+
+## A4's own Account Entries dialog no longer re-merges an already-Released A3S SG leg — the "already 沖帳" case the Ownership Rule's own gate never covered
+
+User-reported live, on real dev-DB data (LC S01, B02) — "S01 A35 已經把SG的帳沖掉了 所以A4 不需再冲SG的帳
+只要冲LC的帳即可" (once A3S's own SG redemption is genuinely RELEASED/booked, A4 must not show/re-process
+it — only the LC's own entries belong to A4). A separate report in the same investigation ("Submit A4
+結果SG BALANCE變成-100 這是BUG") turned out NOT to be a bug: direct API inspection of the real SG (G01)
+confirmed its current balance is genuinely `0/0/0` (Confirmed/Available/PendingEarmarkTotal) — fully
+RELEASED, exactly matching "已經把SG的帳沖掉了". The `-100` the user recalled was `pendingEarmarkTotal`'s
+own correct, EXPECTED transient reading from an earlier moment — while the SG's own `FULL_REDEEM` was
+still PENDING (Confirmed 100, Available 0, so `available − confirmed = −100`) — not something Submit A4
+caused; A4 never touches the SG contract at all (`submitA4()`/`release()` only ever act on the LC's own
+UTILIZE movementId).
+
+The REAL bug: `resolveLinkedAccountingMovement()`'s (`transaction-builder.component.ts`, the A6/B4
+Accounting Event Ownership Rule's own resolution helper) `IPLC_LC/UTILIZE` branch merges in the matched SG
+leg via `businessEventId` whenever one exists — correct while THIS SAME record is still under A3S's own
+pre-Release Checker review (F1 §14.4, "見到帳再決定" — the SG leg is genuinely still PENDING then), but
+the record's own `businessEventId` never gets cleared once A3S's Checker actually Releases it — so A4's
+OWN later view of the identical record (Maker Result panel after Submit A4, or A4's own Checker pre-Release
+screen) kept re-resolving and merging in the SG leg even after it had already become an independently,
+permanently booked, closed event. This is exactly the failure mode the Ownership Rule
+itself exists to prevent, just via `businessEventId` (A3S) rather than `referencedTransactionId` (A6) —
+the gate for THAT mechanism was never added.
+
+Fixed: `businessEventIdEligible`'s `IPLC_LC/UTILIZE` clause gained `&& !movement.acknowledgedAt` —
+`acknowledgedAt` is the exact moment A3S's own Checker Release happens (and, per this file's own
+"deferSettlement" convention, the SAME signal `isFinalizing()`/`functionFor()` already use elsewhere to
+decide "is this still A3/A3S's own business, or has it moved on"). Scoped to this ONE branch only — B4's
+own `EPLC_CONFIRMATION/ACCEPT` clause and the reverse `SHGT/FULL_REDEEM|PARTIAL_REDEEM` clause are
+unaffected, since B4's compound Submit creates both legs in a single call with no staged Maker/Checker
+handoff to gate on.
+
+1 new test in `transaction-builder.component.actions.spec.ts` (an already-acknowledged A3S UTILIZE no
+longer triggers `findByBusinessEventId`/merges nothing). `ng build --configuration production` clean.
+Angular suite: 1455/1455 (98.79%/96.23%/97.09%/99.03%). Live-verified against the REAL dev-DB record (LC
+S01's own B02 UTILIZE, `acknowledgedAt`/`makerSubmittedAt` both already set, matched SG `FULL_REDEEM`
+already RELEASED) via direct component-instance invocation: `accountEntryDialogLinkedMovement` correctly
+resolves to `null` — no stale, already-booked SG entries shown alongside A4's own LC entries.
+
+## Fix Pending widened to A8/A10/A11/B6/B7; A9 deliberately excluded (zero editable fields); A9's own Amount label simplified
+
+User-directed ("更正: A8 A9 A10 A11 B6 B7 加上FIX PENDING功能 頁面使用配置"). Per-Function audit of each
+one's own field-lock shape: A8 (`fixPendingEnabled: true`) is a plain creating ISSUE, same shape as A1/B1
+— Amount genuinely free-typed. A10/A11/B6/B7 (`fixPendingEnabled: true`) have Amount fully locked/hidden
+(`amountFromClose`/`amountFromFixed`), but Reason Code (F1 §13.1, mandatory for Close/Reopen) unlocks
+automatically via the SAME `requiresReasonCode`-driven derivation `deriveFixPendingLockFlags()` already
+had — zero new logic needed for any of the five. A9 raised via `AskUserQuestion` (would have zero
+editable fields: Amount fully locked to the SG's own Available Balance, no `secondaryRefLabel`, no
+`reasonCode`) — user confirmed skipping it (`fixPendingEnabled` stays absent). `function-strategy.ts`'s
+own shared `fixPendingEnabled` doc comment updated to record the widened scope and A9's exclusion.
+
+Separately, per the same round of feedback ("Amount ... 說明簡單一點"): A9's own Amount field label
+shortened from "Amount (Full Redeem only — carried from the Shipping Guarantee's Available Balance,
+protected; Partial Redeem is no longer supported here)" to "Amount (Full Redeem — carried from the SG's
+Available Balance, protected)" — same `amountFromSgRedeem` branch in `amountFieldLabel()`
+(`builder-fields.ts`), no lock/behavior change.
+
+`function-strategy.spec.ts`'s own roster test updated (`['A1','A2','A3','A3S','A8','A10','A11','B1','B2','B6','B7']`,
+11 Functions now). No other test referenced A8/A10/A11/B6/B7 as a Fix-Pending-disabled boundary example.
+`tsc --noEmit`/`ng build --configuration production` clean. Angular suite: 1455/1455
+(98.79%/96.23%/97.09%/99.03%).
+
+Live-verified A10 end-to-end against the real dev stack (direct component-instance invocation): Submit
+Close → Fix Pending shows Reason Code genuinely editable (`disabled: false`) while Amount stays locked
+(`disabled: true`, not hidden) — matches A2/B2's own already-proven pattern, confirming the derivation
+generalizes correctly with zero Function-specific code.
+
+## Real bug found live verifying the above — A10/A11 Fix Pending Save could self-reject with "one or more Events ... are not yet fully resolved"; a second, related bug found chasing it in A11/B7's own restore-amount computation
+
+User-reported live mid-session ("A10 FIX PENDING then SAVE => get error Cannot Close IPLC_LC ... One or
+more Events under this LC (including child ledgers) are not yet fully resolved"), immediately while this
+same Fix Pending widening was being live-verified. Root cause: `closeShaped`'s own sufficiency check
+(`createMovement()`'s CLOSE branch, ALSO reused by `applyEditToMovement()` for Fix Pending edits via the
+shared `movementTypeRegistry`) calls `evaluateContractCloseEligibility(ctx.contract)` with no
+`excludeMovementId` — that param exists precisely so `release()`'s own re-check can exclude the CLOSE
+movement it's about to release (still PENDING at that point) from its own "open event" tree-walk, but
+`applyEditToMovement()`'s call into the SAME shared check never had an equivalent hook: a Fix Pending Save
+always finds the very CLOSE/REOPEN movement being edited still PENDING in the DB, self-triggering
+`hasOpenEvents`. `reopenShaped` had the identical gap via its own bare `gatherEventTree(ctx.contract)`
+call — A11/B7 were exposed the moment they gained `fixPendingEnabled: true` in the SAME pass above.
+
+Fixed: `MovementSufficiencyContext` gained an optional `excludeMovementId` field, populated by
+`applyEditToMovement()`'s own `ctx` construction (`old.movementId`) and left `undefined` for
+`createMovement()`'s own call (the new movement isn't inserted yet at that point, same posture
+`release()`'s own re-check already documented) — `closeShaped`/`reopenShaped` both now thread it through
+to `evaluateContractCloseEligibility()`/`gatherEventTree()` respectively.
+
+**Second, deeper bug found while writing the A11/B7 regression test**: even with the guard above, Reopen's
+own Fix Pending Save then failed release() with "the amount to restore has changed since Submit (was
+10000, now 0)" — a predecessor-row artifact of the pre-2026-08-29 Fix Pending design tripping up
+`domain/reopenRestoration.ts`'s own `computeReopenRestoreAmount()` walk. Fixed at the time with a status
+filter in that function; that filter (and the underlying predecessor-row design it worked around) was
+later removed outright once Fix Pending was redesigned to correct a record's row in place — see this
+file's own later entry.
+
+2 new regression tests (`closeFunction.test.ts`: A10 Fix Pending Save → Release round-trips correctly;
+`expiryExtensionAndReopen.test.ts`: A11 Fix Pending Save → Release round-trips correctly, `ceilingAmount`
+re-derives to the same restore total). Microservice suite: 721/721 (99.09%/95.07%/100%/99.7%);
+`tsc --noEmit`/`npm run build` clean. Live-verified via direct curl against the real running microservice
+(not just Jest): a fresh LC → CLOSE → Fix Pending edit (corrected Reason Code) → Release now succeeds
+(previously threw the reported error); a fresh REOPEN on the same contract → Fix Pending edit → Release
+also now succeeds, `ceilingAmount` correctly re-derived to `10000` and the restored Confirmed Balance
+correct. Angular/backend unaffected (microservice-only fix), both re-confirmed green per the standing
+three-suite rule (Angular 1455/1455, backend 41/41).
+
+## A9/A3S "SG Balance > 0" LC-level and SG-level eligibility gating — confirmed already correct, no code change
+
+User asked to confirm A9 (and, on correction, A3S too) only offers LCs/SG records with SG Balance > 0
+("A9 選有SG BALANCE > 0的LC交易" → "更正: A35 A9 選有SG BALANCE > 0的LC交易"). Live-verified against fresh
+dev-DB data rather than re-derived from a doc: A9's own Step-1 Parent LC picker
+(`resolveParentEligibilityRule()`'s `amountVsAvailableDerivation === 'REDEEM'` branch →
+`documentArrivalHints.parentSgEligible`) and A3S's own Step-1 flat Catalog LC Index
+(`resolveCatalogEligibilityRule()`'s `documentArrivalWithSg` branch → `catalogSgEligible`) both already
+correctly exclude an LC with no SG at all or whose every SG is fully redeemed, via the existing
+`loadParentSgEligibility()`/`loadCatalogSgEligibility()` (`document-arrival-hints.service.ts`,
+2026-08-25's own `loadChildBalanceEligibility()` generalization). A9's own Step-2 SG Index
+(`filteredIbIndexCatalog`, generic-fallback + `DECREASING_MOVEMENT_TYPES` since `FULL_REDEEM` is in that
+set) independently also excludes a 0-balance SG within an already-picked LC. Confirmed live via two fresh
+LCs (one with an eligible SG, one with none) at both layers for both Functions — no gap found, no code
+change made. Also confirmed A9's own screen has no bespoke (non-`buildFields()`) template block left in
+`maker-panel.component.html` — Currency/Amount both already render via the generic config-driven
+mechanism, protected, exactly as A4's now does (`"A9要求顯示幣別與金額(PROTECTED)"`, live-verified: Amount
+shows "Amount (Full Redeem — carried from the SG's Available Balance, protected)", Currency shows
+"Currency (carried from the existing record, protected)").
+
+Separately, S01 briefly showing under A9/A3S's own LC Index despite the user's own "already 0" belief was
+also investigated and confirmed NOT a bug: `availableBalance` for S01's own SG G02 was genuinely non-zero
+(`confirmedBalance 0 + a still-PENDING SG ISSUE of 2200 = availableBalance 2200`) — a leftover Maker-
+Submitted-but-never-Released SG from earlier test data on this same shared dev DB, not a stale/incorrect
+read. Resolves itself once that PENDING SG is Released or the dev DB is reset, per the user's own stated
+"打算清除交易後再試一試" plan — no code change needed.
+
+## A6 (Acceptance) own "New Reference — Natural Key" free-typed LC/IB Number block was a duplicate of the already-protected readout card — removed for A6's own shape
+
+User-reported live ("Ａ６頁面欄位也應該是ＩＮＤＥＸ選交易後帶入的 不是輸入的 要顯示但ＰＲＯＴＥＣＴＥＤ" →
+"Ａ６頁面欄位也應該是配置的"). A6 (`settlesDocumentArrival`) is a `hasParent` CREATING function, so it
+reaches the SAME "New Reference — Natural Key" template block A8/B3 (also `hasParent`+creating) share —
+but unlike A8/B3, A6's own LC Number and IB Number are NEVER freely typed: LC Number comes from the
+Parent LC pick, IB Number is carried from the picked Document Arrival
+(`PickerSelectionService.selectPayMovement()`'s own `naturalKeyIbNumber` assignment, widened into this
+same shape during the earlier A4 config-driven pass this session). The bespoke block rendered a real,
+editable-LOOKING `[disabled]`-bound "IB Number *" input showing the exact same value the protected
+readout card above it ALSO already showed — live-reproduced (picked LC/IB Number both rendered twice,
+once genuinely protected, once as a second, redundant "New Reference" card).
+
+Fixed by gating the entire "New Reference — Natural Key" block on
+`!selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival` (A6 only in practice — B4 never
+reaches `isCreatingMovement` at all) rather than trying to selectively re-style just the IB Number cell
+inside it — removed for this shape entirely, since the protected card above already covers both fields
+and there's nothing else in this cell for A6 to type. A8/B3 (the only other functions reaching this
+block) confirmed unaffected — both still show a real free-typed SG/EB Number input, live-verified.
+
+Separately, per the same round of feedback ("Search LC NUMBER SG NUMBER 加大加粗明顯"): the free-text
+"Search Existing Contract" fallback's own LC Number/IB Number/SG Number inputs (A7/A9/B5's own
+`usesTwoFieldSearch` shape) gained the same `.tb-natural-key--emphasized` class every other natural-key
+input on this screen already carries — the one remaining plain-styled natural-key entry point.
+
+Pure template change (one `*ngIf` gate + 3 added classes), zero `.ts`/`.spec.ts` edits needed — no test
+asserted this block's own markup shape. `tsc --noEmit`/`ng build --configuration production` clean.
+Angular suite unaffected (1455/1455, unchanged from before this pass — a template-only Jest project has
+no coverage of this). Live-verified end-to-end against a fresh Usance LC/Document Arrival: A6 now shows
+exactly one protected "LC NUMBER"/"IB NUMBER" card (bold, 17px, no duplicate input below it), a genuine
+Submit A6 still succeeds; A9's own free-text LC/SG Number search inputs confirmed bold/17px via computed
+style; A8's own free-typed SG Number input confirmed still present and unaffected.
+
+## A8/B3's own SG/EB Number was ALSO duplicated (protected card + still-editable input, same value) — the same class of bug as A6's fix above, one step further
+
+User-reported live against real LC U01 ("New Reference — Natural Key / U01 / SG Number * / G02" appearing
+underneath an ALREADY-shown "LC Number / U01" protected card — the exact same value shown twice, in two
+different visual treatments, one genuinely protected and one still an editable-looking mandatory input).
+Root cause distinct from A6's own (A6's IB Number really was fully carried/resolved once picked; A8/B3's
+own SG/EB Number is NOT — it's the NEW value the Maker is still typing) but same underlying trigger:
+`hasEligibleTargetSelected` (`submit-rules.ts`) has nothing SG/EB-Number-specific to wait on for A8/B3 —
+`lcNumberFromParent(model) && !ctx.selectedParent` is the only relevant guard, so it returns `true` the
+instant the Parent LC alone is picked, before any SG/EB Number has been typed. `naturalKeyLocked` then
+engages off that same signal, showing the protected card's own IB/SG Number span (`contextSecondaryRef`,
+which for a creating function reads straight off `naturalKey[field]` — the SAME live model field the
+mandatory input below is bound to) alongside the still-fully-editable input underneath. The card's own LC
+Number line ALSO duplicated the "New Reference" block's own `lcNumberFromParent` readout (identical value,
+disabled input) — same duplicate-LC-Number symptom A6 had, never previously noticed for A8/B3 because no
+one had reported it until this LC Number + SG Number combination was shown together live.
+
+Two fixes, both in `maker-panel.component.html`:
+1. The protected card's own IB/SG Number spans gated with `&& !isCreatingMovement` — for A8/B3 (the only
+   `isCreatingMovement` functions with a non-empty `requiredNaturalKeyFields`), the card now shows ONLY
+   the LC Number line; A7/A9/B5 (existing-record two-field search, the only other consumers of these two
+   spans) are unaffected — their own 2ndary Number really is fully resolved once `naturalKeyLocked`
+   engages there.
+2. The "New Reference — Natural Key" block's own `lcNumberFromParent` readout gated with
+   `&& !naturalKeyLocked` — once the top card takes over (Parent LC picked), this now-redundant disabled
+   LC Number echo hides; before that (no Parent picked yet), it still renders with its own "Pick the
+   Parent LC above first." hint exactly as before. The mandatory SG/EB Number input itself is
+   UNCHANGED — never gated on `naturalKeyLocked` at all, stays visible/editable the whole time (only
+   `formLocked`, i.e. post-Submit, disables it, same as every other mandatory field on this screen).
+
+Pure template change, zero `.ts`/`.spec.ts` edits (no test asserted this block's own rendered shape).
+`tsc --noEmit`/`ng build --configuration production` clean, same two pre-existing warnings only. Angular
+suite unaffected (1455/1455). Live-verified end-to-end exactly reproducing the report (LC U01, A8): after
+picking Parent LC, the screen now shows the protected card with ONLY "LC NUMBER — U01", then "New
+Reference — Natural Key" with ONLY a clean mandatory "SG Number *" input (no duplicate LC Number, no
+premature-protected SG Number); typed "G02" into it via a real DOM `input` event (not a direct model
+assignment) to confirm it's genuinely interactive, not merely rendered — value flowed into
+`naturalKey.sgNumber` correctly; a real Submit A8 then succeeded end-to-end. B3 (the only other function
+reaching this exact code path — EPLC_CONFIRMATION's own Present Docs) independently re-verified against a
+fresh Export Confirmation LC: identical correct shape ("LC NUMBER" card + a clean mandatory "EB Number *"
+input, no duplicates).
+
+**A7/A9/B5 audited on request ("A7 A9 B5 也檢查一下有沒有一樣的問題") — confirmed NOT affected, no code
+change.** These are the "existing-record, two-field search" shape (`usesTwoFieldSearch`), structurally
+different from A8/B3's own "creating, free-typed 2ndary key" shape: `hasEligibleTargetSelected`
+(`submit-rules.ts`) correctly waits for Step 2 (the actual SG/IB/EB Number pick, via `ctx.selectedContract`/
+`ctx.selectedContractSnapshot`) before returning true for all three — picking the Parent LC (Step 1) alone
+is never sufficient, unlike A8/B3 where `lcNumberFromParent(model) && !ctx.selectedParent` was the ONLY
+relevant check. Live-verified for all three (fresh LC+SG for A9, fresh Usance LC+Acceptance for A7, fresh
+Export Confirmation+Acceptance for B5): `naturalKeyLocked` stays `false` and the Step 1/Step 2 pickers
+remain interactive right after Step 1 alone; once Step 2 completes, the screen collapses to exactly one
+clean protected card, no duplicate of anything.
+
+## A10/A11 (and B6/B7) no longer generate a zero-value `contingentAccountEntry` when the write-off/restore amount is genuinely 0 — S01-shaped (Tight Available Balance already 0) case
+
+User-directed ("A10 and A11 if Tight Available Balance = 0 then no entries should be generated. Refer to
+S01 for Import"). `CLOSE`/`EXPIRE`/`REOPEN` are the only movementTypes where a genuinely zero amount is a
+legitimate value at all (`assertValidAmount()`'s own doc comment already establishes this — an
+already-fully-utilized LC that's since Expired/Closed has 0 left to write off/restore) — every other
+movementType is rejected outright by `assertValidAmount()` before reaching account-entry derivation at
+all. Confirmed live via direct API: closing S01 (Confirmed Balance already 0, matching Tight Available
+Balance 0) generated a real `contingentAccountEntry` with `amount: "0"` — a zero-value Dr/Cr voucher
+carrying no genuine accounting information.
+
+Fixed in `domain/contingentAccountEntry.ts`'s `deriveContingentAccountEntry()`: returns `null` when the
+signed amount is exactly zero AND the movementType is `CLOSE`/`EXPIRE`/`REOPEN` — same "no real balance
+effect, don't generate a placeholder pair" posture `AMEND_EXPIRY_DATE`/`EPLC_EXAMINATION` already use
+above it in the same function, just triggered by the amount being zero here rather than the movementType
+itself never carrying one. **Deliberately scoped to the amount, not to a Tight Available Balance check** —
+Close's own write-off is against Confirmed Balance, not Tight Available Balance (two different figures
+that happen to coincide for S01, which has no outstanding SG/Acceptance exposure); keying the null-check
+off the movement's own `ceilingAmount` being zero is both simpler and correct for every case, including
+one where Tight Available Balance is non-zero but Confirmed Balance (and therefore the write-off) is
+still genuinely 0.
+
+**Eligibility itself is completely unaffected — user-confirmed requirement** ("S01 should be shown in A10
+even Tight Available Balance == 0... after S01 A10 approved, then it should be able to shown on A11"):
+`evaluateContractCloseEligibility()`/`listCloseEligibleContracts()`/`reopenShaped`'s own eligibility gate
+were untouched by this fix — only `deriveContingentAccountEntry()` changed. Live-verified end-to-end
+against the real S01 record for real (not cancelled afterward, a genuine exercise of the full lifecycle):
+`GET /balance-contracts/close-eligible` still lists S01 before Close; Close Submit+Release both return
+`contingentAccountEntry: null`; S01 correctly transitions to `CLOSED`; `GET /balance-contracts/
+reopen-eligible` then lists S01; Reopen Submit+Release both also return `contingentAccountEntry: null`;
+S01 correctly returns to `ACTIVE` with its own original balance (0/0/0) unchanged. Also live-verified
+through the real browser UI (not just curl): A10's own LC Index still shows S01, Amount auto-fills to "0"
+and Submit is ready, a genuine Submit succeeds with `contingentAccountEntry: null`, and — the concrete
+visible effect — no "Account Entries" button renders on the Maker Result panel at all (gated on
+`contingentAccountEntry` being present, same convention every other Account Entries button on this screen
+already uses).
+
+2 new regression tests: `closeFunction.test.ts` (Confirmed Balance already 0 at Close — asserts `null` on
+both the Submit and Release response, plus a non-zero happy-path assertion added to the pre-existing test
+that had never checked `contingentAccountEntry` at all) and `expiryExtensionAndReopen.test.ts` (the full
+S01 shape end to end — UTILIZE to 0, Close with `null` entry, Reopen with `null` entry, contract correctly
+back to ACTIVE). OAS bumped to v1.32.0. All three suites re-run green: microservice 723/723
+(99.09%/95.1%/100%/99.7%), Angular 1455/1455 (unaffected, no client-side change — the Angular UI already
+correctly hides the Account Entries button whenever `contingentAccountEntry` is absent, no new logic
+needed there), backend 41/41 (unaffected). `npm run build` (microservice) clean.
+
+## B3 Fix Pending widened (same method as A8); Tenor Type now shown as a protected field for A2-A11/B2-B7
+
+User-directed ("Use the same method for B3 with Fix Pending. Furthermore for A2 - A11, B2 - B7 display the
+Tenor Type as protected field."), two independent changes.
+
+**B3 Fix Pending**: `fixPendingEnabled: true` added to B3's own registry entry — same shape as A8 (plain
+creating `CREATE`, `hasParent`, Amount genuinely free-typed Bill Amount), simply Export's own counterpart
+left out of the original A8/A10/A11/B6/B7 batch. Zero new derivation logic — `deriveFixPendingLockFlags()`
+already unlocks a free-typed Amount automatically. `EPLC_EXAMINATION`'s own `contingentAccountEntry` stays
+`null` regardless (D3, MEMO_ONLY, never posts) — unrelated to whether the Bill Amount itself is
+correctable before Release. Roster test updated
+(`['A1','A10','A11','A2','A3','A3S','A8','B1','B2','B3','B6','B7']`, 12 Functions now). Live-verified
+end-to-end against a fresh Export Present Docs presentation: Submit (Amount 12000) → Fix Pending (Amount
+genuinely `disabled: false`) → corrected to 15000 → Save → Release — the RELEASED record's own `amount`
+reads `15000`, `contingentAccountEntry` stays `null` throughout as expected.
+
+**Tenor Type protected display — corrected same day** ("Tenor Type 改的不對 應該跟Currency欄位一樣 是輸入欄位
+但是PROTECTED for B2-B7 A2 - A11" → "使用配置設定即可"). Previously Tenor Type only ever appeared for A1/B1
+(a real editable dropdown) and A6 (its own dedicated `tenorTypeOptions`-driven, already-protected Formly
+field) — every other function (A2-A5/A7-A11/B2-B7) never showed it anywhere at all, even though the
+underlying contract always has one.
+
+A first attempt added it as a read-only line in the protected-natural-key card instead of a genuine bound
+Formly field — user-corrected: it must follow the SAME config-driven mechanism `carriedCurrency` already
+uses (a real, disabled `model`-bound field rendered by `buildFields()`, not a bespoke template addition).
+Fixed for real:
+
+- `MakerPanelComponent.applyCarriedContractFields()` (new) — consolidates what were 6 separately-
+  duplicated `if (this.carriedCurrency) { this.model.currency = ...; this.rebuildFields(); }` call sites
+  (`onSelectContract`, `searchExistingContract` ×2, `onSelectParent`, `onSelectSettleableBalance`,
+  `onSelectIbIndex`) into one method that carries BOTH Currency (unchanged) and the new
+  `carriedTenorType` (→ `model.tenorType`) together — consolidating first meant Tenor Type could be added
+  everywhere Currency already carries without risking a missed call site. The Tenor Type branch is a
+  no-op whenever the Function has its own `tenorTypeOptions` (A1/B1/A6) — A6's own separate, pre-existing
+  `onSelectParent()` block (also carries `tenorDays`, which this method deliberately does not) keeps
+  doing that work unchanged.
+- `carriedTenorType` getter delegates to `contextTenorType(s: ContextRefState)` (`function-policy.ts`) —
+  `selectedContract?.tenorType ?? selectedParent?.tenorType ?? null`, the same fallback chain
+  `contextLcNumber` already uses, covering every picker shape without special-casing per Function: A9's
+  own SG contract carries no `tenorType` of its own (Tenor doesn't apply to Shipping Guarantees), so it
+  falls through to the parent LC's; A7's own Acceptance record carries one directly.
+- `builder-fields.ts`'s existing `tenorType` field widened rather than duplicated: new `tenorTypeCarried`
+  flag (`!tenorLocked && !selectedFunction?.tenorTypeOptions?.length && !!model.tenorType`) drives a new
+  `hide`/`disabled`/label branch ("Tenor Type (carried from the existing record, protected)"), reusing the
+  SAME field Currency-style rather than adding a second one. Always rendered as `type: 'select'` even in
+  the carried case (unlike Currency's own plain `input` for non-A1/B1) — Tenor Type's own raw enum values
+  (`'SELLERS_USANCE'` etc.) aren't human-readable the way Currency's ISO codes already are, so the carried
+  case synthesizes a single-option list via the existing `tenorTypeLabel()` formatter (`selectedFunction
+  .side ?? 'IMPORT'`) — same "Sight"/"Seller's Usance"/"Buyer's Usance"/Export's plain "Usance" table
+  Inquire Events already uses. A1/B1/A6 are excluded automatically (`tenorTypeOptions.length` truthy for
+  them), so this can never duplicate their own existing treatment.
+- Confirmed harmless to the wire payload: `submit-rules.ts`'s `buildSubmitRequest()` only ever forwards
+  `request.tenorType` when `selectedFunction?.tenorTypeOptions?.length` is truthy — `model.tenorType` being
+  populated for A2-A11/B2-B7 (display only) never reaches the actual `POST /balance-movements` body for
+  them.
+
+9 new/updated tests: `function-policy.spec.ts` (`contextTenorType` prefers `selectedContract`, falls back
+to `selectedParent`, null boundary — unchanged from the first attempt, this function's own resolution
+logic was already correct); `maker-panel.component.spec.ts` (`carriedTenorType` getter; `onSelectContract`/
+`onSelectIbIndex` write `model.tenorType`; A6 confirmed to still carry via its OWN dedicated block, not
+this new method); `builder-fields.spec.ts` (the carried field's own `hide`/`disabled`/label/options shape
+for A2, the Export-side "Usance" label for B2). `tsc --noEmit`/`ng build --configuration production`
+clean. Angular suite: 1464/1464 (98.79%/96.21%/97.1%/99.03%). Live-verified against real dev-stack data
+(Usance LC U01, A2): the rendered DOM element is confirmed to be a genuine `<select disabled>` (not a
+plain span) showing "Seller's Usance" as its only option, exactly matching Currency's own mechanism; a
+real Submit A2 still succeeds end-to-end with the new field present; Fix Pending correctly force-disables
+it ("not editable via Fix Pending for this Function") same as Currency, per §15. Microservice/backend
+unaffected (Angular-only pass), both re-confirmed green (microservice 723/723, backend 41/41).
+
+## B4's own EB Index — audited on request ("B4 should be able to select all EARMARKED records") — confirmed already correct, no code change
+
+`resolveCatalogEligibilityRule()`'s own `catalogChildPayableIbs` hint (Step-1 LC-level, via
+`loadChildHints()`) and `loadPayableMovementsAcrossChildContracts()`'s own filter (Step-2, the actual EB
+Index) both already gate on `movementType === 'CREATE' && status === 'RELEASED' && !presentDocsConsumedAt`
+— exactly "EARMARKED" per this file's own convention (B3 genuinely RELEASEs on its own,
+`sourceAlreadyReleasedBeforePick: true`, so RELEASED **is** EARMARKED for this Function, not merely a
+precondition of it). Live-verified against fresh dev-DB data (a fresh Export Confirmation with 3 Present
+Docs presentations — two genuinely Released/EARMARKED, F01/F02, one still PENDING/EARMARKING, F03): B4's
+own EB Index correctly lists BOTH F01 and F02 together ("2 total", neither auto-picked since more than
+one candidate exists), and correctly excludes F03. No gap found, no code change made.
+
+## B4's own EB Index re-audited against a full 5-state matrix ("B4 candidate list = All eligible EARMARKED Events under the selected LC") — confirmed correct, no code change
+
+User re-raised this as a formal rule with an explicit exclusion list ("EARMARKING、PENDING、REJECTED、
+APPROVED 等非 EARMARKED 狀態不得列入" + "應隨交易狀態即時更新"), broader than the earlier 2-candidate spot
+check above. Re-verified against a genuinely comprehensive 5-record scenario on one fresh Export
+Confirmation LC, covering every state the rule names plus the two states most likely to interact with
+this session's own recent fixes (an already-consumed B3 record, and a Fix-Pending-edited one):
+
+| Record | Real state | Expected | Result |
+|---|---|---|---|
+| G01 | EARMARKING (PENDING, not yet Checker-Released) | excluded | ✅ excluded |
+| G02 | EARMARKED (RELEASED, not consumed) | included | ✅ included (20000) |
+| G03 | REJECTED | excluded | ✅ excluded |
+| G04 | Fix-Pending-edited (corrected from 40000 to a live RELEASED 45000) | only the live EARMARKED one | ✅ only 45000 shown — this picker's own strict `status === 'RELEASED'` match already only ever sees the live, corrected record |
+| G05 | RELEASED but already consumed by a real B4 Honour (`presentDocsConsumedAt` set — effectively APPROVED, moved on) | excluded | ✅ excluded |
+
+"即時更新" (live update on re-query) also confirmed: released G01 mid-session (EARMARKING → EARMARKED)
+without reloading the page, re-selected the same LC, and the EB Index correctly grew from 2 to 3
+candidates (G01/G02/G04) — the picker re-derives from a fresh fetch each time it's engaged, same
+convention every other picker on this screen already uses; no push/live-socket mechanism exists or was
+requested. No gap found across the full matrix, no code change made — `resolveCatalogEligibilityRule()`'s
+`catalogChildPayableIbs` hint and `loadPayableMovementsAcrossChildContracts()`'s own filter
+(`movementType === 'CREATE' && status === 'RELEASED' && !presentDocsConsumedAt`) already implement this
+rule exactly as stated.
+
+## A8's own Maker-Queue-originated Fix Pending — two real bugs found live (blank LC Number, un-emphasized SG/EB Number), both fixed
+
+User-reported live via a real Maker Queue → Fix Pending click on an A8 record: "LC NUMBER —" (blank) and
+"2 SG Number 沒有加大加粗明顯" (not bold/enlarged), plus an initial "1 不該顯示LC INDEX" that turned out to
+be a false read of a stale DOM snapshot mid-reproduction (once a real Angular change-detection cycle
+settled, the LC Index picker was already correctly hidden — `naturalKeyLocked` was `true` throughout, as
+designed; no separate bug there).
+
+**Root cause of the blank LC Number**: `contextLcNumber()`'s own `lcNumberFromParent` branch (A6/A8/B3)
+read `s.selectedParent?.naturalKey.lcNumber ?? null` — but Maker Queue's own Fix Pending entry point
+(`reconstructScreenForSubmitResult()`) never re-resolves `selectedParent` (no Parent LC picker interaction
+happens during review, only `naturalKey`/`model` get reconstructed from the fetched contract), so this
+always evaluated to `null` for A8/B3 specifically. Fixed with a fallback to `s.naturalKey.lcNumber` —
+proven safe (not a new, second source of truth) because `onSelectParent()`'s own existing
+`this.naturalKey.lcNumber = this.selectedParent.naturalKey.lcNumber` assignment already keeps the two
+values in sync during every normal live flow; the fallback is a genuine no-op outside Fix Pending and
+simply also works during it, since `reconstructScreenForSubmitResult()` DOES correctly populate
+`naturalKey.lcNumber` from the fetched contract regardless of Function shape.
+
+**SG/EB Number emphasis**: the "New Reference — Natural Key" block's own free-typed `ibNumber`/`sgNumber`
+inputs (A8/B3 only — the two creating+hasParent functions whose 2ndary key is genuinely typed, never
+carried) never had `tb-natural-key--emphasized` at all — added unconditionally, same footing as A1/B1's
+own LC Number just above it in the same block (the one Natural Key field on THEIR screen that's genuinely
+typed, not picked) rather than gating it on Fix Pending/review mode specifically.
+
+2 new tests (`function-policy.spec.ts`: `contextLcNumber` falls back to `naturalKey.lcNumber` for an
+A8-shape Fix Pending scenario with `selectedParent: null`; `maker-panel.component.spec.ts`: the full
+`externalFixPendingRequest` reconstruction for A8 resolves `contextLcNumber` correctly with
+`selectedParent` confirmed still `null` throughout). `tsc --noEmit` clean. Angular suite: 1466/1466
+(98.79%/96.21%/97.1%/99.03%). Live-verified end-to-end reproducing the exact report: Maker Queue → click
+Fix Pending on a real A8/U01/G01 record → "LC NUMBER" now correctly shows "U01"; the "SG Number" input
+confirmed bold (700)/17px via computed style, still correctly showing its real value "G01" and disabled
+during review. Microservice/backend unaffected (Angular-only pass), both re-confirmed green (microservice
+723/723, backend 41/41).
+
+## Maker Queue → Fix Pending → Save must retain the SAME Event context throughout (A2–A11/B2–B7) — two more real bugs found completing the audit, both fixed
+
+User-directed formal rule ("Maker Queue → Select Event → Fix Pending → Save Fix Pending → No LC / Index
+Record re-selection is required. The original Event context must be retained throughout the Fix Pending
+flow... 此規則應統一檢查A2–A11、B2–B7"), following straight on from the A8 blank-LC-Number/un-emphasized-
+SG-Number fixes above. Auditing the full flow (not just entering Fix Pending, but SAVING it too) surfaced
+two more real gaps, both scoped to the exact same A8/B3 shape (`lcNumberFromParent` — the only functions
+where the natural key's LC-Number half is resolved via `selectedParent`, never `selectedContract`, in a
+normal live flow):
+
+1. **The LC Index picker itself could reappear after Save.** `hasEligibleTargetSelected()`
+   (`submit-rules.ts`) drives `naturalKeyLocked` — during Fix Pending itself this was masked by
+   `isExternalReviewMode` forcing it true regardless, but once Save completes (`fixPendingMode` flips back
+   to `false`), the gate falls through to `hasEligibleTargetSelected()` alone. Its own `lcNumberFromParent`
+   branch required `ctx.selectedParent`, which Fix Pending's own reconstruction
+   (`reconstructScreenForSubmitResult()`) never sets (no Parent LC picker interaction happens during
+   review) — so for A8/B3 specifically, this returned `false` immediately after Save, re-showing the
+   `hasParent && !naturalKeyLocked`-gated LC Index picker for a record that was never actually
+   un-selected. Fixed by also accepting `ctx.selectedContract` — safe because `onSelectParent()`'s own
+   pre-existing alias (`this.selectedContract = this.selectedParent`, the same A8/B3-only shape already
+   documented on that assignment) already keeps the two in agreement throughout every normal live flow, so
+   this can never accept a genuinely different target. A6 (the only other `lcNumberFromParent` function,
+   not Fix-Pending-enabled) is structurally unaffected — its own `selectedContract` is never set before
+   `selectedParent` in the first place.
+2. **Stale field labels/config after Save (found while verifying #1).** `applyCheckerOutcome()` (the
+   handler for a successful Fix Pending Save, arriving via `externalCheckerOutcome`) flipped
+   `fixPendingMode` back to `false` but never called `rebuildFields()` — so `this.fields` stayed exactly as
+   `startFixPending()` last built it, e.g. Currency's own label kept reading "locked — Fix Pending can
+   never change Currency, see §15" even after Fix Pending had genuinely ended. Functionally harmless
+   (`displayFields`'s own `toReadOnlyFields()` wrapper already force-disables everything via
+   `fieldsLocked` regardless of this staleness), but visibly misleading. `cancelFixPending()` already
+   calls `rebuildFields()` in the equivalent spot — `applyCheckerOutcome()` was simply missing the same
+   call; added.
+
+3 new/updated tests: `submit-rules.spec.ts` (A8 — `selectedContract` alone, with `selectedParent` still
+`null`, now also satisfies `hasEligibleTargetSelected`; B3's own existing test extended with the same
+case); `maker-panel.component.spec.ts` (a genuine `externalFixPendingRequest` → `externalCheckerOutcome`
+'released' sequence proving the Currency label transitions from genuinely-stale "Fix Pending" wording to
+the correct post-Save "carried from the existing record, protected" wording — not merely asserting the
+end state, which alone wouldn't have caught the original bug). `tsc --noEmit` clean. Angular suite:
+1468/1468 (98.79%/96.21%/97.1%/99.03%). Live-verified end-to-end for BOTH A8 and B3 (its Export
+counterpart, same shape): Maker Queue → Fix Pending → edit Amount → Save — in both cases the "LC INDEX —
+EXISTING CONTRACT" picker never reappears, "LC NUMBER" keeps showing the same value throughout, and
+Currency's own label correctly flips to "carried from the existing record, protected" the instant Save
+completes. Every other Fix-Pending-enabled Function (A1/A2/A3/A3S/A10/A11/B1/B2/B6/B7) was already
+structurally unaffected — all of them resolve their own target via `selectedContract` directly (never
+`selectedParent`), which Fix Pending reconstruction has always correctly populated. Microservice/backend
+unaffected (Angular-only pass), both re-confirmed green (microservice 723/723, backend 41/41).
+
+## A Fix Pending edit's own replaced predecessor no longer duplicates in Event Timeline / Account Entries
+
+`toEventRows()` and `resolveLinkedAccountingMovement()`'s two lookup branches now exclude a replaced
+predecessor, resolving the current record (same eventSeq) instead. Maker Queue/Checker Queue/
+`CheckerActionsService`'s own lookups were already unaffected (their own status filters already exclude
+it structurally). Display-only fix — the underlying record-replacement mechanism is unchanged.
+
+## Fix Pending §19 redesigned — in-place correction; the internal replaced-predecessor status value removed entirely (2026-08-29, business/BA-directed)
+
+A full architecture review (business/BA, in-chat) concluded the pre-2026-08-27 two-row mechanism itself
+was the real problem: it conflated Business Status with a technical revision marker in the same `status`
+column, and that marker genuinely leaked into raw API responses (`GET .../movements`,
+`GET /balance-movements?businessEventId=`), filtered only at the Angular display layer, never at the API
+contract itself. **Final decision: Fix Pending Save is now an atomic in-place correction** — the
+PENDING/REJECTED movement's row is corrected in place (same `movementId` **and** `eventSeq`, landing back
+at `PENDING`) rather than being retired and replaced by a second row. `MovementStatus` drops that marker
+value entirely (4 values left: PENDING/RELEASED/REJECTED/CANCELLED). `ContractStatus.SUPERSEDED`/
+`markSuperseded()` is a separate, unrelated, already-unused mechanism (contract-version replacement) —
+explicitly out of scope, confirmed with the user.
+
+New `fix_pending_audit` table/`FixPendingAuditStore` (mirrors `delete_pending_audit`'s own append-only
+shape) is the only place the pre-edit content now survives — `before_snapshot`/`after_snapshot` JSON,
+original Maker/status, editor/time. `editPending()`/`applyEditToMovement()`/
+`applyArrivalWithSgCompoundEdit()` (`balanceService.ts`) rewritten: write one audit row per corrected leg,
+then `BalanceMovementStore.applyFixPendingCorrection()` (replaces the old retire-and-mark method) does a
+single in-place `UPDATE` — no INSERT, so the whole "insert unexpectedly collided" defensive branch is gone
+(nothing left that could collide). `statusTransition.ts`'s `EDIT` action now targets `PENDING` (both
+PENDING/REJECTED sources), never a second status of its own. The idempotency index reverts to a plain
+unconditional `UNIQUE(balance_contract_id, event_seq)` — only ever one row per event now.
+
+Migration 21 (new `fix_pending_audit` table) + migration 22 (rebuild `balance_movements`: narrow the
+`status` CHECK, drop `superseded_by_movement_id` — Fix Pending's own 2026-08-27 addition, safe to remove —
+**backfill** `fix_pending_audit` from any pre-existing retired-predecessor row on the real dev DB before
+excluding it as a now-redundant duplicate of its own already-live successor). `superseded_movement_id` (a
+genuinely separate, pre-existing, still-unused reserved column predating Fix Pending) is untouched — same
+posture as `ContractStatus.SUPERSEDED`.
+
+Every filter that guarded against a stale duplicate row is now dead code and was removed rather than left
+as defensive cruft: `reopenRestoration.ts`'s own filter, `inquire-events.service.ts`'s `toEventRows()`
+branch, `transaction-builder.component.ts`'s `resolveLinkedAccountingMovement()` (both branches, the
+`!== 'CANCELLED'` clause kept). `checker-actions.service.ts`'s own PENDING filter in
+`resolveArrivalSgLegAfterEdit()` is kept — it's a genuine "is this leg still correctable" check, not a
+duplicate-exclusion.
+
+New tests: `FixPendingAuditStore` (mirrors `deletePendingAuditStore`'s own untested-before shape),
+migration 21/22 backfill (`migration22FixPendingBackfill.test.ts`, seeded via `PRAGMA
+ignore_check_constraints=1` since migrations 13/15/17 rebuild using the CURRENT — already-narrowed —
+`MOVEMENT_STATUS_VALUES` at replay time, closing off the historical window a plain legacy-fixture replay
+would otherwise rely on). Every test fixture that exercised the now-structurally-impossible old two-row
+scenario removed rather than adapted. OAS bumped to v1.34.0. All three suites re-run green: microservice
+728/728 (98.99%/95.01%/100%/99.57%), Angular 1468/1468 (98.79%/96.21%/97.1%/99.03%), backend 41/41. `ng
+build --configuration production` clean (same two pre-existing warnings). Live-verified both via direct
+curl (Submit → Fix Pending Save → Release, same movementId throughout, single row in `GET .../movements`)
+and through the real Angular UI (`window.ng` component invocation): Fix Pending Save correctly lands back
+at PENDING with the corrected amount under the same movementId, no stray LC Index picker, Currency/result
+banner correct.
+
+Documentation cleanup, same day: every prose mention of the retired internal status name was removed from
+`CLAUDE.md`, `TODO.md`, and the `analysis/` BA proposal/requirement documents — condensed to describe the
+current in-place-correction design directly rather than narrating the discarded two-row mechanism's own
+review history. `ContractStatus.SUPERSEDED`/`markSuperseded()` mentions (a separate, unrelated,
+still-reserved mechanism) were left untouched throughout.
+
+## `fix_pending_audit` missed the same "Cleanup Database Tables" FK gotcha `delete_pending_audit` already had — found live, fixed same day
+
+User-reported ("Cleanup Database Tables in not working now"). `POST /admin/reset-database` (`app.ts`)
+already had a code comment explaining exactly this class of bug from `delete_pending_audit`'s own
+2026-08-28 fix — the new `fix_pending_audit` table (FK REFERENCES to both `balance_movements`/
+`balance_contracts`, `PRAGMA foreign_keys = ON`) was simply never added to the DELETE sequence when it
+shipped that same day, so the route 500'd the instant any Fix Pending Save had ever happened (true on the
+real dev DB from this session's own earlier testing). Fixed: `DELETE FROM fix_pending_audit` added before
+`balance_movements`. New regression test mirrors `delete_pending_audit`'s own existing one exactly. All
+three suites green (microservice 729/729, Angular 1468/1468, backend 41/41); live-verified via the real
+button click in the browser against the real dev DB — "Database tables cleaned up.", 0 contracts remaining,
+no 500. Reconfirms the standing rule: every new FK-constrained table needs every existing raw DELETE/reset
+statement touching its referenced tables re-checked, not just a green suite for the new feature alone.
+
+## Inquire Delete Pending catalog showed "LC Amount 0 / Last Event Date/Time —" for a root ISSUE cancelled before Release — real bug, fixed
+
+User-reported (real dev-DB LC, `status: CANCELLED`, a root ISSUE Delete-Pending'd before ever being
+Released). `computeLcIndexRow()` (shared by Inquire Events' own catalog and Inquire Delete Pending's LC
+Catalog) derived `lastEventAt` purely from `toEventRows()`'s own event list — which deliberately excludes
+CANCELLED movements from the true Event Timeline (by design, documented at that function's own CANCELLED
+branch) — so a contract whose ONLY movement is CANCELLED had an empty event list and `lastEventAt` fell
+back to `null` ("—" in the template), even though a real Delete Pending action clearly happened.
+Unexercised until now: Inquire Events' own catalog never passes a CANCELLED contract to this function at
+all (its own `loadIndex()` already excludes CANCELLED), so this gap only ever bit Inquire Delete Pending's
+own catalog — exactly the shape of contract it exists to surface.
+
+Fixed: `computeLcIndexRow()` now also derives a raw fallback timestamp directly from the movement list
+itself (`cancelledAt ?? releasedAt ?? createdAt`, never filtered by `toEventRows()`), taking the later of
+that and the existing display-derived value — a no-op for every other caller/contract shape, since a real
+event always has a later or equal display-derived timestamp already. `lcAmount` is unaffected and stays
+`"0"` for this shape — `deriveLcAmount()` already correctly excludes CANCELLED movements from the summed
+face amount, and that's the right answer (nothing was ever actually confirmed). New regression test
+(`inquire-events.service.spec.ts`) reproduces the exact shape. All Angular tests green (1469/1469,
+98.76%/96.13%/96.99%/98.99%); microservice/backend unaffected (Angular-only fix), re-confirmed green.
+Live-verified via the real running dev stack: reproduced the exact reported scenario (fresh LC → ISSUE →
+Delete Pending) and confirmed the Inquire Delete Pending catalog now shows a real timestamp instead of
+"—".
+
+## Inquire Delete Pending's own "LC Amount" now shows the typed amount, not the RELEASED-only figure (user-directed, "比較USER FRIENDLY")
+
+Follow-up to the entry above, same day. User asked directly whether "LC Amount" in Inquire Delete Pending
+reflects what the Maker actually typed — it doesn't: `deriveLcAmount()` is RELEASED-only, so it always
+reads `"0"` for exactly the shape this screen surfaces (a transaction cancelled before ever being
+released), telling a reviewer nothing about what was actually submitted.
+
+`computeLcIndexRow()` gained a third param, `amountSource: 'released' | 'input' = 'released'` —
+`InquireEventsService`'s own catalog call site is unchanged (still RELEASED-only, correct for reflecting
+confirmed exposure); `InquireDeletePendingService`'s own call site now passes `'input'`. New
+`deriveLcInputAmount()` returns the contract's own root `ISSUE` movement's `amount`, unconditional on
+status — a contract has exactly one creating movement, so this is unambiguous. 2 new tests
+(`inquire-events.service.spec.ts`: `'input'` mode shows the typed amount for a CANCELLED-before-release
+ISSUE; falls back to `"0"` when no ISSUE exists at all). All Angular tests green (1471/1471,
+98.76%/96.2%/97%/98.99%); microservice/backend unaffected. `ng build --configuration production` clean.
+Live-verified: the real dev-DB catalog rows (previously all showing "0") now show their real typed amounts
+(42000/44/333); Inquire Events' own catalog re-confirmed unaffected (still RELEASED-only for its own ACTIVE
+contracts).
+
+## Maker Queue's own Delete Pending review — "Confirm Delete Pending" button was missing entirely for A4
+
+User-reported ("Maker Queue -> A4 EVENT -> Delete Pending -> Confirm Delete Pending Button 不見了").
+`maker-panel.component.html`'s "Maker Queue's own Delete Pending review" action block (`Confirm Delete
+Pending`/`Cancel` buttons) was nested inside the SAME `*ngIf="!...releasesExistingMovementInPlace"`
+`ng-container` that correctly excludes A4 from the generic Submit/Fix Pending actions above it (A4 has
+its own separate "Submit A4" button) — but that exclusion was written before this Delete Pending review
+block existed, and the block was added inside it by mistake. A4's own Maker Queue row genuinely IS
+Delete-Pending-able (`MakerQueueService.deletePending()`'s own `isWithdrawMakerSubmitCase()` routes it
+through `withdrawMakerSubmit()`), so the review screen opened correctly (`deletePendingReviewMode: true`)
+but had no button to confirm or cancel with. Fixed by moving the block to be a sibling OUTSIDE that
+`ng-container`, gated purely on `deletePendingReviewMode`. Pure template change, no `.ts`/`.spec.ts`
+impact (this project's no-TestBed convention means Jest never exercises this binding — `ng build`'s
+strict-template check is what actually verifies it). Angular suite unaffected (1471/1471), `ng build
+--configuration production` clean. Live-verified end-to-end against the real dev stack: fresh A1→A3
+(acknowledge)→A4 (maker-submit) scenario, clicked "Delete Pending" on the A4 row in Maker Queue, "Confirm
+Delete Pending" now renders and clicking it correctly reverts the underlying UTILIZE's own
+`makerSubmittedAt` to `null` (status back to `PENDING`) and returns to Maker Queue.
+
+## A4 Checker's own pre-Release "View Voucher" showed EARMARKED/EARMARKING instead of PENDING
+
+User-reported ("A4 Checker View Voucher shows EARMARKED 不對 應該是PENDING"), same day as the button fix
+above. `openCheckerAccountEntryDialog()` never passed a `phase` argument at all (unlike
+`onMakerOpenAccountEntries()`, which already forwards one) — so a still-PENDING A4-in-progress record (the
+SAME underlying A3/A3S UTILIZE row, A4 has no movement of its own) fell back to A3's own EARMARKING/
+EARMARKED label instead of A4's own PENDING/APPROVED one. Same root cause, and same fix shape, as
+`MakerPanelComponent.resultPhase`'s own doc comment already documents for the identical gap on the Maker
+Result panel (fixed earlier this session): derive `phase: 'finalize'` from
+`selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace` (A4's own unique flag) combined
+with the movement's own `makerSubmittedAt` — true only while A4 itself is selected AND its own Maker
+Submit has actually happened, so this can't misfire for A3's own still-PENDING pre-Submit state or for any
+other Function. 3 new tests (`transaction-builder.component.actions.spec.ts`: A4 with `makerSubmittedAt`
+set → `'finalize'`; A4 without it → `null`; a non-A4 Function with `makerSubmittedAt` set → still `null`).
+Angular suite: 1474/1474 (98.76%/96.21%/97%/98.99%). `ng build --configuration production` clean.
+Live-verified against the real dev stack: fresh A1→A3(acknowledge)→A4(maker-submit) scenario, Checker
+search finds the A4 row, View Voucher now shows "PENDING" (previously "EARMARKING").
+
+## A6's own protected natural-key card never showed its (carried) IB Number
+
+User-directed ("A6 選中交易 應該把2NDARY REF 顯示出來 給一下配置"). The card's own IB Number span was
+gated `requiredNaturalKeyFields.includes('ibNumber') && !isCreatingMovement` — written for A8/B3, the
+shape where `isCreatingMovement` genuinely means "the 2ndary key is still being typed, not yet a real
+value to protect." A6 is also `isCreatingMovement` (creates a new `IPLC_ACCEPTANCE` contract), but unlike
+A8/B3 its own IB Number is CARRIED from the picked Document Arrival
+(`PickerSelectionService.selectPayMovement()`'s own `naturalKeyIbNumber`, `settlesDocumentArrival`-gated)
+— never typed, and `contextSecondaryRef()`'s own `isCreatingMovement` branch (`s.naturalKey[field]`)
+already resolved it correctly; the card's own guard just never let A6 through to see it. Widened to
+`(!isCreatingMovement || selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival)` — config-driven
+(not naming A6 by code); B4 (the only other `settlesDocumentArrival` function) never reaches
+`isCreatingMovement` at all, so it's structurally unaffected either way. Pure template change, `ng build
+--configuration production` clean, Angular suite unaffected (1474/1474, this project's no-TestBed
+convention means Jest never exercises this binding). Live-verified against the real dev stack: fresh
+A1→A3(acknowledge) scenario, picked the Parent LC then the Document Arrival under A6 — protected card now
+shows both "LC Number" and "IB Number" (previously LC Number only).
+
+## Real regression from the A6 fix above — B4 lost its own Step-1 "LC Index" picker entirely
+
+User-reported ("B4 選EARMARKED交易" — turned out to mean B4 had no way to select an LC at all). The A6
+"New Reference" dedup fix immediately above put its `!settlesDocumentArrival` exclusion on the OUTER
+`<div>` — which also wraps the `else existingContract` branch (the `isCreatingMovement`-false path,
+including `flatCatalogPicker`, B4's own ONLY Step-1 LC picker). That entry's own recorded reasoning ("B4
+never reaches `isCreatingMovement` at all, so this is a no-op") was backwards: hiding the whole div for
+every `settlesDocumentArrival` function removes it regardless of which INNER branch a given function would
+have taken — it doesn't matter that B4 never evaluates the `isCreatingMovement`-true branch specifically,
+the div itself (and everything inside it, including the `else` branch B4 DOES use) was gone. Confirmed via
+direct inspection: `document.querySelectorAll('app-index-picker')` returned 0 elements on B4's own screen,
+even though `filteredCatalogContracts` had real data (`["B4EARM21621","S01"]`) — the data layer was never
+broken, only the template guard.
+
+Fixed by scoping the exclusion to `isCreatingMovement && settlesDocumentArrival` (exactly A6's own shape)
+instead of `settlesDocumentArrival` alone — A8/B3 (`isCreatingMovement` true, `settlesDocumentArrival`
+false) and every plain `existingContract` function (both false) are structurally unaffected either way, so
+this only changes B4's own case. This class of bug — a hidden `*ngIf` branch, not a type error — is
+invisible to `tsc`/Jest under this project's own no-TestBed convention; only `ng build`'s strict-template
+check (which doesn't catch a runtime-hidden div either) or a live browser pass catches it, which is exactly
+how it was found and re-verified here: real DOM clicks (not direct component-method calls, which had
+misleadingly kept "working" throughout by bypassing the broken template entirely) — S01 → LC Index →
+EB Index → E01 → `isSubmitReady: true`, full B4 flow confirmed end-to-end. `ng build --configuration
+production` clean, Angular suite unaffected (1473/1473 — no test coverage possible for this specific class
+of bug under this project's own convention, same caveat the A6 fix's own live-verification note already
+implicitly relied on).
+
+## B4's own EB Index still let the Maker re-pick a B3 presentation with an already-live, unresolved B4 attempt — real gap, fixed
+
+User-reported live ("B4 S02 E01 Submit -> Maker Queue (看不到) -> B4 還可以選同一筆 再SUBMIT" — a duplicate
+`sourceTransactionRef` rejection on the second Submit). Two separate things were reported; only one was a
+real defect:
+
+- **"Maker Queue 看不到" — not a bug.** Maker Queue defaults to the Import LC tab on load (same convention
+  Inquire Events already uses); B4 is an Export function, so its own PENDING row only shows once the
+  "Export Confirmed" tab is selected. Confirmed live — the row was correctly there under that tab the
+  whole time.
+- **"B4 還可以選同一筆再Submit" — real gap, fixed.** Unlike A4/A6 (whose own candidate filter already
+  excludes `!m.makerSubmittedAt`, set on the referenced UTILIZE ITSELF at A6's own CREATE time), B4's own
+  HONOUR/ACCEPT is a genuinely SEPARATE movement referencing the B3 CREATE via `referencedTransactionId` —
+  the B3 record itself carries no equivalent "already has a live attempt" marker, so a still-PENDING (not
+  yet Released or Rejected/Cancelled) prior B4 attempt left the SAME B3 presentation fully re-pickable,
+  and a second Submit against it hit the server's own duplicate-`sourceTransactionRef` guard.
+
+Fixed in `PickerSelectionService.loadPayableMovementsAcrossChildContracts()` (B4's own cross-contract
+picker load): now also fetches the PARENT Confirmation's own `contractId` movements (newly threaded
+through from `loadPayableMovements()`, in parallel with the child catalog search) and excludes any B3
+candidate whose `movementId` already appears as `referencedTransactionId` on a still-PENDING parent
+movement. A REJECTED/CANCELLED prior attempt does NOT exclude the candidate — re-picking the same
+presentation after a genuine Delete Pending must keep working (and does — verified both ways below).
+
+2 new tests (`picker-selection.service.spec.ts`): the exclusion itself, and its own negative case (a
+CANCELLED prior attempt does not block a re-pick). One pre-existing test updated to reflect the parent's
+own movements now genuinely being fetched even when the child catalog search returns zero candidates
+(previously asserted zero `listMovements` calls — now asserts exactly one, for the parent). All three
+suites green: Angular 1475/1475 (98.76%/96.16%/97%/99%), microservice 729/729, backend 41/41 (both
+unaffected, Angular-only fix). `ng build --configuration production` clean. Live-verified against the
+real dev stack: reproduced the exact reported scenario (S02/E01, a genuinely live PENDING B4 attempt) —
+E01 no longer appears in the EB Index at all while that attempt is unresolved; E02/E03 (with no live
+attempt) still show correctly.

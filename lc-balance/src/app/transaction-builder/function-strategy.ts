@@ -69,12 +69,71 @@ export interface SelectionFlowStrategy {
   usesSettleableBalanceIndex: boolean;
 }
 
+/**
+ * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+ * 2026-08-28) — the closed set of `BuilderModel` fields a Function's own Fix Pending screen could EVER
+ * offer as editable. `instrumentType`/`movementType`/`currency`/`eventSeq`/`createdBy`/`secondaryRef`
+ * (the movement's own business "2ndary Key") are deliberately NOT expressible here at all — §15 locks
+ * them for every Function unconditionally, so the type system rules out a Function ever declaring one
+ * editable, rather than relying on every Function's own config to correctly omit them.
+ */
+export type FixPendingEditableField = 'amount' | 'tolerancePct' | 'tenorType' | 'tenorDays' | 'expiryDate' | 'newExpiryDate' | 'reasonCode';
+
 export interface FunctionStrategy {
   code: string;
   movementDerivation: MovementDerivationStrategy;
   compoundSubmission: CompoundSubmissionStrategy;
   checkerRelease: CheckerReleaseStrategy;
   selectionFlow: SelectionFlowStrategy;
+  /**
+   * Fix Pending — does this Function offer a "Fix Pending" entry point on its own MAKER RESULT panel at
+   * all (2026-08-28 redesign, "頁面配置檔原先輸入或FIX PENDING可共用" — user-confirmed SOLID/DRY
+   * direction). This is now the ONLY Fix-Pending-specific fact declared per Function — WHICH fields are
+   * genuinely editable once Fix Pending is entered is no longer a second, separately hand-maintained
+   * per-Function list here; it is DERIVED, field by field, from the exact same lock flags
+   * `builder-fields.ts`'s `buildFields()` already computes for a fresh Submit (`amountLocked`/
+   * `tenorLocked`), via `deriveFixPendingLockFlags()`/`isFixPendingFieldEditable()` in that file — a
+   * field locked/carried at original Submit stays locked in Fix Pending too, and a field free-typed at
+   * original Submit becomes Fix-Pending-editable automatically, with zero registry change needed here.
+   * Only two Fix-Pending-specific facts are layered on top there, both with no original-Submit
+   * equivalent to derive from: the trial-scope gate this flag itself represents, and — for the 4
+   * CONTRACT-level fields (tolerancePct/tenorType/tenorDays/expiryDate) — `isCreatingMovement(model)`
+   * (§19: a still-PENDING/REJECTED CREATING movement owns the contract it just created exclusively).
+   * `secondaryRef`/`currency` are unconditionally excluded regardless of this flag, per §15 — see
+   * `BuilderFieldsContext.fixPendingMode`'s own doc comment.
+   *
+   * Phase 4 (§2.5, 2026-08-28) scoped and implemented for exactly ONE compound shape — A3S's own
+   * `documentArrivalWithSg` — via `BalanceService.applyArrivalWithSgCompoundEdit()` (microservice): the
+   * SG's own matched redemption leg is silently recomputed/replaced alongside the LC's own UTILIZE when
+   * its Bill Amount is corrected, same "MIN(Bill Amount, SG outstanding)" formula a fresh Submit already
+   * uses. Every OTHER compound Function (B4's confirmationHonourWithReceivable/
+   * confirmationAcceptWithReceivable, B5's acceptanceSettleWithReceivable) stays `false` — genuinely out
+   * of this pass's own scope, not because compound support itself is impossible, same posture Delete
+   * Pending's own compound-cascade support once had before ITS OWN Phase 4 landed (`MakerQueueService`'s
+   * own `groupCompoundRows()`/cascading `deletePending()`). A4 (`releasesExistingMovementInPlace`) is
+   * separately excluded in the template regardless of this flag, since it has no movement of its own to
+   * edit at all — flipping this flag for A4 would be a structural no-op, not a partial feature.
+   *
+   * A8/A10/A11/B6/B7 widened in 2026-08-28 ("A8 A9 A10 A11 B6 B7 加上FIX PENDING功能"): A8 is a plain
+   * creating movementType (ISSUE, same shape as A1/B1 — Amount genuinely free-typed). A10/A11/B6/B7 all
+   * have Amount fully locked/hidden (`amountAutoFilledFrom`/`amountFixed`), but Reason Code (F1 §13.1,
+   * mandatory for Close/Reopen) is the genuinely editable target — unlocked automatically via the SAME
+   * `requiresReasonCode`-driven `reasonCode` field derivation `deriveFixPendingLockFlags()` already had,
+   * zero new logic needed. A9 deliberately EXCLUDED (user-confirmed via `AskUserQuestion`) — its own
+   * Amount is fully locked to the SG's own Available Balance with no secondaryRef/reasonCode of its own,
+   * so every field on its screen is already locked at fresh Submit; a Fix Pending screen for A9 would have
+   * nothing genuinely editable to fix.
+   *
+   * B3 widened same day ("Use the same method for B3 with Fix Pending") — same shape as A8 (plain
+   * creating CREATE, hasParent, Amount genuinely free-typed) — its own Export counterpart, simply not
+   * included in the original A8/A10/A11/B6/B7 batch.
+   */
+  fixPendingEnabled: boolean;
+}
+
+/** Single derived source of truth for "does this Function offer a Fix Pending entry point at all" — a template-friendly wrapper around `FunctionStrategy.fixPendingEnabled` (never re-derive this from field-level editability; a Function with `fixPendingEnabled: false` offers no entry point even if every field would otherwise derive as editable). */
+export function functionSupportsFixPending(strategy: FunctionStrategy | null | undefined): boolean {
+  return !!strategy?.fixPendingEnabled;
 }
 
 const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
@@ -83,6 +142,7 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
   compoundSubmission: Object.freeze({ possibleShapes: Object.freeze(['plain']) as readonly SubmissionShape[] }),
   checkerRelease: Object.freeze({ releasesExistingMovementInPlace: false, settlesDocumentArrival: false, sourceAlreadyReleasedBeforePick: false, deferSettlement: false }),
   selectionFlow: Object.freeze({ usesSettleableBalanceIndex: false }),
+  fixPendingEnabled: false,
 });
 
 /**
@@ -117,16 +177,33 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
  *   amountAutoFilledFrom).
  */
 const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> = {
-  A1: { ...NO_SPECIAL_BEHAVIOR, code: 'A1' },
-  A2: { ...NO_SPECIAL_BEHAVIOR, code: 'A2' },
+  // A1 — a CREATING movementType (ISSUE): builder-fields.ts's own deriveFixPendingLockFlags() therefore
+  // also unlocks the 4 contract-level fields (tolerancePct/tenorType/tenorDays/expiryDate) alongside
+  // Amount, per isCreatingMovement(model) — see BalanceContractStore.updateIssueFields()'s own doc
+  // comment for why that's safe (nothing else can have relied on them yet).
+  A1: { ...NO_SPECIAL_BEHAVIOR, code: 'A1', fixPendingEnabled: true },
+  // A2 — a non-creating movementType (AMEND_INCREASE/AMEND_DECREASE/AMEND_EXPIRY_DATE):
+  // deriveFixPendingLockFlags() locks the 4 contract-level fields automatically (isCreatingMovement is
+  // false, same as A3), leaving Amount (or newExpiryDate, for the AMEND_EXPIRY_DATE subChoice) as the
+  // only editable field(s) — zero extra logic needed, same derivation A3 already exercises.
+  A2: { ...NO_SPECIAL_BEHAVIOR, code: 'A2', fixPendingEnabled: true },
+  // A3 — a non-creating movementType (UTILIZE): deriveFixPendingLockFlags() locks the 4 contract-level
+  // fields automatically (isCreatingMovement is false), leaving Amount as the only editable field.
   A3: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A3',
+    fixPendingEnabled: true,
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, deferSettlement: true },
   },
+  // A3S — Phase 4 compound Fix Pending (2026-08-28, "現在實作 Phase 4 compound cascade"): the same
+  // deriveFixPendingLockFlags() derivation as plain A3 applies to the LC's own UTILIZE leg (non-creating,
+  // Amount — labeled "Bill Amount" here — is the only Fix-Pending-editable field); the SG's own matched
+  // redemption leg is never directly user-editable (server-recomputed, see fixPendingEnabled's own doc
+  // comment above), so no separate SG-leg field config is needed here.
   A3S: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A3S',
+    fixPendingEnabled: true,
     compoundSubmission: { possibleShapes: ['documentArrivalWithSg'] },
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, deferSettlement: true },
   },
@@ -141,25 +218,51 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, settlesDocumentArrival: true },
   },
   A7: { ...NO_SPECIAL_BEHAVIOR, code: 'A7' },
-  A8: { ...NO_SPECIAL_BEHAVIOR, code: 'A8' },
+  // A8 — a CREATING movementType (ISSUE, SHGT): same shape as A1/B1, Amount is genuinely free-typed (no
+  // amountLocked rule applies to A8 at all) — a real, meaningful Fix Pending target.
+  A8: { ...NO_SPECIAL_BEHAVIOR, code: 'A8', fixPendingEnabled: true },
+  // A9 — deliberately NOT Fix-Pending-enabled (2026-08-28, user-confirmed via AskUserQuestion): Amount is
+  // fully locked to the SG's own Available Balance (BA-confirmed Full-Redeem-only rule) and A9 has no
+  // secondaryRef/reasonCode of its own — every field on this screen is already locked at fresh Submit, so
+  // a Fix Pending screen for A9 would have genuinely nothing editable to fix.
   A9: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A9',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'REDEEM' },
   },
+  // A10 — Amount is fully auto-filled/locked (amountAutoFilledFrom), but Reason Code (F1 §13.1, mandatory
+  // for Close) is genuinely editable — the meaningful Fix Pending target here, via the SAME
+  // requiresReasonCode-driven reasonCode unlock A11/B6/B7 below already share.
   A10: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A10',
+    fixPendingEnabled: true,
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
   },
+  // A11 — Amount is hidden entirely (amountFixed, server-computed at Submit), but Reason Code (F1 §13.1,
+  // mandatory for Reopen) is genuinely editable — same "Reason Code is the real Fix Pending target" shape
+  // as A10 above.
   A11: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A11',
+    fixPendingEnabled: true,
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountFixed: '0' },
   },
-  B1: { ...NO_SPECIAL_BEHAVIOR, code: 'B1' },
-  B2: { ...NO_SPECIAL_BEHAVIOR, code: 'B2' },
-  B3: { ...NO_SPECIAL_BEHAVIOR, code: 'B3' },
+  // B1 — a CREATING movementType (ISSUE, EPLC_CONFIRMATION), same shape as A1: the 4 contract-level
+  // fields unlock alongside Amount per isCreatingMovement(model).
+  B1: { ...NO_SPECIAL_BEHAVIOR, code: 'B1', fixPendingEnabled: true },
+  // B2 — a non-creating movementType (AMEND, direction via sign) — same shape as A2: deriveFixPendingLockFlags()
+  // locks the 4 contract-level fields automatically, leaving Amount (or newExpiryDate for its own
+  // AMEND_EXPIRY_DATE subChoice option) as the only editable field, and Tolerance % (EPLC_CONFIRMATION is
+  // tolerance-applicable) stays editable via the same 2026-08-28 exception A2 already exercises — zero
+  // extra derivation logic needed, only this flag (2026-08-28, "使用同樣方式處理...B2").
+  B2: { ...NO_SPECIAL_BEHAVIOR, code: 'B2', fixPendingEnabled: true },
+  // B3 — a plain creating CREATE (hasParent, no Step-2 picker of its own — same shape as A8), Amount is
+  // genuinely free-typed (face-level Bill Amount) — a real, meaningful Fix Pending target, same reasoning
+  // A8 already got (2026-08-28, "Use the same method for B3 with Fix Pending"). EPLC_EXAMINATION's own
+  // contingentAccountEntry is always null (D3, MEMO_ONLY, never posts) regardless of Fix Pending — that's
+  // unrelated to whether the Bill Amount itself can be corrected before Release.
+  B3: { ...NO_SPECIAL_BEHAVIOR, code: 'B3', fixPendingEnabled: true },
   B4: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'B4',
@@ -174,14 +277,18 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     compoundSubmission: { possibleShapes: ['acceptanceSettleWithReceivable'] },
     selectionFlow: { usesSettleableBalanceIndex: true },
   },
+  // B6 — Export counterpart of A10: same "Reason Code is the real Fix Pending target" shape.
   B6: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'B6',
+    fixPendingEnabled: true,
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountAutoFilledFrom: 'confirmedBalance' },
   },
+  // B7 — Export counterpart of A11: same "Reason Code is the real Fix Pending target" shape.
   B7: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'B7',
+    fixPendingEnabled: true,
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountFixed: '0' },
   },
 };
@@ -199,6 +306,7 @@ export function deriveFunctionStrategy(fn: TransactionFunction): FunctionStrateg
     compoundSubmission: { possibleShapes: [...strategy.compoundSubmission.possibleShapes] },
     checkerRelease: { ...strategy.checkerRelease },
     selectionFlow: { ...strategy.selectionFlow },
+    fixPendingEnabled: strategy.fixPendingEnabled,
   };
 }
 

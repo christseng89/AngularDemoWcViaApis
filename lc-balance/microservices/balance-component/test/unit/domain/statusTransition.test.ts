@@ -6,9 +6,9 @@ describe('applyStatusTransition (Design doc §4/§8)', () => {
     ['PENDING', 'RELEASE', 'RELEASED'],
     ['PENDING', 'REJECT', 'REJECTED'],
     ['PENDING', 'CANCEL', 'CANCELLED'],
-    ['PENDING', 'EDIT', 'SUPERSEDED'],
+    ['PENDING', 'EDIT', 'PENDING'],
     ['REJECTED', 'CANCEL', 'CANCELLED'],
-    ['REJECTED', 'EDIT', 'SUPERSEDED'],
+    ['REJECTED', 'EDIT', 'PENDING'],
   ] as const)('%s -> %s => %s', (currentStatus, action, expected) => {
     expect(applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' })).toBe(expected);
   });
@@ -34,7 +34,8 @@ describe('applyStatusTransition (Design doc §4/§8)', () => {
     ['RELEASED', 'REJECT'],
     ['REJECTED', 'RELEASE'], // cannot re-release an already-rejected movement
     ['CANCELLED', 'CANCEL'],
-    ['SUPERSEDED', 'EDIT'],
+    ['RELEASED', 'EDIT'], // a released movement is no longer Fix-Pending-editable
+    ['CANCELLED', 'EDIT'],
   ] as const)('illegal: %s -> %s throws, never silently succeeds', (currentStatus, action) => {
     expect(() => applyStatusTransition({ currentStatus, action, createdBy: 'maker1', actingUser: 'checker1' })).toThrow(IllegalStateTransitionError);
   });

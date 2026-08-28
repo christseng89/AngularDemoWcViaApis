@@ -14,6 +14,7 @@
  * created after those columns were added to `SCHEMA_SQL`, or because the old hand-rolled `migrate()`
  * already added them) is correctly recorded as migrated without re-running (harmless) ALTER statements.
  */
+import { randomUUID } from 'crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   CONTRACT_STATUS_VALUES,
@@ -515,6 +516,194 @@ export const MIGRATIONS: Migration[] = [
       `);
       db.exec('CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_movement ON delete_pending_audit(movement_id)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_contract ON delete_pending_audit(balance_contract_id)');
+    },
+  },
+  {
+    id: 19,
+    description:
+      'Add superseded_by_movement_id/edited_by/edited_at to balance_movements (2026-08-27, Fix Pending §2.2/§15/§19 — see schema.ts\'s own column comment). Simple ALTER TABLE ADD COLUMN, no CHECK/REFERENCES constraint (§6.4/§15.3(d) — deliberately kept out at this stage, same posture as fresh schema.ts).',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('superseded_by_movement_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN superseded_by_movement_id TEXT');
+      if (!columns.includes('edited_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN edited_by TEXT');
+      if (!columns.includes('edited_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN edited_at TEXT');
+    },
+  },
+  {
+    id: 20,
+    description:
+      'Widen idx_movements_idempotency to a partial unique index excluding SUPERSEDED (2026-08-27, Fix Pending §19 — see schema.ts\'s own index comment for the full rationale: Fix Pending\'s replacement record reuses its predecessor\'s eventSeq, which a plain unconditional UNIQUE index would reject). Pure index swap, no table rebuild needed (same technique as migration 12) — must run AFTER migration 19 so the column referenced by the partial predicate already exists on every pre-existing on-disk DB (harmless either way here since the predicate is on the pre-existing status column, not a new one, but kept in this order for readability).',
+    up: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_movements_idempotency');
+      db.exec("CREATE UNIQUE INDEX idx_movements_idempotency ON balance_movements(balance_contract_id, event_seq) WHERE status != 'SUPERSEDED'");
+    },
+  },
+  {
+    id: 21,
+    description:
+      'Add fix_pending_audit table (Fix Pending §19, redesigned 2026-08-29 — editPending() now corrects a movement\'s row IN PLACE rather than inserting a SUPERSEDED-marked replacement; this table is the only place the pre-edit content survives) — see schema.ts\'s own doc comment on this table for the full shape/rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally, same as migration 18\'s delete_pending_audit addition.',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS fix_pending_audit (
+          audit_id                TEXT PRIMARY KEY,
+          edit_seq                 INTEGER NOT NULL,
+          movement_id              TEXT NOT NULL REFERENCES balance_movements(movement_id),
+          balance_contract_id      TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+          event_seq                INTEGER NOT NULL,
+          original_created_by      TEXT NOT NULL,
+          original_created_at      TEXT NOT NULL,
+          status_before            TEXT NOT NULL CHECK (status_before IN ('PENDING', 'REJECTED')),
+          before_snapshot          TEXT NOT NULL,
+          after_snapshot           TEXT NOT NULL,
+          edited_by                TEXT NOT NULL,
+          edited_at                TEXT NOT NULL
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_fix_pending_audit_movement ON fix_pending_audit(movement_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_fix_pending_audit_contract ON fix_pending_audit(balance_contract_id)');
+    },
+  },
+  {
+    id: 22,
+    description:
+      'Fix Pending §19 redesigned to correct a movement\'s row IN PLACE instead of marking it SUPERSEDED and inserting a replacement (2026-08-29 — see fixPendingAuditStore.ts/balanceService.ts editPending() for the new mechanism, fix_pending_audit above for where the pre-edit content now lives). Backfills fix_pending_audit from any existing status=\'SUPERSEDED\' rows (matched to their own successor via superseded_by_movement_id, both already-persisted from the pre-redesign mechanism) BEFORE the rebuild below excludes them as redundant duplicates of their own already-live successor. Rebuilds balance_movements via the same 12-step procedure as migrations 13/15/17 to narrow the status CHECK (SUPERSEDED no longer a legal value — MOVEMENT_STATUS_VALUES already reflects this) and drop superseded_by_movement_id (migration 19\'s own addition, no longer needed — superseded_movement_id is a SEPARATE, pre-existing, still-reserved-but-unused column, untouched). idx_movements_idempotency reverts to a plain unconditional UNIQUE index — there is only ever one row per (contract, eventSeq) now.',
+    up: (db) => {
+      const backfillRows = db.prepare(`SELECT * FROM balance_movements WHERE status = 'SUPERSEDED'`).all() as Record<string, unknown>[];
+      for (const row of backfillRows) {
+        const successorId = row.superseded_by_movement_id as string | null;
+        const successor = successorId ? (db.prepare('SELECT * FROM balance_movements WHERE movement_id = ?').get(successorId) as Record<string, unknown> | undefined) : undefined;
+        db.prepare(
+          `INSERT INTO fix_pending_audit (
+            audit_id, edit_seq, movement_id, balance_contract_id, event_seq,
+            original_created_by, original_created_at, status_before,
+            before_snapshot, after_snapshot, edited_by, edited_at
+          ) VALUES (
+            @auditId, 1, @movementId, @balanceContractId, @eventSeq,
+            @originalCreatedBy, @originalCreatedAt, @statusBefore,
+            @beforeSnapshot, @afterSnapshot, @editedBy, @editedAt
+          )`,
+        ).run({
+          auditId: randomUUID(),
+          movementId: row.movement_id as string,
+          balanceContractId: row.balance_contract_id as string,
+          eventSeq: row.event_seq as number,
+          originalCreatedBy: row.created_by as string,
+          originalCreatedAt: row.created_at as string,
+          statusBefore: 'PENDING', // the pre-redesign mechanism only ever recorded the NEW status, not the source movement's own pre-edit status — best-effort backfill for one-time historical data only
+          beforeSnapshot: JSON.stringify(row),
+          afterSnapshot: JSON.stringify(successor ?? {}),
+          editedBy: (row.edited_by as string | null) ?? 'unknown',
+          editedAt: (row.edited_at as string | null) ?? (row.created_at as string),
+        });
+      }
+
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        db.exec(`
+          CREATE TABLE balance_movements_new (
+            movement_id             TEXT PRIMARY KEY,
+            balance_contract_id     TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+            event_seq               INTEGER NOT NULL,
+            business_event_id       TEXT,
+            movement_type           TEXT NOT NULL CHECK (movement_type IN (${sqlInList(MOVEMENT_TYPE_VALUES)})),
+            exposure_nature         TEXT NOT NULL CHECK (exposure_nature IN (${sqlInList(EXPOSURE_NATURE_VALUES)})),
+            amount                  TEXT NOT NULL,
+            ceiling_amount          TEXT NOT NULL,
+            currency                TEXT NOT NULL,
+            leg_ref                 TEXT,
+            account_entries         TEXT,
+            contingent_account_entry TEXT,
+            lmts_reservation_id     TEXT,
+            status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
+            superseded_movement_id  TEXT REFERENCES balance_movements_new(movement_id),
+            reversal_of_movement_id TEXT REFERENCES balance_movements_new(movement_id),
+            reason_code             TEXT,
+            remarks                 TEXT,
+            new_expiry_date         TEXT,
+            transaction_date        TEXT,
+            business_date           TEXT,
+            value_date              TEXT,
+            source_module           TEXT,
+            source_function         TEXT,
+            source_transaction_ref  TEXT,
+            referenced_transaction_id TEXT,
+            balance_before          TEXT,
+            balance_after           TEXT,
+            warnings                TEXT,
+            created_by              TEXT NOT NULL,
+            released_by             TEXT,
+            created_at              TEXT NOT NULL,
+            released_at             TEXT,
+            acknowledged_by         TEXT,
+            acknowledged_at         TEXT,
+            maker_submitted_by      TEXT,
+            maker_submitted_at      TEXT,
+            event_snapshot          TEXT,
+            root_event_snapshot     TEXT,
+            acceptance_event_snapshot TEXT,
+            sg_event_snapshot        TEXT,
+            finalize_event_snapshot TEXT,
+            finalize_acceptance_event_snapshot TEXT,
+            finalize_sg_event_snapshot TEXT,
+            present_docs_consumed_at TEXT,
+            present_docs_consumed_by TEXT,
+            cancelled_by             TEXT,
+            cancelled_at             TEXT,
+            edited_by                TEXT,
+            edited_at                TEXT,
+            amendment_approved       INTEGER,
+            amendment_effective      TEXT,
+            consent_status           TEXT
+          )
+        `);
+        db.exec(`
+          INSERT INTO balance_movements_new (
+            movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
+            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            reversal_of_movement_id, reason_code, remarks, new_expiry_date, transaction_date,
+            business_date, value_date, source_module, source_function, source_transaction_ref,
+            referenced_transaction_id, balance_before, balance_after, warnings, created_by,
+            released_by, created_at, released_at, acknowledged_by, acknowledged_at,
+            maker_submitted_by, maker_submitted_at, event_snapshot, root_event_snapshot,
+            acceptance_event_snapshot, sg_event_snapshot, finalize_event_snapshot,
+            finalize_acceptance_event_snapshot, finalize_sg_event_snapshot, present_docs_consumed_at,
+            present_docs_consumed_by, cancelled_by, cancelled_at, edited_by, edited_at,
+            amendment_approved, amendment_effective, consent_status
+          )
+          SELECT
+            movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
+            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            reversal_of_movement_id, reason_code, remarks, new_expiry_date, transaction_date,
+            business_date, value_date, source_module, source_function, source_transaction_ref,
+            referenced_transaction_id, balance_before, balance_after, warnings, created_by,
+            released_by, created_at, released_at, acknowledged_by, acknowledged_at,
+            maker_submitted_by, maker_submitted_at, event_snapshot, root_event_snapshot,
+            acceptance_event_snapshot, sg_event_snapshot, finalize_event_snapshot,
+            finalize_acceptance_event_snapshot, finalize_sg_event_snapshot, present_docs_consumed_at,
+            present_docs_consumed_by, cancelled_by, cancelled_at, edited_by, edited_at,
+            amendment_approved, amendment_effective, consent_status
+          FROM balance_movements
+          WHERE status != 'SUPERSEDED'
+        `);
+        db.exec('DROP TABLE balance_movements');
+        db.exec('ALTER TABLE balance_movements_new RENAME TO balance_movements');
+        db.exec(`
+          CREATE UNIQUE INDEX idx_movements_idempotency ON balance_movements(balance_contract_id, event_seq);
+          CREATE INDEX idx_movements_contract_status ON balance_movements(balance_contract_id, status);
+          CREATE INDEX idx_movements_business_event ON balance_movements(business_event_id);
+        `);
+
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
     },
   },
 ];

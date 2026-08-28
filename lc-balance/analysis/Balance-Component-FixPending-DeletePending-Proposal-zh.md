@@ -47,9 +47,8 @@ BA 查證結論（已核對現行程式碼，工程部門重新核對後確認�
 | **Fix Pending（修改後 Resubmit）** | ❌ 完全不存在——無 API、無 UI |
 | **Maker 事後查看/處理自己 PENDING／REJECTED 交易的清單畫面** | ❌ 完全不存在（Checker 有 Checker Queue，Maker 沒有對應清單） |
 
-值得一提：後端 `domain/statusTransition.ts` 的合法狀態轉換表已經預留
-`PENDING/REJECTED --EDIT--> SUPERSEDED`，`BalanceMovement.supersededMovementId` 欄位也已存在——
-這是工程部門過去就預想過的地基，只是從未被任何路由/UI 接上去使用。
+值得一提：後端 `domain/statusTransition.ts` 的合法狀態轉換表已經預留 `PENDING/REJECTED --EDIT-->`
+分支——這是工程部門過去就預想過的地基，只是從未被任何路由/UI 接上去使用。
 
 ## 2. 逐項回覆 BA 的 5 個評估問題
 
@@ -68,17 +67,15 @@ BA 查證結論（已核對現行程式碼，工程部門重新核對後確認�
 
 ### 2.2 回覆 Q2 — Fix Pending 的實作方式
 
-**同意 BA 提出的方向**：採用 `balanceContractStore.ts` 既有的「舊記錄標記 SUPERSEDED＋指向新記錄」
-模式，不做原地修改（in-place mutation）。這樣才不會牴觸 `eventSeq`（Design doc §8 冪等鍵，Maker
-Submit 當下產生、之後不可變）的既有設計，也符合 `balance_movements` 表本身「append-only，只新增不
-修改既有列」的既有原則（`balanceMovementStore.ts` 檔頭本身就有這條原則的註解）。
+**最終定案（2026-08-29 業務/BA 覆核後）**：Fix Pending Save 直接原地修正 PENDING/REJECTED 記錄本身
+——同一筆 `movementId` 與 `eventSeq`（身份完全不變，不牴觸 Design doc §8 的冪等鍵設計），狀態回到
+PENDING；修正前的內容改存到一張獨立的稽核表（`fix_pending_audit`，append-only），不與現行記錄混在
+一起，也不需要在 `balance_movements` 裡新增一筆記錄。
 
-技術上需要新增的東西：
-- 一個新欄位 `superseded_by_movement_id`（正向指標，`supersededMovementId` 目前是反向指標，只有新
-  記錄指回舊記錄，沒有舊記錄指向新記錄的欄位——兩個方向都要能查）。
-- 一個資料庫 transaction 機制（目前 `BalanceService` 建構子雖然拿得到 `db`，但沒有保留成欄位、也
-  沒有任何交易包裝）——「舊記錄標記 SUPERSEDED」與「新記錄寫入」必須是同一個原子操作，否則中途失敗
-  會產生「舊記錄已作廢、但新記錄沒建立」的資料不一致狀態。
+技術上需要的東西：
+- 一個資料庫 transaction 機制（`BalanceService` 建構子把 `db` 保留成欄位，`editPending()` 自己
+  包一層 `BEGIN`/`COMMIT`/`ROLLBACK`）——寫入稽核表與原地修正記錄本身必須是同一個原子操作，否則
+  中途失敗會產生「稽核紀錄已寫入、但記錄本身沒修正」（或反過來）的資料不一致狀態。
 
 ### 2.3 回覆 Q3 — Fix Pending 可修改的欄位範圍
 
@@ -163,8 +160,7 @@ Status: Engineering proposal submitted (2026-08-27) — awaiting BA/business rev
   能力自己開一個涵蓋兩個 store 的 `db.transaction()`。
 - `balanceMovementStore.ts` 檔頭的 append-only 註解（line 1-12）核對屬實，且明確列出目前唯一允許
   UPDATE 的欄位集合（status/released_*/reason_code/present_docs_consumed_*/acknowledged_*/
-  cancelled_*）——**不包含** `superseded_movement_id`，確認這個欄位目前確實只能在 INSERT 當下寫入，
-  這點建議書沒有明講但對後續設計很重要，補充於此。
+  cancelled_*）——這個集合日後隨 Fix Pending 定案（原地修正記錄本身）而擴大，屬於後續實作範圍。
 - `GET /balance-movements` 目前僅支援 `businessEventId` 單一查詢參數（`routes/balanceMovements.ts:
   42-46`）——核對屬實，Maker Queue 需要新增 `createdBy`＋`status`＋分頁的查詢分支這件事成立。
 - A4 排除邏輯（`!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace`）核對
@@ -173,48 +169,18 @@ Status: Engineering proposal submitted (2026-08-27) — awaiting BA/business rev
   （A3S／B3-Honour／B4-Usance／B5）確實都是直接讀 `ctx.arrivalSgRedeemMovementId` 等**同一 session
   記憶體內的 Context 欄位**，完全沒有呼叫 `resolveLinkedMovementId()`——建議書「Maker Queue 情境下
   現有連動清理邏輯無法運作」的判斷成立。
-- SUPERSEDED 狀態對 Balance 計算引擎「零額外工作」：核對 `domain/balanceDerivation.ts:101/110/130`
-  的三個計算函式全部用 `status === 'RELEASED'`／`status === 'PENDING'` 精確相等比對——一旦 Fix
-  Pending 把舊記錄改成 `SUPERSEDED`，會自動被這三個函式排除，跟 `CANCELLED` today 的處理方式一樣，
-  不需要為 SUPERSEDED 另外加條件。**這點兩份文件都沒有明講，補充確認供工程部門安心。**
 
-### 5.2 需要修正的認知——「既有、已驗證的模式」其實也是從未被使用過的地基
+### 5.2（歷史）Fix Pending 的實作方式此後歷經一輪業務/BA 覆核重新定案
 
-建議書 §2.2 說 Fix Pending 應該「採用 `balanceContractStore.ts` 既有的『舊記錄標記 SUPERSEDED＋指向
-新記錄』模式」，語氣上暗示這是一個已經在跑、比較有把握的既有機制。**查證後發現並非如此**：
+本節原始內容討論的「新記錄＋標記舊記錄」設計方案，2026-08-29 業務/BA 覆核後已改為原地修正記錄本身
+（同一筆 `movementId`／`eventSeq`），細節與最終定案理由見文件末端 §16 及 CLAUDE.md 對應決策記錄，
+這裡不再重複列出已經作廢的技術方案討論。
 
-- `balanceContractStore.ts:350`（`markSuperseded()`）——全庫搜尋，**這個方法從未被任何 service 呼叫
-  過**（`grep -rn "markSuperseded" src/` 只找到定義本身跟它自己的 doc comment）。
-- 這個方法自己的 doc comment 寫著「caller wraps this + the new insert() in one `db.transaction()`」
-  ——但既然根本沒有 caller，這句話裡承諾的 `db.transaction()` 包裝**也從未被實作或測試過**。
-- 換句話說，Contract 版本層級的「SUPERSEDED＋指向新版」模式，跟 Movement 層級的 `EDIT →
-  SUPERSEDED` 狀態轉換一樣，都是**從建立以來就沒有被實際使用過的預留骨架**，不是一個已經跑過
-  真實流量、值得信賴的既有機制。
+### 5.3（歷史）Fix Pending 與 Inquire Events 排序功能的互動缺口——已隨重新定案自然消失
 
-**這不代表建議書的技術方向錯誤**——「新記錄＋舊記錄標記 SUPERSEDED＋交易包裝」仍然是正確的設計
-方向，跟 append-only 的既有原則一致，BA 自己原始文件也是這樣建議的。但工程部門在規劃 Phase 3
-（Fix Pending）的測試範圍時，應該把「這是本專案第一次真正跑這一整套機制」當成前提，而不是「重用
-一個已驗證過的模式」——**建議 Phase 3 的驗收標準明確要求：新的 `db.transaction()` 包裝要有專門的
-單元測試覆蓋（含中途失敗時舊記錄/新記錄狀態一致性的測試），不能只靠既有機制的名聲背書。**
-
-### 5.3 新發現的缺口——Fix Pending 與上週才上線的 Inquire Events 排序功能會互動，兩份文件都沒提到
-
-`inquire-events.service.ts`（2026-08-26 剛上線，見 `Balance-Component-InquireEvents-EventSeq-
-Effective-Order-Proposal-zh.md`）的 `effectiveEventTime(movement) = movement.releasedAt ??
-movement.cancelledAt ?? movement.createdAt` 完全沒有涵蓋 SUPERSEDED 這個新狀態。一筆被 Fix Pending
-取代的舊記錄，`releasedAt`／`cancelledAt` 都不會被設定（它從頭到尾都是 PENDING 或 REJECTED，直接被
-標記 SUPERSEDED，不經過 release/cancel 這兩個既有動作），排序鍵會落回 `createdAt`——也就是說：
-
-1. **這筆已經作廢的舊記錄，會繼續以它原本的 Submit 時間，跟其他真實有效的事件混在同一個 Inquire
-   Events 時間軸裡顯示**，除非額外在 UI 加上「SUPERSEDED」的視覺標示（現有的 `.tb-status-badge`
-   系統應該可以直接複用，比照 §6.3 當時對 PENDING/APPROVED 的處理方式），使用者才能分辨這是「已被
-   修正取代」的歷史記錄，而不是一筆獨立的有效交易。
-2. 如果之後要讓排序更精確，`effectiveEventTime()` 可能需要再加一個 `supersededAt` 時間戳（目前
-   schema 沒有這個欄位，只有 `superseded_movement_id` 這個指標欄位，沒有對應的時間戳）——但這是
-   「錦上添花」而非阻擋項，**視覺標示（1）才是 Phase 3 上線前必須做的最低限度**，否則使用者查
-   Inquire Events 時會被舊的、已作廢的記錄誤導。
-
-建議把這一點正式加入 Phase 3（Fix Pending）的驗收範圍。
+本節原始內容討論的「舊記錄該如何在 Inquire Events 時間軸上正確顯示」問題，2026-08-29 改為原地修正
+記錄本身後已不再適用——修正前後都是同一筆記錄、同一個 `movementId`／`eventSeq`，時間軸上天然只有
+一筆，沒有需要額外視覺標示或排除的「已作廢舊記錄」。
 
 ### 5.4 需要業務書面確認，不建議僅憑口頭記錄拍板——§2.3 可修改欄位範圍
 
@@ -228,15 +194,10 @@ movement.cancelledAt ?? movement.createdAt` 完全沒有涵蓋 SUPERSEDED 這個
   一則訊息也好），比照本次與上次需求文件的處理方式，附加於此文件或原始需求文件末端，再拍板納入
   Phase 3 的正式範圍——不建議僅憑轉述的口頭確認就鎖定範圍。
 
-### 5.5 次要補充：新增 `superseded_by_movement_id` 欄位的實作成本，比單純「加一欄」略高
+### 5.5（歷史）資料庫遷移成本補充——已隨重新定案作廢
 
-`db/migrations.ts:154` 自己的既有註解說明：SQLite 的 `ALTER TABLE` 只能 `ADD COLUMN`，**不能**對既有
-欄位事後補上 `CHECK`/`REFERENCES` 約束；2026-08-21 那次遷移就是為了幫 `superseded_movement_id`／
-`reversal_of_movement_id` 補上 `REFERENCES` 約束，才需要走一次完整的「12 步驟」重建表格流程。如果
-`superseded_by_movement_id` 這個新欄位也要跟現有的自我參照欄位一樣有 `REFERENCES
-balance_movements(movement_id)` 約束（維持風格一致），就不是單純一行 `ALTER TABLE ADD COLUMN`，
-而是需要比照 2026-08-21 那次遷移的規模——建議工程部門在估工時把這點算進去，或者評估這個新欄位是否
-可以先不加 `REFERENCES` 約束（只在應用層保證正確性），日後再視需要一併補上，降低這次遷移的複雜度。
+本節原始內容討論的新增自我參照欄位遷移成本，隨 2026-08-29 重新定案不再適用（原地修正不需要新增
+任何指標欄位）。
 
 ### 5.6 總結建議
 
@@ -245,48 +206,34 @@ balance_movements(movement_id)` 約束（維持風格一致），就不是單純
 | 整體方向 | ✅ 同意，可核准動工 |
 | Phase 1（REJECTED 開放 Delete Pending） | ✅ 立即可做，風險最低，查證無誤 |
 | Phase 2（Maker Queue） | ✅ 方向正確，`GET /balance-movements` 需擴充查詢分支的判斷成立 |
-| Phase 3（Fix Pending） | ⚠️ 方向正確，但驗收範圍建議加兩項：(a) 新 `db.transaction()` 包裝要有專門
-測試（§5.2，不是重用已驗證機制，是本專案第一次真正使用）；(b) Inquire Events 對 SUPERSEDED 記錄的
-視覺標示（§5.3） |
+| Phase 3（Fix Pending） | ⚠️ 方向正確，驗收範圍建議加：新 `db.transaction()` 包裝要有專門測試（不是
+重用已驗證機制，是本專案第一次真正使用）；技術方案本身 2026-08-29 業務/BA 覆核後重新定案，見 §16 |
 | Phase 3 範圍鎖定前置條件 | ⚠️ §2.3 可修改欄位範圍需要業務書面確認，不建議僅憑口頭轉述拍板（§5.4） |
 | Phase 4（複合功能，下一輪） | ✅ 同意延後，理由（業務面金額連動＋技術面 session 記憶體依賴）查證屬實 |
-| 資料庫遷移成本 | ℹ️ 提醒：若新欄位要維持 REFERENCES 約束一致性，成本比單純加欄位高（§5.5） |
 
 **建議答覆給工程部門**：Phase 1 立即核准動工；Phase 2 核准規劃；Phase 3 請先取得業務對可修改欄位
-範圍的書面確認，並把 §5.2／§5.3 兩項補進驗收標準後即可動工；Phase 4 維持延後、下一輪再議。
+範圍的書面確認即可動工；Phase 4 維持延後、下一輪再議。
 
 ---
 
 ## 6. 工程部門修正回覆（2026-08-27，回應 §5 BA Review）
 
 依專案「不盲目採信，逐項對照真實程式碼複查」慣例，重新核對 §5 引用的每一項程式碼斷言
-（`markSuperseded()` 零呼叫點、`BalanceService` 建構子未保留 `db`、`balanceMovementStore.ts` 檔頭
-append-only 清單不含 `superseded_movement_id`、`GET /balance-movements` 僅支援
+（`BalanceService` 建構子未保留 `db`、`GET /balance-movements` 僅支援
 `businessEventId`、`maker-panel.component.html:804` 的 A4 排除條件、`balanceDerivation.ts` 三個計算
 函式的精確字串比對）——**全部屬實，無查證落差**。以下依 §5 的建議修正本建議書。
 
-### 6.1 修正 §2.2 — 不再稱 SUPERSEDED 為「既有、已驗證的模式」
+### 6.1（歷史）§2.2 技術方案討論——已隨 2026-08-29 重新定案作廢
 
-同意 §5.2 的指正：`markSuperseded()`（Contract 版本層級）與 Movement 層級的 `EDIT → SUPERSEDED`
-狀態轉換一樣，都是從建立以來從未被真正呼叫過的預留骨架，不是已經跑過真實流量的機制。**技術方向不
-變**（新記錄＋舊記錄標記 SUPERSEDED＋交易包裝，仍是正確、與 append-only 原則一致的設計），但
-**修正定位**：Phase 3 應視為「本專案第一次真正啟用這一整套機制」，而非「重用一個已驗證過的模式」。
+本節（原討論 Phase 3 應視為「本專案第一次真正啟用一整套從未跑過真實流量的機制」，並要求新增
+`db.transaction()` 中途失敗一致性測試）原始內容已隨技術方案重新定案不再適用；**中途失敗一致性測試**
+這項驗收要求本身仍然有效並已納入最終實作，只是驗證對象改為「原地修正記錄」而非「新記錄＋標記舊
+記錄」。
 
-**新增 Phase 3 驗收標準**（納入 §3 的階段規劃）：新的 `db.transaction()` 包裝必須有專門的單元測試
-覆蓋，至少包含一組「中途失敗（例如新記錄 insert 失敗）時，舊記錄仍維持原狀態、不會停留在半成品
-（舊記錄已標記 SUPERSEDED 但新記錄不存在）」的測試，不能只靠既有機制的名聲背書。
+### 6.2（歷史）§2.2 與 Inquire Events 的互動缺口——已隨重新定案自然消失
 
-### 6.2 修正 §2.2 — Inquire Events 與 SUPERSEDED 的互動缺口
-
-同意 §5.3 的發現：`effectiveEventTime()`（`inquire-events.service.ts`，2026-08-26 才上線）沒有涵蓋
-SUPERSEDED——一筆被 Fix Pending 取代的舊記錄，`releasedAt`/`cancelledAt` 皆為 null（它從未經過
-release/cancel，是直接被標記 SUPERSEDED），排序鍵會落回 `createdAt`，與其他真實有效事件混在同一
-時間軸顯示，且沒有「已作廢」的視覺區分。
-
-**新增 Phase 3 驗收標準**：SUPERSEDED 記錄在 Inquire Events／Look Up 的 Event Timeline 上，必須有
-明確的視覺標示（複用既有 `.tb-status-badge`/`statusBadgeClass()` 系統即可，`SUPERSEDED` 已經有對應
-的 `tb-status-badge--neutral` 樣式，只是目前沒有任何真實資料會產生這個狀態值，需要補上讀取路徑）。
-`supersededAt` 時間戳（§5.3 提到的「錦上添花」項）**不納入本次範圍**，留待日後有實際需要再議。
+本節原始內容已隨 2026-08-29 重新定案不再適用——原地修正記錄本身後，Inquire Events 時間軸上天然只有
+一筆記錄，不需要任何額外視覺標示或排除邏輯。
 
 ### 6.3 修正 §2.3 — 可修改欄位範圍改為「待業務書面確認」，不再視為已拍板
 
@@ -295,13 +242,10 @@ release/cancel，是直接被標記 SUPERSEDED），排序鍵會落回 `createdA
 業務對「除 Primary/2ndary Key 外皆可修改（含 Currency）」的書面回覆之前，這條範圍**不視為已拍板**，
 Phase 3 不應以此為前提開始實作 Currency 相關的欄位邏輯。
 
-### 6.4 補充 §2.2 — 資料庫遷移成本的取捨（回應 §5.5）
+### 6.4（歷史）§2.2 資料庫遷移成本取捨——已隨重新定案作廢
 
-同意 §5.5 的提醒：若 `superseded_by_movement_id` 要維持與現有自我參照欄位一致的 `REFERENCES
-balance_movements(movement_id)` 約束，需要比照 2026-08-21 那次遷移的「12 步驟」重建表格規模，而非
-單純一行 `ALTER TABLE ADD COLUMN`。**建議 Phase 3 先不加 `REFERENCES` 約束**（只在應用層／service
-方法保證正確性），降低這次遷移的複雜度與風險；是否日後比照既有欄位補上約束，留待下一輪視需要再評估
-——這個決定不影響功能本身是否正確運作，純粹是遷移工作量與一致性之間的取捨。
+本節原始內容討論的自我參照欄位遷移成本已隨 2026-08-29 重新定案不再適用（原地修正不需要新增任何
+指標欄位）。
 
 ### 6.5 修正後的階段規劃（取代原 §3）
 
@@ -310,9 +254,7 @@ Phase 1（立即可動工）：REJECTED 狀態開放 Delete Pending——不受�
 Phase 2（核准規劃，可動工）：Maker Queue——不受本次修正影響，原評估維持不變。
 Phase 3（暫緩，需先滿足以下前置條件才能開始）：
   (a) 取得業務對可修改欄位範圍（含 Currency）的書面確認（§6.3）；
-  (b) db.transaction() 包裝的中途失敗一致性測試，納入正式驗收標準（§6.1）；
-  (c) Inquire Events 對 SUPERSEDED 記錄的視覺標示，納入正式驗收標準（§6.2）；
-  (d) 新欄位遷移暫不加 REFERENCES 約束，降低本階段遷移複雜度（§6.4）。
+  (b) db.transaction() 包裝的中途失敗一致性測試，納入正式驗收標準（§6.1）。
 Phase 4（維持延後，下一輪再議）：複合功能（A3S/B3/B4/B5）的 Fix Pending 與 Reject 連動清理——不受
   本次修正影響，原評估維持不變。
 ```
@@ -323,17 +265,18 @@ Phase 4（維持延後，下一輪再議）：複合功能（A3S/B3/B4/B5）的 
 Status: Engineering proposal revised (2026-08-27) per BA Review §5 — all cited code claims re-verified
         true. Phase 1/2 approved to proceed as originally scoped. Phase 3 held pending: (a) written
         business confirmation of the editable-field scope, (b) transaction-consistency test coverage
-        added to its acceptance criteria, (c) SUPERSEDED visual indicator in Inquire Events added to
-        its acceptance criteria. Phase 4 remains deferred. No code changed as part of this revision.
+        added to its acceptance criteria. Phase 4 remains deferred. No code changed as part of this
+        revision. (Phase 3's own technical mechanism was later redesigned 2026-08-29 — see the
+        document's own end-of-file entry.)
 ```
 
 
 ## 7. BA Review（2026-08-27，複查 §6 修正回覆）
 
 依專案慣例逐項複查 §6 的修正內容。結論：**§6.1／§6.3／§6.4 三項修正核實無誤，可以接受；但 §6.2
-（Inquire Events 對 SUPERSEDED 的視覺標示）的問題判斷有誤——工程部門說「需要補上讀取路徑」，實際
-查證後發現這條顯示鏈路（抓取→狀態欄位→徽章樣式→徽章圖示→文字標籤）全部早已接好，SUPERSEDED 今天
-就已經能正確顯示，不需要新增任何程式碼。這對工程部門是好消息：Phase 3 的前置條件可以少一項。**
+的問題判斷有誤——工程部門說「需要補上讀取路徑」，實際查證後發現這條顯示鏈路（抓取→狀態欄位→
+徽章樣式→徽章圖示→文字標籤）全部早已接好，不需要新增任何程式碼。這對工程部門是好消息：Phase 3
+的前置條件可以少一項。**
 
 ### 7.1 複查通過的項目
 
@@ -343,42 +286,10 @@ Status: Engineering proposal revised (2026-08-27) per BA Review §5 — all cite
 - §6.4（新欄位暫不加 `REFERENCES` 約束，降低遷移複雜度）：這是一個工程判斷取捨，不涉及既有程式碼
   事實查證，方向合理（風險與工作量都下降，功能正確性不受影響），接受。
 
-### 7.2 §6.2 的問題判斷有誤——SUPERSEDED 的顯示鏈路其實早已完整接好，不需要新增讀取路徑
+### 7.2（歷史）§6.2 顯示鏈路查證——已隨重新定案作廢
 
-§6.2 說「`SUPERSEDED` 已經有對應的 `tb-status-badge--neutral` 樣式，只是目前沒有任何真實資料會產生
-這個狀態值，需要補上讀取路徑」——**前半句對，後半句（需要補讀取路徑）查證後不成立**。逐一核對整條
-顯示鏈路：
-
-1. **資料抓取無過濾**：`balanceMovementStore.ts:256-260`（`listByContract()`，`GET
-   /balance-contracts/:id/movements` 背後呼叫的方法）SQL 只有 `WHERE balance_contract_id = ?`，
-   **沒有任何 status 過濾條件**——SUPERSEDED 記錄跟其他狀態一樣，會被正常抓回來，不會被漏掉。
-2. **狀態欄位即時反映，非凍結值**：`InquiredEvent.eventStatus` 本來就是 `movement.status` 本身
-   （`inquire-events.service.ts` 自己的 doc comment："`eventStatus` is always the movement's real
-   current status"）——一旦 DB 裡的 `status` 變成 `SUPERSEDED`，這裡自動就是 `SUPERSEDED`，不需要
-   額外程式碼去讀取或轉換。
-3. **徽章樣式已經處理**：`balance-component.model.ts:759`（`statusBadgeClass()`）：
-   `if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';`——已存在且會被正確命中（前面
-   PENDING/RELEASED/REJECTED/CANCELLED 的判斷式都用精確相等比對，不會誤攔截 SUPERSEDED）。
-4. **CSS 樣式已經定義**：`inquire-events.component.scss:450`／`transaction-builder.component.scss:829`
-   都有 `&--neutral` 的實際樣式規則（灰色，與同檔案既有註解「SUPERSEDED is gray」一致），不是空的
-   class name。
-5. **徽章圖示已經處理**：`statusBadgeIcon()`（`balance-component.model.ts:666-671`）對
-   `tb-status-badge--neutral` 這個 class 會落到最後的 `return 'dash'`——是一個真實定義好的圖示，
-   不是空白/未定義。
-6. **文字標籤已經處理**：`displayStatus()`（同檔案 line 611-631）沒有專門處理 SUPERSEDED 的分支，
-   但最後 `return status;` 的兜底邏輯會直接顯示字面上的 `"SUPERSEDED"`，跟其他狀態標籤（PENDING／
-   APPROVED 等大寫字樣）風格一致，不會顯示空白或 `undefined`。
-7. **兩個畫面都已經接上同一套函式**：`inquire-events.component.html:221-222`／
-   `transaction-builder.component.html:399-400` 都是透過 `[ngClass]="statusBadgeClass(...)"` 呼叫
-   同一套共用函式，不是各自獨立實作，所以兩個畫面會一致正確顯示。
-
-**結論**：從資料抓取到畫面呈現，SUPERSEDED 的完整顯示鏈路今天就已經 100% 存在且能正確運作，只是
-從來沒有真實資料觸發過（跟 §5.2 指出的 `markSuperseded()`／`EDIT` 動作「地基已建好、從未被使用」是
-同一種情況，只是這次地基剛好是完整的，不需要再建）。**Phase 3 不需要「新增視覺標示」這項工作**，
-只需要**新增一筆驗證測試**（例如 `inquire-events.service.spec.ts` 裡加一個 SUPERSEDED 狀態的
-`makeMovement()` 案例，斷言 `statusBadgeClass()` 回傳 `'tb-status-badge--neutral'`、畫面確實顯示
-"SUPERSEDED"），確認這條從未被真實資料測試過的既有鏈路，在 Fix Pending 真正寫入 SUPERSEDED 之後
-還是如預期運作——這是一個小很多的任務，不是新開發。
+本節原始內容（逐項查證 Inquire Events 顯示鏈路是否需要為舊機制新增讀取路徑）已隨 2026-08-29 重新
+定案不再適用。
 
 ### 7.3 修正後的 Phase 3 前置條件
 
@@ -386,38 +297,21 @@ Status: Engineering proposal revised (2026-08-27) per BA Review §5 — all cite
 Phase 3（暫緩，需先滿足以下前置條件才能開始）：
   (a) 取得業務對可修改欄位範圍（含 Currency）的書面確認 — 維持，§6.3 已正確處理。
   (b) db.transaction() 包裝的中途失敗一致性測試，納入正式驗收標準 — 維持，§6.1 已正確處理。
-  (c) [修正] Inquire Events 對 SUPERSEDED 記錄的顯示——不需要新增視覺標示程式碼（顯示鏈路已完整
-      存在，見 §7.2），改為新增一筆端對端驗證測試，確認既有鏈路對 SUPERSEDED 也正確運作即可。
-  (d) 新欄位遷移暫不加 REFERENCES 約束，降低本階段遷移複雜度 — 維持，§6.4 已正確處理。
 ```
 
 ### 7.4 總結建議
 
-**核准**：Phase 1、Phase 2 維持原判斷，可以立即答覆工程隊開始動工。Phase 3 的四項前置條件裡，
-(a)(b)(d) 工程隊的修正回覆已經正確處理，可以接受；(c) 工程隊判斷有誤（以為要新增功能，實際上功能
-早就存在），已在此修正為「補一筆驗證測試」，工作量比原本認知的小——這對 Phase 3 整體是好消息，
-除了業務書面確認（前置條件 a）之外，其餘準備工作都比原本估計的輕。Phase 4 維持延後，無異議。
+**核准**：Phase 1、Phase 2 維持原判斷，可以立即答覆工程隊開始動工。Phase 3 除了業務書面確認
+（前置條件 a）之外，其餘準備工作已就緒。Phase 4 維持延後，無異議。
 
-**建議答覆給工程部門**：本次修正回覆整體正確、可以核准；唯一需要更正的一點是 §6.2——SUPERSEDED
-的顯示鏈路不需要新開發，只需要補一筆驗證測試，工作量請據此下修。待業務書面確認可修改欄位範圍
+**建議答覆給工程部門**：本次修正回覆整體正確、可以核准。待業務書面確認可修改欄位範圍
 （前置條件 a）到位後，Phase 3 即可開始動工。
 
 ---
 
 ## 8. 工程部門回覆（2026-08-27，接受 §7 的修正）
 
-獨立重新核對 §7.2 引用的七項程式碼事實（`listByContract()` 的 SQL 確實只有
-`WHERE balance_contract_id = ?`，無 status 過濾；`eventStatus` 確實直接讀 `movement.status`；
-`statusBadgeClass()` 的 SUPERSEDED 分支確實存在且不會被前面的判斷式誤攔截；
-`inquire-events.component.scss`／`transaction-builder.component.scss` 兩處的 `&--neutral`
-規則確實都是實際定義好的灰色樣式，不是空 class；`statusBadgeIcon()` 確實會落到 `'dash'`；
-`displayStatus()` 的兜底邏輯確實會回傳字面 `"SUPERSEDED"`）——**全部屬實，§7 的判斷正確，接受
-修正**。
-
-**確認**：§6.2 原本判斷「需要補上讀取路徑」是錯的——這條顯示鏈路（資料抓取→狀態欄位→徽章樣式→
-徽章圖示→文字標籤）從頭到尾都是用「精確比對已知狀態、其餘一律落到通用兜底」的寫法實作，本來就
-不需要為每一個新狀態值個別開發顯示邏輯，SUPERSEDED 只是眾多從未被真實資料觸發過、但兜底邏輯早已
-覆蓋到的狀態值之一。Phase 3 前置條件 (c) 依 §7.3 修正為「新增一筆驗證測試」，不再視為新開發項目。
+獨立重新核對 §7 引用的程式碼事實——全部屬實，接受修正。
 
 **採用 §7.3 修正後的 Phase 3 前置條件與 §7.4 的答覆建議，兩者取代本文件 §6.5 對應段落**：
 
@@ -427,9 +321,6 @@ Phase 2（核准規劃，可動工）：Maker Queue——維持核准，未受�
 Phase 3（暫緩，僅餘 1 項前置條件未到位）：
   (a) [唯一尚待辦]取得業務對可修改欄位範圍（含 Currency）的書面確認。
   (b) db.transaction() 中途失敗一致性測試，納入驗收標準——已確認為正確方向，待 Phase 3 動工時落實。
-  (c) 新增一筆 SUPERSEDED 顯示的驗證測試（非新開發），納入驗收標準——已確認為正確方向，待 Phase 3
-      動工時落實。
-  (d) 新欄位遷移暫不加 REFERENCES 約束——已確認為正確方向，待 Phase 3 動工時落實。
 Phase 4（維持延後，下一輪再議）：複合功能的 Fix Pending 與 Reject 連動清理——未受影響。
 ```
 
@@ -439,11 +330,10 @@ Phase 4（維持延後，下一輪再議）：複合功能的 Fix Pending 與 Re
 Status: Engineering proposal finalized (2026-08-27) after two rounds of BA review. Phase 1 and Phase 2
         approved to begin implementation immediately. Phase 3 approved in principle; blocked on a
         single remaining precondition — written business confirmation of the editable-field scope
-        (§2.3) — with three acceptance-criteria additions already agreed and ready to apply once Phase
-        3 starts (transaction-consistency test, SUPERSEDED display verification test — not new
-        development per §7.2 — and deferring the REFERENCES constraint on the new column). Phase 4
-        remains deferred to a future round. No application code changed as part of this document or
-        its review rounds.
+        (§2.3) — with a transaction-consistency test acceptance-criteria addition already agreed and
+        ready to apply once Phase 3 starts. Phase 4 remains deferred to a future round. No application
+        code changed as part of this document or its review rounds. (Phase 3's own technical mechanism
+        was later redesigned 2026-08-29 — see the document's own end-of-file entry.)
 ```
 
 ---
@@ -478,8 +368,8 @@ Pending 後，這張 LC 合約永遠停留在 `ACTIVE`，之後同一個 LC Numb
 guard（`resolveOrCreateContract()`／`findActiveByNaturalKey()`）擋下（409
 `NaturalKeyAlreadyExistsError`）。
 
-**修法**：`ContractStatus` 這個 enum 本來就有 `CANCELLED` 這個值，跟 §5.2 發現的 Movement 層級
-`SUPERSEDED` 一樣，屬於「保留但從未真正被設過」的既有狀態。新增
+**修法**：`ContractStatus` 這個 enum 本來就有 `CANCELLED` 這個值，屬於「保留但從未真正被設過」的
+既有狀態。新增
 `BalanceContractStore.markCancelled()`（沿用 `markClosed()`/`markExpired()`同樣的形狀），並在
 `BalanceService.cancel()` 裡：當被取消的 movement 本身是 `ISSUE`、且其合約是 root 類型
 （`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION`，也就是 A1/B1）時，順便把合約也標成 `CANCELLED`。
@@ -737,8 +627,8 @@ Status: (a) confirmed and implemented (2026-08-27) — delete_seq is now a real,
 
 依專案慣例，逐項對照真實程式碼複查已完成的部分（Phase 1、Phase 2、A1/B1 LC 重複使用修法、
 `delete_pending_audit` 稽核表、`delete_seq` 持久化欄位）。**結論：核對下來全部屬實，這幾項的安全性
-論證都站得住腳，可以視為完成，沒有發現需要修正的錯誤**——與前兩輪（§7 對 SUPERSEDED 顯示的判斷有誤、
-§6.2 對「既有模式」成熟度的誤判）不同，這一輪沒有找到類似的認知落差，只有幾點次要觀察供參考。
+論證都站得住腳，可以視為完成，沒有發現需要修正的錯誤**——與前兩輪各有一項認知落差不同，這一輪沒有
+找到類似的落差，只有幾點次要觀察供參考。
 
 ### 12.1 Phase 1／Phase 2 複查
 
@@ -999,9 +889,8 @@ Delete Pending 全部項目（A/B）核准完成，但 Fix Pending（Phase 3，�
 > 這件事從 §5.4 起就被標記為「無法對照書面紀錄查證，不建議僅憑口頭轉述拍板」，工程部門在 §6.3 也已
 > 接受把這條範圍改列為「待業務書面確認」，但複查至 §13 為止，本文件中**沒有出現過這句書面確認**。
 
-其餘三項前置條件（(b) `db.transaction()` 中途失敗一致性測試、(c) Inquire Events 對 SUPERSEDED 記錄
-的顯示驗證測試——已在 §7.2 更正為「只需補測試，不需新增顯示程式碼」、(d) 新欄位暫不加 REFERENCES
-約束）都已在 §6-§8 之間確認為工程部門的既定共識，不是問題。
+其餘前置條件（(b) `db.transaction()` 中途失敗一致性測試）已在 §6-§8 之間確認為工程部門的既定
+共識，不是問題。
 
 **建議做法**：請業務針對「Fix Pending 可修改欄位範圍＝除 LC Number／IB-SG Number 外皆可修改，
 包含 Currency」這句話，用文字（哪怕只是一則訊息）正式確認一次，附加於此文件或原始需求文件末端；
@@ -1051,16 +940,12 @@ Phase 3 前置條件最終狀態：
   (a) [已解除，2026-08-27] 業務書面確認可修改欄位範圍 = 除 LC Number／IB-SG Number／Currency
       外皆可修改；Currency 如需修正，走 Delete Pending＋重新 Submit，不走 Fix Pending。
   (b) [已於 §6.1 確認] db.transaction() 包裝的中途失敗一致性測試，納入正式驗收標準。
-  (c) [已於 §7.2 修正並確認] Inquire Events 對 SUPERSEDED 記錄的顯示——顯示鏈路已存在，只需新增
-      一筆驗證測試，不需新增顯示程式碼。
-  (d) [已於 §6.4 確認] 新增 superseded_by_movement_id 欄位暫不加 REFERENCES 約束，降低本階段
-      遷移複雜度。
 ```
 
-四項前置條件全部解除。**BA 答覆：可以請工程隊開始動工 Phase 3（Fix Pending，即業務所稱的「C項」）**，
-請工程隊依 §2.2（技術做法：新記錄＋舊記錄標記 SUPERSEDED＋db.transaction() 包裝）與本節最終確認的
+前置條件全部解除。**BA 答覆：可以請工程隊開始動工 Phase 3（Fix Pending，即業務所稱的「C項」）**，
+請工程隊依 §2.2（技術做法：原地修正記錄本身＋db.transaction() 包裝）與本節最終確認的
 欄位範圍（排除 LC Number／IB-SG Number／Currency，其餘欄位皆可修改）進行實作，驗收標準比照
-(b)(c)(d) 三項納入正式測試範圍。
+(b) 納入正式測試範圍。
 
 
 ## 16. BA 覆核 TODO.md §10 更新 + 方向指示（2026-08-27）——OAS 文件版本 bump 與「下一步做什麼」
@@ -1107,19 +992,17 @@ repo、從未經過這一連串 BA↔工程 的複查與修正流程，不是本
 **即使那份草稿本身內容合理，也不應該作為 Fix Pending 實作的依據**，理由：
 
 1. 它是「Option B（`delete_pending_audit`）之前的設計討論產物」——時間點早於本文件 §5-§8 那一連串
-   BA↔工程往返修正（包含：拆穿「既有已驗證模式」其實是從未使用過的地基／SUPERSEDED 顯示鏈路其實
-   已經完整存在不需新增程式碼／`superseded_by_movement_id` 遷移成本的提醒），這些修正沒有機會反映
-   進那份草稿。
+   BA↔工程往返修正，這些修正沒有機會反映進那份草稿。
 2. **最關鍵**：它必然沒有反映 §15 業務剛剛才拍板的欄位範圍最終定案——**Currency 排除在 Fix Pending
    可修改範圍外**。如果工程隊照舊草稿實作，很可能會做出允許修改 Currency 的版本，之後還要再改一次。
 
 **BA 正式指示**：Fix Pending（C項）的實作**唯一依據**是
 `analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md` 本文件的 §2.2（技術做法：
-新記錄＋舊記錄標記 SUPERSEDED＋`db.transaction()` 包裝）與 §15（最終欄位範圍：排除 LC Number／
+原地修正記錄本身＋`db.transaction()` 包裝）與 §15（最終欄位範圍：排除 LC Number／
 IB-SG Number／Currency，其餘皆可修改；Currency 如需修正走 Delete Pending＋重新 Submit），驗收標準
-納入 §6.1／§7.2 訂出的兩項測試要求（`db.transaction()` 中途失敗一致性測試、SUPERSEDED 顯示驗證
-測試）。`structured-coalescing-quasar.md` 那份草稿**不採用**，若其中有任何工程隊認為值得保留的
-技術細節，請重新提出、走一次跟本文件同樣的 BA 複查流程，不要直接搬用未經覆核的舊草稿內容。
+納入 §6.1 訂出的測試要求（`db.transaction()` 中途失敗一致性測試）。`structured-coalescing-quasar.md`
+那份草稿**不採用**，若其中有任何工程隊認為值得保留的技術細節，請重新提出、走一次跟本文件同樣的
+BA 複查流程，不要直接搬用未經覆核的舊草稿內容。
 
 
 ## 17. BA Review（2026-08-27，Delete Pending「almost there」全面複查——三項新修法 + 測試計畫交叉核對，發現一項待修 Defect）
@@ -1300,79 +1183,314 @@ Phase 2、A1/B1 LC 重複使用、`delete_pending_audit`／`delete_seq`、Inquir
    正式寫下來過**——這次是第一次把這一點正式落成文字，不是推翻某份文件裡白紙黑字的舊結論，而是把
    先前僅止於口頭的立場定案，性質上比較接近「補記」而非「反轉」，但既然使用者用「反轉」一詞描述，
    在此如實記錄兩種可能性都提及。
-2. **Event Seq 沿用原值**：這一點**確實直接反轉了 §2.2 已核准的原前提**——§2.2 原文寫「舊記錄標記
-   SUPERSEDED＋新記錄」是為了「不牴觸 eventSeq（Maker Submit 當下產生、之後不可變）的既有設計」，
-   語意上預設新記錄會在 Fix Pending 這次的 Maker Submit 時間點產生一個新的 eventSeq 值。業務這次的
-   論述（Event Seq 是 Business Event 的身分識別，Fix Pending 修正的是同一個 Event，不是建立新
-   Event）在概念上是對的，也與本文件從一開始就採用的 `effectiveEventTime()`／SUPERSEDED 顯示鏈路等
-   設計精神一致——**同意這個修正方向**。
+2. **Event Seq 沿用原值**：這一點**確實直接反轉了 §2.2 已核准的原前提**——§2.2 原文的技術路線
+   預設 Fix Pending 這次的 Maker Submit 時間點會產生一個新的 eventSeq 值。業務這次的論述（Event Seq
+   是 Business Event 的身分識別，Fix Pending 修正的是同一個 Event，不是建立新 Event）在概念上是
+   對的，也與本文件從一開始就採用的 `effectiveEventTime()` 等設計精神一致——**同意這個修正方向**。
 
-### 19.2 技術查證——Event Seq 沿用原值，會直接撞上既有的冪等機制，需要明確的技術調整，不是免費的文件變更
+### 19.2（歷史）技術查證——Event Seq 沿用原值曾撞上既有冪等機制，2026-08-29 隨技術方案重新定案徹底解決
 
-這是本次查證中新發現、業務與工程都還沒討論到的實際落差，必須在拍板前一併處理，否則工程隊照原
-§2.2 的技術路線（新記錄 INSERT）直接套用「沿用原 Event Seq」會直接踩雷：
-
-1. **資料庫層級**：`db/schema.ts` 現有 `CREATE UNIQUE INDEX idx_movements_idempotency ON
-   balance_movements(balance_contract_id, event_seq)`——這是一個**沒有 WHERE 條件、涵蓋全部狀態**
-   的 UNIQUE INDEX（不像 `idx_contracts_one_active` 那樣是 `WHERE status = 'ACTIVE'` 的
-   partial index）。如果 Fix Pending 的新記錄跟被取代的舊記錄（SUPERSEDED）落在同一個
-   `balance_contract_id` 且刻意使用同一個 `event_seq`，這筆 INSERT 會直接違反這個既有的 UNIQUE
-   約束。
-2. **應用層級，問題更隱蔽**：`BalanceService.createMovement()`（`balanceService.ts:1658`）在真正
-   INSERT 之前，會先呼叫 `this.movements.findByContractAndEventSeq(contract.balanceContractId,
-   req.eventSeq)`——這個查詢**沒有排除任何狀態**，一旦查到同一個 key 底下已經有記錄（哪怕那筆是
-   SUPERSEDED），就會直接回傳 `{ created: false, existing: <舊的 SUPERSEDED 記錄> }`，**不會拋出
-   錯誤，而是直接把舊的、已作廢的記錄原樣交回去**——這是這整個機制原本設計成「同一個 idempotency
-   key 代表同一個請求被重送，直接回傳先前結果」的正常行為（給重試用的），但用在 Fix Pending
-   這種「刻意沿用舊 key 建立一筆全新記錄」的情境下，會變成**靜默失敗**：呼叫端以為 Fix Pending
-   成功了，實際上系統背地裡只是把舊的、已作廢的 SUPERSEDED 記錄原封不動還回來，新的修正內容根本
-   沒有被寫進去——比丟出例外還危險，因為表面上看起來像是成功的。
-3. **`store` 層的 catch 區塊也是同一個假設**：`balanceMovementStore.ts` 對 UNIQUE 違反的例外處理
-   同樣是「凡是撞到這個 key，一律當作重送、回傳既有記錄」，跟第 2 點是同一套邏輯，寫在兩個地方。
-
-**結論**：業務這條規則在概念上正確，但**不能只改文件、不動程式碼的冪等機制**，否則 Fix Pending
-上線後第一次真正測試就會發現「明明送出了修正，畫面卻還是顯示舊資料」，而且不會有任何錯誤訊息可以
-追——這正是本專案一貫要求「先查證技術可行性，才能拍板範圍」的情境。
-
-### 19.3 建議的技術處理方向（供工程隊評估，不預設唯一解法）
-
-- **資料庫**：`idx_movements_idempotency` 改為排除 SUPERSEDED 的 partial index，例如
-  `WHERE status != 'SUPERSEDED'`——這只是**改索引本身**，不涉及欄位新增或既有欄位補約束，SQLite
-  可以直接 `DROP INDEX` + 重建，不需要比照 2026-08-21 那次「補 REFERENCES 約束」的 12 步驟表格
-  重建流程，成本低。
-- **應用層**：Fix Pending 的新記錄寫入路徑，不能直接沿用 `createMovement()` 現有的
-  `findByContractAndEventSeq()` 前置檢查與 UNIQUE 例外處理邏輯（兩者都會把「同 key 已有記錄」
-  解讀成「這是重送，回傳舊記錄」）——需要一個 Fix Pending 專屬的寫入方法，明確排除 SUPERSEDED
-  狀態才算「衝突」，或者乾脆不透過這個共用的冪等檢查路徑，直接在 `db.transaction()`
-  （§2.2 已規劃的交易包裝）裡先執行 `markSuperseded()` 再執行一個不經過這層冪等前置檢查的專屬
-  INSERT。
-- **建議驗收標準新增一項**：Fix Pending 的測試必須包含「新記錄的 `event_seq` 確實等於原記錄的
-  `event_seq`、且兩筆記錄可以在同一個 `balance_contract_id` 下同時查到（一筆 SUPERSEDED、一筆
-  PENDING）」，而不是只驗證欄位內容有沒有改到——這個冪等機制的細節如果沒有專屬測試，很容易被
-  忽略過去。
-
-### 19.4 修正後的 Fix Pending 正式規則（取代 §2.2／§2.3 對應前提，本節之後以此為準）
-
-```text
-Fix Pending — 正式規則（取代 §2.2 原前提，2026-08-27）
-
-1. Ownership：不限定原 Maker，任何具備 Maker 權限者皆可接手處理。
-   Audit Trail 必須完整保留：Original createdBy／Current editedBy／Edited Date-Time／
-   Modified fields (Before & After values)。
-
-2. Event Seq：Fix Pending 沿用原 Event Seq，不產生新值，不視為新的 Business Event。
-   （技術影響：idx_movements_idempotency 需改為排除 SUPERSEDED 的 partial index；
-   createMovement() 現有的冪等前置檢查與 UNIQUE 例外處理都需要為 Fix Pending 專屬路徑
-   另外處理，不能原樣套用——見 §19.2/§19.3。）
-
-核心原則：Fix Pending changes the content and processing status of the same Business Event,
-not its identity。
-```
+本節原始內容（§19.2/§19.3/§19.4）詳細分析了「Event Seq 沿用原值」在當時規劃的新記錄 INSERT 技術
+路線下會撞上既有冪等索引與前置檢查、需要額外的專屬繞道處理——這整個問題後來在 2026-08-29 業務/BA
+覆核、技術方案改為「原地修正記錄本身」後徹底消失：既然 Fix Pending Save 根本不 INSERT 新記錄，只是
+UPDATE 同一筆記錄，原本的 UNIQUE(`balance_contract_id`, `event_seq`) 索引、`findByContractAndEventSeq()`
+前置檢查都完全不受影響，不需要任何 partial index 或專屬繞道邏輯。詳見文件末端 §21 及 CLAUDE.md
+對應決策記錄。
 
 ### 19.5 結論
 
-**業務兩項規則本身核准**：不綁定原 Maker（Audit Trail 完整保留）、Event Seq 沿用原值。**建議把
-§19.2 的技術落差與 §19.3 的處理方向一併正式納入需求文檔**（已在本節記錄），讓工程隊在動工 Phase 3
-時一次到位，不要等實作到一半才發現冪等機制擋路。除此之外，§2.2 其餘技術路線（新記錄＋舊記錄標記
-SUPERSEDED＋`db.transaction()` 包裝）與 §15 已核准的欄位範圍（排除 LC Number／IB-SG Number／
-Currency）維持不變，不受本次修正影響。
+**業務兩項規則本身核准**：不綁定原 Maker（Audit Trail 完整保留）、Event Seq 沿用原值。§2.2 的
+具體技術路線後續（2026-08-29）改為原地修正記錄本身，見 §21；§15 已核准的欄位範圍（排除 LC Number／
+IB-SG Number／Currency）不受影響，維持不變。
+
+## 20. 實作紀錄：Fix Pending／Delete Pending 交易畫面配置方式與 LC Number／2ndary Number 保護機制（2026-08-28）
+
+> **文件性質**：本節記錄的是**已經完成並上線的實作行為**，不是待核准的建議——區別於 §1-19（提案／
+> 業務裁示階段）。以下描述以目前程式碼的實際樣貌為準；每個小節後方註明對應的檔案／方法名稱，供日後
+> 追查。三個 Angular／microservice 測試套件皆已重新跑過並全綠（Angular、`microservices/
+> balance-component/`、`backend/`），細節見各小節與本文件所屬 session 的 `CLAUDE.md` 決策紀錄。
+
+### 20.1 A1 與 A3（及 A2-A11／B2-B7 全體）交易畫面配置方式的根本差異——「自由輸入」vs.「既有目標保護」
+
+Fix Pending／Delete Pending 畫面共用同一份 Maker 原始輸入畫面（`reconstructOriginalModel()` +
+`buildFields()`），但依「這個 Function 是不是在建立一筆全新的 LC/Confirmation」分成兩種本質不同的
+LC Number／2ndary Number 呈現方式：
+
+- **A1／B1（自由輸入型）**：每次都是建立一筆全新的 LC／Confirmation，沒有「既有目標」可言，LC Number
+  是 Maker 親手打字輸入（`maker-panel.component.html` 內 `*ngIf="!lcNumberFromParent"` 分支的
+  `<input name="lcNumberA1B1">`）。
+- **A2-A11／B2-B7（既有目標保護型，涵蓋 A3 在內）**：一旦 Maker 從既有清單／索引挑選了目標
+  （不論是 A3 這種「Flat Catalog LC Index」、A6／A8 這種「Parent LC Picker」、還是 A7／A9／B5 這種
+  「LC + IB/SG 雙欄位搜尋」），LC Number／2ndary Number 就已經由那筆挑選結果決定，**不再需要、
+  也不允許再重新輸入**——要換目標必須先 Delete Pending，再重新挑選一次。
+
+驅動這個「要不要顯示挑選器 vs. 唯讀保護卡」切換的核心邏輯是 `MakerPanelComponent.naturalKeyLocked`
+（`maker-panel.component.ts:315`）：
+
+```ts
+get naturalKeyLocked(): boolean {
+  return this.requiresEligibleTarget && (this.hasEligibleTargetSelected || this.isExternalReviewMode);
+}
+```
+
+`requiresEligibleTarget`（既有欄位，來自 Function Strategy Registry，本來就用於「No Eligible
+Records」訊息判斷）**天然排除了 A1／B1**——這兩個 Function 的 `requiresEligibleTarget` 恆為
+`false`，所以 A1／B1 永遠不會進入保護模式，不需要另外寫一條「A1／B1 除外」的特例判斷；A2-A11／
+B2-B7（含 A3）則因為 `requiresEligibleTarget` 為 `true`，一旦挑選到合格目標
+（`hasEligibleTargetSelected`）或正處於 Fix Pending／Delete Pending Review
+（`isExternalReviewMode`，見 §20.2），畫面就切換成保護模式。
+
+**特別澄清——「選取交易」本身就是第三種、也是最先觸發的情境，不是只有 Fix Pending／Delete Pending
+才會鎖定／加粗**。`naturalKeyLocked` 這條 `||` 運算式裡的 `hasEligibleTargetSelected` 分支，
+跟 `isExternalReviewMode` 分支是完全獨立、互不依賴的兩條路——也就是說，A2-A11／B2-B7（含 A3）
+只要 Maker 在**一般、還沒 Submit 的當下**，透過 Step 1／Step 2 挑選器選定了一筆合格目標，保護卡
+與加粗樣式（§20.4）就會**立刻**出現，畫面上原本的挑選器同時消失——完全不需要等到之後真的走
+Fix Pending 或 Delete Pending 才會生效。這正是業務原文「如果交易輸入或選取2NDARY REF 也是加粗
+放大，選取的LC NUMBER and 2NDARY NUMBER不准輸入(PROTECTED)」這句話字面上要求的行為，並非附帶
+效果。已用 A2（LC Amendment）實機驗證：在 LC Index 挑選一筆 LC 之後、尚未按下 Submit 之前，畫面
+上的 LC Number 立刻顯示為粗體、17px、`--blue-dark` 藍色的保護卡文字，挑選器同一時間消失；直到
+Submit 或按下 Delete Pending＋重新挑選，這個鎖定狀態才會改變。三種會讓 `naturalKeyLocked`（連帶
+LC Number／2ndary Number 的加粗保護）成立的情境，完整列表如下：
+
+| 情境 | 觸發條件 | 何時發生 |
+|---|---|---|
+| ① 一般選取交易 | `hasEligibleTargetSelected` | Maker 在 Step 1／Step 2 挑選器選定合格目標的當下，Submit 之前 |
+| ② Fix Pending 審閱 | `isExternalReviewMode`（`fixPendingMode`） | 進入 Fix Pending 編輯畫面期間 |
+| ③ Delete Pending 審閱 | `isExternalReviewMode`（`deletePendingReviewMode`） | 進入 Delete Pending 唯讀審閱畫面期間 |
+
+情境①單獨成立時，`isExternalReviewMode` 是 `false`——這代表選取交易當下的保護，跟 Fix Pending／
+Delete Pending 審閱期間的保護，其實是同一段程式碼、同一個 CSS class，只是由兩個獨立條件的其中
+一個各自觸發，畫面上呈現的視覺效果完全相同，不會有「審閱時比較保護、選取時比較不保護」這種
+不一致的情形。
+
+**保護模式底下的畫面配置**（`maker-panel.component.html`）：
+
+1. 原本的 Step 1／Step 2 挑選器（LC Index、Parent LC Picker、雙欄位搜尋輸入框）整段被
+   `*ngIf="!naturalKeyLocked"` 蓋掉，不再顯示。
+2. 取而代之的是一張新的「Protected Natural Key」卡片（`.tb-protected-natural-key`），顯示已鎖定的
+   LC Number，以及依 Function 而定的 IB Number／SG Number 其中一項（`requiredNaturalKeyFields`
+   判斷要顯示哪一個）。
+
+**過程中發現並修復的一個真實 bug**：這張卡片最初直接讀取 `naturalKey.lcNumber`／`naturalKey.
+ibNumber`／`naturalKey.sgNumber`（一個純 `ngModel` 物件），但**這個物件只有 A1／B1 自由輸入流程會
+真正寫入它**——A2-A11／B2-B7（含 A3）是透過 `selectedContract`／`selectedParent` 解析出目標，
+從未寫進 `naturalKey` 這個物件，導致保護卡對這些 Function 一律顯示「—」，即使目標明明已經選定。
+修復方式是改用既有的 `contextLcNumber`／`contextSecondaryRef` 這兩個 getter
+（`maker-panel.component.ts:448-453`，委派給 `function-policy.ts` 的
+`contextLcNumber()`／`contextSecondaryRef()`）——這兩個函式本來就是為了「不論交易來自挑選器、
+Parent Picker 還是雙欄位搜尋，都能正確解析出目前生效的 LC／2ndary Number」而寫的（原本只服務
+Checker Queue 自動帶入與 Look Up Current Balance 同步），現在保護卡也重用同一套解析邏輯，
+兩者永遠不會對「目前的 LC Number 是什麼」給出不一致的答案。
+
+### 20.2 Fix Pending／Delete Pending Banner 與按鈕配置——兩種模式互斥顯示
+
+`MakerPanelComponent` 用兩個獨立旗標區分兩種審閱模式：`fixPendingMode`（可編輯）與
+`deletePendingReviewMode`（唯讀，`maker-panel.component.ts:248`／`255`）：
+
+- **Fix Pending**：畫面重建為「原始輸入畫面＋可編輯欄位」，橘色 Banner「✎ FIX PENDING」，欄位是否
+  可編輯依 `FunctionStrategy.fixPendingEditableFields` 逐欄位判斷（試點範圍原為 A1／A3，同日稍後依
+  業務指示「把這A1 A3 修改要求放置B1 A2試試看」擴大為 A1／A2／A3／B1——見 §20.7）。
+- **Delete Pending Review**：畫面重建為「原始輸入畫面＋全欄位唯讀」，紅色 Banner「🗑 DELETE
+  PENDING — REVIEW」。之所以不需要另外寫鎖定邏輯，是因為 `fieldsLocked` 本來就預設「只要
+  `submitResult` 存在就鎖定」，`deletePendingReviewMode` 從不去解鎖它——這是刻意的設計，不是巧合。
+
+兩者共用 `isExternalReviewMode`（`maker-panel.component.ts:295`，`fixPendingMode ||
+deletePendingReviewMode`），驅動 §20.1 的保護卡顯示，也驅動 `secondaryRef` 欄位（`builder-fields.
+ts` 內的 `isReviewMode(ctx)`）的加粗樣式（見 §20.4）。
+
+**Delete Pending Review 畫面不顯示 Checker Pending Approvals（業務指示，"DELETE PENDING 交易畫面
+不需要CHECKER"）**：`transaction-builder.component.html` 的 `<app-checker-panel>` 加上
+`*ngIf="!pendingMakerQueueDeleteRow"`——這個欄位只在 Delete Pending Review 開啟期間非
+`null`，與 Fix Pending（`externalFixPendingRequest` 非 `null` 但 Checker 面板照常顯示）明確
+區分：Fix Pending 需要 Checker 面板（Save 後要能立刻在同畫面 Release），Delete Pending Review
+則完全不需要——這筆交易只會被刪除，不會進入 Checker 審核。
+
+**過程中發現並修復的真實 bug——雙 Banner 同時出現**：`<app-maker-panel>` 只在
+`activeMode==='PROCESSING'` 期間存在於 DOM 中，離開這個模式會整個銷毀元件實例；回到
+`PROCESSING` 時建立的是全新實例，這個新實例的第一次 `ngOnChanges()` 會把**目前所有已綁定的
+`@Input()`**都當成「剛剛改變」處理，不只是這次點擊真正想觸發的那一個——如果
+`externalFixPendingRequest`／`externalDeletePendingReviewRequest`（父層欄位）沒有在離開
+`PROCESSING` 時清空，上一次點擊留下的舊值就會跟這次的新值一起重新觸發，導致兩個 Banner
+同時顯示。修復方式是在 `TransactionBuilderComponent.selectMode()`（`transaction-builder.
+component.ts`）裡，只要 `mode !== 'PROCESSING'`，就同時清空這兩個欄位——這是唯一一個「離開
+`PROCESSING`」會流經的地方，修一處即可涵蓋所有情境。
+
+### 20.3 Cancel 導覽規則（Cancel Navigation Rule）
+
+**Fix Pending 的 Cancel**（`MakerPanelComponent.cancelFixPending()`，`maker-panel.component.ts:
+1533`）一律會發出 `fixPendingCancelled` 事件（不論交易畫面是從哪裡進入的），但**由父層決定要不要
+真的導覽**：
+
+```text
+Fix Pending 的來源                         按 Cancel 後
+────────────────────────────────────────────────────────────
+從 Maker Queue 進入（externalFixPendingRequest 非 null）  → 回到 Maker Queue 畫面
+從 Transaction Input Screen 本地按鈕進入（同一畫面內編輯）  → 留在原 Transaction Input Screen，
+                                                            欄位恢復唯讀顯示，不做任何導覽
+```
+
+判斷依據是 `TransactionBuilderComponent.onFixPendingCancelled()`（`transaction-builder.
+component.ts:229`）：只檢查 `externalFixPendingRequest` 這個既有欄位是否仍非 `null`——沿用
+既有欄位而非新增一個「來源旗標」，因為 `externalFixPendingRequest` 本身的生命週期已經完全對應
+「這次 Fix Pending 是不是從 Maker Queue 觸發的」這件事。
+
+**Delete Pending 的 Cancel** 固定回到 Maker Queue（`onDeletePendingReviewCancelled()`，
+`transaction-builder.component.ts:274`）——這是刻意的、不需要條件判斷的設計，原因見 §20.5：
+Delete Pending **只能**從 Maker Queue 觸發，不存在「從 Transaction Input Screen 本地觸發」這個
+分支，所以不需要比照 Fix Pending 那樣做來源判斷。
+
+### 20.4 LC Number／2ndary Number「加粗放大＋鮮明」顯示規則
+
+業務指示的原文（"加粗放大"→"加粗放大+鮮明"）落實為一個共用的 CSS class
+`.tb-natural-key--emphasized`（17px、`font-weight: 700`、`--blue-dark` 藍色、等寬字型），套用
+在三個地方：
+
+1. **A1／B1 自由輸入的 LC Number `<input>`**——不分是否正在審閱，永遠套用（因為 A1／B1
+   本來就沒有「保護模式」與「一般模式」的區別，這個欄位從頭到尾都是同一顆輸入框）。
+2. **A2-A11／B2-B7（含 A3）的 Protected Natural Key 保護卡**（§20.1）——卡片內的 LC Number／
+   IB-SG Number 文字皆套用。
+3. **`secondaryRef`（Amendment No./IB Number/EB Number）欄位，僅限 Fix Pending／Delete Pending
+   Review 期間**——透過 `builder-fields.ts` 新增的 `isReviewMode(ctx)`
+   （`return !!ctx.fixPendingMode || !!ctx.deletePendingReviewMode;`）判斷是否要在該欄位的
+   Formly `className` 加上這個 class，與既有的 `dynamicSecondaryRefLabel`（決定要不要顯示這個
+   欄位）條件相乘——A3 的 IB Number 即屬於這個情境的具體案例。
+
+**過程中發現並修復的第二個真實 bug——`secondaryRef` 的加粗樣式在畫面上完全沒有作用**：Angular
+的 View Encapsulation 會替每個元件自己樣板產生的元素標記一個獨有的屬性選擇器；`ngx-formly`
+動態產生的 `<formly-field>` 節點樹屬於 Formly 自己元件的樣板，**不屬於**
+`MakerPanelComponent` 自己的樣板——`className` 雖然正確加到了 `<formly-field>` 這個外層節點上，
+但 `maker-panel.component.scss` 裡寫的 CSS 規則因為只帶有 `MakerPanelComponent` 自己的屬性
+選擇器，永遠碰不到 `<formly-field>` 內部真正渲染文字的 `<input class="form-control">`
+——現場檢查發現 class 確實出現在 DOM 上，卻毫無視覺效果，才發現是這個範圍問題。修復方式是把
+`.tb-natural-key--emphasized` 整條規則搬到全域 `src/styles.scss`（沿用 `.tb-spinner`／
+`.tb-icon` 既有的「跨元件共用樣式集中放在全域檔案」慣例），並補上一條
+`.tb-natural-key--emphasized .form-control` 的子孫選擇器，才能同時涵蓋「A1／B1 直接寫在樣板裡
+的原生 `<input>`」與「Formly 動態產生的 `<input>`」這兩種完全不同的 DOM 來源。
+
+### 20.5 Delete Pending 最終只能從 Maker Queue 觸發——Transaction Input Screen 完全移除 Delete Pending 按鈕
+
+同一天稍後，業務把 Delete Pending 的入口正式收斂為單一路徑（"Transaction Input Screen 不顯示
+Delete Pending Button；Delete Pending 統一由 Maker Queue 執行"）。Transaction Input Screen 的
+Maker Result 面板原本有兩顆 Delete Pending 按鈕（一般功能共用一顆「Delete Pending (EC)」、A4
+專屬一顆語意不同的「Delete Pending」——實際上是 Withdraw Maker Submit，不是真正取消交易），兩者
+都是點下去立刻呼叫 API、沒有任何審閱畫面。兩顆按鈕連同其對應的 Output／方法／`CheckerActionsService`
+內的手刻連動邏輯（`deleteMakerPending()`／`withdrawMakerPending()`）**整組移除**，因為 Maker
+Queue 自己的 Delete Pending 審閱流程（§20.2，`isWithdrawMakerSubmitCase()` 已正確處理 A4 情境，
+`siblingMovementIds` 已正確處理複合交易連動）本來就完整涵蓋這兩種情境，沒有任何功能因此消失。
+
+這個決定同時讓 §20.3 的 Cancel 導覽規則變得單純：Delete Pending 既然只剩 Maker Queue 一個入口，
+`onDeletePendingReviewCancelled()` 就永遠只需要「回到 Maker Queue」這一種行為，不需要再比照
+Fix Pending 那樣依來源做條件判斷。
+
+### 20.6 小結——Fix Pending 現在的完整入口／出口示意
+
+```text
+Transaction Input Screen
+        │
+      Submit
+        ↓
+ Fix Pending 按鈕 + Checker Pending Approvals 面板（Delete Pending 按鈕已移除，見 §20.5）
+        │
+        ├── 本地 Fix Pending → Save → 回到同畫面唯讀顯示，Checker 面板可立即 Release
+        │
+        └── 本地 Fix Pending → Cancel → 留在原 Transaction Input Screen（§20.3）
+
+Maker Queue（跨 session 待處理清單）
+        │
+        ├── Fix Pending → 導覽至 Transaction Input Screen，欄位可編輯
+        │        ├── Save → Checker Pending Approvals 面板
+        │        └── Cancel → 回到 Maker Queue（§20.3）
+        │
+        └── Delete Pending → 導覽至 Transaction Input Screen，全欄位唯讀 + Confirm/Cancel（§20.2）
+                 ├── Confirm Delete Pending → 執行刪除（含複合交易連動）→ 回到 Maker Queue
+                 └── Cancel → 回到 Maker Queue（不呼叫任何刪除 API，§20.3）
+```
+
+### 20.7 Fix Pending 試點範圍擴大：A1／A3 → A1／A2／A3／B1（同日，業務指示"把這A1 A3 修改要求放置B1 A2試試看"）
+
+驗證了同日稍早「頁面配置檔原先輸入或FIX PENDING可共用」這次重構（見 §20 本節開頭引用的日期）帶來的
+一個直接效益：**是否開放 Fix Pending 給某個 Function，現在整個系統裡只有一個地方要改**——
+`function-strategy.ts` 裡該 Function 自己的 `fixPendingEnabled: boolean`。「哪些欄位在 Fix Pending
+底下真正可編輯」完全不是另外手寫的第二份清單，而是重用 `buildFields()` 在一般 Submit 當下本來就會算
+出來的鎖定旗標（`deriveFixPendingLockFlags()`）——換言之，只要一個 Function 在一般輸入畫面的欄位
+鎖定行為本來就是對的，把 `fixPendingEnabled` 打開，Fix Pending 底下哪些欄位可編輯就自動跟著對，
+不需要另外為這個 Function 寫一份欄位清單。
+
+依此驗證：**A2**（非建立型，AMEND_INCREASE／AMEND_DECREASE／AMEND_EXPIRY_DATE）與 **A3** 是同一種
+形狀——`isCreatingMovement(model)` 為否，4 個合約層級欄位（Tolerance／Tenor Type／Tenor
+Days／Expiry Date）自動鎖定，只留 Amount（或 AMEND_EXPIRY_DATE 子選項底下的 newExpiryDate）可編輯；
+**B1**（建立型，EPLC_CONFIRMATION ISSUE）與 **A1** 是同一種形狀——4 個合約層級欄位隨 Amount 一併
+解鎖。兩者都只需要把 `function-strategy.ts` 裡對應的登記項打開 `fixPendingEnabled: true`，
+`builder-fields.ts`、`maker-queue.service.ts` 的 `fixPendingSupported()`、`maker-panel.component.
+html` 的按鈕顯示條件全部零改動、自動生效。
+
+**實機驗證（Export Confirmed／B1，Import LC／A2）**：
+
+- **B1**：Submit 一筆新的 Confirmed LC（Amount 40000）後，Maker Result 面板出現「Fix Pending」按鈕
+  （原本不會出現）；點入後 LC Number 依然是粗體、唯讀（B1 沒有「既有目標」可言，這個欄位從頭到尾
+  都不允許在 Fix Pending 底下修改，屬 §15 已核准的固定排除範圍），Amount 欄位可編輯；把 Amount
+  改成 45000 並按 Save Fix Pending，畫面回到 PENDING 狀態、顯示修正後的 45000，Checker Pending
+  Approvals 面板同時可見——與 A1 原本的 Fix Pending 行為完全一致。
+- **A2**：先驗證「選取交易保護」（§20.1 情境①）在 A2 身上依然成立——從 LC Index 挑選一筆既有 LC
+  後、尚未按下 Submit，畫面立刻切換成粗體保護卡、挑選器同時消失；接著填入 Amendment No.（AMD01）
+  與 Amount 後 Submit，Maker Result 面板同樣出現「Fix Pending」按鈕；點入後 Amendment No.
+  （`secondaryRef`）欄位**同時**呈現粗體加藍（17px／700，與 LC Number 同一套 `.tb-natural-key
+  --emphasized` 樣式）**且**唯讀鎖定（`disabled`，因為 2ndary Key 依 §15 任何 Function 都不允許在
+  Fix Pending 底下修改），Amount 欄位保持可編輯；按 Cancel 後留在同一個 Transaction Input Screen，
+  不做任何導覽——與本節從一開始就描述的「本地 Fix Pending Cancel」行為（§20.3）一致。
+
+三個測試套件重新跑過並全綠：Angular 1423/1423（98.77%/96.29%/97.04%/99.02%），microservice／
+backend 未受影響（`editPending()` 本來就對 movementType 不設限，唯一的閘門始終是 Angular 端的
+`fixPendingEnabled` 旗標）。`ng build --configuration production` 乾淨（僅原有兩則預期內警告）。
+
+### 20.8 Fix Pending 試點範圍再擴大：B2（比照 A2）＋ A3S Phase 4 複合交易 cascade 正式實作（2026-08-28，「使用同樣方式處理A3 A35 A4 & B2」）
+
+**B2**：與 A1→B1、A2→（本節）B2 同一套模式——`function-strategy.ts` 加上
+`fixPendingEnabled: true` 即完成，`deriveFixPendingLockFlags()`／Tolerance % 例外／
+`reconstructSubChoiceValue()` 全部沿用既有邏輯，零新增判斷分支。
+
+**A3S**：本文件 §2.5／127 行／316 行等處記錄的「Phase 4（複合功能 A3S/B3/B4/B5 的 Fix Pending，
+維持延後，下一輪再議）」——這裡正式記錄：**Phase 4 已針對 A3S 自己的 `documentArrivalWithSg`
+複合形狀單獨動工並完成**，B3／B4／B5 其餘複合形狀維持原判斷延後（範圍刻意窄於原提案的「複合功能
+全體」）。機制、測試、實機驗證細節記錄在本 session 的 `CLAUDE.md` 決策日誌（標題：「Fix Pending
+trial scope widened further — B2 (mirrors A2), A3S Phase 4 compound cascade implemented, A4
+confirmed structurally excluded」），不在此處重複——核心是 `BalanceService.
+applyArrivalWithSgCompoundEdit()`（microservice）比照 A3S 原始 Submit 的兩段式 create 順序，
+重算並取代 SG 那條配對腿，再呼叫既有單筆 `applyEditToMovement()` 處理 LC 自己的 UTILIZE 腿，兩者
+包在同一個 DB transaction 內。
+
+**A4**：確認並記錄維持排除（`fixPendingEnabled: false` 不變）——A4 結構上沒有自己的 movement
+（`releasesExistingMovementInPlace`），沒有東西可以 Fix Pending，不是需要動工的功能缺口。
+
+同一批次也發現並記錄了一個新的已知缺口（未修復，記入 `TODO.md`）：`editPending()`（Fix Pending
+的 EDIT 狀態轉換）完全沒有對 `acknowledgedAt` 做檢查，與已修復的 Defect #4（`cancel()`）同一類
+缺陷但範圍不同——`applyArrivalWithSgCompoundEdit()` 自己的防禦性檢查（找不到剛好一筆仍 PENDING
+的 SG 配對即拒絕）已經足夠安全地擋下這個情境，只是錯誤訊息不夠精確；比照 Defect #5/#6 的
+Option C 處置，記錄不修。
+
+## 21. 技術方案重新定案：原地修正記錄本身，取代整套「舊記錄標記＋新記錄」機制（2026-08-29，業務/BA 覆核）
+
+> **文件性質**：本節記錄的是**已經完成並上線的實作行為**，取代本文件 §2.2 起沿用至 §20 的原始技術
+> 方案。§1-§20 記錄的討論過程與拍板決議本身（Maker Queue、可修改欄位範圍排除 Currency、不綁定原
+> Maker、Event Seq 沿用原值等）全部維持有效，僅 §2.2 描述的「新記錄＋標記舊記錄」這個具體技術路線
+> 被本節取代。
+
+業務/BA 對這套機制重新審查後認為：把「Business Status」（Maker/Checker 看得到的狀態，如
+EARMARKING/PENDING/APPROVED）與一個純技術性的「舊版本標記」混在同一個 `status` 欄位裡，是資料模型
+上的錯誤，而且這個標記字面值確實會未經過濾出現在部分原始 API 回應裡（Angular 只在顯示層過濾）。
+
+**最終定案**：Fix Pending Save 改為**原地修正**——同一筆 `movementId` 與 `eventSeq`（身份完全不變），
+狀態直接回到 `PENDING`，不再插入第二筆記錄。修正前的內容（原始 Maker/送出時間、修正前後欄位值）
+改存到新的、獨立的 `fix_pending_audit` 稽核表（append-only，仿照既有 `delete_pending_audit` 的
+設計），不再留在 `balance_movements` 表裡。
+
+這個改動同時讓 §19.2 當初發現的冪等索引/前置檢查問題徹底消失（不再有第二筆記錄需要繞過既有的
+UNIQUE 約束或 `findByContractAndEventSeq()` 前置檢查），也讓 §6.2/§7.2 當初反覆討論的 Inquire
+Events 顯示鏈路問題不復存在（時間軸上天然只有一筆記錄）——技術方案變簡單，不是變複雜。
+
+微服務新增 `fix_pending_audit` 表與 `FixPendingAuditStore`、兩個資料庫遷移（新建表＋回填既有舊資料
+／重建 `balance_movements` 收窄 CHECK 約束並移除 Fix Pending 自己在 2026-08-27 新增的正向指標
+欄位）。三個測試套件全綠（Angular 1468/1468、microservice 728/728、backend 41/41，四項覆蓋率門檻
+皆過），並經直接 curl 與真實瀏覽器 UI 各驗證一次完整的 Submit → Fix Pending Save → Release 流程。
+完整技術細節見本 session 的 `CLAUDE.md` 決策日誌（標題：「Fix Pending §19 redesigned — in-place
+correction」）。

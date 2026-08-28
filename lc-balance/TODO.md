@@ -125,7 +125,7 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   `analysis/Balance-Component-InquireEvents-EventSeq-Effective-Order-Proposal-zh.md` §8（BA Code
   Review，複查第9節排序實作時發現）；本條目為該節的摘要版，方便在 TODO 清單裡直接追蹤。
   使用者於本次 Inquire Events 排序需求（見第9節）驗證期間查證發現：`domain/statusTransition.ts`
-  的 `LEGAL_TRANSITIONS`（第28行）允許 `REJECTED: { CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' }`——
+  的 `LEGAL_TRANSITIONS`（第28行）允許 `REJECTED: { CANCEL: 'CANCELLED', EDIT: ... }`——
   一筆已 Reject 的交易確實可以再被 Cancel（EC），並非終態。但 `store/balanceMovementStore.ts` 的
   `updateStatus()`（第450-466行）對 `released_by`/`released_at` 是直接覆寫（`SET released_by =
   @releasedBy, released_at = @releasedAt`），不像同一條 SQL 裡的 `reason_code` 那樣用
@@ -647,10 +647,21 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
   進這個 repo、也早於 §5-§15 這輪 BA↔工程覆核，最關鍵的是它必然沒反映 Currency 排除這條最終定案——
   照舊草稿做很可能做出「允許改 Currency」的錯誤版本。工程隊若認為舊草稿某些技術細節值得保留，須重新
   提出、走一次跟本文件同樣的 BA 複查流程，不得直接搬用。
-- [ ] **Phase 3（Fix Pending）尚未動工**——前置條件已全部解除（見上兩條），可以開始實作。依 §2.2
-  （新記錄＋舊記錄標記 SUPERSEDED＋`db.transaction()` 包裝）與 §15（欄位範圍）進行，驗收標準納入
-  §6.1（`db.transaction()` 中途失敗一致性測試）與 §7.2（Inquire Events 對 SUPERSEDED 記錄的顯示
-  驗證測試——顯示鏈路已存在，只需補測試）。
+- [x] **Phase 3（Fix Pending）已完成，並於 2026-08-29 重新設計**——最初依 §2.2（新記錄＋舊記錄標記為
+  已取代＋`db.transaction()` 包裝）與 §15（欄位範圍）落地，驗收標準含 §6.1（`db.transaction()` 中途失敗
+  一致性測試）與 §7.2（Inquire Events 對已取代記錄的顯示驗證測試）。2026-08-29 業務/BA 覆核後，該
+  「舊記錄標記＋插入新記錄」機制整套改為「原地修正同一筆記錄」（同一 `movementId`／`eventSeq`，狀態
+  直接回到 PENDING），修正前內容改存到新的 `fix_pending_audit` 稽核表——詳見 CLAUDE.md 對應決策記錄。
+- [ ] **2026-08-29 新增待辦（使用者指示「記錄在TODO」，尚未決定）**：`balance_movements` 表上的
+  `superseded_movement_id`／`BalanceMovement.supersededMovementId` 欄位，是 Design doc §8 就存在的
+  預留自我參照欄位，早於這次 Fix Pending 重新設計，目前**沒有任何程式碼路徑會真的寫入它**（純粹是
+  `rowToMovement()` 讀出來映射成型別，永遠是 `null`）——性質上跟 `ContractStatus.SUPERSEDED`／
+  `markSuperseded()`（合約版本置換用，同樣保留但從未觸發）是同一類「保留但從未使用」的既有基礎設施，
+  這次重新設計時特意保留未動（範圍只限定在 Fix Pending 自己 2026-08-27 新增的
+  `superseded_by_movement_id`，那個已經拿掉）。使用者後來指出這個欄位名稱本身仍帶有「superseded」字樣，
+  但尚未決定是否要連同這個既有欄位一起改名或移除——本項僅記錄這個未決問題本身，不預設答案，需要業務
+  /使用者明確指示範圍後才動手（若真的要動，屬於比這次 Fix Pending 重新設計更大的範圍，因為牽動的是
+  `ContractStatus.SUPERSEDED` 那一整套既有機制的措辭慣例，不只是這一個欄位）。
 
 ---
 
@@ -702,3 +713,40 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
   Angular 全套 1348/1348 綠燈，四項覆蓋率皆 ≥95%。瀏覽器對真實 dev server 實測：U01（Usance）合併成
   1 列、S01（Sight）合併成 1 列，點 U01 那列的 Delete Pending 後直接對 3 個底層合約各自的 movement
   查證，全部變成 `CANCELLED`，UI 上該列也正確消失、S01 那列不受影響。
+- **2026-08-28 新增待辦（使用者指示「暫時記到TODO即可」，尚未實作）**：A2／B2 的 Direction 子選項目前
+  是 Increase／Decrease／Expiry Date 三選一（`balance-component.model.ts` 的 `SubChoice.options`）。
+  使用者提出應該再增加第四個選項——**Tolerance**——讓 Maker 可以獨立提交一筆「純粹修改 Tolerance %」
+  的交易，而不是像現在這樣只能搭在 Increase／Decrease 的 Submit 或 Fix Pending 底下順便改
+  （見同日稍早「A2 Tolerance % FIX PENDING INCREASE/DECREASE時准許修改」那筆修改——**該筆已實作**，
+  Fix Pending 底下 Increase／Decrease 可以修正 Tolerance %，只影響這筆交易自己的 Ceiling，不寫回合約
+  本身的 `tolerance_pct`；本項是**另一件事**：一個全新的、獨立的第四個 Direction 選項）。實作前需要
+  業務先定案至少以下幾點，本項僅記錄需求本身，不預設答案：
+  1. 新選項底下 movementType 該是什麼——沿用某個既有值（如 `AMEND`）還是需要一個全新值？
+  2. 這筆「純改 Tolerance」交易本身要不要有自己的 Amount／Ceiling？還是完全不涉及金額，只改
+     `contract.tolerance_pct` 本身（比較接近 Fix Pending 目前對 A1／B1 的處理方式，但透過一筆
+     全新的、有自己 Checker Approve 流程的交易而非 Fix Pending 修正）？
+  3. 這筆交易一旦 Approve，是否要回頭影響「已經 RELEASED」的既有 movement 自己的
+     `ceiling_amount`／`contingentAccountEntry`？還是只影響「未來」新交易的 Ceiling 計算基礎？
+- [ ] **2026-08-28 新增待辦（使用者指示，尚未實作）**：Amount 欄位的輸入格式（小數位數）必須跟該筆交易
+  Currency 的 Decimal Place 掛勾；**計算結果**（`ceilingAmount`／`contingentAccountEntry` 等衍生金額）
+  的格式化顯示也要跟著同一個 Currency 的 Decimal Place 掛勾，不能各自獨立。目前
+  `CURRENCY_DECIMALS`/`decimalPlacesForCurrency()`/`amountExceedsCurrencyDecimals()`（`CLAUDE.md` 決策
+  日誌「Amount input follows the typed Currency's own decimal places」一節）只涵蓋 Maker 輸入 Amount
+  當下的驗證（Submit 前擋超過該幣別小數位數的輸入），尚未確認：(a) 顯示层（Maker Result 面板、Account
+  Entries 對話框、Look Up／Inquire Events 的金額欄）是否已經照 Currency 的 Decimal Place 格式化，還是
+  仍原樣顯示伺服器回傳的字串；(b) 伺服器端衍生金額（`computeCeilingAmount()` 等）的四捨五入/精度是否
+  也對齊同一張小數位數表，而非固定精度。本項僅記錄需求本身，實作前需盤點上述兩點目前的實際行為並跟業務
+  確認預期格式（例如 JPY 0 位小數 vs. USD 2 位小數時，衍生金額該如何顯示）。
+- [ ] **2026-08-28 發現，尚未修復（Phase 4 A3S compound Fix Pending 實作過程中順帶發現）**：
+  `BalanceService.editPending()`（Fix Pending 的 EDIT 狀態轉換）完全沒有對 `acknowledgedAt` 做任何檢查——
+  跟已修復的 Defect #4（`cancel()` 已補上「Checker 已 Approve 的 A3/A3S UTILIZE 不得 Delete Pending」
+  guard）是同一類缺陷，但 `editPending()` 這邊還沒補。實務影響：A3/A3S 的 UTILIZE 一旦被 Checker
+  acknowledge（EARMARKED，但 `status` 仍是 PENDING，因為 A3/A3S 的 Checker 動作本來就是 acknowledgment-
+  only），目前仍然可以對它 Fix Pending——對純 A3（非 compound）沒有立即的資料正確性風險，但對 A3S
+  （Phase 4 compound cascade）而言，若 SG 那條腿已經被 Checker 真正 Release 過（狀態變成 RELEASED，
+  不再是 PENDING），`applyArrivalWithSgCompoundEdit()` 目前的防禦性檢查（「找不到剛好一筆仍是 PENDING
+  的 SG 配對」→ 拋出 `RequestValidationError`）會正確擋下這個情境、不會誤改已入帳的 SG 記錄——換句話說
+  結果是「安全地拒絕」，不是「資料損毀」，但錯誤訊息不夠精確（沒有明講「這筆 SG 已經 Approve 過，不能
+  再修改」）。本項記錄為已知缺口，比照 Defect #5/#6 的處置方式（Option C，先記錄不修），需要業務確認
+  是否要把 Defect #4 的 guard 也套用到 `editPending()`（同時涵蓋 A3/A3S 的 Fix Pending 與 Delete
+  Pending），或維持現狀（Fix Pending 目前的防禦性拒絕已經足夠安全）。

@@ -113,9 +113,18 @@ export function lcNumberFromParent(model: BuilderModel): boolean {
  * Whatever LC Number is currently resolved for THIS function, from whichever picker shape it came from
  * (freely typed A1/B1, Parent picker A6/A8, flat Catalog A2-A5/A3S, or the LC+IB/SG two-field search
  * A7/A9/B5). Feeds both the Checker queue and runLookup()'s auto-fill.
+ *
+ * `lcNumberFromParent` (A6/A8/B3) falls back to `s.naturalKey.lcNumber` when `selectedParent` is null —
+ * bug found live 2026-08-28 ("Maker Queue -> Fix Pending... LC Number —"): Fix Pending's own screen
+ * reconstruction never re-resolves `selectedParent` (no Parent LC picker interaction happens during
+ * review), only `naturalKey.lcNumber` itself — but that field is ALREADY kept in sync with
+ * `selectedParent.naturalKey.lcNumber` during a normal live flow too (`onSelectParent()`'s own
+ * `this.naturalKey.lcNumber = this.selectedParent.naturalKey.lcNumber` assignment, unconditional for
+ * every creating function), so this fallback is a genuine no-op outside Fix Pending, not a new source of
+ * truth — it just also works during Fix Pending's own reconstructed-model-only state.
  */
 export function contextLcNumber(s: ContextRefState): string | null {
-  if (lcNumberFromParent(s.model)) return s.selectedParent?.naturalKey.lcNumber ?? null;
+  if (lcNumberFromParent(s.model)) return s.selectedParent?.naturalKey.lcNumber ?? (s.naturalKey.lcNumber || null);
   if (isCreatingMovement(s.model)) return s.naturalKey.lcNumber || null;
   if (usesTwoFieldSearch(s.model)) return s.selectedContract?.naturalKey.lcNumber ?? (s.searchNaturalKey.lcNumber || null);
   return s.selectedContract?.naturalKey.lcNumber ?? null;
@@ -132,6 +141,21 @@ export function contextSecondaryRef(s: ContextRefState): string | null {
   if (isCreatingMovement(s.model)) return s.naturalKey[field] || null;
   if (usesTwoFieldSearch(s.model)) return s.selectedContract?.naturalKey[field] ?? (s.searchNaturalKey[field] || null);
   return s.selectedContract?.naturalKey[field] ?? null;
+}
+
+/**
+ * Whatever Tenor Type is currently resolved for THIS function's own target contract, from whichever
+ * picker shape supplied it — 2026-08-28, "A2 - A11, B2 - B7 display the Tenor Type as protected field".
+ * `selectedContract` (the specific SG/Acceptance/etc. record, once Step 2 resolves) is checked first —
+ * SHGT contracts carry no `tenorType` of their own (Tenor doesn't apply to Shipping Guarantees), so the
+ * `??` fallback to `selectedParent` (the LC itself) picks up the right value for A9 automatically, same
+ * reasoning `carriedCurrency`'s own fallback order already uses. A1/B1 (still typing/choosing it) and A6
+ * (its own dedicated `tenorTypeOptions`-driven Formly field, already "carried from the parent LC,
+ * protected") are excluded by the TEMPLATE's own gate, not by this function — both would resolve a real
+ * value here too if called, this is simply the wrong display mechanism for their own shape.
+ */
+export function contextTenorType(s: ContextRefState): string | null {
+  return s.selectedContract?.tenorType ?? s.selectedParent?.tenorType ?? null;
 }
 
 /**

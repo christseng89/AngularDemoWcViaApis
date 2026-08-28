@@ -42,16 +42,19 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
 
   // Dev-only — Business Case Runner's "Cleanup Database Tables" button. Standalone: wipes every
-  // balance_movements/balance_contracts row (delete_pending_audit first, then movements, then contracts —
-  // satisfying the FK from delete_pending_audit to both, and from movements to contracts) so a fresh
-  // sequence of Business Cases can run without natural-key collisions. Deliberately bypasses the
-  // append-only store layer (BalanceMovementStore/BalanceContractStore/DeletePendingAuditStore never
-  // expose a delete) — this is a disclosed, dev-only exception to that invariant, not a new persistence
-  // pattern. delete_pending_audit (added for the Fix Pending/Delete Pending Phase, §10) has FK
-  // REFERENCES to both other tables with no ON DELETE CASCADE (PRAGMA foreign_keys = ON) — omitting it
-  // here throws a foreign key constraint failure the instant any Delete Pending audit row exists.
+  // balance_movements/balance_contracts row (every table with an FK into either one first, then
+  // movements, then contracts) so a fresh sequence of Business Cases can run without natural-key
+  // collisions. Deliberately bypasses the append-only store layer (BalanceMovementStore/
+  // BalanceContractStore/DeletePendingAuditStore/FixPendingAuditStore never expose a delete) — this is a
+  // disclosed, dev-only exception to that invariant, not a new persistence pattern. Both audit tables
+  // have FK REFERENCES to balance_movements/balance_contracts with no ON DELETE CASCADE (PRAGMA
+  // foreign_keys = ON) — omitting either here throws a foreign key constraint failure the instant any
+  // audit row exists (fix_pending_audit's own omission is exactly this same class of bug, found live
+  // 2026-08-29 — every new FK-constrained table needs this same check, not just a green test suite for
+  // the new feature alone).
   app.post('/admin/reset-database', (_req, res) => {
     db.exec('DELETE FROM delete_pending_audit');
+    db.exec('DELETE FROM fix_pending_audit');
     db.exec('DELETE FROM balance_movements');
     db.exec('DELETE FROM balance_contracts');
     res.json({ status: 'ok' });

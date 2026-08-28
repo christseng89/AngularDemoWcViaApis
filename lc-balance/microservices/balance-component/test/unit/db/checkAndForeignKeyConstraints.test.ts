@@ -159,7 +159,7 @@ describe('balance_movements CHECK constraints', () => {
   });
 
   test('accepts every real MovementStatus value', () => {
-    ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'].forEach((v, i) => {
+    ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED'].forEach((v, i) => {
       expect(() => insertMovement(db, baseMovementRow({ movement_id: `m-${i}`, event_seq: i + 1, status: v }))).not.toThrow();
     });
   });

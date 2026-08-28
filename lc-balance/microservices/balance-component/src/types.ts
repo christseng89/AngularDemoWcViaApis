@@ -48,11 +48,15 @@ export type ContractStatus = 'ACTIVE' | 'SUPERSEDED' | 'CLOSED' | 'CANCELLED' | 
 /**
  * §4 Maker/Checker lifecycle. PENDING is created by a maker (createdBy);
  * every other state is a Checker action (RELEASED/REJECTED, releasedBy) or a
- * Maker action on their own not-yet-released record (CANCELLED/SUPERSEDED).
- * Design doc §8: a transition into an illegal target state from the movement's
- * CURRENT status must fail loudly — see domain/statusTransition.ts.
+ * Maker action on their own not-yet-released record (CANCELLED). Design doc
+ * §8: a transition into an illegal target state from the movement's CURRENT
+ * status must fail loudly — see domain/statusTransition.ts. Fix Pending
+ * (§19, redesigned 2026-08-29) corrects a PENDING/REJECTED record IN PLACE
+ * (same movementId/eventSeq, landing back at PENDING) rather than minting a
+ * second row — there is no separate "replaced" status; the pre-edit content
+ * is preserved in FixPendingAuditRecord below, not in this table.
  */
-export type MovementStatus = 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED' | 'SUPERSEDED';
+export type MovementStatus = 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED';
 
 /**
  * MEMO (business-confirmed 2026-08-14, Export LC design): an Unconfirmed
@@ -161,6 +165,7 @@ export interface BalanceMovement {
   contingentAccountEntry?: ContingentAccountEntry | null;
   lmtsReservationId?: string | null;
   status: MovementStatus;
+  /** Design doc §8 — reserved, pre-dating Fix Pending and unrelated to it. Never actually written by any current code path (same "reserved but unused" posture as ContractStatus.SUPERSEDED). */
   supersededMovementId?: string | null;
   reversalOfMovementId?: string | null;
   reasonCode?: string | null;
@@ -220,6 +225,14 @@ export interface BalanceMovement {
    */
   cancelledBy?: string | null;
   cancelledAt?: string | null;
+  /**
+   * Fix Pending §19 (redesigned 2026-08-29) — who last corrected this record's content and when, via an
+   * in-place Fix Pending Save (same movementId/eventSeq, `createdBy`/`createdAt` also updated to this
+   * editor/time — see `FixPendingAuditRecord` for the preserved pre-edit content and original Maker).
+   * Null until this record has ever been Fix-Pending-edited.
+   */
+  editedBy?: string | null;
+  editedAt?: string | null;
   /**
    * EPLC_EXAMINATION only (2026-08-15, "Present Docs 須有一個 Present Docs Earmark (Pending/Approved)
    * 來控制"). HISTORICAL FIELD, no longer written — superseded 2026-08-18 (business instruction, "所有
@@ -392,6 +405,32 @@ export interface DeletePendingAuditWithContract extends DeletePendingAuditRecord
   lcNumber: string;
   ibNumber: string | null;
   sgNumber: string | null;
+}
+
+/**
+ * Fix Pending §19 (redesigned 2026-08-29) — one row per `BalanceService.editPending()` correction,
+ * mirroring `DeletePendingAuditRecord`'s own append-only, purpose-built shape. Fix Pending now corrects
+ * the movement's live row IN PLACE (same movementId/eventSeq) rather than minting a second row, so this
+ * table is the only place the pre-edit content survives. `editSeq` mirrors `deleteSeq`'s own per-movement
+ * numbering (a movement can be Fix-Pending-edited more than once).
+ */
+export interface FixPendingAuditRecord {
+  auditId: string;
+  editSeq: number;
+  movementId: string;
+  balanceContractId: string;
+  eventSeq: number;
+  /** The record's own true Maker/submit-time, as they stood immediately before this edit — never overwritten going forward. */
+  originalCreatedBy: string;
+  originalCreatedAt: string;
+  /** The movement's own status immediately before this edit — PENDING or REJECTED (same two source states `statusTransition.ts`'s own EDIT action allows). */
+  statusBefore: 'PENDING' | 'REJECTED';
+  /** Full pre-edit movement content, JSON. */
+  beforeSnapshot: Record<string, unknown>;
+  /** The corrected field values this edit applied, JSON. */
+  afterSnapshot: Record<string, unknown>;
+  editedBy: string;
+  editedAt: string;
 }
 
 export interface BalanceSnapshot {

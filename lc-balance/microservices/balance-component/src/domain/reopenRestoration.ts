@@ -21,6 +21,9 @@
  * contract already reopened once and re-closed again is handled correctly by the same walk with no extra
  * bookkeeping: the intervening REOPEN movement itself is neither EXPIRE nor CLOSE, so the walk naturally
  * stops there rather than double-counting the earlier chain.
+ *
+ * A11/B7 Fix Pending §19 (redesigned 2026-08-29) corrects a REOPEN's own row IN PLACE (same
+ * movementId/eventSeq, no second row) — this walk never sees a stale duplicate, no filtering needed.
  */
 import Decimal from 'decimal.js';
 import { parseMonetaryAmount, ZERO } from '../money';

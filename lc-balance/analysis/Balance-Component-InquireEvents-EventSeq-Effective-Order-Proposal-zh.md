@@ -350,8 +350,8 @@ Submit/EC/Approve 三件事各自獨立可查而刻意拆開的，`toEventRows()
 
 ```ts
 const LEGAL_TRANSITIONS: Record<MovementStatus, Partial<Record<MovementAction, MovementStatus>>> = {
-  PENDING: { RELEASE: 'RELEASED', REJECT: 'REJECTED', CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },
-  REJECTED: { CANCEL: 'CANCELLED', EDIT: 'SUPERSEDED' },   // ← REJECTED 也能被 CANCEL
+  PENDING: { RELEASE: 'RELEASED', REJECT: 'REJECTED', CANCEL: 'CANCELLED', EDIT: 'PENDING' },
+  REJECTED: { CANCEL: 'CANCELLED', EDIT: 'PENDING' },   // ← REJECTED 也能被 CANCEL
   ...
 };
 ```

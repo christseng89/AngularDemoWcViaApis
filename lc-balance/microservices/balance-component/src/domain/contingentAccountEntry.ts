@@ -152,6 +152,20 @@ export function deriveContingentAccountEntry(params: {
   if (baseDirection === undefined) return null;
 
   const signedAmount = parseMonetaryAmount(params.amount);
+
+  // User-directed 2026-08-28 ("A10 and A11 if Tight Available Balance = 0 then no entries should be
+  // generated") — CLOSE/EXPIRE/REOPEN are the only movementTypes where a genuinely zero amount is a
+  // legitimate value at all (assertValidAmount()'s own doc comment: "an already-fully-utilized LC that
+  // has since expired/been closed has 0 left to write off/restore, which is a legitimate figure" — every
+  // other movementType is rejected outright by assertValidAmount() before ever reaching here, so this
+  // guard can never silently swallow a real, non-zero-but-mistaken amount elsewhere). A zero-value Dr/Cr
+  // voucher carries no real accounting information — same "no real balance effect, don't generate a
+  // placeholder pair" reasoning AMEND_EXPIRY_DATE/EPLC_EXAMINATION already use above, just triggered by
+  // the AMOUNT being zero here rather than the movementType itself never having one.
+  if (signedAmount.isZero() && (params.movementType === 'CLOSE' || params.movementType === 'EXPIRE' || params.movementType === 'REOPEN')) {
+    return null;
+  }
+
   // AMEND (EPLC_CONFIRMATION only, Design doc/B2's own registry) is the one movementType whose fixed
   // MOVEMENT_DIRECTION coefficient (+1) does not by itself distinguish Increase from Decrease —
   // Balance Component has no separate AMEND_INCREASE/AMEND_DECREASE for EPLC_CONFIRMATION the way

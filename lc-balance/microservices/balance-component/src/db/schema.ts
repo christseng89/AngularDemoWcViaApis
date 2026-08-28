@@ -50,7 +50,7 @@ export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCEL
 
 export const TENOR_TYPE_VALUES = ['SIGHT', 'BUYERS_USANCE', 'SELLERS_USANCE', 'DP', 'DA'] as const;
 
-export const MOVEMENT_STATUS_VALUES = ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'] as const;
+export const MOVEMENT_STATUS_VALUES = ['PENDING', 'RELEASED', 'REJECTED', 'CANCELLED'] as const;
 
 export const EXPOSURE_NATURE_VALUES = ['CONTINGENT', 'ACTUAL', 'MEMO'] as const;
 
@@ -161,6 +161,10 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   contingent_account_entry TEXT,
   lmts_reservation_id     TEXT,
   status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
+  -- Design doc §8 — reserved self-referencing pointer, pre-dating Fix Pending and unrelated to it
+  -- (Fix Pending §19 uses its own superseded_by_movement_id, added/removed separately — see
+  -- migrations.ts 19/22). Never actually written by any current code path, same "reserved but unused"
+  -- posture as ContractStatus.SUPERSEDED/markSuperseded() above.
   superseded_movement_id  TEXT REFERENCES balance_movements(movement_id),
   reversal_of_movement_id TEXT REFERENCES balance_movements(movement_id),
   reason_code             TEXT,
@@ -246,6 +250,12 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   -- released_by/released_at (see types.ts BalanceMovement.cancelledAt for why).
   cancelled_by             TEXT,
   cancelled_at             TEXT,
+  -- Fix Pending §19 (redesigned 2026-08-29) — editPending() now corrects this row IN PLACE (same
+  -- movement_id/event_seq); edited_by/edited_at record who last did so and when. The pre-edit content
+  -- (original created_by/created_at, before/after values) lives in fix_pending_audit below, not here —
+  -- created_by/created_at on THIS row are updated to the editor/edit-time, same as every other field.
+  edited_by                TEXT,
+  edited_at                TEXT,
   -- F1 proposal §13.1 item 2 (BA-ratified 2026-08-25) — AMEND_EXPIRY_DATE/REOPEN's own upstream consent
   -- passthrough. This component does NOT judge whether consent was actually obtained — it only accepts,
   -- shape-validates (consent_status against a fixed enum, see validation/requestSchema.ts), and persists
@@ -256,7 +266,9 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   consent_status           TEXT
 );
 
--- Design doc §8 — idempotency key: (balanceContractId, eventSeq).
+-- Design doc §8 — idempotency key: (balanceContractId, eventSeq). Fix Pending §19 (redesigned
+-- 2026-08-29) corrects a movement's row IN PLACE rather than inserting a replacement, so this stays a
+-- plain, unconditional UNIQUE index — there is only ever one row per (contract, eventSeq), forever.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movements_idempotency
   ON balance_movements(balance_contract_id, event_seq);
 
@@ -307,4 +319,32 @@ CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_movement
 
 CREATE INDEX IF NOT EXISTS idx_delete_pending_audit_contract
   ON delete_pending_audit(balance_contract_id);
+
+-- Fix Pending §19 (redesigned 2026-08-29) — a dedicated, append-only audit trail for every Fix Pending
+-- Save, mirroring delete_pending_audit's own shape/rationale above. editPending() now corrects a
+-- movement's row IN PLACE (same movement_id/event_seq, see balance_movements' own edited_by/edited_at
+-- comment) rather than inserting a second row, so this table is the only place the pre-edit content
+-- (original Maker/submit-time, before/after values) survives.
+CREATE TABLE IF NOT EXISTS fix_pending_audit (
+  audit_id                TEXT PRIMARY KEY,
+  -- Same per-natural-key numbering convention as delete_pending_audit.delete_seq above — grouped by the
+  -- movement's own movement_id here (not natural key), since a Fix Pending edit never changes identity.
+  edit_seq                 INTEGER NOT NULL,
+  movement_id              TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  balance_contract_id      TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+  event_seq                INTEGER NOT NULL,
+  original_created_by      TEXT NOT NULL,
+  original_created_at      TEXT NOT NULL,
+  status_before            TEXT NOT NULL CHECK (status_before IN ('PENDING', 'REJECTED')),
+  before_snapshot          TEXT NOT NULL, -- JSON, full pre-edit movement content
+  after_snapshot           TEXT NOT NULL, -- JSON, the corrected field values this edit applied
+  edited_by                TEXT NOT NULL,
+  edited_at                TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fix_pending_audit_movement
+  ON fix_pending_audit(movement_id);
+
+CREATE INDEX IF NOT EXISTS idx_fix_pending_audit_contract
+  ON fix_pending_audit(balance_contract_id);
 `;

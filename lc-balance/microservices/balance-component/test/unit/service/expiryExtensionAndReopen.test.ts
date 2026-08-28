@@ -329,6 +329,108 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     expect(movements.find((m) => m.movementType === 'REOPEN')?.reasonCode).toBe('TEST_REOPEN_REASON');
   });
 
+  // User-directed 2026-08-28 ("A10 and A11 if Tight Available Balance = 0 then no entries should be
+  // generated. Refer to S01 for Import") — the real S01 shape (fully UTILIZE'd to Confirmed Balance 0,
+  // then Closed) reproduced end to end: the CLOSE's own ceilingAmount is 0 (nothing left to write off),
+  // so computeReopenRestoreAmount()'s own trailing-run sum is ALSO 0 — a legitimate REOPEN with nothing
+  // to restore. deriveContingentAccountEntry() now returns null for this case too, same as the analogous
+  // zero-amount CLOSE case in closeFunction.test.ts.
+  test('restore-chain total is genuinely 0 (LC fully utilized before Close, S01-shaped) — no contingentAccountEntry is generated on either the CLOSE or the REOPEN', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueImportLc(service, 'REOPEN-ZERO-001', { expiryDate: '2099-01-01' });
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+      sourceTransactionRef: 'B01',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    service.submitByMaker(utilize.movement.movementId, 'maker1'); // BAL-123 — Sight-tenor UTILIZE requires Maker Submit before Release
+    service.release(utilize.movement.movementId, 'checker1');
+    expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('0');
+
+    const close = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'CLOSE',
+      eventSeq: 3,
+      amount: '0',
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
+    });
+    if (!close.created) throw new Error('expected a new movement');
+    expect(close.movement.contingentAccountEntry).toBeNull();
+    service.release(close.movement.movementId, 'checker1');
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-ZERO-001' }, true)?.status).toBe('CLOSED');
+
+    const reopen = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'REOPEN',
+      eventSeq: 4,
+      amount: '0',
+      currency: 'USD',
+      createdBy: BATCH_MAKER_ACTOR,
+      reasonCode: 'TEST_REOPEN_REASON',
+    });
+    if (!reopen.created) throw new Error('expected a new movement');
+    expect(reopen.movement.ceilingAmount).toBe('0');
+    expect(reopen.movement.contingentAccountEntry).toBeNull();
+    const released = service.release(reopen.movement.movementId, BATCH_CHECKER_ACTOR);
+    expect(released.status).toBe('RELEASED');
+    expect(released.contingentAccountEntry).toBeNull();
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-ZERO-001' })?.status).toBe('ACTIVE');
+    expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('0');
+  });
+
+  // Same root cause/fix as closeFunction.test.ts's own "Fix Pending on a still-PENDING CLOSE movement
+  // itself" regression (2026-08-28) — reopenShaped's own gatherEventTree() call re-queries the DB rather
+  // than reading ctx.existingMovements, so it always saw the very PENDING REOPEN movement being edited as
+  // an "open event" and self-rejected every Fix Pending Save for A11/B7 too.
+  test('Fix Pending on a still-PENDING REOPEN movement itself does not self-reject via the "open Events" eligibility scan', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issueImportLc(service, 'REOPEN-FIXPENDING-001', { expiryDate: '2099-01-01' });
+    const close = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'CLOSE',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'TEST_CLOSE_REASON',
+    });
+    if (!close.created) throw new Error('expected a new movement');
+    service.release(close.movement.movementId, 'checker1');
+
+    const reopen = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'REOPEN',
+      eventSeq: 3,
+      amount: '0',
+      currency: 'USD',
+      createdBy: 'maker1',
+      reasonCode: 'ORIGINAL_REOPEN_REASON',
+    });
+    if (!reopen.created) throw new Error('expected a new movement');
+
+    const replacement = service.editPending(reopen.movement.movementId, { amount: reopen.movement.amount, reasonCode: 'CORRECTED_REOPEN_REASON', editedBy: 'maker1' });
+    expect(replacement.status).toBe('PENDING');
+    expect(replacement.reasonCode).toBe('CORRECTED_REOPEN_REASON');
+    expect(replacement.ceilingAmount).toBe('10000'); // re-derived from the same restore-chain computation, unaffected by the edit
+
+    const released = service.release(replacement.movementId, 'checker1');
+    expect(released.status).toBe('RELEASED');
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-FIXPENDING-001' })?.status).toBe('ACTIVE');
+    expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('10000');
+  });
+
   test('path B (EXPIRE then AUTO CLOSE — §9.7 chain reversal): reverses BOTH the EXPIRE and the CLOSE, restores the ORIGINAL balance (not 0)', () => {
     // Fixed now() so the EXPIRE's own effectiveTo (F1 §13.5 Auto Close Grace Period anchor) is
     // deterministic — the AUTO CLOSE sweep below is called well past its 2-business-day grace window.

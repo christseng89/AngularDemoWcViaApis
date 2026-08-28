@@ -311,6 +311,7 @@ export class PickerSelectionService {
     }
     if (selectedFunction?.payableMovementInstrumentType) {
       this.loadPayableMovementsAcrossChildContracts(
+        contractId,
         selectedFunction.payableMovementInstrumentType,
         lcNumber,
         selectedFunction,
@@ -358,8 +359,23 @@ export class PickerSelectionService {
    * its still-PENDING/RELEASED record. One `EPLC_EXAMINATION` contract carries at most one `CREATE`.
    * Excludes anything with `presentDocsConsumedAt` already set — a status filter alone isn't enough once
    * a presentation can be RELEASED yet already consumed by an earlier B4 (a no-op for A6's candidates).
+   *
+   * Real bug fixed 2026-08-29 (live-reported, "B4 S02 E01 Submit -> Maker Queue (看不到) -> B4 還可以選同一筆
+   * 再SUBMIT" — a duplicate `sourceTransactionRef` rejection at the SECOND Submit): unlike A4/A6 (whose own
+   * candidate filter above already excludes `!m.makerSubmittedAt` — set on the referenced UTILIZE ITSELF
+   * at A6's own CREATE time), B4's own HONOUR/ACCEPT is a genuinely SEPARATE movement referencing the B3
+   * CREATE via `referencedTransactionId` — the B3 record itself carries no equivalent "already has a live
+   * attempt" marker, so a still-PENDING (not yet Released or Rejected/Cancelled) B4 attempt left the
+   * SAME B3 presentation fully re-pickable. Fixed by ALSO fetching the parent Confirmation's own
+   * `contractId` movements (now passed in) alongside the child catalog fetch, and excluding any B3
+   * candidate whose `movementId` is already `referencedTransactionId` on a still-PENDING parent movement
+   * — the same "referencing sibling still live" signal `resolveLinkedAccountingMovement()` already reads
+   * elsewhere for a different purpose (Account Entries), applied here to eligibility instead. A REJECTED
+   * or CANCELLED prior B4 attempt does NOT exclude the candidate — exactly the case this bug report's own
+   * Delete Pending step needs to keep working (re-pick the same E01 after the first attempt is retired).
    */
   private loadPayableMovementsAcrossChildContracts(
+    contractId: string | undefined,
     childInstrumentType: InstrumentType,
     lcNumber: string | undefined,
     selectedFunction: TransactionFunction | null,
@@ -372,15 +388,21 @@ export class PickerSelectionService {
     }
     const wantedMovementType = selectedFunction?.payableMovementType ?? 'UTILIZE';
     this.payableMovementsLoading = true;
-    this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, lcNumber).subscribe({
-      next: (result) => {
-        if (!result.items.length) {
+    forkJoin({
+      children: this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, lcNumber),
+      parentMovements: contractId ? this.api.listMovements(contractId).pipe(catchError(() => of([] as BalanceMovement[]))) : of([] as BalanceMovement[]),
+    }).subscribe({
+      next: ({ children, parentMovements }) => {
+        const alreadyReferencedByPendingParent = new Set(
+          parentMovements.filter((m) => m.status === 'PENDING' && m.referencedTransactionId).map((m) => m.referencedTransactionId as string),
+        );
+        if (!children.items.length) {
           this.payableMovementsLoading = false;
           this.payableMovements = [];
           return;
         }
         forkJoin(
-          result.items.map((c) =>
+          children.items.map((c) =>
             this.api.listMovements(c.balanceContractId).pipe(
               // EPLC_EXAMINATION's EB Number lives on the contract's naturalKey.ibNumber — merge it onto
               // each movement as a synthetic sourceTransactionRef so callers can read that field generically.
@@ -395,7 +417,13 @@ export class PickerSelectionService {
           const requiresRelease = !!selectedFunctionStrategy?.checkerRelease.sourceAlreadyReleasedBeforePick;
           this.payableMovements = movementLists
             .flat()
-            .filter((m) => m.movementType === wantedMovementType && m.status === (requiresRelease ? 'RELEASED' : 'PENDING') && !m.presentDocsConsumedAt);
+            .filter(
+              (m) =>
+                m.movementType === wantedMovementType &&
+                m.status === (requiresRelease ? 'RELEASED' : 'PENDING') &&
+                !m.presentDocsConsumedAt &&
+                !alreadyReferencedByPendingParent.has(m.movementId),
+            );
           this.payableMovementsPaging.total = this.payableMovements.length;
           if (this.payableMovements.length === 1) {
             onAutoPicked(this.selectPayMovement(this.payableMovements[0].movementId, selectedFunctionStrategy, selectedFunction?.secondaryRefLabel));
@@ -448,10 +476,27 @@ export class PickerSelectionService {
       needsRebuildFields: false,
       clearsSubmitResult: false,
     };
-    if (selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedPayMovement) {
-      outcome.naturalKeyIbNumber = this.selectedPayMovement.sourceTransactionRef ?? '';
+    // 2026-08-28 ("A4 銀幕改成配置方式"／"A4 沒抓到2ndary number" — live-reported bug) — widened from
+    // settlesDocumentArrival-only (A6/B4) to also cover releasesExistingMovementInPlace (A4): A4's own
+    // template used to read `pickerSelection.selectedPayMovement.amount`/`.sourceTransactionRef` DIRECTLY
+    // in a bespoke readout, bypassing `model` entirely — masking the fact that THIS method never actually
+    // populated `modelAmount`/`modelSecondaryRef` for A4's own shape. Once that bespoke readout was
+    // replaced with the generic, config-driven Amount field + protected-natural-key card (both reading
+    // `model.amount`/`model.secondaryRef`), the underlying gap became visible: neither ever got set.
+    if ((selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival || selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) && this.selectedPayMovement) {
+      // naturalKeyIbNumber only applies to A6/B4 — they CREATE a new contract whose own natural key needs
+      // it; A4 creates nothing (submitA4() only ever calls maker-submit on the picked movementId), so
+      // naturalKey.ibNumber is irrelevant to its own Submit and stays untouched.
+      if (selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival) {
+        outcome.naturalKeyIbNumber = this.selectedPayMovement.sourceTransactionRef ?? '';
+      }
       // B4 (EPLC_CONFIRMATION) has no ibNumber field — carries its EB Number via secondaryRef instead.
-      if (secondaryRefLabel) outcome.modelSecondaryRef = this.selectedPayMovement.sourceTransactionRef ?? '';
+      // A4 has no secondaryRefLabel of its own at all (its "2ndary Number" is the picked record's own
+      // reference, not a freely-typed natural-key field — see the protected-card template's own doc
+      // comment), but still needs this value for that same protected-card readout.
+      if (secondaryRefLabel || selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+        outcome.modelSecondaryRef = this.selectedPayMovement.sourceTransactionRef ?? '';
+      }
       outcome.modelAmount = this.selectedPayMovement.amount;
       outcome.needsRebuildFields = true;
     }

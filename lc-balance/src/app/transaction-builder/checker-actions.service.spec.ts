@@ -40,6 +40,7 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
     acknowledge: jest.fn(() => of({ movementId: 'acknowledged', status: 'PENDING' })),
     withdrawMakerSubmit: jest.fn(() => of({ movementId: 'withdrawn', status: 'PENDING', makerSubmittedAt: null })),
     findByBusinessEventId: jest.fn(() => of([] as BalanceMovement[])),
+    editPending: jest.fn(() => of(makeMovement({ movementId: 'mv-edited', amount: '999' }))),
     ...overrides,
   } as unknown as BalanceComponentApiService;
 }
@@ -437,81 +438,70 @@ describe('CheckerActionsService.reject() — prefers selectedCheckerMovement ove
   });
 });
 
-describe('CheckerActionsService.deleteMakerPending() — BAL-132 createdBy runtime guard', () => {
-  it('fails cleanly, without calling the API, when createdBy is null', (done) => {
-    const api = makeApi();
-    const service = new CheckerActionsService(api);
-    const ctx = makeContext({ createdBy: null, submitResult: makeMovement({ movementId: 'mv-1' }) });
-
-    service.deleteMakerPending(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('no Maker (createdBy) is known');
-      expect(api.cancel).not.toHaveBeenCalled();
-      done();
-    });
-  });
-
-  it('still cancels normally when createdBy is present (unaffected by the new guard)', (done) => {
-    const api = makeApi();
-    const service = new CheckerActionsService(api);
-    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-2' }) });
-
-    service.deleteMakerPending(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('released');
-      expect(api.cancel).toHaveBeenCalledWith('mv-2', 'maker1', 'MAKER_EC');
-      done();
-    });
-  });
-});
-
-describe('CheckerActionsService.withdrawMakerPending() — A4\'s own Delete Pending (business-confirmed 2026-08-27)', () => {
-  it('fails cleanly, without calling the API, when createdBy is null', (done) => {
-    const api = makeApi();
-    const service = new CheckerActionsService(api);
-    const ctx = makeContext({ createdBy: null, submitResult: makeMovement({ movementId: 'mv-1' }) });
-
-    service.withdrawMakerPending(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('no Maker (createdBy) is known');
-      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
-      done();
-    });
-  });
-
+describe('CheckerActionsService.editPending() — Fix Pending trial (A1/A3, generic mechanism)', () => {
   it('fails cleanly, without calling the API, when submitResult is null', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);
     const ctx = makeContext({ createdBy: 'maker1', submitResult: null });
 
-    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+    service.editPending(ctx, { amount: '999' }).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('no A4 submission is known');
-      expect(api.withdrawMakerSubmit).not.toHaveBeenCalled();
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('no submission is known');
+      expect(api.editPending).not.toHaveBeenCalled();
       done();
     });
   });
 
-  it('routes to api.withdrawMakerSubmit (not cancel) with submitResult\'s own movementId and ctx.createdBy', (done) => {
+  it('calls api.editPending with submitResult\'s own movementId, the patched amount, and ctx.createdBy as editedBy', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);
-    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-2' }) });
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1' }) });
 
-    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+    service.editPending(ctx, { amount: '150000' }).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');
-      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-2', 'maker1');
-      expect(api.cancel).not.toHaveBeenCalled();
+      if (outcome.kind === 'released') expect(outcome.result.movementId).toBe('mv-edited');
+      expect(api.editPending).toHaveBeenCalledWith('mv-1', { amount: '150000', editedBy: 'maker1' });
+      done();
+    });
+  });
+
+  it('§19.1 — falls back to "maker1" when ctx.createdBy is falsy, rather than sending an empty editedBy (not bound to a specific known Maker, but never silently blank either)', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: null, submitResult: makeMovement({ movementId: 'mv-1' }) });
+
+    service.editPending(ctx, { amount: '150000' }).subscribe(() => {
+      expect(api.editPending).toHaveBeenCalledWith('mv-1', { amount: '150000', editedBy: 'maker1' });
       done();
     });
   });
 
   it('maps an API error to a failed outcome', (done) => {
-    const api = makeApi({ withdrawMakerSubmit: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))) });
+    const api = makeApi({ editPending: jest.fn(() => throwError(() => ({ error: { message: 'INSUFFICIENT_AVAILABLE_BALANCE' } }))) });
     const service = new CheckerActionsService(api);
-    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-2' }) });
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1' }) });
 
-    service.withdrawMakerPending(ctx).subscribe((outcome) => {
+    service.editPending(ctx, { amount: '999999999' }).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toBe('ILLEGAL_STATE_TRANSITION');
+      if (outcome.kind === 'failed') expect(outcome.message).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
+      done();
+    });
+  });
+
+  it('頁面配置檔 — passes contract-level fields straight through to api.editPending, unchanged (this service never re-derives which fields a Function declares editable)', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({ createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-1' }) });
+
+    service.editPending(ctx, { amount: '150000', tolerancePct: '5', tenorType: 'SIGHT', tenorDays: 0, expiryDate: '2027-01-01' }).subscribe(() => {
+      expect(api.editPending).toHaveBeenCalledWith('mv-1', {
+        amount: '150000',
+        tolerancePct: '5',
+        tenorType: 'SIGHT',
+        tenorDays: 0,
+        expiryDate: '2027-01-01',
+        editedBy: 'maker1',
+      });
       done();
     });
   });

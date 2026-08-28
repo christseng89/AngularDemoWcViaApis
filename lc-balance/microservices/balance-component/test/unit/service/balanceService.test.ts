@@ -12,9 +12,17 @@
 import { createDb } from '../../../src/db';
 import { BalanceService } from '../../../src/service/balanceService';
 import { InvalidMonetaryAmountError } from '../../../src/money';
-import { CurrencyMismatchError, IllegalStateTransitionError, NaturalKeyAlreadyExistsError, RequestValidationError } from '../../../src/errors';
+import {
+  CurrencyMismatchError,
+  IllegalStateTransitionError,
+  InsufficientBalanceError,
+  NaturalKeyAlreadyExistsError,
+  NotFoundError,
+  RequestValidationError,
+} from '../../../src/errors';
 import { DeletePendingAuditStore } from '../../../src/store/deletePendingAuditStore';
 import { BalanceMovementStore } from '../../../src/store/balanceMovementStore';
+import { BalanceContractStore } from '../../../src/store/balanceContractStore';
 
 describe('BalanceService.createMovement — parseMonetaryAmount enforcement at the service layer (BAL-115)', () => {
   test('AMEND_DECREASE with a malformed amount throws InvalidMonetaryAmountError, not a silent NaN comparison', () => {
@@ -1202,7 +1210,7 @@ describe('BalanceService.listMyMovements — Fix Pending/Delete Pending Phase 2 
 
     const page = service.listMyMovements({ createdBy: 'maker1' });
 
-    expect(page.total).toBe(2); // pending + rejectedSource; releasedSource (RELEASED) excluded by the default status set
+    expect(page.items).toHaveLength(2); // pending + rejectedSource; releasedSource (RELEASED) excluded by the default status set
     const movementIds = page.items.map((r) => r.movement.movementId);
     expect(movementIds).toContain(pending.movementId);
     expect(movementIds).toContain(rejectedSource.movementId);
@@ -1212,30 +1220,124 @@ describe('BalanceService.listMyMovements — Fix Pending/Delete Pending Phase 2 
     expect(rejectedRow.contract.naturalKey.lcNumber).toBe('MYMV-003');
   });
 
-  test('respects an explicit statuses filter, page, and pageSize', () => {
+  test('respects an explicit statuses filter; returns every matching row unpaginated (pagination moved client-side, 2026-08-28)', () => {
     const service = new BalanceService(createDb(':memory:'));
     const pending = issue(service, 'MYMV-010', 'maker3');
     const rejectedSource = issue(service, 'MYMV-011', 'maker3');
     service.reject(rejectedSource.movementId, 'checker1', 'MANUAL_TEST_REJECT');
 
     const pendingOnly = service.listMyMovements({ createdBy: 'maker3', statuses: ['PENDING'] });
-    expect(pendingOnly.total).toBe(1);
+    expect(pendingOnly.items).toHaveLength(1);
     expect(pendingOnly.items[0]!.movement.movementId).toBe(pending.movementId);
 
-    const page1 = service.listMyMovements({ createdBy: 'maker3', page: 1, pageSize: 1 });
-    expect(page1.total).toBe(2);
-    expect(page1.items).toHaveLength(1);
-    expect(page1.page).toBe(1);
-    expect(page1.pageSize).toBe(1);
-    const page2 = service.listMyMovements({ createdBy: 'maker3', page: 2, pageSize: 1 });
-    expect(page2.items).toHaveLength(1);
-    expect(page2.items[0]!.movement.movementId).not.toBe(page1.items[0]!.movement.movementId);
+    const both = service.listMyMovements({ createdBy: 'maker3' });
+    expect(both.items).toHaveLength(2);
+    expect(both.items.map((r) => r.movement.movementId)).toEqual(expect.arrayContaining([pending.movementId, rejectedSource.movementId]));
   });
 
-  test('returns an empty page (not an error) for a createdBy with nothing PENDING/REJECTED', () => {
+  test('returns an empty list (not an error) for a createdBy with nothing PENDING/REJECTED', () => {
     const service = new BalanceService(createDb(':memory:'));
     const page = service.listMyMovements({ createdBy: 'nobody-has-submitted-anything' });
-    expect(page).toEqual({ items: [], total: 0, page: 1, pageSize: 10 });
+    expect(page).toEqual({ items: [] });
+  });
+});
+
+// User-directed 2026-08-28 ("Order by Function ASC → LC Number ASC → Secondary Reference Number ASC" /
+// "Maker Queue 提供 LC Number Search 功能" / "支援 LIKE / Partial Match"). The TRUE Maker Queue ordering
+// (Function-first) is an Angular-side concern — see maker-queue.service.spec.ts — since Function has no
+// column here; this server layer only owns the base LC-Number-ascending order (a stable tiebreaker
+// Angular's own sort is applied on top of) and the substring `q` filter.
+describe('BalanceService.listMyMovements — base LC Number ascending order, optional substring `q` filter', () => {
+  function issue(service: BalanceService, lcNumber: string, createdBy: string) {
+    const result = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy,
+    });
+    if (!result.created) throw new Error('expected a new movement');
+    return result.movement;
+  }
+
+  test('the default (unfiltered) list is ordered by LC Number ascending, not creation order', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    // Issued deliberately out of alphabetical order, so a created_at-based sort would return them in a
+    // different order than this test's own assertion.
+    issue(service, 'SORT-CCC', 'maker7');
+    issue(service, 'SORT-AAA', 'maker7');
+    issue(service, 'SORT-BBB', 'maker7');
+
+    const page = service.listMyMovements({ createdBy: 'maker7' });
+
+    expect(page.items.map((r) => r.contract.naturalKey.lcNumber)).toEqual(['SORT-AAA', 'SORT-BBB', 'SORT-CCC']);
+  });
+
+  test('a q filter returns only PENDING/REJECTED items whose LC Number contains it, others under the same createdBy excluded', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const target = issue(service, 'SORT-FILTER-001', 'maker8');
+    issue(service, 'OTHER-002', 'maker8');
+
+    const page = service.listMyMovements({ createdBy: 'maker8', q: 'SORT-FILTER-001' });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.movement.movementId).toBe(target.movementId);
+    expect(page.items[0]!.contract.naturalKey.lcNumber).toBe('SORT-FILTER-001');
+  });
+
+  test('the filter is a substring LIKE, not exact-match — a partial q matches (user-directed, "支援 LIKE / Partial Match")', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const target = issue(service, 'SORT-EXACT-001', 'maker9');
+
+    const page = service.listMyMovements({ createdBy: 'maker9', q: 'EXACT' });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.movement.movementId).toBe(target.movementId);
+  });
+
+  test('a q with no match returns an empty list', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    issue(service, 'SORT-NOMATCH-001', 'maker9');
+
+    const page = service.listMyMovements({ createdBy: 'maker9', q: 'DOES-NOT-EXIST' });
+
+    expect(page.items).toHaveLength(0);
+  });
+
+  test('a search result set keeps the same LC-Number-ascending base ordering as the unfiltered list — multiple still-PENDING/REJECTED movements on the SAME LC stay ordered most-recent-first within it', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lc = issue(service, 'SORT-SAME-LC-001', 'maker10');
+    service.release(lc.movementId, 'checker1');
+    const older = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '1000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker10',
+    });
+    if (!older.created) throw new Error('expected a new movement');
+    const newer = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random() + 1,
+      amount: '2000',
+      currency: 'USD',
+      sourceTransactionRef: 'B02',
+      createdBy: 'maker10',
+    });
+    if (!newer.created) throw new Error('expected a new movement');
+
+    const page = service.listMyMovements({ createdBy: 'maker10', q: 'SORT-SAME-LC-001' });
+
+    expect(page.items.map((r) => r.movement.movementId)).toEqual([newer.movement.movementId, older.movement.movementId]);
   });
 });
 
@@ -1285,7 +1387,7 @@ describe('BalanceService.listMyMovements — EARMARKED (acknowledged, not yet Ma
     const page = service.listMyMovements({ createdBy: 'maker1' });
 
     expect(page.items.map((r) => r.movement.movementId)).not.toContain(utilize.movementId);
-    expect(page.total).toBe(0);
+    expect(page.items).toHaveLength(0);
   });
 
   test('once Maker-Submitted into A4, the SAME row reappears (genuinely actionable PENDING again)', () => {
@@ -1297,7 +1399,7 @@ describe('BalanceService.listMyMovements — EARMARKED (acknowledged, not yet Ma
     const page = service.listMyMovements({ createdBy: 'maker1' });
 
     expect(page.items.map((r) => r.movement.movementId)).toContain(utilize.movementId);
-    expect(page.total).toBe(1);
+    expect(page.items).toHaveLength(1);
   });
 
   test('a REJECTED A4 attempt (acknowledged + makerSubmitted, then Checker-rejected) still appears', () => {
@@ -1312,15 +1414,14 @@ describe('BalanceService.listMyMovements — EARMARKED (acknowledged, not yet Ma
     expect(page.items.map((r) => r.movement.movementId)).toContain(utilize.movementId);
   });
 
-  test('total/pagination stay consistent with the exclusion (no off-by-one from a naive client-side filter)', () => {
+  test('the returned list stays consistent with the exclusion (no off-by-one from a naive client-side filter)', () => {
     const service = new BalanceService(createDb(':memory:'));
     const earmarking = issueSightLcAndUtilize(service, 'MQ-EARMARK-5', 'maker9');
     const earmarked = issueSightLcAndUtilize(service, 'MQ-EARMARK-6', 'maker9');
     service.acknowledgeArrival(earmarked.movementId, 'checker1');
 
-    const page = service.listMyMovements({ createdBy: 'maker9', page: 1, pageSize: 10 });
+    const page = service.listMyMovements({ createdBy: 'maker9' });
 
-    expect(page.total).toBe(1);
     expect(page.items).toHaveLength(1);
     expect(page.items[0]!.movement.movementId).toBe(earmarking.movementId);
   });
@@ -1389,7 +1490,7 @@ describe('BalanceService.listMyMovements — A6\'s own referenced A3/A3S UTILIZE
     const page = service.listMyMovements({ createdBy: 'maker1' });
 
     expect(page.items.map((r) => r.movement.movementId)).toEqual([acceptance.movement.movementId]);
-    expect(page.total).toBe(1);
+    expect(page.items).toHaveLength(1);
   });
 
   test('if A6\'s own CREATE is later Delete-Pending\'d (CANCELLED), the referenced UTILIZE does NOT reappear — Delete Pending\'s own applyCancelSideEffects() (see the dedicated describe block below) reverts it to plain not-yet-actionable EARMARKED, the same "notYetActionableEarmark" state a fresh A3 record is already excluded in', () => {
@@ -2572,5 +2673,649 @@ describe('BalanceMovementStore.listShgtMovementsForParents — two children unde
 
     const movements = byParent.get(lcContract.logicalContractId) ?? [];
     expect(movements.map((m) => m.movementId).sort()).toEqual([sg1.movement.movementId, sg2.movement.movementId].sort());
+  });
+});
+
+// Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+// 2026-08-27) — trial rollout for A1/A3, first two Functions wired up on the Angular side; the
+// service method itself (editPending()) is generic across every movementType already covered by
+// movementTypeRegistry, per the same test-plan-execution convention this file already uses elsewhere.
+describe('BalanceService.editPending — Fix Pending trial (A1 ISSUE, A3 UTILIZE)', () => {
+  function issueSightLc(service: BalanceService, lcNumber: string) {
+    const result = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!result.created) throw new Error('expected a new movement');
+    return result.movement;
+  }
+
+  function issueSightLcAndUtilize(service: BalanceService, lcNumber: string) {
+    const lc = issueSightLc(service, lcNumber);
+    service.release(lc.movementId, 'checker1');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '40000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+    return { lc, utilize: utilize.movement };
+  }
+
+  test('A1 (ISSUE) — Fix Pending amount corrects the SAME row in place (same movementId/eventSeq), and a fix_pending_audit row preserves the pre-edit content', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-001');
+
+    const corrected = service.editPending(issue.movementId, { amount: '120000', editedBy: 'maker2' });
+
+    expect(corrected.status).toBe('PENDING');
+    expect(corrected.amount).toBe('120000');
+    expect(corrected.eventSeq).toBe(issue.eventSeq); // §19 — reused, not a new value
+    expect(corrected.movementId).toBe(issue.movementId); // same identity, not a replacement row
+    expect(corrected.createdBy).toBe('maker2'); // the editor now stands as the current content's author
+    expect(corrected.editedBy).toBe('maker2');
+    expect(corrected.editedAt).toBeTruthy();
+
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A1-001' })!;
+    // Exactly one row for this event — no second/duplicate row lingering anywhere.
+    expect(service.listMovements(contract.balanceContractId)).toHaveLength(1);
+
+    const audit = service.listFixPendingAudit(issue.movementId);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.statusBefore).toBe('PENDING');
+    expect(audit[0]!.originalCreatedBy).toBe('maker1'); // the TRUE original Maker, preserved
+    expect(audit[0]!.editedBy).toBe('maker2');
+    expect((audit[0]!.beforeSnapshot as { amount: string }).amount).toBe('100000');
+    expect((audit[0]!.afterSnapshot as { amount: string }).amount).toBe('120000');
+  });
+
+  test('A3 (UTILIZE) — Fix Pending amount, sourceTransactionRef carried over unchanged (locked, the movement\'s own business "2ndary Key")', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { utilize } = issueSightLcAndUtilize(service, 'FIXP-A3-001');
+
+    const replacement = service.editPending(utilize.movementId, { amount: '35000', editedBy: 'maker1' });
+
+    expect(replacement.amount).toBe('35000');
+    expect(replacement.sourceTransactionRef).toBe('B01');
+    expect(replacement.eventSeq).toBe(utilize.eventSeq);
+  });
+
+  test('§19.1 — Fix Pending is NOT bound to the original Maker; a different editor succeeds with no ownership check', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-002');
+    expect(issue.createdBy).toBe('maker1');
+
+    const replacement = service.editPending(issue.movementId, { amount: '90000', editedBy: 'someone-else-entirely' });
+
+    expect(replacement.status).toBe('PENDING');
+    expect(replacement.createdBy).toBe('someone-else-entirely');
+  });
+
+  test('REJECTED is also a legal source state (mirrors CANCEL\'s own PENDING/REJECTED shape)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { utilize } = issueSightLcAndUtilize(service, 'FIXP-A3-002');
+    service.reject(utilize.movementId, 'checker1', 'DOC_DISCREPANCY');
+
+    const replacement = service.editPending(utilize.movementId, { amount: '20000', editedBy: 'maker1' });
+
+    expect(replacement.status).toBe('PENDING');
+  });
+
+  test('RELEASED/CANCELLED are illegal source states — 409, same statusTransition.ts table CANCEL already uses', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const released = issueSightLc(service, 'FIXP-A1-003');
+    service.release(released.movementId, 'checker1');
+    expect(() => service.editPending(released.movementId, { amount: '1', editedBy: 'maker1' })).toThrow(IllegalStateTransitionError);
+
+    const cancelled = issueSightLc(service, 'FIXP-A1-004');
+    service.cancel(cancelled.movementId, 'maker1');
+    expect(() => service.editPending(cancelled.movementId, { amount: '1', editedBy: 'maker1' })).toThrow(IllegalStateTransitionError);
+  });
+
+  test('a corrected record lands back at PENDING and can be Fix-Pending-edited again — the in-place mechanism has no "already edited once" restriction', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-005');
+
+    service.editPending(issue.movementId, { amount: '2', editedBy: 'maker1' });
+    const twiceCorrected = service.editPending(issue.movementId, { amount: '3', editedBy: 'maker1' });
+
+    expect(twiceCorrected.movementId).toBe(issue.movementId);
+    expect(twiceCorrected.status).toBe('PENDING');
+    expect(twiceCorrected.amount).toBe('3');
+    expect(service.listFixPendingAudit(issue.movementId)).toHaveLength(2);
+  });
+
+  test('editing a non-existent movementId throws NotFoundError', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    expect(() => service.editPending('00000000-0000-0000-0000-000000000000', { amount: '1', editedBy: 'maker1' })).toThrow(NotFoundError);
+  });
+
+  test('the sufficiency check genuinely re-runs against the patched amount — increasing A3\'s own amount past Available Balance is rejected (InsufficientBalanceError), proving this is not a lighter-weight path than a real Submit', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { utilize } = issueSightLcAndUtilize(service, 'FIXP-A3-003'); // LC Confirmed 100000, this UTILIZE 40000
+
+    expect(() => service.editPending(utilize.movementId, { amount: '999999', editedBy: 'maker1' })).toThrow(InsufficientBalanceError);
+
+    // Rejected attempt must leave the original record completely untouched.
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A3-003' })!;
+    const untouched = service.listMovements(contract.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    expect(untouched.status).toBe('PENDING');
+    expect(untouched.amount).toBe('40000');
+  });
+
+  test('§6.1 transaction consistency — if the correction half fails mid-transaction, the record is rolled back to its original, untouched state, and no audit row survives either', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-006');
+
+    const correctionSpy = jest.spyOn(BalanceMovementStore.prototype, 'applyFixPendingCorrection').mockImplementationOnce(() => {
+      throw new Error('simulated correction failure, mid-transaction');
+    });
+    try {
+      expect(() => service.editPending(issue.movementId, { amount: '150000', editedBy: 'maker1' })).toThrow('simulated correction failure');
+    } finally {
+      correctionSpy.mockRestore();
+    }
+
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A1-006' })!;
+    const untouched = service.listMovements(contract.balanceContractId).find((m) => m.movementId === issue.movementId)!;
+    expect(untouched.status).toBe('PENDING');
+    expect(untouched.amount).toBe('100000'); // the original amount, unchanged
+    expect(untouched.editedBy).toBeFalsy();
+    expect(untouched.createdBy).toBe('maker1'); // never overwritten to the editor
+    // And the audit row the failed transaction attempted to insert never survived the rollback either.
+    expect(service.listFixPendingAudit(issue.movementId)).toHaveLength(0);
+    expect(service.listMovements(contract.balanceContractId)).toHaveLength(1);
+  });
+
+  test('every optional passthrough field on the patch is honored when supplied, not just the ??-fallback-to-null default path', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-008');
+
+    const replacement = service.editPending(issue.movementId, {
+      amount: '111000',
+      editedBy: 'maker2',
+      businessEventId: 'BEV-EDIT-001',
+      exposureNature: 'ACTUAL',
+      legRef: 'LEG-01',
+      newExpiryDate: '2030-01-01',
+      transactionDate: '2026-08-28',
+      businessDate: '2026-08-28',
+      valueDate: '2026-08-28',
+      sourceModule: 'FIXP-TEST',
+      sourceFunction: 'A1',
+      referencedTransactionId: '11111111-1111-1111-1111-111111111111',
+      reasonCode: 'CUSTOMER_REQUEST',
+      amendmentApproved: true,
+      amendmentEffective: '2026-08-28',
+      consentStatus: 'OBTAINED',
+    });
+
+    expect(replacement.businessEventId).toBe('BEV-EDIT-001');
+    expect(replacement.exposureNature).toBe('ACTUAL');
+    expect(replacement.legRef).toBe('LEG-01');
+    expect(replacement.newExpiryDate).toBe('2030-01-01');
+    expect(replacement.transactionDate).toBe('2026-08-28');
+    expect(replacement.businessDate).toBe('2026-08-28');
+    expect(replacement.valueDate).toBe('2026-08-28');
+    expect(replacement.sourceModule).toBe('FIXP-TEST');
+    expect(replacement.sourceFunction).toBe('A1');
+    expect(replacement.referencedTransactionId).toBe('11111111-1111-1111-1111-111111111111');
+    expect(replacement.reasonCode).toBe('CUSTOMER_REQUEST');
+    expect(replacement.amendmentApproved).toBe(true);
+    expect(replacement.amendmentEffective).toBe('2026-08-28');
+    expect(replacement.consentStatus).toBe('OBTAINED');
+  });
+
+  test('accountEntries — provided and honored for a non-MEMO edit, forced null when exposureNature is patched to MEMO (same rule createMovement() itself applies)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issueWithEntries = issueSightLc(service, 'FIXP-A1-009');
+    const withEntries = service.editPending(issueWithEntries.movementId, {
+      amount: '105000',
+      editedBy: 'maker2',
+      accountEntries: [{ accountRef: 'GL-001', drCr: 'D', amount: '105000' }],
+    });
+    expect(withEntries.accountEntries).toEqual([{ accountRef: 'GL-001', drCr: 'D', amount: '105000' }]);
+
+    const issueForMemo = issueSightLc(service, 'FIXP-A1-010');
+    const memoEdit = service.editPending(issueForMemo.movementId, {
+      amount: '106000',
+      editedBy: 'maker2',
+      exposureNature: 'MEMO',
+      accountEntries: [{ accountRef: 'GL-002', drCr: 'C', amount: '106000' }],
+    });
+    expect(memoEdit.accountEntries).toBeNull();
+  });
+
+  test('a patched amount violating the currency\'s own decimal scale (e.g. USD to 3 decimal places) is rejected — proves this check genuinely re-runs against the CONTRACT\'s real currency, since the edit payload never carries currency itself', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-011');
+    expect(() => service.editPending(issue.movementId, { amount: '100000.123', editedBy: 'maker2' })).toThrow(RequestValidationError);
+  });
+
+  test('the defensive "no movementTypeRegistry descriptor for this movementType" branch throws RequestValidationError — unreachable via the public API since editPending() always reuses old.movementType, a value that was itself only ever accepted by a prior createMovement() call against the SAME registry', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-015');
+
+    const originalRegistry = (service as unknown as { movementTypeRegistry: Record<string, unknown> }).movementTypeRegistry;
+    (service as unknown as { movementTypeRegistry: Record<string, unknown> }).movementTypeRegistry = {};
+    try {
+      expect(() => service.editPending(issue.movementId, { amount: '1', editedBy: 'maker2' })).toThrow(RequestValidationError);
+    } finally {
+      (service as unknown as { movementTypeRegistry: Record<string, unknown> }).movementTypeRegistry = originalRegistry;
+    }
+  });
+
+  test('the defensive "no BalanceContract owning this movement" branch throws NotFoundError — same defense-in-depth posture as cancel()\'s own equivalent check, unreachable via the public API since a movement always has a real owning contract by FK construction', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-012');
+
+    const contractSpy = jest.spyOn(BalanceContractStore.prototype, 'findById').mockReturnValueOnce(undefined);
+    try {
+      expect(() => service.editPending(issue.movementId, { amount: '1', editedBy: 'maker2' })).toThrow(NotFoundError);
+    } finally {
+      contractSpy.mockRestore();
+    }
+  });
+
+  // Contract-level fields (2026-08-28, per direct user feedback — "為什麼只有amount可以改... Expiry Date,
+  // Tenor Type etc.?"; "頁面配置檔 for A1-A11/B1-B7") — isCreatingEdit's own two branches. A1's own ISSUE
+  // is `isCreating: true` in movementTypeRegistry, so its still-PENDING record owns the contract it just
+  // created; A3's own UTILIZE is not, so the same patch fields must be silently ignored server-side even
+  // if a caller sends them (defense-in-depth — the Angular client itself never sends them for A3 either,
+  // per function-strategy.ts's own A3 fixPendingEditableFields: Set(['amount'])).
+  test('A1 (ISSUE, isCreatingEdit=true) — patched tolerancePct/tenorType/tenorDays/expiryDate/mailFloatGraceDays are written onto the CONTRACT via updateIssueFields(), and the replacement\'s own ceilingAmount reflects the new tolerancePct', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-013'); // tenorType SIGHT, no tolerancePct set (contract.tolerancePct is null)
+
+    const replacement = service.editPending(issue.movementId, {
+      amount: '100000',
+      editedBy: 'maker2',
+      tolerancePct: '10',
+      tenorType: 'SELLERS_USANCE',
+      tenorDays: 90,
+      expiryDate: '2099-06-30',
+      mailFloatGraceDays: 5,
+    });
+
+    // ceilingAmount = amount * (1 + tolerancePct/100) = 100000 * 1.10 = 110000 — proves the PATCHED
+    // tolerancePct was actually used, not the contract's own pre-edit (null) value.
+    expect(replacement.ceilingAmount).toBe('110000');
+
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A1-013' })!;
+    expect(contract.tolerancePct).toBe('10');
+    expect(contract.tenorType).toBe('SELLERS_USANCE');
+    expect(contract.tenorDays).toBe(90);
+    expect(contract.expiryDate).toBe('2099-06-30');
+    expect(contract.mailFloatGraceDays).toBe(5);
+  });
+
+  test('A1 (ISSUE, isCreatingEdit=true) via Fix Pending — contingentAccountEntry also books the Ceiling amount, same "LC Balance = Amount × (1 + Tolerance%) 帳務是用LC Balance出帳" rule createMovement() itself follows', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-016'); // no tolerancePct set yet
+
+    const replacement = service.editPending(issue.movementId, { amount: '100000', editedBy: 'maker2', tolerancePct: '10' });
+
+    expect(replacement.ceilingAmount).toBe('110000');
+    expect(replacement.contingentAccountEntry?.amount).toBe('110000'); // not the face amount 100000
+  });
+
+  test('A1 (ISSUE, isCreatingEdit=true) — omitting a contract-level field from the patch leaves the contract\'s own existing value untouched (COALESCE, not a forced null)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = issueSightLc(service, 'FIXP-A1-014'); // tenorType SIGHT, expiryDate 2099-12-31 already set
+
+    service.editPending(issue.movementId, { amount: '100000', editedBy: 'maker2', tolerancePct: '7' });
+
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A1-014' })!;
+    expect(contract.tolerancePct).toBe('7'); // the one field actually patched
+    expect(contract.tenorType).toBe('SIGHT'); // untouched — not overwritten to null
+    expect(contract.expiryDate).toBe('2099-12-31'); // untouched
+  });
+
+  test('A3 (UTILIZE, isCreatingEdit=false) — the SAME contract-level fields in the patch are silently ignored; the parent LC\'s own tolerancePct/tenorType are never touched by a non-creating edit', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, utilize } = issueSightLcAndUtilize(service, 'FIXP-A3-004');
+    const before = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A3-004' })!;
+    expect(before.balanceContractId).toBe(lc.balanceContractId);
+
+    service.editPending(utilize.movementId, {
+      amount: '35000',
+      editedBy: 'maker1',
+      tolerancePct: '99',
+      tenorType: 'BUYERS_USANCE',
+      tenorDays: 999,
+      expiryDate: '2001-01-01',
+    });
+
+    const after = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A3-004' })!;
+    expect(after.tolerancePct).toBe(before.tolerancePct);
+    expect(after.tenorType).toBe(before.tenorType);
+    expect(after.tenorDays).toBe(before.tenorDays);
+    expect(after.expiryDate).toBe(before.expiryDate);
+  });
+
+  // 2026-08-28, per direct user feedback ("A2 Tolerance % FIX PENDING INCREASE/DECREASE時准許修改") —
+  // tolerancePct is a DELIBERATE EXCEPTION to the A3-style "contract-level fields stay locked for a
+  // non-creating edit" rule above: unlike tenorType/tenorDays/expiryDate, a patched tolerancePct on a
+  // non-creating, tolerance-applicable edit (A2's own AMEND_INCREASE/AMEND_DECREASE) DOES flow into
+  // buildEditedRequest()'s own merged.tolerancePct (`patch.tolerancePct ?? contract.tolerancePct`, no
+  // isCreatingEdit gate) — but updateIssueFields()'s own contract write-back a few lines below stays
+  // gated `if (isCreatingEdit)`, unchanged, so the patch only ever affects THIS movement's own
+  // ceilingAmount/contingentAccountEntry, never the contract's own stored tolerancePct. See
+  // AskUserQuestion-confirmed scope in balanceService.ts's own buildEditedRequest() doc comment.
+  test('A2 (AMEND_INCREASE, isCreatingEdit=false, tolerance-applicable) — a patched tolerancePct changes THIS movement\'s own ceilingAmount/contingentAccountEntry but the contract\'s own tolerancePct is left genuinely UNCHANGED', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'FIXP-A2-001' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      tolerancePct: '5', // the contract's own ORIGINAL Tolerance %, set at ISSUE
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_INCREASE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '20000',
+      currency: 'USD',
+      sourceTransactionRef: 'A01',
+      createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+    // ceilingAmount at the ORIGINAL Fix Pending-untouched tolerancePct (5%): 20000 * 1.05 = 21000.
+    expect(amend.movement.ceilingAmount).toBe('21000');
+
+    const replacement = service.editPending(amend.movement.movementId, {
+      amount: '20000',
+      editedBy: 'maker2',
+      tolerancePct: '15', // patched — A2's own Fix Pending Tolerance % edit
+    });
+
+    // The PATCHED tolerancePct (15%) is used for THIS movement's own ceiling: 20000 * 1.15 = 23000.
+    expect(replacement.ceilingAmount).toBe('23000');
+    expect(replacement.contingentAccountEntry?.amount).toBe('23000'); // Ceiling, not the face amount 20000
+
+    // The contract's own stored tolerancePct is genuinely untouched — still the original 5%, not 15%.
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A2-001' })!;
+    expect(contract.tolerancePct).toBe('5');
+  });
+
+  test('A2 (AMEND_INCREASE) — omitting tolerancePct from the patch falls back to the contract\'s own current tolerancePct (COALESCE), same as a creating edit', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'FIXP-A2-002' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      tolerancePct: '10',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_INCREASE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '20000',
+      currency: 'USD',
+      sourceTransactionRef: 'A02',
+      createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+
+    const replacement = service.editPending(amend.movement.movementId, { amount: '30000', editedBy: 'maker2' });
+
+    // No tolerancePct in the patch — falls back to the contract's own current 10%: 30000 * 1.10 = 33000.
+    expect(replacement.ceilingAmount).toBe('33000');
+  });
+});
+
+// Phase 4 (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.5, 2026-08-28, user-
+// directed "現在實作 Phase 4 compound cascade") — A3S's own documentArrivalWithSg compound Fix Pending
+// cascade, exercising `BalanceService.applyArrivalWithSgCompoundEdit()`.
+describe('BalanceService.editPending — Phase 4 compound cascade (A3S, documentArrivalWithSg)', () => {
+  function issueSightLcWithSg(service: BalanceService, lcNumber: string, sgAmount: string) {
+    const lcIssue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '1000000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lcIssue.created) throw new Error('expected a new movement');
+    service.release(lcIssue.movement.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber })!;
+
+    const sgIssue = service.createMovement({
+      instrumentType: 'SHGT',
+      naturalKey: { lcNumber, sgNumber: `${lcNumber}-SG` },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: sgAmount,
+      currency: 'USD',
+      parentLogicalContractId: lc.logicalContractId,
+      createdBy: 'maker1',
+    });
+    if (!sgIssue.created) throw new Error('expected a new movement');
+    service.release(sgIssue.movement.movementId, 'checker1');
+    const sg = service.resolveContract('SHGT', { lcNumber, sgNumber: `${lcNumber}-SG` })!;
+    return { lc, sg };
+  }
+
+  /** Mirrors maker-submit.service.ts's own submitDocumentArrivalWithSg() — SG redeem MIN(billAmount, SG outstanding) first, then the LC's own UTILIZE, sharing one businessEventId. */
+  function submitDocumentArrivalWithSg(service: BalanceService, lcBalanceContractId: string, sgBalanceContractId: string, sgOutstanding: string, billAmount: string, sourceTransactionRef: string) {
+    const businessEventId = randomUUIDForTest();
+    const redeemAmount = Math.min(Number(billAmount), Number(sgOutstanding));
+    const sgRedeem = service.createMovement({
+      instrumentType: 'SHGT',
+      balanceContractId: sgBalanceContractId,
+      movementType: redeemAmount >= Number(sgOutstanding) ? 'FULL_REDEEM' : 'PARTIAL_REDEEM',
+      eventSeq: Date.now() + Math.random(),
+      amount: String(redeemAmount),
+      currency: 'USD',
+      businessEventId,
+      sourceTransactionRef,
+      createdBy: 'maker1',
+    });
+    if (!sgRedeem.created) throw new Error('expected a new SG redeem movement');
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lcBalanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: billAmount,
+      currency: 'USD',
+      businessEventId,
+      sourceTransactionRef,
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new UTILIZE movement');
+    return { sgRedeem: sgRedeem.movement, utilize: utilize.movement, businessEventId };
+  }
+
+  function randomUUIDForTest(): string {
+    return `bev-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+  }
+
+  test('Fix Pending Bill Amount downward — SG redeem recomputes MIN(newBillAmount, SG outstanding), stays PARTIAL_REDEEM, businessEventId preserved on both legs', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-001', '20000');
+    const { sgRedeem, utilize, businessEventId } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '15000', 'B01');
+    expect(sgRedeem.movementType).toBe('PARTIAL_REDEEM');
+    expect(sgRedeem.amount).toBe('15000');
+
+    const corrected = service.editPending(utilize.movementId, { amount: '8000', editedBy: 'maker2' });
+
+    expect(corrected.amount).toBe('8000');
+    expect(corrected.ceilingAmount).toBe('8000'); // IPLC_LC UTILIZE — never tolerance-applicable
+    expect(corrected.businessEventId).toBe(businessEventId); // regression: was silently nulled before the 2026-08-28 buildEditedRequest() fix
+    expect(corrected.movementId).toBe(utilize.movementId); // same identity — an in-place correction, not a replacement
+
+    const linked = service.findByBusinessEventId(businessEventId);
+    expect(linked).toHaveLength(2); // still exactly two live legs — no stray extra row
+    const newSg = linked.find((m) => m.movementType === 'FULL_REDEEM' || m.movementType === 'PARTIAL_REDEEM')!;
+    expect(newSg.movementId).toBe(sgRedeem.movementId); // same identity on the SG leg too
+    expect(newSg.status).toBe('PENDING');
+    expect(newSg.movementType).toBe('PARTIAL_REDEEM');
+    expect(newSg.amount).toBe('8000'); // MIN(8000, 20000)
+    expect(newSg.businessEventId).toBe(businessEventId);
+
+    // Both legs each get their own fix_pending_audit row preserving the pre-edit content.
+    const sgAudit = service.listFixPendingAudit(sgRedeem.movementId);
+    expect(sgAudit).toHaveLength(1);
+    expect((sgAudit[0]!.beforeSnapshot as { amount: string }).amount).toBe('15000');
+    const utilizeAudit = service.listFixPendingAudit(utilize.movementId);
+    expect(utilizeAudit).toHaveLength(1);
+    expect((utilizeAudit[0]!.beforeSnapshot as { amount: string }).amount).toBe('15000'); // the original Bill Amount
+  });
+
+  test('Fix Pending Bill Amount upward past the SG\'s own outstanding — SG redeem flips PARTIAL_REDEEM to FULL_REDEEM, capped at SG outstanding', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-002', '20000');
+    const { utilize, businessEventId } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '15000', 'B01');
+
+    const replacement = service.editPending(utilize.movementId, { amount: '25000', editedBy: 'maker2' });
+
+    expect(replacement.amount).toBe('25000'); // the LC's own UTILIZE is NOT capped by the SG's outstanding
+    const linked = service.findByBusinessEventId(businessEventId);
+    const newSg = linked.find((m) => m.status === 'PENDING' && (m.movementType === 'FULL_REDEEM' || m.movementType === 'PARTIAL_REDEEM'))!;
+    expect(newSg.movementType).toBe('FULL_REDEEM');
+    expect(newSg.amount).toBe('20000'); // MIN(25000, 20000) — capped at the SG's own outstanding
+  });
+
+  test('Fix Pending rejected — the corrected Bill Amount would need more SG capacity than currently Available (netting an unrelated still-PENDING redemption on the same SG)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-003', '20000');
+    const { utilize } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '5000', 'B01');
+    // An unrelated, independent standalone A9-shaped PENDING redemption already reserves 10,000 of the
+    // same SG's own capacity — Available (excluding the old A3S redemption itself) is 20000 - 10000 = 10000.
+    const unrelated = service.createMovement({
+      instrumentType: 'SHGT',
+      balanceContractId: sg.balanceContractId,
+      movementType: 'FULL_REDEEM',
+      eventSeq: Date.now() + Math.random(),
+      amount: '10000',
+      currency: 'USD',
+      createdBy: 'maker1',
+    });
+    if (!unrelated.created) throw new Error('expected a new movement');
+
+    expect(() => service.editPending(utilize.movementId, { amount: '18000', editedBy: 'maker2' })).toThrow(InsufficientBalanceError);
+
+    // Rejected atomically — neither the UTILIZE nor the SG redemption's own PENDING record was touched.
+    const utilizeRefetched = service.listMovements(lc.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    expect(utilizeRefetched.status).toBe('PENDING');
+    expect(utilizeRefetched.amount).toBe('5000');
+  });
+
+  test('Fix Pending on a compound UTILIZE whose SG sibling is no longer PENDING (already Approved/Released) is rejected, not silently mis-edited', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-004', '20000');
+    const { sgRedeem, utilize } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '15000', 'B01');
+    service.release(sgRedeem.movementId, 'checker1'); // A3S's own Checker Release genuinely releases the SG leg for real, while the LC's own UTILIZE stays PENDING (acknowledgment-only)
+
+    expect(() => service.editPending(utilize.movementId, { amount: '12000', editedBy: 'maker2' })).toThrow(RequestValidationError);
+  });
+
+  test('a plain, non-compound A3 UTILIZE (no businessEventId) is completely unaffected by the compound-detection branch', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const lcIssue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'A3S-FIXP-005' },
+      movementType: 'ISSUE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!lcIssue.created) throw new Error('expected a new movement');
+    service.release(lcIssue.movement.movementId, 'checker1');
+    const plainUtilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lcIssue.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '30000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!plainUtilize.created) throw new Error('expected a new movement');
+
+    const replacement = service.editPending(plainUtilize.movement.movementId, { amount: '35000', editedBy: 'maker2' });
+
+    expect(replacement.amount).toBe('35000');
+    expect(replacement.businessEventId).toBeNull();
+  });
+
+  test('the defensive "no BalanceContract owning the linked SG redemption" branch throws NotFoundError — same posture as the single-movement path\'s own equivalent check, unreachable via the public API since a movement always has a real owning contract by FK construction', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-007', '20000');
+    const { utilize } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '15000', 'B01');
+
+    // First findById() call (in editPending()'s own preamble) resolves the LC contract normally; the
+    // SECOND (inside applyArrivalWithSgCompoundEdit(), looking up the linked SG's own contract) fails.
+    const contractSpy = jest.spyOn(BalanceContractStore.prototype, 'findById').mockReturnValueOnce(lc).mockReturnValueOnce(undefined);
+    try {
+      expect(() => service.editPending(utilize.movementId, { amount: '8000', editedBy: 'maker2' })).toThrow(NotFoundError);
+    } finally {
+      contractSpy.mockRestore();
+    }
+  });
+
+  test('a failure correcting the SG leg rolls back the WHOLE compound transaction — the UTILIZE leg (corrected second) is left completely untouched, and no audit row from either leg survives', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-006', '20000');
+    const { sgRedeem, utilize } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '15000', 'B01');
+
+    const correctionSpy = jest.spyOn(BalanceMovementStore.prototype, 'applyFixPendingCorrection').mockImplementationOnce(() => {
+      throw new Error('simulated SG leg correction failure, mid-transaction');
+    });
+    try {
+      expect(() => service.editPending(utilize.movementId, { amount: '8000', editedBy: 'maker2' })).toThrow('simulated SG leg correction failure');
+    } finally {
+      correctionSpy.mockRestore();
+    }
+
+    // Rolled back atomically — the UTILIZE itself was never even reached (SG leg corrected first).
+    const utilizeRefetched = service.listMovements(lc.balanceContractId).find((m) => m.movementId === utilize.movementId)!;
+    expect(utilizeRefetched.status).toBe('PENDING');
+    expect(utilizeRefetched.amount).toBe('15000'); // the original Bill Amount
+    const sgRefetched = service.listMovements(sg.balanceContractId).find((m) => m.movementId === sgRedeem.movementId)!;
+    expect(sgRefetched.amount).toBe('15000');
+    expect(service.listFixPendingAudit(utilize.movementId)).toHaveLength(0);
+    expect(service.listFixPendingAudit(sgRedeem.movementId)).toHaveLength(0);
   });
 });

@@ -756,14 +756,12 @@ export function statusBadgeClass(
   if (status === 'PENDING') return isEarmarkFunction(instrumentType, movementType, phase) && acknowledgedAt ? 'tb-status-badge--earmark' : 'tb-status-badge--pending';
   if (status === 'RELEASED') return isEarmarkFunction(instrumentType, movementType, phase) ? 'tb-status-badge--earmark' : 'tb-status-badge--approved';
   if (status === 'REJECTED' || status === 'CANCELLED') return 'tb-status-badge--negative';
-  if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
   return '';
 }
 
 /**
- * Contract-level `ContractStatus` (ACTIVE/CLOSED/SUPERSEDED/CANCELLED) — a genuinely different enum from
- * `MovementStatus` above (PENDING/RELEASED/REJECTED/CANCELLED/SUPERSEDED — 'CANCELLED'/'SUPERSEDED' are
- * shared strings but mean different things on the two enums), so this is its own small function rather
+ * Contract-level `ContractStatus` is a genuinely different enum from `MovementStatus` above (they share
+ * some string values but mean different things), so this is its own small function rather
  * than overloading `statusBadgeClass()` with a status space it was never designed for. User-requested
  * 2026-08-21 ("LC Active shows Green, Close shows Red... 容易識別") for the LC Master Records Index,
  * where ACTIVE/CLOSED previously rendered as the same plain `.tb-type-tag` regardless of status. Reuses

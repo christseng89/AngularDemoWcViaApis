@@ -835,7 +835,50 @@ info:
         A6's own cancelled `CREATE` is the single audit record of this whole two-record business event; a
         second row would reintroduce the identical "two records for one event" duplication the Design
         Principle above exists to prevent, on the Delete Pending audit trail instead of the Event Timeline.
-  version: "1.30.0"
+
+
+    v1.31.0 (2026-08-28, user-directed — "A1 B1 A2 B2, LC Balance = Amount * (1 + Tolerance%) 帳務是用LC
+    Balance出帳"): `BalanceMovement.contingentAccountEntry.amount` was booking the caller's own face-level
+    `amount` for every movementType, including A1/B1 (`ISSUE`) and A2/B2 (`AMEND_INCREASE`/`AMEND_DECREASE`/
+    `AMEND`) — the exact four where Tolerance conversion applies (`ceilingAmount = amount × (1 +
+    tolerancePct/100)`, already the figure Confirmed/Available Balance are derived from) — so the generated
+    Dr/Cr voucher's own amount could silently disagree with the balance the SAME movement was actually
+    posted against whenever `tolerancePct` was non-null. Every other movementType (SHGT/Acceptance, which
+    Tolerance never applies to) is unaffected — `ceilingAmount` already equals `amount` unchanged there.
+      - CHANGED: `BalanceMovement.contingentAccountEntry.amount` — now the movement's own `ceilingAmount`
+        (already returned alongside it on the same movement), not the face-level `amount`, for A1/B1/A2/B2;
+        a true no-op everywhere else. Sign is preserved (B2's own negative-amount-as-Decrease convention
+        still resolves the same Dr/Cr direction). Same fix applied to `POST .../edit` (Fix Pending).
+
+    v1.32.0 (2026-08-28, user-directed — "A10 and A11 if Tight Available Balance = 0 then no entries
+    should be generated. Refer to S01 for Import"): `CLOSE`/`EXPIRE`/`REOPEN` are the only movementTypes
+    where a genuinely zero amount is legitimate (an already-fully-utilized/EXPIRED/CLOSED contract with
+    nothing left to write off or restore) — previously still generated a zero-value `contingentAccountEntry`
+    Dr/Cr pair, carrying no real accounting information. Eligibility itself is unaffected — S01-shaped LCs
+    (Confirmed/Tight Available Balance already 0) remain fully selectable in A10's own picker, Close, appear
+    in A11's own Reopen picker once CLOSED, and Reopen back to ACTIVE exactly as before; only the generated
+    voucher changes.
+      - CHANGED: `BalanceMovement.contingentAccountEntry` — now `null` (not a zero-value pair) whenever the
+        movement's own `ceilingAmount` is exactly `"0"` for `CLOSE`/`EXPIRE`/`REOPEN`. Every other
+        movementType is unaffected — `assertValidAmount()` already rejects a zero amount for all of them,
+        so this can never mask a genuinely non-zero figure elsewhere.
+
+    v1.33.0 (2026-08-28): doc-only — `MovementStatus`'s own stale claim that SUPERSEDED "is not reachable
+    through any endpoint" is corrected; no schema/endpoint change. The Angular client already resolves the
+    current record everywhere, not the replaced predecessor.
+
+    v1.34.0 (2026-08-29): Fix Pending §19 redesigned — `POST /balance-movements/{movementId}/edit`
+    now corrects the movement's row IN PLACE (same `movementId`/`eventSeq`) instead of marking it
+    SUPERSEDED and inserting a replacement. `MovementStatus` drops the `SUPERSEDED` value entirely (4
+    legal values now) — it conflated a Business Status with an internal technical revision marker, and
+    could leak into raw API responses (`GET /balance-contracts/{id}/movements`,
+    `GET /balance-movements?businessEventId=`) unfiltered. The pre-edit content is preserved separately
+    (no new endpoint yet — the microservice's own `FixPendingAuditStore`/`fix_pending_audit` table).
+      - CHANGED: `MovementStatus` enum — `SUPERSEDED` removed.
+      - CHANGED: `POST .../edit` — response is now the SAME movement (same `movementId`), corrected;
+        previously a NEW movement with a `supersededByMovementId` pointer to the (now-nonexistent)
+        predecessor. `editedBy`/`editedAt` are unaffected — still set on the live row.
+  version: "1.34.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1864,11 +1907,9 @@ components:
       type: string
       description: >
         Design doc §3.1 — a completely separate state machine from
-        MovementStatus. A Contract being SUPERSEDED does not retroactively
-        change the status of movements recorded against it while it was
-        ACTIVE. SUPERSEDED is carried in the schema for the state machine's
-        own completeness and future contract-versioning work (see the
-        v1.0.0 changelog note on the removed versioning endpoint) — no
+        MovementStatus. The enum's SUPERSEDED value is carried for the state
+        machine's own completeness and future contract-versioning work (see
+        the v1.0.0 changelog note on the removed versioning endpoint) — no
         current endpoint transitions a contract into it. CLOSED (v1.16.0)
         IS now reachable: a root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION
         transitions into it as a side effect of
@@ -1907,8 +1948,11 @@ components:
 
     MovementStatus:
       type: string
-      description: Design doc §4 — Maker/Checker lifecycle. Every transition into these is a deliberate design decision. SUPERSEDED is carried in the schema for the status-transition table's own completeness (an EDIT action legally targets it) but is not reachable through any endpoint in this v1.0.0 contract — see the changelog note on the removed PATCH edit endpoint.
-      enum: [PENDING, RELEASED, REJECTED, CANCELLED, SUPERSEDED]
+      description: >
+        Design doc §4 — Maker/Checker lifecycle. `POST .../edit` (Fix Pending §19) corrects a
+        PENDING/REJECTED movement's row in place (same movementId/eventSeq) rather than transitioning
+        it through a distinct status of its own — it always lands back at PENDING.
+      enum: [PENDING, RELEASED, REJECTED, CANCELLED]
 
     ExposureNature:
       type: string
@@ -1978,7 +2022,12 @@ components:
         (never a caller-supplied array like `AccountEntry`/`accountEntries`
         above) — `drAccount`/`crAccount` already carry any applicable tenor
         suffix (e.g. "Documentary Credits Outstanding — Sight") baked in,
-        so no separate tenor field is needed on this schema.
+        so no separate tenor field is needed on this schema. v1.31.0 —
+        `amount` is the movement's own `ceilingAmount` (Tolerance-converted
+        LC Balance), not the caller's face-level `amount`, for A1/B1
+        (`ISSUE`) and A2/B2 (`AMEND_INCREASE`/`AMEND_DECREASE`/`AMEND`); a
+        true no-op for every other movementType, where `ceilingAmount`
+        already equals `amount` unchanged.
       required: [drAccount, crAccount, currency, amount]
       properties:
         drAccount: { type: string }

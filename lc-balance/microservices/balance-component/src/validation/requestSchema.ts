@@ -55,6 +55,58 @@ export const createMovementRequestSchema = z
   });
 
 /**
+ * Fix Pending `POST /balance-movements/:movementId/edit` (analysis/Balance-Component-FixPending-
+ * DeletePending-Proposal-zh.md §2.2/§15/§19, 2026-08-27) — `service/balanceService.ts`'s own
+ * `EditMovementRequest` doc comment explains why this is an ALLOWLIST, not a `.partial()` of
+ * `createMovementRequestSchema` above: `.strict()` here means any locked field (`naturalKey`,
+ * `balanceContractId`, `instrumentType`, `movementType`, `currency`, `eventSeq`, `createdBy`,
+ * `sourceTransactionRef` — the movement's own business "2ndary Key", excluded for the same reason
+ * §15 excludes LC Number/IB-SG Number) is rejected by zod itself as an unrecognized key, rather than
+ * needing a hand-written "did the caller try to change this" check that could drift out of sync with
+ * `EditMovementRequest`'s own field list.
+ */
+export const editMovementRequestSchema = z
+  .object({
+    amount: z.string({ required_error: 'amount is required.' }).min(1, 'amount is required.'),
+    editedBy: z.string({ required_error: 'editedBy is required.' }).min(1, 'editedBy is required.'),
+    legRef: z.string().nullable().optional(),
+    accountEntries: z.array(z.record(z.unknown())).nullable().optional(),
+    businessEventId: z.string().nullable().optional(),
+    exposureNature: z.enum(['CONTINGENT', 'ACTUAL', 'MEMO']).optional(),
+    newExpiryDate: z.string().nullable().optional(),
+    transactionDate: z.string().nullable().optional(),
+    businessDate: z.string().nullable().optional(),
+    valueDate: z.string().nullable().optional(),
+    sourceModule: z.string().nullable().optional(),
+    sourceFunction: z.string().nullable().optional(),
+    referencedTransactionId: z.string().nullable().optional(),
+    reasonCode: z.string().nullable().optional(),
+    amendmentApproved: z.boolean().nullable().optional(),
+    amendmentEffective: z.string().min(1).nullable().optional(),
+    consentStatus: z.enum(['NOT_REQUIRED', 'OBTAINED']).nullable().optional(),
+    // Contract-level fields (2026-08-28, per direct user feedback — "為什麼只有amount可以改...
+    // Expiry Date, Tenor Type etc.?") — accepted here regardless of movementType (this schema has no
+    // access to what the target movement's own movementType is); `BalanceService.editPending()`'s own
+    // `isCreatingEdit` gate is what actually decides whether they take effect (silently ignored for a
+    // non-creating edit, same posture other passthrough-only fields already have).
+    tolerancePct: z.string().nullable().optional(),
+    tenorType: z.enum(['SIGHT', 'SELLERS_USANCE', 'BUYERS_USANCE']).nullable().optional(),
+    tenorDays: z.number().nullable().optional(),
+    expiryDate: z.string().nullable().optional(),
+    mailFloatGraceDays: z.number().nullable().optional(),
+  })
+  .strict('Unrecognized or locked field in Fix Pending request — naturalKey/balanceContractId/instrumentType/movementType/currency/eventSeq/createdBy/sourceTransactionRef cannot be changed via Fix Pending.')
+  .superRefine((data, ctx) => {
+    if (!MONETARY_AMOUNT_PATTERN.test(data.amount)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['amount'],
+        message: `amount "${data.amount}" is not a valid MonetaryAmount (expected ${MONETARY_AMOUNT_PATTERN}).`,
+      });
+    }
+  });
+
+/**
  * This route has always surfaced ONE message at a time (the hand-rolled checks it replaced were
  * sequential early-returns) — matches that convention by taking only the first zod issue rather than
  * concatenating all of them, so an existing caller parsing this field for a single sentence still gets

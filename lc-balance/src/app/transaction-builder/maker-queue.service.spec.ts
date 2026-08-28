@@ -32,7 +32,7 @@ function makeMovement(overrides: Partial<BalanceMovement> = {}): BalanceMovement
 }
 
 function makePage(overrides: Partial<MyMovementsPage> = {}): MyMovementsPage {
-  return { items: [], total: 0, page: 1, pageSize: 10, ...overrides };
+  return { items: [], ...overrides };
 }
 
 function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jest.Mock>> = {}) {
@@ -55,13 +55,13 @@ describe('MakerQueueService', () => {
 
     it('defaults to PENDING+REJECTED for the current createdBy and populates items/paging on success', () => {
       const row = { movement: makeMovement(), contract: makeContract() };
-      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [row], total: 1, page: 1, pageSize: 10 }))) });
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [row] }))) });
       const svc = new MakerQueueService(api);
       svc.createdBy = 'maker1';
 
       svc.load();
 
-      expect(api.listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], page: 1, pageSize: 10 });
+      expect(api.listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], q: undefined });
       expect(svc.items).toEqual([row]);
       expect(svc.paging.total).toBe(1);
       expect(svc.loading).toBe(false);
@@ -79,23 +79,99 @@ describe('MakerQueueService', () => {
       expect(svc.items).toEqual([]);
       expect(svc.paging.total).toBe(0);
     });
+
+    // User-directed 2026-08-28 ("Maker Queue 提供 LC Number Search 功能", "支援 LIKE / Partial Match")
+    it('passes lcNumberSearch through as the q filter when set', () => {
+      const api = makeApi();
+      const svc = new MakerQueueService(api);
+      svc.createdBy = 'maker1';
+      svc.lcNumberSearch = 'S001';
+
+      svc.load();
+
+      expect(api.listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], q: 'S001' });
+    });
+
+    it('omits the q filter (undefined) when lcNumberSearch is blank', () => {
+      const api = makeApi();
+      const svc = new MakerQueueService(api);
+      svc.createdBy = 'maker1';
+      svc.lcNumberSearch = '';
+
+      svc.load();
+
+      const call = (api.listMyMovements as jest.Mock).mock.calls[0][0];
+      expect(call.q).toBeUndefined();
+    });
+
+    // User-directed 2026-08-28 — load() no longer takes/sends page/pageSize at all; pagination is a
+    // purely client-side window over the fully-loaded `items` array (see paging/pagedItems below). Uses
+    // 25 rows (3 pages at the default pageSize 10) so page 3 is genuinely still in range — an empty/small
+    // result set would clamp page back to 1 regardless of resetToFirstPage, confounding this assertion.
+    it('resets to page 1 by default; a caller passing resetToFirstPage=false preserves the current page', () => {
+      const rows = Array.from({ length: 25 }, (_, i) => ({ movement: makeMovement({ movementId: `mv-${i}`, businessEventId: null }), contract: makeContract({ naturalKey: { lcNumber: `LC-${String(i).padStart(3, '0')}` } }) }));
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: rows }))) });
+      const svc = new MakerQueueService(api);
+      svc.paging.page = 3;
+
+      svc.load();
+      expect(svc.paging.page).toBe(1);
+
+      svc.paging.page = 3;
+      svc.load(false);
+      expect(svc.paging.page).toBe(3);
+    });
+
+    it('clamps paging.page back into range if the freshly-loaded set is now smaller than the page the Maker was viewing', () => {
+      const rows = Array.from({ length: 3 }, (_, i) => ({ movement: makeMovement({ movementId: `mv-${i}`, businessEventId: null }), contract: makeContract({ naturalKey: { lcNumber: `LC-${i}` } }) }));
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: rows }))) });
+      const svc = new MakerQueueService(api);
+      svc.paging.page = 5; // simulate a stale page from before a shrink (3 items / pageSize 10 is always page 1's own single page)
+
+      svc.load(false);
+
+      expect(svc.paging.page).toBe(1); // clamped to totalPages, since 3 items / pageSize 10 = 1 page
+    });
   });
 
-  describe('prevPage/nextPage', () => {
-    it('nextPage() re-loads at the next page target', () => {
-      const listMyMovements = jest.fn(() => of(makePage({ total: 25, page: 1, pageSize: 10 })));
+  describe('paging (client-side windowing, 2026-08-28)', () => {
+    function makeRows(n: number) {
+      return Array.from({ length: n }, (_, i) => ({
+        movement: makeMovement({ movementId: `mv-${i}`, businessEventId: null }),
+        contract: makeContract({ naturalKey: { lcNumber: `LC-${String(i).padStart(3, '0')}` } }),
+      }));
+    }
+
+    it('pagedItems windows the full sorted items array at the configured pageSize', () => {
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: makeRows(25) }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items).toHaveLength(25);
+      expect(svc.pagedItems).toHaveLength(10);
+      expect(svc.paging.total).toBe(25);
+      expect(svc.paging.totalPages).toBe(3);
+    });
+
+    it('nextPage()/prevPage() move the local window WITHOUT re-fetching', () => {
+      const listMyMovements = jest.fn(() => of(makePage({ items: makeRows(25) })));
       const api = makeApi({ listMyMovements });
       const svc = new MakerQueueService(api);
       svc.load();
-      expect(svc.paging.total).toBe(25);
+      listMyMovements.mockClear();
 
       svc.nextPage();
+      expect(svc.paging.page).toBe(2);
+      expect(svc.pagedItems).toHaveLength(10);
 
-      expect(listMyMovements).toHaveBeenLastCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], page: 2, pageSize: 10 });
+      svc.prevPage();
+      expect(svc.paging.page).toBe(1);
+      expect(listMyMovements).not.toHaveBeenCalled(); // no re-fetch for either move
     });
 
     it('prevPage() no-ops on page 1', () => {
-      const listMyMovements = jest.fn(() => of(makePage()));
+      const listMyMovements = jest.fn(() => of(makePage({ items: makeRows(25) })));
       const api = makeApi({ listMyMovements });
       const svc = new MakerQueueService(api);
       svc.load();
@@ -103,7 +179,178 @@ describe('MakerQueueService', () => {
 
       svc.prevPage();
 
+      expect(svc.paging.page).toBe(1);
       expect(listMyMovements).not.toHaveBeenCalled();
+    });
+
+    it('nextPage() no-ops on the last page', () => {
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: makeRows(5) }))) });
+      const svc = new MakerQueueService(api);
+      svc.load();
+
+      svc.nextPage();
+
+      expect(svc.paging.page).toBe(1);
+    });
+  });
+
+  // User-directed 2026-08-28 ("Maker Queue進口 出口 分開 (similar as Inquire Events)") — a purely
+  // client-side filter over the already-loaded `items` array (no re-fetch on selectSide()), since every
+  // row already resolves a TransactionFunction with its own `side` field.
+  describe('side (Import LC／Export Confirmed split, 2026-08-28)', () => {
+    const importRow = { movement: makeMovement({ movementId: 'mv-a1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } }) };
+    const exportRow = { movement: makeMovement({ movementId: 'mv-b1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'E001' } }) };
+
+    it('defaults to IMPORT', () => {
+      const svc = new MakerQueueService(makeApi());
+      expect(svc.side).toBe('IMPORT');
+    });
+
+    it('sideFilteredItems returns only the current side\'s own rows', () => {
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [importRow, exportRow] }))) });
+      const svc = new MakerQueueService(api);
+      svc.load();
+
+      expect(svc.sideFilteredItems.map((r) => r.movement.movementId)).toEqual(['mv-a1']);
+      svc.selectSide('EXPORT');
+      expect(svc.sideFilteredItems.map((r) => r.movement.movementId)).toEqual(['mv-b1']);
+    });
+
+    it('a row whose Function cannot be resolved is invisible on BOTH sides, never guessed onto one', () => {
+      const unresolved = { movement: makeMovement({ movementId: 'mv-unresolved', movementType: 'REVERSAL', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [unresolved] }))) });
+      const svc = new MakerQueueService(api);
+      svc.load();
+
+      expect(svc.sideFilteredItems).toEqual([]);
+      svc.selectSide('EXPORT');
+      expect(svc.sideFilteredItems).toEqual([]);
+    });
+
+    it('selectSide() never re-fetches — items is already fully loaded (both sides) by load()', () => {
+      const listMyMovements = jest.fn(() => of(makePage({ items: [importRow, exportRow] })));
+      const api = makeApi({ listMyMovements });
+      const svc = new MakerQueueService(api);
+      svc.load();
+      listMyMovements.mockClear();
+
+      svc.selectSide('EXPORT');
+
+      expect(listMyMovements).not.toHaveBeenCalled();
+    });
+
+    it('selectSide() resets to page 1 (from a non-1 page) and re-derives paging.total for the newly-selected side', () => {
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [importRow, exportRow] }))) });
+      const svc = new MakerQueueService(api);
+      svc.load();
+      expect(svc.paging.total).toBe(1); // IMPORT side: only importRow
+      svc.paging.page = 2; // simulate having navigated away from page 1 on the IMPORT side
+
+      svc.selectSide('EXPORT');
+
+      expect(svc.paging.page).toBe(1);
+      expect(svc.paging.total).toBe(1); // EXPORT side: only exportRow
+    });
+
+    it('load() itself sets paging.total to the CURRENT side\'s own count, not the combined total', () => {
+      const rows = [
+        importRow,
+        { movement: makeMovement({ movementId: 'mv-a2', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S002' } }) },
+        exportRow,
+      ];
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: rows }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load(); // still IMPORT (default)
+
+      expect(svc.paging.total).toBe(2);
+      expect(svc.items).toHaveLength(3); // items itself always holds both sides
+    });
+
+    it('pagedItems windows over sideFilteredItems, not the combined items array', () => {
+      const importRows = Array.from({ length: 3 }, (_, i) => ({
+        movement: makeMovement({ movementId: `mv-a${i}`, movementType: 'ISSUE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: `S00${i}` } }),
+      }));
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [...importRows, exportRow] }))) });
+      const svc = new MakerQueueService(api);
+      svc.load();
+
+      expect(svc.pagedItems).toHaveLength(3); // 3 IMPORT rows, EXPORT's own row excluded
+
+      svc.selectSide('EXPORT');
+      expect(svc.pagedItems.map((r) => r.movement.movementId)).toEqual(['mv-b1']);
+    });
+  });
+
+  // User-directed 2026-08-28 ("Order by Function ASC → LC Number ASC → Secondary Reference Number ASC")
+  describe('load — sort order (Function ASC → LC Number ASC → Secondary Reference Number ASC)', () => {
+    it('sorts by Function ASC using registry order, not lexicographic string order (A2 before A10/A11)', () => {
+      const a10 = { movement: makeMovement({ movementId: 'mv-a10', movementType: 'CLOSE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ZZZ' } }) };
+      const a2 = { movement: makeMovement({ movementId: 'mv-a2', movementType: 'AMEND_INCREASE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'AAA' } }) };
+      const a1 = { movement: makeMovement({ movementId: 'mv-a1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'MMM' } }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [a10, a2, a1] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items.map((r) => r.movement.movementId)).toEqual(['mv-a1', 'mv-a2', 'mv-a10']);
+    });
+
+    it('within the same Function, sorts by LC Number ASC', () => {
+      const b = { movement: makeMovement({ movementId: 'mv-b', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'BBB' } }) };
+      const a = { movement: makeMovement({ movementId: 'mv-a', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'AAA' } }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [b, a] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items.map((r) => r.movement.movementId)).toEqual(['mv-a', 'mv-b']);
+    });
+
+    it('within the same Function and LC Number, sorts by Secondary Reference Number (sourceTransactionRef) ASC', () => {
+      const b02 = { movement: makeMovement({ movementId: 'mv-b02', movementType: 'UTILIZE', businessEventId: null, sourceTransactionRef: 'B02' }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } }) };
+      const b01 = { movement: makeMovement({ movementId: 'mv-b01', movementType: 'UTILIZE', businessEventId: null, sourceTransactionRef: 'B01' }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [b02, b01] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items.map((r) => r.movement.movementId)).toEqual(['mv-b01', 'mv-b02']);
+    });
+
+    it('is a stable no-op tiebreaker when both rows have no sourceTransactionRef at all (e.g. A1 ISSUE, which never carries one)', () => {
+      const b = { movement: makeMovement({ movementId: 'mv-b', movementType: 'ISSUE', businessEventId: null, sourceTransactionRef: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } }) };
+      const a = { movement: makeMovement({ movementId: 'mv-a', movementType: 'ISSUE', businessEventId: null, sourceTransactionRef: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' } }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [b, a] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items).toHaveLength(2); // neither throws nor drops a row when both secondary refs are absent
+    });
+
+    it('a row whose Function cannot be resolved sorts last, not first', () => {
+      const unresolved = { movement: makeMovement({ movementId: 'mv-unresolved', movementType: 'REVERSAL', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'AAA' } }) };
+      const a1 = { movement: makeMovement({ movementId: 'mv-a1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'ZZZ' } }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [unresolved, a1] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items.map((r) => r.movement.movementId)).toEqual(['mv-a1', 'mv-unresolved']);
+    });
+
+    it('a search (q set) produces the SAME ordering as the unfiltered default index — both run through the same load() pipeline', () => {
+      const b = { movement: makeMovement({ movementId: 'mv-b', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'BBB' } }) };
+      const a = { movement: makeMovement({ movementId: 'mv-a', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'AAA' } }) };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [b, a] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.lcNumberSearch = 'anything';
+      svc.load();
+
+      expect(svc.items.map((r) => r.movement.movementId)).toEqual(['mv-a', 'mv-b']);
     });
   });
 
@@ -186,6 +433,69 @@ describe('MakerQueueService', () => {
     });
   });
 
+  describe('fixPendingSupported (2026-08-28, "Maker Queue Need to provide Fix Pending button as well")', () => {
+    it('is true for a plain A1 ISSUE row (fixPendingEnabled, non-compound)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      expect(svc.fixPendingSupported(row)).toBe(true);
+    });
+
+    it('is true for a plain A3 UTILIZE row (fixPendingEnabled, non-compound, not yet makerSubmittedAt)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'UTILIZE', businessEventId: null, makerSubmittedAt: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      expect(svc.fixPendingSupported(row)).toBe(true);
+    });
+
+    // Phase 4 (2026-08-28, "使用同樣方式處理A3 A35 A4 & B2") — reverses the former "every compound row
+    // excluded" posture specifically for the documentArrivalWithSg (A3S) shape: BalanceService's own
+    // applyArrivalWithSgCompoundEdit() now correctly cascades the SG's own matched leg alongside this
+    // UTILIZE, so this row is safe to Fix Pending even though its own leg structurally resolves to A3
+    // (IPLC_LC/UTILIZE) rather than "A3S" by name.
+    it('is TRUE for a documentArrivalWithSg (A3S) compound row — Phase 4 cascade support', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'UTILIZE', businessEventId: 'be-1' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      expect(svc.fixPendingSupported(row)).toBe(true);
+    });
+
+    // A genuinely DIFFERENT compound shape (B4's own ACCEPT+CREATE Acceptance pairing, sharing
+    // businessEventId the same way A3S's own pair does) stays excluded — Phase 4 only ever scoped/
+    // implemented the ONE documentArrivalWithSg cascade, not every compound shape indiscriminately.
+    it('stays FALSE for a genuinely different compound shape (B4 ACCEPT, EPLC_CONFIRMATION) — Phase 4 is A3S-only, not every businessEventId row', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'ACCEPT', businessEventId: 'be-2' }), contract: makeContract({ instrumentType: 'EPLC_CONFIRMATION' }) };
+      expect(svc.fixPendingSupported(row)).toBe(false);
+    });
+
+    it('is false once the row has moved on to A4 (makerSubmittedAt set — A4 has no fixPendingEnabled entry)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = {
+        movement: makeMovement({ movementType: 'UTILIZE', businessEventId: null, acknowledgedAt: '2026-08-27T00:00:00.000Z', makerSubmittedAt: '2026-08-27T01:00:00.000Z' }),
+        contract: makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' }),
+      };
+      expect(svc.fixPendingSupported(row)).toBe(false);
+    });
+
+    // A2 was widened INTO the trial scope 2026-08-28 ("把這A1 A3 修改要求放置B1 A2試試看") — see the
+    // now-true case just above this describe block's own A1/A3 tests. A6 remains outside it.
+    it('is true for A2 AMEND_INCREASE (widened trial scope, 2026-08-28)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'AMEND_INCREASE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      expect(svc.fixPendingSupported(row)).toBe(true);
+    });
+
+    it('is false for a Function with no fixPendingEnabled entry (e.g. A6 CREATE)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'CREATE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_ACCEPTANCE' }) };
+      expect(svc.fixPendingSupported(row)).toBe(false);
+    });
+
+    it('is false when functionFor() resolves to nothing at all (an unrecognized movementType)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = { movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      expect(svc.fixPendingSupported(row)).toBe(false);
+    });
+  });
+
   describe('isWithdrawMakerSubmitCase (business-confirmed 2026-08-27, unified under the "Delete Pending" name)', () => {
     it('is true once makerSubmittedAt is set on an IPLC_LC/UTILIZE row, regardless of status (PENDING)', () => {
       const svc = new MakerQueueService(makeApi());
@@ -216,7 +526,7 @@ describe('MakerQueueService', () => {
       const acceptanceCreate = { movement: makeMovement({ movementId: 'mv-acceptance', movementType: 'CREATE', businessEventId: 'be-1', createdAt: '2026-08-28T00:00:01.000Z' }), contract: makeContract({ instrumentType: 'EPLC_ACCEPTANCE' }) };
       const receivableCreate = { movement: makeMovement({ movementId: 'mv-receivable', movementType: 'CREATE', businessEventId: 'be-1', createdAt: '2026-08-28T00:00:00.000Z' }), contract: makeContract({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE' }) };
       // server order is created_at DESC — Confirmation first (most recent leg created), then Acceptance, then Receivable.
-      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [confirmationAccept, acceptanceCreate, receivableCreate], total: 3 }))) });
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [confirmationAccept, acceptanceCreate, receivableCreate] }))) });
       const svc = new MakerQueueService(api);
 
       svc.load();
@@ -230,7 +540,7 @@ describe('MakerQueueService', () => {
 
     it('a plain single-leg row (no businessEventId) is left untouched, no siblingMovementIds', () => {
       const row = { movement: makeMovement({ movementId: 'mv-1', businessEventId: null }), contract: makeContract() };
-      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [row], total: 1 }))) });
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [row] }))) });
       const svc = new MakerQueueService(api);
 
       svc.load();
@@ -239,12 +549,23 @@ describe('MakerQueueService', () => {
       expect(svc.items[0].siblingMovementIds).toBeUndefined();
     });
 
+    it('a businessEventId-carrying row whose sibling legs are NOT in this query\'s own result (e.g. already RELEASED, excluded by the status filter) is left with only itself as its own siblingMovementIds', () => {
+      const row = { movement: makeMovement({ movementId: 'mv-1', businessEventId: 'be-lonely' }), contract: makeContract() };
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [row] }))) });
+      const svc = new MakerQueueService(api);
+
+      svc.load();
+
+      expect(svc.items).toEqual([row]); // group.length === 1 — returned as-is, no siblingMovementIds added
+      expect(svc.items[0].siblingMovementIds).toBeUndefined();
+    });
+
     it('two DIFFERENT compound events (different businessEventId) merge independently, not into each other', () => {
       const eventA1 = { movement: makeMovement({ movementId: 'a-1', businessEventId: 'be-a', movementType: 'ACCEPT', createdAt: '2026-08-28T00:00:03.000Z' }), contract: makeContract({ instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE' }) };
       const eventA2 = { movement: makeMovement({ movementId: 'a-2', businessEventId: 'be-a', movementType: 'CREATE', createdAt: '2026-08-28T00:00:02.000Z' }), contract: makeContract({ instrumentType: 'EPLC_ACCEPTANCE' }) };
       const eventB1 = { movement: makeMovement({ movementId: 'b-1', businessEventId: 'be-b', movementType: 'UTILIZE', createdAt: '2026-08-28T00:00:01.000Z' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
       const eventB2 = { movement: makeMovement({ movementId: 'b-2', businessEventId: 'be-b', movementType: 'FULL_REDEEM', createdAt: '2026-08-28T00:00:00.000Z' }), contract: makeContract({ instrumentType: 'SHGT' }) };
-      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [eventA1, eventA2, eventB1, eventB2], total: 4 }))) });
+      const api = makeApi({ listMyMovements: jest.fn(() => of(makePage({ items: [eventA1, eventA2, eventB1, eventB2] }))) });
       const svc = new MakerQueueService(api);
 
       svc.load();
@@ -257,9 +578,12 @@ describe('MakerQueueService', () => {
   });
 
   describe('deletePending', () => {
-    it('calls api.cancel with createdBy/MAKER_EC and reloads the current page on success', () => {
+    it('calls api.cancel with createdBy/MAKER_EC and reloads WITHOUT resetting to page 1 on success', () => {
       const cancel = jest.fn(() => of(makeMovement({ status: 'CANCELLED' })));
-      const listMyMovements = jest.fn(() => of(makePage()));
+      // 25 rows (3 pages) so page 2 is genuinely still in range post-reload — an empty result would clamp
+      // page back to 1 regardless of resetToFirstPage, confounding this assertion.
+      const rows = Array.from({ length: 25 }, (_, i) => ({ movement: makeMovement({ movementId: `mv-${i}`, businessEventId: null }), contract: makeContract({ naturalKey: { lcNumber: `LC-${String(i).padStart(3, '0')}` } }) }));
+      const listMyMovements = jest.fn(() => of(makePage({ items: rows })));
       const api = makeApi({ cancel, listMyMovements });
       const svc = new MakerQueueService(api);
       svc.createdBy = 'maker1';
@@ -269,7 +593,8 @@ describe('MakerQueueService', () => {
       svc.deletePending(row);
 
       expect(cancel).toHaveBeenCalledWith('mv-9', 'maker1', 'MAKER_EC');
-      expect(listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], page: 2, pageSize: 10 });
+      expect(listMyMovements).toHaveBeenCalledWith({ createdBy: 'maker1', statuses: ['PENDING', 'REJECTED'], q: undefined });
+      expect(svc.paging.page).toBe(2); // stayed on the same page — see load()'s own resetToFirstPage doc comment
     });
 
     it('on failure, sets a describable error and does not reload', () => {
@@ -327,6 +652,86 @@ describe('MakerQueueService', () => {
 
       expect(svc.error).toBe('ILLEGAL_STATE_TRANSITION');
       expect(listMyMovements).not.toHaveBeenCalled();
+    });
+
+    // 2026-08-28, "Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否" — the optional onSettled
+    // callback lets TransactionBuilderComponent.onDeletePendingReviewConfirmed() know when it's safe to
+    // navigate back from the review screen, without this method needing any knowledge of that navigation.
+    describe('onSettled callback', () => {
+      it('is called with true on a plain (non-compound) success', () => {
+        const api = makeApi({ cancel: jest.fn(() => of(makeMovement({ status: 'CANCELLED' }))), listMyMovements: jest.fn(() => of(makePage())) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-9' }), contract: makeContract() };
+        const onSettled = jest.fn();
+
+        svc.deletePending(row, onSettled);
+
+        expect(onSettled).toHaveBeenCalledWith(true);
+      });
+
+      it('is called with false on a plain (non-compound) failure', () => {
+        const api = makeApi({ cancel: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-9' }), contract: makeContract() };
+        const onSettled = jest.fn();
+
+        svc.deletePending(row, onSettled);
+
+        expect(onSettled).toHaveBeenCalledWith(false);
+      });
+
+      it('is called with true on an A4 (withdrawMakerSubmit) success', () => {
+        const api = makeApi({ withdrawMakerSubmit: jest.fn(() => of(makeMovement({ makerSubmittedAt: null }))), listMyMovements: jest.fn(() => of(makePage())) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-9', movementType: 'UTILIZE', makerSubmittedAt: '2026-08-27T01:00:00.000Z', status: 'PENDING' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+        const onSettled = jest.fn();
+
+        svc.deletePending(row, onSettled);
+
+        expect(onSettled).toHaveBeenCalledWith(true);
+      });
+
+      it('is called with false on an A4 (withdrawMakerSubmit) failure', () => {
+        const api = makeApi({ withdrawMakerSubmit: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-9', movementType: 'UTILIZE', makerSubmittedAt: '2026-08-27T01:00:00.000Z', status: 'PENDING' }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+        const onSettled = jest.fn();
+
+        svc.deletePending(row, onSettled);
+
+        expect(onSettled).toHaveBeenCalledWith(false);
+      });
+
+      it('is called with true exactly once, after every leg, for a successful compound cascade', () => {
+        const api = makeApi({ cancel: jest.fn((id: string) => of(makeMovement({ movementId: id, status: 'CANCELLED' }))), listMyMovements: jest.fn(() => of(makePage())) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-confirm' }), contract: makeContract(), siblingMovementIds: ['mv-confirm', 'mv-acceptance'] };
+        const onSettled = jest.fn();
+
+        svc.deletePending(row, onSettled);
+
+        expect(onSettled).toHaveBeenCalledTimes(1);
+        expect(onSettled).toHaveBeenCalledWith(true);
+      });
+
+      it('is called with false when a compound cascade fails partway', () => {
+        const api = makeApi({ cancel: jest.fn((id: string) => (id === 'mv-acceptance' ? throwError(() => ({ error: { message: 'CANNOT_CANCEL_RELEASED' } })) : of(makeMovement({ movementId: id, status: 'CANCELLED' })))) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-confirm' }), contract: makeContract(), siblingMovementIds: ['mv-confirm', 'mv-acceptance'] };
+        const onSettled = jest.fn();
+
+        svc.deletePending(row, onSettled);
+
+        expect(onSettled).toHaveBeenCalledWith(false);
+      });
+
+      it('deletePending(row) without a callback still works (onSettled is optional)', () => {
+        const api = makeApi({ cancel: jest.fn(() => of(makeMovement({ status: 'CANCELLED' }))), listMyMovements: jest.fn(() => of(makePage())) });
+        const svc = new MakerQueueService(api);
+        const row = { movement: makeMovement({ movementId: 'mv-9' }), contract: makeContract() };
+
+        expect(() => svc.deletePending(row)).not.toThrow();
+      });
     });
 
     // Business-confirmed 2026-08-28 ("1 只應該顯示一筆 2 一筆刪全部") — a merged compound row (built by

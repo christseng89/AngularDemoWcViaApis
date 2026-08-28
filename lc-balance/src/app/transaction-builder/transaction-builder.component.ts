@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, of } from 'rxjs';
@@ -6,12 +6,12 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { FormlyModule } from '@ngx-formly/core';
 import { IndexPickerComponent } from './index-picker.component';
 import { TbIconComponent } from '../tb-icon.component';
-import { BalanceComponentApiService, BalanceMovement } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceMovement, EditMovementRequest } from './balance-component-api.service';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { LookUpPanelService } from './look-up-panel.service';
 import { InquireEventsService } from './inquire-events.service';
 import { InquireEventsComponent, InquireOpenAccountEntriesEvent } from './inquire-events.component';
-import { MakerQueueService } from './maker-queue.service';
+import { MakerQueueRow, MakerQueueService } from './maker-queue.service';
 import { MakerQueueComponent } from './maker-queue.component';
 import { InquireDeletePendingService } from './inquire-delete-pending.service';
 import { InquireDeletePendingComponent } from './inquire-delete-pending.component';
@@ -65,6 +65,17 @@ export class TransactionBuilderComponent {
   readonly importFunctions = IMPORT_FUNCTIONS;
   readonly exportFunctions = EXPORT_FUNCTIONS;
 
+  /**
+   * User-reported live ("A3交易 SUBMIT後 CHECKER沒顯示" → confirmed via direct DOM inspection: the
+   * Checker panel WAS always correctly rendered/populated, just positioned well below the fold on a
+   * normal viewport height — every function's own Maker form (fields + Maker Result panel) sits above
+   * it, so a Checker panel a Maker just became eligible to act on required scrolling down to discover at
+   * all) — scrolled into view automatically in `onMakerSyncRequested()` below, on the SAME
+   * `alsoSyncLookup` signal that already means "a genuine Submit/Fix Pending Save/Release/Reject just
+   * succeeded", not on a mere selection pick.
+   */
+  @ViewChild('checkerPanelEl') private checkerPanelEl?: ElementRef<HTMLElement>;
+
   activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
   activeMode: 'PROCESSING' | 'INQUIRE' | 'MAKER_QUEUE' | 'DELETE_PENDING_AUDIT' = 'PROCESSING';
   selectedFunction: TransactionFunction | null = null;
@@ -104,6 +115,12 @@ export class TransactionBuilderComponent {
   makerOutcomeSignal: CheckerActionOutcome | null = null;
   /** Forwarded to `MakerPanelComponent`'s `refreshRequested` `@Input()` — used by `checkerAct()`'s plain release/reject path instead of `makerOutcomeSignal`. */
   refreshNonce = 0;
+  /** Forwarded to `MakerPanelComponent`'s `externalFixPendingRequest` `@Input()` — see `onMakerQueueFixPending()`'s own doc comment. */
+  externalFixPendingRequest: BalanceMovement | null = null;
+  /** Forwarded to `MakerPanelComponent`'s `externalDeletePendingReviewRequest` `@Input()` — see `onMakerQueueDeletePendingReview()`'s own doc comment. */
+  externalDeletePendingReviewRequest: BalanceMovement | null = null;
+  /** The original `MakerQueueRow` a Delete Pending review is currently open for — kept here (not just the bare movement above) so `onDeletePendingReviewConfirmed()` can call `MakerQueueService.deletePending()` with its own `siblingMovementIds`, cascade-aware for a compound row, rather than the generic same-session-only Checker-action deletion path. */
+  pendingMakerQueueDeleteRow: MakerQueueRow | null = null;
 
   accountEntryDialogMovement: BalanceMovement | null = null;
   accountEntryDialogInstrumentType: InstrumentType | null = null;
@@ -127,6 +144,22 @@ export class TransactionBuilderComponent {
     this.accountEntryDialogInstrumentType = null;
     this.accountEntryDialogPhase = null;
     this.accountEntryDialogLinkedMovement = null;
+    // Real bug found live 2026-08-28 ("✎ FIX PENDING... 🗑 DELETE PENDING — REVIEW..." both banners shown
+    // together for the same movement): `<app-maker-panel>` only exists in the DOM while `activeMode ===
+    // 'PROCESSING'` (the `*ngIf` wrapping the whole workspace) — leaving this mode DESTROYS that
+    // component instance entirely, so re-entering it later creates a genuinely FRESH instance whose very
+    // first `ngOnChanges()` reports EVERY currently-bound `@Input()` as changed, not just the one this
+    // click meant to trigger. `externalFixPendingRequest`/`externalDeletePendingReviewRequest` are both
+    // parent-level fields that otherwise never get cleared — a stale non-null value left over from an
+    // EARLIER Maker-Queue-originated Fix Pending (or Delete Pending review) would silently re-fire
+    // alongside a genuinely new one, setting `fixPendingMode`/`deletePendingReviewMode` both `true` at
+    // once. Cleared here, the one place every exit from 'PROCESSING' funnels through, rather than in each
+    // of the two `onMakerQueueXxx()` methods individually (which only guards against THAT pair colliding
+    // with each other, not against a THIRD future signal added the same way later).
+    if (mode !== 'PROCESSING') {
+      this.externalFixPendingRequest = null;
+      this.externalDeletePendingReviewRequest = null;
+    }
     if (mode === 'INQUIRE') {
       this.inquireEvents.loadIndex();
     }
@@ -173,6 +206,87 @@ export class TransactionBuilderComponent {
     this.checkerError = null;
   }
 
+  /**
+   * Maker Queue's own Fix Pending entry point (2026-08-28, "Maker Queue Need to provide Fix Pending
+   * button as well") — jumps to Transaction Processing, selects this row's own resolved Function
+   * (`MakerQueueService.fixPendingSupported()` already guarantees it's Fix-Pending-eligible and
+   * single-leg only), then feeds the row's movement into `MakerPanelComponent`'s own
+   * `externalFixPendingRequest` — the exact same "return to the real original-event screen" mechanism
+   * the in-session Fix Pending button already drives, never a second, separately-built edit UI for
+   * Maker Queue's own table. `selectFunction()` runs first, in this same synchronous call, so both its
+   * own `resetTrigger` bump and this assignment land in `MakerPanelComponent`'s next `ngOnChanges()`
+   * together (see that `@Input()`'s own doc comment for why ordering there is safe). Spread into a fresh
+   * object — `row.movement` is a stable reference across multiple clicks on the same still-loaded row,
+   * and `ngOnChanges()` only fires on a genuine reference change, same "fresh object per emission"
+   * convention `externalCheckerOutcome` already uses.
+   */
+  onMakerQueueFixPending(row: MakerQueueRow): void {
+    const fn = this.makerQueue.functionFor(row);
+    if (!fn) return;
+    this.selectMode('PROCESSING');
+    this.selectFunction(fn);
+    this.externalFixPendingRequest = { ...row.movement };
+  }
+
+  /**
+   * "FIX PENDING OR DELETE PENDING 按CANCEL 回到原來的MAKER QUEUE畫面" (2026-08-28) — `cancelFixPending()`
+   * emits `fixPendingCancelled` unconditionally, for both the in-session button and a Maker-Queue-
+   * originated session; only THIS method decides which one it was, via whether `externalFixPendingRequest`
+   * is still the non-null value `onMakerQueueFixPending()` set (never cleared except by `selectMode()`
+   * leaving 'PROCESSING' — see that method's own doc comment). An in-session Cancel (opened from the
+   * Maker Result panel after a normal same-session Submit) leaves it `null` and this is a no-op, matching
+   * the existing "revert to read-only display in place" behavior exactly as before this feature existed.
+   */
+  onFixPendingCancelled(): void {
+    if (!this.externalFixPendingRequest) return;
+    this.externalFixPendingRequest = null;
+    this.selectMode('MAKER_QUEUE');
+  }
+
+  /**
+   * Maker Queue's own Delete Pending review entry point (2026-08-28, "Maker Queue Delete Pending 也要
+   * 顯示交易畫面 確認刪除與否" — "CLICK DELETE PENDING BUTTON -> 顯示交易畫面 (ALL FIELDS PROTECTED) +
+   * Confirm / Cancel Button"). Same navigation shape as `onMakerQueueFixPending()` above, but feeds
+   * `MakerPanelComponent`'s own `externalDeletePendingReviewRequest` instead — a read-only reconstruction,
+   * never editable — and keeps the ORIGINAL `row` (not just its movement) in `pendingMakerQueueDeleteRow`
+   * so the eventual Confirm can cascade-delete a compound row's own sibling legs correctly.
+   */
+  onMakerQueueDeletePendingReview(row: MakerQueueRow): void {
+    const fn = this.makerQueue.functionFor(row);
+    if (!fn) return;
+    this.selectMode('PROCESSING');
+    this.selectFunction(fn);
+    this.pendingMakerQueueDeleteRow = row;
+    this.externalDeletePendingReviewRequest = { ...row.movement };
+  }
+
+  /**
+   * The Maker confirmed on the review screen — now, and only now, does the actual delete call happen.
+   * Routes through `MakerQueueService.deletePending()` (not the generic Checker-action deletion path)
+   * specifically so a compound row's own `siblingMovementIds` — reconstructed server-side when the row
+   * was first loaded, carried unchanged in `pendingMakerQueueDeleteRow` — cascade correctly; the generic
+   * path's own cascade only works via same-session in-memory state this cross-session flow never has.
+   * Stays on the reconstructed screen (busy state via `actionBusy`) until the delete call actually
+   * settles, then returns to Maker Queue either way — same "wait for the async result before resetting
+   * the screen" convention `release()` already follows, not an optimistic immediate navigation.
+   */
+  onDeletePendingReviewConfirmed(): void {
+    const row = this.pendingMakerQueueDeleteRow;
+    if (!row) return;
+    this.actionBusy = true;
+    this.makerQueue.deletePending(row, () => {
+      this.actionBusy = false;
+      this.pendingMakerQueueDeleteRow = null;
+      this.selectMode('MAKER_QUEUE');
+    });
+  }
+
+  /** The Maker reviewed and declined — no delete call was ever made. Discards the pending row and returns to Maker Queue. */
+  onDeletePendingReviewCancelled(): void {
+    this.pendingMakerQueueDeleteRow = null;
+    this.selectMode('MAKER_QUEUE');
+  }
+
   /** Kept current by `MakerPanelComponent`'s `contextChanged` output. */
   onMakerContextChanged(ctx: MakerCheckerContext): void {
     this.makerContext = ctx;
@@ -186,7 +300,17 @@ export class TransactionBuilderComponent {
     this.lastMakerSync = { lcNumber: e.lcNumber, instrumentType: e.instrumentType };
     if (e.alsoSyncLookup && e.instrumentType) {
       this.lookUp.syncFrom(e.lcNumber, e.instrumentType, () => this.closeAccountEntryDialog());
+      this.scrollCheckerIntoView();
     }
+  }
+
+  /**
+   * See `checkerPanelEl`'s own doc comment for the full "why". A no-op harmlessly whenever the Checker
+   * panel is hidden (`pendingMakerQueueDeleteRow` — Maker Queue's own Delete Pending review, which
+   * deliberately has no Checker panel at all) — the `@ViewChild` itself is simply `undefined` then.
+   */
+  private scrollCheckerIntoView(): void {
+    this.checkerPanelEl?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   /**
@@ -304,7 +428,15 @@ export class TransactionBuilderComponent {
   openCheckerAccountEntryDialog(): void {
     const movement = this.selectedCheckerMovement;
     if (!movement) return;
-    this.openAccountEntryDialogWithLinkedResolution(movement, this.selectedFunction?.instrumentType);
+    // Bug fixed 2026-08-29 (live-reported, "A4 Checker View Voucher shows EARMARKED 不對 應該是PENDING")
+    // — never passed `phase` at all, so a still-PENDING A4-in-progress record (the SAME underlying A3/
+    // A3S UTILIZE row, no movement of A4's own) fell back to A3's own EARMARKING/EARMARKED label. Same
+    // derivation rule as `MakerPanelComponent.resultPhase` (its own doc comment records the identical
+    // gap for the Maker Result panel, fixed earlier the same way): `releasesExistingMovementInPlace` is
+    // A4's own unique strategy flag, true only while A4 itself is selected, so this can't misfire for any
+    // other Function's own selectedCheckerMovement.
+    const phase = this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace && movement.makerSubmittedAt ? 'finalize' : undefined;
+    this.openAccountEntryDialogWithLinkedResolution(movement, this.selectedFunction?.instrumentType, phase);
   }
 
   /**
@@ -367,9 +499,22 @@ export class TransactionBuilderComponent {
         catchError(() => of(null)),
       );
     }
+    // 2026-08-28 (live-reported, "S01 A35 已經把SG的帳沖掉了 所以A4 不需再冲SG的帳 只要冲LC的帳即可") —
+    // the IPLC_LC/UTILIZE branch below is ONLY correct while this SAME record is still under A3S's own
+    // pre-Release Checker review (F1 §14.4, "見到帳再決定") — its own SG leg is genuinely still PENDING
+    // then, and A3S's Checker Release is what finalizes BOTH legs together. Once `acknowledgedAt` is set
+    // (A3S's own Checker has already Released — the SG leg is ALREADY independently, permanently booked,
+    // "沖帳" already happened), this SAME UTILIZE record moves on to being A4's own business (Sight
+    // Settlement finalizes the LC side alone, `resultPhase === 'finalize'`) — merging in the SG leg here
+    // would show an already-closed, unrelated business event as if it were still part of THIS one.
+    // `!movement.acknowledgedAt` scopes the merge to exactly A3S's own pre-Release window, matching this
+    // exact same "still A3/A3S's own business until acknowledgedAt" rule `isFinalizing()`/`functionFor()`
+    // (maker-queue.service.ts) already use elsewhere for the identical A3S→A4 handoff question. The other
+    // two branches (B4/SHGT) are unaffected — B4's own compound Submit creates both legs in ONE call, no
+    // staged Maker/Checker handoff to gate on.
     const businessEventIdEligible =
       (instrumentType === 'EPLC_CONFIRMATION' && movement.movementType === 'ACCEPT') ||
-      (instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE') ||
+      (instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && !movement.acknowledgedAt) ||
       (instrumentType === 'SHGT' && (movement.movementType === 'FULL_REDEEM' || movement.movementType === 'PARTIAL_REDEEM'));
     if (businessEventIdEligible && movement.businessEventId) {
       return this.api.findByBusinessEventId(movement.businessEventId).pipe(
@@ -481,7 +626,7 @@ export class TransactionBuilderComponent {
   /**
    * Forwards a non-special outcome to `MakerPanelComponent` via `makerOutcomeSignal`. Also reloads the
    * Checker Queue in place for any outcome that genuinely changed a movement's state — 'released' (e.g.
-   * reject()/deleteMakerPending()'s own success, which never resets the whole screen the way release()'s
+   * reject()'s own success, which never resets the whole screen the way release()'s
    * own selectFunction() call does) and 'documentArrivalAcknowledged' (A3S) — never for 'failed'. Same
    * unification as checkerAct()'s own plain path (see checkerQueueRefreshNonce's own doc comment).
    * Also refreshes Look Up Current Balance (Common Requirement — every successful Maker Submit or
@@ -604,30 +749,24 @@ export class TransactionBuilderComponent {
     });
   }
 
-  deleteMakerPending(): void {
-    // Widened to also cover REJECTED — see maker-panel.component.html's own doc comment on the button
-    // that emits deletePendingRequested (Fix Pending/Delete Pending Phase 1).
+  /**
+   * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
+   * 2026-08-27; per-field config 2026-08-28, "頁面配置檔 for A1-A11/B1-B7") — same Checker-action-layer
+   * boundary as `release()`/`reject()`; `checkerActions.editPending()` itself stays
+   * generic (see its own doc comment), the `fixPendingEditableFields` gate lives in `function-strategy.ts`
+   * (via `MakerPanelComponent.confirmFixPending()`, which decides what goes into `event`), not here — this
+   * method is a pure pass-through of whatever patch the panel already built.
+   */
+  fixPending(event: Record<string, unknown> & { movementId: string }): void {
     if (
       !this.makerContext.submitResult?.movementId ||
+      this.makerContext.submitResult.movementId !== event.movementId ||
       (this.makerContext.submitResult.status !== 'PENDING' && this.makerContext.submitResult.status !== 'REJECTED')
     )
       return;
+    const { movementId: _movementId, ...patch } = event;
     this.actionBusy = true;
-    this.checkerActions.deleteMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => {
-      this.actionBusy = false;
-      this.forwardOutcomeToMaker(outcome);
-    });
-  }
-
-  /** A4's own Delete Pending (see checkerActions.withdrawMakerPending()'s own doc comment) — same guard shape as deleteMakerPending() above. */
-  withdrawMakerPending(): void {
-    if (
-      !this.makerContext.submitResult?.movementId ||
-      (this.makerContext.submitResult.status !== 'PENDING' && this.makerContext.submitResult.status !== 'REJECTED')
-    )
-      return;
-    this.actionBusy = true;
-    this.checkerActions.withdrawMakerPending(this.buildCheckerActionContext()).subscribe((outcome) => {
+    this.checkerActions.editPending(this.buildCheckerActionContext(), patch as Omit<EditMovementRequest, 'editedBy'>).subscribe((outcome) => {
       this.actionBusy = false;
       this.forwardOutcomeToMaker(outcome);
     });

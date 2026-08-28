@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { RequestValidationError } from '../errors';
-import type { CreateMovementRequest } from '../service/balanceService';
+import type { CreateMovementRequest, EditMovementRequest } from '../service/balanceService';
 import type { MovementStatus } from '../types';
-import { createMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
+import { createMovementRequestSchema, editMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 
 export function balanceMovementsRouter(service: BalanceService): Router {
   const router = Router();
@@ -40,18 +40,20 @@ export function balanceMovementsRouter(service: BalanceService): Router {
   // the linked leg(s) of a compound submission (A3S's SG redemption, B5's Reimbursement Receivable)
   // by their shared businessEventId, instead of requiring the Maker's own in-memory submitResult to
   // still be present — see BalanceMovementStore.findByBusinessEventId's own doc comment.
-  // GET /balance-movements?createdBy=&status=&page=&pageSize= — Fix Pending/Delete Pending Phase 2
-  // (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.1) — the Maker Queue's own
-  // "My Pending/My Rejected" worklist. A second, independent query shape on the same route (mutually
-  // exclusive with businessEventId above) rather than a new endpoint — same convention this route
-  // already establishes. `status` is a comma-separated list; defaults to PENDING,REJECTED when omitted.
+  // GET /balance-movements?createdBy=&status=&q= — Fix Pending/Delete Pending Phase 2 (analysis/
+  // Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/
+  // My Rejected" worklist. A second, independent query shape on the same route (mutually exclusive with
+  // businessEventId above) rather than a new endpoint — same convention this route already establishes.
+  // `status` is a comma-separated list; defaults to PENDING,REJECTED when omitted. `q` (user-directed
+  // 2026-08-28, renamed from a prior `lcNumber` exact-match param — "支援 LIKE / Partial Match") is an
+  // optional substring filter — see BalanceMovementStore.listByCreatedByAndStatus()'s own doc comment
+  // for the sort/filter it drives, and why `page`/`pageSize` were removed from this query shape entirely.
   router.get('/balance-movements', (req, res) => {
-    const { businessEventId, createdBy, status, page, pageSize } = req.query as {
+    const { businessEventId, createdBy, status, q } = req.query as {
       businessEventId?: string;
       createdBy?: string;
       status?: string;
-      page?: string;
-      pageSize?: string;
+      q?: string;
     };
     if (businessEventId) {
       res.json(service.findByBusinessEventId(businessEventId));
@@ -62,8 +64,7 @@ export function balanceMovementsRouter(service: BalanceService): Router {
         service.listMyMovements({
           createdBy,
           statuses: status ? (status.split(',') as MovementStatus[]) : undefined,
-          page: page ? Number(page) : undefined,
-          pageSize: pageSize ? Number(pageSize) : undefined,
+          q: q || undefined,
         }),
       );
       return;
@@ -84,6 +85,23 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     const { cancelledBy, reasonCode, remarks } = req.body as { cancelledBy?: string; reasonCode?: string; remarks?: string };
     if (!cancelledBy) throw new RequestValidationError('cancelledBy is required.');
     res.json(service.cancel(req.params.movementId, cancelledBy, reasonCode, remarks));
+  });
+
+  // POST /balance-movements/:movementId/edit — Fix Pending (analysis/Balance-Component-FixPending-
+  // DeletePending-Proposal-zh.md §2.2/§15/§19, 2026-08-27): corrects and resubmits a PENDING/REJECTED
+  // movement in place of a Delete Pending + full re-Submit, reusing the same eventSeq (see
+  // service.editPending()'s own doc comment for the full mechanism). editMovementRequestSchema is a
+  // `.strict()` allowlist — any locked field (naturalKey/currency/instrumentType/movementType/
+  // sourceTransactionRef/etc.) is rejected by zod itself, not by a hand-written check here.
+  router.post('/balance-movements/:movementId/edit', (req, res) => {
+    const parsed = editMovementRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new RequestValidationError(firstValidationMessage(parsed.error));
+    }
+    // Same cast-after-zod convention createMovementRequestSchema's own route uses just below —
+    // accountEntries' own shape (AccountEntry[]) isn't worth re-modeling in zod a second time here,
+    // same posture as .passthrough() there.
+    res.json(service.editPending(req.params.movementId, parsed.data as EditMovementRequest));
   });
 
   // POST /balance-movements/:movementId/acknowledge — B3's own former Checker acknowledgment-only path
