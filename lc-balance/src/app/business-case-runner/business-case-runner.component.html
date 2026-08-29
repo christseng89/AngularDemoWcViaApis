@@ -1,8 +1,8 @@
 <div class="container py-4">
   <h1 class="h3 mb-1">Balance Component — Business Case Runner</h1>
   <p class="text-muted">
-    Runs Import LC Case 1-5 and Export LC Case #1-#5 against the real balance-component microservice,
-    via the Node.js 中台 orchestrator (one HTTP call per movement, per Design doc §7.4).
+    Runs the complete Import/Export LC lifecycle suite against the real Balance Component microservice.
+    Run All finishes by retaining one eligible prerequisite each for manual A4, A6, and B4 testing.
   </p>
 
   <div *ngIf="loadError" class="alert alert-danger">{{ loadError }}</div>
@@ -38,7 +38,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let step of result.trace" [class]="rowClass(step)">
-            <td>{{ step.type }}</td>
+            <td>{{ step.functionCode || step.type }}</td>
             <td>{{ step.label }}</td>
             <td>{{ statusText(step) }}</td>
             <td><pre class="step-detail">{{ detailText(step) }}</pre></td>
@@ -59,7 +59,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let step of r.trace" [class]="rowClass(step)">
-            <td>{{ step.type }}</td>
+            <td>{{ step.functionCode || step.type }}</td>
             <td>{{ step.label }}</td>
             <td>{{ statusText(step) }}</td>
             <td><pre class="step-detail">{{ detailText(step) }}</pre></td>

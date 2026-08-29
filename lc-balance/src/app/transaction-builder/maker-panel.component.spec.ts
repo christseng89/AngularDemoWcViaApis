@@ -1,5 +1,6 @@
 import { FormGroup } from '@angular/forms';
-import { Subject, of, throwError } from 'rxjs';
+import { Subject, forkJoin, of, throwError } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { MakerPanelComponent } from './maker-panel.component';
 import type {
   BalanceComponentApiService,
@@ -114,8 +115,11 @@ function mkCatalogPage(items: BalanceContract[], total?: number): CatalogPage {
 }
 
 function makeApiMock() {
-  return {
+  const api: any = {
     createMovement: jest.fn(),
+    createCompoundMovements: jest.fn((requests: CreateMovementRequest[]) =>
+      forkJoin(requests.map((request) => api.createMovement(request).pipe(map((response: { body: BalanceMovement }) => response.body)))),
+    ),
     release: jest.fn(),
     reject: jest.fn(),
     cancel: jest.fn(),
@@ -128,6 +132,7 @@ function makeApiMock() {
     listMovements: jest.fn(() => of([] as any[])),
     submitByMaker: jest.fn(),
   };
+  return api;
 }
 
 function makeComponentA() {
@@ -2592,8 +2597,11 @@ describe('MakerPanelComponent', () => {
   }
 
   function makeApiC() {
-    return {
+    const api: any = {
       createMovement: jest.fn(() => of({ body: { movementId: 'mv-new', status: 'PENDING' } })),
+      createCompoundMovements: jest.fn((requests: CreateMovementRequest[]) =>
+        forkJoin(requests.map((request) => api.createMovement(request).pipe(map((response: { body: BalanceMovement }) => response.body)))),
+      ),
       release: jest.fn(() => of({ movementId: 'mv-released', status: 'RELEASED' })),
       reject: jest.fn(() => of({ movementId: 'mv-rejected', status: 'REJECTED' })),
       cancel: jest.fn(() => of({ movementId: 'mv-cancelled', status: 'CANCELLED' })),
@@ -2603,6 +2611,7 @@ describe('MakerPanelComponent', () => {
       listMovements: jest.fn(() => of([] as any[])),
       findByBusinessEventId: jest.fn(() => of([] as any[])),
     };
+    return api;
   }
 
   function setupC() {
@@ -3117,8 +3126,8 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
-      expect(comp.submitError).toBe('Could not reserve the Shipping Guarantee redemption: INSUFFICIENT_AVAILABLE_BALANCE');
+      expect(api.createMovement).toHaveBeenCalledTimes(2);
+      expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
       expect(comp.submitting).toBe(false);
     });
 
@@ -3135,11 +3144,9 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(api.cancel).toHaveBeenCalledWith('sg-redeem-1', expect.any(String), 'AUTO_ROLLBACK_LC_LEG_FAILED');
+      expect(api.cancel).not.toHaveBeenCalled();
       expect(comp.compoundLegs.arrivalSgRedeemMovementId).toBeNull();
-      expect(comp.submitError).toBe(
-        'Document Arrival failed: LEGS_UNBALANCED. The reserved Shipping Guarantee redemption was automatically cancelled, so its capacity is available again.',
-      );
+      expect(comp.submitError).toBe('LEGS_UNBALANCED');
       expect(comp.submitting).toBe(false);
     });
   });
@@ -3180,7 +3187,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
+      expect(api.createMovement).toHaveBeenCalledTimes(2);
       expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
     });
 
@@ -3193,7 +3200,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.submitError).toBe('Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: REQUEST_VALIDATION_FAILED');
+      expect(comp.submitError).toBe('REQUEST_VALIDATION_FAILED');
     });
   });
 
@@ -3271,7 +3278,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(api.createMovement).toHaveBeenCalledTimes(1);
+      expect(api.createMovement).toHaveBeenCalledTimes(3);
       expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
     });
 
@@ -3284,8 +3291,8 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(api.createMovement).toHaveBeenCalledTimes(2);
-      expect(comp.submitError).toBe('Confirmation accepted (PENDING), but the Acceptance liability failed to record: REQUEST_VALIDATION_FAILED');
+      expect(api.createMovement).toHaveBeenCalledTimes(3);
+      expect(comp.submitError).toBe('REQUEST_VALIDATION_FAILED');
     });
 
     it('ACCEPT + Acceptance succeed, Receivable CREATE fails — surfaces the compound error', () => {
@@ -3298,9 +3305,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.submitError).toBe(
-        'Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: REQUEST_VALIDATION_FAILED',
-      );
+      expect(comp.submitError).toBe('REQUEST_VALIDATION_FAILED');
     });
   });
 
@@ -3349,7 +3354,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(api.resolveContract).not.toHaveBeenCalled();
+      expect(api.resolveContract).toHaveBeenCalledTimes(1);
       expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
     });
 
@@ -3361,7 +3366,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.submitError).toBe('Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: NOT_FOUND');
+      expect(comp.submitError).toBe('NOT_FOUND');
     });
 
     it('settle + resolve succeed but the Receivable createMovement fails — surfaces the compound error', () => {
@@ -3374,7 +3379,7 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.submitError).toBe('Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: REQUEST_VALIDATION_FAILED');
+      expect(comp.submitError).toBe('REQUEST_VALIDATION_FAILED');
     });
   });
 

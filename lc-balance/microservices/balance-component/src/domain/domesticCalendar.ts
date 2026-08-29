@@ -23,10 +23,7 @@
  * a multi-year tenor.
  */
 
-interface DomesticHoliday {
-  date: string; // YYYY-MM-DD
-  name: string;
-}
+import { DOMESTIC_HOLIDAYS as GENERATED_DOMESTIC_HOLIDAYS, type DomesticHoliday } from './domesticHolidays.generated';
 
 // Keep in sync by hand with microservices/business-days-mock/data/calendar.json — see this file's own
 // top doc comment for why this is a copy, not a shared import (separate deployable microservices).
@@ -69,7 +66,7 @@ const DOMESTIC_HOLIDAYS: readonly DomesticHoliday[] = [
   { date: '2028-10-10', name: '國慶日' },
 ];
 
-const HOLIDAYS_BY_DATE: ReadonlyMap<string, string> = new Map(DOMESTIC_HOLIDAYS.map((h) => [h.date, h.name]));
+const HOLIDAYS_BY_DATE: ReadonlyMap<string, string> = new Map(GENERATED_DOMESTIC_HOLIDAYS.map((h) => [h.date, h.name]));
 
 /** `dateStr` must be `YYYY-MM-DD`. Parsed as UTC so this is stable regardless of server timezone. */
 export function isWeekend(dateStr: string): boolean {

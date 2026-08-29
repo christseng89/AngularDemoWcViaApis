@@ -44,6 +44,7 @@ import {
 import { FixPendingEditableField, deriveFunctionStrategy, functionSupportsFixPending } from './function-strategy';
 import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
+import { beginMakerSubmission, reduceMakerSubmitOutcome } from './maker-workflow-state';
 
 /**
  * The fields `TransactionBuilderComponent.buildCheckerActionContext()` needs from this panel's own
@@ -1463,19 +1464,17 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   private applyMakerSubmitOutcome(outcome: MakerSubmitOutcome): void {
-    this.submitting = false;
-    // Safe as a plain merge-spread, not 7 `!== undefined` guards: every `secondary:` object
-    // maker-submit.service.ts constructs includes only keys it has a value for, never `key: undefined`.
-    this.compoundLegs = { ...this.compoundLegs, ...outcome.secondary };
+    const next = reduceMakerSubmitOutcome(this, outcome);
+    this.submitting = next.submitting;
+    this.submitResult = next.submitResult;
+    this.submitError = next.submitError;
+    this.compoundLegs = next.compoundLegs;
 
     if (outcome.kind === 'submitted') {
-      this.submitResult = outcome.result;
       this.emitContext();
       this.emitCheckerAndLookupSync();
       return;
     }
-    this.submitError = outcome.message;
-    if ('result' in outcome && outcome.result !== undefined) this.submitResult = outcome.result;
     this.emitContext();
   }
 
@@ -1484,13 +1483,12 @@ export class MakerPanelComponent implements OnChanges {
     const req = this.buildSubmitRequest();
     if (!req) return;
 
-    this.submitting = true;
-    this.submitResult = null;
-    this.submitError = null;
+    const next = beginMakerSubmission(this);
+    this.submitting = next.submitting;
+    this.submitResult = next.submitResult;
+    this.submitError = next.submitError;
+    this.compoundLegs = next.compoundLegs;
     this.arrivalApproved = false;
-    // Deliberately a PARTIAL reset — only these 3 of the 7 compoundLegs fields; the other 4 are cleared
-    // only by resetForFunction().
-    this.compoundLegs = { ...this.compoundLegs, arrivalSgRedeemMovementId: null, arrivalSgRedeemMovement: null, acceptanceMovement: null };
 
     this.makerSubmit.submit(req, this.buildMakerSubmitContext()).subscribe((outcome) => this.applyMakerSubmitOutcome(outcome));
   }

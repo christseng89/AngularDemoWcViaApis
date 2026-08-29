@@ -24,6 +24,29 @@ describe('BalanceComponentApiService', () => {
     expect(result).toBe('OBS');
   });
 
+  it('createCompoundMovements() POSTs one atomic command', () => {
+    const requests = [{ instrumentType: 'IPLC_LC', movementType: 'ISSUE' }] as CreateMovementRequest[];
+    service.createCompoundMovements(requests);
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/compound', { requests });
+  });
+
+  it('releaseCompoundMovements() POSTs one atomic release command', () => {
+    service.releaseCompoundMovements(['MV-1', 'MV-2'], 'checker1');
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/compound-release', {
+      movementIds: ['MV-1', 'MV-2'],
+      releasedBy: 'checker1',
+    });
+  });
+
+  it('executeCompoundActions() POSTs mixed atomic actions', () => {
+    const actions = [
+      { kind: 'release' as const, movementId: 'MV-1' },
+      { kind: 'acknowledge' as const, movementId: 'MV-2' },
+    ];
+    service.executeCompoundActions(actions, 'checker1');
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/compound-actions', { actions, actor: 'checker1' });
+  });
+
   it('release() POSTs to the /release sub-path with releasedBy', () => {
     service.release('MV-1', 'checker1');
     expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/release', { releasedBy: 'checker1' });

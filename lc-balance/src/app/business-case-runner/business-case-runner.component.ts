@@ -144,6 +144,9 @@ export class BusinessCaseRunnerComponent implements OnInit {
         `confirmed=${r.confirmedBalance}  available=${r.availableBalance}` +
         (r.offBalanceExposure ? `  offBalanceExposure=${r.offBalanceExposure}  tightAvailable=${r.tightAvailableBalance}` : '')
       );
+    if ((step.type === 'createCompoundMovements' || step.type === 'compoundActions') && Array.isArray(r)) {
+      return r.map((movement) => `${movement.movementType ?? 'movement'} status=${movement.status}`).join(' | ');
+    }
     if (step.type === 'createMovement') {
       const w = r.warnings?.length ? `  ⚠ ${r.warnings[0].message}` : '';
       return `${r.movementType} amount=${r.amount} ceilingAmount=${r.ceilingAmount} status=${r.status}${w}`;

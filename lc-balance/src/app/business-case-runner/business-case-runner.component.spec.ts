@@ -474,5 +474,15 @@ describe('BusinessCaseRunnerComponent', () => {
       const step: TraceStep = { type: 'release', label: 'l', response: { status: 'RELEASED' } };
       expect(component.detailText(step)).toBe('status=RELEASED');
     });
+
+    it('formats every movement in an A6/B4 compound trace record', () => {
+      const step: TraceStep = {
+        type: 'createCompoundMovements',
+        functionCode: 'B4',
+        label: 'B4 compound',
+        response: [{ movementType: 'ACCEPT', status: 'PENDING' }, { movementType: 'CREATE', status: 'PENDING' }],
+      };
+      expect(component.detailText(step)).toBe('ACCEPT status=PENDING | CREATE status=PENDING');
+    });
   });
 });

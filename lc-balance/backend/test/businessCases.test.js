@@ -35,16 +35,44 @@ const EXPECTED_IDS = [
   'export-case-12',
   'export-case-13',
   'export-case-14',
+  'import-a4-ready',
+  'import-a6-ready',
+  'export-b4-ready',
 ];
 
-const VALID_STEP_TYPES = ['note', 'createMovement', 'release', 'makerSubmit', 'acknowledge', 'snapshot'];
+const VALID_STEP_TYPES = ['note', 'createMovement', 'createCompoundMovements', 'compoundActions', 'release', 'makerSubmit', 'acknowledge', 'snapshot'];
 
 describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
-  it('returns exactly 29 business cases, Import Case 1-15 then Export Case #1-#14, in order', () => {
-    expect(registry).toHaveLength(29);
+  it('returns all lifecycle and manual-readiness business cases in Run All order', () => {
+    expect(registry).toHaveLength(32);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
+  });
+
+  it('Run All ends with retained, eligible prerequisites for manual A4, A6, and B4 testing', () => {
+    const byId = Object.fromEntries(registry.map((businessCase) => [businessCase.id, businessCase]));
+    const a4 = byId['import-a4-ready'];
+    const a6 = byId['import-a6-ready'];
+    const b4 = byId['export-b4-ready'];
+
+    const assertImportReady = (businessCase, tenorType) => {
+      const issue = businessCase.steps.find((step) => step.type === 'createMovement' && step.request?.movementType === 'ISSUE');
+      const arrival = businessCase.steps.find((step) => step.type === 'createMovement' && step.request?.movementType === 'UTILIZE');
+      expect(issue.request.tenorType).toBe(tenorType);
+      expect(arrival).toBeDefined();
+      expect(businessCase.steps.some((step) => step.type === 'acknowledge' && step.movementRef === arrival.captureAs)).toBe(true);
+      expect(businessCase.steps.some((step) => step.type === 'makerSubmit')).toBe(false);
+      expect(businessCase.steps.some((step) => step.functionCode === 'A4' || step.functionCode === 'A6')).toBe(false);
+    };
+
+    assertImportReady(a4, 'SIGHT');
+    assertImportReady(a6, 'SELLERS_USANCE');
+    const presentDocs = b4.steps.find((step) => step.type === 'createMovement' && step.request?.instrumentType === 'EPLC_EXAMINATION');
+    expect(presentDocs).toBeDefined();
+    expect(b4.steps.some((step) => step.type === 'release' && step.movementRef === presentDocs.captureAs)).toBe(true);
+    expect(b4.steps.some((step) => step.functionCode === 'B4')).toBe(false);
+    expect(registry.slice(-3).map((businessCase) => businessCase.id)).toEqual(['import-a4-ready', 'import-a6-ready', 'export-b4-ready']);
   });
 
   it('every case has a non-empty title/description and a non-empty step list', () => {
@@ -76,7 +104,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['export-case-7'].title).toBe(
       'Export Case #7 — USD Sellers Usance 120 days + Confirmed + Present Docs (B3) -> Accept (B4) -> Acceptance + Reimbursement Receivable -> Settlement (B5)',
     );
-    expect(byId['import-case-8'].title).toBe("Import Case 8 — USD Sellers Usance 120 days, full lifecycle to Close (A10)");
+    expect(byId['import-case-8'].title).toBe('Import Case 8 — USD Sellers Usance 120 days, full lifecycle to Close (A10)');
     expect(byId['import-case-9'].title).toBe("Import Case 9 — USD Buyer's Usance 120 days, full lifecycle to Close (A10)");
     expect(byId['import-case-10'].title).toBe(
       'Import Case 10 — USD Sight, Shipping Guarantee + Document Arrival both taken to their own terminus, then Close (A10)',
@@ -84,7 +112,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['import-case-11'].title).toBe('Import Case 11 — A10 Close eligibility gate, negative path (expect ERROR)');
     expect(byId['import-case-12'].title).toBe('Import Case 12 — A10 Close eligibility gate, negative path (Acceptance balance outstanding, expect ERROR)');
     expect(byId['export-case-8'].title).toBe('Export Case #8 — USD Sight + Confirmed, full lifecycle to Close (B6)');
-    expect(byId['export-case-9'].title).toBe("Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)");
+    expect(byId['export-case-9'].title).toBe('Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)');
     expect(byId['export-case-10'].title).toBe('Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)');
     expect(byId['export-case-11'].title).toBe('Export Case #11 — B6 Close eligibility gate, negative path (expect ERROR)');
     expect(byId['import-case-13'].title).toBe(
@@ -124,23 +152,27 @@ describe('data/businessCases.js buildRegistry()', () => {
     registry.forEach((c) => {
       const defined = new Set();
       c.steps.forEach((step, idx) => {
-        if (step.type === 'createMovement') {
-          const req = step.request || {};
-          if (req.balanceContractIdRef) {
-            expect(defined.has(req.balanceContractIdRef)).toBe(true);
-          }
-          if (req.parentLogicalContractIdRef) {
-            expect(defined.has(req.parentLogicalContractIdRef)).toBe(true);
-          }
-          if (req.referencedTransactionIdRef) {
-            expect(defined.has(req.referencedTransactionIdRef)).toBe(true);
-          }
-          if (step.captureAs) {
+        if (step.type === 'createMovement' || step.type === 'createCompoundMovements') {
+          const requests = step.type === 'createMovement' ? [step.request || {}] : step.requests;
+          requests.forEach((req) => {
+            if (req.balanceContractIdRef) {
+              expect(defined.has(req.balanceContractIdRef)).toBe(true);
+            }
+            if (req.parentLogicalContractIdRef) {
+              expect(defined.has(req.parentLogicalContractIdRef)).toBe(true);
+            }
+            if (req.referencedTransactionIdRef) {
+              expect(defined.has(req.referencedTransactionIdRef)).toBe(true);
+            }
+          });
+          const captureKeys = step.type === 'createMovement' ? [step.captureAs] : step.captureAs;
+          captureKeys.filter(Boolean).forEach((captureAs) => {
             // A step must not "define" a key it also references as its own ref (sanity check —
             // would indicate a self-referential, unresolvable step).
-            expect(step.captureAs === req.balanceContractIdRef).toBe(false);
-            defined.add(step.captureAs);
-          }
+            defined.add(captureAs);
+          });
+        } else if (step.type === 'compoundActions') {
+          step.actions.forEach((action) => expect(defined.has(action.movementRef)).toBe(true));
         } else if (step.type === 'release' || step.type === 'makerSubmit') {
           expect(step.movementRef).toBeTruthy();
           expect(defined.has(step.movementRef)).toBe(true);

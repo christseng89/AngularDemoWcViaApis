@@ -284,9 +284,9 @@ describe('runAutoExpirySweep (F1)', () => {
   test('no-ops entirely when AUTO_EXPIRY_ENABLED is false — nothing touched, no error', () => {
     jest.resetModules();
     jest.doMock('../../../src/config', () => ({ ...jest.requireActual('../../../src/config'), AUTO_EXPIRY_ENABLED: false }));
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { BalanceService: PatchedService } = require('../../../src/service/balanceService');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createDb: patchedCreateDb } = require('../../../src/db');
     const service = new PatchedService(patchedCreateDb(':memory:'));
     const issue = service.createMovement({

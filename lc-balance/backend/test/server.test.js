@@ -33,11 +33,30 @@ function createGenericFetchMock() {
         status: 'PENDING',
       });
     }
+    if (method === 'POST' && url.endsWith('/balance-movements/compound')) {
+      const requests = JSON.parse(opts.body).requests;
+      return jsonResponse(
+        201,
+        requests.map(() => {
+          movementCounter += 1;
+          return { movementId: `mv-${movementCounter}`, balanceContractId: `bc-${movementCounter}`, status: 'PENDING' };
+        }),
+      );
+    }
+    if (method === 'POST' && url.endsWith('/balance-movements/compound-actions')) {
+      return jsonResponse(
+        200,
+        JSON.parse(opts.body).actions.map((action) => ({ movementId: action.movementId, status: 'RELEASED' })),
+      );
+    }
     if (method === 'POST' && /\/balance-movements\/[^/]+\/release$/.test(url)) {
       return jsonResponse(200, { status: 'RELEASED' });
     }
     if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
       return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
+    }
+    if (method === 'POST' && /\/balance-movements\/[^/]+\/acknowledge$/.test(url)) {
+      return jsonResponse(200, { status: 'PENDING', acknowledgedBy: 'checker1', acknowledgedAt: '2026-08-29T00:00:00.000Z', makerSubmittedAt: null });
     }
     if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
       const [, contractId] = url.match(/\/balance-contracts\/([^/]+)\/balance$/);
@@ -64,13 +83,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('GET /api/business-cases', () => {
-    it('lists all 29 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
+    it('lists all 32 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
       global.fetch = jest.fn();
 
       const res = await request(app).get('/api/business-cases');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(29);
+      expect(res.body).toHaveLength(32);
 
       const registry = buildRegistry();
       res.body.forEach((c, i) => {
@@ -164,13 +183,12 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
 
       expect(res.status).toBe(200);
 
-      const creates = res.body.trace.filter((t) => t.type === 'createMovement');
-      const examination = creates.find((t) => t.label.startsWith('Present Docs'));
-      const honour = creates.find((t) => t.label.startsWith('Issuing Bank Honour'));
+      const examination = res.body.trace.find((t) => t.type === 'createMovement' && t.label.startsWith('Present Docs'));
+      const honour = res.body.trace.find((t) => t.type === 'createCompoundMovements');
       expect(examination).toBeDefined();
       expect(honour).toBeDefined();
-      expect(honour.request.referencedTransactionId).toBe(examination.response.movementId);
-      expect(honour.request.referencedTransactionIdRef).toBeUndefined();
+      expect(honour.requests[0].referencedTransactionId).toBe(examination.response.movementId);
+      expect(honour.requests[0].referencedTransactionIdRef).toBeUndefined();
 
       const case6 = buildRegistry().find((c) => c.id === 'export-case-6');
       // referencedTransactionIdRef resolves inline from already-captured data (no extra GET, unlike
@@ -205,6 +223,30 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
     });
   });
 
+  describe('Run All manual-readiness fixtures', () => {
+    it.each([
+      ['import-a4-ready', 'acknowledge', 'SIGHT'],
+      ['import-a6-ready', 'acknowledge', 'SELLERS_USANCE'],
+      ['export-b4-ready', 'release', 'SIGHT'],
+    ])('%s completes while retaining its approved prerequisite', async (caseId, finalStepType, tenorType) => {
+      global.fetch = createGenericFetchMock();
+      const res = await request(app).post(`/api/business-cases/${caseId}/run`).send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.trace.every((step) => step.ok !== false && !step.skipped)).toBe(true);
+      const issue = res.body.trace.find((step) => step.type === 'createMovement' && step.request?.movementType === 'ISSUE');
+      expect(issue.request.tenorType).toBe(tenorType);
+      expect(res.body.trace.at(-1).type).toBe(finalStepType);
+      expect(res.body.trace.some((step) => step.functionCode === 'A4' || step.functionCode === 'A6' || step.functionCode === 'B4')).toBe(false);
+      if (caseId.startsWith('import-')) {
+        expect(res.body.trace.at(-1).response).toMatchObject({ status: 'PENDING', acknowledgedAt: expect.any(String), makerSubmittedAt: null });
+      } else {
+        expect(res.body.trace.at(-1).response).toMatchObject({ status: 'RELEASED' });
+        expect(res.body.trace.at(-1).response.presentDocsConsumedAt).toBeUndefined();
+      }
+    });
+  });
+
   // SUPERSEDED 2026-08-18 ("所有交易要RELEASE過後 才能根據流程走下一個交易" — every transaction must
   // genuinely RELEASE before the next step in the flow can act on it). Quality-report-balance.md BAL-131
   // (2026-08-17) originally closed a gap where the Business Case Registry never exercised B3's own
@@ -227,7 +269,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
 
       const case6 = buildRegistry().find((c) => c.id === 'export-case-6');
       const examinationReleaseIdx = case6.steps.findIndex((s) => s.type === 'release' && s.label.startsWith('Checker releases Present Docs ('));
-      const honourCreateIdx = case6.steps.findIndex((s) => s.type === 'createMovement' && s.label.includes('Issuing Bank Honour'));
+      const honourCreateIdx = case6.steps.findIndex((s) => s.type === 'createCompoundMovements' && s.label.includes('Issuing Bank Honour'));
       expect(examinationReleaseIdx).toBeGreaterThanOrEqual(0);
       expect(examinationReleaseIdx).toBeLessThan(honourCreateIdx);
     });
@@ -411,7 +453,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('POST /api/admin/reset-database — dev-only Business Case Runner "Cleanup Database Tables" button', () => {
-    it('proxies straight through to the microservice\'s own /admin/reset-database and forwards its status/body', async () => {
+    it("proxies straight through to the microservice's own /admin/reset-database and forwards its status/body", async () => {
       global.fetch = jest.fn(async (url, opts = {}) => {
         expect(url).toBe('http://localhost:4100/admin/reset-database');
         expect(opts.method).toBe('POST');

@@ -3,6 +3,8 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import type { Db } from './db';
 import { BalanceService } from './service/balanceService';
+import { CompoundMovementService } from './service/compoundMovementService';
+import { SqliteUnitOfWork } from './service/unitOfWork';
 import { balanceContractsRouter } from './routes/balanceContracts';
 import { balanceMovementsRouter } from './routes/balanceMovements';
 import { deletePendingAuditRouter } from './routes/deletePendingAudit';
@@ -16,6 +18,7 @@ import { ApiError } from './errors';
  */
 export function createApp(db: Db, service: BalanceService = new BalanceService(db)): Express {
   const app = express();
+  const compound = new CompoundMovementService(service, new SqliteUnitOfWork(db));
   app.use(helmet());
   app.use(express.json());
 
@@ -36,7 +39,7 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
   // window. See backend/server.js's own resolveLogicalContractId()/createMovement-step doc comments for
   // the companion fix — a 429 mid-run (now much rarer) surfaces a clear error instead of crashing.
   app.use('/balance-movements', rateLimit({ windowMs: 60_000, limit: 1000, standardHeaders: true, legacyHeaders: false }));
-  app.use(balanceMovementsRouter(service));
+  app.use(balanceMovementsRouter(service, compound));
   app.use(deletePendingAuditRouter(service));
 
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));

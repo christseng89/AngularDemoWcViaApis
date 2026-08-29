@@ -139,6 +139,47 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
   });
 });
 
+describe('HTTP integration — atomic compound commands', () => {
+  const movement = (lcNumber: string, eventSeq: number) => ({
+    instrumentType: 'IPLC_LC',
+    naturalKey: { lcNumber },
+    movementType: 'ISSUE',
+    expiryDate: '2099-12-31',
+    eventSeq,
+    amount: '100',
+    currency: 'USD',
+    tenorType: 'SIGHT',
+    createdBy: 'maker1',
+    businessEventId: 'http-compound-event',
+  });
+
+  test('creates and releases all legs through one command each', async () => {
+    const app = createApp(createDb(':memory:'));
+    const created = await request(app)
+      .post('/balance-movements/compound')
+      .send({ requests: [movement('HTTP-CMP-1', 901), movement('HTTP-CMP-2', 902)] })
+      .expect(201);
+    expect(created.body).toHaveLength(2);
+
+    const released = await request(app)
+      .post('/balance-movements/compound-release')
+      .send({ movementIds: created.body.map((item: { movementId: string }) => item.movementId), releasedBy: 'checker1' })
+      .expect(200);
+    expect(released.body.map((item: { status: string }) => item.status)).toEqual(['RELEASED', 'RELEASED']);
+  });
+
+  test.each([
+    ['/balance-movements/compound', {}],
+    ['/balance-movements/compound', { requests: [{}] }],
+    ['/balance-movements/compound-release', {}],
+    ['/balance-movements/compound-release', { movementIds: [1, 2], releasedBy: 'checker1' }],
+    ['/balance-movements/compound-actions', {}],
+    ['/balance-movements/compound-actions', { actions: [{ kind: 'other', movementId: 'x' }], actor: 'checker1' }],
+  ])('%s rejects an invalid command body', async (path, body) => {
+    await request(createApp(createDb(':memory:'))).post(path).send(body).expect(400);
+  });
+});
+
 describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS past Tight Available; matched "Document Arrival w/ Shipping Gtee" (redeem-then-arrive) still succeeds (Import Case 4 shape)', () => {
   const app = createApp(createDb(':memory:'));
   let lcId: string;

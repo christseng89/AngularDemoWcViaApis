@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { forkJoin, of, throwError } from 'rxjs';
 import { CheckerActionsService, CheckerActionContext } from './checker-actions.service';
 import { BalanceComponentApiService, BalanceMovement } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
@@ -33,11 +33,20 @@ function makeMovement(overrides: Partial<BalanceMovement> = {}): BalanceMovement
 }
 
 function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jest.Mock>> = {}) {
+  const release = overrides.release ?? jest.fn(() => of(makeMovement({ movementId: 'released', status: 'RELEASED' })));
+  const acknowledge = overrides.acknowledge ?? jest.fn(() => of(makeMovement({ movementId: 'acknowledged', status: 'PENDING' })));
   return {
-    release: jest.fn(() => of({ movementId: 'released', status: 'RELEASED' })),
+    release,
     reject: jest.fn(() => of({ movementId: 'rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'cancelled', status: 'CANCELLED' })),
-    acknowledge: jest.fn(() => of({ movementId: 'acknowledged', status: 'PENDING' })),
+    acknowledge,
+    releaseCompoundMovements:
+      overrides.releaseCompoundMovements ?? jest.fn((movementIds: string[], actor: string) => forkJoin(movementIds.map((id) => release(id, actor)))),
+    executeCompoundActions:
+      overrides.executeCompoundActions ??
+      jest.fn((actions: { kind: 'release' | 'acknowledge'; movementId: string }[], actor: string) =>
+        forkJoin(actions.map((action) => (action.kind === 'release' ? release(action.movementId, actor) : acknowledge(action.movementId, actor)))),
+      ),
     withdrawMakerSubmit: jest.fn(() => of({ movementId: 'withdrawn', status: 'PENDING', makerSubmittedAt: null })),
     findByBusinessEventId: jest.fn(() => of([] as BalanceMovement[])),
     editPending: jest.fn(() => of(makeMovement({ movementId: 'mv-edited', amount: '999' }))),
@@ -290,10 +299,10 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
 
     service.release(ctx).subscribe((outcome) => {
-      // Primary still releases; only the unresolved downstream leg is skipped — one api.release call.
-      expect(outcome.kind).toBe('released');
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('Due from Issuing Bank');
       expect(api.findByBusinessEventId).not.toHaveBeenCalled();
-      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).not.toHaveBeenCalled();
       done();
     });
   });
@@ -336,10 +345,12 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Acceptance NOT approved');
-        expect(outcome.message).toContain('IB-FAIL');
+        expect(outcome.message).toContain('failed to release atomically');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
       }
-      expect(api.release).toHaveBeenCalledTimes(1);
+      // The HTTP adapter sends one compound command; this test double subscribes both inner
+      // observables, while the real SQLite endpoint rolls the whole transaction back.
+      expect(api.release).toHaveBeenCalledTimes(2);
       done();
     });
   });
@@ -383,8 +394,8 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
 
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('Reimbursement Receivable could not be found');
-      expect(api.release).toHaveBeenCalledTimes(2);
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('Acceptance and Reimbursement Receivable');
+      expect(api.release).not.toHaveBeenCalled();
       done();
     });
   });
@@ -400,9 +411,8 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
 
     service.release(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('released');
-      expect(api.release).toHaveBeenCalledTimes(1);
-      expect(api.release).toHaveBeenCalledWith('honour-3', 'checker1');
+      expect(outcome.kind).toBe('failed');
+      expect(api.release).not.toHaveBeenCalled();
       done();
     });
   });

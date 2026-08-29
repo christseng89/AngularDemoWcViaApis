@@ -331,6 +331,23 @@ function creatingOnly<T>(isCreatingEdit: boolean, patched: T | null | undefined,
   return isCreatingEdit ? (patched ?? existing) : existing;
 }
 
+/** Persistence port bundle: production uses SQLite stores; tests or future adapters can inject alternatives. */
+export interface BalanceServiceStores {
+  contracts: BalanceContractStore;
+  movements: BalanceMovementStore;
+  deletePendingAudit: DeletePendingAuditStore;
+  fixPendingAudit: FixPendingAuditStore;
+}
+
+export function createSqliteBalanceServiceStores(db: Db): BalanceServiceStores {
+  return {
+    contracts: new BalanceContractStore(db),
+    movements: new BalanceMovementStore(db),
+    deletePendingAudit: new DeletePendingAuditStore(db),
+    fixPendingAudit: new FixPendingAuditStore(db),
+  };
+}
+
 export class BalanceService {
   private readonly contracts: BalanceContractStore;
   private readonly movements: BalanceMovementStore;
@@ -351,12 +368,13 @@ export class BalanceService {
   constructor(
     db: Db,
     private readonly now: () => string = () => new Date().toISOString(),
+    stores: BalanceServiceStores = createSqliteBalanceServiceStores(db),
   ) {
     this.db = db;
-    this.contracts = new BalanceContractStore(db);
-    this.movements = new BalanceMovementStore(db);
-    this.deletePendingAudit = new DeletePendingAuditStore(db);
-    this.fixPendingAudit = new FixPendingAuditStore(db);
+    this.contracts = stores.contracts;
+    this.movements = stores.movements;
+    this.deletePendingAudit = stores.deletePendingAudit;
+    this.fixPendingAudit = stores.fixPendingAudit;
     this.movementTypeRegistry = this.buildMovementTypeRegistry();
     this.newContractSufficiencyRegistry = this.buildNewContractSufficiencyRegistry();
   }

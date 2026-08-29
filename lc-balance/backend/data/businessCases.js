@@ -685,12 +685,12 @@ function importCase6(lc) {
           'LC Balance before any A4 Sight Settlement (expect Confirmed 100,000, Available 46,000 — 54,000 still Pending across all three Document Arrivals)',
         contractRef: 'lc',
       },
-      { type: 'makerSubmit', label: 'A4 real Maker Submit — B01', movementRef: 'utilizeB01', makerSubmittedBy: MAKER },
-      { type: 'release', label: 'A4 Checker Release — B01 (Sight Settlement finalizes)', movementRef: 'utilizeB01', releasedBy: CHECKER },
-      { type: 'makerSubmit', label: 'A4 real Maker Submit — B02', movementRef: 'utilizeB02', makerSubmittedBy: MAKER },
-      { type: 'release', label: 'A4 Checker Release — B02 (Sight Settlement finalizes)', movementRef: 'utilizeB02', releasedBy: CHECKER },
-      { type: 'makerSubmit', label: 'A4 real Maker Submit — B03', movementRef: 'utilizeB03', makerSubmittedBy: MAKER },
-      { type: 'release', label: 'A4 Checker Release — B03 (Sight Settlement finalizes)', movementRef: 'utilizeB03', releasedBy: CHECKER },
+      { type: 'makerSubmit', functionCode: 'A4', label: 'A4 real Maker Submit — B01', movementRef: 'utilizeB01', makerSubmittedBy: MAKER },
+      { type: 'release', functionCode: 'A4', label: 'A4 Checker Release — B01 (Sight Settlement finalizes)', movementRef: 'utilizeB01', releasedBy: CHECKER },
+      { type: 'makerSubmit', functionCode: 'A4', label: 'A4 real Maker Submit — B02', movementRef: 'utilizeB02', makerSubmittedBy: MAKER },
+      { type: 'release', functionCode: 'A4', label: 'A4 Checker Release — B02 (Sight Settlement finalizes)', movementRef: 'utilizeB02', releasedBy: CHECKER },
+      { type: 'makerSubmit', functionCode: 'A4', label: 'A4 real Maker Submit — B03', movementRef: 'utilizeB03', makerSubmittedBy: MAKER },
+      { type: 'release', functionCode: 'A4', label: 'A4 Checker Release — B03 (Sight Settlement finalizes)', movementRef: 'utilizeB03', releasedBy: CHECKER },
       { type: 'snapshot', label: 'LC Balance after all three A4 Settlements (expect Confirmed 46,000, Available 46,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'SG1 Balance (expect 0, fully redeemed)', contractRef: 'sg1' },
       { type: 'snapshot', label: 'SG2 Balance (expect 8,000 still outstanding)', contractRef: 'sg2' },
@@ -800,7 +800,8 @@ function importCase7(lc) {
       },
       {
         type: 'createMovement',
-        label: 'Create Acceptance 20,000 for B01 (A6 — references the Document Arrival)',
+        functionCode: 'A6',
+        label: 'A6 — Create Acceptance 20,000 for B01',
         captureAs: 'acceptanceB01',
         request: {
           instrumentType: 'IPLC_ACCEPTANCE',
@@ -818,15 +819,19 @@ function importCase7(lc) {
         },
       },
       {
-        type: 'release',
-        label: "Checker releases B01's own Document Arrival (resolved via referencedTransactionId, released first)",
-        movementRef: 'utilizeB01',
-        releasedBy: CHECKER,
+        type: 'compoundActions',
+        functionCode: 'A6',
+        label: 'A6 Checker approval — B01',
+        actor: CHECKER,
+        actions: [
+          { kind: 'release', movementRef: 'utilizeB01' },
+          { kind: 'release', movementRef: 'acceptanceB01' },
+        ],
       },
-      { type: 'release', label: 'Checker releases Acceptance CREATE — B01', movementRef: 'acceptanceB01', releasedBy: CHECKER },
       {
         type: 'createMovement',
-        label: 'Create Acceptance 25,000 for B02 (A6 — references the Document Arrival)',
+        functionCode: 'A6',
+        label: 'A6 — Create Acceptance 25,000 for B02',
         captureAs: 'acceptanceB02',
         request: {
           instrumentType: 'IPLC_ACCEPTANCE',
@@ -844,12 +849,15 @@ function importCase7(lc) {
         },
       },
       {
-        type: 'release',
-        label: "Checker releases B02's own Document Arrival (resolved via referencedTransactionId, released first)",
-        movementRef: 'utilizeB02',
-        releasedBy: CHECKER,
+        type: 'compoundActions',
+        functionCode: 'A6',
+        label: 'A6 Checker approval — B02',
+        actor: CHECKER,
+        actions: [
+          { kind: 'release', movementRef: 'utilizeB02' },
+          { kind: 'release', movementRef: 'acceptanceB02' },
+        ],
       },
-      { type: 'release', label: 'Checker releases Acceptance CREATE — B02', movementRef: 'acceptanceB02', releasedBy: CHECKER },
       { type: 'snapshot', label: 'LC Balance after both Acceptances (expect Confirmed 55,000, Available 55,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'Acceptance B01 Balance (expect 20,000)', contractRef: 'acceptanceB01' },
       { type: 'snapshot', label: 'Acceptance B02 Balance (expect 25,000)', contractRef: 'acceptanceB02' },
@@ -897,7 +905,7 @@ function importCase7(lc) {
 function importCase8(lc) {
   return {
     id: 'import-case-8',
-    title: "Import Case 8 — USD Sellers Usance 120 days, full lifecycle to Close (A10)",
+    title: 'Import Case 8 — USD Sellers Usance 120 days, full lifecycle to Close (A10)',
     description:
       "Extends Import Case 7's own path (LC Issue -> two Document Arrivals, one plain (B01) one SG-matched (B02) -> two Acceptances (A6) -> two Settlements (A7)) through to A10 Close, once SG and both Acceptances are confirmed at 0 and no Event in the tree is still open.",
     steps: [
@@ -1313,7 +1321,7 @@ function importCase11(lc, sg) {
     id: 'import-case-11',
     title: 'Import Case 11 — A10 Close eligibility gate, negative path (expect ERROR)',
     description:
-      "LC Issue 100,000 -> SG 30,000 issued and never redeemed -> Close attempted while SG Balance is still outstanding — domain/closeEligibility.ts must reject it (SG Confirmed Balance != 0), not silently allow it.",
+      'LC Issue 100,000 -> SG 30,000 issued and never redeemed -> Close attempted while SG Balance is still outstanding — domain/closeEligibility.ts must reject it (SG Confirmed Balance != 0), not silently allow it.',
     steps: [
       ...createAndRelease(
         'LC Issue 100,000 (no tolerance, kept simple for this negative case)',
@@ -1362,7 +1370,11 @@ function importCase11(lc, sg) {
           createdBy: MAKER,
         },
       },
-      { type: 'snapshot', label: 'LC Balance unchanged (expect still Confirmed 100,000, status still ACTIVE — the rejected Close never applied)', contractRef: 'lc' },
+      {
+        type: 'snapshot',
+        label: 'LC Balance unchanged (expect still Confirmed 100,000, status still ACTIVE — the rejected Close never applied)',
+        contractRef: 'lc',
+      },
       { type: 'snapshot', label: 'SG Balance unchanged (expect still 30,000)', contractRef: 'sg' },
     ],
   };
@@ -1446,7 +1458,11 @@ function importCase12(lc, ib) {
           createdBy: MAKER,
         },
       },
-      { type: 'snapshot', label: 'LC Balance unchanged (expect still Confirmed 50,000, status still ACTIVE — the rejected Close never applied)', contractRef: 'lc' },
+      {
+        type: 'snapshot',
+        label: 'LC Balance unchanged (expect still Confirmed 50,000, status still ACTIVE — the rejected Close never applied)',
+        contractRef: 'lc',
+      },
       { type: 'snapshot', label: 'Acceptance Liability unchanged (expect still 50,000)', contractRef: 'acceptance' },
     ],
   };
@@ -1516,7 +1532,12 @@ function importCase13(lc) {
           createdBy: MAKER,
         },
       },
-      { type: 'release', label: 'Checker releases Reopen — balance updates directly (REOPEN carries its own amount), status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
+      {
+        type: 'release',
+        label: 'Checker releases Reopen — balance updates directly (REOPEN carries its own amount), status returns to ACTIVE',
+        movementRef: 'reopen',
+        releasedBy: CHECKER,
+      },
       { type: 'snapshot', label: "LC Balance after Reopen (expect Confirmed 50,000 restored — REOPEN's own computed amount)", contractRef: 'lc' },
       {
         type: 'createMovement',
@@ -1579,7 +1600,11 @@ function importCase14(lc) {
           createdBy: MAKER,
         },
       },
-      { type: 'snapshot', label: 'LC Balance unchanged (expect still Confirmed 30,000, status still ACTIVE — the rejected Reopen never applied)', contractRef: 'lc' },
+      {
+        type: 'snapshot',
+        label: 'LC Balance unchanged (expect still Confirmed 30,000, status still ACTIVE — the rejected Reopen never applied)',
+        contractRef: 'lc',
+      },
     ],
   };
 }
@@ -1587,7 +1612,8 @@ function importCase14(lc) {
 function importCase15(lc) {
   return {
     id: 'import-case-15',
-    title: 'Import Case 15 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> A11 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
+    title:
+      'Import Case 15 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> A11 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
     description:
       "LC Issue 30,000 with an Expiry Date already in the past -> EXPIRE (date-triggered write-off, same -1 direction as Close but with its own narrower eligibility — no SG/Acceptance-zero condition) writes off the full 30,000 -> the contract is now EXPIRED, so AUTO CLOSE's own write-off amount is already 0 (nothing left) -> A11 Reopen must reverse BOTH not-yet-reversed write-offs in the chain to restore the real historic balance (30,000), not just the last one (which would incorrectly restore 0). createdBy/releasedBy on the Expire/Close steps use the same BATCH_MAKER/BATCH_CHECKER system-actor identifiers the real background sweep (server.ts's own setInterval) uses — this case calls the microservice directly with those same movementTypes/actors rather than waiting on the real sweep interval, since this registry's step model has no \"wait N seconds\" step type.",
     steps: [
@@ -1625,7 +1651,8 @@ function importCase15(lc) {
       { type: 'snapshot', label: 'LC Balance after Expire (expect Confirmed 0, status EXPIRED)', contractRef: 'lc' },
       {
         type: 'createMovement',
-        label: "AUTO CLOSE's own Close — amount is already 0, nothing left to write off (this is exactly the §9.7 path-B case: reversing only THIS movement would restore 0, not the real 30,000)",
+        label:
+          "AUTO CLOSE's own Close — amount is already 0, nothing left to write off (this is exactly the §9.7 path-B case: reversing only THIS movement would restore 0, not the real 30,000)",
         captureAs: 'close',
         request: {
           instrumentType: 'IPLC_LC',
@@ -1656,7 +1683,12 @@ function importCase15(lc) {
         },
       },
       { type: 'release', label: 'Checker releases Reopen — status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
-      { type: 'snapshot', label: 'LC Balance after Reopen (expect Confirmed 30,000 — the ORIGINAL Expire amount, proving the chain was fully reversed, not just the follow-on Close’s own 0)', contractRef: 'lc' },
+      {
+        type: 'snapshot',
+        label:
+          'LC Balance after Reopen (expect Confirmed 30,000 — the ORIGINAL Expire amount, proving the chain was fully reversed, not just the follow-on Close’s own 0)',
+        contractRef: 'lc',
+      },
     ],
   };
 }
@@ -2120,45 +2152,46 @@ function exportCase6(lc) {
         'Checker releases Present Docs (B3 — a genuine standalone Release, EARMARKED; still occupies Present Docs Earmark capacity until B4 consumes it)',
       ),
       {
-        type: 'createMovement',
-        label: 'Issuing Bank Honour 10,000 (B4 — unified legal event; references the already-RELEASED Present Docs earmark)',
-        captureAs: 'honour',
-        request: {
-          instrumentType: 'EPLC_CONFIRMATION',
-          balanceContractIdRef: 'conf',
-          movementType: 'HONOUR',
-          eventSeq: 2,
-          amount: '10000',
-          currency: 'USD',
-          sourceTransactionRef: 'E01',
-          referencedTransactionIdRef: 'examination',
-          businessEventId: `${lc}-honour`,
-          createdBy: MAKER,
-        },
+        type: 'createCompoundMovements',
+        functionCode: 'B4',
+        label: 'B4 — Issuing Bank Honour + Due From Issuing Bank 10,000',
+        captureAs: ['honour', 'dueFromIssuingBank'],
+        requests: [
+          {
+            instrumentType: 'EPLC_CONFIRMATION',
+            balanceContractIdRef: 'conf',
+            movementType: 'HONOUR',
+            eventSeq: 2,
+            amount: '10000',
+            currency: 'USD',
+            sourceTransactionRef: 'E01',
+            referencedTransactionIdRef: 'examination',
+            businessEventId: `${lc}-honour`,
+            createdBy: MAKER,
+          },
+          {
+            instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
+            naturalKey: { lcNumber: lc, ibNumber: 'E01' },
+            parentLogicalContractIdRef: 'conf',
+            movementType: 'CREATE',
+            eventSeq: 1,
+            amount: '10000',
+            currency: 'USD',
+            businessEventId: `${lc}-honour`,
+            createdBy: MAKER,
+          },
+        ],
       },
       {
-        type: 'createMovement',
-        label: 'Due From Issuing Bank 10,000 (linked asset leg, same compound submission as Honour — shares businessEventId)',
-        captureAs: 'dueFromIssuingBank',
-        request: {
-          instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
-          naturalKey: { lcNumber: lc, ibNumber: 'E01' },
-          parentLogicalContractIdRef: 'conf',
-          movementType: 'CREATE',
-          eventSeq: 1,
-          amount: '10000',
-          currency: 'USD',
-          businessEventId: `${lc}-honour`,
-          createdBy: MAKER,
-        },
+        type: 'compoundActions',
+        functionCode: 'B4',
+        label: 'B4 Checker approval — Honour and linked asset',
+        actor: CHECKER,
+        actions: [
+          { kind: 'release', movementRef: 'honour' },
+          { kind: 'release', movementRef: 'dueFromIssuingBank' },
+        ],
       },
-      {
-        type: 'release',
-        label: 'Checker releases Honour (the primary compound leg — also marks the Present Docs earmark consumed, via referencedTransactionId)',
-        movementRef: 'honour',
-        releasedBy: CHECKER,
-      },
-      { type: 'release', label: 'Checker releases Due From Issuing Bank (the linked compound leg)', movementRef: 'dueFromIssuingBank', releasedBy: CHECKER },
       { type: 'snapshot', label: 'CONF LIAB after Honour (expect 90,000)', contractRef: 'conf' },
       { type: 'snapshot', label: 'Due From Issuing Bank Balance (expect 10,000)', contractRef: 'dueFromIssuingBank' },
     ],
@@ -2211,65 +2244,61 @@ function exportCase7(lc, ib) {
         'Checker releases Present Docs (B3 — a genuine standalone Release, EARMARKED; still occupies Present Docs Earmark capacity until B4 consumes it)',
       ),
       {
-        type: 'createMovement',
-        label: 'Issuing Bank Accept 10,000 (B4 — unified legal event; references the already-RELEASED Present Docs earmark)',
-        captureAs: 'accept',
-        request: {
-          instrumentType: 'EPLC_CONFIRMATION',
-          balanceContractIdRef: 'conf',
-          movementType: 'ACCEPT',
-          eventSeq: 2,
-          amount: '10000',
-          currency: 'USD',
-          sourceTransactionRef: 'E01',
-          referencedTransactionIdRef: 'examination',
-          businessEventId: `${lc}-accept`,
-          createdBy: MAKER,
-        },
+        type: 'createCompoundMovements',
+        functionCode: 'B4',
+        label: 'B4 — Issuing Bank Accept + Acceptance + Reimbursement Receivable 10,000',
+        captureAs: ['accept', 'acceptance', 'reimbReceivable'],
+        requests: [
+          {
+            instrumentType: 'EPLC_CONFIRMATION',
+            balanceContractIdRef: 'conf',
+            movementType: 'ACCEPT',
+            eventSeq: 2,
+            amount: '10000',
+            currency: 'USD',
+            sourceTransactionRef: 'E01',
+            referencedTransactionIdRef: 'examination',
+            businessEventId: `${lc}-accept`,
+            createdBy: MAKER,
+          },
+          {
+            instrumentType: 'EPLC_ACCEPTANCE',
+            naturalKey: { lcNumber: lc, ibNumber: ib },
+            parentLogicalContractIdRef: 'conf',
+            movementType: 'CREATE',
+            eventSeq: 1,
+            amount: '10000',
+            currency: 'USD',
+            tenorType: 'SELLERS_USANCE',
+            tenorDays: 120,
+            exposureNature: 'ACTUAL',
+            businessEventId: `${lc}-accept`,
+            createdBy: MAKER,
+          },
+          {
+            instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+            naturalKey: { lcNumber: lc, ibNumber: ib },
+            parentLogicalContractIdRef: 'conf',
+            movementType: 'CREATE',
+            eventSeq: 1,
+            amount: '10000',
+            currency: 'USD',
+            businessEventId: `${lc}-accept`,
+            createdBy: MAKER,
+          },
+        ],
       },
       {
-        type: 'createMovement',
-        label: 'Create Acceptance Liability 10,000 (linked compound leg, same submission as Accept — shares businessEventId)',
-        captureAs: 'acceptance',
-        request: {
-          instrumentType: 'EPLC_ACCEPTANCE',
-          naturalKey: { lcNumber: lc, ibNumber: ib },
-          parentLogicalContractIdRef: 'conf',
-          movementType: 'CREATE',
-          eventSeq: 1,
-          amount: '10000',
-          currency: 'USD',
-          tenorType: 'SELLERS_USANCE',
-          tenorDays: 120,
-          exposureNature: 'ACTUAL',
-          businessEventId: `${lc}-accept`,
-          createdBy: MAKER,
-        },
+        type: 'compoundActions',
+        functionCode: 'B4',
+        label: 'B4 Checker approval — Accept and linked legs',
+        actor: CHECKER,
+        actions: [
+          { kind: 'release', movementRef: 'accept' },
+          { kind: 'release', movementRef: 'acceptance' },
+          { kind: 'release', movementRef: 'reimbReceivable' },
+        ],
       },
-      {
-        type: 'createMovement',
-        label: 'Create Acceptance Reimbursement Receivable 10,000 (linked compound leg, same submission as Accept — shares businessEventId)',
-        captureAs: 'reimbReceivable',
-        request: {
-          instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-          naturalKey: { lcNumber: lc, ibNumber: ib },
-          parentLogicalContractIdRef: 'conf',
-          movementType: 'CREATE',
-          eventSeq: 1,
-          amount: '10000',
-          currency: 'USD',
-          businessEventId: `${lc}-accept`,
-          createdBy: MAKER,
-        },
-      },
-      {
-        type: 'release',
-        label: 'Checker releases Accept (the primary compound leg — also marks the Present Docs earmark consumed, via referencedTransactionId)',
-        movementRef: 'accept',
-        releasedBy: CHECKER,
-      },
-      { type: 'release', label: 'Checker releases Acceptance CREATE (linked compound leg)', movementRef: 'acceptance', releasedBy: CHECKER },
-      { type: 'release', label: 'Checker releases Reimbursement Receivable CREATE (linked compound leg)', movementRef: 'reimbReceivable', releasedBy: CHECKER },
       { type: 'snapshot', label: 'CONF LIAB after Accept (expect 90,000)', contractRef: 'conf' },
       { type: 'snapshot', label: 'Acceptance Liability (expect 10,000)', contractRef: 'acceptance' },
       { type: 'snapshot', label: 'Acceptance Reimbursement Receivable (expect 10,000)', contractRef: 'reimbReceivable' },
@@ -2419,7 +2448,7 @@ function exportCase8(lc) {
 function exportCase9(lc, ib) {
   return {
     id: 'export-case-9',
-    title: "Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)",
+    title: 'Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)',
     description:
       'Confirm LC 100,000 (Sellers Usance) -> Present Docs (B3) -> Accept (B4, compound-creates Acceptance + Reimbursement Receivable) -> Settlement (B5, compound-releases both) -> B6 Close once the Acceptance is confirmed at 0 and the Present Docs presentation is consumed.',
     steps: [
@@ -2578,7 +2607,7 @@ function exportCase10(lc) {
     id: 'export-case-10',
     title: 'Export Case #10 — standalone B2 Amendment (increase, then decrease past Tight Available — expect ERROR)',
     description:
-      "B2 has no separate AMEND_INCREASE/AMEND_DECREASE movementType — direction rides the sign of amount. Positive: Confirm LC 100,000 -> AMEND +20,000 (succeeds, 120,000). Negative: AMEND -130,000 against a Tight Available of only 120,000 — must be rejected (checkAmendDecreaseSufficiency), not silently clipped.",
+      'B2 has no separate AMEND_INCREASE/AMEND_DECREASE movementType — direction rides the sign of amount. Positive: Confirm LC 100,000 -> AMEND +20,000 (succeeds, 120,000). Negative: AMEND -130,000 against a Tight Available of only 120,000 — must be rejected (checkAmendDecreaseSufficiency), not silently clipped.',
     steps: [
       ...createAndRelease(
         'Confirm LC 100,000 (no tolerance, kept simple for this focused B2 case)',
@@ -2638,7 +2667,7 @@ function exportCase11(lc, ib) {
     id: 'export-case-11',
     title: 'Export Case #11 — B6 Close eligibility gate, negative path (expect ERROR)',
     description:
-      "Confirm LC 100,000 (Sellers Usance) -> Present Docs (B3) -> Accept (B4, creates Acceptance Liability 10,000) -> Close attempted while the Acceptance Liability is still outstanding (Settlement/B5 never run) — domain/closeEligibility.ts must reject it (Acceptance Confirmed Balance != 0), not silently allow it.",
+      'Confirm LC 100,000 (Sellers Usance) -> Present Docs (B3) -> Accept (B4, creates Acceptance Liability 10,000) -> Close attempted while the Acceptance Liability is still outstanding (Settlement/B5 never run) — domain/closeEligibility.ts must reject it (Acceptance Confirmed Balance != 0), not silently allow it.',
     steps: [
       ...createAndRelease(
         'Confirm LC 100,000 (Sellers Usance, 120 days)',
@@ -2727,7 +2756,11 @@ function exportCase11(lc, ib) {
           createdBy: MAKER,
         },
       },
-      { type: 'snapshot', label: 'CONF LIAB unchanged (expect still Confirmed 90,000, status still ACTIVE — the rejected Close never applied)', contractRef: 'conf' },
+      {
+        type: 'snapshot',
+        label: 'CONF LIAB unchanged (expect still Confirmed 90,000, status still ACTIVE — the rejected Close never applied)',
+        contractRef: 'conf',
+      },
       { type: 'snapshot', label: 'Acceptance Liability unchanged (expect still 10,000)', contractRef: 'acceptance' },
     ],
   };
@@ -2791,7 +2824,12 @@ function exportCase12(lc) {
           createdBy: MAKER,
         },
       },
-      { type: 'release', label: 'Checker releases Reopen — balance updates directly (REOPEN carries its own amount), status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
+      {
+        type: 'release',
+        label: 'Checker releases Reopen — balance updates directly (REOPEN carries its own amount), status returns to ACTIVE',
+        movementRef: 'reopen',
+        releasedBy: CHECKER,
+      },
       { type: 'snapshot', label: "CONF LIAB after Reopen (expect Confirmed 60,000 restored — REOPEN's own computed amount)", contractRef: 'conf' },
     ],
   };
@@ -2840,7 +2878,11 @@ function exportCase13(lc) {
           createdBy: MAKER,
         },
       },
-      { type: 'snapshot', label: 'CONF LIAB unchanged (expect still Confirmed 30,000, status still ACTIVE — the rejected Reopen never applied)', contractRef: 'conf' },
+      {
+        type: 'snapshot',
+        label: 'CONF LIAB unchanged (expect still Confirmed 30,000, status still ACTIVE — the rejected Reopen never applied)',
+        contractRef: 'conf',
+      },
     ],
   };
 }
@@ -2848,7 +2890,8 @@ function exportCase13(lc) {
 function exportCase14(lc) {
   return {
     id: 'export-case-14',
-    title: 'Export Case #14 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> B7 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
+    title:
+      'Export Case #14 — AUTO EXPIRY then AUTO CLOSE (simulated via the same BATCH_MAKER/BATCH_CHECKER actors the real background sweep uses) -> B7 Reopen restores the ORIGINAL Expire amount, not the follow-on Close’s own zero (§9.7 path B)',
     description:
       "Confirm LC 40,000 with an Expiry Date already in the past -> EXPIRE (date-triggered write-off) writes off the full 40,000 -> the contract is now EXPIRED, so AUTO CLOSE's own write-off amount is already 0 (nothing left) -> B7 Reopen must reverse BOTH not-yet-reversed write-offs in the chain to restore the real historic balance (40,000), not just the last one (which would incorrectly restore 0). Same mechanism as Import Case 15's own path-B — see that case's own doc comment for the shared §9.7 rationale.",
     steps: [
@@ -2886,7 +2929,8 @@ function exportCase14(lc) {
       { type: 'snapshot', label: 'CONF LIAB after Expire (expect Confirmed 0, status EXPIRED)', contractRef: 'conf' },
       {
         type: 'createMovement',
-        label: "AUTO CLOSE's own Close — amount is already 0, nothing left to write off (this is exactly the §9.7 path-B case: reversing only THIS movement would restore 0, not the real 40,000)",
+        label:
+          "AUTO CLOSE's own Close — amount is already 0, nothing left to write off (this is exactly the §9.7 path-B case: reversing only THIS movement would restore 0, not the real 40,000)",
         captureAs: 'close',
         request: {
           instrumentType: 'EPLC_CONFIRMATION',
@@ -2917,7 +2961,143 @@ function exportCase14(lc) {
         },
       },
       { type: 'release', label: 'Checker releases Reopen — status returns to ACTIVE', movementRef: 'reopen', releasedBy: CHECKER },
-      { type: 'snapshot', label: 'CONF LIAB after Reopen (expect Confirmed 40,000 — the ORIGINAL Expire amount, proving the chain was fully reversed, not just the follow-on Close’s own 0)', contractRef: 'conf' },
+      {
+        type: 'snapshot',
+        label:
+          'CONF LIAB after Reopen (expect Confirmed 40,000 — the ORIGINAL Expire amount, proving the chain was fully reversed, not just the follow-on Close’s own 0)',
+        contractRef: 'conf',
+      },
+    ],
+  };
+}
+
+/**
+ * Run-All readiness fixtures deliberately stop at the approved prerequisite. They are production-shaped
+ * lifecycle cases, not eligibility bypasses: the normal downstream picker must discover them exactly as
+ * it would discover a manually entered A3/A3S or B3.
+ */
+function importA4Ready(lc) {
+  return {
+    id: 'import-a4-ready',
+    title: 'Manual Test Seed — A4-ready Sight Document Arrival',
+    description: 'Leaves one Sight A3 Document Arrival Checker-approved/EARMARKED and not Maker-submitted or processed by A4.',
+    steps: [
+      ...createAndRelease(
+        'A1 Issue 100,000 (Sight)',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2028-12-28',
+          createdBy: MAKER,
+        },
+        'Checker releases A1 Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'A3 Document Arrival 10,000 — retain for manual A4',
+        captureAs: 'arrival',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'UTILIZE',
+          eventSeq: 2,
+          amount: '10000',
+          currency: 'USD',
+          sourceTransactionRef: 'B01',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'acknowledge', label: 'Checker approves A3 — remains EARMARKED and eligible for A4', movementRef: 'arrival', acknowledgedBy: CHECKER },
+    ],
+  };
+}
+
+function importA6Ready(lc) {
+  return {
+    id: 'import-a6-ready',
+    title: 'Manual Test Seed — A6-ready Usance Document Arrival',
+    description: "Leaves one Seller's Usance A3 Document Arrival Checker-approved/EARMARKED and not processed by A6.",
+    steps: [
+      ...createAndRelease(
+        "A1 Issue 100,000 (Seller's Usance)",
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SELLERS_USANCE',
+          tenorDays: 120,
+          expiryDate: '2028-12-28',
+          createdBy: MAKER,
+        },
+        'Checker releases A1 Issue',
+      ),
+      {
+        type: 'createMovement',
+        label: 'A3 Document Arrival 10,000 — retain for manual A6',
+        captureAs: 'arrival',
+        request: {
+          instrumentType: 'IPLC_LC',
+          balanceContractIdRef: 'lc',
+          movementType: 'UTILIZE',
+          eventSeq: 2,
+          amount: '10000',
+          currency: 'USD',
+          sourceTransactionRef: 'B01',
+          createdBy: MAKER,
+        },
+      },
+      { type: 'acknowledge', label: 'Checker approves A3 — remains EARMARKED and eligible for A6', movementRef: 'arrival', acknowledgedBy: CHECKER },
+    ],
+  };
+}
+
+function exportB4Ready(lc) {
+  return {
+    id: 'export-b4-ready',
+    title: 'Manual Test Seed — B4-ready Present Docs',
+    description: 'Leaves one B3 Present Docs Checker-approved/EARMARKED and not consumed by B4.',
+    steps: [
+      ...createAndRelease(
+        'B1 Confirm LC 100,000 (Sight)',
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2028-12-28',
+          createdBy: MAKER,
+        },
+        'Checker releases B1 Confirmation',
+      ),
+      ...createAndRelease(
+        'B3 Present Docs 10,000 — retain for manual B4',
+        'presentDocs',
+        {
+          instrumentType: 'EPLC_EXAMINATION',
+          naturalKey: { lcNumber: lc, ibNumber: 'E01' },
+          parentLogicalContractIdRef: 'conf',
+          movementType: 'CREATE',
+          eventSeq: 1,
+          amount: '10000',
+          currency: 'USD',
+          createdBy: MAKER,
+        },
+        'Checker approves B3 — remains EARMARKED and eligible for B4',
+      ),
     ],
   };
 }
@@ -2954,6 +3134,10 @@ function buildRegistry() {
     exportCase12(lcNumberFor('EXP-C12')),
     exportCase13(lcNumberFor('EXP-C13')),
     exportCase14(lcNumberFor('EXP-C14')),
+    // Keep these LAST: Run All must finish with untouched downstream prerequisites for manual testing.
+    importA4Ready(lcNumberFor('IMP-C16')),
+    importA6Ready(lcNumberFor('IMP-C17')),
+    exportB4Ready(lcNumberFor('EXP-C15')),
   ];
 }
 

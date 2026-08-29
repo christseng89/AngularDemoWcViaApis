@@ -64,25 +64,8 @@ export class CheckerActionsService {
     // releasing the primary instead. A6's own source (a Usance Document Arrival, acknowledgment-only)
     // has no such flag and always takes the release-the-source-first path below.
     if (strategy?.checkerRelease.settlesDocumentArrival) {
-      if (strategy?.checkerRelease.sourceAlreadyReleasedBeforePick) {
-        return this.resolveSettlesDocumentArrivalIds(ctx).pipe(switchMap((ids) => this.releaseAcceptance(checkerId, ctx, ids)));
-      }
       return this.resolveSettlesDocumentArrivalIds(ctx).pipe(
-        switchMap((ids) => {
-          if (!ids.sourceMovementId) {
-            return this.fail(
-              `Could not find the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} record this was created from (no referencedTransactionId correlation found) — release it separately first.`,
-            );
-          }
-          return this.api.release(ids.sourceMovementId, checkerId).pipe(
-            switchMap(() => this.releaseAcceptance(checkerId, ctx, ids)),
-            catchError((err) =>
-              this.fail(
-                `Could not release the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (${ctx.selectedPayMovement?.sourceTransactionRef ?? ctx.selectedCheckerMovement?.sourceTransactionRef ?? ''}) — Acceptance NOT approved: ${describeApiError(err)}`,
-              ),
-            ),
-          );
-        }),
+        switchMap((ids) => this.releaseSettlesDocumentArrival(checkerId, ctx, ids)),
       );
     }
 
@@ -100,9 +83,15 @@ export class CheckerActionsService {
               'Could not find the matched Shipping Guarantee redemption linked to this Document Arrival (no businessEventId correlation found) — release it separately first.',
             );
           }
-          return this.api.release(arrivalSgRedeemMovementId, checkerId).pipe(
-            switchMap(() => this.acknowledgeUtilize(ctx, checkerId)),
-            switchMap(() => of<CheckerActionOutcome>({ kind: 'documentArrivalAcknowledged' })),
+          const utilizeId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
+          return this.api.executeCompoundActions(
+            [
+              { kind: 'release', movementId: arrivalSgRedeemMovementId },
+              { kind: 'acknowledge', movementId: utilizeId! },
+            ],
+            checkerId,
+          ).pipe(
+            map(() => ({ kind: 'documentArrivalAcknowledged' as const })),
             catchError((err) => this.fail(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`)),
           );
         }),
@@ -121,8 +110,8 @@ export class CheckerActionsService {
             );
           }
           const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
-          return this.api.release(primaryMovementId!, checkerId).pipe(
-            switchMap((res) => this.releaseMatchedReceivable(checkerId, res, matchedReceivableMovementId)),
+          return this.api.releaseCompoundMovements([primaryMovementId!, matchedReceivableMovementId], checkerId).pipe(
+            map(([res]) => ({ kind: 'released' as const, result: res! })),
             catchError((err) => this.fail(describeApiError(err))),
           );
         }),
@@ -216,14 +205,6 @@ export class CheckerActionsService {
     );
   }
 
-  /** B5's Usance/CNF_MATURE branch only — second leg, releasing the matching Reimbursement Receivable's REIMBURSE after the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE was already released above. */
-  private releaseMatchedReceivable(checkerId: string, settleRes: BalanceMovement, matchedReceivableMovementId: string): Observable<CheckerActionOutcome> {
-    return this.api.release(matchedReceivableMovementId, checkerId).pipe(
-      switchMap(() => of<CheckerActionOutcome>({ kind: 'released', result: settleRes })),
-      catchError((err) => this.fail(`Acceptance settled, but the matching Reimbursement Receivable failed to release: ${describeApiError(err)}`)),
-    );
-  }
-
   /**
    * Resolves a linked leg's movementId — prefers the caller's already-known id (same-session Submit),
    * falls back to a businessEventId lookup for a cross-session Checker. Matches by movementType alone
@@ -265,8 +246,9 @@ export class CheckerActionsService {
         acceptanceReimbReceivableMovementId: ctx.acceptanceReimbReceivableMovementId,
       });
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
-    const isHonour = ctx.selectedCheckerMovement?.movementType === 'HONOUR';
-    const isAccept = ctx.selectedCheckerMovement?.movementType === 'ACCEPT';
+    const primaryMovementType = ctx.selectedCheckerMovement?.movementType ?? ctx.submitResult?.movementType;
+    const isHonour = primaryMovementType === 'HONOUR' || !!ctx.dueFromIssuingBankMovementId;
+    const isAccept = primaryMovementType === 'ACCEPT' || !!ctx.acceptanceMovementId || !!ctx.acceptanceReimbReceivableMovementId;
     const needsDownstreamLookup =
       (isHonour && !!strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable') && !ctx.dueFromIssuingBankMovementId) ||
       (isAccept && !!strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && (!ctx.acceptanceMovementId || !ctx.acceptanceReimbReceivableMovementId));
@@ -286,6 +268,47 @@ export class CheckerActionsService {
         };
       }),
       catchError(asIs),
+    );
+  }
+
+  private releaseSettlesDocumentArrival(
+    checkerId: string,
+    ctx: CheckerActionContext,
+    ids: { sourceMovementId: string | null; dueFromIssuingBankMovementId: string | null; acceptanceMovementId: string | null; acceptanceReimbReceivableMovementId: string | null },
+  ): Observable<CheckerActionOutcome> {
+    const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
+    const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
+    const primaryMovementType = ctx.selectedCheckerMovement?.movementType ?? ctx.submitResult?.movementType;
+    const isHonour = primaryMovementType === 'HONOUR' || !!ctx.dueFromIssuingBankMovementId;
+    const isAccept = primaryMovementType === 'ACCEPT' || !!ctx.acceptanceMovementId || !!ctx.acceptanceReimbReceivableMovementId;
+    if (!primaryMovementId) return this.fail('Could not find the primary movement for this compound release.');
+
+    const actions: { kind: 'release'; movementId: string }[] = [];
+    if (!strategy?.checkerRelease.sourceAlreadyReleasedBeforePick) {
+      if (!ids.sourceMovementId) {
+        return this.fail(
+          `Could not find the ${ctx.selectedFunction?.pendingItemLabel ?? 'Document Arrival'} record this was created from (no referencedTransactionId correlation found) — release it separately first.`,
+        );
+      }
+      actions.push({ kind: 'release', movementId: ids.sourceMovementId });
+    }
+    actions.push({ kind: 'release', movementId: primaryMovementId });
+
+    if (isHonour && strategy?.compoundSubmission.possibleShapes.includes('confirmationHonourWithReceivable')) {
+      if (!ids.dueFromIssuingBankMovementId) return this.fail('Could not find the linked Due from Issuing Bank movement.');
+      actions.push({ kind: 'release', movementId: ids.dueFromIssuingBankMovementId });
+    }
+    if (isAccept && strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable')) {
+      if (!ids.acceptanceMovementId || !ids.acceptanceReimbReceivableMovementId) {
+        return this.fail('Could not find every linked Acceptance and Reimbursement Receivable movement.');
+      }
+      actions.push({ kind: 'release', movementId: ids.acceptanceMovementId });
+      actions.push({ kind: 'release', movementId: ids.acceptanceReimbReceivableMovementId });
+    }
+
+    return this.api.executeCompoundActions(actions, checkerId).pipe(
+      map((results) => ({ kind: 'released' as const, result: results[strategy?.checkerRelease.sourceAlreadyReleasedBeforePick ? 0 : 1]! })),
+      catchError((err) => this.fail(`Compound event failed to release atomically: ${describeApiError(err)}`)),
     );
   }
 

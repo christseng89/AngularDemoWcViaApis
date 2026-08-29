@@ -101,51 +101,13 @@ export class MakerSubmitService {
       businessEventId,
       sourceTransactionRef: ctx.model.secondaryRef || undefined,
     };
-    return this.api.createMovement(redeemReq).pipe(
-      switchMap((redeemRes) => {
-        const secondary: MakerSubmitSecondary = { arrivalSgRedeemMovementId: redeemRes.body!.movementId, arrivalSgRedeemMovement: redeemRes.body! };
-        return this.api.createMovement(req).pipe(
-          map((res) => ({ kind: 'submitted' as const, result: res.body!, secondary })),
-          catchError((err) => this.rollbackArrivalSgRedeem(redeemRes.body!.movementId, ctx.model.createdBy!, describeApiError(err))),
-        );
-      }),
-      catchError((err) =>
-        of<MakerSubmitOutcome>({ kind: 'failed', message: `Could not reserve the Shipping Guarantee redemption: ${describeApiError(err)}`, secondary: {} }),
-      ),
-    );
-  }
-
-  /**
-   * Bug fixed 2026-08-20 (reviewer-reported live, "After the A3S transaction fails with an error, the
-   * selected SG becomes unavailable and cannot be selected or reused" — S001/G01+G02 repro): the SG's own
-   * redemption (`redeemMovementId`) already succeeded and sits genuinely PENDING when the LC's own
-   * UTILIZE (`req`) then fails — with no compensation, that reservation was permanently orphaned (nothing
-   * in the UI surfaced its movementId to cancel it, since a primary-call failure deliberately leaves
-   * `result` absent, F-08), and its own SG contract's live Available Balance stayed pinned at 0 forever,
-   * making `loadSgsForArrival()`'s own 0-balance filter exclude it (and, if it was the LC's only
-   * outstanding SG, the whole LC) from every future A3S attempt. Auto-cancels the just-reserved SG
-   * redemption as a compensating action (same `POST .../cancel` Maker EC endpoint `deleteMakerPending()`
-   * already uses for a Checker-visible compound submission's own reverse-order cleanup) so the SG's
-   * capacity is immediately usable again — `secondary` stays empty either way, since there is nothing
-   * left PENDING for a Checker to act on once the rollback succeeds.
-   */
-  private rollbackArrivalSgRedeem(redeemMovementId: string, cancelledBy: string, primaryErrorMessage: string): Observable<MakerSubmitOutcome> {
-    return this.api.cancel(redeemMovementId, cancelledBy, 'AUTO_ROLLBACK_LC_LEG_FAILED').pipe(
-      map(() => ({
-        kind: 'failed' as const,
-        message: `Document Arrival failed: ${primaryErrorMessage}. The reserved Shipping Guarantee redemption was automatically cancelled, so its capacity is available again.`,
-        secondary: {},
+    return this.api.createCompoundMovements([redeemReq, req]).pipe(
+      map(([redeem, result]) => ({
+        kind: 'submitted' as const,
+        result: result!,
+        secondary: { arrivalSgRedeemMovementId: redeem!.movementId, arrivalSgRedeemMovement: redeem! },
       })),
-      catchError((cancelErr) =>
-        of<MakerSubmitOutcome>({
-          kind: 'failed',
-          message:
-            `Document Arrival failed: ${primaryErrorMessage}. Additionally, automatically cancelling the reserved Shipping Guarantee redemption ` +
-            `(movement ${redeemMovementId}) also failed: ${describeApiError(cancelErr)} — it will stay unavailable until a Checker rejects it ` +
-            `manually (search this SG under A9's own Checker panel).`,
-          secondary: {},
-        }),
-      ),
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
     );
   }
 
@@ -154,40 +116,20 @@ export class MakerSubmitService {
     const businessEventId = crypto.randomUUID();
     req.businessEventId = businessEventId;
     const cnfContract = ctx.selectedContract!;
-    return this.api.createMovement(req).pipe(
-      switchMap((res) => {
-        const result = res.body!;
-        const receivableReq: CreateMovementRequest = {
-          instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
-          naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
-          parentLogicalContractId: cnfContract.logicalContractId,
-          movementType: 'CREATE',
-          eventSeq: Date.now(),
-          amount: String(ctx.model.amount),
-          currency: ctx.model.currency!,
-          createdBy: ctx.model.createdBy!,
-          businessEventId,
-        };
-        return this.api.createMovement(receivableReq).pipe(
-          map((receivableRes) => ({
-            kind: 'submitted' as const,
-            result,
-            secondary: { dueFromIssuingBankMovementId: receivableRes.body!.movementId },
-          })),
-          catchError((err) =>
-            of<MakerSubmitOutcome>({
-              kind: 'failed',
-              message: `Confirmation honoured (PENDING), but the Due from Issuing Bank asset failed to record: ${describeApiError(err)}`,
-              result,
-              secondary: {},
-            }),
-          ),
-        );
-      }),
-      catchError((err) =>
-        // `req` (the HONOUR itself) failed — nothing created yet; result stays absent (F-08).
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
-      ),
+    const receivableReq: CreateMovementRequest = {
+      instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
+      naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
+      parentLogicalContractId: cnfContract.logicalContractId,
+      movementType: 'CREATE',
+      eventSeq: Date.now(),
+      amount: String(ctx.model.amount),
+      currency: ctx.model.currency!,
+      createdBy: ctx.model.createdBy!,
+      businessEventId,
+    };
+    return this.api.createCompoundMovements([req, receivableReq]).pipe(
+      map(([result, receivable]) => ({ kind: 'submitted' as const, result: result!, secondary: { dueFromIssuingBankMovementId: receivable!.movementId } })),
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
     );
   }
 
@@ -196,10 +138,7 @@ export class MakerSubmitService {
     const businessEventId = crypto.randomUUID();
     req.businessEventId = businessEventId;
     const cnfContract = ctx.selectedContract!;
-    return this.api.createMovement(req).pipe(
-      switchMap((res) => {
-        const result = res.body!;
-        const acceptanceReq: CreateMovementRequest = {
+    const acceptanceReq: CreateMovementRequest = {
           instrumentType: 'EPLC_ACCEPTANCE',
           naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
           parentLogicalContractId: cnfContract.logicalContractId,
@@ -212,11 +151,8 @@ export class MakerSubmitService {
           exposureNature: 'ACTUAL',
           tenorType: cnfContract.tenorType ?? undefined,
           tenorDays: cnfContract.tenorDays ?? undefined,
-        };
-        return this.api.createMovement(acceptanceReq).pipe(
-          switchMap((acceptanceRes) => {
-            const acceptanceMovement = acceptanceRes.body!;
-            const receivableReq: CreateMovementRequest = {
+    };
+    const receivableReq: CreateMovementRequest = {
               instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
               naturalKey: { lcNumber: cnfContract.naturalKey.lcNumber, ibNumber: ctx.naturalKey.ibNumber || ctx.model.secondaryRef || null, sgNumber: null },
               parentLogicalContractId: cnfContract.logicalContractId,
@@ -226,41 +162,18 @@ export class MakerSubmitService {
               currency: ctx.model.currency!,
               createdBy: ctx.model.createdBy!,
               businessEventId,
-            };
-            return this.api.createMovement(receivableReq).pipe(
-              map((receivableRes) => ({
-                kind: 'submitted' as const,
-                result,
-                secondary: {
-                  acceptanceMovementId: acceptanceMovement.movementId,
-                  acceptanceMovement,
-                  acceptanceReimbReceivableMovementId: receivableRes.body!.movementId,
-                },
-              })),
-              catchError((err) =>
-                of<MakerSubmitOutcome>({
-                  kind: 'failed',
-                  message: `Confirmation accepted (PENDING) and Acceptance created (PENDING), but the Reimbursement Receivable asset failed to record: ${describeApiError(err)}`,
-                  result,
-                  secondary: { acceptanceMovementId: acceptanceMovement.movementId, acceptanceMovement },
-                }),
-              ),
-            );
-          }),
-          catchError((err) =>
-            of<MakerSubmitOutcome>({
-              kind: 'failed',
-              message: `Confirmation accepted (PENDING), but the Acceptance liability failed to record: ${describeApiError(err)}`,
-              result,
-              secondary: {},
-            }),
-          ),
-        );
-      }),
-      catchError((err) =>
-        // `req` (primary) failed — result stays absent (F-08, see module doc comment).
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
-      ),
+    };
+    return this.api.createCompoundMovements([req, acceptanceReq, receivableReq]).pipe(
+      map(([result, acceptanceMovement, receivable]) => ({
+        kind: 'submitted' as const,
+        result: result!,
+        secondary: {
+          acceptanceMovementId: acceptanceMovement!.movementId,
+          acceptanceMovement: acceptanceMovement!,
+          acceptanceReimbReceivableMovementId: receivable!.movementId,
+        },
+      })),
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
     );
   }
 
@@ -269,53 +182,29 @@ export class MakerSubmitService {
     const businessEventId = crypto.randomUUID();
     req.businessEventId = businessEventId;
     const acceptanceContract = ctx.selectedContract!;
-    return this.api.createMovement(req).pipe(
-      switchMap((res) => {
-        const result = res.body!;
-        return this.api
-          .resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
-            lcNumber: acceptanceContract.naturalKey.lcNumber,
-            ibNumber: acceptanceContract.naturalKey.ibNumber,
-          })
-          .pipe(
-            switchMap((receivableContract) => {
-              const reimbReq: CreateMovementRequest = {
-                instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-                balanceContractId: receivableContract.balanceContractId,
-                movementType: 'REIMBURSE',
-                eventSeq: Date.now(),
-                amount: String(ctx.model.amount),
-                currency: ctx.model.currency!,
-                createdBy: ctx.model.createdBy!,
-                businessEventId,
-              };
-              return this.api.createMovement(reimbReq).pipe(
-                map((reimbRes) => ({ kind: 'submitted' as const, result, secondary: { matchedReceivableMovementId: reimbRes.body!.movementId } })),
-                catchError((err) =>
-                  of<MakerSubmitOutcome>({
-                    kind: 'failed',
-                    message: `Acceptance settled (PENDING), but the matching Reimbursement Receivable failed to record: ${describeApiError(err)}`,
-                    result,
-                    secondary: {},
-                  }),
-                ),
-              );
-            }),
-            catchError((err) =>
-              of<MakerSubmitOutcome>({
-                kind: 'failed',
-                message: `Acceptance settled (PENDING), but its matching Reimbursement Receivable could not be found: ${describeApiError(err)}`,
-                result,
-                secondary: {},
-              }),
-            ),
+    return this.api
+      .resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
+        lcNumber: acceptanceContract.naturalKey.lcNumber,
+        ibNumber: acceptanceContract.naturalKey.ibNumber,
+      })
+      .pipe(
+        switchMap((receivableContract) => {
+          const reimbReq: CreateMovementRequest = {
+            instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+            balanceContractId: receivableContract.balanceContractId,
+            movementType: 'REIMBURSE',
+            eventSeq: Date.now(),
+            amount: String(ctx.model.amount),
+            currency: ctx.model.currency!,
+            createdBy: ctx.model.createdBy!,
+            businessEventId,
+          };
+          return this.api.createCompoundMovements([req, reimbReq]).pipe(
+            map(([result, reimb]) => ({ kind: 'submitted' as const, result: result!, secondary: { matchedReceivableMovementId: reimb!.movementId } })),
           );
-      }),
-      catchError((err) =>
-        // `req` (primary) failed — result stays absent (F-08, see module doc comment).
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
-      ),
-    );
+        }),
+        catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
+      );
   }
 
   /** The default single-call path — every function that doesn't need one of the four compound shapes above. */

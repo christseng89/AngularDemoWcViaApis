@@ -1,18 +1,13 @@
 /**
  * User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要") — client-side
- * mirror of `microservices/balance-component/src/domain/domesticCalendar.ts`. Kept as a hand-synced copy,
- * not a shared import — these are two independently-deployable projects (Angular app vs. microservice),
- * same "copy, not shared import" posture that file's own top doc comment already establishes for its own
- * relationship to `microservices/business-days-mock/data/calendar.json`.
+ * mirror of `microservices/balance-component/src/domain/domesticCalendar.ts`. Holiday data is generated
+ * from the repository's canonical `microservices/business-days-mock/data/calendar.json` before test/build.
  *
  * This is a client-side CONVENIENCE (immediate feedback before Submit) — the microservice's own copy is
  * the authoritative enforcement; this one existing does not relax that server-side check at all.
  */
 
-interface DomesticHoliday {
-  date: string; // YYYY-MM-DD
-  name: string;
-}
+import { DOMESTIC_HOLIDAYS as GENERATED_DOMESTIC_HOLIDAYS, type DomesticHoliday } from './domestic-holidays.generated';
 
 // Keep in sync by hand with microservices/balance-component/src/domain/domesticCalendar.ts.
 const DOMESTIC_HOLIDAYS: readonly DomesticHoliday[] = [
@@ -54,7 +49,7 @@ const DOMESTIC_HOLIDAYS: readonly DomesticHoliday[] = [
   { date: '2028-10-10', name: '國慶日' },
 ];
 
-const HOLIDAYS_BY_DATE: ReadonlyMap<string, string> = new Map(DOMESTIC_HOLIDAYS.map((h) => [h.date, h.name]));
+const HOLIDAYS_BY_DATE: ReadonlyMap<string, string> = new Map(GENERATED_DOMESTIC_HOLIDAYS.map((h) => [h.date, h.name]));
 
 /** `dateStr` must be `YYYY-MM-DD`. Parsed as UTC so this is stable regardless of browser timezone. */
 export function isWeekend(dateStr: string): boolean {

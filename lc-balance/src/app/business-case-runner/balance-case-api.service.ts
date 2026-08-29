@@ -10,7 +10,8 @@ export interface BusinessCaseSummary {
 }
 
 export interface TraceStep {
-  type: 'createMovement' | 'release' | 'snapshot' | 'note';
+  type: 'createMovement' | 'createCompoundMovements' | 'compoundActions' | 'release' | 'makerSubmit' | 'acknowledge' | 'snapshot' | 'note';
+  functionCode?: 'A4' | 'A6' | 'B4';
   label: string;
   status?: number;
   ok?: boolean;

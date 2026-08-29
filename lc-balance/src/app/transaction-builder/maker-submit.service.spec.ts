@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { forkJoin, map, of, throwError } from 'rxjs';
 import { MakerSubmitService, MakerSubmitContext } from './maker-submit.service';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
@@ -76,8 +76,14 @@ function makeMovement(overrides: Partial<BalanceMovement> = {}): BalanceMovement
 }
 
 function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jest.Mock>> = {}) {
+  const createMovement = overrides.createMovement ?? jest.fn(() => of({ body: makeMovement() }));
   return {
-    createMovement: jest.fn(() => of({ body: makeMovement() })),
+    createMovement,
+    createCompoundMovements:
+      overrides.createCompoundMovements ??
+      jest.fn((requests: CreateMovementRequest[]) =>
+        forkJoin(requests.map((request) => createMovement(request).pipe(map((response: { body: BalanceMovement }) => response.body)))),
+      ),
     resolveContract: jest.fn(() => of(makeContract({ instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', balanceContractId: 'receivable-bc' }))),
     cancel: jest.fn(() => of(makeMovement({ status: 'CANCELLED' }))),
     ...overrides,
@@ -225,7 +231,7 @@ describe('MakerSubmitService — submitDocumentArrivalWithSg (A3S)', () => {
     service.submit(makeReq(), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Could not reserve the Shipping Guarantee redemption');
+        expect(outcome.message).toContain('INSUFFICIENT_AVAILABLE_BALANCE');
         expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
@@ -252,12 +258,11 @@ describe('MakerSubmitService — submitDocumentArrivalWithSg (A3S)', () => {
     service.submit(makeReq(), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Document Arrival failed: ILLEGAL_STATE_TRANSITION');
-        expect(outcome.message).toContain('automatically cancelled');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
         expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
-      expect(cancel).toHaveBeenCalledWith('sg-redeem-2', 'maker1', 'AUTO_ROLLBACK_LC_LEG_FAILED');
+      expect(cancel).not.toHaveBeenCalled();
       done();
     });
   });
@@ -275,10 +280,7 @@ describe('MakerSubmitService — submitDocumentArrivalWithSg (A3S)', () => {
     service.submit(makeReq(), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Document Arrival failed: ILLEGAL_STATE_TRANSITION');
-        expect(outcome.message).toContain('automatically cancelling');
-        expect(outcome.message).toContain('NOT_FOUND');
-        expect(outcome.message).toContain('sg-redeem-3');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
         expect(outcome.secondary).toEqual({});
       }
       done();
@@ -338,8 +340,8 @@ describe('MakerSubmitService — submitConfirmationHonourWithReceivable (B4 Sigh
     service.submit(makeReq({ movementType: 'HONOUR' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Due from Issuing Bank asset failed to record');
-        expect(outcome.result?.movementId).toBe('honour-2');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
+        expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
       done();
@@ -392,18 +394,15 @@ describe('MakerSubmitService — submitConfirmationAcceptWithReceivable (B4 Usan
 
   it('Accept liability CREATE fails after Accept succeeds: secondary still empty (liability never got an id)', (done) => {
     const api = makeApi({
-      createMovement: jest
-        .fn()
-        .mockReturnValueOnce(of({ body: makeMovement({ movementId: 'accept-2', movementType: 'ACCEPT' }) }))
-        .mockReturnValueOnce(throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
+      createCompoundMovements: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
     });
     const service = new MakerSubmitService(api);
 
     service.submit(makeReq({ movementType: 'ACCEPT' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Acceptance liability failed to record');
-        expect(outcome.result?.movementId).toBe('accept-2');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
+        expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
       done();
@@ -423,9 +422,9 @@ describe('MakerSubmitService — submitConfirmationAcceptWithReceivable (B4 Usan
     service.submit(makeReq({ movementType: 'ACCEPT' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Reimbursement Receivable asset failed to record');
-        expect(outcome.result?.movementId).toBe('accept-3');
-        expect(outcome.secondary.acceptanceMovementId).toBe('liability-3');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
+        expect(outcome.result).toBeUndefined();
+        expect(outcome.secondary.acceptanceMovementId).toBeUndefined();
         expect(outcome.secondary.acceptanceReimbReceivableMovementId).toBeUndefined();
       }
       done();
@@ -484,8 +483,8 @@ describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () 
     service.submit(makeReq({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('matching Reimbursement Receivable could not be found');
-        expect(outcome.result?.movementId).toBe('settle-2');
+        expect(outcome.message).toContain('NOT_FOUND');
+        expect(outcome.result).toBeUndefined();
       }
       done();
     });
@@ -503,8 +502,8 @@ describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () 
     service.submit(makeReq({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('Reimbursement Receivable failed to record');
-        expect(outcome.result?.movementId).toBe('settle-3');
+        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
+        expect(outcome.result).toBeUndefined();
         expect(outcome.secondary).toEqual({});
       }
       done();

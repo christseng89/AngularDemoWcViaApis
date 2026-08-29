@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "generate:calendar": "node scripts/generate-domestic-calendar.mjs",
+    "pretest": "npm run generate:calendar",
+    "prebuild": "npm run generate:calendar",
     "ng": "ng",
     "start": "ng serve --open",
     "test": "jest",

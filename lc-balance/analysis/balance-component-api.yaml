@@ -33,20 +33,33 @@ info:
     of one exposure-amount change against one specific contract version.
 
 
-    API design principle — ONE MOVEMENT, ONE LEG, ONE CALL: every mutating
-    endpoint in this contract creates or transitions exactly one
-    `BalanceMovement`. There is no batch or compound endpoint anywhere in
-    this service, even for the several named business functions (see the
-    companion Web/Mobile Channel API, balance-component-channel-api.yaml)
-    that are business-approved to require more than one linked movement in
-    sequence (e.g. Document Arrival w/ Shipping Guarantee's SG redemption +
-    LC utilization, or Confirmation Honour/Accept's multi-leg compound).
-    Linking related movements across separate calls is done with the
-    caller-supplied `businessEventId` (correlation only, never a
-    transaction boundary — this service does not offer cross-movement
-    atomicity; a caller whose second leg fails after the first succeeded
-    gets a partial result and must decide how to compensate, exactly as
-    every existing linked-movement business function already documents).
+    API design principle — a single-leg command uses the single-movement
+    endpoints, while one approved multi-leg business event uses the
+    `/balance-movements/compound*` endpoints. Compound create, release, and
+    mixed release/acknowledge actions execute inside one SQLite transaction:
+    every requested movement succeeds, or all writes and side effects are
+    rolled back. Sibling create requests must carry one identical,
+    caller-supplied `businessEventId`, which is both their audit correlation
+    key and the identity checked at the compound transaction boundary.
+
+
+    BUSINESS FLOW ROUTING (business-confirmed 2026-08-29):
+      - Import: A3 (Document Arrival) or A3S (Document Arrival with Shipping
+        Guarantee) creates the source `IPLC_LC`/`UTILIZE` earmark. The parent
+        LC's tenor then determines the only valid continuation: `SIGHT` → A4
+        (Sight Settlement), while `SELLERS_USANCE` or `BUYERS_USANCE` → A6
+        (Acceptance). A4 Maker-Submits and finalizes that existing UTILIZE in
+        place; A6 creates an `IPLC_ACCEPTANCE`/`CREATE` referencing it and the
+        Checker command atomically releases the still-PENDING source plus the
+        Acceptance.
+      - Export: B3 (Present Docs) creates and independently releases the
+        `EPLC_EXAMINATION`/`CREATE` source before B4 can select it. B4 always
+        references and consumes that B3 record. The Confirmation tenor chooses
+        the B4 shape: `SIGHT` → `EPLC_CONFIRMATION`/`HONOUR` plus Due From
+        Issuing Bank; `SELLERS_USANCE` or `BUYERS_USANCE` →
+        `EPLC_CONFIRMATION`/`ACCEPT` plus Acceptance and Reimbursement
+        Receivable legs. B4's own newly-created legs are one atomic compound
+        business event; the already-RELEASED B3 source is not released again.
 
 
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
@@ -249,8 +262,8 @@ info:
     endpoint gives any caller a server-side way to resolve that correlation independently, via the
     businessEventId every linked-movement submission already shared but was never queryable by. No
     change to `POST /balance-movements` itself — `businessEventId` was already an accepted request
-    field (this document's own "ONE MOVEMENT, ONE LEG, ONE CALL" principle above already describes it
-    as "correlation only, never a transaction boundary"); this only adds a way to query BY it afterward.
+    field. At v1.2.0 it was correlation only; v1.36.0 later made a shared businessEventId mandatory for
+    atomic compound create while retaining this query behavior.
 
 
     v1.3.0 (2026-08-16, bug fixed, reviewer-directed — "A6/B4 也修一下" i.e. "fix A6/B4 too", extending
@@ -883,7 +896,19 @@ info:
       - CHANGED: `ContractStatus` enum — the reserved contract-versioning value removed (4 legal values now).
       - REMOVED: `BalanceMovement.supersededMovementId` — reserved since v1.0.0, never populated by any
         endpoint in this contract.
-  version: "1.35.0"
+
+    v1.36.0 (2026-08-29): multi-leg business events now have server-owned SQLite transaction boundaries.
+      - ADDED: `POST /balance-movements/compound` atomically creates two or more sibling movements sharing
+        one non-null `businessEventId`.
+      - ADDED: `POST /balance-movements/compound-release` atomically releases two or more distinct movements.
+      - ADDED: `POST /balance-movements/compound-actions` atomically executes two or more ordered Release or
+        Acknowledge actions with one actor. This supports compound workflows whose legs require different
+        state transitions while preserving all-or-nothing behavior.
+      - CLARIFIED: the existing single-movement create/release endpoints remain valid for single-leg commands;
+        callers no longer need client-side compensation for an approved multi-leg command.
+      - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
+        Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
+  version: "1.36.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1133,7 +1158,7 @@ paths:
         - name: balanceContractId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          schema: { type: string }
       responses:
         '200':
           description: The contract version, whatever its current status (ACTIVE/CLOSED/CANCELLED/EXPIRED — no status filter, unlike the natural-key form's own ACTIVE-only default).
@@ -1413,6 +1438,124 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /balance-movements/compound:
+    post:
+      tags: [BalanceMovements]
+      summary: Atomically create every movement leg of one business event
+      description: >
+        Creates at least two new PENDING movements inside one SQLite transaction. Every request is
+        validated by the same rules as `POST /balance-movements`; additionally, every request must carry
+        the same non-null `businessEventId`. Idempotent replay is deliberately not accepted here: if any
+        leg's `(balanceContractId, eventSeq)` already exists, the whole command fails with 400 and no new
+        movement, contract, audit field, or balance side effect is committed. The response order matches
+        the request order. Relevant routed flows include B4's Sight HONOUR + Due From Issuing Bank legs
+        and B4's Usance ACCEPT + Acceptance + Reimbursement Receivable legs. Import A6 itself creates one
+        new Acceptance movement and therefore continues to use the single-movement create endpoint; its
+        multi-record transition occurs at Checker approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompoundMovementCreateRequest' }
+      responses:
+        '201':
+          description: Every movement was created and committed atomically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing/invalid requests, fewer than two legs, inconsistent or missing businessEventId, invalid leg data, or an existing compound leg. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A domain conflict such as insufficient balance, currency mismatch, or an existing natural key occurred in any leg. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/compound-release:
+    post:
+      tags: [BalanceMovements]
+      summary: Atomically release several PENDING movements
+      description: >
+        Releases at least two distinct movement IDs, in the supplied order, inside one SQLite transaction.
+        Each movement uses the same authoritative release rules and side effects as
+        `POST /balance-movements/{movementId}/release`. If any release fails, every preceding release and
+        side effect from this command is rolled back. The response order matches `movementIds`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompoundMovementReleaseRequest' }
+      responses:
+        '200':
+          description: Every movement was released and committed atomically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing/invalid fields, fewer than two movement IDs, or duplicate movement IDs. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: At least one movement was not found. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: At least one movement cannot transition to RELEASED or violates a release-time domain rule. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/compound-actions:
+    post:
+      tags: [BalanceMovements]
+      summary: Atomically execute ordered Release/Acknowledge actions
+      description: >
+        Executes at least two ordered actions inside one SQLite transaction using one actor. `release`
+        delegates to the normal release behavior; `acknowledge` delegates to the A3/A3S arrival
+        acknowledgment behavior. This endpoint is intended for a single business command whose legs need
+        different transitions. If any action fails, all earlier actions and side effects are rolled back.
+        The response order matches `actions`. In the Import Usance flow, A6 uses this boundary to release
+        the still-PENDING A3/A3S source UTILIZE and its referencing Acceptance as one Checker command. B4
+        does not release B3 here because B3 is already independently RELEASED before B4 selection; only
+        B4's newly-created Sight or Usance legs belong to its compound approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompoundMovementActionsRequest' }
+      responses:
+        '200':
+          description: Every action completed and was committed atomically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing/invalid fields, fewer than two actions, or an unsupported action kind. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: At least one movement was not found. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: At least one action violates its state transition, Maker/Checker separation, or another domain rule. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /balance-movements/{movementId}/balance-as-of:
     get:
       tags: [Balances]
@@ -1449,14 +1592,11 @@ paths:
         becomes a permanent Confirmed Balance change, and accountEntries
         (if present on the movement) become available for a downstream
         accounting component to consume (§2/§3.3 — this service never
-        posts GL itself). One call releases exactly one movement — a
-        business function whose approved design requires releasing several
-        linked movements together (e.g. "one Release click does BOTH...")
-        is the caller's own responsibility to sequence as that many
-        separate calls to this endpoint, sharing the linked movements'
-        common `businessEventId` for audit/query correlation only (see the
-        companion Web/Mobile Channel API for how a named business function
-        maps onto this).
+        posts GL itself). This endpoint releases exactly one movement. An
+        approved multi-leg Checker command must use `/balance-movements/
+        compound-release` when every leg is a Release, or `/balance-movements/
+        compound-actions` when Release and Acknowledge transitions are mixed,
+        so all legs and their side effects commit or roll back together.
 
 
         v1.5.0 (2026-08-17, Quality-report-balance.md BAL-123, reviewer-found):
@@ -2115,7 +2255,7 @@ components:
         movementId: { type: string, format: uuid }
         balanceContractId: { type: string, format: uuid }
         eventSeq: { type: integer }
-        businessEventId: { type: string, format: uuid, nullable: true }
+        businessEventId: { type: string, nullable: true, description: Caller-defined correlation identifier; the service does not require UUID syntax. }
         movementType: { type: string, description: "Legal values depend on instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side; that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table." }
         exposureNature: { $ref: '#/components/schemas/ExposureNature' }
         amount:
@@ -2443,7 +2583,7 @@ components:
           type: array
           nullable: true
           items: { $ref: '#/components/schemas/AccountEntry' }
-        businessEventId: { type: string, format: uuid, nullable: true, description: Correlates this movement with any sibling leg movements from the same named business function (see the companion Web/Mobile Channel API) — not a transaction boundary. }
+        businessEventId: { type: string, nullable: true, description: Correlates sibling movements from the same named business function; UUID syntax is not required. Required and identical across every request in POST /balance-movements/compound, where it identifies the legs governed by one atomic transaction boundary; optional correlation metadata on the single-movement endpoint. }
         reasonCode: { type: string, nullable: true, description: "v1.24.0 — REQUIRED (400 if absent) for movementType 'CLOSE'/'REOPEN'; optional/passthrough otherwise. See BalanceMovement.reasonCode's own description." }
         amendmentApproved: { type: boolean, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentApproved's own description." }
         amendmentEffective: { type: string, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentEffective's own description." }
@@ -2456,6 +2596,50 @@ components:
         sourceTransactionRef: { type: string, nullable: true, description: Must be unique per resolved balanceContractId (400 on reuse). }
         referencedTransactionId: { type: string, format: uuid, nullable: true, description: "v1.3.0 — A6/B4 only: the movementId of the pre-existing source Document Arrival/Present Docs record this movement converts/finalizes. See BalanceMovement.referencedTransactionId's own description for the full rule." }
         createdBy: { type: string }
+
+    CompoundMovementCreateRequest:
+      type: object
+      required: [requests]
+      properties:
+        requests:
+          type: array
+          minItems: 2
+          description: Two or more movement requests. Every item must carry the same non-null businessEventId.
+          items: { $ref: '#/components/schemas/BalanceMovementCreateRequest' }
+
+    CompoundMovementReleaseRequest:
+      type: object
+      required: [movementIds, releasedBy]
+      properties:
+        movementIds:
+          type: array
+          minItems: 2
+          uniqueItems: true
+          items: { type: string }
+        releasedBy:
+          type: string
+          minLength: 1
+
+    CompoundMovementAction:
+      type: object
+      required: [kind, movementId]
+      properties:
+        kind:
+          type: string
+          enum: [release, acknowledge]
+        movementId: { type: string }
+
+    CompoundMovementActionsRequest:
+      type: object
+      required: [actions, actor]
+      properties:
+        actions:
+          type: array
+          minItems: 2
+          items: { $ref: '#/components/schemas/CompoundMovementAction' }
+        actor:
+          type: string
+          minLength: 1
 
     BalanceMovementCancelRequest:
       type: object

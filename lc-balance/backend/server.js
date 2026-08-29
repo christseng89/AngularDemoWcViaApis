@@ -44,13 +44,38 @@ async function resolveLogicalContractId(captured, ref) {
   // absent or an error body with no `balanceContractId`. A bare `entry.response.balanceContractId` threw
   // an opaque TypeError in that case, surfacing as a generic 500 with no indication of the real cause.
   if (!entry.response?.balanceContractId) {
-    throw new Error(`Step "${ref}" never produced a balanceContractId (its own createMovement call did not succeed) — cannot resolve a parent for a dependent step. Last known response: ${JSON.stringify(entry.response)}`);
+    throw new Error(
+      `Step "${ref}" never produced a balanceContractId (its own createMovement call did not succeed) — cannot resolve a parent for a dependent step. Last known response: ${JSON.stringify(entry.response)}`,
+    );
   }
   if (entry.logicalContractId) return entry.logicalContractId;
   const snap = await callMicroservice('GET', `/balance-contracts/${entry.response.balanceContractId}/balance`);
   if (!snap.ok) throw new Error(`Could not resolve logicalContractId for "${ref}": ${JSON.stringify(snap.body)}`);
   entry.logicalContractId = snap.body.logicalContractId;
   return entry.logicalContractId;
+}
+
+async function resolveMovementRequest(captured, source) {
+  const request = { ...source };
+  if (request.balanceContractIdRef) {
+    const referenced = captured[request.balanceContractIdRef];
+    if (!referenced?.response?.balanceContractId)
+      throw new Error(`Step references "${request.balanceContractIdRef}" for its own balanceContractId, but that step never produced one.`);
+    request.balanceContractId = referenced.response.balanceContractId;
+    delete request.balanceContractIdRef;
+  }
+  if (request.parentLogicalContractIdRef) {
+    request.parentLogicalContractId = await resolveLogicalContractId(captured, request.parentLogicalContractIdRef);
+    delete request.parentLogicalContractIdRef;
+  }
+  if (request.referencedTransactionIdRef) {
+    const referenced = captured[request.referencedTransactionIdRef];
+    if (!referenced?.response?.movementId)
+      throw new Error(`Step references "${request.referencedTransactionIdRef}" for its own movementId, but that step never produced one.`);
+    request.referencedTransactionId = referenced.response.movementId;
+    delete request.referencedTransactionIdRef;
+  }
+  return request;
 }
 
 // Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release' and
@@ -92,42 +117,12 @@ async function runCase(businessCase) {
     }
 
     if (step.type === 'createMovement') {
-      const request = { ...step.request };
-      if (request.balanceContractIdRef) {
-        // See resolveLogicalContractId()'s own doc comment on why the full chain must be optional —
-        // a referenced step's own createMovement call can fail without this step knowing.
-        const referenced = captured[request.balanceContractIdRef];
-        if (!referenced?.response?.balanceContractId) {
-          throw new Error(
-            `Step references "${request.balanceContractIdRef}" for its own balanceContractId, but that step never produced one (its own createMovement call did not succeed). Last known response: ${JSON.stringify(referenced?.response)}`,
-          );
-        }
-        request.balanceContractId = referenced.response.balanceContractId;
-        delete request.balanceContractIdRef;
-      }
-      if (request.parentLogicalContractIdRef) {
-        request.parentLogicalContractId = await resolveLogicalContractId(captured, request.parentLogicalContractIdRef);
-        delete request.parentLogicalContractIdRef;
-      }
-      // Export Case #6/#7 (2026-08-16, B3->B4 compound release shape — see types.ts's own
-      // BalanceMovement.referencedTransactionId doc comment): resolves to the REAL movementId of an
-      // earlier captureAs step, only known once that step's own createMovement response comes back —
-      // same resolution pattern as balanceContractIdRef above, just targeting movementId instead.
-      if (request.referencedTransactionIdRef) {
-        const entry = captured[request.referencedTransactionIdRef];
-        if (!entry) throw new Error(`Step references unknown captureAs key "${request.referencedTransactionIdRef}" — check step ordering in businessCases.js.`);
-        if (!entry.response?.movementId) {
-          throw new Error(
-            `Step references "${request.referencedTransactionIdRef}" for its own movementId, but that step never produced one (its own createMovement call did not succeed). Last known response: ${JSON.stringify(entry.response)}`,
-          );
-        }
-        request.referencedTransactionId = entry.response.movementId;
-        delete request.referencedTransactionIdRef;
-      }
+      const request = await resolveMovementRequest(captured, step.request);
       const result = await callMicroservice('POST', '/balance-movements', request);
       if (step.captureAs) captured[step.captureAs] = { response: result.body };
       trace.push({
         type: 'createMovement',
+        functionCode: step.functionCode,
         label: step.label,
         request,
         status: result.status,
@@ -135,6 +130,35 @@ async function runCase(businessCase) {
         expectedError: Boolean(step.expectError),
         response: result.body,
       });
+      continue;
+    }
+
+    if (step.type === 'createCompoundMovements') {
+      const requests = [];
+      for (const request of step.requests) requests.push(await resolveMovementRequest(captured, request));
+      const result = await callMicroservice('POST', '/balance-movements/compound', { requests });
+      if (result.ok) {
+        step.captureAs.forEach((key, index) => {
+          captured[key] = { response: result.body[index] };
+        });
+      }
+      trace.push({
+        type: step.type,
+        functionCode: step.functionCode,
+        label: step.label,
+        requests,
+        status: result.status,
+        ok: result.ok,
+        response: result.body,
+      });
+      continue;
+    }
+
+    if (step.type === 'compoundActions') {
+      const actions = step.actions.map(({ kind, movementRef }) => ({ kind, movementId: captured[movementRef]?.response?.movementId }));
+      if (actions.some((action) => !action.movementId)) throw new Error(`Compound action "${step.label}" references a movement that was not created.`);
+      const result = await callMicroservice('POST', '/balance-movements/compound-actions', { actions, actor: step.actor });
+      trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }
 
@@ -151,7 +175,7 @@ async function runCase(businessCase) {
         continue;
       }
       const result = await callMicroservice('POST', `/balance-movements/${movementId}/${subPath}`, { [bodyKey]: step[bodyKey] });
-      trace.push({ type: step.type, label: step.label, status: result.status, ok: result.ok, response: result.body });
+      trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }
 

@@ -1,4 +1,4 @@
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, forkJoin, of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
@@ -78,7 +78,7 @@ function apiErr(message: string) {
 }
 
 function makeApi() {
-  return {
+  const api: any = {
     createMovement: jest.fn(() => of({ body: { movementId: 'mv-new', status: 'PENDING' } })),
     release: jest.fn(() => of({ movementId: 'mv-released', status: 'RELEASED' })),
     reject: jest.fn(() => of({ movementId: 'mv-rejected', status: 'REJECTED' })),
@@ -92,11 +92,16 @@ function makeApi() {
     getContract: jest.fn(() => of(makeContract())),
     listMovements: jest.fn(() => of([] as any[])),
     findByBusinessEventId: jest.fn(() => of([] as any[])),
+    releaseCompoundMovements: jest.fn((movementIds: string[], actor: string) => forkJoin(movementIds.map((id) => api.release(id, actor)))),
+    executeCompoundActions: jest.fn((actions: { kind: 'release' | 'acknowledge'; movementId: string }[], actor: string) =>
+      forkJoin(actions.map((action) => (action.kind === 'release' ? api.release(action.movementId, actor) : api.acknowledge(action.movementId, actor)))),
+    ),
     // MakerQueueService (constructed with this same mock via TransactionBuilderComponent's own default
     // param) calls this internally after a successful deletePending()/withdrawMakerSubmit() — needed for
     // onDeletePendingReviewConfirmed()'s own tests below, harmless default for every other test here.
     listMyMovements: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
   };
+  return api;
 }
 
 function setup() {
@@ -353,10 +358,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledTimes(2);
       expect(comp.makerOutcomeSignal).toEqual({
         kind: 'failed',
-        message: 'Could not release the Document Arrival (IB01) — Acceptance NOT approved: ILLEGAL_STATE_TRANSITION',
+        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
       expect(comp.actionBusy).toBe(false);
     });
@@ -376,7 +381,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.makerOutcomeSignal).toEqual({
         kind: 'failed',
-        message: 'Document Arrival released, but the Confirmation Honour/Accept itself failed to release: ILLEGAL_STATE_TRANSITION',
+        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
       expect(comp.actionBusy).toBe(false);
     });
@@ -479,7 +484,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledTimes(2);
       expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
     });
 
@@ -495,7 +500,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.makerOutcomeSignal).toEqual({
         kind: 'failed',
-        message: 'Acceptance settled, but the matching Reimbursement Receivable failed to release: ILLEGAL_STATE_TRANSITION',
+        message: 'ILLEGAL_STATE_TRANSITION',
       });
     });
 
@@ -563,7 +568,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.makerOutcomeSignal).toEqual({
         kind: 'failed',
-        message: 'Confirmation Honour released, but the Due from Issuing Bank asset failed to release: ILLEGAL_STATE_TRANSITION',
+        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
     });
 
@@ -608,10 +613,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(api.release).toHaveBeenCalledTimes(2);
+      expect(api.release).toHaveBeenCalledTimes(3);
       expect(comp.makerOutcomeSignal).toEqual({
         kind: 'failed',
-        message: 'Confirmation accepted, but the Acceptance liability failed to release: ILLEGAL_STATE_TRANSITION',
+        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
     });
 
@@ -633,7 +638,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.makerOutcomeSignal).toEqual({
         kind: 'failed',
-        message: 'Acceptance released, but the Reimbursement Receivable asset failed to release: ILLEGAL_STATE_TRANSITION',
+        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
     });
 

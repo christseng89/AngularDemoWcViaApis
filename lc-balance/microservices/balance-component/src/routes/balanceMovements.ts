@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
+import type { CompoundMovementService } from '../service/compoundMovementService';
 import { RequestValidationError } from '../errors';
 import type { CreateMovementRequest, EditMovementRequest } from '../service/balanceService';
 import type { MovementStatus } from '../types';
 import { createMovementRequestSchema, editMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 
-export function balanceMovementsRouter(service: BalanceService): Router {
+export function balanceMovementsRouter(service: BalanceService, compound: CompoundMovementService): Router {
   const router = Router();
 
   // POST /balance-movements
@@ -21,6 +22,43 @@ export function balanceMovementsRouter(service: BalanceService): Router {
     const body = parsed.data as CreateMovementRequest;
     const result = service.createMovement(body);
     res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
+  });
+
+  // A compound business event is one atomic command even when it spans several contracts/ledgers.
+  router.post('/balance-movements/compound', (req, res) => {
+    const body = req.body as { requests?: unknown[] };
+    if (!Array.isArray(body.requests)) throw new RequestValidationError('requests is required.');
+    const requests = body.requests.map((request) => {
+      const parsed = createMovementRequestSchema.safeParse(request);
+      if (!parsed.success) throw new RequestValidationError(firstValidationMessage(parsed.error));
+      return parsed.data as CreateMovementRequest;
+    });
+    res.status(201).json(compound.create(requests));
+  });
+
+  router.post('/balance-movements/compound-release', (req, res) => {
+    const { movementIds, releasedBy } = req.body as { movementIds?: unknown; releasedBy?: string };
+    if (!Array.isArray(movementIds) || !movementIds.every((id): id is string => typeof id === 'string') || !releasedBy) {
+      throw new RequestValidationError('movementIds and releasedBy are required.');
+    }
+    res.json(compound.release(movementIds, releasedBy));
+  });
+
+  router.post('/balance-movements/compound-actions', (req, res) => {
+    const { actions, actor } = req.body as { actions?: unknown; actor?: string };
+    const valid =
+      Array.isArray(actions) &&
+      actions.every(
+        (action): action is { kind: 'release' | 'acknowledge'; movementId: string } =>
+          !!action &&
+          typeof action === 'object' &&
+          ('kind' in action) &&
+          (action.kind === 'release' || action.kind === 'acknowledge') &&
+          ('movementId' in action) &&
+          typeof action.movementId === 'string',
+      );
+    if (!valid || !actor) throw new RequestValidationError('actions and actor are required.');
+    res.json(compound.execute(actions, actor));
   });
 
   // POST /balance-movements/:movementId/release

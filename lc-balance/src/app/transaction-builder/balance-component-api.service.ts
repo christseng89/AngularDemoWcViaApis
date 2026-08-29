@@ -243,8 +243,20 @@ export class BalanceComponentApiService {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements`, req, { observe: 'response' });
   }
 
+  createCompoundMovements(requests: readonly CreateMovementRequest[]): Observable<BalanceMovement[]> {
+    return this.http.post<BalanceMovement[]>(`${this.base}/balance-movements/compound`, { requests });
+  }
+
   release(movementId: string, releasedBy: string): Observable<BalanceMovement> {
     return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/release`, { releasedBy });
+  }
+
+  releaseCompoundMovements(movementIds: readonly string[], releasedBy: string): Observable<BalanceMovement[]> {
+    return this.http.post<BalanceMovement[]>(`${this.base}/balance-movements/compound-release`, { movementIds, releasedBy });
+  }
+
+  executeCompoundActions(actions: readonly { kind: 'release' | 'acknowledge'; movementId: string }[], actor: string): Observable<BalanceMovement[]> {
+    return this.http.post<BalanceMovement[]>(`${this.base}/balance-movements/compound-actions`, { actions, actor });
   }
 
   reject(movementId: string, releasedBy: string, reasonCode: string, remarks?: string): Observable<BalanceMovement> {
