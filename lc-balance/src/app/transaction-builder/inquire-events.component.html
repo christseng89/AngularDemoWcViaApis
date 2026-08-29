@@ -45,18 +45,14 @@
            comments). The OLD single-exact-match "type LC Number, click Search" box (formerly Export
            Confirmed's only entry point) is fully retired — both sides now share this Index instead. -->
         <ng-container *ngIf="inquireEvents.indexView === 'INDEX'">
-          <div class="tb-field tb-field--inline tb-field--search mt-2">
-            <label class="tb-field__label">LC Number Search / Filter</label>
-            <input
-              class="tb-input"
-              placeholder="e.g. S0 (matches any LC Number containing this text)"
-              [(ngModel)]="inquireEvents.indexSearch"
-              (keyup.enter)="inquireEvents.searchIndex()"
-            />
-            <button type="button" class="tb-btn tb-btn--outline" [disabled]="inquireEvents.indexLoading" (click)="inquireEvents.searchIndex()">
-              <span class="tb-spinner" aria-hidden="true" *ngIf="inquireEvents.indexLoading"></span>{{ inquireEvents.indexLoading ? 'Searching…' : 'Search' }}
-            </button>
-          </div>
+          <app-transaction-search-field
+            label="LC Number Search / Filter"
+            placeholder="e.g. S0 (matches any LC Number containing this text)"
+            [value]="inquireEvents.indexSearch"
+            [loading]="inquireEvents.indexLoading"
+            (valueChange)="inquireEvents.indexSearch = $event"
+            (searchRequested)="inquireEvents.searchIndex()"
+          ></app-transaction-search-field>
           <div class="tb-error mt-2" role="alert" *ngIf="inquireEvents.indexError">{{ inquireEvents.indexError }}</div>
           <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.indexLoading">
             <span class="tb-spinner" aria-hidden="true"></span>Loading {{ inquireEvents.indexEntityLabel }} Master Records…
@@ -89,37 +85,22 @@
                   <td class="tb-table__amount">{{ row.lcAmount }}</td>
                   <td class="tb-table__amount">{{ row.availableBalance }}</td>
                   <td class="tb-table__status">
-                    <span class="tb-status-badge" [ngClass]="contractStatusBadgeClass(row.status, row.closingPending)"
-                      ><app-tb-icon [name]="statusBadgeIcon(contractStatusBadgeClass(row.status, row.closingPending))"></app-tb-icon
-                      >{{ contractStatusLabel(row.status, row.closingPending) }}</span
-                    >
+                    <app-contract-status-badge [status]="row.status" [closingPending]="row.closingPending"></app-contract-status-badge>
                   </td>
                   <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date: 'short') : '—' }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="tb-pagination" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexPaging.totalPages > 1">
-            <button
-              type="button"
-              class="tb-btn tb-btn--tiny tb-btn--outline"
-              [disabled]="inquireEvents.indexPaging.page <= 1"
-              (click)="inquireEvents.prevIndexPage()"
-            >
-              ‹ Prev
-            </button>
-            <span class="tb-muted"
-              >Page {{ inquireEvents.indexPaging.page }} / {{ inquireEvents.indexPaging.totalPages }} ({{ inquireEvents.indexPaging.total }} total)</span
-            >
-            <button
-              type="button"
-              class="tb-btn tb-btn--tiny tb-btn--outline"
-              [disabled]="inquireEvents.indexPaging.page >= inquireEvents.indexPaging.totalPages"
-              (click)="inquireEvents.nextIndexPage()"
-            >
-              Next ›
-            </button>
-          </div>
+          <app-transaction-pagination
+            *ngIf="!inquireEvents.indexLoading && inquireEvents.indexPaging.totalPages > 1"
+            [page]="inquireEvents.indexPaging.page"
+            [totalPages]="inquireEvents.indexPaging.totalPages"
+            [total]="inquireEvents.indexPaging.total"
+            [loading]="inquireEvents.indexLoading"
+            (previousRequested)="inquireEvents.prevIndexPage()"
+            (nextRequested)="inquireEvents.nextIndexPage()"
+          ></app-transaction-pagination>
           <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError && inquireEvents.indexEmptyIsError">
             {{ inquireEvents.indexEmptyMessage }}
           </div>
@@ -219,12 +200,13 @@
                     <td class="tb-table__ref">{{ inquireEvents.primaryReferenceFor(e) }}</td>
                     <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
                     <td>
-                      <span
-                        class="tb-status-badge"
-                        [ngClass]="statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt)"
-                        ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt))"></app-tb-icon
-                        >{{ displayStatus(e.eventStatus, e.contract.instrumentType, e.movement.movementType, e.phase, e.movement.acknowledgedAt) }}</span
-                      >
+                      <app-transaction-status-badge
+                        [status]="e.eventStatus"
+                        [instrumentType]="e.contract.instrumentType"
+                        [movementType]="e.movement.movementType"
+                        [phase]="e.phase"
+                        [acknowledgedAt]="e.movement.acknowledgedAt"
+                      ></app-transaction-status-badge>
                     </td>
                     <td class="tb-table__time">{{ e.eventTime | date: 'short' }}</td>
                   </tr>
@@ -236,27 +218,15 @@
              page — see InquireEventsService.eventsPaging's own doc comment for why). Same Prev/Next +
              "Page X / Y (Z total)" convention app-index-picker's own pagination uses elsewhere in this
              app, reused rather than reinvented — only shown once there's more than one page. -->
-            <div class="tb-pagination" *ngIf="inquireEvents.eventsPaging.totalPages > 1">
-              <button
-                type="button"
-                class="tb-btn tb-btn--tiny tb-btn--outline"
-                [disabled]="inquireEvents.eventsPaging.page <= 1"
-                (click)="inquireEvents.prevEventsPage()"
-              >
-                ‹ Prev
-              </button>
-              <span class="tb-muted"
-                >Page {{ inquireEvents.eventsPaging.page }} / {{ inquireEvents.eventsPaging.totalPages }} ({{ inquireEvents.eventsPaging.total }} total)</span
-              >
-              <button
-                type="button"
-                class="tb-btn tb-btn--tiny tb-btn--outline"
-                [disabled]="inquireEvents.eventsPaging.page >= inquireEvents.eventsPaging.totalPages"
-                (click)="inquireEvents.nextEventsPage()"
-              >
-                Next ›
-              </button>
-            </div>
+            <app-transaction-pagination
+              *ngIf="inquireEvents.eventsPaging.totalPages > 1"
+              [page]="inquireEvents.eventsPaging.page"
+              [totalPages]="inquireEvents.eventsPaging.totalPages"
+              [total]="inquireEvents.eventsPaging.total"
+              [loading]="inquireEvents.eventsLoading"
+              (previousRequested)="inquireEvents.prevEventsPage()"
+              (nextRequested)="inquireEvents.nextEventsPage()"
+            ></app-transaction-pagination>
             <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
           </div>
 

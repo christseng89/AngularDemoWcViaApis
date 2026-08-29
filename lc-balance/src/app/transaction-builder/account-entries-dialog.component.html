@@ -10,9 +10,13 @@
     <div class="tb-dialog__meta">
       <span class="tb-type-tag">{{ displayMovementType() }}</span>
       <span class="tb-muted">{{ m.sourceTransactionRef || 'eventSeq ' + m.eventSeq }}</span>
-      <span class="tb-status-badge" [ngClass]="statusBadgeClass(m.status)"
-        ><app-tb-icon [name]="statusBadgeIcon(m.status)"></app-tb-icon>{{ displayStatus(m.status) }}</span
-      >
+      <app-transaction-status-badge
+        [status]="m.status"
+        [instrumentType]="instrumentType"
+        [movementType]="m.movementType"
+        [phase]="phase"
+        [acknowledgedAt]="m.acknowledgedAt"
+      ></app-transaction-status-badge>
     </div>
     <!-- Set label only appears once a second set exists (linkedMovement) — a plain single-set event stays
          exactly as before, no "Set" heading. Derived from movement's own movementType, not a hardcoded
@@ -23,9 +27,14 @@
          match) — the primary set's badge reuses the SAME real, top-level status already shown above. -->
     <div class="tb-hint mt-2" *ngIf="linkedMovement">
       <strong>{{ primarySetLabel }}</strong>
-      <span class="tb-status-badge ms-2" [ngClass]="statusBadgeClass(m.status)"
-        ><app-tb-icon [name]="statusBadgeIcon(m.status)"></app-tb-icon>{{ displayStatus(m.status) }}</span
-      >
+      <app-transaction-status-badge
+        [status]="m.status"
+        [instrumentType]="instrumentType"
+        [movementType]="m.movementType"
+        [phase]="phase"
+        [acknowledgedAt]="m.acknowledgedAt"
+        extraClass="ms-2"
+      ></app-transaction-status-badge>
     </div>
     <table class="tb-table tb-table--static mt-2" *ngIf="m.contingentAccountEntry as entry">
       <caption class="visually-hidden">

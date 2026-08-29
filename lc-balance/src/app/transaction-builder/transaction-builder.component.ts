@@ -159,6 +159,10 @@ export class TransactionBuilderComponent {
     if (mode !== 'PROCESSING') {
       this.externalFixPendingRequest = null;
       this.externalDeletePendingReviewRequest = null;
+      // The Delete Pending review is the only workflow allowed to hide the Checker panel. If the user
+      // leaves Processing through navigation instead of the review's own Confirm/Cancel buttons, its
+      // row must not leak into the next normal Function screen and keep Checker hidden there.
+      this.pendingMakerQueueDeleteRow = null;
     }
     if (mode === 'INQUIRE') {
       this.inquireEvents.loadIndex();
@@ -182,6 +186,11 @@ export class TransactionBuilderComponent {
    * what stays parent-owned.
    */
   selectFunction(fn: TransactionFunction): void {
+    // A direct Function selection always starts a normal transaction screen. Clear any abandoned
+    // Delete Pending review first; onMakerQueueDeletePendingReview() intentionally assigns its row and
+    // request again immediately after this call.
+    this.pendingMakerQueueDeleteRow = null;
+    this.externalDeletePendingReviewRequest = null;
     this.selectedFunction = fn;
     this.activeFunctionSide = fn.side;
     this.lookUp.resetForSide(fn.side);

@@ -9,13 +9,17 @@
       <button type="button" class="tb-tab" [class.tb-tab--active]="makerQueue.side === 'IMPORT'" (click)="makerQueue.selectSide('IMPORT')">Import LC</button>
       <button type="button" class="tb-tab" [class.tb-tab--active]="makerQueue.side === 'EXPORT'" (click)="makerQueue.selectSide('EXPORT')">Export Confirmed</button>
     </div>
-    <div class="tb-field tb-field--inline tb-field--search mt-2">
-      <label class="tb-field__label">Maker (createdBy)</label>
-      <input class="tb-input tb-input--required" placeholder="maker1" [(ngModel)]="makerQueue.createdBy" (keyup.enter)="makerQueue.load()" />
-      <button type="button" class="tb-btn tb-btn--outline" (click)="makerQueue.load()" [disabled]="makerQueue.loading">
-        <span class="tb-spinner" aria-hidden="true" *ngIf="makerQueue.loading"></span>{{ makerQueue.loading ? 'Loading…' : 'Load' }}
-      </button>
-    </div>
+    <app-transaction-search-field
+      label="Maker (createdBy)"
+      placeholder="maker1"
+      [required]="true"
+      [value]="makerQueue.createdBy"
+      [loading]="makerQueue.loading"
+      idleText="Load"
+      busyText="Loading…"
+      (valueChange)="makerQueue.createdBy = $event"
+      (searchRequested)="makerQueue.load()"
+    ></app-transaction-search-field>
     <!-- LC Number Search (user-directed 2026-08-28, "Maker Queue 提供 LC Number Search 功能" — "支援
              LIKE / Partial Match") — a substring filter on the same worklist; `makerQueue.load()`
              defaults its own `resetToFirstPage` param to `true`, so reusing it here (same as the Maker
@@ -25,12 +29,19 @@
              doc comment), so a search's own results always share the SAME ordering (Function ASC → LC
              Number ASC → Secondary Reference Number ASC) as the unfiltered index — never a separate
              client-side sort of its own. -->
-    <div class="tb-field tb-field--inline tb-field--search mt-2">
-      <label class="tb-field__label">LC Number</label>
-      <input class="tb-input" placeholder="Search LC Number… (partial match)" [(ngModel)]="makerQueue.lcNumberSearch" (keyup.enter)="makerQueue.load()" />
-      <button type="button" class="tb-btn tb-btn--outline" (click)="makerQueue.load()" [disabled]="makerQueue.loading">Search</button>
-    </div>
-    <div class="tb-error mt-2" role="alert" *ngIf="makerQueue.error">{{ makerQueue.error }}</div>
+    <app-transaction-search-field
+      label="LC Number"
+      placeholder="Search LC Number… (partial match)"
+      [value]="makerQueue.lcNumberSearch"
+      [loading]="makerQueue.loading"
+      (valueChange)="makerQueue.lcNumberSearch = $event"
+      (searchRequested)="makerQueue.load()"
+    ></app-transaction-search-field>
+    <app-feedback-message
+      *ngIf="errorFeedback as feedback"
+      [message]="feedback"
+      (retry)="makerQueue.load()"
+    ></app-feedback-message>
     <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="makerQueue.loading">
       <span class="tb-spinner" aria-hidden="true"></span>Loading My Pending/My Rejected…
     </div>
@@ -59,20 +70,13 @@
             <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
             <td class="tb-table__amount">{{ row.movement.amount }} {{ row.movement.currency }}</td>
             <td class="tb-table__status">
-              <span
-                class="tb-status-badge"
-                [ngClass]="statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType, makerQueue.displayPhaseFor(row), row.movement.acknowledgedAt)"
-                ><app-tb-icon
-                  [name]="
-                    statusBadgeIcon(
-                      statusBadgeClass(row.movement.status, row.contract.instrumentType, row.movement.movementType, makerQueue.displayPhaseFor(row), row.movement.acknowledgedAt)
-                    )
-                  "
-                ></app-tb-icon
-                >{{
-                  displayStatus(row.movement.status, row.contract.instrumentType, row.movement.movementType, makerQueue.displayPhaseFor(row), row.movement.acknowledgedAt)
-                }}</span
-              >
+              <app-transaction-status-badge
+                [status]="row.movement.status"
+                [instrumentType]="row.contract.instrumentType"
+                [movementType]="row.movement.movementType"
+                [phase]="makerQueue.displayPhaseFor(row)"
+                [acknowledgedAt]="row.movement.acknowledgedAt"
+              ></app-transaction-status-badge>
             </td>
             <td class="tb-table__time">{{ row.movement.createdAt | date: 'short' }}</td>
             <td>
@@ -110,18 +114,15 @@
         </tbody>
       </table>
     </div>
-    <div class="tb-pagination" *ngIf="makerQueue.paging.totalPages > 1">
-      <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="makerQueue.paging.page <= 1" (click)="makerQueue.prevPage()">‹ Prev</button>
-      <span class="tb-muted">Page {{ makerQueue.paging.page }} / {{ makerQueue.paging.totalPages }} ({{ makerQueue.paging.total }} total)</span>
-      <button
-        type="button"
-        class="tb-btn tb-btn--tiny tb-btn--outline"
-        [disabled]="makerQueue.paging.page >= makerQueue.paging.totalPages"
-        (click)="makerQueue.nextPage()"
-      >
-        Next ›
-      </button>
-    </div>
+    <app-transaction-pagination
+      *ngIf="makerQueue.paging.totalPages > 1"
+      [page]="makerQueue.paging.page"
+      [totalPages]="makerQueue.paging.totalPages"
+      [total]="makerQueue.paging.total"
+      [loading]="makerQueue.loading"
+      (previousRequested)="makerQueue.prevPage()"
+      (nextRequested)="makerQueue.nextPage()"
+    ></app-transaction-pagination>
     <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && makerQueue.emptyStateIsError">
       {{ makerQueue.emptyStateMessage }}
     </div>

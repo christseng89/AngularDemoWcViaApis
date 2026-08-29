@@ -1,0 +1,160 @@
+/*
+ * Shared transaction controls live in the application design-system layer rather than a caller's
+ * component stylesheet. The custom-element prefix keeps these rules isolated while ensuring they
+ * still apply when the controls are rendered across an Angular view-encapsulation boundary.
+ */
+app-transaction-search-field {
+  display: block;
+
+  .tb-field {
+    margin-bottom: 14px;
+  }
+
+  .tb-field--inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0;
+  }
+
+  .tb-field--search .tb-input {
+    width: 180px;
+  }
+
+  .tb-field__label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--gray-body);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .tb-input {
+    box-sizing: border-box;
+    border: 1px solid var(--gray-input-border);
+    border-radius: var(--radius-md);
+    outline: none;
+    background: var(--bg-surface);
+    color: var(--gray-body);
+    padding: 7px 10px;
+    font: inherit;
+    font-size: 13px;
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
+  }
+
+  .tb-input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.12);
+  }
+
+  .tb-input--required {
+    border-left: 3px solid var(--blue);
+    background: var(--blue-bg-soft);
+  }
+
+  .tb-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 8px 16px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition:
+      background-color var(--transition-fast),
+      border-color var(--transition-fast),
+      transform 80ms ease;
+  }
+
+  .tb-btn--primary {
+    border-color: var(--blue-solid);
+    background: var(--blue-solid);
+    color: #fff;
+  }
+
+  .tb-btn--primary:hover:not(:disabled) {
+    border-color: var(--blue-solid-hover);
+    background: var(--blue-solid-hover);
+  }
+
+  .tb-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .tb-btn:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  .tb-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+}
+
+app-transaction-pagination {
+  display: block;
+
+  .tb-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .tb-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--blue-border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--blue-dark);
+    padding: 3px 9px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition:
+      background-color var(--transition-fast),
+      border-color var(--transition-fast),
+      transform 80ms ease;
+  }
+
+  .tb-btn:hover:not(:disabled) {
+    border-color: var(--blue);
+    background: var(--blue-bg-soft);
+  }
+
+  .tb-btn:disabled {
+    border-color: var(--gray-input-border);
+    background: var(--gray-readonly-bg);
+    color: var(--gray-disabled);
+    cursor: not-allowed;
+  }
+
+  .tb-btn:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  .tb-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .tb-muted {
+    color: var(--gray-muted);
+    font-size: 12px;
+  }
+}

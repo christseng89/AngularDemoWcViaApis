@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BalanceSnapshot } from './balance-component-api.service';
 
@@ -28,6 +28,7 @@ export interface BalanceSnapshotImpact {
   imports: [CommonModule],
   templateUrl: './balance-snapshot-box.component.html',
   styleUrl: './balance-snapshot-box.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BalanceSnapshotBoxComponent {
   @Input() title: string | null = null;
@@ -35,4 +36,6 @@ export class BalanceSnapshotBoxComponent {
   @Input() snapshot: BalanceSnapshot | null = null;
   /** Omitted (stays null) by the Look Up panel's own call site — that box shows plain, unannotated Confirmed Balance, unchanged. Only Inquire Events passes a real value. */
   @Input() impact: BalanceSnapshotImpact | null = null;
+  @Input() variant: 'full' | 'compact' = 'full';
+  @Input() appearance: 'current' | 'default' = 'current';
 }

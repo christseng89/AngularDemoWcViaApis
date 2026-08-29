@@ -1,3 +1,6 @@
+@use 'styles/transaction-controls';
+@use 'styles/feedback';
+
 /**
  * Design tokens — matched to lc-payment-wc's established banking palette
  * (business instruction 2026-08-15: "UI for Functions Import LC, Export LC

@@ -1011,6 +1011,33 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.externalFixPendingRequest).toBe(movement);
     });
+
+    it('leaving PROCESSING clears an abandoned Delete Pending row so it cannot hide Checker on the next screen', () => {
+      const { comp } = setup();
+      comp.pendingMakerQueueDeleteRow = {
+        movement: makeMovement({ movementId: 'mv-abandoned-delete' }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      } as any;
+
+      comp.selectMode('MAKER_QUEUE');
+
+      expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+    });
+
+    it('a normal Function selection clears stale Delete Pending state so Checker renders before any transaction is selected', () => {
+      const { comp } = setup();
+      comp.pendingMakerQueueDeleteRow = {
+        movement: makeMovement({ movementId: 'mv-stale-delete' }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      } as any;
+      comp.externalDeletePendingReviewRequest = makeMovement({ movementId: 'mv-stale-delete' });
+
+      comp.selectFunction(A3);
+
+      expect(comp.selectedFunction).toBe(A3);
+      expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+      expect(comp.externalDeletePendingReviewRequest).toBeNull();
+    });
   });
 
   // ---------------------------------------------------------------------

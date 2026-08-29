@@ -107,6 +107,21 @@ describe('LcCatalogIndexService', () => {
       expect(decorate).toHaveBeenCalledWith([contract], 'IMPORT');
       expect(svc.rows).toEqual([{ contract, tag: 'decorated' }]);
     });
+
+    it('clears loading and reports an error when row decoration fails', () => {
+      const contract = makeContract();
+      const catalog = jest.fn(() => of(makePage({ items: [contract], total: 1 })));
+      const decorate = jest.fn(() => throwError(() => ({ error: { message: 'decoration failed' } })));
+      const svc = new LcCatalogIndexService(makeApi({ catalog }), decorate);
+      svc.rows = [makeContract({ balanceContractId: 'stale' })];
+
+      svc.load();
+
+      expect(svc.loading).toBe(false);
+      expect(svc.error).toBe('decoration failed');
+      expect(svc.rows).toEqual([]);
+      expect(svc.paging.total).toBe(0);
+    });
   });
 
   describe('custom fetchPage hook (e.g. Inquire Delete Pending\'s own catalogWithDeletePendingHistory)', () => {

@@ -14,7 +14,7 @@ import {
 } from './balance-component.model';
 import { describeApiError as describeApiErrorShared, notFoundMessage } from './api-error';
 import * as policy from './function-policy';
-import { deriveFunctionStrategy, movementTypeMatchesFunction } from './function-strategy';
+import { isCheckerActionableMovement } from './checker-eligibility-policy';
 
 /**
  * A pending sync request for the Checker's own independent search — see `ngOnChanges()`'s own doc
@@ -246,7 +246,7 @@ export class CheckerPanelComponent implements OnChanges {
           return forkJoin(
             result.items.map((c) =>
               this.api.listMovements(c.balanceContractId).pipe(
-                map((movements) => (movements.some((m) => this.isCheckerActionable(m, selectedFunction)) ? c : null)),
+                map((movements) => (movements.some((m) => isCheckerActionableMovement(m, selectedFunction)) ? c : null)),
                 catchError(() => of(null)),
               ),
             ),
@@ -334,7 +334,7 @@ export class CheckerPanelComponent implements OnChanges {
     this.api.listMovements(contractId).subscribe({
       next: (list: BalanceMovement[]) => {
         this.checkerLoading = false;
-        this.checkerItems = list.filter((m) => this.isCheckerActionable(m, selectedFunction));
+        this.checkerItems = list.filter((m) => isCheckerActionableMovement(m, selectedFunction));
         this.queueLoadSucceeded.emit();
       },
       error: () => {
@@ -342,26 +342,6 @@ export class CheckerPanelComponent implements OnChanges {
         this.checkerItems = [];
       },
     });
-  }
-
-  /**
-   * Whether `m` is a genuinely actionable (EARMARKING) item for `selectedFunction`'s own Checker screen
-   * — the single source of truth `loadCheckerQueue()` and `searchCheckerCandidatesByLcOnly()` both defer
-   * to, so a candidate that this method excludes can never lead into a queue that shows something for it
-   * anyway (or vice versa). See `loadCheckerQueue()`'s own original doc comment (moved here) for the
-   * EARMARKING(PENDING+no acknowledgedAt)/EARMARKED(PENDING+acknowledgedAt) split business instruction.
-   * `selectedFunction` is nullable — every function-scoped rule below is skipped (not the whole check)
-   * when it's null, same as this logic's original inline form only ever guarded with `selectedFunction &&`.
-   */
-  private isCheckerActionable(m: BalanceMovement, selectedFunction: TransactionFunction | null): boolean {
-    if (m.status !== 'PENDING') return false;
-    if (selectedFunction && !movementTypeMatchesFunction(selectedFunction, m.movementType)) return false;
-    const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
-    const deferMovementType = strategy?.checkerRelease.deferSettlement ? (selectedFunction?.deferSettlementMovementType ?? 'UTILIZE') : null;
-    if (deferMovementType && m.movementType === deferMovementType && m.acknowledgedAt) return false;
-    const requiresEarmarked = !!strategy?.checkerRelease.releasesExistingMovementInPlace;
-    if (requiresEarmarked && m.movementType === 'UTILIZE' && (!m.acknowledgedAt || !m.makerSubmittedAt)) return false;
-    return true;
   }
 
   onSelectCheckerMovement(movementId: string): void {

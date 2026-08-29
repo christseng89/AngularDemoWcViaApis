@@ -6,6 +6,8 @@ import { TbIconComponent } from '../tb-icon.component';
 import { InquireDeletePendingService } from './inquire-delete-pending.service';
 import { DeletePendingAuditRow } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
+import { TransactionSearchFieldComponent } from './transaction-search-field.component';
+import { TransactionPaginationComponent } from './transaction-pagination.component';
 
 /**
  * Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11, BA &
@@ -16,7 +18,7 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
 @Component({
   selector: 'app-inquire-delete-pending',
   standalone: true,
-  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent],
+  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, TransactionSearchFieldComponent, TransactionPaginationComponent],
   templateUrl: './inquire-delete-pending.component.html',
   styleUrl: './inquire-delete-pending.component.scss',
 })

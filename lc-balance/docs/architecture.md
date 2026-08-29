@@ -43,6 +43,14 @@ Balance Microservice (:4100)
 
 SQLite 适合当前开发和验证，但其文件级锁不能代表生产环境的逐笔工具并发控制。生产设计需要 PostgreSQL 等支持行级锁和成熟事务隔离的数据库。
 
+## 营业日历生成
+
+`src/app/transaction-builder/domestic-holidays.generated.ts` 与
+`microservices/balance-component/src/domain/domesticHolidays.generated.ts` 由
+`scripts/generate-domestic-calendar.mjs` 从 `microservices/business-days-mock/data/calendar.json`
+生成，是 Angular 与微服务共享的营业日历唯一来源；两端 `pretest`／`prebuild` 会自动重新生成。不要手改
+这两个 `*.generated.ts` 文件，修改营业日历请改 `calendar.json` 后重新生成（`npm run generate:calendar`）。
+
 ## 合约与资料
 
 - `analysis/balance-component-api.yaml`：Balance 微服务 API。

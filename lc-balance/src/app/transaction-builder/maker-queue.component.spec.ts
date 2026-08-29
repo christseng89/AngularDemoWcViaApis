@@ -40,6 +40,25 @@ function makeMovement(overrides: Partial<BalanceMovement> = {}): BalanceMovement
 }
 
 describe('MakerQueueComponent', () => {
+  describe('errorFeedback', () => {
+    it('returns null when the queue has no error', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+      expect(c.errorFeedback).toBeNull();
+    });
+
+    it('adapts a no-match string to the shared informational search message', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+      c.makerQueue.lcNumberSearch = 'S001';
+      c.makerQueue.error = 'S001 not found';
+
+      expect(c.errorFeedback).toEqual(
+        expect.objectContaining({ severity: 'INFO', title: 'No matching transaction', message: 'No transaction matched S001.' }),
+      );
+    });
+  });
+
   describe('thin pure-function delegations (same shared balance-component.model.ts rules the rest of this sub-project uses)', () => {
     it('displayStatus()', () => {
       const c = new MakerQueueComponent();

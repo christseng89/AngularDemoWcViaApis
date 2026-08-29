@@ -1,8 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { FormlyModule } from '@ngx-formly/core';
-import { TbIconComponent } from '../tb-icon.component';
 import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { BalanceMovement } from './balance-component-api.service';
 import { InquireEventsService } from './inquire-events.service';
@@ -17,6 +15,10 @@ import {
   statusBadgeIcon as statusBadgeIconShared,
 } from './balance-component.model';
 import { ibNumberLabel as ibNumberLabelShared } from './function-policy';
+import { TransactionStatusBadgeComponent } from './transaction-status-badge.component';
+import { TransactionSearchFieldComponent } from './transaction-search-field.component';
+import { TransactionPaginationComponent } from './transaction-pagination.component';
+import { ContractStatusBadgeComponent } from './contract-status-badge.component';
 
 /** Emitted when the "Original Transaction Screen" panel's own Account Entries button is clicked — the dialog itself stays parent-owned (`TransactionBuilderComponent`), since it's also opened from the Maker Result panel and the Look Up panel's own Event Timeline, not just from here. */
 export interface InquireOpenAccountEntriesEvent {
@@ -45,7 +47,15 @@ export interface InquireOpenAccountEntriesEvent {
 @Component({
   selector: 'app-inquire-events',
   standalone: true,
-  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, BalanceSnapshotBoxComponent],
+  imports: [
+    CommonModule,
+    FormlyModule,
+    BalanceSnapshotBoxComponent,
+    TransactionStatusBadgeComponent,
+    TransactionSearchFieldComponent,
+    TransactionPaginationComponent,
+    ContractStatusBadgeComponent,
+  ],
   templateUrl: './inquire-events.component.html',
   styleUrl: './inquire-events.component.scss',
 })

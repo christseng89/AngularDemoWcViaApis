@@ -13,90 +13,18 @@
                success, which clears releaseSuccessHint too; this brief visible confirmation is set right
                AFTER that reset call so it survives it, and disappears the moment any other action
                (switching functions, a fresh Submit, etc.) touches state again. -->
-    <div class="tb-hint tb-hint--ok mb-2" *ngIf="releaseSuccessHint">{{ releaseSuccessHint }}</div>
+    <app-maker-workflow-notices
+      [releaseSuccessHint]="releaseSuccessHint"
+      [fixPendingMode]="fixPendingMode"
+      [deletePendingReviewMode]="deletePendingReviewMode"
+      [functionCode]="selectedFunction?.code ?? null"
+      [movementId]="submitResult?.movementId ?? null"
+    ></app-maker-workflow-notices>
 
-    <!-- Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
-               2026-08-27; UX redesign per direct user feedback, "回到原EVENT輸入畫面，放開可以修改的欄位讓
-               用戶修改後重新SUBMIT... 加一個標誌鮮明的FIX PENDING讓用戶知道") — a prominent banner so the
-               Maker can never mistake this reconstructed screen for a fresh new Submit; the form below is
-               the SAME screen (reconstructOriginalModel() + the real buildFields()), not a stripped-down
-               mini-form. -->
-    <div class="tb-fix-pending-banner mb-2" *ngIf="fixPendingMode" role="alert">
-      <strong>✎ FIX PENDING</strong> — editing the existing {{ selectedFunction?.code }} record (movement
-      {{ submitResult?.movementId }}). LC Number / 2ndary Reference / Currency stay locked; correct the
-      other fields below, then Save.
-    </div>
-
-    <!-- Maker Queue's own Delete Pending review screen (2026-08-28, "Maker Queue Delete Pending 也要顯示
-               交易畫面 確認刪除與否" — "CLICK DELETE PENDING BUTTON -> 顯示交易畫面 (ALL FIELDS PROTECTED) +
-               Confirm / Cancel Button") — same prominent-banner convention as Fix Pending above, but every
-               field below stays read-only (fieldsLocked's own default whenever submitResult is set,
-               deletePendingReviewMode never unlocks it) — this is a review, not an edit. -->
-    <div class="tb-delete-pending-review-banner mb-2" *ngIf="deletePendingReviewMode" role="alert">
-      <strong>🗑 DELETE PENDING — REVIEW</strong> — reviewing the existing {{ selectedFunction?.code }}
-      record (movement {{ submitResult?.movementId }}) below before deleting it. All fields are protected —
-      this is a review only. Confirm to delete, or Cancel to leave it unchanged.
-    </div>
-
-    <!-- Protected LC Number / 2ndary natural-key readout (2026-08-28, "A2 - A11 B2-B7 無須再選LC NUMBER
-               AND 2NDARY REF。因為已經PROTECTED了" → "如果交易輸入或選取2NDARY REF 也是加粗放大 選取的LC
-               NUMBER and 2NDARY NUMBER不准輸入(PROTECTED)" → "加粗放大+鮮明") — replaces the interactive
-               Step 1/Step 2 index pickers below (hidden while naturalKeyLocked, see that getter's own doc
-               comment) for A2-A11/B2-B7 once the target is picked (a normal in-progress Submit) or this is
-               a Fix Pending/Delete Pending review: the contract is already fully resolved either way, so
-               re-searching/re-picking can never change anything — genuinely changing the target means
-               Delete Pending + a fresh Submit. A1/B1 have no equivalent "existing target to protect"
-               concept (they create a brand-new LC/Confirmation each time) — see their own LC Number
-               input's `.tb-natural-key--emphasized` styling instead, applied unconditionally there. -->
-    <div class="tb-field tb-protected-natural-key mb-2" *ngIf="naturalKeyLocked">
-      <span class="tb-protected-natural-key__item"
-        ><span class="tb-protected-natural-key__label">LC Number</span
-        ><span class="tb-protected-natural-key__value tb-natural-key--emphasized">{{ contextLcNumber || '—' }}</span></span
-      >
-      <!-- 2026-08-28, "A8 SG Number should be shown in next line as a mandatory field to be entered" —
-                 A8/B3 (isCreatingMovement + hasParent) are the one shape where requiredNaturalKeyFields is
-                 non-empty but the 2ndary key ISN'T an existing, already-resolved value to protect — it's
-                 the NEW SG/EB Number the Maker is still typing into the free-typed input below (the
-                 "New Reference — Natural Key" block's own mandatory field). Live-reproduced: as soon as
-                 Parent LC alone was picked, hasEligibleTargetSelected already returned true for A8/B3 (its
-                 own check has nothing SG/EB-Number-specific to wait on), so naturalKeyLocked engaged and
-                 this card started echoing whatever had been typed so far into the SAME still-editable
-                 input below it — a confusing duplicate, not a genuine protection. Excluded via
-                 `!isCreatingMovement` — every other requiredNaturalKeyFields function (A7/A9/B5, existing-
-                 record two-field search) is unaffected, its own 2ndary Number really is fully resolved
-                 once naturalKeyLocked engages there.
-
-                 A6 is the ONE exception to that exclusion (bug fixed 2026-08-29, "A6 選中交易 應該把2NDARY
-                 REF 顯示出來") — also isCreatingMovement (it creates a new IPLC_ACCEPTANCE contract), but
-                 unlike A8/B3 its own IB Number is CARRIED from the picked Document Arrival
-                 (PickerSelectionService.selectPayMovement()'s own naturalKeyIbNumber, settlesDocumentArrival-
-                 gated), never typed — contextSecondaryRef() already resolves it correctly via its own
-                 isCreatingMovement branch (s.naturalKey[field]), this card's own guard just hadn't been
-                 widened to let it show. `settlesDocumentArrival` (not naming A6 by code) so this stays
-                 config-driven — B4 (the only other settlesDocumentArrival function) never reaches
-                 isCreatingMovement at all, so it can never be affected either way. -->
-      <span class="tb-protected-natural-key__item" *ngIf="requiredNaturalKeyFields.includes('ibNumber') && (!isCreatingMovement || selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival)"
-        ><span class="tb-protected-natural-key__label">{{ ibNumberLabel }}</span
-        ><span class="tb-protected-natural-key__value tb-natural-key--emphasized">{{ contextSecondaryRef || '—' }}</span></span
-      >
-      <span class="tb-protected-natural-key__item" *ngIf="requiredNaturalKeyFields.includes('sgNumber') && !isCreatingMovement"
-        ><span class="tb-protected-natural-key__label">SG Number</span
-        ><span class="tb-protected-natural-key__value tb-natural-key--emphasized">{{ contextSecondaryRef || '—' }}</span></span
-      >
-      <!-- A4 only (2026-08-28, "A4 顯示LC NUMBER & 2NDARY NUMBER (PROTECTED)") — `requiredNaturalKeyFields`/
-                 `contextSecondaryRef` above are driven by `NATURAL_KEY_FIELDS_BY_INSTRUMENT[instrumentType]`,
-                 a structurally different question ("does THIS contract's own instrumentType carry a natural-
-                 key IB/SG field") that's always empty for A4's own `IPLC_LC` target — A4's "2ndary Number" is
-                 instead the picked Document Arrival's own `sourceTransactionRef`, already carried into
-                 `model.secondaryRef` by `applyPayMovementOutcome()` (shared with A6). Reads `model.secondaryRef`
-                 directly rather than reusing `contextSecondaryRef()`, since that function can never resolve
-                 this case by design. -->
-      <span class="tb-protected-natural-key__item" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace"
-        ><span class="tb-protected-natural-key__label">IB Number</span
-        ><span class="tb-protected-natural-key__value tb-natural-key--emphasized">{{ model.secondaryRef || '—' }}</span></span
-      >
-    </div>
-
+    <app-protected-transaction-identity
+      [visible]="naturalKeyLocked"
+      [items]="protectedIdentityItems"
+    ></app-protected-transaction-identity>
     <!-- 2026-08-20: unified — B2 now shares this exact block via subChoice.key === 'amendDirection'
                  (see SubChoice's own doc comment) instead of a bespoke, separately-hand-rolled Direction
                  <select>. [disabled] on formLocked, matching every other field's own "no changes after a
@@ -611,124 +539,19 @@
           <div class="tb-hint" *ngIf="snapshotLoading" role="status" aria-live="polite" aria-busy="true">
             <span class="tb-spinner" aria-hidden="true"></span>Loading balance…
           </div>
-          <div class="tb-balance-box" *ngIf="!snapshotLoading && selectedContractSnapshot">
-            <div class="tb-balance-row">
-              <span class="tb-balance-row__label">Confirmed</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.confirmedBalance }}</span>
-            </div>
-            <div class="tb-balance-row">
-              <span class="tb-balance-row__label">Available</span><span class="tb-balance-row__value">{{ selectedContractSnapshot.availableBalance }}</span>
-            </div>
-            <div
-              class="tb-balance-row"
-              *ngIf="selectedContractSnapshot.offBalanceExposure !== null && selectedContractSnapshot.offBalanceExposure !== undefined"
-            >
-              <span class="tb-balance-row__label">Off-Balance Exposure</span
-              ><span class="tb-balance-row__value">{{ selectedContractSnapshot.offBalanceExposure }}</span>
-            </div>
+          <app-balance-snapshot-box
+            *ngIf="!snapshotLoading && selectedContractSnapshot"
+            [snapshot]="selectedContractSnapshot"
+            variant="compact"
+            appearance="default"
+          >
             <!-- 2026-08-18, user-requested ("the same [Tight Available Balance] field for the Export
                        Confirmed LC") — this used to be nested inside the offBalanceExposure ngIf above,
                        which is IPLC_LC/EPLC_LC-only; EPLC_CONFIRMATION's own tightAvailableBalance (netting
                        the Present Docs earmark instead of SHGT exposure) is now populated with
                        offBalanceExposure staying null, so the two rows must gate independently. -->
-            <div
-              class="tb-balance-row"
-              *ngIf="selectedContractSnapshot.tightAvailableBalance !== null && selectedContractSnapshot.tightAvailableBalance !== undefined"
-            >
-              <span class="tb-balance-row__label">Tight Available</span
-              ><span class="tb-balance-row__value">{{ selectedContractSnapshot.tightAvailableBalance }}</span>
-            </div>
-            <!-- Bug fixed 2026-08-18, reviewer-reported ("A1 1000 A3 1000 Submit => get warning, which
-                       is wrong"): both warnings below are pre-submit HINTS computed live from model.amount vs
-                       the CURRENT selectedContractSnapshot — but a successful Submit calls
-                       refreshSelectedContractSnapshot() (applyMakerSubmitOutcome()), which correctly drops
-                       Available Balance to reflect the just-created PENDING earmark, while model.amount is
-                       never cleared. Neither warning is part of the Formly `fields`/`displayFields` array (the
-                       balance box is a hand-coded template block, not a Formly field), so formLocked's own
-                       "grey out every field once submitted" fix never reached them — the stale typed amount
-                       kept re-comparing against the NEW, already-reduced balance, making an already-successful
-                       Submit look freshly rejected. Both gated on `!formLocked` now — a pre-submit hint has
-                       nothing left to warn about once the submission it was warning about has already gone
-                       through. -->
-            <!-- Bug fixed 2026-08-19, reviewer-reported ("A2 — LC Amendment Increase: Incorrect Available
-                       Balance Warning") — this warning used to fire for ANY movementType, including
-                       ISSUE/AMEND_INCREASE/CREATE/AMEND, none of which the microservice ever checks against
-                       Available Balance (Design doc §6.2: "Increase always succeeds; Decrease is checked").
-                       Now gated on movementTypeChecksAvailableBalance() (DECREASING_MOVEMENT_TYPES) OR
-                       isAmendDecreaseDirection (B2's own Decrease — `model.movementType` is always 'AMEND'
-                       for B2, so DECREASING_MOVEMENT_TYPES alone can never see it; business instruction
-                       2026-08-20, "A2 Decrease 輸入金額控制規則 B2 Decrease... 都適用" — B2 previously got NO
-                       client-side warning at all for a Decrease the server would reject). -->
-            <div
-              class="tb-error mt-2"
-              role="alert"
-              *ngIf="
-                !formLocked &&
-                model.amount &&
-                (movementTypeChecksAvailableBalance(model.movementType) || isAmendDecreaseDirection) &&
-                +model.amount > +selectedContractSnapshot.availableBalance
-              "
-            >
-              ⚠ Typed amount ({{ model.amount }}) exceeds Available Balance — this will be rejected (Design doc §6).
-            </div>
-            <!-- Business-reported gap 2026-08-18 ("It should show no warning, since the amount <= tight
-                       LC balance. Right?" — confirmed correct, then "fix it" for the OTHER direction): the
-                       warning above only ever compares against plain Available Balance, so an amount between
-                       Tight Available and plain Available (Design doc §6.1's own second, Tight-Available-based
-                       check) was never warned about client-side even though the server will reject it.
-                       Bug fixed 2026-08-20 ("A35 可以使用SG交易的金額 所以應該是 Tight Available + 選中SG的金額")
-                       — this used to compare against the plain tightAvailableBalance even for A35, a false
-                       positive (see tightAvailableBalanceForWarning's own doc comment). Now compares against
-                       that getter instead, which widens by the selected SG's own Outstanding for A35 only.
-                       Extended 2026-08-20 ("A2 Decrease 輸入金額控制規則 B2 Decrease, A3 & B3 都適用" — A2/B2's
-                       own AMEND_DECREASE/AMEND-Decrease sufficiency check, checkAmendDecreaseSufficiency, now
-                       also compares against Tight Available Balance server-side, same as A3/A3S's
-                       checkUtilizeSufficiency) and again ("B3金額輸入檢查與B2 Decrease相同" — B3/A8 previously
-                       showed NO balance box or warning at all, since selectedContract was never populated for
-                       their own "create a new child directly under the picked parent" shape; see
-                       onSelectParent()'s own doc comment for the alias fix, and checksAgainstTightAvailable's
-                       own doc comment for the full movementType/instrumentType matrix this now covers.
-                       Extended again 2026-08-20 ("A2-A9, B2-B5 對於金額輸入的檢查... 統一在金額輸入時都檢查")
-                       — B4 (HONOUR/ACCEPT) was the one remaining function checked only server-side at
-                       Submit; now widened by the referenced B3 presentation's own amount, same false-positive
-                       fix as A35's SG widening (see tightAvailableBalanceForWarning's own doc comment).
-                       Bug found live the same day (user-reported: an amount exceeding BOTH Available and
-                       Tight Available for B3 showed no warning at all) — the `<= availableBalance` guard
-                       below was written assuming every checksAgainstTightAvailable function also has a real
-                       plain-Available tier to fall back to (true for UTILIZE/HONOUR/ACCEPT/AMEND_DECREASE-
-                       direction), but B3/A8 have none (see checksAgainstTightAvailable's own doc comment) —
-                       so that guard silently suppressed their ONLY warning whenever the amount happened to
-                       also exceed plain Available. Now scoped via checksAgainstPlainAvailable: the guard
-                       only applies for functions that genuinely have both tiers. -->
-            <div
-              class="tb-error mt-2"
-              role="alert"
-              *ngIf="
-                !formLocked &&
-                model.amount &&
-                (!checksAgainstPlainAvailable || +model.amount <= +selectedContractSnapshot.availableBalance) &&
-                checksAgainstTightAvailable &&
-                tightAvailableBalanceForWarning !== null &&
-                +model.amount > +tightAvailableBalanceForWarning
-              "
-            >
-              ⚠ Typed amount ({{ model.amount }}) exceeds Tight Available Balance ({{ tightAvailableBalanceForWarning }}) — this will be rejected
-              (Design doc §6.1/§6.2: Confirmed Balance minus still-PENDING decreases minus outstanding
-              <ng-container *ngIf="selectedContract?.instrumentType === 'EPLC_CONFIRMATION'">Present Docs Earmark</ng-container>
-              <ng-container *ngIf="selectedContract?.instrumentType !== 'EPLC_CONFIRMATION'"
-                >off-balance-sheet (SHGT) exposure {{ selectedContractSnapshot.offBalanceExposure }}</ng-container
-              >{{
-                selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && pickerSelection.arrivalSgSnapshot
-                  ? ', netted against the selected SG\'s own Outstanding (' + pickerSelection.arrivalSgSnapshot.confirmedBalance + ')'
-                  : (model.movementType === 'HONOUR' || model.movementType === 'ACCEPT') && pickerSelection.selectedPayMovement
-                    ? ', netted against the referenced presentation\'s own amount (' + pickerSelection.selectedPayMovement.ceilingAmount + ')'
-                    : ''
-              }} — only APPROVED amounts count as usable capacity).
-              <ng-container *ngIf="model.movementType === 'UTILIZE' && !selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg')"
-                >If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping
-                Gtee" instead — it nets that SG's own exposure out of this check.</ng-container
-              >
-            </div>
-          </div>
+            <app-maker-balance-warnings [messages]="balanceWarningMessages"></app-maker-balance-warnings>
+          </app-balance-snapshot-box>
         </div>
       </div>
 
@@ -918,178 +741,30 @@
                  (A1-A9/B1-B5) applies here too. Disabled-once-submitResult-set convention matches the
                  generic Submit button below exactly (business instruction 2026-08-15, "按Submit...後
                  Button 直接灰掉"). -->
-      <button
-        class="tb-btn tb-btn--primary mt-2"
-        *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract"
-        (click)="submitA4()"
-        [disabled]="!pickerSelection.selectedPayMovement || submitting || !!submitResult"
-      >
-        <span class="tb-spinner" aria-hidden="true" *ngIf="submitting"></span>{{ submitting ? 'Submitting…' : 'Submit A4' }}
-      </button>
-      <!-- "Transaction Selection and Navigation Flow" rule — abandon the current pick, back to the
-                 Selection Screen for this same Function. Only meaningful pre-Submit (formLocked false);
-                 Fix Pending/Delete Pending review already have their own, differently-scoped Cancel. -->
-      <button
-        class="tb-btn tb-btn--outline mt-2"
-        *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && naturalKeyLocked && !formLocked"
-        (click)="cancelSelection()"
-        [disabled]="submitting"
-      >
-        Cancel
-      </button>
-
-      <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
-        <!-- Business instruction 2026-08-15 ("按Submit...後 Button 直接灰掉 不要重複提交") — stays
-                   disabled once submitResult is set (a successful Submit already happened) too, not just
-                   while submitting is true, so a second click can't fire a duplicate movement for the same
-                   entry. selectFunction() resets submitResult to null, which is already how a Maker starts
-                   a genuinely new submission — re-picking the function chip (same or different).
-                   Business requirement 2026-08-19 ("Submit Button Enablement — A1–A9 / B1–B5") — also
-                   disabled until isSubmitReady (an eligible record selected AND every mandatory field
-                   holds a valid value, per the exact same validateSubmit() guards a real click already
-                   runs) — see isSubmitReady's own doc comment. Applies to every function including A1/B1
-                   this time (unlike the earlier "No Eligible Records" requirement's own narrower
-                   requiresEligibleTarget, isSubmitReady's own hasEligibleTargetSelected half is already
-                   unconditionally true for A1/B1, so only the mandatory-field-validity half is new for
-                   them). -->
-        <button class="tb-btn tb-btn--primary" *ngIf="!fixPendingMode && !deletePendingReviewMode" (click)="submit()" [disabled]="submitting || !!submitResult || !isSubmitReady">
-          <span class="tb-spinner" aria-hidden="true" *ngIf="submitting"></span>{{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction?.code }}
-        </button>
-        <!-- "Transaction Selection and Navigation Flow" rule — abandon the current pick, back to the
-                   Selection Screen for this same Function. Only meaningful pre-Submit (formLocked false);
-                   requiresEligibleTarget already excludes A1/B1 (no prior selection to abandon). -->
-        <button
-          class="tb-btn tb-btn--outline"
-          *ngIf="!fixPendingMode && !deletePendingReviewMode && requiresEligibleTarget && naturalKeyLocked && !formLocked"
-          (click)="cancelSelection()"
-          [disabled]="submitting"
-        >
-          Cancel
-        </button>
-        <!-- Fix Pending's own resubmit action — replaces the normal Submit button in place (same
-                   position a Maker already expects a primary action button) while fixPendingMode is on. -->
-        <div class="tb-fix-pending-actions mt-2" *ngIf="fixPendingMode">
-          <button class="tb-btn tb-btn--primary" (click)="confirmFixPending()" [disabled]="actionBusy || !fixPendingSaveReady">
-            <span class="tb-spinner" aria-hidden="true" *ngIf="actionBusy"></span>{{ actionBusy ? 'Working…' : 'Save Fix Pending' }}
-          </button>
-          <button class="tb-btn tb-btn--outline" (click)="cancelFixPending()" [disabled]="actionBusy">Cancel</button>
-        </div>
-      </ng-container>
-      <!-- Maker Queue's own Delete Pending review — same "replaces the normal Submit button in place"
-                 convention as Fix Pending's own actions above. Deliberately OUTSIDE the
-                 releasesExistingMovementInPlace-excluding ng-container above (bug fixed 2026-08-29,
-                 "Confirm Delete Pending Button 不見了" for an A4 event) — A4's own Maker Queue row IS
-                 Delete-Pending-able (MakerQueueService.deletePending()'s own isWithdrawMakerSubmitCase()
-                 routes it through withdrawMakerSubmit() instead of cancel()), so these buttons must render
-                 for A4 too, not just every other Function. Confirm routes to deletePendingReviewConfirmed
-                 (parent owns the actual cascade-aware delete call), never a direct API call from this panel
-                 — this button only ever reports "confirmed" or "cancelled". -->
-      <div class="tb-delete-pending-review-actions mt-2" *ngIf="deletePendingReviewMode">
-        <button class="tb-btn tb-btn--danger-outline" (click)="confirmDeletePendingReview()" [disabled]="actionBusy">
-          <span class="tb-spinner" aria-hidden="true" *ngIf="actionBusy"></span>{{ actionBusy ? 'Working…' : 'Confirm Delete Pending' }}
-        </button>
-        <button class="tb-btn tb-btn--outline" (click)="cancelDeletePendingReview()" [disabled]="actionBusy">Cancel</button>
-      </div>
+      <app-maker-action-bar
+        [state]="actionBarState"
+        (submitA4)="submitA4()"
+        (submitTransaction)="submit()"
+        (cancelSelection)="cancelSelection()"
+        (saveFixPending)="confirmFixPending()"
+        (cancelFixPending)="cancelFixPending()"
+        (confirmDeletePending)="confirmDeletePendingReview()"
+        (cancelDeletePending)="cancelDeletePendingReview()"
+      ></app-maker-action-bar>
     </ng-container>
   </div>
 </section>
 
-<div class="tb-result" *ngIf="submitResult || submitError" role="status" aria-live="polite" aria-atomic="true">
-  <h3 class="tb-result__title">Maker Result</h3>
-  <div class="tb-error" role="alert" *ngIf="submitError">{{ submitError }}</div>
-  <!-- Business instruction 2026-08-14 "Balance Update from Pending to Approved" — friendly status readout, no raw JSON. -->
-  <p class="tb-result__status" *ngIf="submitResult?.status">
-    <strong>Status:</strong> {{ displayStatus(submitResult!.status, model.instrumentType, submitResult!.movementType, submitResult!.acknowledgedAt) }}
-  </p>
-  <!-- Bug fixed 2026-08-16 (reviewer-reported — "A3S does not generate the related SG redemption
-             entries in Pending"): A3S's own SG FULL_REDEEM/PARTIAL_REDEEM leg is a separate, EARLIER API
-             call than submitResult (which holds A3S's own LC UTILIZE) — its own contingentAccountEntry
-             was being silently dropped. Same root cause also affected B4 Usance's own new Acceptance
-             liability leg (acceptanceMovement below); both now get their own button. arrivalSgRedeemMovement
-             is always SHGT (A3S's own SG leg); acceptanceMovement is always EPLC_ACCEPTANCE (B4 Usance's own
-             Acceptance-liability leg) — both instrumentTypes are fixed by which field they are, not read off
-             the movement itself.
-
-             Fallback-only, gated on `!submitResult?.contingentAccountEntry` (fixed 2026-08-28, reviewer-
-             reported "Account Entries — Acceptance 已經併入Account Entries了 應該移除 避免誤會"): once the
-             primary "Account Entries" button above exists, its own dialog already resolves and shows this
-             SAME leg merged alongside the primary one (`openAccountEntryDialogWithLinkedResolution()` /
-             `resolveLinkedAccountingMovement()` in transaction-builder.component.ts, added earlier the same
-             day for the identical "A6 Maker Account Entries 只顯示一套" gap) — showing a second, standalone
-             button for a leg the first button's dialog already covers reads as two different things when
-             it is the same data. Kept as a fallback for the case the primary button's own doc comment
-             already documents (a null submitResult.contingentAccountEntry, e.g. an on-balance-sheet primary
-             leg) — there the primary button never renders at all, so this remains the only way to open it. -->
-  <button
-    type="button"
-    class="tb-btn tb-btn--outline mt-2"
-    *ngIf="compoundLegs.arrivalSgRedeemMovement?.contingentAccountEntry && !submitResult?.contingentAccountEntry"
-    (click)="openAccountEntries.emit({ movement: compoundLegs.arrivalSgRedeemMovement!, instrumentType: 'SHGT' })"
-  >
-    Account Entries — SG Redemption
-  </button>
-  <button
-    type="button"
-    class="tb-btn tb-btn--outline mt-2"
-    *ngIf="compoundLegs.acceptanceMovement?.contingentAccountEntry && !submitResult?.contingentAccountEntry"
-    (click)="openAccountEntries.emit({ movement: compoundLegs.acceptanceMovement!, instrumentType: 'EPLC_ACCEPTANCE' })"
-  >
-    Account Entries — Acceptance
-  </button>
-  <p class="tb-hint" *ngIf="submitResult?.status === 'PENDING'">
-    Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.
-  </p>
-  <!-- Delete Pending is Maker Queue-only (2026-08-28, "Transaction Input Screen 不顯示 Delete Pending
-             Button；Delete Pending 統一由 Maker Queue 執行") — this panel used to carry two Delete Pending
-             buttons here (a generic "Delete Pending (EC)" for every function except A4, and A4's own
-             "Delete Pending" withdrawing its Maker Submit instead of cancelling anything), both calling
-             straight through `checkerActions.deleteMakerPending()`/`withdrawMakerPending()` with no
-             review step. Both removed outright, along with this panel's own
-             `deletePendingRequested`/`withdrawMakerPendingRequested` outputs,
-             `TransactionBuilderComponent.deleteMakerPending()`/`withdrawMakerPending()`, and
-             `CheckerActionsService.deleteMakerPending()`/`withdrawMakerPending()` (no other caller left).
-             `MakerQueueService.deletePending()` already correctly special-cases an A4-shaped row via its
-             own `isWithdrawMakerSubmitCase()` (routing to `api.withdrawMakerSubmit()` instead of
-             `api.cancel()`), so Maker Queue's single Delete Pending review flow already covers both
-             shapes this pair of buttons used to. Fix Pending is unaffected — still reachable from this
-             same panel, in-session, exactly as before. -->
-  <!-- Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
-             2026-08-27; UX redesign per direct user feedback — "回到原EVENT輸入畫面，放開可以修改的欄位讓
-             用戶修改後重新SUBMIT", not a separate mini-form) — corrects and resubmits this same
-             PENDING/REJECTED record (same eventSeq, same Business Event) in place of a full re-Submit.
-             Clicking this button reconstructs the REAL Maker form above (`reconstructOriginalModel()` +
-             the same `buildFields()` every Submit uses) into an editable state (`fixPendingMode`) — the
-             actual editing happens up there, in the familiar screen, with the banner making the mode
-             unmistakable; this button only starts it. Gated on `fixPendingSupported` (derived from
-             `selectedFunctionStrategy.fixPendingEnabled` — A1/A2/A3/A3S/B1/B2 today, widened from A1/A3
-             2026-08-28, "把這A1 A3 修改要求放置B1 A2試試看", then again the same day ("使用同樣方式處理
-             A3 A35 A4 & B2") — see that field's own doc comment in function-strategy.ts for why
-             extending to another Function is exactly one boolean flip in the registry, not a template
-             change). Shares this same row with "Account Entries" (moved here 2026-08-28, "Account
-             Entries + Spaces + Fix Pending 同一行 字體放大加粗醒目") — both are the two primary actions a
-             Maker takes right after Submit, `.tb-maker-result-actions--emphasized` (global styles.scss,
-             same ViewEncapsulation reasoning `.tb-natural-key--emphasized` already documents) bolds/
-             enlarges both `.tb-btn`s in this row so neither reads as secondary to the other. -->
-  <div class="tb-maker-result-actions tb-maker-result-actions--emphasized mt-2" *ngIf="!deletePendingReviewMode">
-  <!-- analysis/contingent-liability-ledger.html (business-requested 2026-08-16) — only shown when
-             this event actually has a contingent-scope entry (null for an on-balance-sheet instrumentType,
-             e.g. the DUE_FROM_ISSUING_BANK/ACCEPTANCE_REIMB_RECEIVABLE legs a B4 compound also creates). -->
-  <button
-    type="button"
-    class="tb-btn tb-btn--outline"
-    *ngIf="submitResult?.contingentAccountEntry"
-    (click)="openAccountEntries.emit({ movement: submitResult!, instrumentType: model.instrumentType ?? null, phase: resultPhase })"
-  >
-    Account Entries
-  </button>
-  <button
-    type="button"
-    class="tb-btn tb-btn--outline"
-    *ngIf="fixPendingSupported && !fixPendingMode && (submitResult?.status === 'PENDING' || submitResult?.status === 'REJECTED')"
-    (click)="startFixPending()"
-    [disabled]="actionBusy"
-  >
-    Fix Pending
-  </button>
-  </div>
-</div>
+<app-maker-result-panel
+  [result]="submitResult"
+  [error]="submitError"
+  [instrumentType]="model.instrumentType ?? null"
+  [resultPhase]="resultPhase"
+  [compoundLegs]="compoundLegs"
+  [fixPendingSupported]="fixPendingSupported"
+  [fixPendingMode]="fixPendingMode"
+  [deletePendingReviewMode]="deletePendingReviewMode"
+  [actionBusy]="actionBusy"
+  (openAccountEntries)="openAccountEntries.emit($event)"
+  (fixPending)="startFixPending()"
+></app-maker-result-panel>

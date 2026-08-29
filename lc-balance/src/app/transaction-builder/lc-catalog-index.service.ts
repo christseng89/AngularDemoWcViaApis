@@ -1,4 +1,5 @@
 import { Observable, of } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, CatalogPage } from './balance-component-api.service';
 import { defaultLcInstrumentTypeForSide } from './balance-component.model';
 import { describeApiError, notFoundMessage } from './api-error';
@@ -77,27 +78,27 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
   load(page: number = this.paging.page): void {
     this.loading = true;
     this.error = null;
-    this.fetchPage(this.side, this.search.trim() || undefined, page, this.paging.pageSize).subscribe({
-      next: (result) => {
-        this.paging.total = result.total;
-        this.paging.page = result.page;
-        if (!result.items.length) {
-          this.rows = [];
-          this.loading = false;
-          return;
-        }
-        this.decorate(result.items, this.side).subscribe((rows) => {
+    this.fetchPage(this.side, this.search.trim() || undefined, page, this.paging.pageSize)
+      .pipe(
+        switchMap((result) => {
+          if (!result.items.length) return of({ result, rows: [] as TRow[] });
+          return this.decorate(result.items, this.side).pipe(map((rows) => ({ result, rows })));
+        }),
+      )
+      .subscribe({
+        next: ({ result, rows }) => {
+          this.paging.total = result.total;
+          this.paging.page = result.page;
           this.rows = rows;
           this.loading = false;
-        });
-      },
-      error: (err) => {
-        this.loading = false;
-        this.error = describeApiError(err);
-        this.rows = [];
-        this.paging.total = 0;
-      },
-    });
+        },
+        error: (err) => {
+          this.loading = false;
+          this.error = describeApiError(err);
+          this.rows = [];
+          this.paging.total = 0;
+        },
+      });
   }
 
   searchNow(): void {

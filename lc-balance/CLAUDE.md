@@ -8,11 +8,12 @@
 
 - `microservices/balance-component/`：Balance Component 账本微服务。
 - `src/app/transaction-builder/`：Balance Component Angular Maker／Checker UI。
+- `src/app/shared/`：跨 Feature 共用的 Angular UI（如 feedback／訊息呈现），可被 transaction-builder 与 business-case-runner 共用。
 - `src/app/business-case-runner/` 与 `backend/`：Business Case Runner 和开发用编排服务。
 - `microservices/business-days-mock/`：开发／测试用营业日依赖。
 - `analysis/`：Balance Component 需求、设计、API 合约和映射资料。
 
-不得把工作扩展到其他组件或仓库。不要修改生成物和运行产物，例如 `coverage/`、`dist/`、压缩包或数据库文件，除非任务明确要求。
+不得把工作扩展到其他组件或仓库。不要修改生成物和运行产物，例如 `coverage/`、`dist/`、压缩包、数据库文件或 `*.generated.ts`，除非任务明确要求。
 
 ## 权威来源顺序
 

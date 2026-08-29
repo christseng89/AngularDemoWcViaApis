@@ -45,6 +45,15 @@ import { FixPendingEditableField, deriveFunctionStrategy, functionSupportsFixPen
 import * as policy from './function-policy';
 import { BuilderModel } from './function-policy';
 import { beginMakerSubmission, reduceMakerSubmitOutcome } from './maker-workflow-state';
+import { MakerResultPanelComponent } from './maker-result-panel.component';
+import { MakerActionBarComponent } from './maker-action-bar.component';
+import { MakerActionBarState } from './maker-action-bar.policy';
+import { MakerWorkflowNoticesComponent } from './maker-workflow-notices.component';
+import { ProtectedTransactionIdentityComponent } from './protected-transaction-identity.component';
+import { ProtectedIdentityItem, deriveProtectedIdentityItems } from './protected-transaction-identity.policy';
+import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
+import { MakerBalanceWarningsComponent } from './maker-balance-warnings.component';
+import { deriveMakerBalanceWarnings } from './maker-balance-warning.policy';
 
 /**
  * The fields `TransactionBuilderComponent.buildCheckerActionContext()` needs from this panel's own
@@ -125,7 +134,7 @@ export interface MakerSyncRequest {
 @Component({
   selector: 'app-maker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, TbIconComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, TbIconComponent, MakerResultPanelComponent, MakerActionBarComponent, MakerWorkflowNoticesComponent, ProtectedTransactionIdentityComponent, BalanceSnapshotBoxComponent, MakerBalanceWarningsComponent],
   templateUrl: './maker-panel.component.html',
   styleUrl: './maker-panel.component.scss',
   /**
@@ -289,6 +298,59 @@ export class MakerPanelComponent implements OnChanges {
 
   get selectedFunctionStrategy() {
     return this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
+  }
+
+  /** Presentation-only snapshot consumed by the extracted action bar; all command handlers remain here. */
+  get actionBarState(): MakerActionBarState {
+    return {
+      releasesExistingMovementInPlace: !!this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace,
+      hasSelectedContract: !!this.selectedContract,
+      hasSelectedPayMovement: !!this.pickerSelection.selectedPayMovement,
+      submitting: this.submitting,
+      hasSubmitResult: !!this.submitResult,
+      naturalKeyLocked: this.naturalKeyLocked,
+      formLocked: this.formLocked,
+      fixPendingMode: this.fixPendingMode,
+      deletePendingReviewMode: this.deletePendingReviewMode,
+      requiresEligibleTarget: this.requiresEligibleTarget,
+      submitReady: this.isSubmitReady,
+      actionBusy: this.actionBusy,
+      fixPendingSaveReady: this.fixPendingSaveReady,
+      functionCode: this.selectedFunction?.code ?? null,
+    };
+  }
+
+  get protectedIdentityItems(): ProtectedIdentityItem[] {
+    return deriveProtectedIdentityItems({
+      lcNumber: this.contextLcNumber,
+      secondaryRef: this.contextSecondaryRef,
+      carriedSecondaryRef: this.model.secondaryRef ?? null,
+      requiredNaturalKeyFields: this.requiredNaturalKeyFields,
+      isCreatingMovement: this.isCreatingMovement,
+      settlesDocumentArrival: !!this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival,
+      releasesExistingMovementInPlace: !!this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace,
+      ibNumberLabel: this.ibNumberLabel,
+    });
+  }
+
+  get balanceWarningMessages(): string[] {
+    const snapshot = this.selectedContractSnapshot;
+    if (!snapshot) return [];
+    const usesDocumentArrivalWithSg = !!this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg');
+    return deriveMakerBalanceWarnings({
+      formLocked: this.formLocked,
+      amount: this.model.amount,
+      movementType: this.model.movementType,
+      availableBalance: snapshot.availableBalance,
+      tightAvailableBalance: this.tightAvailableBalanceForWarning,
+      checksAgainstPlainAvailable: this.checksAgainstPlainAvailable,
+      checksAgainstTightAvailable: this.checksAgainstTightAvailable,
+      contractInstrumentType: this.selectedContract?.instrumentType,
+      offBalanceExposure: snapshot.offBalanceExposure,
+      usesDocumentArrivalWithSg,
+      arrivalSgOutstanding: usesDocumentArrivalWithSg ? (this.pickerSelection.arrivalSgSnapshot?.confirmedBalance ?? null) : null,
+      referencedPresentationAmount: this.pickerSelection.selectedPayMovement?.ceilingAmount ?? null,
+    });
   }
 
   /** Template-friendly wrapper around `functionSupportsFixPending()` (the single derived source of truth — see `FunctionStrategy.fixPendingEditableFields`'s own doc comment). */

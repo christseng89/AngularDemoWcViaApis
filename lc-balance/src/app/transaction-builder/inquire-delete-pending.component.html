@@ -20,18 +20,14 @@
         </button>
       </div>
 
-      <div class="tb-field tb-field--inline tb-field--search mt-2">
-        <label class="tb-field__label">LC Number Search / Filter</label>
-        <input
-          class="tb-input"
-          placeholder="e.g. S0 (matches any LC Number containing this text)"
-          [(ngModel)]="service.catalogIndex.search"
-          (keyup.enter)="service.catalogIndex.searchNow()"
-        />
-        <button type="button" class="tb-btn tb-btn--outline" [disabled]="service.catalogIndex.loading" (click)="service.catalogIndex.searchNow()">
-          <span class="tb-spinner" aria-hidden="true" *ngIf="service.catalogIndex.loading"></span>{{ service.catalogIndex.loading ? 'Searching…' : 'Search' }}
-        </button>
-      </div>
+      <app-transaction-search-field
+        label="LC Number Search / Filter"
+        placeholder="e.g. S0 (matches any LC Number containing this text)"
+        [value]="service.catalogIndex.search"
+        [loading]="service.catalogIndex.loading"
+        (valueChange)="service.catalogIndex.search = $event"
+        (searchRequested)="service.catalogIndex.searchNow()"
+      ></app-transaction-search-field>
       <div class="tb-error mt-2" role="alert" *ngIf="service.catalogIndex.error">{{ service.catalogIndex.error }}</div>
       <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="service.catalogIndex.loading">
         <span class="tb-spinner" aria-hidden="true"></span>Loading {{ service.catalogIndex.entityLabel }} Master Records…
@@ -60,20 +56,15 @@
           </tbody>
         </table>
       </div>
-      <div class="tb-pagination" *ngIf="!service.catalogIndex.loading && service.catalogIndex.paging.totalPages > 1">
-        <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="service.catalogIndex.paging.page <= 1" (click)="service.catalogIndex.prevPage()">
-          ‹ Prev
-        </button>
-        <span class="tb-muted">Page {{ service.catalogIndex.paging.page }} / {{ service.catalogIndex.paging.totalPages }} ({{ service.catalogIndex.paging.total }} total)</span>
-        <button
-          type="button"
-          class="tb-btn tb-btn--tiny tb-btn--outline"
-          [disabled]="service.catalogIndex.paging.page >= service.catalogIndex.paging.totalPages"
-          (click)="service.catalogIndex.nextPage()"
-        >
-          Next ›
-        </button>
-      </div>
+      <app-transaction-pagination
+        *ngIf="!service.catalogIndex.loading && service.catalogIndex.paging.totalPages > 1"
+        [page]="service.catalogIndex.paging.page"
+        [totalPages]="service.catalogIndex.paging.totalPages"
+        [total]="service.catalogIndex.paging.total"
+        [loading]="service.catalogIndex.loading"
+        (previousRequested)="service.catalogIndex.prevPage()"
+        (nextRequested)="service.catalogIndex.nextPage()"
+      ></app-transaction-pagination>
       <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error && service.catalogIndex.emptyMessageIsError">
         {{ service.catalogIndex.emptyMessage('with Delete Pending history') }}
       </div>
@@ -155,18 +146,15 @@
           </tbody>
         </table>
       </div>
-      <div class="tb-pagination" *ngIf="service.paging.totalPages > 1">
-        <button type="button" class="tb-btn tb-btn--tiny tb-btn--outline" [disabled]="service.paging.page <= 1" (click)="service.prevPage()">‹ Prev</button>
-        <span class="tb-muted">Page {{ service.paging.page }} / {{ service.paging.totalPages }} ({{ service.paging.total }} total)</span>
-        <button
-          type="button"
-          class="tb-btn tb-btn--tiny tb-btn--outline"
-          [disabled]="service.paging.page >= service.paging.totalPages"
-          (click)="service.nextPage()"
-        >
-          Next ›
-        </button>
-      </div>
+      <app-transaction-pagination
+        *ngIf="service.paging.totalPages > 1"
+        [page]="service.paging.page"
+        [totalPages]="service.paging.totalPages"
+        [total]="service.paging.total"
+        [loading]="service.loading"
+        (previousRequested)="service.prevPage()"
+        (nextRequested)="service.nextPage()"
+      ></app-transaction-pagination>
       <div class="tb-hint mt-2" *ngIf="!service.loading && !service.filteredItems.length && !service.error">
         No Delete Pending audit records found for this LC.
       </div>

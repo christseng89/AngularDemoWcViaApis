@@ -1,9 +1,13 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { TbIconComponent } from '../tb-icon.component';
 import { MakerQueueService, MakerQueueRow } from './maker-queue.service';
 import { displayStatus as displayStatusShared, statusBadgeClass as statusBadgeClassShared, statusBadgeIcon as statusBadgeIconShared } from './balance-component.model';
+import { TransactionSearchFieldComponent } from './transaction-search-field.component';
+import { TransactionPaginationComponent } from './transaction-pagination.component';
+import { TransactionStatusBadgeComponent } from './transaction-status-badge.component';
+import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
+import { UiMessage } from '../shared/feedback/ui-message.model';
+import { presentApiError } from '../shared/feedback/api-error-presenter';
 
 /**
  * Part of Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
@@ -13,7 +17,7 @@ import { displayStatus as displayStatusShared, statusBadgeClass as statusBadgeCl
 @Component({
   selector: 'app-maker-queue',
   standalone: true,
-  imports: [CommonModule, FormsModule, TbIconComponent],
+  imports: [CommonModule, TransactionSearchFieldComponent, TransactionPaginationComponent, TransactionStatusBadgeComponent, FeedbackMessageComponent],
   templateUrl: './maker-queue.component.html',
   styleUrl: './maker-queue.component.scss',
 })
@@ -43,6 +47,12 @@ export class MakerQueueComponent {
   readonly displayStatus = displayStatusShared;
   readonly statusBadgeClass = statusBadgeClassShared;
   readonly statusBadgeIcon = statusBadgeIconShared;
+
+  /** Phase 12 migration boundary: the service keeps its stable string state while the view uses standard feedback. */
+  get errorFeedback(): UiMessage | null {
+    if (!this.makerQueue.error) return null;
+    return presentApiError({ message: this.makerQueue.error }, 'SEARCH', this.makerQueue.lcNumberSearch || undefined);
+  }
 
   /**
    * Business-confirmed 2026-08-27 ("改成 Delete Pending 統一名稱") — the visible button text is always
