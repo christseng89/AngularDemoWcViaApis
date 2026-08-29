@@ -4,6 +4,9 @@ import { BalanceMovement } from './balance-component-api.service';
 import { InstrumentType, displayStatus } from './balance-component.model';
 import type { CompoundLegState } from './maker-panel.component';
 import { TransactionStatusPhase } from './transaction-status-badge.component';
+import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
+import { UiMessage } from '../shared/feedback/ui-message.model';
+import { presentApiError } from '../shared/feedback/api-error-presenter';
 
 export interface MakerAccountEntriesRequest {
   movement: BalanceMovement;
@@ -15,7 +18,7 @@ export interface MakerAccountEntriesRequest {
 @Component({
   selector: 'app-maker-result-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FeedbackMessageComponent],
   templateUrl: './maker-result-panel.component.html',
   styleUrl: './maker-result-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,6 +36,11 @@ export class MakerResultPanelComponent {
 
   @Output() openAccountEntries = new EventEmitter<MakerAccountEntriesRequest>();
   @Output() fixPending = new EventEmitter<void>();
+
+  get errorFeedback(): UiMessage | null {
+    if (!this.error) return null;
+    return { ...presentApiError({ message: this.error }, 'SUBMIT'), retryable: false };
+  }
 
   get statusLabel(): string {
     if (!this.result?.status) return '';

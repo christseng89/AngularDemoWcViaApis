@@ -69,6 +69,8 @@ export const editMovementRequestSchema = z
   .object({
     amount: z.string({ required_error: 'amount is required.' }).min(1, 'amount is required.'),
     editedBy: z.string({ required_error: 'editedBy is required.' }).min(1, 'editedBy is required.'),
+    editMode: z.enum(['STANDARD', 'REMARKS_ONLY']).optional(),
+    remarks: z.string().max(500, 'remarks must not exceed 500 characters.').nullable().optional(),
     legRef: z.string().nullable().optional(),
     accountEntries: z.array(z.record(z.unknown())).nullable().optional(),
     businessEventId: z.string().nullable().optional(),

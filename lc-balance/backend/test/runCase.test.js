@@ -130,6 +130,7 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
             type: 'createMovement',
             label: 'LC Issue (fails)',
             captureAs: 'lc',
+            expectError: true,
             request: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000' },
           },
           {
@@ -156,6 +157,7 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
             type: 'createMovement',
             label: 'Present Docs (fails)',
             captureAs: 'presentDocs',
+            expectError: true,
             request: { instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE', amount: '1000' },
           },
           {
@@ -180,6 +182,112 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
 
       await expect(runCase(businessCase)).rejects.toThrow(/Unknown step type "bogus-step-type"/);
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('fails when an expectError step incorrectly succeeds', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(201, { movementId: 'mv-invalid', balanceContractId: 'bc-invalid' }));
+      const businessCase = {
+        id: 'synthetic-expected-error-succeeded',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Over-limit transaction',
+            captureAs: 'invalid',
+            expectError: true,
+            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1001' },
+          },
+        ],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(/expected a business rejection but succeeded/);
+    });
+
+    it('accepts an expectError step only when the API actually rejects it', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(409, { code: 'INSUFFICIENT_AVAILABLE_BALANCE' }));
+      const businessCase = {
+        id: 'synthetic-expected-error-rejected',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Over-limit transaction',
+            captureAs: 'invalid',
+            expectError: true,
+            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1001' },
+          },
+        ],
+      };
+
+      const trace = await runCase(businessCase);
+      expect(trace).toHaveLength(1);
+      expect(trace[0]).toMatchObject({ ok: false, expectedError: true, status: 409 });
+    });
+
+    it('fails immediately when a release-shaped action fails instead of hiding it until a later step', async () => {
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockImplementationOnce(async () => jsonResponse(409, { code: 'ILLEGAL_STATE_TRANSITION', message: 'not eligible' }));
+      const businessCase = {
+        id: 'synthetic-action-failure',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Document Arrival',
+            captureAs: 'utilize',
+            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1000' },
+          },
+          { type: 'acknowledge', label: 'Checker acknowledges Document Arrival', movementRef: 'utilize', acknowledgedBy: 'checker1' },
+        ],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(
+        /Step "Checker acknowledges Document Arrival" unexpectedly failed with HTTP 409.*ILLEGAL_STATE_TRANSITION/,
+      );
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails a successful create response that contains a negative Tight Available Balance', async () => {
+      global.fetch = jest.fn(async () =>
+        jsonResponse(201, {
+          movementId: 'mv-invalid',
+          balanceContractId: 'bc-invalid',
+          eventSnapshot: { tightAvailableBalance: '-0.01' },
+        }),
+      );
+      const businessCase = {
+        id: 'synthetic-negative-tight',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Invalid successful transaction',
+            captureAs: 'invalid',
+            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1' },
+          },
+        ],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(/invalid negative Tight Available Balance \(-0.01\)/);
+    });
+
+    it('fails a snapshot that reports a negative Tight Available Balance', async () => {
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockImplementationOnce(async () => jsonResponse(200, { tightAvailableBalance: '-1' }));
+      const businessCase = {
+        id: 'synthetic-negative-snapshot',
+        steps: [
+          {
+            type: 'createMovement',
+            label: 'Valid create',
+            captureAs: 'lc',
+            request: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000' },
+          },
+          { type: 'snapshot', label: 'Invalid balance snapshot', contractRef: 'lc' },
+        ],
+      };
+
+      await expect(runCase(businessCase)).rejects.toThrow(/invalid negative Tight Available Balance \(-1\)/);
     });
 
     it('makerSubmit step: POSTs to .../maker-submit with makerSubmittedBy, distinct from release', async () => {

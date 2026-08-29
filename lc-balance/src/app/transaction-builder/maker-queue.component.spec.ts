@@ -57,6 +57,13 @@ describe('MakerQueueComponent', () => {
         expect.objectContaining({ severity: 'INFO', title: 'No matching transaction', message: 'No transaction matched S001.' }),
       );
     });
+
+    it('uses generic no-match copy when the search query is empty', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+      c.makerQueue.error = 'record not found';
+      expect(c.errorFeedback).toMatchObject({ message: 'No transaction matched your search.' });
+    });
   });
 
   describe('thin pure-function delegations (same shared balance-component.model.ts rules the rest of this sub-project uses)', () => {

@@ -122,3 +122,4 @@ npm run build --prefix microservices/balance-component
 - 决策索引：`docs/decisions/README.md`
 - 分析资料索引：`analysis/README.md`
 - 历史实施记录：`docs/history/implementation-log.md`
+- UI 标准化提案与迁移进度（Message／Feedback／共用样式）：`UI_TODO/README.md`

@@ -6,6 +6,11 @@ import { FUNCTION_STRATEGIES, deriveFunctionStrategy, functionSupportsFixPending
  * source of truth.
  */
 describe('PR-2 — FunctionStrategy is a faithful projection of the current registry (not yet consumed by production code)', () => {
+  it('uses the closed default strategy for an unregistered extension code', () => {
+    const strategy = deriveFunctionStrategy({ code: 'X1' } as any);
+    expect(strategy).toMatchObject({ code: 'X1', fixPendingEnabled: false, fixPendingMode: null });
+    expect(strategy.compoundSubmission.possibleShapes).toEqual(['plain']);
+  });
   it('every one of the 18 registered function codes has exactly one FunctionStrategy entry', () => {
     const allCodes = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((f) => f.code);
     expect(allCodes).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7']);
@@ -245,7 +250,9 @@ describe('FunctionStrategy.fixPendingEnabled / functionSupportsFixPending', () =
       .filter((s) => functionSupportsFixPending(s))
       .map((s) => s.code)
       .sort();
-    expect(supported).toEqual(['A1', 'A10', 'A11', 'A2', 'A3', 'A3S', 'A8', 'B1', 'B2', 'B3', 'B6', 'B7']);
+    expect(supported).toEqual(['A1', 'A10', 'A11', 'A2', 'A3', 'A3S', 'A8', 'A9', 'B1', 'B2', 'B3', 'B6', 'B7']);
+    expect(FUNCTION_STRATEGIES['A9'].fixPendingMode).toBe('REMARKS_ONLY');
+    expect(FUNCTION_STRATEGIES['A1'].fixPendingMode).toBe('STANDARD');
   });
 
   it('functionSupportsFixPending is false for null/undefined (no Function selected)', () => {

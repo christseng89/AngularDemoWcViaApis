@@ -30,6 +30,7 @@ describe('MakerActionBarComponent', () => {
     fixture.detectChanges();
 
     const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
+    expect((fixture.nativeElement as HTMLElement).querySelector('.tb-submit-actions')).not.toBeNull();
     expect(buttons[0].textContent).toContain('Submit B3');
     expect(buttons[0].classList).toContain('tb-btn--primary');
     buttons[0].click();

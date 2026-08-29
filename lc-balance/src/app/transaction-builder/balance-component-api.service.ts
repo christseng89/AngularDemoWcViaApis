@@ -208,6 +208,8 @@ export interface BalanceMovement {
 export interface EditMovementRequest {
   amount: string;
   editedBy: string;
+  editMode?: 'STANDARD' | 'REMARKS_ONLY';
+  remarks?: string | null;
   reasonCode?: string | null;
   businessEventId?: string | null;
   referencedTransactionId?: string | null;

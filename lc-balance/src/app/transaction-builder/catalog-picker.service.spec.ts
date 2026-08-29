@@ -20,6 +20,11 @@ function contract(overrides: Partial<BalanceContract> = {}): BalanceContract {
 }
 
 describe('CatalogPickerService — load() status/requireIssueReleased override (desiger-comments.md F-09)', () => {
+  it('uses the transaction-screen requirement of 10 rows per display page', () => {
+    const api = { catalog: jest.fn() } as unknown as BalanceComponentApiService;
+    expect(new CatalogPickerService(100, api).pageSize).toBe(10);
+  });
+
   it('defaults to status=ACTIVE and requireIssueReleased=true when neither is supplied (existing Maker-action picker behavior, unchanged)', () => {
     const catalogSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 100 }));
     const api = { catalog: catalogSpy } as unknown as BalanceComponentApiService;
@@ -38,6 +43,17 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: 'CLOSED' });
 
     expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', 'CLOSED', undefined, 1, 100, undefined, undefined, true);
+  });
+
+  it('supports a null query override for a client-side multi-column index', () => {
+    const catalogSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 100 }));
+    const api = { catalog: catalogSpy } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+    svc.search = 'IB-02';
+
+    svc.load({ guardFails: false, instrumentType: 'IPLC_ACCEPTANCE', query: null });
+
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 100, undefined, undefined, true);
   });
 
   it('requests NO status filter (undefined, every status a legitimate candidate) when status is explicitly null — the read-only-inquiry case F-09 was written for', () => {

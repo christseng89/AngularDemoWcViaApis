@@ -62,6 +62,17 @@ function apiErr(message: string) {
 }
 
 describe('CheckerPanelComponent', () => {
+  it('presents search errors through the shared feedback policy', () => {
+    const c = new CheckerPanelComponent(mockApi());
+    expect(c.checkerSearchFeedback).toBeNull();
+    c.checkerLcNumber = 'LC404';
+    c.checkerSearchError = 'LC404 not found';
+    c.checkerSearchErrorIsNotFound = true;
+    expect(c.checkerSearchFeedback).toMatchObject({ severity: 'INFO', title: 'No matching transaction', retryable: false });
+    c.checkerSearchErrorIsNotFound = false;
+    c.checkerSearchError = 'internal boom';
+    expect(c.checkerSearchFeedback).toMatchObject({ severity: 'ERROR', title: 'Unable to search the transaction' });
+  });
   it('has the documented @Input defaults and initial state', () => {
     const c = new CheckerPanelComponent(mockApi());
     expect(c.selectedFunction).toBeNull();

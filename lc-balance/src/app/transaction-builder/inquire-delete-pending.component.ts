@@ -8,6 +8,9 @@ import { DeletePendingAuditRow } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
 import { TransactionSearchFieldComponent } from './transaction-search-field.component';
 import { TransactionPaginationComponent } from './transaction-pagination.component';
+import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
+import { UiMessage } from '../shared/feedback/ui-message.model';
+import { presentApiError } from '../shared/feedback/api-error-presenter';
 
 /**
  * Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11, BA &
@@ -18,7 +21,7 @@ import { TransactionPaginationComponent } from './transaction-pagination.compone
 @Component({
   selector: 'app-inquire-delete-pending',
   standalone: true,
-  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, TransactionSearchFieldComponent, TransactionPaginationComponent],
+  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, TransactionSearchFieldComponent, TransactionPaginationComponent, FeedbackMessageComponent],
   templateUrl: './inquire-delete-pending.component.html',
   styleUrl: './inquire-delete-pending.component.scss',
 })
@@ -27,6 +30,22 @@ export class InquireDeletePendingComponent {
 
   /** The full Function picklist (both sides) for the query form's Function filter dropdown — same registries A1–A11/B1–B7 chips are built from. */
   readonly functionOptions = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS];
+
+  get indexErrorFeedback(): UiMessage | null {
+    if (!this.service.catalogIndex.error) return null;
+    return presentApiError({ message: this.service.catalogIndex.error }, 'SEARCH', this.service.catalogIndex.search);
+  }
+
+  get indexEmptyFeedback(): UiMessage {
+    const isError = this.service.catalogIndex.emptyMessageIsError;
+    return {
+      severity: isError ? 'WARNING' : 'INFO',
+      title: isError ? 'No matching transaction' : 'No transactions available',
+      message: this.service.catalogIndex.emptyMessage('with Delete Pending history'),
+      nextAction: isError ? 'Check the LC number and search again.' : undefined,
+      retryable: false,
+    };
+  }
 
   functionLabel(row: DeletePendingAuditRow): string {
     const fn = this.service.functionFor(row);

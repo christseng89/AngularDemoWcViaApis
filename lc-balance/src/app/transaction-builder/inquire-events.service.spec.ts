@@ -66,6 +66,82 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
 }
 
 describe('InquireEventsService', () => {
+  describe('tightenLcBalanceFor', () => {
+    it('uses the root LC create-time snapshot for an ordinary root event', () => {
+      const svc = new InquireEventsService(makeApi());
+      const root = makeContract({ balanceContractId: 'bc-root' });
+      svc.rootContract = root;
+      const event = makeEvent({
+        contract: root,
+        movement: makeMovement({ eventSnapshot: makeSnapshot({ tightAvailableBalance: '73000' }) }),
+      });
+
+      expect(svc.tightenLcBalanceFor(event)).toBe('73000');
+    });
+
+    it('uses the later finalize snapshot for an A4 finalize row', () => {
+      const svc = new InquireEventsService(makeApi());
+      const root = makeContract({ balanceContractId: 'bc-root' });
+      svc.rootContract = root;
+      const event = makeEvent({
+        contract: root,
+        phase: 'finalize',
+        movement: makeMovement({
+          eventSnapshot: makeSnapshot({ tightAvailableBalance: '73000' }),
+          finalizeEventSnapshot: makeSnapshot({ tightAvailableBalance: '61000' }),
+        }),
+      });
+
+      expect(svc.tightenLcBalanceFor(event)).toBe('61000');
+    });
+
+    it('falls back to the create snapshot for a legacy finalize row without finalizeEventSnapshot', () => {
+      const svc = new InquireEventsService(makeApi());
+      const root = makeContract({ balanceContractId: 'bc-root' });
+      svc.rootContract = root;
+      const event = makeEvent({
+        contract: root,
+        phase: 'finalize',
+        movement: makeMovement({
+          eventSnapshot: makeSnapshot({ tightAvailableBalance: '73000' }),
+          finalizeEventSnapshot: null,
+        }),
+      });
+
+      expect(svc.tightenLcBalanceFor(event)).toBe('73000');
+    });
+
+    it('uses rootEventSnapshot for a child-ledger event, not the child eventSnapshot', () => {
+      const svc = new InquireEventsService(makeApi());
+      svc.rootContract = makeContract({ balanceContractId: 'bc-root' });
+      const child = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT' });
+      const event = makeEvent({
+        contract: child,
+        movement: makeMovement({
+          balanceContractId: 'bc-sg',
+          eventSnapshot: makeSnapshot({ tightAvailableBalance: '99999' }),
+          rootEventSnapshot: makeSnapshot({ tightAvailableBalance: '42000' }),
+        }),
+      });
+
+      expect(svc.tightenLcBalanceFor(event)).toBe('42000');
+    });
+
+    it('shows an em dash when legacy event data has no frozen LC snapshot value', () => {
+      const svc = new InquireEventsService(makeApi());
+      const root = makeContract();
+      svc.rootContract = root;
+
+      expect(svc.tightenLcBalanceFor(makeEvent({ contract: root, movement: makeMovement() }))).toBe('—');
+    });
+
+    it('shows an em dash when no root contract has been resolved', () => {
+      const svc = new InquireEventsService(makeApi());
+
+      expect(svc.tightenLcBalanceFor(makeEvent({ contract: makeContract(), movement: makeMovement() }))).toBe('—');
+    });
+  });
+
   describe('selectSide', () => {
     it('sets side, clears lcNumber, and clears any prior search results/selection', () => {
       const svc = new InquireEventsService(makeApi());
@@ -115,7 +191,7 @@ describe('InquireEventsService', () => {
       expect(svc.events).toEqual([]);
     });
 
-    it('merges the root contract\'s own movements with every child ledger\'s (IPLC_LC -> IPLC_ACCEPTANCE + SHGT), sorted by createdAt ascending', () => {
+    it("merges the root contract's own movements with every child ledger's (IPLC_LC -> IPLC_ACCEPTANCE + SHGT), sorted by createdAt ascending", () => {
       const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC' });
       const sg = makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
       const rootMovement = makeMovement({ movementId: 'mv-root', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-02T00:00:00.000Z' });
@@ -164,7 +240,9 @@ describe('InquireEventsService', () => {
 
       const api = makeApi({
         resolveContract: jest.fn(() => of(root)),
-        listMovements: jest.fn((contractId: string) => of(contractId === 'bc-lc' ? [issueMovement, utilizeMovement] : contractId === 'bc-sg' ? [sgMovement] : [])),
+        listMovements: jest.fn((contractId: string) =>
+          of(contractId === 'bc-lc' ? [issueMovement, utilizeMovement] : contractId === 'bc-sg' ? [sgMovement] : []),
+        ),
         catalog: jest.fn((instrumentType: string) => of(instrumentType === 'SHGT' ? { items: [sg], total: 1, page: 1, pageSize: 50 } : emptyCatalog())),
       });
 
@@ -178,7 +256,12 @@ describe('InquireEventsService', () => {
       expect(svc.events.map((e) => e.phase)).toEqual(['primary', 'create', 'primary', 'finalize']);
       // eventStatus is the movement's real current status on EVERY row, never a frozen 'PENDING' — see toEventRows().
       expect(svc.events.map((e) => e.eventStatus)).toEqual(['RELEASED', 'RELEASED', 'RELEASED', 'RELEASED']);
-      expect(svc.events.map((e) => e.eventTime)).toEqual([issueMovement.createdAt, utilizeMovement.createdAt, sgMovement.createdAt, utilizeMovement.releasedAt]);
+      expect(svc.events.map((e) => e.eventTime)).toEqual([
+        issueMovement.createdAt,
+        utilizeMovement.createdAt,
+        sgMovement.createdAt,
+        utilizeMovement.releasedAt,
+      ]);
 
       // 'create' resolves to A3 with the movement's real status/impact — same real impact 'finalize' (A4) shows.
       const createRow = svc.events.find((e) => e.phase === 'create')!;
@@ -203,11 +286,16 @@ describe('InquireEventsService', () => {
      * LC ledger) and A6's own CREATE row (on the Acceptance ledger) would both appear, reading as two rows
      * for one business event.
      */
-    it('mergeAccountingEventRows() folds the UTILIZE\'s own finalize row into A6\'s own referencing CREATE row — ONE row for the cascade event, carrying the UTILIZE\'s own contingentAccountEntry as linkedMovement', () => {
+    it("mergeAccountingEventRows() folds the UTILIZE's own finalize row into A6's own referencing CREATE row — ONE row for the cascade event, carrying the UTILIZE's own contingentAccountEntry as linkedMovement", () => {
       const root = makeContract({ balanceContractId: 'bc-lc', instrumentType: 'IPLC_LC', tenorType: 'SELLERS_USANCE', naturalKey: { lcNumber: 'U01' } });
       const acceptance = makeContract({ balanceContractId: 'bc-acc', instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01' } });
       const issueMovement = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-lc', movementType: 'ISSUE', createdAt: '2026-08-27T15:00:00.000Z' });
-      const lcEntry = { drAccount: 'Documentary Credits Outstanding — Seller\'s Usance', crAccount: 'Customers\' Liability under DC — Seller\'s Usance', currency: 'USD', amount: '1000' };
+      const lcEntry = {
+        drAccount: "Documentary Credits Outstanding — Seller's Usance",
+        crAccount: "Customers' Liability under DC — Seller's Usance",
+        currency: 'USD',
+        amount: '1000',
+      };
       const utilizeMovement = makeMovement({
         movementId: 'mv-utilize',
         balanceContractId: 'bc-lc',
@@ -222,7 +310,12 @@ describe('InquireEventsService', () => {
         makerSubmittedAt: '2026-08-27T15:22:00.000Z',
         contingentAccountEntry: lcEntry,
       });
-      const acceptanceEntry = { drAccount: "Acceptances & DPU — Customers' Liability (memo)", crAccount: 'Acceptances & DPU — Outstanding (memo)', currency: 'USD', amount: '1000' };
+      const acceptanceEntry = {
+        drAccount: "Acceptances & DPU — Customers' Liability (memo)",
+        crAccount: 'Acceptances & DPU — Outstanding (memo)',
+        currency: 'USD',
+        amount: '1000',
+      };
       const acceptanceMovement = makeMovement({
         movementId: 'mv-acceptance',
         balanceContractId: 'bc-acc',
@@ -236,8 +329,12 @@ describe('InquireEventsService', () => {
 
       const api = makeApi({
         resolveContract: jest.fn(() => of(root)),
-        listMovements: jest.fn((contractId: string) => of(contractId === 'bc-lc' ? [issueMovement, utilizeMovement] : contractId === 'bc-acc' ? [acceptanceMovement] : [])),
-        catalog: jest.fn((instrumentType: string) => of(instrumentType === 'IPLC_ACCEPTANCE' ? { items: [acceptance], total: 1, page: 1, pageSize: 50 } : emptyCatalog())),
+        listMovements: jest.fn((contractId: string) =>
+          of(contractId === 'bc-lc' ? [issueMovement, utilizeMovement] : contractId === 'bc-acc' ? [acceptanceMovement] : []),
+        ),
+        catalog: jest.fn((instrumentType: string) =>
+          of(instrumentType === 'IPLC_ACCEPTANCE' ? { items: [acceptance], total: 1, page: 1, pageSize: 50 } : emptyCatalog()),
+        ),
       });
 
       const svc = new InquireEventsService(api);
@@ -266,11 +363,21 @@ describe('InquireEventsService', () => {
      * `referencedTransactionId` cascade. Reproduces the live repro exactly: B1, B3(EARMARKED), then B4's
      * own two `businessEventId`-linked legs (EPLC_CONFIRMATION/ACCEPT + EPLC_ACCEPTANCE/CREATE).
      */
-    it('mergeAccountingEventRows() ALSO folds B4\'s own primary EPLC_CONFIRMATION/ACCEPT leg into its businessEventId-linked EPLC_ACCEPTANCE/CREATE leg — same Ownership Rule, different correlation mechanism', () => {
-      const root = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SELLERS_USANCE', naturalKey: { lcNumber: 'B4-01' } });
+    it("mergeAccountingEventRows() ALSO folds B4's own primary EPLC_CONFIRMATION/ACCEPT leg into its businessEventId-linked EPLC_ACCEPTANCE/CREATE leg — same Ownership Rule, different correlation mechanism", () => {
+      const root = makeContract({
+        balanceContractId: 'bc-cnf',
+        instrumentType: 'EPLC_CONFIRMATION',
+        tenorType: 'SELLERS_USANCE',
+        naturalKey: { lcNumber: 'B4-01' },
+      });
       const acceptance = makeContract({ balanceContractId: 'bc-acc', instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'B4-01', ibNumber: 'E01' } });
       const issueMovement = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-cnf', movementType: 'ISSUE', createdAt: '2026-08-28T00:00:00.000Z' });
-      const cnfEntry = { drAccount: 'Confirmation Undertakings Outstanding — Usance', crAccount: 'Issuing Bank Confirmation Exposure — Usance', currency: 'USD', amount: '1000' };
+      const cnfEntry = {
+        drAccount: 'Confirmation Undertakings Outstanding — Usance',
+        crAccount: 'Issuing Bank Confirmation Exposure — Usance',
+        currency: 'USD',
+        amount: '1000',
+      };
       const acceptMovement = makeMovement({
         movementId: 'mv-accept',
         balanceContractId: 'bc-cnf',
@@ -282,7 +389,12 @@ describe('InquireEventsService', () => {
         businessEventId: 'be-1',
         contingentAccountEntry: cnfEntry,
       });
-      const acceptanceEntry = { drAccount: "Confirmed Acceptances & DPU — Customers' Liability (memo)", crAccount: 'Confirmed Acceptances & DPU — Outstanding (memo)', currency: 'USD', amount: '1000' };
+      const acceptanceEntry = {
+        drAccount: "Confirmed Acceptances & DPU — Customers' Liability (memo)",
+        crAccount: 'Confirmed Acceptances & DPU — Outstanding (memo)',
+        currency: 'USD',
+        amount: '1000',
+      };
       const acceptanceCreate = makeMovement({
         movementId: 'mv-acceptance-create',
         balanceContractId: 'bc-acc',
@@ -296,8 +408,12 @@ describe('InquireEventsService', () => {
 
       const api = makeApi({
         resolveContract: jest.fn(() => of(root)),
-        listMovements: jest.fn((contractId: string) => of(contractId === 'bc-cnf' ? [issueMovement, acceptMovement] : contractId === 'bc-acc' ? [acceptanceCreate] : [])),
-        catalog: jest.fn((instrumentType: string) => of(instrumentType === 'EPLC_ACCEPTANCE' ? { items: [acceptance], total: 1, page: 1, pageSize: 50 } : emptyCatalog())),
+        listMovements: jest.fn((contractId: string) =>
+          of(contractId === 'bc-cnf' ? [issueMovement, acceptMovement] : contractId === 'bc-acc' ? [acceptanceCreate] : []),
+        ),
+        catalog: jest.fn((instrumentType: string) =>
+          of(instrumentType === 'EPLC_ACCEPTANCE' ? { items: [acceptance], total: 1, page: 1, pageSize: 50 } : emptyCatalog()),
+        ),
       });
 
       const svc = new InquireEventsService(api);
@@ -549,7 +665,7 @@ describe('InquireEventsService', () => {
       expect(svc.events[0].phase).toBe('primary');
     });
 
-    it('does NOT split a still-PENDING Sight UTILIZE — Document Arrival hasn\'t been Sight-Settled yet, so there is only the one row', () => {
+    it("does NOT split a still-PENDING Sight UTILIZE — Document Arrival hasn't been Sight-Settled yet, so there is only the one row", () => {
       const root = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
       const utilizeMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', releasedAt: null });
       const api = makeApi({ resolveContract: jest.fn(() => of(root)), listMovements: jest.fn(() => of([utilizeMovement])) });
@@ -577,7 +693,7 @@ describe('InquireEventsService', () => {
       expect(svc.events.length).toBe(1);
     });
 
-    it('a child catalog() call itself failing (e.g. network error) is swallowed (catchError -> []) — the root\'s own movements still come back', () => {
+    it("a child catalog() call itself failing (e.g. network error) is swallowed (catchError -> []) — the root's own movements still come back", () => {
       const root = makeContract();
       const rootMovement = makeMovement();
       const api = makeApi({
@@ -596,24 +712,82 @@ describe('InquireEventsService', () => {
   /** Side-agnostic — mostly exercises Import LC; a dedicated Export case covers deriveLcAmount()'s side-specific AMEND branching. */
   describe('LC Master Records Index (loadIndex / searchIndex / paging / selectLcFromIndex / backToIndex)', () => {
     function s001(): BalanceContract {
-      return makeContract({ balanceContractId: 'bc-s001', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S001' }, status: 'ACTIVE', currency: 'USD', tenorType: 'BUYERS_USANCE' });
+      return makeContract({
+        balanceContractId: 'bc-s001',
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'S001' },
+        status: 'ACTIVE',
+        currency: 'USD',
+        tenorType: 'BUYERS_USANCE',
+      });
     }
     function s002(): BalanceContract {
-      return makeContract({ balanceContractId: 'bc-s002', instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'S002' }, status: 'ACTIVE', currency: 'EUR', tenorType: 'SIGHT' });
+      return makeContract({
+        balanceContractId: 'bc-s002',
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'S002' },
+        status: 'ACTIVE',
+        currency: 'EUR',
+        tenorType: 'SIGHT',
+      });
     }
     function sgUnderS001(): BalanceContract {
       return makeContract({ balanceContractId: 'bc-sg-s001', instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
     }
 
-    it('loadIndex() populates indexRows — lcAmount sums RELEASED ISSUE(+)/AMEND_INCREASE(+)/AMEND_DECREASE(-) only (a PENDING UTILIZE contributes nothing), availableBalance comes from getSnapshot(), and lastEventAt is the max eventTime across the root AND every child ledger (a later SHGT event wins over the root\'s own latest movement)', () => {
-      const issueS001 = makeMovement({ movementId: 'mv-issue-1', balanceContractId: 'bc-s001', movementType: 'ISSUE', amount: '100000', createdAt: '2026-08-01T00:00:00.000Z' });
-      const incS001 = makeMovement({ movementId: 'mv-inc-1', balanceContractId: 'bc-s001', movementType: 'AMEND_INCREASE', amount: '20000', createdAt: '2026-08-02T00:00:00.000Z' });
-      const decS001 = makeMovement({ movementId: 'mv-dec-1', balanceContractId: 'bc-s001', movementType: 'AMEND_DECREASE', amount: '10000', createdAt: '2026-08-03T00:00:00.000Z' });
-      const pendingUtilizeS001 = makeMovement({ movementId: 'mv-utl-1', balanceContractId: 'bc-s001', movementType: 'UTILIZE', amount: '5000', status: 'PENDING', createdAt: '2026-08-04T00:00:00.000Z' });
+    it("loadIndex() populates indexRows — lcAmount sums RELEASED ISSUE(+)/AMEND_INCREASE(+)/AMEND_DECREASE(-) only (a PENDING UTILIZE contributes nothing), availableBalance comes from getSnapshot(), and lastEventAt is the max eventTime across the root AND every child ledger (a later SHGT event wins over the root's own latest movement)", () => {
+      const issueS001 = makeMovement({
+        movementId: 'mv-issue-1',
+        balanceContractId: 'bc-s001',
+        movementType: 'ISSUE',
+        amount: '100000',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      });
+      const incS001 = makeMovement({
+        movementId: 'mv-inc-1',
+        balanceContractId: 'bc-s001',
+        movementType: 'AMEND_INCREASE',
+        amount: '20000',
+        createdAt: '2026-08-02T00:00:00.000Z',
+      });
+      const decS001 = makeMovement({
+        movementId: 'mv-dec-1',
+        balanceContractId: 'bc-s001',
+        movementType: 'AMEND_DECREASE',
+        amount: '10000',
+        createdAt: '2026-08-03T00:00:00.000Z',
+      });
+      const pendingUtilizeS001 = makeMovement({
+        movementId: 'mv-utl-1',
+        balanceContractId: 'bc-s001',
+        movementType: 'UTILIZE',
+        amount: '5000',
+        status: 'PENDING',
+        createdAt: '2026-08-04T00:00:00.000Z',
+      });
       // A RELEASED but non-face-amount movementType — proves deriveLcAmount() filters by type too, not just status.
-      const releasedUtilizeS001 = makeMovement({ movementId: 'mv-utl-2', balanceContractId: 'bc-s001', movementType: 'UTILIZE', amount: '7000', status: 'RELEASED', createdAt: '2026-08-04T12:00:00.000Z' });
-      const sgIssue = makeMovement({ movementId: 'mv-sg-issue', balanceContractId: 'bc-sg-s001', movementType: 'ISSUE', amount: '12345', createdAt: '2026-08-05T00:00:00.000Z' });
-      const issueS002 = makeMovement({ movementId: 'mv-issue-2', balanceContractId: 'bc-s002', movementType: 'ISSUE', amount: '9999', createdAt: '2026-07-01T00:00:00.000Z' });
+      const releasedUtilizeS001 = makeMovement({
+        movementId: 'mv-utl-2',
+        balanceContractId: 'bc-s001',
+        movementType: 'UTILIZE',
+        amount: '7000',
+        status: 'RELEASED',
+        createdAt: '2026-08-04T12:00:00.000Z',
+      });
+      const sgIssue = makeMovement({
+        movementId: 'mv-sg-issue',
+        balanceContractId: 'bc-sg-s001',
+        movementType: 'ISSUE',
+        amount: '12345',
+        createdAt: '2026-08-05T00:00:00.000Z',
+      });
+      const issueS002 = makeMovement({
+        movementId: 'mv-issue-2',
+        balanceContractId: 'bc-s002',
+        movementType: 'ISSUE',
+        amount: '9999',
+        createdAt: '2026-07-01T00:00:00.000Z',
+      });
 
       const api = makeApi({
         catalog: jest.fn((instrumentType: string, _status?: string, _q?: string, _page?: number, _pageSize?: number, lcNumber?: string) => {
@@ -632,7 +806,15 @@ describe('InquireEventsService', () => {
                   : [],
           ),
         ),
-        getSnapshot: jest.fn((id: string) => of(makeSnapshot({ balanceContractId: id, availableBalance: id === 'bc-s001' ? '77000' : '5000' }))),
+        getSnapshot: jest.fn((id: string) =>
+          of(
+            makeSnapshot({
+              balanceContractId: id,
+              availableBalance: id === 'bc-s001' ? '77000' : '5000',
+              tightAvailableBalance: id === 'bc-s001' ? '65000' : '4000',
+            }),
+          ),
+        ),
       });
 
       const svc = new InquireEventsService(api);
@@ -645,6 +827,7 @@ describe('InquireEventsService', () => {
       const row1 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S001')!;
       expect(row1.lcAmount).toBe('110000'); // 100000 + 20000 - 10000; neither UTILIZE counts.
       expect(row1.availableBalance).toBe('77000');
+      expect(row1.tightLcBalance).toBe('65000');
       expect(row1.currency).toBe('USD');
       expect(row1.status).toBe('ACTIVE');
       expect(row1.tenorType).toBe("Buyer's Usance");
@@ -653,6 +836,7 @@ describe('InquireEventsService', () => {
       const row2 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S002')!;
       expect(row2.lcAmount).toBe('9999');
       expect(row2.availableBalance).toBe('5000');
+      expect(row2.tightLcBalance).toBe('4000');
       expect(row2.tenorType).toBe('Sight');
       expect(row2.lastEventAt).toBe(issueS002.createdAt);
     });
@@ -728,15 +912,49 @@ describe('InquireEventsService', () => {
 
     /** EPLC_CONFIRMATION has no AMEND_INCREASE/AMEND_DECREASE split — direction is the sign of AMEND's own amount. */
     it('loadIndex() on the Export Confirmed side derives lcAmount from ISSUE + signed AMEND (not AMEND_INCREASE/AMEND_DECREASE, which never apply to EPLC_CONFIRMATION)', () => {
-      const confirmation = makeContract({ balanceContractId: 'bc-cnf01', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE', currency: 'USD', tenorType: 'SELLERS_USANCE' });
-      const issue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf01', movementType: 'ISSUE', amount: '100000', createdAt: '2026-08-01T00:00:00.000Z' });
-      const amendIncrease = makeMovement({ movementId: 'mv-cnf-amend-inc', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '20000', createdAt: '2026-08-02T00:00:00.000Z' });
-      const amendDecrease = makeMovement({ movementId: 'mv-cnf-amend-dec', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '-15000', createdAt: '2026-08-03T00:00:00.000Z' });
+      const confirmation = makeContract({
+        balanceContractId: 'bc-cnf01',
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'CNF01' },
+        status: 'ACTIVE',
+        currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+      });
+      const issue = makeMovement({
+        movementId: 'mv-cnf-issue',
+        balanceContractId: 'bc-cnf01',
+        movementType: 'ISSUE',
+        amount: '100000',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      });
+      const amendIncrease = makeMovement({
+        movementId: 'mv-cnf-amend-inc',
+        balanceContractId: 'bc-cnf01',
+        movementType: 'AMEND',
+        amount: '20000',
+        createdAt: '2026-08-02T00:00:00.000Z',
+      });
+      const amendDecrease = makeMovement({
+        movementId: 'mv-cnf-amend-dec',
+        balanceContractId: 'bc-cnf01',
+        movementType: 'AMEND',
+        amount: '-15000',
+        createdAt: '2026-08-03T00:00:00.000Z',
+      });
       // A PENDING AMEND must not contribute (same RELEASED-only rule as Import).
-      const pendingAmend = makeMovement({ movementId: 'mv-cnf-amend-pending', balanceContractId: 'bc-cnf01', movementType: 'AMEND', amount: '99999', status: 'PENDING', createdAt: '2026-08-04T00:00:00.000Z' });
+      const pendingAmend = makeMovement({
+        movementId: 'mv-cnf-amend-pending',
+        balanceContractId: 'bc-cnf01',
+        movementType: 'AMEND',
+        amount: '99999',
+        status: 'PENDING',
+        createdAt: '2026-08-04T00:00:00.000Z',
+      });
 
       const api = makeApi({
-        catalog: jest.fn((instrumentType: string) => of(instrumentType === 'EPLC_CONFIRMATION' ? { items: [confirmation], total: 1, page: 1, pageSize: 10 } : emptyCatalog())),
+        catalog: jest.fn((instrumentType: string) =>
+          of(instrumentType === 'EPLC_CONFIRMATION' ? { items: [confirmation], total: 1, page: 1, pageSize: 10 } : emptyCatalog()),
+        ),
         listMovements: jest.fn(() => of([issue, amendIncrease, amendDecrease, pendingAmend])),
         getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '105000' }))),
       });
@@ -763,6 +981,7 @@ describe('InquireEventsService', () => {
       svc.loadIndex(1);
       expect(svc.indexRows.length).toBe(1);
       expect(svc.indexRows[0].availableBalance).toBe('—');
+      expect(svc.indexRows[0].tightLcBalance).toBe('—');
       expect(svc.indexRows[0].lcAmount).toBe('1000');
     });
 
@@ -793,8 +1012,17 @@ describe('InquireEventsService', () => {
       it('a still-PENDING CLOSE movement -> closingPending true, even though contract.status itself already reads ACTIVE', () => {
         const contract = noChildContract();
         const issue = makeMovement({ movementId: 'mv-issue', balanceContractId: 'bc-nc', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
-        const close = makeMovement({ movementId: 'mv-close', balanceContractId: 'bc-nc', movementType: 'CLOSE', status: 'PENDING', createdAt: '2026-08-02T00:00:00.000Z' });
-        const api = makeApi({ catalog: jest.fn(() => of({ items: [contract], total: 1, page: 1, pageSize: 10 })), listMovements: jest.fn(() => of([issue, close])) });
+        const close = makeMovement({
+          movementId: 'mv-close',
+          balanceContractId: 'bc-nc',
+          movementType: 'CLOSE',
+          status: 'PENDING',
+          createdAt: '2026-08-02T00:00:00.000Z',
+        });
+        const api = makeApi({
+          catalog: jest.fn(() => of({ items: [contract], total: 1, page: 1, pageSize: 10 })),
+          listMovements: jest.fn(() => of([issue, close])),
+        });
         const svc = new InquireEventsService(api);
 
         svc.loadIndex(1);
@@ -828,14 +1056,27 @@ describe('InquireEventsService', () => {
       });
 
       it('B6 (EPLC_CONFIRMATION, Export side) — the same still-PENDING-CLOSE detection applies, confirming this is not an Import-only (A10) fix', () => {
-        const confirmation = makeContract({ balanceContractId: 'bc-cnf', instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: 'CNF01' }, status: 'ACTIVE' });
+        const confirmation = makeContract({
+          balanceContractId: 'bc-cnf',
+          instrumentType: 'EPLC_CONFIRMATION',
+          naturalKey: { lcNumber: 'CNF01' },
+          status: 'ACTIVE',
+        });
         const issue = makeMovement({ movementId: 'mv-cnf-issue', balanceContractId: 'bc-cnf', movementType: 'ISSUE', createdAt: '2026-08-01T00:00:00.000Z' });
-        const close = makeMovement({ movementId: 'mv-cnf-close', balanceContractId: 'bc-cnf', movementType: 'CLOSE', status: 'PENDING', createdAt: '2026-08-02T00:00:00.000Z' });
+        const close = makeMovement({
+          movementId: 'mv-cnf-close',
+          balanceContractId: 'bc-cnf',
+          movementType: 'CLOSE',
+          status: 'PENDING',
+          createdAt: '2026-08-02T00:00:00.000Z',
+        });
         // EPLC_CONFIRMATION has real child instrument types (EPLC_EXAMINATION/EPLC_ACCEPTANCE/...) — the
         // catalog() mock must return the root contract only for the root's OWN instrumentType, empty for
         // every child-fan-out call, or childMovementsOf$() would wrongly treat this same contract as its
         // own child too.
-        const catalog = jest.fn((instrumentType: string) => of(instrumentType === 'EPLC_CONFIRMATION' ? { items: [confirmation], total: 1, page: 1, pageSize: 10 } : emptyCatalog()));
+        const catalog = jest.fn((instrumentType: string) =>
+          of(instrumentType === 'EPLC_CONFIRMATION' ? { items: [confirmation], total: 1, page: 1, pageSize: 10 } : emptyCatalog()),
+        );
         const api = makeApi({ catalog, listMovements: jest.fn(() => of([issue, close])) });
         const svc = new InquireEventsService(api);
         svc.side = 'EXPORT';
@@ -861,7 +1102,19 @@ describe('InquireEventsService', () => {
     it('an empty page (no matching contracts) clears indexRows without any per-row fan-out calls', () => {
       const api = makeApi({ catalog: jest.fn(() => of(emptyCatalog())) });
       const svc = new InquireEventsService(api);
-      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null, closingPending: false }];
+      svc.indexRows = [
+        {
+          contract: s001(),
+          currency: 'USD',
+          tenorType: "Buyer's Usance",
+          lcAmount: '1',
+          availableBalance: '1',
+          tightLcBalance: '1',
+          status: 'ACTIVE',
+          lastEventAt: null,
+          closingPending: false,
+        },
+      ];
       svc.loadIndex(1);
       expect(svc.indexRows).toEqual([]);
       expect(svc.indexLoading).toBe(false);
@@ -913,7 +1166,19 @@ describe('InquireEventsService', () => {
       const issue = makeMovement({ balanceContractId: 'bc-s001', movementType: 'ISSUE' });
       const api = makeApi({ listMovements: jest.fn(() => of([issue])) });
       const svc = new InquireEventsService(api);
-      svc.indexRows = [{ contract, currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '100', availableBalance: '100', status: 'ACTIVE', lastEventAt: null, closingPending: false }];
+      svc.indexRows = [
+        {
+          contract,
+          currency: 'USD',
+          tenorType: "Buyer's Usance",
+          lcAmount: '100',
+          availableBalance: '100',
+          tightLcBalance: '100',
+          status: 'ACTIVE',
+          lastEventAt: null,
+          closingPending: false,
+        },
+      ];
       svc.indexPaging.page = 2;
       svc.indexPaging.total = 15;
       svc.indexSearch = 'S0';
@@ -934,7 +1199,19 @@ describe('InquireEventsService', () => {
     it('backToIndex() only flips indexView back to INDEX — indexRows/indexPaging/indexSearch are untouched', () => {
       const svc = new InquireEventsService(makeApi());
       svc.indexView = 'EVENTS';
-      svc.indexRows = [{ contract: s001(), currency: 'USD', tenorType: "Buyer's Usance", lcAmount: '1', availableBalance: '1', status: 'ACTIVE', lastEventAt: null, closingPending: false }];
+      svc.indexRows = [
+        {
+          contract: s001(),
+          currency: 'USD',
+          tenorType: "Buyer's Usance",
+          lcAmount: '1',
+          availableBalance: '1',
+          tightLcBalance: '1',
+          status: 'ACTIVE',
+          lastEventAt: null,
+          closingPending: false,
+        },
+      ];
       svc.indexPaging.page = 4;
       svc.indexSearch = 'kept';
 
@@ -1036,7 +1313,18 @@ describe('InquireEventsService', () => {
       const svc = make25EventsService();
       svc.nextEventsPage();
       expect(svc.eventsPaging.page).toBe(2);
-      expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual(['mv-10', 'mv-11', 'mv-12', 'mv-13', 'mv-14', 'mv-15', 'mv-16', 'mv-17', 'mv-18', 'mv-19']);
+      expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual([
+        'mv-10',
+        'mv-11',
+        'mv-12',
+        'mv-13',
+        'mv-14',
+        'mv-15',
+        'mv-16',
+        'mv-17',
+        'mv-18',
+        'mv-19',
+      ]);
 
       svc.nextEventsPage();
       expect(svc.eventsPaging.page).toBe(3);
@@ -1089,14 +1377,26 @@ describe('InquireEventsService', () => {
     it("resolves a 'finalize' phase Sight UTILIZE to A4, not A3 (payExistingUtilizeFunctionFor(), not the generic resolver)", () => {
       const svc = new InquireEventsService(makeApi());
       const contract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
-      const finalizeEvent: InquiredEvent = { movement: makeMovement({ movementType: 'UTILIZE', status: 'RELEASED' }), contract, eventTime: '2026-08-18T00:00:00.000Z', eventStatus: 'RELEASED', phase: 'finalize' };
+      const finalizeEvent: InquiredEvent = {
+        movement: makeMovement({ movementType: 'UTILIZE', status: 'RELEASED' }),
+        contract,
+        eventTime: '2026-08-18T00:00:00.000Z',
+        eventStatus: 'RELEASED',
+        phase: 'finalize',
+      };
       expect(svc.functionFor(finalizeEvent)?.code).toBe('A4');
     });
 
     it("resolves the SAME Sight UTILIZE's own 'create' phase to A3 — the generic resolver, unaffected by phase", () => {
       const svc = new InquireEventsService(makeApi());
       const contract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
-      const createEvent: InquiredEvent = { movement: makeMovement({ movementType: 'UTILIZE' }), contract, eventTime: '2026-08-18T00:00:00.000Z', eventStatus: 'PENDING', phase: 'create' };
+      const createEvent: InquiredEvent = {
+        movement: makeMovement({ movementType: 'UTILIZE' }),
+        contract,
+        eventTime: '2026-08-18T00:00:00.000Z',
+        eventStatus: 'PENDING',
+        phase: 'create',
+      };
       expect(svc.functionFor(createEvent)?.code).toBe('A3');
     });
 
@@ -1155,7 +1455,7 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventForm.value).toEqual({});
     });
 
-    it('carries the saved expiryDate onto the model, so A1/B1\'s Original Transaction Screen shows the saved date instead of the field\'s empty placeholder (reviewer-reported 2026-08-26)', () => {
+    it("carries the saved expiryDate onto the model, so A1/B1's Original Transaction Screen shows the saved date instead of the field's empty placeholder (reviewer-reported 2026-08-26)", () => {
       const svc = new InquireEventsService(makeApi());
       const contract = makeContract({ instrumentType: 'IPLC_LC', expiryDate: '2026-12-31' });
       const movement = makeMovement({ movementType: 'ISSUE' });
@@ -1186,7 +1486,7 @@ describe('InquireEventsService', () => {
       expect(svc.selectedEventModel.reasonCode).toBe('NATURAL_EXPIRY_ALL_BALANCES_CLEARED');
     });
 
-    it('carries the saved reasonCode onto the model for a Reopen event too — same field, A11/B7\'s own Reopen Reason', () => {
+    it("carries the saved reasonCode onto the model for a Reopen event too — same field, A11/B7's own Reopen Reason", () => {
       const svc = new InquireEventsService(makeApi());
       const contract = makeContract({ instrumentType: 'IPLC_LC' });
       const movement = makeMovement({ movementType: 'REOPEN', reasonCode: 'CLOSED_IN_ERROR' });
@@ -1399,7 +1699,9 @@ describe('InquireEventsService', () => {
     it('a stale fallback response is discarded once a different Event has since been selected (race guard)', () => {
       const firstResponse = new Subject<BalanceSnapshot>();
       const api = makeApi({
-        getBalanceAsOfMovement: jest.fn((movementId: string) => (movementId === 'mv-first' ? firstResponse.asObservable() : of(makeSnapshot({ confirmedBalance: 'mv-second' })))),
+        getBalanceAsOfMovement: jest.fn((movementId: string) =>
+          movementId === 'mv-first' ? firstResponse.asObservable() : of(makeSnapshot({ confirmedBalance: 'mv-second' })),
+        ),
       });
       const svc = new InquireEventsService(api);
       svc.rootContract = makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' });
@@ -1471,12 +1773,23 @@ describe('InquireEventsService', () => {
 
       const frozenAtCreate = null; // SG G01 didn't exist yet at A3's own transaction time.
       const asOfFinalize = makeSnapshot({ balanceContractId: 'bc-sg', confirmedBalance: '12345' });
-      const utilizeMovement = makeMovement({ movementType: 'UTILIZE', status: 'RELEASED', sgEventSnapshot: frozenAtCreate, finalizeSgEventSnapshot: asOfFinalize });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'RELEASED',
+        sgEventSnapshot: frozenAtCreate,
+        finalizeSgEventSnapshot: asOfFinalize,
+      });
 
       svc.selectEvent({ movement: utilizeMovement, contract: root, eventTime: utilizeMovement.createdAt, eventStatus: 'PENDING', phase: 'create' });
       expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.snapshot).toBeNull();
 
-      svc.selectEvent({ movement: utilizeMovement, contract: root, eventTime: utilizeMovement.releasedAt ?? utilizeMovement.createdAt, eventStatus: 'RELEASED', phase: 'finalize' });
+      svc.selectEvent({
+        movement: utilizeMovement,
+        contract: root,
+        eventTime: utilizeMovement.releasedAt ?? utilizeMovement.createdAt,
+        eventStatus: 'RELEASED',
+        phase: 'finalize',
+      });
       expect(svc.selectedEventTabs.find((t) => t.key === 'SG')!.snapshot).toBe(asOfFinalize);
     });
 
@@ -1486,9 +1799,20 @@ describe('InquireEventsService', () => {
       svc.rootContract = root;
 
       const asOfFinalize = makeSnapshot({ balanceContractId: 'bc-acc', confirmedBalance: '30000' });
-      const utilizeMovement = makeMovement({ movementType: 'UTILIZE', status: 'RELEASED', acceptanceEventSnapshot: null, finalizeAcceptanceEventSnapshot: asOfFinalize });
+      const utilizeMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'RELEASED',
+        acceptanceEventSnapshot: null,
+        finalizeAcceptanceEventSnapshot: asOfFinalize,
+      });
 
-      svc.selectEvent({ movement: utilizeMovement, contract: root, eventTime: utilizeMovement.releasedAt ?? utilizeMovement.createdAt, eventStatus: 'RELEASED', phase: 'finalize' });
+      svc.selectEvent({
+        movement: utilizeMovement,
+        contract: root,
+        eventTime: utilizeMovement.releasedAt ?? utilizeMovement.createdAt,
+        eventStatus: 'RELEASED',
+        phase: 'finalize',
+      });
       expect(svc.selectedEventTabs.find((t) => t.key === 'ACCEPTANCE')!.snapshot).toBe(asOfFinalize);
     });
   });
@@ -1571,7 +1895,7 @@ describe('InquireEventsService', () => {
       expect(svc.primaryReferenceFor(honourEvent)).toBe('—');
     });
 
-    it('does NOT reclassify A2/B2\'s own Amendment No. (same sourceTransactionRef wire field, different meaning) — stays under Reference only', () => {
+    it("does NOT reclassify A2/B2's own Amendment No. (same sourceTransactionRef wire field, different meaning) — stays under Reference only", () => {
       const svc = new InquireEventsService(makeApi());
       const lcContract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'U01' } });
       const amendEvent = makeEvent({ movement: makeMovement({ movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD-1' }), contract: lcContract });
@@ -1583,7 +1907,9 @@ describe('InquireEventsService', () => {
       const svc = new InquireEventsService(makeApi());
       const lcContract = makeContract({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'U01' } });
       expect(svc.primaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE' }), contract: lcContract }))).toBe('—');
-      expect(svc.primaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE', sourceTransactionRef: 'REF-1' }), contract: lcContract }))).toBe('REF-1');
+      expect(
+        svc.primaryReferenceFor(makeEvent({ movement: makeMovement({ movementType: 'ISSUE', sourceTransactionRef: 'REF-1' }), contract: lcContract })),
+      ).toBe('REF-1');
     });
   });
 

@@ -36,6 +36,7 @@ function snapshot(overrides: Partial<BalanceSnapshot> = {}): BalanceSnapshot {
     confirmedBalance: '100000',
     availableBalance: '80000',
     pendingEarmarkTotal: '20000',
+    tightAvailableBalance: '80000',
     ...overrides,
   };
 }
@@ -296,7 +297,122 @@ describe('submit-rules', () => {
 
     it('passes once both the SG and its snapshot are resolved', () => {
       const result = validateSubmit(
-        a3sCtx({ selectedArrivalSg: contract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } }), arrivalSgSnapshot: snapshot() }),
+        a3sCtx({
+          model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '100000', currency: 'USD', createdBy: 'maker1' },
+          selectedContractSnapshot: snapshot(),
+          selectedArrivalSg: contract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } }),
+          arrivalSgSnapshot: snapshot(),
+        }),
+      );
+      expect(result.error).toBeNull();
+    });
+
+    it('rejects a Bill Amount below the selected Shipping Guarantee Balance', () => {
+      const result = validateSubmit(
+        a3sCtx({
+          selectedArrivalSg: contract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } }),
+          arrivalSgSnapshot: snapshot({ confirmedBalance: '8000' }),
+        }),
+      );
+      expect(result.error).toBe('Bill Amount must be greater than or equal to the Shipping Guarantee Balance (8000).');
+    });
+  });
+
+  describe('validateSubmit — Tight Available Balance must never become negative', () => {
+    const cases: Array<{
+      code: 'A2' | 'B2' | 'A3' | 'A8' | 'B3';
+      movementType: string;
+      instrumentType: BuilderModel['instrumentType'];
+      amendDirection?: 'DECREASE';
+    }> = [
+      { code: 'A2', movementType: 'AMEND_DECREASE', instrumentType: 'IPLC_LC' },
+      { code: 'B2', movementType: 'AMEND', instrumentType: 'EPLC_CONFIRMATION', amendDirection: 'DECREASE' },
+      { code: 'A3', movementType: 'UTILIZE', instrumentType: 'IPLC_LC' },
+      { code: 'A8', movementType: 'ISSUE', instrumentType: 'SHGT' },
+      { code: 'B3', movementType: 'CREATE', instrumentType: 'EPLC_EXAMINATION' },
+    ];
+
+    test.each(cases)('$code blocks Submit when Amount exceeds Tight Available Balance', ({ code, movementType, instrumentType, amendDirection }) => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn(code),
+          model: { instrumentType, movementType, amount: '100.01', currency: 'USD', createdBy: 'maker1', secondaryRef: 'REF01' },
+          naturalKey: { lcNumber: 'S001', ibNumber: code === 'B3' ? 'E01' : '', sgNumber: code === 'A8' ? 'G01' : '' },
+          selectedContract: contract(),
+          selectedParent: code === 'A8' || code === 'B3' ? contract() : null,
+          selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
+          amendDirection: amendDirection ?? null,
+        }),
+      );
+
+      expect(result.error).toBe('Amount must not exceed Tight Available Balance (100); the transaction cannot make Tight Available Balance negative.');
+    });
+
+    test.each(cases)('$code accepts the exact zero-after-transaction boundary', ({ code, movementType, instrumentType, amendDirection }) => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn(code),
+          model: { instrumentType, movementType, amount: '100', currency: 'USD', createdBy: 'maker1', secondaryRef: 'REF01' },
+          naturalKey: { lcNumber: 'S001', ibNumber: code === 'B3' ? 'E01' : '', sgNumber: code === 'A8' ? 'G01' : '' },
+          selectedContract: contract(),
+          selectedParent: code === 'A8' || code === 'B3' ? contract() : null,
+          selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
+          amendDirection: amendDirection ?? null,
+        }),
+      );
+
+      expect(result.error).toBeNull();
+    });
+
+    it('A3S uses Tight Available plus the selected SG Balance as its upper limit', () => {
+      const base = {
+        selectedFunction: fn('A3S'),
+        model: { instrumentType: 'IPLC_LC' as const, movementType: 'UTILIZE', amount: '130.01', currency: 'USD', createdBy: 'maker1', secondaryRef: 'IB01' },
+        selectedContract: contract(),
+        selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
+        selectedArrivalSg: contract({ instrumentType: 'SHGT' }),
+        arrivalSgSnapshot: snapshot({ confirmedBalance: '30' }),
+      };
+
+      expect(validateSubmit(ctx(base)).error).toBe(
+        'Amount must not exceed Tight Available Balance plus selected SG Balance (130); the transaction cannot make Tight Available Balance negative.',
+      );
+      expect(validateSubmit(ctx({ ...base, model: { ...base.model, amount: '130' } })).error).toBeNull();
+    });
+
+    it('blocks Submit until the Tight Available snapshot is available', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A3'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '10', currency: 'USD', createdBy: 'maker1', secondaryRef: 'IB01' },
+          selectedContract: contract(),
+          selectedContractSnapshot: null,
+        }),
+      );
+      expect(result.error).toContain('Wait for the balance lookup to complete');
+    });
+
+    it('blocks rather than clamps an impossible negative Tight Available Balance returned by the API', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A3'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1', currency: 'USD', createdBy: 'maker1', secondaryRef: 'IB01' },
+          selectedContract: contract(),
+          selectedContractSnapshot: snapshot({ tightAvailableBalance: '-0.01' }),
+        }),
+      );
+      expect(result.error).toBe('Current Tight Available Balance (-0.01) is invalid. Submission is blocked; please investigate the balance data.');
+    });
+
+    it('does not apply the Decrease-only rule to B2 Increase', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('B2'),
+          model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', amount: '101', currency: 'USD', createdBy: 'maker1', secondaryRef: 'A01' },
+          selectedContract: contract(),
+          selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
+          amendDirection: 'INCREASE',
+        }),
       );
       expect(result.error).toBeNull();
     });
@@ -322,7 +438,9 @@ describe('submit-rules', () => {
           selectedContractSnapshot: snapshot({ availableBalance: '80000' }),
         }),
       );
-      expect(result.error).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (80000) — Partial Redeem is no longer supported here.');
+      expect(result.error).toBe(
+        'A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (80000) — Partial Redeem is no longer supported here.',
+      );
     });
 
     it('submits FULL_REDEEM (boundary — amount exactly equals Available, the only value the UI now permits)', () => {
@@ -338,7 +456,9 @@ describe('submit-rules', () => {
           selectedContractSnapshot: snapshot({ availableBalance: '80000' }),
         }),
       );
-      expect(result.error).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (80000) — Partial Redeem is no longer supported here.');
+      expect(result.error).toBe(
+        'A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (80000) — Partial Redeem is no longer supported here.',
+      );
     });
   });
 
@@ -559,7 +679,14 @@ describe('submit-rules', () => {
       const { request, error } = buildSubmitRequest(
         ctx({
           selectedFunction: fn('A2'),
-          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_EXPIRY_DATE', amount: '9999', currency: 'USD', createdBy: 'maker1', newExpiryDate: '2027-06-30' },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'AMEND_EXPIRY_DATE',
+            amount: '9999',
+            currency: 'USD',
+            createdBy: 'maker1',
+            newExpiryDate: '2027-06-30',
+          },
           selectedContract: contract(),
         }),
       );
@@ -638,7 +765,7 @@ describe('submit-rules', () => {
       expect(result.error).not.toBe('Amount must be greater than 0.');
     });
 
-    it('the CLOSE exemption skips this guard entirely, not just for 0 — a negative Amount also isn\'t caught here (the exact-equals-Confirmed-Balance check that would reject it lives server-side, closeShaped in balanceService.ts, since this pure function has no snapshot to compare against)', () => {
+    it("the CLOSE exemption skips this guard entirely, not just for 0 — a negative Amount also isn't caught here (the exact-equals-Confirmed-Balance check that would reject it lives server-side, closeShaped in balanceService.ts, since this pure function has no snapshot to compare against)", () => {
       const result = validateSubmit(
         ctx({
           selectedFunction: fn('A10'),
@@ -649,7 +776,7 @@ describe('submit-rules', () => {
       expect(result.error).not.toBe('Amount must be greater than 0.');
     });
 
-    it('F1: A11/B7 (Reopen) are exempted too — Amount is always 0 by construction (a fixed literal, see builder-fields.ts\'s own amountFixed)', () => {
+    it("F1: A11/B7 (Reopen) are exempted too — Amount is always 0 by construction (a fixed literal, see builder-fields.ts's own amountFixed)", () => {
       const result = validateSubmit(
         ctx({
           selectedFunction: fn('A11'),
@@ -660,7 +787,7 @@ describe('submit-rules', () => {
       expect(result.error).not.toBe('Amount must be greater than 0.');
     });
 
-    it('F1: AMEND_EXPIRY_DATE (A2/B2\'s third subChoice option) is exempted from both the blank-amount and >0 guards — Amount has no meaning here, newExpiryDate is required instead', () => {
+    it("F1: AMEND_EXPIRY_DATE (A2/B2's third subChoice option) is exempted from both the blank-amount and >0 guards — Amount has no meaning here, newExpiryDate is required instead", () => {
       const passes = validateSubmit(
         ctx({
           selectedFunction: fn('A2'),
@@ -716,7 +843,15 @@ describe('submit-rules', () => {
     it('rejects A1 (LC Issue) with no Expiry Date, even when every other mandatory field is filled', () => {
       const result = validateSubmit(
         ctx({
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: undefined },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: undefined,
+          },
         }),
       );
       expect(result.error).toBe('Expiry Date is mandatory for A1.');
@@ -725,7 +860,15 @@ describe('submit-rules', () => {
     it('passes A1 (LC Issue) once Expiry Date is supplied', () => {
       const result = validateSubmit(
         ctx({
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2028-12-28' },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: '2028-12-28',
+          },
         }),
       );
       expect(result.error).toBeNull();
@@ -736,7 +879,15 @@ describe('submit-rules', () => {
         ctx({
           selectedFunction: fn('B1'),
           activeFunctionSide: 'EXPORT',
-          model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: undefined },
+          model: {
+            instrumentType: 'EPLC_CONFIRMATION',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: undefined,
+          },
         }),
       );
       expect(result.error).toBe('Expiry Date is mandatory for B1.');
@@ -746,7 +897,15 @@ describe('submit-rules', () => {
       const result = validateSubmit(
         ctx({
           selectedFunction: fn('A2'),
-          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '5000', currency: 'USD', createdBy: 'maker1', secondaryRef: 'AMD-01', expiryDate: undefined },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'AMEND_INCREASE',
+            amount: '5000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            secondaryRef: 'AMD-01',
+            expiryDate: undefined,
+          },
           selectedContract: contract(),
         }),
       );
@@ -758,7 +917,15 @@ describe('submit-rules', () => {
     it('rejects A1 (LC Issue) with an Expiry Date on a known public holiday', () => {
       const result = validateSubmit(
         ctx({
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-01' },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: '2026-01-01',
+          },
         }),
       );
       expect(result.error).toBe('Expiry Date 2026-01-01 falls on a domestic non-business day (元旦) — pick a genuine business day.');
@@ -767,7 +934,15 @@ describe('submit-rules', () => {
     it('rejects A1 (LC Issue) with an Expiry Date on a Saturday/Sunday', () => {
       const result = validateSubmit(
         ctx({
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-03' },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: '2026-01-03',
+          },
         }),
       );
       expect(result.error).toBe('Expiry Date 2026-01-03 falls on a domestic non-business day (Saturday/Sunday) — pick a genuine business day.');
@@ -778,7 +953,15 @@ describe('submit-rules', () => {
         ctx({
           selectedFunction: fn('B1'),
           activeFunctionSide: 'EXPORT',
-          model: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-01' },
+          model: {
+            instrumentType: 'EPLC_CONFIRMATION',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: '2026-01-01',
+          },
         }),
       );
       expect(result.error).toBe('Expiry Date 2026-01-01 falls on a domestic non-business day (元旦) — pick a genuine business day.');
@@ -787,7 +970,15 @@ describe('submit-rules', () => {
     it('passes A1 with a genuine business day', () => {
       const result = validateSubmit(
         ctx({
-          model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '10000', currency: 'USD', createdBy: 'maker1', tenorType: 'SIGHT', expiryDate: '2026-01-08' },
+          model: {
+            instrumentType: 'IPLC_LC',
+            movementType: 'ISSUE',
+            amount: '10000',
+            currency: 'USD',
+            createdBy: 'maker1',
+            tenorType: 'SIGHT',
+            expiryDate: '2026-01-08',
+          },
         }),
       );
       expect(result.error).toBeNull();

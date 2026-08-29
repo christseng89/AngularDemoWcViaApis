@@ -28,7 +28,7 @@
         (valueChange)="service.catalogIndex.search = $event"
         (searchRequested)="service.catalogIndex.searchNow()"
       ></app-transaction-search-field>
-      <div class="tb-error mt-2" role="alert" *ngIf="service.catalogIndex.error">{{ service.catalogIndex.error }}</div>
+      <app-feedback-message *ngIf="indexErrorFeedback as feedback" [message]="feedback" (retry)="service.catalogIndex.searchNow()"></app-feedback-message>
       <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="service.catalogIndex.loading">
         <span class="tb-spinner" aria-hidden="true"></span>Loading {{ service.catalogIndex.entityLabel }} Master Records…
       </div>
@@ -65,12 +65,7 @@
         (previousRequested)="service.catalogIndex.prevPage()"
         (nextRequested)="service.catalogIndex.nextPage()"
       ></app-transaction-pagination>
-      <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error && service.catalogIndex.emptyMessageIsError">
-        {{ service.catalogIndex.emptyMessage('with Delete Pending history') }}
-      </div>
-      <div class="tb-hint mt-2" *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error && !service.catalogIndex.emptyMessageIsError">
-        {{ service.catalogIndex.emptyMessage('with Delete Pending history') }}
-      </div>
+      <app-feedback-message *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error" [message]="indexEmptyFeedback"></app-feedback-message>
     </ng-container>
 
     <!-- Selected LC's own Delete Pending Audit Records — business rule: "同一個 Event 如果曾經多次執行

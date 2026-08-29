@@ -8,26 +8,30 @@
   </div>
   <div class="tb-section__body">
     <div class="tb-field tb-field--inline tb-field--search" [attr.aria-busy]="checkerSearching || null">
-      <label class="tb-field__label">LC Number</label>
-      <input class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="checkerLcNumber" (keyup.enter)="searchCheckerLc()" />
+      <label class="tb-field__label" for="checkerLcNumber">LC Number</label>
+      <input id="checkerLcNumber" class="tb-input tb-input--required" placeholder="e.g. S001" [(ngModel)]="checkerLcNumber" (keyup.enter)="searchCheckerLc()" aria-required="true" [attr.aria-invalid]="checkerSearchError ? 'true' : null" [attr.aria-describedby]="checkerSearchError ? 'checkerSearchFeedback' : null" />
       <!-- Business-reported gap 2026-08-15 ("Check[er] function is not working for Shipping Gtee (Issue)",
          repro'd with LC S001 / SG G01): SHGT/Acceptance are keyed by LC Number + SG/IB Number (one LC can
          have multiple), so this second field is mandatory whenever checkerSecondaryField is set — see
          searchCheckerLc()'s own doc comment. -->
       <ng-container *ngIf="checkerSecondaryField">
-        <label class="tb-field__label">{{ checkerSecondaryLabel }}</label>
+        <label class="tb-field__label" for="checkerSecondaryRef">{{ checkerSecondaryLabel }}</label>
         <input
+          id="checkerSecondaryRef"
           class="tb-input tb-input--required"
           [placeholder]="'e.g. ' + (checkerSecondaryField === 'sgNumber' ? 'G01' : 'B01')"
           [(ngModel)]="checkerSecondaryRef"
           (keyup.enter)="searchCheckerLc()"
+          aria-required="true"
+          [attr.aria-invalid]="checkerSearchError ? 'true' : null"
+          [attr.aria-describedby]="checkerSearchError ? 'checkerSearchFeedback' : null"
         />
       </ng-container>
       <button type="button" class="tb-btn tb-btn--outline" (click)="searchCheckerLc()" [disabled]="checkerSearching">
         <span class="tb-spinner" aria-hidden="true" *ngIf="checkerSearching"></span>{{ checkerSearching ? 'Searching…' : 'Search' }}
       </button>
     </div>
-    <div class="tb-error mt-2" [class.tb-error--fit]="checkerSearchErrorIsNotFound" role="alert" aria-live="polite" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
+    <app-feedback-message id="checkerSearchFeedback" *ngIf="checkerSearchFeedback as feedback" [message]="feedback" (retry)="searchCheckerLc()"></app-feedback-message>
     <div class="tb-hint tb-hint--ok mt-2" *ngIf="checkerAutoPickedHint">{{ checkerAutoPickedHint }}</div>
 
     <!-- Business-reported gap 2026-08-21 ("單獨執行 A9 Checker 輸入LC NUMBER 無法自動找到PENDING交易") —

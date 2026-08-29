@@ -343,7 +343,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.model.movementType).toBe('AMEND_DECREASE');
     });
 
-    it('F1: A2\'s third option (Expiry Date) resolves movementType to AMEND_EXPIRY_DATE directly — its own key is already \'movementType\', so no override is declared or needed', () => {
+    it("F1: A2's third option (Expiry Date) resolves movementType to AMEND_EXPIRY_DATE directly — its own key is already 'movementType', so no override is declared or needed", () => {
       const { comp, mockApi } = makeComponentA();
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
       comp.selectedFunction = A2;
@@ -355,7 +355,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.model.movementType).toBe('AMEND_EXPIRY_DATE');
     });
 
-    it('F1: B2\'s third option (Expiry Date) declares a movementTypeOverride — resolves movementType to AMEND_EXPIRY_DATE directly, bypassing the amendDirection indirection its other two options use, and never touches this.amendDirection', () => {
+    it("F1: B2's third option (Expiry Date) declares a movementTypeOverride — resolves movementType to AMEND_EXPIRY_DATE directly, bypassing the amendDirection indirection its other two options use, and never touches this.amendDirection", () => {
       const { comp, mockApi } = makeComponentA();
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
       comp.selectedFunction = B2;
@@ -368,7 +368,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.amendDirection).toBeNull();
     });
 
-    it('F1: B2\'s own ordinary Increase/Decrease options are unaffected by the new movementTypeOverride branch — still write amendDirection only, model.movementType stays whatever it already was', () => {
+    it("F1: B2's own ordinary Increase/Decrease options are unaffected by the new movementTypeOverride branch — still write amendDirection only, model.movementType stays whatever it already was", () => {
       const { comp, mockApi } = makeComponentA();
       mockApi.catalog.mockReturnValue(of(mkCatalogPage([])));
       comp.selectedFunction = B2;
@@ -868,6 +868,28 @@ describe('MakerPanelComponent', () => {
       expect(comp.catalogPicker.page).toBe(1);
       expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U003', 1, comp.catalogPageSize, undefined, undefined, true);
     });
+
+    it('A4 filters the combined LC Number + IB Number index locally and does not refetch a partial server page', () => {
+      const { comp, mockApi } = makeComponentA();
+      triggerSelectFunction(comp, A4);
+      mockApi.catalog.mockClear();
+      comp.catalogPicker.page = 3;
+      comp.catalogPicker.search = 'IB00002';
+      const contract = mkContract('c1', 'LC001');
+      comp.catalogPicker.contracts = [contract];
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001', 'IB00002']);
+      comp.documentArrivalHints.catalogPayableMovements.set('c1', [
+        mkMovement('m1', { sourceTransactionRef: 'IB00001' }),
+        mkMovement('m2', { sourceTransactionRef: 'IB00002' }),
+      ]);
+
+      comp.onCatalogSearch();
+
+      expect(comp.catalogPicker.page).toBe(1);
+      expect(comp.catalogPicker.total).toBe(1);
+      expect(comp.flattenedPayableRows.map((row) => row.movementId)).toEqual(['m2']);
+      expect(mockApi.catalog).not.toHaveBeenCalled();
+    });
   });
 
   describe('onSelectFlattenedPayable', () => {
@@ -887,6 +909,23 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.payableMovements).toEqual([movement]);
       expect(comp.pickerSelection.payableMovementsLoading).toBe(false);
       expect(comp.pickerSelection.selectedPayMovement).toBe(movement);
+    });
+
+    it('selects both the LC and its IB transaction from one combined-index row id', () => {
+      const { comp, mockApi } = makeComponentA();
+      triggerSelectFunction(comp, A4);
+      const contract = mkContract('c1', 'LC001');
+      const movement = mkMovement('m1', { sourceTransactionRef: 'IB00001', amount: '25000' });
+      comp.catalogPicker.contracts = [contract];
+      comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001']);
+      comp.documentArrivalHints.catalogPayableMovements.set('c1', [movement]);
+      mockApi.getSnapshot.mockReturnValue(of(mkSnapshot('c1')));
+
+      comp.onSelectFlattenedPayableMovement('m1');
+
+      expect(comp.selectedContract).toBe(contract);
+      expect(comp.pickerSelection.selectedPayMovement).toBe(movement);
+      expect(comp.model.secondaryRef).toBe('IB00001');
     });
 
     it('auto-fills and locks the Acceptance amount/IB Number for a settlesDocumentArrival function (A6)', () => {
@@ -958,11 +997,11 @@ describe('MakerPanelComponent', () => {
   });
 
   // Prev/Next are pure client-side windowing over the already-fetched, already-filtered set (display
-  // page size 5 — see CatalogPickerService's own module doc comment); neither triggers a new api.catalog call.
+  // page size 10 — see CatalogPickerService's own module doc comment); neither triggers a new api.catalog call.
   describe('catalogPrevPage / catalogNextPage', () => {
     it('catalogPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponentA();
-      comp.catalogPicker.total = 12; // display pageSize 5 -> 3 pages
+      comp.catalogPicker.total = 12; // display pageSize 10 -> 2 pages
       comp.catalogPicker.page = 1;
 
       comp.catalogPrevPage();
@@ -974,22 +1013,22 @@ describe('MakerPanelComponent', () => {
     it('catalogPrevPage moves back a page locally, without reloading', () => {
       const { comp, mockApi } = makeComponentA();
       comp.catalogPicker.total = 12;
-      comp.catalogPicker.page = 3;
+      comp.catalogPicker.page = 2;
 
       comp.catalogPrevPage();
 
-      expect(comp.catalogPicker.page).toBe(2);
+      expect(comp.catalogPicker.page).toBe(1);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
     it('catalogNextPage is a no-op on the last page', () => {
       const { comp, mockApi } = makeComponentA();
-      comp.catalogPicker.total = 12; // totalPages = 3
-      comp.catalogPicker.page = 3;
+      comp.catalogPicker.total = 12; // totalPages = 2
+      comp.catalogPicker.page = 2;
 
       comp.catalogNextPage();
 
-      expect(comp.catalogPicker.page).toBe(3);
+      expect(comp.catalogPicker.page).toBe(2);
       expect(mockApi.catalog).not.toHaveBeenCalled();
     });
 
@@ -1104,7 +1143,7 @@ describe('MakerPanelComponent', () => {
   describe('parentPrevPage / parentNextPage', () => {
     it('parentPrevPage is a no-op on page 1', () => {
       const { comp, mockApi } = makeComponentA();
-      comp.parentPicker.total = 8; // display pageSize 5 -> 2 pages
+      comp.parentPicker.total = 18; // display pageSize 10 -> 2 pages
       comp.parentPicker.page = 1;
 
       comp.parentPrevPage();
@@ -1126,7 +1165,7 @@ describe('MakerPanelComponent', () => {
 
     it('parentNextPage is a no-op on the last page', () => {
       const { comp, mockApi } = makeComponentA();
-      comp.parentPicker.total = 8; // totalPages = 2
+      comp.parentPicker.total = 18; // totalPages = 2
       comp.parentPicker.page = 2;
 
       comp.parentNextPage();
@@ -1137,7 +1176,7 @@ describe('MakerPanelComponent', () => {
 
     it('parentNextPage moves forward a page locally, without reloading', () => {
       const { comp, mockApi } = makeComponentA();
-      comp.parentPicker.total = 8;
+      comp.parentPicker.total = 18;
       comp.parentPicker.page = 1;
 
       comp.parentNextPage();
@@ -1528,6 +1567,8 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.sgsForArrival).toHaveLength(1);
       expect(comp.pickerSelection.selectedArrivalSg?.balanceContractId).toBe('SG1');
       expect(comp.pickerSelection.arrivalSgSnapshot?.availableBalance).toBe('3000');
+      expect(comp.pickerSelection.arrivalSgSnapshots.get('SG1')?.availableBalance).toBe('3000');
+      expect(comp.arrivalSgIndexAmount(sgContract)).toBe('3000 USD');
       // An SG whose own A8 Issue isn't Released yet shouldn't be offered as a redemption target.
       expect(api.catalog).toHaveBeenCalledWith('SHGT', 'ACTIVE', undefined, 1, 50, 'LC1', undefined, true);
     });
@@ -2331,7 +2372,7 @@ describe('MakerPanelComponent', () => {
   });
 
   // Prev/Next are pure client-side windowing over the already-fetched, already-filtered set (display
-  // page size 5); neither triggers a new api.catalog call, regardless of LC context.
+  // page size 10); neither triggers a new api.catalog call, regardless of LC context.
   describe('ibIndexPrevPage / ibIndexNextPage', () => {
     function setupIb() {
       const api = makeApi();
@@ -2345,7 +2386,7 @@ describe('MakerPanelComponent', () => {
     it('ibIndexPrevPage is a no-op on page 1', () => {
       const { api, comp } = setupIb();
       comp.ibIndexPicker.page = 1;
-      comp.ibIndexPicker.total = 12; // display pageSize 5 -> 3 pages
+      comp.ibIndexPicker.total = 12; // display pageSize 10 -> 2 pages
 
       comp.ibIndexPrevPage();
 
@@ -2366,12 +2407,12 @@ describe('MakerPanelComponent', () => {
 
     it('ibIndexNextPage is a no-op on the last page', () => {
       const { api, comp } = setupIb();
-      comp.ibIndexPicker.page = 3; // totalPages = 3
+      comp.ibIndexPicker.page = 2; // totalPages = 2
       comp.ibIndexPicker.total = 12;
 
       comp.ibIndexNextPage();
 
-      expect(comp.ibIndexPicker.page).toBe(3);
+      expect(comp.ibIndexPicker.page).toBe(2);
       expect(api.catalog).not.toHaveBeenCalled();
     });
 
@@ -2411,7 +2452,7 @@ describe('MakerPanelComponent', () => {
     it('arrivalSgPrevPage/arrivalSgNextPage move pickerSelection.arrivalSgPaging.page within bounds', () => {
       const comp = makeComponentB(getFn('A3S'), makeApi());
       comp.pickerSelection.arrivalSgPaging.page = 1;
-      comp.pickerSelection.arrivalSgPaging.total = 12; // display pageSize 5 -> 3 pages
+      comp.pickerSelection.arrivalSgPaging.total = 12; // display pageSize 10 -> 2 pages
 
       comp.arrivalSgPrevPage();
       expect(comp.pickerSelection.arrivalSgPaging.page).toBe(1); // no-op on page 1
@@ -2454,26 +2495,28 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  describe('loadIbIndex() guard (via onSelectParent) — clears the index when the guard fails', () => {
-    it('clears ibIndexPicker.contracts/total without calling the api when the picked Parent has no LC Number of its own', () => {
+  describe('combined LC Number + 2nd Ref transaction index', () => {
+    it('loads all eligible child contracts without requiring a parent-LC pick first', () => {
       const api = makeApi();
       const comp = makeComponentB(getFn('A7'), api, 'FULL_SETTLE');
-      // A degenerate parent (empty lcNumber) still resolves via onSelectParent() and still reaches
-      // loadIbIndex() (usesTwoFieldSearch only depends on model.instrumentType/requiredNaturalKeyFields,
-      // both already set by makeComponentB's own subChoice), but loadIbIndex()'s own guard
-      // (`!searchNaturalKey.lcNumber`) then correctly fails, since onSelectParent() carries the empty
-      // lcNumber straight through to searchNaturalKey.
-      comp.parentPicker.contracts = [makeContract({ balanceContractId: 'P1', naturalKey: { lcNumber: '', ibNumber: null, sgNumber: null } })];
-      comp.ibIndexPicker.contracts = [makeContract({ balanceContractId: 'STALE' })];
-      comp.ibIndexPicker.total = 7;
-      (api.catalog as jest.Mock).mockClear();
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, comp.ibIndexPageSize, undefined, undefined, true);
+    });
 
-      comp.onSelectParent('P1');
+    it('searches LC Number and 2nd Ref in the same index and one pick carries both values', () => {
+      const comp = makeComponentB(getFn('A7'), makeApi(), 'FULL_SETTLE');
+      const picked = makeContract({ balanceContractId: 'A-2', naturalKey: { lcNumber: 'LC-200', ibNumber: 'IB-902', sgNumber: null } });
+      comp.ibIndexPicker.contracts = [
+        makeContract({ balanceContractId: 'A-1', naturalKey: { lcNumber: 'LC-100', ibNumber: 'IB-101', sgNumber: null } }),
+        picked,
+      ];
+      comp.ibIndexPicker.search = '902';
 
-      expect(comp.searchNaturalKey.lcNumber).toBe('');
-      expect(comp.ibIndexPicker.contracts).toEqual([]);
-      expect(comp.ibIndexPicker.total).toBe(0);
-      expect(api.catalog).not.toHaveBeenCalled();
+      comp.onCombinedIndexSearch();
+      expect(comp.filteredIbIndexCatalog).toEqual([picked]);
+
+      comp.onSelectIbIndex('A-2');
+      expect(comp.searchNaturalKey.lcNumber).toBe('LC-200');
+      expect(comp.searchNaturalKey.ibNumber).toBe('IB-902');
     });
   });
 
@@ -2777,7 +2820,9 @@ describe('MakerPanelComponent', () => {
       comp.selectedContract = makeContractC({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
       comp.selectedContractSnapshot = makeSnapshotC({ availableBalance: '1000' });
       comp.submit();
-      expect(comp.submitError).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (1000) — Partial Redeem is no longer supported here.');
+      expect(comp.submitError).toBe(
+        'A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (1000) — Partial Redeem is no longer supported here.',
+      );
       expect(api.createMovement).not.toHaveBeenCalled();
     });
 
@@ -2864,6 +2909,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '100';
       comp.model.secondaryRef = 'AMD01';
       comp.selectedContract = makeContractC();
+      comp.selectedContractSnapshot = makeSnapshotC({ tightAvailableBalance: '100' });
       expect(comp.isSubmitReady).toBe(true);
     });
 
@@ -3028,7 +3074,7 @@ describe('MakerPanelComponent', () => {
       expect(lastReqC(api).movementType).toBe('FULL_REDEEM');
     });
 
-    it('A9 (locked to Full Redeem, BA-confirmed 2026-08-21): rejects rather than deriving PARTIAL_REDEEM when amount is below Available Balance — the Amount field is disabled in the real UI (builder-fields.ts amountFromSgRedeem); this exercises submit-rules.ts\'s own defense-in-depth backstop for a caller that bypasses it', () => {
+    it("A9 (locked to Full Redeem, BA-confirmed 2026-08-21): rejects rather than deriving PARTIAL_REDEEM when amount is below Available Balance — the Amount field is disabled in the real UI (builder-fields.ts amountFromSgRedeem); this exercises submit-rules.ts's own defense-in-depth backstop for a caller that bypasses it", () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A9);
       comp.selectedContract = makeContractC({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null } });
@@ -3037,7 +3083,9 @@ describe('MakerPanelComponent', () => {
 
       comp.submit();
 
-      expect(comp.submitError).toBe('A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (500) — Partial Redeem is no longer supported here.');
+      expect(comp.submitError).toBe(
+        'A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (500) — Partial Redeem is no longer supported here.',
+      );
       expect(api.createMovement).not.toHaveBeenCalled();
     });
 
@@ -3070,6 +3118,7 @@ describe('MakerPanelComponent', () => {
       comp.model.amount = '1000';
       comp.model.secondaryRef = 'IB01';
       comp.selectedContract = makeContractC({ balanceContractId: 'bc-lc' });
+      comp.selectedContractSnapshot = makeSnapshotC({ tightAvailableBalance: '0' });
       comp.pickerSelection.selectedArrivalSg = makeContractC({
         balanceContractId: 'bc-sg',
         instrumentType: 'SHGT',
@@ -3710,15 +3759,30 @@ describe('MakerPanelComponent', () => {
       expect(rows.map((r) => r.movement.movementId)).toEqual(['m-a1', 'm-a2', 'm-b2']);
     });
 
+    it('paginates the combined A4 transaction rows at 10 records per page, rather than paginating LC parents first', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A4'));
+      const parent = contract({ balanceContractId: 'lc-1', naturalKey: { lcNumber: 'LC001' } });
+      c.catalogPicker.contracts = [parent];
+      const movements = Array.from({ length: 11 }, (_, i) => movement({ movementId: `m-${i + 1}`, sourceTransactionRef: `IB${String(i + 1).padStart(2, '0')}` }));
+      c.documentArrivalHints.catalogPayableIbs.set('lc-1', movements.map((item) => item.sourceTransactionRef!));
+      c.documentArrivalHints.catalogPayableMovements.set('lc-1', movements);
+      c.catalogPicker.total = c.allFlattenedPayableRows.length;
+
+      expect(c.flattenedPayableRows).toHaveLength(10);
+      c.catalogPicker.page = 2;
+      expect(c.flattenedPayableRows.map((row) => row.movementId)).toEqual(['m-11']);
+    });
+
     it('catalogPicker.totalPages / parentPicker.totalPages are always at least 1', () => {
       const c = new MakerPanelComponent(mockApiD());
       expect(c.catalogPicker.totalPages).toBe(1);
       expect(c.parentPicker.totalPages).toBe(1);
-      // Display page size is 5 for every picker CatalogPickerService backs.
+      // Display page size is 10 for every picker CatalogPickerService backs.
       c.catalogPicker.total = 13;
-      expect(c.catalogPicker.totalPages).toBe(3);
+      expect(c.catalogPicker.totalPages).toBe(2);
       c.parentPicker.total = 21;
-      expect(c.parentPicker.totalPages).toBe(5);
+      expect(c.parentPicker.totalPages).toBe(3);
     });
 
     it('filteredCatalogContracts: no tenor filter / no movementType -> passthrough', () => {
@@ -3780,7 +3844,7 @@ describe('MakerPanelComponent', () => {
       expect(c.filteredCatalogContracts.map((x) => x.balanceContractId)).toEqual(['sg-eligible']);
     });
 
-    it('filteredCatalogContracts: Close (A10) is close-eligibility-driven — keeps a candidate the server-computed hint-set includes, excludes one it doesn\'t, regardless of Available Balance', () => {
+    it("filteredCatalogContracts: Close (A10) is close-eligibility-driven — keeps a candidate the server-computed hint-set includes, excludes one it doesn't, regardless of Available Balance", () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A10'));
       c.catalogPicker.contracts = [contract({ balanceContractId: 'close-eligible' }), contract({ balanceContractId: 'close-ineligible' })];
@@ -3803,7 +3867,7 @@ describe('MakerPanelComponent', () => {
       expect(c.documentArrivalHints.catalogCloseEligible).toEqual(new Set(['c1']));
     });
 
-    it('onSelectContract (A10) auto-fills model.amount from the snapshot\'s Confirmed Balance, not Available Balance, once resolved', () => {
+    it("onSelectContract (A10) auto-fills model.amount from the snapshot's Confirmed Balance, not Available Balance, once resolved", () => {
       const api = mockApiD({ getSnapshot: jest.fn(() => of(snapshot({ confirmedBalance: '7000', availableBalance: '9000' }))) });
       const c = new MakerPanelComponent(api);
       triggerSelectFunction(c, fn('A10'));
@@ -3814,7 +3878,7 @@ describe('MakerPanelComponent', () => {
       expect(c.model.amount).toBe('7000');
     });
 
-    it('F1: filteredCatalogContracts for A11 (Reopen) is reopen-eligibility-driven — keeps a candidate the server-computed hint-set includes, excludes one it doesn\'t', () => {
+    it("F1: filteredCatalogContracts for A11 (Reopen) is reopen-eligibility-driven — keeps a candidate the server-computed hint-set includes, excludes one it doesn't", () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A11'));
       c.catalogPicker.contracts = [contract({ balanceContractId: 'reopen-eligible' }), contract({ balanceContractId: 'reopen-ineligible' })];
@@ -3836,7 +3900,7 @@ describe('MakerPanelComponent', () => {
       expect(c.documentArrivalHints.catalogReopenEligible).toEqual(new Set(['c1']));
     });
 
-    it('F1: A10 (Close) still queries the default ACTIVE status — the CLOSED override applies only to A11/B7\'s own requiresReopenEligibility', () => {
+    it("F1: A10 (Close) still queries the default ACTIVE status — the CLOSED override applies only to A11/B7's own requiresReopenEligibility", () => {
       const api = mockApiD({ catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })) });
       const c = new MakerPanelComponent(api);
       triggerSelectFunction(c, fn('A10'));
@@ -3844,7 +3908,7 @@ describe('MakerPanelComponent', () => {
       expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, c.catalogPageSize, undefined, undefined, true);
     });
 
-    it('F1: onSelectContract (A11) locks model.amount to the fixed literal \'0\' immediately, with no snapshot fetch needed — unlike A10\'s own Confirmed-Balance-derived amount above', () => {
+    it("F1: onSelectContract (A11) locks model.amount to the fixed literal '0' immediately, with no snapshot fetch needed — unlike A10's own Confirmed-Balance-derived amount above", () => {
       const api = mockApiD({ getSnapshot: jest.fn(() => of(snapshot({ confirmedBalance: '0', availableBalance: '0' }))) });
       const c = new MakerPanelComponent(api);
       triggerSelectFunction(c, fn('A11'));
@@ -3924,7 +3988,7 @@ describe('MakerPanelComponent', () => {
       expect(c.filteredParentCatalog.map((x) => x.balanceContractId).sort()).toEqual(['legacy', 'usance'].sort());
     });
 
-    it('filteredParentCatalog: requiresEligibleParentAcceptance (A7, 2026-08-25) is Acceptance-Balance-eligibility-driven — keeps a candidate WITH an outstanding Acceptance Balance, excludes one without, regardless of the LC\'s own Available Balance', () => {
+    it("filteredParentCatalog: requiresEligibleParentAcceptance (A7, 2026-08-25) is Acceptance-Balance-eligibility-driven — keeps a candidate WITH an outstanding Acceptance Balance, excludes one without, regardless of the LC's own Available Balance", () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A7'));
       c.parentPicker.contracts = [
@@ -4111,7 +4175,7 @@ describe('MakerPanelComponent', () => {
       expect(c.tightAvailableBalanceForWarning).toBe('24');
     });
 
-    it('widens by the selected SG\'s own Outstanding for A35 — the S01/G01 live-reproduced case (Tight 24 + SG 10 = 34)', () => {
+    it("widens by the selected SG's own Outstanding for A35 — the S01/G01 live-reproduced case (Tight 24 + SG 10 = 34)", () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A3S'));
       c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '24' });
@@ -4126,7 +4190,7 @@ describe('MakerPanelComponent', () => {
       expect(c.tightAvailableBalanceForWarning).toBe('0');
     });
 
-    it('widens by the referenced B3 presentation\'s own ceilingAmount for B4 HONOUR (Tight 0 + 10000 = 10000)', () => {
+    it("widens by the referenced B3 presentation's own ceilingAmount for B4 HONOUR (Tight 0 + 10000 = 10000)", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'HONOUR';
       c.selectedContractSnapshot = snapshot({ tightAvailableBalance: '0' });
@@ -4144,26 +4208,26 @@ describe('MakerPanelComponent', () => {
   });
 
   describe('isAmendDecreaseDirection (business instruction 2026-08-20, "A2 Decrease 輸入金額控制規則 B2 Decrease... 都適用")', () => {
-    it('is true for A2\'s own genuine AMEND_DECREASE movementType', () => {
+    it("is true for A2's own genuine AMEND_DECREASE movementType", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'AMEND_DECREASE';
       expect(c.isAmendDecreaseDirection).toBe(true);
     });
 
-    it('is false for A2\'s own AMEND_INCREASE', () => {
+    it("is false for A2's own AMEND_INCREASE", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'AMEND_INCREASE';
       expect(c.isAmendDecreaseDirection).toBe(false);
     });
 
-    it('is true for B2\'s own AMEND with amendDirection DECREASE — model.movementType is always \'AMEND\', never a distinct decrease movementType', () => {
+    it("is true for B2's own AMEND with amendDirection DECREASE — model.movementType is always 'AMEND', never a distinct decrease movementType", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'AMEND';
       c.amendDirection = 'DECREASE';
       expect(c.isAmendDecreaseDirection).toBe(true);
     });
 
-    it('is false for B2\'s own AMEND with amendDirection INCREASE', () => {
+    it("is false for B2's own AMEND with amendDirection INCREASE", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'AMEND';
       c.amendDirection = 'INCREASE';
@@ -4195,7 +4259,7 @@ describe('MakerPanelComponent', () => {
       expect(c.checksAgainstPlainAvailable).toBe(true);
     });
 
-    it('is true for AMEND_DECREASE / B2\'s own Decrease direction', () => {
+    it("is true for AMEND_DECREASE / B2's own Decrease direction", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'AMEND_DECREASE';
       expect(c.checksAgainstPlainAvailable).toBe(true);
@@ -4233,7 +4297,7 @@ describe('MakerPanelComponent', () => {
       expect(c.checksAgainstTightAvailable).toBe(true);
     });
 
-    it('is false for CREATE against a non-EPLC_CONFIRMATION contract (e.g. A6\'s own IPLC_ACCEPTANCE)', () => {
+    it("is false for CREATE against a non-EPLC_CONFIRMATION contract (e.g. A6's own IPLC_ACCEPTANCE)", () => {
       const c = new MakerPanelComponent(mockApiD());
       c.model.movementType = 'CREATE';
       c.selectedContract = contract({ instrumentType: 'IPLC_ACCEPTANCE' });
@@ -4271,6 +4335,19 @@ describe('MakerPanelComponent', () => {
   });
 
   describe('IB Index / context getters', () => {
+    it('shows the selectable IB/EB contract available balance as a read-only Amount column value', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      const item = contract({ balanceContractId: 'ib-1', currency: 'HKD' });
+      expect(c.transactionContractAmount(item)).toBe('—');
+      c.ibIndexPicker.snapshots.set('ib-1', snapshot({ availableBalance: '12500', currency: 'HKD' }));
+      expect(c.transactionContractAmount(item)).toBe('12500 HKD');
+    });
+
+    it('uses a dash when an A3S SG row has no live outstanding snapshot', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      expect(c.arrivalSgIndexAmount(contract({ balanceContractId: 'sg-missing' }))).toBe('—');
+    });
+
     it('filteredIbIndexCatalog: passthrough for a non-decreasing movementType, filters 0-balance for a decreasing one', () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A1'));
@@ -4416,7 +4493,12 @@ describe('MakerPanelComponent', () => {
     });
 
     it('onSelectIbIndex (two-field search, A7) writes model.tenorType from the resolved Acceptance record', () => {
-      const foundContract = contract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'S001', ibNumber: 'B01' }, currency: 'USD', tenorType: 'SELLERS_USANCE' });
+      const foundContract = contract({
+        instrumentType: 'IPLC_ACCEPTANCE',
+        naturalKey: { lcNumber: 'S001', ibNumber: 'B01' },
+        currency: 'USD',
+        tenorType: 'SELLERS_USANCE',
+      });
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A7'));
       c.subChoiceValue = 'FULL_SETTLE';
@@ -4858,7 +4940,13 @@ describe('MakerPanelComponent', () => {
       it('A2 AMEND_INCREASE — subChoiceValue reads straight off the reconstructed movementType (subChoice.key === "movementType")', () => {
         const comp = makeComponentB(getFn('A2'), makeApi());
         comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
-        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '3000', movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD01' });
+        comp.submitResult = makeMovement({
+          movementId: 'mv-1',
+          balanceContractId: 'C1',
+          amount: '3000',
+          movementType: 'AMEND_INCREASE',
+          sourceTransactionRef: 'AMD01',
+        });
 
         comp.startFixPending();
 
@@ -4868,7 +4956,13 @@ describe('MakerPanelComponent', () => {
       it('A2 AMEND_DECREASE — same movementType-key derivation', () => {
         const comp = makeComponentB(getFn('A2'), makeApi());
         comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
-        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '-2000', movementType: 'AMEND_DECREASE', sourceTransactionRef: 'AMD02' });
+        comp.submitResult = makeMovement({
+          movementId: 'mv-1',
+          balanceContractId: 'C1',
+          amount: '-2000',
+          movementType: 'AMEND_DECREASE',
+          sourceTransactionRef: 'AMD02',
+        });
 
         comp.startFixPending();
 
@@ -4878,7 +4972,13 @@ describe('MakerPanelComponent', () => {
       it('A2 AMEND_EXPIRY_DATE — needs no movementTypeOverride at all (A2\'s own third option\'s own value IS "AMEND_EXPIRY_DATE" directly, unlike B2\'s "EXPIRY_DATE"+override pair below) — still resolves via the plain movementType-key branch', () => {
         const comp = makeComponentB(getFn('A2'), makeApi());
         comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
-        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '0', movementType: 'AMEND_EXPIRY_DATE', newExpiryDate: '2028-12-28' });
+        comp.submitResult = makeMovement({
+          movementId: 'mv-1',
+          balanceContractId: 'C1',
+          amount: '0',
+          movementType: 'AMEND_EXPIRY_DATE',
+          newExpiryDate: '2028-12-28',
+        });
 
         comp.startFixPending();
 
@@ -4899,7 +4999,13 @@ describe('MakerPanelComponent', () => {
       it('B2 AMEND with a negative amount — derives DECREASE via displayMovementType(), strips the shared AMEND_ prefix', () => {
         const comp = makeComponentB(getFn('B2'), makeApi());
         comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION' });
-        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '-1500', movementType: 'AMEND', sourceTransactionRef: 'AMD04' });
+        comp.submitResult = makeMovement({
+          movementId: 'mv-1',
+          balanceContractId: 'C1',
+          amount: '-1500',
+          movementType: 'AMEND',
+          sourceTransactionRef: 'AMD04',
+        });
 
         comp.startFixPending();
 
@@ -4910,7 +5016,13 @@ describe('MakerPanelComponent', () => {
       it('B2 AMEND_EXPIRY_DATE — matches movementTypeOverride the same way A2 does, bypassing the amendDirection branch entirely', () => {
         const comp = makeComponentB(getFn('B2'), makeApi());
         comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'EPLC_CONFIRMATION' });
-        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '0', movementType: 'AMEND_EXPIRY_DATE', newExpiryDate: '2028-12-28' });
+        comp.submitResult = makeMovement({
+          movementId: 'mv-1',
+          balanceContractId: 'C1',
+          amount: '0',
+          movementType: 'AMEND_EXPIRY_DATE',
+          newExpiryDate: '2028-12-28',
+        });
 
         comp.startFixPending();
 
@@ -4929,7 +5041,13 @@ describe('MakerPanelComponent', () => {
       it('also reconstructs correctly for Delete Pending review (startDeletePendingReview()), not just Fix Pending', () => {
         const comp = makeComponentB(getFn('A2'), makeApi());
         comp.selectedContract = makeContract({ balanceContractId: 'C1', instrumentType: 'IPLC_LC' });
-        comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '3000', movementType: 'AMEND_INCREASE', sourceTransactionRef: 'AMD01' });
+        comp.submitResult = makeMovement({
+          movementId: 'mv-1',
+          balanceContractId: 'C1',
+          amount: '3000',
+          movementType: 'AMEND_INCREASE',
+          sourceTransactionRef: 'AMD01',
+        });
 
         comp.startDeletePendingReview();
 
@@ -4972,7 +5090,7 @@ describe('MakerPanelComponent', () => {
       });
     });
 
-    it('confirmFixPending() emits fixPendingRequested with the movementId + the model\'s own (edited) amount — A3 declares amount only, so no other field is sent', () => {
+    it("confirmFixPending() emits fixPendingRequested with the movementId + the model's own (edited) amount — A3 declares amount only, so no other field is sent", () => {
       const comp = makeComponentB(getFn('A3'), makeApi());
       comp.selectedContract = makeContract({ balanceContractId: 'C1' });
       comp.submitResult = makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', amount: '20000' });
@@ -5010,7 +5128,7 @@ describe('MakerPanelComponent', () => {
       });
     });
 
-    it('confirmFixPending() coerces a number-typed tolerancePct to a string — Angular\'s NumberValueAccessor coerces the bound value on this Formly `type: \'number\'` field to a real JS number, which the backend\'s z.string() schema rejects ("Expected string, received number") unless coerced back, same trap amount\'s own submit-rules.ts coercion already guards against', () => {
+    it("confirmFixPending() coerces a number-typed tolerancePct to a string — Angular's NumberValueAccessor coerces the bound value on this Formly `type: 'number'` field to a real JS number, which the backend's z.string() schema rejects (\"Expected string, received number\") unless coerced back, same trap amount's own submit-rules.ts coercion already guards against", () => {
       const comp = makeComponentB(getFn('A1'), makeApi());
       comp.submitResult = makeMovement({ movementId: 'mv-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
       comp.startFixPending();
@@ -5071,7 +5189,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.submitResult?.amount).toBe('95000');
     });
 
-    it('externalFixPendingRequest (Maker Queue\'s own Fix Pending entry point, 2026-08-28) sets submitResult and starts Fix Pending — same reconstructed-screen mechanism the in-session button already drives', () => {
+    it("externalFixPendingRequest (Maker Queue's own Fix Pending entry point, 2026-08-28) sets submitResult and starts Fix Pending — same reconstructed-screen mechanism the in-session button already drives", () => {
       const api = makeApi({ getContract: jest.fn(() => of(makeContract({ balanceContractId: 'C1', currency: 'USD' }))) });
       const comp = makeComponentB(getFn('A1'), api);
       const movement = makeMovement({ movementId: 'mv-ext-1', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
@@ -5126,7 +5244,10 @@ describe('MakerPanelComponent', () => {
       // Genuinely stale before the fix — this.fields was last built while fixPendingMode was true.
       expect(comp.fields.find((f: any) => f.key === 'currency')?.props?.label).toContain('Fix Pending');
 
-      comp.externalCheckerOutcome = { kind: 'released', result: makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', movementType: 'AMEND_INCREASE', currency: 'USD', status: 'PENDING' }) };
+      comp.externalCheckerOutcome = {
+        kind: 'released',
+        result: makeMovement({ movementId: 'mv-2', balanceContractId: 'C1', movementType: 'AMEND_INCREASE', currency: 'USD', status: 'PENDING' }),
+      };
       comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
 
       expect(comp.fixPendingMode).toBe(false);
@@ -5134,7 +5255,7 @@ describe('MakerPanelComponent', () => {
       expect(currencyField?.props?.label).not.toContain('Fix Pending');
     });
 
-    it('live bug found via browser verification, fixed same day — emits contextChanged with the new submitResult, so the parent\'s own makerContext mirror (which selectFunction() just reset to submitResult: null) is up to date BEFORE the Maker clicks Save Fix Pending; without this, TransactionBuilderComponent.fixPending()\'s own movementId guard silently no-ops the whole save', () => {
+    it("live bug found via browser verification, fixed same day — emits contextChanged with the new submitResult, so the parent's own makerContext mirror (which selectFunction() just reset to submitResult: null) is up to date BEFORE the Maker clicks Save Fix Pending; without this, TransactionBuilderComponent.fixPending()'s own movementId guard silently no-ops the whole save", () => {
       const comp = makeComponentB(getFn('A1'), makeApi());
       const movement = makeMovement({ movementId: 'mv-ext-3', balanceContractId: 'C1', amount: '80000', movementType: 'ISSUE' });
       comp.externalFixPendingRequest = movement;
@@ -5158,7 +5279,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.submitResult).toBe(movement);
     });
 
-    it('is a no-op when externalFixPendingRequest changes to null (the @Input()\'s own default, never itself a trigger)', () => {
+    it("is a no-op when externalFixPendingRequest changes to null (the @Input()'s own default, never itself a trigger)", () => {
       const comp = makeComponentB(getFn('A1'), makeApi());
 
       comp.ngOnChanges({ externalFixPendingRequest: makeChange(null, null) } as any);

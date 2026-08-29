@@ -683,6 +683,13 @@ export class BalanceMovementStore {
       });
   }
 
+  /** A9 Remarks-only Fix Pending: deliberately updates no monetary, status, accounting, or identity column. */
+  applyRemarksOnlyCorrection(params: { movementId: string; remarks: string | null; editedBy: string; editedAt: string }): void {
+    this.db
+      .prepare('UPDATE balance_movements SET remarks = @remarks, edited_by = @editedBy, edited_at = @editedAt WHERE movement_id = @movementId')
+      .run(params);
+  }
+
   /** A4's own real Maker Submit (2026-08-16) — sets maker_submitted_by/maker_submitted_at only, never touches status. Mirrors markPresentDocsConsumed() above, on the Maker side. */
   submitByMaker(params: { movementId: string; makerSubmittedBy: string; makerSubmittedAt: string }): void {
     this.db

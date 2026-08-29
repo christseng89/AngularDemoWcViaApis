@@ -395,6 +395,15 @@
   text-align: right;
 }
 
+// Keep the three adjacent LC balance figures visually grouped on wide screens. Width: 1% makes these
+// columns use their content/minimum header width; the table's spare width flows to descriptive columns.
+.tb-table--lc-index .tb-table__compact-number {
+  width: 1%;
+  min-width: 118px;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .tb-table__ref {
   font-family: var(--font-mono);
   font-size: 11px;

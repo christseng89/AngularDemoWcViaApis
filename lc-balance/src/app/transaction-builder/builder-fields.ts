@@ -69,7 +69,7 @@ function deriveFixPendingLockFlags(
   const enabled = fixPendingModeOn && functionSupportsFixPending(strategy);
   const contractLevelEditable = enabled && isCreatingMovement(ctx.model);
   return {
-    amount: enabled && amountLocked,
+    amount: enabled && (amountLocked || strategy?.fixPendingMode === 'REMARKS_ONLY'),
     // tolerancePct is a deliberate exception to the shared contractLevelEditable rule below (2026-08-28,
     // "A2 Tolerance % FIX PENDING INCREASE/DECREASE時准許修改") — unlike tenorType/tenorDays/expiryDate,
     // Tolerance is ALSO genuinely applicable to a non-creating AMEND_INCREASE/AMEND_DECREASE/AMEND edit
@@ -84,6 +84,7 @@ function deriveFixPendingLockFlags(
     expiryDate: enabled && !contractLevelEditable,
     newExpiryDate: fixPendingModeOn && (!enabled || !isAmendExpiryDate),
     reasonCode: fixPendingModeOn && (!enabled || !requiresReasonCode),
+    remarks: fixPendingModeOn && strategy?.fixPendingMode !== 'REMARKS_ONLY',
   };
 }
 
@@ -225,6 +226,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const expiryDateFixPendingLocked = fixPendingFlags.expiryDate;
   const newExpiryDateFixPendingLocked = fixPendingFlags.newExpiryDate;
   const reasonCodeFixPendingLocked = fixPendingFlags.reasonCode;
+  const remarksFixPendingLocked = fixPendingFlags.remarks;
 
   const fields: FormlyFieldConfig[] = [
     // Must be the first field on the entry screen (Amendment No. for A2/B2, IB Number for A3/A3S, EB
@@ -333,6 +335,18 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       hide: !requiresReasonCode,
     },
     {
+      key: 'remarks',
+      type: 'textarea',
+      props: {
+        label: 'Remarks',
+        description: 'Optional note for this pending A9 redemption. Monetary and accounting fields remain unchanged.',
+        maxLength: 500,
+        rows: 4,
+        disabled: remarksFixPendingLocked,
+      },
+      hide: !ctx.fixPendingMode || strategy?.fixPendingMode !== 'REMARKS_ONLY',
+    },
+    {
       key: 'currency',
       // Reuses the same Formly `type: 'select'` pattern the Tenor Type field uses below.
       type: currencyIsDropdown ? 'select' : 'input',
@@ -427,10 +441,13 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // Mandatory-field visual distinction (UI/UX best practice: don't rely on the tiny asterisk
   // alone) — applies uniformly to every function (A1-A9/B1-B5) since it reads props.required
   // rather than hardcoding field keys. See .tb-field--required in the stylesheet.
-  for (const f of fields) {
+  const applicableFields = strategy?.fixPendingMode === 'REMARKS_ONLY' && ctx.fixPendingMode
+    ? fields
+    : fields.filter((field) => field.key !== 'remarks');
+  for (const f of applicableFields) {
     if (f.props?.required) f.className = [f.className, 'tb-field--required'].filter(Boolean).join(' ');
   }
-  return fields;
+  return applicableFields;
 }
 
 /**
@@ -475,6 +492,7 @@ const MODEL_FIELD_SOURCES: { [K in keyof Required<BuilderModel>]: (movement: Bal
   expiryDate: (_movement, contract) => contract.expiryDate ?? undefined,
   newExpiryDate: (movement) => movement.newExpiryDate ?? undefined,
   reasonCode: (movement) => movement.reasonCode ?? undefined,
+  remarks: (movement) => movement.remarks ?? undefined,
 };
 
 /** Rebuilds the full `BuilderModel` a historical Event's Original Transaction Screen should show, straight off the saved movement/contract — see MODEL_FIELD_SOURCES' own doc comment for why this is exhaustive by construction rather than hand-picked. */

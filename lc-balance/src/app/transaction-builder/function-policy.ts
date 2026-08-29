@@ -36,6 +36,8 @@ export interface BuilderModel {
   newExpiryDate?: string;
   /** F1 proposal §13.1 item 4/3(a) (BA-ratified 2026-08-25) — A10/B6 (Close) and A11/B7 (Reopen) only, mandatory. */
   reasonCode?: string;
+  /** Optional operational note. A9 exposes this as its sole Remarks-only Fix Pending field. */
+  remarks?: string;
 }
 
 /** The three natural-key components a Maker can type or have carried in — shared shape of `naturalKey` and `searchNaturalKey`. */

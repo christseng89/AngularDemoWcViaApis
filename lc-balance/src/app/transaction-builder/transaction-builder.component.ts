@@ -34,6 +34,9 @@ import { AccountEntriesDialogComponent } from './account-entries-dialog.componen
 import { CheckerPanelComponent, CheckerSyncSignal } from './checker-panel.component';
 import { MakerCheckerContext, MakerPanelComponent, MakerSyncRequest } from './maker-panel.component';
 import { deriveFunctionStrategy } from './function-strategy';
+import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
+import { UiMessage } from '../shared/feedback/ui-message.model';
+import { presentApiError } from '../shared/feedback/api-error-presenter';
 
 /**
  * Named Import (A-series) / Export (B-series) business functions, not a raw instrumentType/
@@ -56,6 +59,7 @@ import { deriveFunctionStrategy } from './function-strategy';
     BalanceSnapshotBoxComponent,
     MakerQueueComponent,
     InquireDeletePendingComponent,
+    FeedbackMessageComponent,
   ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
@@ -88,6 +92,10 @@ export class TransactionBuilderComponent {
   selectedCheckerMovement: BalanceMovement | null = null;
   checkerBusy = false;
   checkerError: string | null = null;
+  get checkerFeedback(): UiMessage | null {
+    if (!this.checkerError) return null;
+    return { ...presentApiError({ message: this.checkerError }, 'APPROVE'), retryable: false };
+  }
   checkerId = 'checker1';
   checkerSyncSignal: CheckerSyncSignal | null = null;
   /** Public for template binding — shared reset trigger for both CheckerPanelComponent and MakerPanelComponent. */

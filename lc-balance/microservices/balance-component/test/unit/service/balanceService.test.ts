@@ -3096,6 +3096,44 @@ describe('BalanceService.editPending — Fix Pending trial (A1 ISSUE, A3 UTILIZE
   });
 });
 
+describe('BalanceService.editPending — A9 Remarks-only mode', () => {
+  function pendingStandaloneA9(service: BalanceService, lcNumber: string) {
+    const lcIssue = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber }, movementType: 'ISSUE', eventSeq: 91001, amount: '100000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', createdBy: 'maker1' });
+    if (!lcIssue.created) throw new Error('expected LC issue');
+    service.release(lcIssue.movement.movementId, 'checker1');
+    const lc = service.resolveContract('IPLC_LC', { lcNumber })!;
+    const sgIssue = service.createMovement({ instrumentType: 'SHGT', naturalKey: { lcNumber, sgNumber: 'SG-A9' }, movementType: 'ISSUE', eventSeq: 91002, amount: '10000', currency: 'USD', parentLogicalContractId: lc.logicalContractId, createdBy: 'maker1' });
+    if (!sgIssue.created) throw new Error('expected SG issue');
+    service.release(sgIssue.movement.movementId, 'checker1');
+    const sg = service.resolveContract('SHGT', { lcNumber, sgNumber: 'SG-A9' })!;
+    const redeem = service.createMovement({ instrumentType: 'SHGT', balanceContractId: sg.balanceContractId, movementType: 'FULL_REDEEM', eventSeq: 91003, amount: '10000', currency: 'USD', createdBy: 'maker1' });
+    if (!redeem.created) throw new Error('expected A9 redemption');
+    return redeem.movement;
+  }
+
+  test('trims remarks, preserves all monetary/status/identity fields, and writes an audit snapshot', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const before = pendingStandaloneA9(service, 'FIXP-A9-001');
+    const after = service.editPending(before.movementId, { amount: before.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: '  checked docs  ' });
+    expect(after).toMatchObject({ movementId: before.movementId, eventSeq: before.eventSeq, amount: before.amount, currency: before.currency, status: before.status, createdBy: before.createdBy, remarks: 'checked docs', editedBy: 'maker2' });
+    const audit = service.listFixPendingAudit(before.movementId);
+    expect(audit).toHaveLength(1);
+    expect((audit[0]!.afterSnapshot as { remarks: string }).remarks).toBe('checked docs');
+  });
+
+  test('rejects amount changes and non-A9 use; blank remarks normalize to null', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const a9 = pendingStandaloneA9(service, 'FIXP-A9-002');
+    expect(() => service.editPending(a9.movementId, { amount: '1', editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: 'x' })).toThrow(RequestValidationError);
+    const cleared = service.editPending(a9.movementId, { amount: a9.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: '   ' });
+    expect(cleared.remarks).toBeNull();
+    const issueResult = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'FIXP-A9-NOT-SG' }, movementType: 'ISSUE', eventSeq: 91004, amount: '1000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', createdBy: 'maker1' });
+    if (!issueResult.created) throw new Error('expected LC issue');
+    const issue = issueResult.movement;
+    expect(() => service.editPending(issue.movementId, { amount: issue.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: 'x' })).toThrow(RequestValidationError);
+  });
+});
+
 // Phase 4 (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.5, 2026-08-28, user-
 // directed "現在實作 Phase 4 compound cascade") — A3S's own documentArrivalWithSg compound Fix Pending
 // cascade, exercising `BalanceService.applyArrivalWithSgCompoundEdit()`.
@@ -3241,7 +3279,7 @@ describe('BalanceService.editPending — Phase 4 compound cascade (A3S, document
   test('Fix Pending on a compound UTILIZE whose SG sibling is no longer PENDING (already Approved/Released) is rejected, not silently mis-edited', () => {
     const service = new BalanceService(createDb(':memory:'));
     const { lc, sg } = issueSightLcWithSg(service, 'A3S-FIXP-004', '20000');
-    const { sgRedeem, utilize } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '15000', 'B01');
+    const { sgRedeem, utilize } = submitDocumentArrivalWithSg(service, lc.balanceContractId, sg.balanceContractId, '20000', '20000', 'B01');
     service.release(sgRedeem.movementId, 'checker1'); // A3S's own Checker Release genuinely releases the SG leg for real, while the LC's own UTILIZE stays PENDING (acknowledgment-only)
 
     expect(() => service.editPending(utilize.movementId, { amount: '12000', editedBy: 'maker2' })).toThrow(RequestValidationError);

@@ -11,7 +11,9 @@ import { FormsModule } from '@angular/forms';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TransactionSearchFieldComponent {
+  private static nextId = 0;
   @Input({ required: true }) label = '';
+  @Input() inputId = `transactionSearch${++TransactionSearchFieldComponent.nextId}`;
   @Input() value = '';
   @Input() placeholder = '';
   @Input() loading = false;

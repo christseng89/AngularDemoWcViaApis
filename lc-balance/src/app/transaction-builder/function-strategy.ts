@@ -77,7 +77,8 @@ export interface SelectionFlowStrategy {
  * them for every Function unconditionally, so the type system rules out a Function ever declaring one
  * editable, rather than relying on every Function's own config to correctly omit them.
  */
-export type FixPendingEditableField = 'amount' | 'tolerancePct' | 'tenorType' | 'tenorDays' | 'expiryDate' | 'newExpiryDate' | 'reasonCode';
+export type FixPendingEditableField = 'amount' | 'tolerancePct' | 'tenorType' | 'tenorDays' | 'expiryDate' | 'newExpiryDate' | 'reasonCode' | 'remarks';
+export type FixPendingMode = 'STANDARD' | 'REMARKS_ONLY';
 
 export interface FunctionStrategy {
   code: string;
@@ -129,6 +130,7 @@ export interface FunctionStrategy {
    * included in the original A8/A10/A11/B6/B7 batch.
    */
   fixPendingEnabled: boolean;
+  fixPendingMode: FixPendingMode | null;
 }
 
 /** Single derived source of truth for "does this Function offer a Fix Pending entry point at all" — a template-friendly wrapper around `FunctionStrategy.fixPendingEnabled` (never re-derive this from field-level editability; a Function with `fixPendingEnabled: false` offers no entry point even if every field would otherwise derive as editable). */
@@ -143,6 +145,7 @@ const NO_SPECIAL_BEHAVIOR: FunctionStrategy = Object.freeze({
   checkerRelease: Object.freeze({ releasesExistingMovementInPlace: false, settlesDocumentArrival: false, sourceAlreadyReleasedBeforePick: false, deferSettlement: false }),
   selectionFlow: Object.freeze({ usesSettleableBalanceIndex: false }),
   fixPendingEnabled: false,
+  fixPendingMode: null,
 });
 
 /**
@@ -228,6 +231,8 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
   A9: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A9',
+    fixPendingEnabled: true,
+    fixPendingMode: 'REMARKS_ONLY',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'REDEEM' },
   },
   // A10 — Amount is fully auto-filled/locked (amountAutoFilledFrom), but Reason Code (F1 §13.1, mandatory
@@ -307,6 +312,7 @@ export function deriveFunctionStrategy(fn: TransactionFunction): FunctionStrateg
     checkerRelease: { ...strategy.checkerRelease },
     selectionFlow: { ...strategy.selectionFlow },
     fixPendingEnabled: strategy.fixPendingEnabled,
+    fixPendingMode: strategy.fixPendingMode ?? (strategy.fixPendingEnabled ? 'STANDARD' : null),
   };
 }
 

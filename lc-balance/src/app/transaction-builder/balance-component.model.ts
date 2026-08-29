@@ -241,6 +241,8 @@ export interface TransactionFunction {
   defaultParentInstrumentType?: InstrumentType;
   /** Every function except LC Issue (A1/B1) requires one generic secondary reference (sent as sourceTransactionRef), labeled per context. SG Number is separate — for A8/A9 it's SHGT's own primary natural key, not a secondary tag. */
   secondaryRefLabel?: string;
+  /** Column heading used by the transaction-selection Index when the selectable key includes a business 2nd reference. */
+  transactionIndexSecondaryRefLabel?: 'SG Number' | 'IB Number' | 'EB Number';
   /** Design doc §7 Tenor Type Routing — when set, Tenor Type is mandatory. A1/B1 offer all three; Acceptance (A6/B4) offers only the two Usance options (Sight never produces an Acceptance). Audit/reporting only — never changes a check. */
   tenorTypeOptions?: { value: string; label: string }[];
   /** A4's Catalog picker: filters to contracts whose own declared tenorType matches, so a Usance LC can't be picked under the Sight card or vice versa. A contract with no tenorType recorded is never filtered out. */
@@ -349,7 +351,8 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     instrumentType: 'IPLC_LC',
     movementType: 'UTILIZE',
     secondaryRefLabel: 'IB Number',
-    help: "For documents arriving against an LC that still has an outstanding Shipping Guarantee reserving the capacity (A8). Pick the LC, then the specific SG record below — Bill Amount is the actual document amount, freely typed; SG Redemption Amount = MIN(Bill Amount, SG Outstanding), shown below once picked (any excess above the SG's outstanding is ordinary incremental LC exposure, still checked against Tight Available). Maker: Submit reserves BOTH the SG's own redemption (Full or Partial, whichever the match works out to) and this Document Arrival as PENDING. Checker: one Release does BOTH — the SG redemption releases AND the Document Arrival moves to Pending LC Balance (still not finalized — go to A4/A6 next, same as a plain A3).",
+    transactionIndexSecondaryRefLabel: 'SG Number',
+    help: "For documents arriving against an LC that still has an outstanding Shipping Guarantee reserving the capacity (A8). Pick the LC, then the specific SG record below — Bill Amount must be greater than or equal to the selected SG Balance. Maker Submit reserves BOTH the SG's full redemption and this Document Arrival as PENDING. Checker Approve re-validates the same minimum before releasing the SG redemption and moving the Document Arrival to EARMARKED (then continue to A4/A6).",
   },
   {
     code: 'A4',
@@ -358,6 +361,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     instrumentType: 'IPLC_LC',
     movementType: 'UTILIZE',
     catalogTenorFilter: 'SIGHT',
+    transactionIndexSecondaryRefLabel: 'IB Number',
     // Amount is NOT re-typed here — it was already fixed when A3 recorded the presentation, so it can't
     // drift from the documents actually presented. submitA4() calls a dedicated maker-submit backend
     // action on A3's own earmarked UTILIZE, not createMovement() — no new movement is created.
@@ -371,6 +375,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     movementType: 'CREATE',
     defaultParentInstrumentType: 'IPLC_LC',
     tenorTypeOptions: USANCE_ONLY_TENOR_OPTIONS,
+    transactionIndexSecondaryRefLabel: 'IB Number',
     // A Usance drawing is deliberately two calls, both fired at the Checker's Release click: release
     // the picked Document Arrival, then the new Acceptance. Amount/Tenor carried and protected.
     payableMovementType: 'UTILIZE',
@@ -383,6 +388,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     label: 'Acceptance Settlement',
     side: 'IMPORT',
     instrumentType: 'IPLC_ACCEPTANCE',
+    transactionIndexSecondaryRefLabel: 'IB Number',
     subChoice: {
       key: 'movementType',
       label: 'Settlement type',
@@ -524,6 +530,7 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     instrumentType: 'EPLC_CONFIRMATION',
     movementType: 'HONOUR',
     secondaryRefLabel: 'EB Number',
+    transactionIndexSecondaryRefLabel: 'EB Number',
     payableMovementType: 'CREATE',
     payableMovementInstrumentType: 'EPLC_EXAMINATION',
     pendingItemLabel: 'Present Docs',
@@ -542,6 +549,7 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     movementType: 'FULL_SETTLE',
     defaultParentInstrumentType: 'EPLC_CONFIRMATION',
     catalogTenorFilter: 'USANCE',
+    transactionIndexSecondaryRefLabel: 'EB Number',
     help: "Confirm LC Settlement — Usance held-to-maturity only (CNF_MATURE): one compound settles BOTH the Acceptance (this bank's own DPU liability, paid to the beneficiary) AND its matching Reimbursement Receivable (the issuing bank's own reimbursement to this bank), same amount, in a single Checker Release. Pick the LC (LC Index, Usance only), then the EB Number (EB Index) — a single LC can have multiple Document Presentations. Sight settlement (Due from Issuing Bank) is out of Balance Component's own scope — Balance Component only owns the contingent/liability side; B4 still creates that asset, but collecting it happens outside this system. Nego'd/discounted Usance (EPLC_EXPORT_BILLS_DISCOUNTED) is still follow-up work, not this function.",
   },
   // Export analog of A10 — see A10's own help text/doc comment above for the shared rationale.

@@ -294,6 +294,8 @@ export type CreateMovementResult = { created: true; movement: BalanceMovement } 
  */
 export interface EditMovementRequest {
   amount: string;
+  editMode?: 'STANDARD' | 'REMARKS_ONLY';
+  remarks?: string | null;
   legRef?: string | null;
   accountEntries?: AccountEntry[] | null;
   businessEventId?: string | null;
@@ -1762,6 +1764,26 @@ export class BalanceService {
     }
   }
 
+  /** A3S invariant shared by Maker Submit and Checker acknowledgement. */
+  private assertA3SBillCoversShippingGuarantee(businessEventId: string | null | undefined, billAmount: string): void {
+    if (!businessEventId) return;
+    const sgRedemptions = this.movements
+      .findByBusinessEventId(businessEventId)
+      .filter((movement) => movement.movementType === 'FULL_REDEEM' || movement.movementType === 'PARTIAL_REDEEM');
+    if (sgRedemptions.length !== 1) {
+      throw new RequestValidationError(`A3S event ${businessEventId} must reference exactly one Shipping Guarantee redemption.`);
+    }
+    const redemption = sgRedemptions[0]!;
+    const sgBalanceBeforeRedemption = computeConfirmedBalance(
+      this.movements.listByContract(redemption.balanceContractId).filter((movement) => movement.movementId !== redemption.movementId),
+    );
+    if (new Decimal(billAmount).lessThan(sgBalanceBeforeRedemption)) {
+      throw new RequestValidationError(
+        `A3S Bill Amount must be greater than or equal to the Shipping Guarantee Balance (${sgBalanceBeforeRedemption.toFixed()}).`,
+      );
+    }
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
     // Checked BEFORE resolveOrCreateContract() — a rejected ISSUE/CREATE must never leave an orphaned,
     // empty BalanceContract row behind (same "checked before createContract()" posture the SG/Present-
@@ -2004,6 +2026,17 @@ export class BalanceService {
     applyStatusTransition({ currentStatus: movement.status, action: 'RELEASE', createdBy: movement.createdBy, actingUser: releasedBy });
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
+    if (
+      contract.instrumentType === 'SHGT' &&
+      (movement.movementType === 'FULL_REDEEM' || movement.movementType === 'PARTIAL_REDEEM') &&
+      movement.businessEventId
+    ) {
+      const arrivals = this.movements
+        .findByBusinessEventId(movement.businessEventId)
+        .filter((linked) => linked.movementType === 'UTILIZE');
+      if (arrivals.length !== 1) throw new RequestValidationError(`A3S event ${movement.businessEventId} must reference exactly one Document Arrival.`);
+      this.assertA3SBillCoversShippingGuarantee(movement.businessEventId, arrivals[0]!.amount);
+    }
     // Quality-report-balance.md BAL-123 (2026-08-17, reviewer-found) / 2026-08-18 (reused again below,
     // for the eventSnapshot-preservation fix) — identifies an IPLC_LC/UTILIZE genuinely finalizing an
     // EXISTING A3/A3S Document Arrival: A4 (Sight Settlement) reaches this release() call DIRECTLY (the
@@ -2604,6 +2637,44 @@ export class BalanceService {
     const contract = this.contracts.findById(old.balanceContractId);
     if (!contract) throw new NotFoundError(`No BalanceContract ${old.balanceContractId} (owner of movement ${old.movementId})`);
 
+    if (patch.editMode === 'REMARKS_ONLY') {
+      const suppliedKeys = Object.keys(patch);
+      const allowedKeys = new Set(['amount', 'editedBy', 'editMode', 'remarks']);
+      if (suppliedKeys.some((key) => !allowedKeys.has(key))) {
+        throw new RequestValidationError('Remarks-only Fix Pending may change remarks only.');
+      }
+      if (contract.instrumentType !== 'SHGT' || !['FULL_REDEEM', 'PARTIAL_REDEEM'].includes(old.movementType) || old.businessEventId) {
+        throw new RequestValidationError('Remarks-only Fix Pending is supported only for a standalone A9 redemption.');
+      }
+      if (patch.amount !== old.amount) throw new RequestValidationError('Amount cannot be changed in Remarks-only Fix Pending.');
+      const remarks = patch.remarks?.trim() || null;
+      const editedAt = this.now();
+      const after = { ...old, remarks, editedBy: patch.editedBy, editedAt };
+      this.db.exec('BEGIN');
+      try {
+        this.fixPendingAudit.insert({
+          auditId: randomUUID(),
+          editSeq: this.fixPendingAudit.nextEditSeq(old.movementId),
+          movementId: old.movementId,
+          balanceContractId: old.balanceContractId,
+          eventSeq: old.eventSeq,
+          originalCreatedBy: old.createdBy,
+          originalCreatedAt: old.createdAt,
+          statusBefore: old.status as 'PENDING' | 'REJECTED',
+          beforeSnapshot: old as unknown as Record<string, unknown>,
+          afterSnapshot: after as unknown as Record<string, unknown>,
+          editedBy: patch.editedBy,
+          editedAt,
+        });
+        this.movements.applyRemarksOnlyCorrection({ movementId: old.movementId, remarks, editedBy: patch.editedBy, editedAt });
+        this.db.exec('COMMIT');
+        return this.movements.findById(old.movementId)!;
+      } catch (err) {
+        this.db.exec('ROLLBACK');
+        throw err;
+      }
+    }
+
     // 2026-08-28, per direct user feedback ("為什麼只有amount可以改... Expiry Date, Tenor Type
     // etc.?") — a CREATING movementType's own still-PENDING/REJECTED record owns the CONTRACT it
     // created (contract.tolerancePct/tenorType/tenorDays/expiryDate/mailFloatGraceDays are genuinely
@@ -2970,6 +3041,7 @@ export class BalanceService {
               `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
           );
         }
+        if (movement.businessEventId) this.assertA3SBillCoversShippingGuarantee(movement.businessEventId, movement.amount);
         // Business-confirmed 2026-08-24 — genuine 4-eyes separation, same rule release()/reject() enforce
         // via applyStatusTransition(); acknowledgeArrival() bypasses that function entirely (it never
         // changes status), so it needs its own explicit call to the same shared check.

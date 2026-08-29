@@ -21,9 +21,17 @@
     </div>
 
     <div class="index-picker__list" *ngIf="items.length">
+      <div
+        class="index-picker__header"
+        [style.--index-picker-columns]="'repeat(' + columnHeaders.length + ', minmax(0, 1fr))'"
+        *ngIf="columnHeaders.length">
+        <span *ngFor="let heading of columnHeaders">{{ heading }}</span>
+      </div>
       <button
         type="button"
         class="index-picker__row"
+        [class.index-picker__row--columns]="columnHeaders.length"
+        [style.--index-picker-columns]="'repeat(' + columnHeaders.length + ', minmax(0, 1fr))'"
         *ngFor="let item of items"
         [class.index-picker__row--active]="selectedId === itemId(item)"
         (click)="pick.emit(itemId(item))">

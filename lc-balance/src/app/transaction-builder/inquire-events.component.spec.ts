@@ -27,6 +27,16 @@ function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
 }
 
 describe('InquireEventsComponent', () => {
+  it('maps index error and both empty states to shared feedback', () => {
+    const c = new InquireEventsComponent();
+    c.inquireEvents = { indexError: null, indexSearch: 'S0', indexEmptyIsError: false, indexEmptyMessage: 'No records.' } as any;
+    expect(c.indexErrorFeedback).toBeNull();
+    expect(c.indexEmptyFeedback).toMatchObject({ severity: 'INFO', title: 'No transactions available' });
+    c.inquireEvents.indexError = 'network down';
+    expect(c.indexErrorFeedback).toMatchObject({ severity: 'ERROR', retryable: true });
+    c.inquireEvents = { ...c.inquireEvents, indexError: null, indexEmptyIsError: true } as any;
+    expect(c.indexEmptyFeedback).toMatchObject({ severity: 'WARNING', title: 'No matching transaction' });
+  });
   it('exposes openAccountEntries as an EventEmitter', () => {
     const c = new InquireEventsComponent();
     expect(c.openAccountEntries.emit).toBeInstanceOf(Function);
@@ -54,6 +64,14 @@ describe('InquireEventsComponent', () => {
 
       expect(spy).toHaveBeenCalledWith({ movement: m, instrumentType: 'EPLC_CONFIRMATION', phase: undefined });
     });
+  });
+
+  it('uses side-correct IB/EB terminology', () => {
+    const c = new InquireEventsComponent();
+    c.inquireEvents = { side: 'IMPORT' } as any;
+    expect(c.ibNumberLabel).toBe('IB Number');
+    c.inquireEvents = { side: 'EXPORT' } as any;
+    expect(c.ibNumberLabel).toBe('EB Number');
   });
 
   describe('thin pure-function delegations (same shared balance-component.model.ts rules TransactionBuilderComponent itself uses for its own remaining sections)', () => {

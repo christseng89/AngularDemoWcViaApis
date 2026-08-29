@@ -765,7 +765,8 @@ export class MakerPanelComponent implements OnChanges {
     }
     this.rebuildFields();
     if (!this.isCreatingMovement && !this.usesTwoFieldSearch) this.reloadCatalog();
-    if (this.parentInstrumentType) this.onParentInstrumentTypeChange();
+    if (this.usesTwoFieldSearch) this.loadIbIndex();
+    else if (this.parentInstrumentType) this.onParentInstrumentTypeChange();
   }
 
   reloadCatalog(): void {
@@ -773,6 +774,7 @@ export class MakerPanelComponent implements OnChanges {
       guardFails: !this.model.instrumentType || this.isCreatingMovement,
       instrumentType: this.model.instrumentType!,
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
+      query: this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace ? null : undefined,
       // A11/B7 (Reopen, F1) only — its own candidates are CLOSED, not ACTIVE like every other flat
       // Catalog picker this service backs; every other function keeps the default (undefined -> 'ACTIVE').
       status: this.selectedFunction?.requiresReopenEligibility ? 'CLOSED' : undefined,
@@ -785,7 +787,7 @@ export class MakerPanelComponent implements OnChanges {
           this.hintsPending++;
           this.documentArrivalHints.loadCatalogHints(items, () => {
             this.hintsPending--;
-            this.catalogPicker.total = this.filteredCatalogContracts.length;
+            this.catalogPicker.total = this.allFlattenedPayableRows.length;
           });
         }
         if (this.selectedFunction?.payableMovementInstrumentType) {
@@ -836,20 +838,39 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   onCatalogSearch(): void {
+    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace) {
+      this.catalogPicker.page = 1;
+      this.catalogPicker.total = this.allFlattenedPayableRows.length;
+      return;
+    }
     this.reloadCatalog();
   }
 
-  get flattenedPayableRows(): { contract: BalanceContract; movement: any }[] {
-    const rows: { contract: BalanceContract; movement: any }[] = [];
-    for (const c of this.pagedFilteredCatalogContracts) {
+  get allFlattenedPayableRows(): { movementId: string; contract: BalanceContract; movement: any }[] {
+    const rows: { movementId: string; contract: BalanceContract; movement: any }[] = [];
+    const query = this.catalogPicker.search.trim().toLowerCase();
+    for (const c of this.filteredCatalogContracts) {
       const movements = this.documentArrivalHints.catalogPayableMovements.get(c.balanceContractId) ?? [];
-      for (const m of movements) rows.push({ contract: c, movement: m });
+      for (const m of movements) {
+        if (query && !c.naturalKey.lcNumber.toLowerCase().includes(query) && !m.sourceTransactionRef?.toLowerCase().includes(query)) continue;
+        rows.push({ movementId: m.movementId, contract: c, movement: m });
+      }
     }
     rows.sort((a, b) => {
       const lc = a.contract.naturalKey.lcNumber.localeCompare(b.contract.naturalKey.lcNumber);
       return lc !== 0 ? lc : (a.movement.sourceTransactionRef ?? '').localeCompare(b.movement.sourceTransactionRef ?? '');
     });
     return rows;
+  }
+
+  get flattenedPayableRows(): { movementId: string; contract: BalanceContract; movement: any }[] {
+    const start = (this.catalogPicker.page - 1) * this.catalogPicker.pageSize;
+    return this.allFlattenedPayableRows.slice(start, start + this.catalogPicker.pageSize);
+  }
+
+  onSelectFlattenedPayableMovement(movementId: string): void {
+    const row = this.allFlattenedPayableRows.find((candidate) => candidate.movementId === movementId);
+    if (row) this.onSelectFlattenedPayable(row.contract.balanceContractId, movementId);
   }
 
   onSelectFlattenedPayable(contractId: string, movementId: string): void {
@@ -1326,11 +1347,16 @@ export class MakerPanelComponent implements OnChanges {
 
   private loadIbIndex(): void {
     this.ibIndexPicker.load({
-      guardFails: !this.model.instrumentType || !this.searchNaturalKey.lcNumber,
+      guardFails: !this.model.instrumentType,
       instrumentType: this.model.instrumentType!,
-      lcNumber: this.searchNaturalKey.lcNumber,
+      query: null,
       qualifies: () => this.filteredIbIndexCatalog.length,
     });
+  }
+
+  onCombinedIndexSearch(): void {
+    this.ibIndexPicker.page = 1;
+    this.ibIndexPicker.total = this.filteredIbIndexCatalog.length;
   }
 
   ibIndexPrevPage(): void {
@@ -1367,7 +1393,13 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   get filteredIbIndexCatalog(): BalanceContract[] {
-    return applyEligibilityRule(this.ibIndexPicker.contracts, this.resolveIbIndexEligibilityRule(), this.model.movementType, this.ibIndexPicker.snapshots);
+    const query = this.ibIndexPicker.search.trim().toLowerCase();
+    const searched = query
+      ? this.ibIndexPicker.contracts.filter((contract) =>
+          [contract.naturalKey.lcNumber, contract.naturalKey.ibNumber, contract.naturalKey.sgNumber].some((value) => value?.toLowerCase().includes(query)),
+        )
+      : this.ibIndexPicker.contracts;
+    return applyEligibilityRule(searched, this.resolveIbIndexEligibilityRule(), this.model.movementType, this.ibIndexPicker.snapshots);
   }
 
   get pagedFilteredIbIndexCatalog(): BalanceContract[] {
@@ -1375,10 +1407,21 @@ export class MakerPanelComponent implements OnChanges {
     return this.filteredIbIndexCatalog.slice(start, start + this.ibIndexPicker.pageSize);
   }
 
+  transactionContractAmount(contract: BalanceContract): string {
+    const snapshot = this.ibIndexPicker.snapshots.get(contract.balanceContractId);
+    return snapshot ? `${snapshot.availableBalance} ${snapshot.currency}` : '—';
+  }
+
+  arrivalSgIndexAmount(contract: BalanceContract): string {
+    const snapshot = this.pickerSelection.arrivalSgSnapshots.get(contract.balanceContractId);
+    return snapshot ? `${snapshot.availableBalance} ${snapshot.currency}` : '—';
+  }
+
   onSelectIbIndex(contractId: string): void {
     this.selectedContract = this.ibIndexPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     this.searchError = null;
     if (this.selectedContract) {
+      this.searchNaturalKey.lcNumber = this.selectedContract.naturalKey.lcNumber;
       this.searchNaturalKey.ibNumber = this.selectedContract.naturalKey.ibNumber ?? '';
       this.searchNaturalKey.sgNumber = this.selectedContract.naturalKey.sgNumber ?? '';
     }
@@ -1752,12 +1795,21 @@ export class MakerPanelComponent implements OnChanges {
     'expiryDate',
     'newExpiryDate',
     'reasonCode',
+    'remarks',
   ];
 
   confirmFixPending(): void {
     if (!this.submitResult || !this.model.amount) return;
     const ctx = this.buildFieldsContext();
     const patch: Record<string, unknown> = { movementId: this.submitResult.movementId, amount: String(this.model.amount) };
+    const strategy = this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
+    if (strategy?.fixPendingMode === 'REMARKS_ONLY') {
+      const remarks = this.model.remarks?.trim() || null;
+      const originalRemarks = this.submitResult.remarks?.trim() || null;
+      if (remarks === originalRemarks) return;
+      patch['editMode'] = 'REMARKS_ONLY';
+      this.model.remarks = remarks ?? undefined;
+    }
     for (const field of MakerPanelComponent.FIX_PENDING_PATCH_FIELDS) {
       if (!isFixPendingFieldEditable(ctx, field)) continue;
       const value = this.model[field];

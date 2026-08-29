@@ -10,6 +10,11 @@ import Decimal from 'decimal.js';
 import { ZERO, parseMonetaryAmount } from '../money';
 import type { BalanceMovement, MovementWarning } from '../types';
 
+/** Trade Finance capacity is never exposed below zero; a negative raw intermediate means no capacity remains. */
+function nonNegativeCapacity(value: Decimal): Decimal {
+  return value.isNegative() ? ZERO : value;
+}
+
 /**
  * §6.1 — Σ (PENDING+RELEASED) SHGT `ISSUE` net of `PARTIAL_REDEEM`/`FULL_REDEEM`, for SHGT contracts
  * under the same parentLogicalContractId. Caller is responsible for having already filtered movements to
@@ -92,7 +97,7 @@ export function checkShgtIssueSufficiency(params: {
   existingShgtExposure: Decimal;
 }): ShgtIssueSufficiencyResult {
   const { requestedAmount, parentConfirmedBalance, parentPendingDecreaseTotal, existingShgtExposure } = params;
-  const tightAvailable = parentConfirmedBalance.minus(parentPendingDecreaseTotal).minus(existingShgtExposure);
+  const tightAvailable = nonNegativeCapacity(parentConfirmedBalance.minus(parentPendingDecreaseTotal).minus(existingShgtExposure));
   if (requestedAmount.greaterThan(tightAvailable)) {
     return {
       ok: false,
@@ -144,9 +149,7 @@ function sumExaminationCreates(examinationMovements: readonly ExaminationMovemen
 export function derivePresentDocsProvisionallyConsumedIds(
   confirmationMovements: readonly Pick<BalanceMovement, 'status' | 'referencedTransactionId'>[],
 ): ReadonlySet<string> {
-  return new Set(
-    confirmationMovements.filter((m) => m.status === 'PENDING' && m.referencedTransactionId).map((m) => m.referencedTransactionId as string),
-  );
+  return new Set(confirmationMovements.filter((m) => m.status === 'PENDING' && m.referencedTransactionId).map((m) => m.referencedTransactionId as string));
 }
 
 /**
@@ -202,7 +205,7 @@ export function checkPresentDocsIssueSufficiency(params: {
   parentConfirmationBalanceContractId: string;
 }): PresentDocsIssueSufficiencyResult {
   const { requestedAmount, parentConfirmedBalance, parentPendingDecreaseTotal, presentDocsEarmark, parentConfirmationBalanceContractId } = params;
-  const tightAvailable = parentConfirmedBalance.minus(parentPendingDecreaseTotal).minus(presentDocsEarmark);
+  const tightAvailable = nonNegativeCapacity(parentConfirmedBalance.minus(parentPendingDecreaseTotal).minus(presentDocsEarmark));
   if (requestedAmount.greaterThan(tightAvailable)) {
     return {
       ok: false,
@@ -295,7 +298,7 @@ export function checkUtilizeSufficiency(params: {
     };
   }
 
-  const tightAvailableBalance = confirmedBalance.minus(pendingDecreaseTotal).minus(offBalanceExposure);
+  const tightAvailableBalance = nonNegativeCapacity(confirmedBalance.minus(pendingDecreaseTotal).minus(offBalanceExposure));
   if (requestedAmount.greaterThan(tightAvailableBalance)) {
     return {
       ok: false,

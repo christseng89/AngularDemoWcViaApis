@@ -1,9 +1,11 @@
 <div class="tb-field tb-field--inline tb-field--search mt-2" [attr.aria-busy]="loading || null">
-  <label class="tb-field__label">{{ label }}</label>
+  <label class="tb-field__label" [for]="inputId">{{ label }}</label>
   <input
+    [id]="inputId"
     class="tb-input"
     [class.tb-input--required]="required"
     [attr.aria-label]="label"
+    [attr.aria-required]="required || null"
     [placeholder]="placeholder"
     [ngModel]="value"
     (ngModelChange)="valueChange.emit($event)"

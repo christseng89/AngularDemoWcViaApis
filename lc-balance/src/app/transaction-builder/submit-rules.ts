@@ -178,6 +178,13 @@ function validateFunctionSpecificRules(
   if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
     return 'Pick the Shipping Guarantee this Document Arrival is against first.';
   }
+  if (
+    strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') &&
+    ctx.arrivalSgSnapshot &&
+    Number(model.amount) < Number(ctx.arrivalSgSnapshot.confirmedBalance)
+  ) {
+    return `Bill Amount must be greater than or equal to the Shipping Guarantee Balance (${ctx.arrivalSgSnapshot.confirmedBalance}).`;
+  }
   // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
   // instrument-based, not amount-based" — SG_RELEASE is always the FULL amount, no residual): movementType
   // is now hardcoded FULL_REDEEM, never derived/picked — Partial Redeem is no longer reachable through
@@ -222,6 +229,49 @@ function validateFunctionSpecificRules(
   return null;
 }
 
+/**
+ * Maker-side capacity backstop for every function whose authoritative API rule is based on the
+ * parent/selected contract's Tight Available Balance. The live warning remains useful while typing,
+ * but a warning alone must never permit a submission that would make Tight Available Balance negative.
+ *
+ * A3S is the one widening rule: redeeming the specifically selected SG releases that SG's outstanding
+ * capacity as part of the same business event, so its upper limit is current Tight Available plus that
+ * SG balance. The base Tight Available itself must still be non-negative; never clamp corrupt data to 0.
+ */
+function validateTightAvailableCapacity(ctx: SubmitRulesContext): string | null {
+  const { selectedFunction, model, selectedContractSnapshot } = ctx;
+  const code = selectedFunction?.code;
+  const applies =
+    (code === 'A2' && model.movementType === 'AMEND_DECREASE') ||
+    (code === 'B2' && ctx.amendDirection === 'DECREASE') ||
+    code === 'A3' ||
+    code === 'A3S' ||
+    code === 'A8' ||
+    code === 'B3';
+  if (!applies) return null;
+  // Preserve the more specific target-selection error from buildSubmitRequest()/the selection gate.
+  // There is no balance to validate until the required contract/parent has actually been selected.
+  if (!ctx.selectedContract && !ctx.selectedParent) return null;
+
+  const tight = selectedContractSnapshot?.tightAvailableBalance;
+  if (tight === null || tight === undefined || tight === '') {
+    return 'Current Tight Available Balance is unavailable. Wait for the balance lookup to complete, then submit again.';
+  }
+
+  const tightAmount = Number(tight);
+  if (!Number.isFinite(tightAmount) || tightAmount < 0) {
+    return `Current Tight Available Balance (${tight}) is invalid. Submission is blocked; please investigate the balance data.`;
+  }
+
+  const sgOutstanding = code === 'A3S' ? Number(ctx.arrivalSgSnapshot?.confirmedBalance ?? 0) : 0;
+  const limit = tightAmount + sgOutstanding;
+  if (Number(model.amount) > limit) {
+    const limitExplanation = code === 'A3S' ? `Tight Available Balance plus selected SG Balance (${limit})` : `Tight Available Balance (${tight})`;
+    return `Amount must not exceed ${limitExplanation}; the transaction cannot make Tight Available Balance negative.`;
+  }
+  return null;
+}
+
 export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
   const { model, selectedFunction } = ctx;
   const patch: Partial<BuilderModel> = {};
@@ -246,6 +296,9 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
 
   const functionError = validateFunctionSpecificRules(ctx, strategy, patch);
   if (functionError) return { error: functionError, patch };
+
+  const tightAvailableError = validateTightAvailableCapacity(ctx);
+  if (tightAvailableError) return { error: tightAvailableError, patch };
 
   return { error: null, patch };
 }

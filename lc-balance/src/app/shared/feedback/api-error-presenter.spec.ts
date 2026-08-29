@@ -30,4 +30,15 @@ describe('presentApiError', () => {
     expect(result).toEqual(expect.objectContaining({ severity: 'ERROR', supportCode: 'BAL-UI-UNEXPECTED', technicalCode: 'internal stack detail' }));
     expect(result.message).not.toContain('internal stack detail');
   });
+
+  it('covers message extraction and fallback branches without leaking technical copy', () => {
+    expect(presentApiError(undefined, 'LOAD')).toMatchObject({ severity: 'ERROR', title: 'Unable to load the queue' });
+    expect(presentApiError({ error: 'record not found' }, 'SEARCH')).toMatchObject({
+      severity: 'INFO',
+      message: 'No transaction matched your search.',
+      technicalCode: 'record not found',
+    });
+    expect(presentApiError({ error: { code: 'NATURAL_KEY_ALREADY_EXISTS' } }, 'SUBMIT')).toMatchObject({ severity: 'WARNING' });
+    expect(presentApiError({ message: 'Failed to fetch' }, 'LOAD')).toMatchObject({ severity: 'ERROR', title: 'Balance service unavailable' });
+  });
 });

@@ -349,29 +349,19 @@ function importCase3(lc, sg) {
 // Tight Available producing a non-blocking WARNING) is now architecturally impossible:
 // checkUtilizeSufficiency() no longer has a warning branch at all (v0.12 removed it, hardening WARNING
 // to ERROR). Rewritten below to demonstrate the CURRENT, correct way to handle this exact scenario
-// instead: create the SG's own PARTIAL_REDEEM movement FIRST (still PENDING, matching the SAME
+// instead: create the SG's own FULL_REDEEM movement FIRST (still PENDING, matching the SAME
 // businessEventId as the Document Arrival that follows — the real "Document Arrival w/ Shipping Gtee"
 // (A3S) ordering) — computeOffBalanceExposure() counts PENDING redemptions the same as RELEASED ones,
 // so by the time the Document Arrival's own sufficiency check runs, this SG's contribution is already
-// netted out and the SAME 50,000 presentation succeeds cleanly, no warning and no error. Final balances
-// (LC 71,000, SG 50,000 outstanding) are UNCHANGED from the original case — only the ordering/mechanism
-// that gets there is fixed, since those numbers were never wrong, just reached via a call sequence the
-// current design no longer permits.
-//
-// Note (2026-08-24, post-Business-Case-Runner-inventory): this case's own `PARTIAL_REDEEM` on the SG is
-// still fully valid at the microservice/API level, but A9 (Shipping Guarantee Redemption) was locked to
-// Full-Redeem-only in the Angular Transaction Builder on 2026-08-21 (amount PROTECTED, equal to the SG's
-// own Available Balance) — a human clicking through the CURRENT interactive UI can no longer reach a
-// Partial Redeem the way this case's own direct API call does. Kept as-is: it remains a correct,
-// disclosed demonstration of the API's own broader contract (any non-UI caller can still Partial Redeem),
-// not a bug or something this registry needs to "fix" — see importCase6() below for the other case with
-// the same note.
+// netted out and the SAME 50,000 presentation succeeds cleanly, no warning and no error. The selected
+// SG and Bill are both 50,000, satisfying A3S's Bill Amount >= SG Balance rule. Final balances are LC
+// 71,000 and SG 0; this case never creates a negative Tight Available Balance.
 function importCase4(lc, sg) {
   return {
     id: 'import-case-4',
-    title: 'Import Case 4 — USD Sight + Shipping Guarantee 100,000, partial match via Document Arrival w/ SG (A3S)',
+    title: 'Import Case 4 — USD Sight + Shipping Guarantee 50,000, full match via Document Arrival w/ SG (A3S)',
     description:
-      "SG covers the full LC but only half the documents arrive — Document Arrival w/ Shipping Gtee (A3S) nets the SG's own reserved capacity out of the Tight Available check BEFORE the Document Arrival's own sufficiency check runs, so the partial presentation succeeds cleanly (no warning, no error); SG itself can only be PARTIAL_REDEEM-ed for the matched amount, leaving the rest outstanding.",
+      "A valid A3S full match: Bill Amount 50,000 is greater than or equal to the selected SG Balance 50,000. The matched FULL_REDEEM releases the SG's reserved capacity before the Document Arrival consumes it, so Tight Available never becomes negative.",
     steps: [
       ...createAndRelease(
         'LC Issue 100,000, Tolerance 10%',
@@ -406,7 +396,7 @@ function importCase4(lc, sg) {
         'Checker releases Amendment',
       ),
       ...createAndRelease(
-        'Shipping Guarantee 100,000 (covers full LC)',
+        'Shipping Guarantee 50,000',
         'sg',
         {
           instrumentType: 'SHGT',
@@ -414,7 +404,7 @@ function importCase4(lc, sg) {
           parentLogicalContractIdRef: 'lc',
           movementType: 'ISSUE',
           eventSeq: 1,
-          amount: '100000',
+          amount: '50000',
           currency: 'USD',
           createdBy: MAKER,
         },
@@ -423,12 +413,12 @@ function importCase4(lc, sg) {
       {
         type: 'createMovement',
         label:
-          "SG Redemption Amount = MIN(Bill 50,000, SG Outstanding 100,000) -> PARTIAL_REDEEM 50,000 (created FIRST — still PENDING, nets out of the Document Arrival's own Tight Available check below)",
+          "SG Redemption Amount = SG Outstanding 50,000 -> FULL_REDEEM 50,000 (created FIRST — still PENDING, nets out of the Document Arrival's own Tight Available check below)",
         captureAs: 'redeem',
         request: {
           instrumentType: 'SHGT',
           balanceContractIdRef: 'sg',
-          movementType: 'PARTIAL_REDEEM',
+          movementType: 'FULL_REDEEM',
           eventSeq: 2,
           amount: '50000',
           currency: 'USD',
@@ -439,7 +429,7 @@ function importCase4(lc, sg) {
       },
       {
         type: 'createMovement',
-        label: "Document Arrival w/ SG 50,000 (A3S — matches the SG's own reserved capacity; only half the SG-covered goods have arrived)",
+        label: 'Document Arrival w/ SG 50,000 (A3S — Bill Amount equals the selected SG Balance)',
         captureAs: 'utilize',
         request: {
           instrumentType: 'IPLC_LC',
@@ -456,7 +446,7 @@ function importCase4(lc, sg) {
       {
         type: 'note',
         label:
-          "No warning and no error here — the SG Redemption above (still PENDING) already nets its own 50,000 out of Off-Balance Exposure before this check runs, so Tight Available is correctly 71,000 (121,000 Available minus 50,000 remaining SG exposure), comfortably covering this 50,000 Document Arrival. An UNMATCHED plain Document Arrival for the same 50,000 against the same LC would instead hard-reject (Design doc §6.1 v0.12) — that's exactly the case this scenario used to (incorrectly) demonstrate as a warning; matching against the SG via A3S is the current, correct way to handle it.",
+          'No warning and no error — Bill Amount equals SG Balance, the pending FULL_REDEEM nets the selected SG exposure, and the 50,000 Document Arrival leaves Tight Available at 71,000.',
       },
       { type: 'release', label: 'Checker releases SG Redemption', movementRef: 'redeem', releasedBy: CHECKER },
       // 2026-08-19 (BAL-123 A4 4-eyes gate — same fix/reasoning as Import Case 1's own doc comment above):
@@ -466,7 +456,7 @@ function importCase4(lc, sg) {
       { type: 'release', label: 'IBL/Pay 50,000 (120 days) — A4 Checker Release', movementRef: 'utilize', releasedBy: CHECKER },
       { type: 'note', label: 'IBL itself is a Loan Component ASSET — no Balance Component call' },
       { type: 'snapshot', label: 'LC Balance (expect 71,000)', contractRef: 'lc' },
-      { type: 'snapshot', label: 'SG Balance (expect 50,000 still outstanding)', contractRef: 'sg' },
+      { type: 'snapshot', label: 'SG Balance (expect 0, fully redeemed)', contractRef: 'sg' },
       { type: 'note', label: 'Settlement Due Date 50,000 — pure Loan Component (IBL maturity), no Balance Component call' },
     ],
   };
@@ -521,8 +511,8 @@ function importCase5(lc) {
 // field from a direct SQLite dump of the user's own live S01 (Sight)/U01 (Sellers Usance) runs, same
 // convention as Export Case #6/#7's own top comment. Case #6 exercises A4's own real Maker Submit
 // (2026-08-16 redesign — "Add real Maker Submit, then have Checker to Release it") on THREE Document
-// Arrivals, two of them A3S-matched against a Shipping Guarantee (one exact/FULL_REDEEM, one
-// partial/PARTIAL_REDEEM). Case #7 exercises A6/A7 (Usance Acceptance + Settlement) instead, since a
+// Arrivals, two of them A3S-matched against a Shipping Guarantee (both FULL_REDEEM). Case #7 exercises
+// A6/A7 (Usance Acceptance + Settlement) instead, since a
 // Usance LC's own UTILIZE settles via A6, never A4 — no separate `makerSubmit` step is ever run against
 // either UTILIZE below, matching the live U01 data this case was transcribed from exactly.
 //
@@ -540,19 +530,15 @@ function importCase5(lc) {
 // the case's own steps are still correct (they still reproduce the real U01 lifecycle), only this
 // comment's claim about the resulting `makerSubmittedBy` field was stale.
 //
-// Note (2026-08-24, post-Business-Case-Runner-inventory): same PARTIAL_REDEEM/UI-lock caveat as
-// importCase4() above — this case's own partial-match SG redemption is still correct at the API level,
-// but is no longer reachable through A9's own Angular screen since the 2026-08-21 Full-Redeem-only lock.
-// Also true of `import_lc_test.sh` (the standalone curl script transcribing this SAME S01 live-data
-// sequence directly against the microservice) — its own SG2 PARTIAL_REDEEM step has the identical
-// API-correct/UI-unreachable status.
+// Both A3S records satisfy Bill Amount >= selected SG Balance; this registry contains no partial A3S
+// redemption that would violate the current UI/API business rule.
 
 function importCase6(lc) {
   return {
     id: 'import-case-6',
-    title: 'Import Case 6 — USD Sight + two Shipping Guarantees (full + partial redeem) + A4 real Maker Submit',
+    title: 'Import Case 6 — USD Sight + two Shipping Guarantees (full redeem) + A4 real Maker Submit',
     description:
-      'LC Issue 100,000 (Sight) -> SG1 10,000 + SG2 20,000 -> Document Arrival w/ SG 12,000 (B01, matches SG1 exactly -> FULL_REDEEM) -> Document Arrival w/ SG 12,000 (B02, partially matches SG2 -> PARTIAL_REDEEM) -> plain Document Arrival 30,000 (B03, no SG) -> A4 Sight Settlement (real Maker Submit + Checker Release) on all three',
+      'LC Issue 100,000 (Sight) -> SG1 10,000 + SG2 12,000 -> Document Arrival w/ SG 12,000 (B01, fully redeems SG1) -> Document Arrival w/ SG 12,000 (B02, equals SG2 -> FULL_REDEEM) -> plain Document Arrival 30,000 (B03, no SG) -> A4 Sight Settlement (real Maker Submit + Checker Release) on all three',
     steps: [
       ...createAndRelease(
         'LC Issue 100,000 (Sight)',
@@ -586,7 +572,7 @@ function importCase6(lc) {
         'Checker releases SG1 Issue',
       ),
       ...createAndRelease(
-        'Shipping Guarantee 20,000 (G02)',
+        'Shipping Guarantee 12,000 (G02)',
         'sg2',
         {
           instrumentType: 'SHGT',
@@ -594,7 +580,7 @@ function importCase6(lc) {
           parentLogicalContractIdRef: 'lc',
           movementType: 'ISSUE',
           eventSeq: 1,
-          amount: '20000',
+          amount: '12000',
           currency: 'USD',
           createdBy: MAKER,
         },
@@ -602,7 +588,7 @@ function importCase6(lc) {
       ),
       {
         type: 'createMovement',
-        label: 'Document Arrival w/ SG 12,000 (B01 — A3S, matches SG1 exactly)',
+        label: 'Document Arrival w/ SG 12,000 (B01 — A3S, Bill exceeds SG1 and fully redeems it)',
         captureAs: 'utilizeB01',
         request: {
           instrumentType: 'IPLC_LC',
@@ -634,7 +620,7 @@ function importCase6(lc) {
       ),
       {
         type: 'createMovement',
-        label: 'Document Arrival w/ SG 12,000 (B02 — A3S, partially matches SG2)',
+        label: 'Document Arrival w/ SG 12,000 (B02 — A3S, equals SG2)',
         captureAs: 'utilizeB02',
         request: {
           instrumentType: 'IPLC_LC',
@@ -649,12 +635,12 @@ function importCase6(lc) {
         },
       },
       ...createAndRelease(
-        'SG2 Redemption Amount = MIN(Bill 12,000, SG Outstanding 20,000) -> PARTIAL_REDEEM 12,000',
+        'SG2 Redemption Amount = SG Outstanding 12,000 -> FULL_REDEEM 12,000',
         'redeemSg2',
         {
           instrumentType: 'SHGT',
           balanceContractIdRef: 'sg2',
-          movementType: 'PARTIAL_REDEEM',
+          movementType: 'FULL_REDEEM',
           eventSeq: 2,
           amount: '12000',
           currency: 'USD',
@@ -662,7 +648,7 @@ function importCase6(lc) {
           businessEventId: `${lc}-b02`,
           createdBy: MAKER,
         },
-        'Checker releases SG2 partial Redemption',
+        'Checker releases SG2 full Redemption',
       ),
       {
         type: 'createMovement',
@@ -693,7 +679,7 @@ function importCase6(lc) {
       { type: 'release', functionCode: 'A4', label: 'A4 Checker Release — B03 (Sight Settlement finalizes)', movementRef: 'utilizeB03', releasedBy: CHECKER },
       { type: 'snapshot', label: 'LC Balance after all three A4 Settlements (expect Confirmed 46,000, Available 46,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'SG1 Balance (expect 0, fully redeemed)', contractRef: 'sg1' },
-      { type: 'snapshot', label: 'SG2 Balance (expect 8,000 still outstanding)', contractRef: 'sg2' },
+      { type: 'snapshot', label: 'SG2 Balance (expect 0, fully redeemed)', contractRef: 'sg2' },
     ],
   };
 }
@@ -759,6 +745,22 @@ function importCase7(lc) {
       ),
       {
         type: 'createMovement',
+        label: 'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
+        captureAs: 'redeemSg1',
+        request: {
+          instrumentType: 'SHGT',
+          balanceContractIdRef: 'sg1',
+          movementType: 'FULL_REDEEM',
+          eventSeq: 2,
+          amount: '20000',
+          currency: 'USD',
+          sourceTransactionRef: 'B02',
+          businessEventId: `${lc}-b02`,
+          createdBy: MAKER,
+        },
+      },
+      {
+        type: 'createMovement',
         label: 'Document Arrival w/ SG 25,000 (B02 — A3S, matches SG1 exactly)',
         captureAs: 'utilizeB02',
         request: {
@@ -773,26 +775,9 @@ function importCase7(lc) {
           createdBy: MAKER,
         },
       },
-      // Added 2026-08-28 — same fix as B01 above; the real Angular Checker's own A3S compound release()
-      // acknowledges this UTILIZE as part of releasing the matched SG redemption, but this orchestrator's
-      // own plain `release` step against `redeemSg1` below does not — needs its own explicit step.
+      // A3S approval validates the complete business event, so both legs must exist before acknowledge.
       { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B02 (A3S)', movementRef: 'utilizeB02', acknowledgedBy: CHECKER },
-      ...createAndRelease(
-        'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
-        'redeemSg1',
-        {
-          instrumentType: 'SHGT',
-          balanceContractIdRef: 'sg1',
-          movementType: 'FULL_REDEEM',
-          eventSeq: 2,
-          amount: '20000',
-          currency: 'USD',
-          sourceTransactionRef: 'B02',
-          businessEventId: `${lc}-b02`,
-          createdBy: MAKER,
-        },
-        'Checker releases SG1 Redemption',
-      ),
+      { type: 'release', label: 'Checker releases SG1 Redemption', movementRef: 'redeemSg1', releasedBy: CHECKER },
       {
         type: 'snapshot',
         label: 'LC Balance before Acceptance (expect Confirmed 100,000, Available 55,000 — 45,000 still Pending across both Document Arrivals)',
@@ -963,6 +948,22 @@ function importCase8(lc) {
       ),
       {
         type: 'createMovement',
+        label: 'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
+        captureAs: 'redeemSg1',
+        request: {
+          instrumentType: 'SHGT',
+          balanceContractIdRef: 'sg1',
+          movementType: 'FULL_REDEEM',
+          eventSeq: 2,
+          amount: '20000',
+          currency: 'USD',
+          sourceTransactionRef: 'B02',
+          businessEventId: `${lc}-b02`,
+          createdBy: MAKER,
+        },
+      },
+      {
+        type: 'createMovement',
         label: 'Document Arrival w/ SG 25,000 (B02 — A3S, matches SG1 exactly)',
         captureAs: 'utilizeB02',
         request: {
@@ -977,26 +978,9 @@ function importCase8(lc) {
           createdBy: MAKER,
         },
       },
-      // Added 2026-08-28 — same fix as B01 above; the real Angular Checker's own A3S compound release()
-      // acknowledges this UTILIZE as part of releasing the matched SG redemption, but this orchestrator's
-      // own plain `release` step against `redeemSg1` below does not — needs its own explicit step.
+      // A3S approval validates the complete business event, so both legs must exist before acknowledge.
       { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B02 (A3S)', movementRef: 'utilizeB02', acknowledgedBy: CHECKER },
-      ...createAndRelease(
-        'SG1 Redemption Amount = MIN(Bill 25,000, SG Outstanding 20,000) -> FULL_REDEEM 20,000',
-        'redeemSg1',
-        {
-          instrumentType: 'SHGT',
-          balanceContractIdRef: 'sg1',
-          movementType: 'FULL_REDEEM',
-          eventSeq: 2,
-          amount: '20000',
-          currency: 'USD',
-          sourceTransactionRef: 'B02',
-          businessEventId: `${lc}-b02`,
-          createdBy: MAKER,
-        },
-        'Checker releases SG1 Redemption',
-      ),
+      { type: 'release', label: 'Checker releases SG1 Redemption', movementRef: 'redeemSg1', releasedBy: CHECKER },
       {
         type: 'createMovement',
         label: 'Create Acceptance 20,000 for B01 (A6 — references the Document Arrival)',
@@ -1106,9 +1090,9 @@ function importCase8(lc) {
 function importCase9(lc, ib) {
   return {
     id: 'import-case-9',
-    title: "Import Case 9 — USD Buyer's Usance 120 days, full lifecycle to Close (A10)",
+    title: "Import Case 9 — USD Buyer's Usance 120 days, A2 Increase + full lifecycle to Close (A10)",
     description:
-      "Extends Import Case 2's own path (LC Issue+Amendment -> Document Arrival -> Accept -> Acceptance -> Settlement) through to A10 Close — this LC never issues a Shipping Guarantee, so SG eligibility is trivially satisfied (0 by construction).",
+      "Extends Import Case 2's own path (LC Issue -> A2 Amendment INCREASE -> Document Arrival -> Accept -> Acceptance -> Settlement) through to A10 Close — this LC never issues a Shipping Guarantee, so SG eligibility is trivially satisfied (0 by construction).",
     steps: [
       ...createAndRelease(
         'LC Issue 100,000, Tolerance 10%',
@@ -1129,7 +1113,7 @@ function importCase9(lc, ib) {
         'Checker releases LC Issue',
       ),
       ...createAndRelease(
-        'LC Amendment increase 10,000',
+        'A2 Amendment INCREASE 10,000',
         'amend',
         {
           instrumentType: 'IPLC_LC',

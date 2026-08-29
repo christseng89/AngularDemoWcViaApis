@@ -91,9 +91,9 @@ describe('data/businessCases.js buildRegistry()', () => {
     expect(byId['import-case-1'].title).toBe('Import Case 1 — USD Sight');
     expect(byId['import-case-2'].title).toBe('Import Case 2 — USD Usance 120 days after sight');
     expect(byId['import-case-3'].title).toBe('Import Case 3 — USD Sight + Shipping Guarantee 50,000 + IBL');
-    expect(byId['import-case-4'].title).toBe('Import Case 4 — USD Sight + Shipping Guarantee 100,000, partial match via Document Arrival w/ SG (A3S)');
+    expect(byId['import-case-4'].title).toBe('Import Case 4 — USD Sight + Shipping Guarantee 50,000, full match via Document Arrival w/ SG (A3S)');
     expect(byId['import-case-5'].title).toBe('Import Case 5 — USD Sight, Amendment Decrease 120,000 (expect ERROR)');
-    expect(byId['import-case-6'].title).toBe('Import Case 6 — USD Sight + two Shipping Guarantees (full + partial redeem) + A4 real Maker Submit');
+    expect(byId['import-case-6'].title).toBe('Import Case 6 — USD Sight + two Shipping Guarantees (full redeem) + A4 real Maker Submit');
     expect(byId['import-case-7'].title).toBe('Import Case 7 — USD Sellers Usance 120 days + Shipping Guarantee + two Acceptances (A6/A7)');
     expect(byId['export-case-1'].title).toBe('Export Case #1 — USD Sight + Confirmed');
     expect(byId['export-case-2'].title).toBe('Export Case #2 — USD Usance + Confirmed + No EBL');
@@ -105,7 +105,7 @@ describe('data/businessCases.js buildRegistry()', () => {
       'Export Case #7 — USD Sellers Usance 120 days + Confirmed + Present Docs (B3) -> Accept (B4) -> Acceptance + Reimbursement Receivable -> Settlement (B5)',
     );
     expect(byId['import-case-8'].title).toBe('Import Case 8 — USD Sellers Usance 120 days, full lifecycle to Close (A10)');
-    expect(byId['import-case-9'].title).toBe("Import Case 9 — USD Buyer's Usance 120 days, full lifecycle to Close (A10)");
+    expect(byId['import-case-9'].title).toBe("Import Case 9 — USD Buyer's Usance 120 days, A2 Increase + full lifecycle to Close (A10)");
     expect(byId['import-case-10'].title).toBe(
       'Import Case 10 — USD Sight, Shipping Guarantee + Document Arrival both taken to their own terminus, then Close (A10)',
     );
@@ -234,6 +234,73 @@ describe('data/businessCases.js buildRegistry()', () => {
             expect(naturalKey.ibNumber).toMatch(REF_PATTERN);
           }
         });
+    });
+  });
+
+  it('every A3S test-data lifecycle uses Bill Amount >= the selected SG Balance', () => {
+    registry.forEach((businessCase) => {
+      const sgIssueAmountByRef = new Map(
+        businessCase.steps
+          .filter((step) => step.type === 'createMovement' && step.request?.instrumentType === 'SHGT' && step.request?.movementType === 'ISSUE')
+          .map((step) => [step.captureAs, Number(step.request.amount)]),
+      );
+      const redemptionByEvent = new Map(
+        businessCase.steps
+          .filter(
+            (step) =>
+              step.type === 'createMovement' &&
+              step.request?.instrumentType === 'SHGT' &&
+              step.request?.businessEventId &&
+              (step.request?.movementType === 'FULL_REDEEM' || step.request?.movementType === 'PARTIAL_REDEEM'),
+          )
+          .map((step) => [step.request.businessEventId, step]),
+      );
+
+      businessCase.steps
+        .filter(
+          (step) =>
+            step.type === 'createMovement' &&
+            step.request?.instrumentType === 'IPLC_LC' &&
+            step.request?.movementType === 'UTILIZE' &&
+            step.request?.businessEventId,
+        )
+        .forEach((arrival) => {
+          const redemption = redemptionByEvent.get(arrival.request.businessEventId);
+          expect(redemption).toBeDefined();
+          const selectedSgBalance = sgIssueAmountByRef.get(redemption.request.balanceContractIdRef);
+          expect(selectedSgBalance).toBeDefined();
+          expect(Number(arrival.request.amount)).toBeGreaterThanOrEqual(selectedSgBalance);
+        });
+    });
+  });
+
+  it('creates both A3S legs before Checker acknowledgment and releases the SG redemption afterwards', () => {
+    for (const caseId of ['import-case-7', 'import-case-8']) {
+      const businessCase = registry.find((candidate) => candidate.id === caseId);
+      const redemptionIndex = businessCase.steps.findIndex(
+        (step) => step.type === 'createMovement' && step.captureAs === 'redeemSg1' && step.request?.businessEventId,
+      );
+      const arrivalIndex = businessCase.steps.findIndex(
+        (step) => step.type === 'createMovement' && step.captureAs === 'utilizeB02' && step.request?.businessEventId,
+      );
+      const acknowledgeIndex = businessCase.steps.findIndex((step) => step.type === 'acknowledge' && step.movementRef === 'utilizeB02');
+      const releaseIndex = businessCase.steps.findIndex((step) => step.type === 'release' && step.movementRef === 'redeemSg1');
+
+      expect(redemptionIndex).toBeGreaterThan(-1);
+      expect(arrivalIndex).toBeGreaterThan(redemptionIndex);
+      expect(acknowledgeIndex).toBeGreaterThan(arrivalIndex);
+      expect(releaseIndex).toBeGreaterThan(acknowledgeIndex);
+    }
+  });
+
+  it('Import Case 9 models its A2 amendment as an explicit increase', () => {
+    const businessCase = registry.find((candidate) => candidate.id === 'import-case-9');
+    const amendment = businessCase.steps.find((step) => step.captureAs === 'amend');
+
+    expect(amendment).toMatchObject({
+      type: 'createMovement',
+      label: 'A2 Amendment INCREASE 10,000',
+      request: { movementType: 'AMEND_INCREASE', amount: '10000' },
     });
   });
 

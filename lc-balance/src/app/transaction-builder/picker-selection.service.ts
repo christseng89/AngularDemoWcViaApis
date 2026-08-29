@@ -70,6 +70,8 @@ export class PickerSelectionService {
   readonly arrivalSgPaging = new PagedListState(10);
   selectedArrivalSg: BalanceContract | null = null;
   arrivalSgSnapshot: BalanceSnapshot | null = null;
+  /** Live outstanding amount for every A3S SG Index row, keyed by contract id. */
+  readonly arrivalSgSnapshots = new Map<string, BalanceSnapshot>();
 
   /** The current page's own slice of `sgsForArrival` — the template iterates this instead of `sgsForArrival` directly. */
   get pagedSgsForArrival(): BalanceContract[] {
@@ -97,6 +99,7 @@ export class PickerSelectionService {
   loadSgsForArrival(lcNumber: string | undefined, onUpdated: () => void): void {
     this.selectedArrivalSg = null;
     this.arrivalSgSnapshot = null;
+    this.arrivalSgSnapshots.clear();
     this.sgsForArrival = [];
     this.arrivalSgPaging.reset();
     if (!lcNumber) return;
@@ -111,6 +114,10 @@ export class PickerSelectionService {
         }
         forkJoin(result.items.map((c) => this.api.getSnapshot(c.balanceContractId).pipe(catchError(() => of(null))))).subscribe((snapshots) => {
           this.sgsForArrivalLoading = false;
+          result.items.forEach((contract, index) => {
+            const snapshot = snapshots[index];
+            if (snapshot) this.arrivalSgSnapshots.set(contract.balanceContractId, snapshot);
+          });
           this.sgsForArrival = result.items.filter((_, i) => {
             const snap = snapshots[i];
             return !!snap && snap.availableBalance !== '0';

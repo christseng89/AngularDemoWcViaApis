@@ -33,6 +33,24 @@ function makeRow(overrides: Partial<DeletePendingAuditRow> = {}): DeletePendingA
 }
 
 describe('InquireDeletePendingComponent', () => {
+  it('maps catalog error and both empty states to shared feedback', () => {
+    const c = new InquireDeletePendingComponent();
+    c.service = {
+      catalogIndex: {
+        error: null,
+        search: 'S0',
+        emptyMessageIsError: false,
+        emptyMessage: () => 'No records.',
+      },
+    } as any;
+    expect(c.indexErrorFeedback).toBeNull();
+    expect(c.indexEmptyFeedback).toMatchObject({ severity: 'INFO', title: 'No transactions available' });
+    c.service.catalogIndex.error = 'network down';
+    expect(c.indexErrorFeedback).toMatchObject({ severity: 'ERROR', retryable: true });
+    c.service.catalogIndex.error = null;
+    Object.defineProperty(c.service.catalogIndex, 'emptyMessageIsError', { value: true });
+    expect(c.indexEmptyFeedback).toMatchObject({ severity: 'WARNING', title: 'No matching transaction' });
+  });
   it('functionOptions exposes both Import and Export function registries', () => {
     const c = new InquireDeletePendingComponent();
     expect(c.functionOptions.some((fn) => fn.code === 'A1')).toBe(true);

@@ -14,6 +14,7 @@ describe('IndexPickerComponent', () => {
     expect(component.selectedId).toBeNull();
     expect(component.emptyText).toBe('Nothing to pick.');
     expect(component.autoPickedHint).toBeNull();
+    expect(component.columnHeaders).toEqual([]);
     expect(component.searchable).toBe(false);
     expect(component.searchValue).toBe('');
     expect(component.searchPlaceholder).toBe('Search…');

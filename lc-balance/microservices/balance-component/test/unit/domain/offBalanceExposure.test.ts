@@ -269,18 +269,32 @@ describe('checkPresentDocsIssueSufficiency (business-reported gap 2026-08-15, "B
     expect(result.ok).toBe(true);
   });
 
-  test('ERROR: exceeds the earmark-adjusted Tight Available Balance — reproduces the reported E01(50k)+E02(70k)+E03(100k) SUM-never-checked gap', () => {
+  test('ERROR: the first presentation that would over-commit the Confirmation is rejected', () => {
     const result = checkPresentDocsIssueSufficiency({
-      requestedAmount: new Decimal('100000'),
+      requestedAmount: new Decimal('30001'),
       parentConfirmedBalance: new Decimal('100000'),
       parentPendingDecreaseTotal: new Decimal('0'),
-      presentDocsEarmark: new Decimal('120000'), // E01 + E02 already outstanding
+      presentDocsEarmark: new Decimal('70000'),
       parentConfirmationBalanceContractId: 'bc-conf-1',
     });
     expect(result.ok).toBe(false);
     assertFailed(result);
-    expect(result.error).toMatch(/Present Docs amount 100000 exceeds the parent Confirmation's Present Earmark-adjusted Tight Available Balance -20000/);
+    expect(result.error).toMatch(/Present Docs amount 30001 exceeds the parent Confirmation's Present Earmark-adjusted Tight Available Balance 30000/);
     expect(result.error).toMatch(/balanceContractId bc-conf-1/);
+  });
+
+  test('invalid legacy commitments expose zero capacity, never a negative Tight Available Balance', () => {
+    const result = checkPresentDocsIssueSufficiency({
+      requestedAmount: new Decimal('1'),
+      parentConfirmedBalance: new Decimal('100000'),
+      parentPendingDecreaseTotal: new Decimal('0'),
+      presentDocsEarmark: new Decimal('120000'),
+      parentConfirmationBalanceContractId: 'bc-conf-legacy',
+    });
+    expect(result.ok).toBe(false);
+    assertFailed(result);
+    expect(result.error).toMatch(/Tight Available Balance 0/);
+    expect(result.error).not.toMatch(/Tight Available Balance -/);
   });
 
   test('ERROR: a still-PENDING parent Confirmation AMEND (Decrease direction) occupies the Tight threshold immediately ("占用從寬")', () => {

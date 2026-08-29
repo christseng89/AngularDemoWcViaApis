@@ -27,6 +27,8 @@ export class IndexPickerComponent {
   @Input() selectedId: string | null = null;
   @Input() emptyText = 'Nothing to pick.';
   @Input() autoPickedHint: string | null = null;
+  /** Optional compact table headings for transaction/contract selection lists. */
+  @Input() columnHeaders: readonly string[] = [];
 
   @Input() searchable = false;
   @Input() searchValue = '';

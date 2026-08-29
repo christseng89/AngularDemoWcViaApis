@@ -67,6 +67,12 @@ function makeComponent() {
 }
 
 describe('TransactionBuilderComponent', () => {
+  it('presents Checker action errors through the shared non-retry feedback policy', () => {
+    const { comp: c } = makeComponent();
+    expect(c.checkerFeedback).toBeNull();
+    c.checkerError = 'approval failed';
+    expect(c.checkerFeedback).toMatchObject({ severity: 'ERROR', title: 'Unable to approve the transaction', retryable: false });
+  });
   describe('constructor', () => {
     it('initializes default parent-owned state', () => {
       const { comp } = makeComponent();

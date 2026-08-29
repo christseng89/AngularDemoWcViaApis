@@ -78,6 +78,22 @@ async function resolveMovementRequest(captured, source) {
   return request;
 }
 
+function assertExpectedOutcome(step, result) {
+  if (step.expectError && result.ok) {
+    throw new Error(`Step "${step.label}" expected a business rejection but succeeded with HTTP ${result.status}.`);
+  }
+  if (!step.expectError && !result.ok) {
+    throw new Error(`Step "${step.label}" unexpectedly failed with HTTP ${result.status}: ${JSON.stringify(result.body)}`);
+  }
+}
+
+function assertNonNegativeTightAvailable(label, response) {
+  const value = response?.eventSnapshot?.tightAvailableBalance ?? response?.tightAvailableBalance;
+  if (value !== null && value !== undefined && Number(value) < 0) {
+    throw new Error(`Step "${label}" produced an invalid negative Tight Available Balance (${value}).`);
+  }
+}
+
 // Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release' and
 // 'makerSubmit' (Import Case #6's own A4 real Maker Submit) are the identical shape — POST to a
 // per-movement sub-path with one body key, same "skipped" handling when the referenced createMovement
@@ -119,6 +135,8 @@ async function runCase(businessCase) {
     if (step.type === 'createMovement') {
       const request = await resolveMovementRequest(captured, step.request);
       const result = await callMicroservice('POST', '/balance-movements', request);
+      assertExpectedOutcome(step, result);
+      if (result.ok) assertNonNegativeTightAvailable(step.label, result.body);
       if (step.captureAs) captured[step.captureAs] = { response: result.body };
       trace.push({
         type: 'createMovement',
@@ -137,6 +155,7 @@ async function runCase(businessCase) {
       const requests = [];
       for (const request of step.requests) requests.push(await resolveMovementRequest(captured, request));
       const result = await callMicroservice('POST', '/balance-movements/compound', { requests });
+      assertExpectedOutcome(step, result);
       if (result.ok) {
         step.captureAs.forEach((key, index) => {
           captured[key] = { response: result.body[index] };
@@ -158,6 +177,7 @@ async function runCase(businessCase) {
       const actions = step.actions.map(({ kind, movementRef }) => ({ kind, movementId: captured[movementRef]?.response?.movementId }));
       if (actions.some((action) => !action.movementId)) throw new Error(`Compound action "${step.label}" references a movement that was not created.`);
       const result = await callMicroservice('POST', '/balance-movements/compound-actions', { actions, actor: step.actor });
+      assertExpectedOutcome(step, result);
       trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }
@@ -175,6 +195,7 @@ async function runCase(businessCase) {
         continue;
       }
       const result = await callMicroservice('POST', `/balance-movements/${movementId}/${subPath}`, { [bodyKey]: step[bodyKey] });
+      assertExpectedOutcome(step, result);
       trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }
@@ -182,6 +203,8 @@ async function runCase(businessCase) {
     if (step.type === 'snapshot') {
       const balanceContractId = captured[step.contractRef]?.response?.balanceContractId;
       const result = await callMicroservice('GET', `/balance-contracts/${balanceContractId}/balance`);
+      if (!result.ok) throw new Error(`Snapshot step "${step.label}" unexpectedly failed with HTTP ${result.status}: ${JSON.stringify(result.body)}`);
+      assertNonNegativeTightAvailable(step.label, result.body);
       trace.push({ type: 'snapshot', label: step.label, status: result.status, ok: result.ok, response: result.body });
       continue;
     }

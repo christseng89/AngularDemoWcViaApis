@@ -101,7 +101,8 @@ export function systemLabelForEvent(event: InquiredEvent): string | null {
  */
 function isReclassifiedSecondaryRefShape(event: InquiredEvent): boolean {
   if (event.contract.instrumentType === 'IPLC_LC' && event.movement.movementType === 'UTILIZE') return true;
-  if (event.contract.instrumentType === 'EPLC_CONFIRMATION' && (event.movement.movementType === 'HONOUR' || event.movement.movementType === 'ACCEPT')) return true;
+  if (event.contract.instrumentType === 'EPLC_CONFIRMATION' && (event.movement.movementType === 'HONOUR' || event.movement.movementType === 'ACCEPT'))
+    return true;
   return false;
 }
 
@@ -124,7 +125,8 @@ function isReclassifiedSecondaryRefShape(event: InquiredEvent): boolean {
 export function secondaryReferenceForEvent(event: InquiredEvent): string {
   if (event.contract.instrumentType === 'EPLC_EXAMINATION') return event.contract.naturalKey.ibNumber ?? '—';
   if (event.contract.instrumentType === 'SHGT') return event.contract.naturalKey.sgNumber ? `SG ${event.contract.naturalKey.sgNumber}` : '—';
-  if (event.contract.instrumentType === 'IPLC_ACCEPTANCE' || event.contract.instrumentType === 'EPLC_ACCEPTANCE') return event.contract.naturalKey.ibNumber ?? '—';
+  if (event.contract.instrumentType === 'IPLC_ACCEPTANCE' || event.contract.instrumentType === 'EPLC_ACCEPTANCE')
+    return event.contract.naturalKey.ibNumber ?? '—';
   if (isReclassifiedSecondaryRefShape(event)) return event.movement.sourceTransactionRef ?? '—';
   return '—';
 }
@@ -205,7 +207,8 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
   // "S05 -> APPROVE... Checker Reject 為何出現兩筆REJECTED" bug this replaced is naturally still avoided:
   // that was A3's OWN Checker rejecting A3 itself, before A4/A6 was ever attempted — makerSubmittedAt is
   // never set in that case, so this condition is still false and no split happens.
-  const isFinalizing = contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType != null && !!movement.makerSubmittedAt;
+  const isFinalizing =
+    contract.instrumentType === 'IPLC_LC' && movement.movementType === 'UTILIZE' && contract.tenorType != null && !!movement.makerSubmittedAt;
   if (!isFinalizing) {
     return [{ movement, contract, eventTime: effectiveEventTime(movement), eventStatus: movement.status, phase: 'primary' }];
   }
@@ -217,7 +220,13 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
   // THIS business event (A4/A6's own Submit) happened.
   return [
     { movement, contract, eventTime: movement.createdAt, eventStatus: movement.status, phase: 'create' },
-    { movement, contract, eventTime: (movement.releasedAt ?? movement.makerSubmittedAt ?? movement.createdAt) as string, eventStatus: movement.status, phase: 'finalize' },
+    {
+      movement,
+      contract,
+      eventTime: (movement.releasedAt ?? movement.makerSubmittedAt ?? movement.createdAt) as string,
+      eventStatus: movement.status,
+      phase: 'finalize',
+    },
   ];
 }
 
@@ -320,6 +329,8 @@ export interface LcIndexRow {
   /** Face amount (Design doc §3.3/§6.2) — see deriveLcAmount(). */
   lcAmount: string;
   availableBalance: string;
+  /** Root LC's current Tight Available Balance from the same snapshot as availableBalance. */
+  tightLcBalance: string;
   status: string;
   lastEventAt: string | null;
   /**
@@ -426,10 +437,13 @@ export function computeLcIndexRow(
       // column is never blank for a contract this specific catalog exists to surface. A no-op for every
       // OTHER caller (InquireEventsService's own catalog never passes a CANCELLED contract to begin with).
       const rawLastEventAt = rootMovements.length
-        ? rootMovements.reduce((latest: string, m) => {
-            const t = m.cancelledAt ?? m.releasedAt ?? m.createdAt;
-            return new Date(t).getTime() > new Date(latest).getTime() ? t : latest;
-          }, rootMovements[0]!.cancelledAt ?? rootMovements[0]!.releasedAt ?? rootMovements[0]!.createdAt)
+        ? rootMovements.reduce(
+            (latest: string, m) => {
+              const t = m.cancelledAt ?? m.releasedAt ?? m.createdAt;
+              return new Date(t).getTime() > new Date(latest).getTime() ? t : latest;
+            },
+            rootMovements[0]!.cancelledAt ?? rootMovements[0]!.releasedAt ?? rootMovements[0]!.createdAt,
+          )
         : null;
       const lastEventAt =
         displayLastEventAt && rawLastEventAt
@@ -446,6 +460,7 @@ export function computeLcIndexRow(
         tenorType: tenorTypeLabel(contract.tenorType, side),
         lcAmount: amountSource === 'input' ? deriveLcInputAmount(rootMovements) : deriveLcAmount(root),
         availableBalance: snapshot ? snapshot.availableBalance : '—',
+        tightLcBalance: snapshot?.tightAvailableBalance ?? '—',
         status: contract.status,
         lastEventAt,
         closingPending,
@@ -673,7 +688,17 @@ export class InquireEventsService {
     this.indexLoading = true;
     this.indexError = null;
     this.api
-      .catalog(defaultLcInstrumentTypeForSide(this.side), undefined, this.indexSearch.trim() || undefined, page, this.indexPaging.pageSize, undefined, undefined, undefined, true)
+      .catalog(
+        defaultLcInstrumentTypeForSide(this.side),
+        undefined,
+        this.indexSearch.trim() || undefined,
+        page,
+        this.indexPaging.pageSize,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      )
       .subscribe({
         next: (result) => {
           this.indexPaging.total = result.total;
@@ -751,6 +776,24 @@ export class InquireEventsService {
   /** F1 — plain-text Function-column fallback for a row functionFor() can't resolve (EXPIRE/REVERSAL) — see systemLabelForEvent()'s own doc comment. Null for every other unresolved case (e.g. legacy data), same as before. */
   systemLabelFor(event: InquiredEvent): string | null {
     return systemLabelForEvent(event);
+  }
+
+  /**
+   * Frozen Tight Available Balance of the root LC at this event's point in time.
+   *
+   * Root-LC rows own their snapshot; an A4 finalize row owns the later finalize snapshot. Child-ledger
+   * rows (Acceptance / Shipping Guarantee / Examination) must instead use rootEventSnapshot so the
+   * Events table never mistakes the child contract's balance for the LC's balance.
+   */
+  tightenLcBalanceFor(event: InquiredEvent): string {
+    const isRootEvent = event.contract.balanceContractId === this.rootContract?.balanceContractId;
+    const snapshot = isRootEvent
+      ? event.phase === 'finalize'
+        ? (event.movement.finalizeEventSnapshot ?? event.movement.eventSnapshot ?? null)
+        : (event.movement.eventSnapshot ?? null)
+      : (event.movement.rootEventSnapshot ?? null);
+
+    return snapshot?.tightAvailableBalance ?? '—';
   }
 
   selectEvent(event: InquiredEvent): void {

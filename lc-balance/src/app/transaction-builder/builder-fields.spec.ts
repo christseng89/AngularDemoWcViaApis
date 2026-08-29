@@ -95,6 +95,20 @@ describe('builder-fields', () => {
     ]);
   });
 
+  it('A9 Remarks-only Fix Pending exposes Remarks as the sole editable business field', () => {
+    const fields = buildFields(baseCtx({
+      selectedFunction: fn('A9'),
+      fixPendingMode: true,
+      model: { instrumentType: 'SHGT', movementType: 'FULL_REDEEM', amount: '10000', currency: 'USD', createdBy: 'maker1', eventSeq: 1 },
+    }));
+    const remarks = fields.find((field) => field.key === 'remarks');
+    expect(remarks).toBeDefined();
+    expect(remarks?.hide).toBe(false);
+    expect(remarks?.props?.disabled).toBe(false);
+    expect(remarks?.props?.maxLength).toBe(500);
+    expect(fields.find((field) => field.key === 'amount')?.props?.disabled).toBe(true);
+  });
+
   describe('Amount field', () => {
     it('is editable with the plain "face-level" label when nothing locks it', () => {
       const amount = fieldByKey(buildFields(baseCtx()), 'amount');

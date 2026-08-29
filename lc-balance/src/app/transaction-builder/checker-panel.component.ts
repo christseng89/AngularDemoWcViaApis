@@ -15,6 +15,9 @@ import {
 import { describeApiError as describeApiErrorShared, notFoundMessage } from './api-error';
 import * as policy from './function-policy';
 import { isCheckerActionableMovement } from './checker-eligibility-policy';
+import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
+import { UiMessage } from '../shared/feedback/ui-message.model';
+import { presentApiError } from '../shared/feedback/api-error-presenter';
 
 /**
  * A pending sync request for the Checker's own independent search — see `ngOnChanges()`'s own doc
@@ -35,7 +38,7 @@ export interface CheckerSyncSignal {
 @Component({
   selector: 'app-checker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, IndexPickerComponent, TbIconComponent],
+  imports: [CommonModule, FormsModule, IndexPickerComponent, TbIconComponent, FeedbackMessageComponent],
   templateUrl: './checker-panel.component.html',
   styleUrl: './checker-panel.component.scss',
 })
@@ -83,6 +86,15 @@ export class CheckerPanelComponent implements OnChanges {
    * `checkerSearchError` itself, set true only in `searchCheckerLc()`'s own 404 branch.
    */
   checkerSearchErrorIsNotFound = false;
+
+  get checkerSearchFeedback(): UiMessage | null {
+    if (!this.checkerSearchError) return null;
+    const query = [this.checkerLcNumber, this.checkerSecondaryRef].filter(Boolean).join(' / ');
+    const error = this.checkerSearchErrorIsNotFound
+      ? { status: 404, message: this.checkerSearchError }
+      : { message: this.checkerSearchError };
+    return presentApiError(error, 'SEARCH', query || undefined);
+  }
   checkerItems: BalanceMovement[] = [];
   checkerLoading = false;
   /** This panel's own copy, for `app-index-picker`'s `[selectedId]` highlighting. */

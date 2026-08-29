@@ -202,7 +202,7 @@
               Account Entries
             </button>
           </div>
-          <div class="tb-error mt-2" role="alert" *ngIf="checkerError">{{ checkerError }}</div>
+          <app-feedback-message *ngIf="checkerFeedback as feedback" [message]="feedback"></app-feedback-message>
         </app-checker-panel>
       </div>
 

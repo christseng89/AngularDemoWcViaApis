@@ -9,7 +9,7 @@ import { PagedListState } from './paged-list-state';
  * how many raw candidates are fetched from the server in one shot) — see this class's own module note
  * below for why the two numbers serve different purposes and must not be conflated.
  */
-const DISPLAY_PAGE_SIZE = 5;
+const DISPLAY_PAGE_SIZE = 10;
 
 /**
  * One instance of this plain class replaces one paginated picker's (Catalog LC Index / Parent LC
@@ -108,6 +108,8 @@ export class CatalogPickerService {
     status?: string | null;
     /** Override for a non-Maker-action caller; defaults to `true`. */
     requireIssueReleased?: boolean;
+    /** Override HTTP q; null fetches all rows while `search` remains available for client-side multi-column filtering. */
+    query?: string | null;
   }): void {
     this.resetPaging();
     if (args.guardFails) {
@@ -123,7 +125,16 @@ export class CatalogPickerService {
     const status = args.status === undefined ? 'ACTIVE' : (args.status ?? undefined);
     const requireIssueReleased = args.requireIssueReleased ?? true;
     this.api
-      .catalog(args.instrumentType, status, this.search || undefined, 1, this.fetchSize, args.lcNumber, args.tenorFamily, requireIssueReleased)
+      .catalog(
+        args.instrumentType,
+        status,
+        args.query === undefined ? this.search || undefined : (args.query ?? undefined),
+        1,
+        this.fetchSize,
+        args.lcNumber,
+        args.tenorFamily,
+        requireIssueReleased,
+      )
       .subscribe({
         next: (result) => {
           this.contracts = result.items;

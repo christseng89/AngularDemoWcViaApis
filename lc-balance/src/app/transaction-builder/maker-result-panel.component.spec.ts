@@ -10,6 +10,9 @@ const movement = {
 } as unknown as BalanceMovement;
 
 describe('MakerResultPanelComponent', () => {
+  it('has no feedback when there is no submission error', () => {
+    expect(new MakerResultPanelComponent().errorFeedback).toBeNull();
+  });
   it('renders result state and keeps result actions styled inside the child boundary', () => {
     const fixture = TestBed.createComponent(MakerResultPanelComponent);
     fixture.componentRef.setInput('result', movement);
@@ -49,7 +52,7 @@ describe('MakerResultPanelComponent', () => {
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Submission failed');
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Unable to submit the transaction');
     expect(element.querySelector('button')).toBeNull();
     expect(fixture.componentInstance.statusLabel).toBe('');
   });

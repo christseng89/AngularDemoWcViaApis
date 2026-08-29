@@ -335,6 +335,13 @@ describe('balance-component.model data invariants', () => {
       expect(a4.catalogTenorFilter).toBe('SIGHT');
     });
 
+    it('configures the business 2nd Ref heading for Import transaction indexes', () => {
+      const expected = { A3S: 'SG Number', A4: 'IB Number', A6: 'IB Number', A7: 'IB Number' } as const;
+      for (const [code, label] of Object.entries(expected)) {
+        expect(IMPORT_FUNCTIONS.find((fn) => fn.code === code)?.transactionIndexSecondaryRefLabel).toBe(label);
+      }
+    });
+
     it("A6 is sourced from A3's own UTILIZE, on IPLC_ACCEPTANCE, Usance-tenor-only", () => {
       const a6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6') as TransactionFunction;
       expect(a6.payableMovementType).toBe('UTILIZE');
@@ -452,6 +459,12 @@ describe('balance-component.model data invariants', () => {
       expect(b4.payableMovementInstrumentType).toBe('EPLC_EXAMINATION');
       expect(b4.pendingItemSourceCode).toBe('B3');
       expect(b4.secondaryRefLabel).toBe('EB Number');
+    });
+
+    it('configures EB Number as the B4/B5 transaction-index 2nd Ref heading', () => {
+      for (const code of ['B4', 'B5']) {
+        expect(EXPORT_FUNCTIONS.find((fn) => fn.code === code)?.transactionIndexSecondaryRefLabel).toBe('EB Number');
+      }
     });
 
     it('B4 is the only function with payableMovementInstrumentType', () => {

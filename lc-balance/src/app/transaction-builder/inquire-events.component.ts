@@ -19,6 +19,9 @@ import { TransactionStatusBadgeComponent } from './transaction-status-badge.comp
 import { TransactionSearchFieldComponent } from './transaction-search-field.component';
 import { TransactionPaginationComponent } from './transaction-pagination.component';
 import { ContractStatusBadgeComponent } from './contract-status-badge.component';
+import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
+import { UiMessage } from '../shared/feedback/ui-message.model';
+import { presentApiError } from '../shared/feedback/api-error-presenter';
 
 /** Emitted when the "Original Transaction Screen" panel's own Account Entries button is clicked — the dialog itself stays parent-owned (`TransactionBuilderComponent`), since it's also opened from the Maker Result panel and the Look Up panel's own Event Timeline, not just from here. */
 export interface InquireOpenAccountEntriesEvent {
@@ -55,6 +58,7 @@ export interface InquireOpenAccountEntriesEvent {
     TransactionSearchFieldComponent,
     TransactionPaginationComponent,
     ContractStatusBadgeComponent,
+    FeedbackMessageComponent,
   ],
   templateUrl: './inquire-events.component.html',
   styleUrl: './inquire-events.component.scss',
@@ -62,6 +66,21 @@ export interface InquireOpenAccountEntriesEvent {
 export class InquireEventsComponent {
   @Input() inquireEvents!: InquireEventsService;
   @Output() openAccountEntries = new EventEmitter<InquireOpenAccountEntriesEvent>();
+
+  get indexErrorFeedback(): UiMessage | null {
+    if (!this.inquireEvents.indexError) return null;
+    return presentApiError({ message: this.inquireEvents.indexError }, 'SEARCH', this.inquireEvents.indexSearch);
+  }
+
+  get indexEmptyFeedback(): UiMessage {
+    return {
+      severity: this.inquireEvents.indexEmptyIsError ? 'WARNING' : 'INFO',
+      title: this.inquireEvents.indexEmptyIsError ? 'No matching transaction' : 'No transactions available',
+      message: this.inquireEvents.indexEmptyMessage,
+      nextAction: this.inquireEvents.indexEmptyIsError ? 'Check the LC number and search again.' : undefined,
+      retryable: false,
+    };
+  }
 
   /** Thin delegations to the same pure shared functions `TransactionBuilderComponent` itself calls for its own remaining sections (Look Up panel) — assigned directly rather than re-declared as wrapper methods, since these never touch `this`. */
   readonly displayStatus = displayStatusShared;

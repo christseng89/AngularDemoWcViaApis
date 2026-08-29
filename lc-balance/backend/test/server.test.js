@@ -298,7 +298,8 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('POST /api/business-cases/import-case-1/run — release "skipped" branch', () => {
-    it('marks a release step skipped (no fetch call) when the preceding createMovement returned no movementId, and keeps running the rest of the case', async () => {
+    it('fails the case immediately when a success-path createMovement is rejected', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       let call = 0;
       global.fetch = jest.fn(async (url, opts = {}) => {
         call += 1;
@@ -316,6 +317,9 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
         if (method === 'POST' && /\/balance-movements\/[^/]+\/release$/.test(url)) {
           return jsonResponse(200, { status: 'RELEASED' });
         }
+        if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
+          return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
+        }
         if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
           return jsonResponse(200, { balanceContractId: 'bc-lc', logicalContractId: 'lct-bc-lc' });
         }
@@ -324,26 +328,11 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
 
       const res = await request(app).post('/api/business-cases/import-case-1/run').send({});
 
-      expect(res.status).toBe(200);
-      // 9 steps, not 8 — see the "full success path" test above for why (BAL-123 makerSubmit step added
-      // 2026-08-19).
-      expect(res.body.trace).toHaveLength(9);
-
-      const skippedRelease = res.body.trace.find((t) => t.type === 'release' && t.skipped);
-      expect(skippedRelease).toBeDefined();
-      expect(skippedRelease.reason).toMatch(/No movementId captured under "lc"/);
-
-      // The skipped release itself made no fetch call: 9 steps - 1 skipped = 8 real invocations (the new
-      // makerSubmit step DOES still fire a real fetch call here — its own movementRef, 'utilize', was
-      // captured successfully, so it isn't skipped; this mock has no dedicated /maker-submit branch, so
-      // it falls through to the generic 404, which is fine — nothing in this test asserts on that step's
-      // own outcome).
-      expect(global.fetch).toHaveBeenCalledTimes(8);
-
-      // Downstream steps still completed normally off the error response's own balanceContractId.
-      const amend = res.body.trace.find((t) => t.type === 'createMovement' && t.label.startsWith('LC Amendment'));
-      expect(amend.request.balanceContractId).toBe('bc-lc');
-      expect(amend.ok).toBe(true);
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('import-case-1'), expect.stringMatching(/unexpectedly failed with HTTP 409/));
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -365,6 +354,9 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
         }
         if (method === 'POST' && /\/balance-movements\/[^/]+\/release$/.test(url)) {
           return jsonResponse(200, { status: 'RELEASED' });
+        }
+        if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
+          return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
         }
         if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
           const [, contractId] = url.match(/\/balance-contracts\/([^/]+)\/balance$/);
@@ -394,6 +386,9 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
         if (method === 'POST' && /\/balance-movements\/[^/]+\/release$/.test(url)) {
           return jsonResponse(200, { status: 'RELEASED' });
         }
+        if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
+          return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
+        }
         if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
           // Simulate the microservice failing to resolve the snapshot needed for logicalContractId.
           return jsonResponse(500, { code: 'INTERNAL_ERROR' });
@@ -407,7 +402,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('import-case-2'),
-        expect.stringMatching(/Could not resolve logicalContractId for "lc"/),
+        expect.stringMatching(/Snapshot step .* unexpectedly failed with HTTP 500/),
       );
       consoleErrorSpy.mockRestore();
     });
