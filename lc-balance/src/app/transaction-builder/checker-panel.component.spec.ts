@@ -378,6 +378,35 @@ describe('CheckerPanelComponent', () => {
       expect(c.checkerContract).toBeNull();
     });
 
+    // "Search — No Match Message" rule (business-directed, applies to every Search button) — a genuine
+    // 404 on the Checker's own direct LC+secondary-ref search shows "{query} not found" too, not the raw
+    // server error text.
+    it('a genuine 404 shows "{LC Number} / {secondary ref} not found"', () => {
+      const api = mockApi({ resolveContract: jest.fn(() => throwError(() => ({ status: 404, error: {} }))) });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A8'); // SHGT -> sgNumber
+      c.checkerLcNumber = 'LC1';
+      c.checkerSecondaryRef = 'SG01';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSearchError).toBe('LC1 / SG01 not found');
+      expect(c.checkerSearchErrorIsNotFound).toBe(true); // "Not Found Message — UI Width" rule
+    });
+
+    it('a non-404 error still falls back to the raw server message', () => {
+      const api = mockApi({ resolveContract: jest.fn(() => throwError(() => ({ status: 500, error: { message: 'internal boom' } }))) });
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A8');
+      c.checkerLcNumber = 'LC1';
+      c.checkerSecondaryRef = 'SG01';
+
+      c.searchCheckerLc();
+
+      expect(c.checkerSearchError).toBe('internal boom');
+      expect(c.checkerSearchErrorIsNotFound).toBe(false); // "Not Found Message — UI Width" rule
+    });
+
     it('emits movementPicked(null) at its own top-of-method reset, even before knowing the search will succeed', () => {
       const c = new CheckerPanelComponent(mockApi());
       c.selectedFunction = fn('A2');

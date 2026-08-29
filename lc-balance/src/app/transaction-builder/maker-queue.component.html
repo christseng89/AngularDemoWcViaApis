@@ -122,8 +122,11 @@
         Next ›
       </button>
     </div>
-    <div class="tb-hint mt-2" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error">
-      Nothing PENDING or REJECTED under this Maker on the {{ makerQueue.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed' }} side right now.
+    <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && makerQueue.emptyStateIsError">
+      {{ makerQueue.emptyStateMessage }}
+    </div>
+    <div class="tb-hint mt-2" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && !makerQueue.emptyStateIsError">
+      {{ makerQueue.emptyStateMessage }}
     </div>
   </div>
 </section>

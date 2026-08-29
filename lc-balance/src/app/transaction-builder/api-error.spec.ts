@@ -1,4 +1,4 @@
-import { describeApiError } from './api-error';
+import { describeApiError, notFoundMessage } from './api-error';
 
 describe('describeApiError', () => {
   it('prefers the server JSON error body message (err.error.message) — this service\'s own ApiError.toBody() shape', () => {
@@ -21,5 +21,23 @@ describe('describeApiError', () => {
 
   it('a bare object with neither .error.message nor .message still stringifies (last-resort, may read "[object Object]" — the specific bug this function used to have for connection-level failures is now closed by the .message fallback above)', () => {
     expect(describeApiError({})).toBe('[object Object]');
+  });
+});
+
+// "Search — No Match Message" rule (business-directed) — the single shared wording every search
+// mechanism in this app (IndexPickerComponent, Maker/Checker natural-key lookups, MakerQueueService,
+// InquireEventsService, LcCatalogIndexService) renders through, so the phrasing can never drift between
+// them.
+describe('notFoundMessage', () => {
+  it('reads "{query} not found"', () => {
+    expect(notFoundMessage('AAA')).toBe('AAA not found');
+  });
+
+  it('trims the query first', () => {
+    expect(notFoundMessage('  AAA  ')).toBe('AAA not found');
+  });
+
+  it('works with a composite (multi-field) query too', () => {
+    expect(notFoundMessage('LC1 / SG01')).toBe('LC1 / SG01 not found');
   });
 });

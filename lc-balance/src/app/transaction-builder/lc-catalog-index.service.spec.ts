@@ -175,4 +175,31 @@ describe('LcCatalogIndexService', () => {
       expect(svc.entityLabel).toBe('Export Confirmed LC');
     });
   });
+
+  // "Search — No Match Message" rule (business-directed, applies to every Search button)
+  describe('emptyMessage', () => {
+    it('reads "{query} not found" once a filter was typed', () => {
+      const svc = new LcCatalogIndexService(makeApi());
+      svc.search = '  AAA  ';
+      expect(svc.emptyMessage('with Delete Pending history')).toBe('AAA not found');
+    });
+
+    it('falls back to "No {entityLabel} {suffix} found." when no filter was typed', () => {
+      const svc = new LcCatalogIndexService(makeApi());
+      svc.search = '';
+      expect(svc.emptyMessage('with Delete Pending history')).toBe('No Import LC with Delete Pending history found.');
+      svc.side = 'EXPORT';
+      expect(svc.emptyMessage('with Delete Pending history')).toBe('No Export Confirmed LC with Delete Pending history found.');
+    });
+  });
+
+  // Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER")
+  describe('emptyMessageIsError', () => {
+    it('is true once a filter was typed, false otherwise', () => {
+      const svc = new LcCatalogIndexService(makeApi());
+      expect(svc.emptyMessageIsError).toBe(false);
+      svc.search = 'AAA';
+      expect(svc.emptyMessageIsError).toBe(true);
+    });
+  });
 });

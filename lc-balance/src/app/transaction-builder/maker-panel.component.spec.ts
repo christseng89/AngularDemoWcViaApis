@@ -1670,6 +1670,53 @@ describe('MakerPanelComponent', () => {
     });
   });
 
+  // "Transaction Selection and Navigation Flow" rule (business-directed) — a single shared mechanism for
+  // EVERY non-A1/B1 Function (not a per-function reimplementation): cancelSelection() is one method,
+  // reused verbatim across every picker shape, gated in the template by the same shared getters
+  // (naturalKeyLocked/formLocked/requiresEligibleTarget) every Function already derives from
+  // function-strategy.ts. Proven here against two structurally different shapes (A2's flat Catalog
+  // picker, A4's payExistingUtilize picker) to confirm it's genuinely shape-agnostic, not coincidentally
+  // correct for only one.
+  describe('cancelSelection — shared "abandon the current pick, back to this Function\'s own Selection Screen" mechanism', () => {
+    it('clears the flat-Catalog selection (A2) and re-opens naturalKeyLocked, without touching selectedFunction', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A2'), api);
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      expect(comp.naturalKeyLocked).toBe(true);
+
+      comp.cancelSelection();
+
+      expect(comp.selectedContract).toBeNull();
+      expect(comp.selectedContractSnapshot).toBeNull();
+      expect(comp.naturalKeyLocked).toBe(false);
+      expect(comp.selectedFunction).toBe(getFn('A2')); // same Function — this is a reset, not a switch
+    });
+
+    it('clears the A4 (payExistingUtilize) selection and re-opens naturalKeyLocked', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A4'), api);
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.pickerSelection.selectedPayMovement = makeMovement({ movementId: 'M1' });
+      expect(comp.naturalKeyLocked).toBe(true);
+
+      comp.cancelSelection();
+
+      expect(comp.selectedContract).toBeNull();
+      expect(comp.pickerSelection.selectedPayMovement).toBeNull();
+      expect(comp.naturalKeyLocked).toBe(false);
+      expect(comp.selectedFunction).toBe(getFn('A4'));
+    });
+
+    it('is a no-op safety net for A1/B1 (requiresEligibleTarget is already false, nothing to abandon)', () => {
+      const api = makeApi();
+      const comp = makeComponentB(getFn('A1'), api);
+      expect(comp.requiresEligibleTarget).toBe(false);
+
+      expect(() => comp.cancelSelection()).not.toThrow();
+      expect(comp.selectedFunction).toBe(getFn('A1'));
+    });
+  });
+
   // Common Requirement: every successful Maker Submit or Checker Release must refresh Look Up Current
   // Balance too, not just the Checker queue — regression coverage for a real gap this requirement's own
   // fix closed (several success paths previously called emitSync() with alsoSyncLookup left false).
@@ -1984,6 +2031,41 @@ describe('MakerPanelComponent', () => {
       expect(comp.selectedContract).toBeNull();
       expect(comp.selectedContractSnapshot).toBeNull();
       expect(comp.searchError).toBe('not found');
+    });
+
+    // "Search — No Match Message" rule (business-directed) — the free-text two-field fallback search
+    // (A7/A9/B5's own usesTwoFieldSearch shape) shows the same "{query} not found" wording a genuine 404
+    // gets everywhere else, not the raw server error text.
+    it('a genuine 404 (nothing matched the typed natural key) shows "{query} not found", combining LC + SG/IB Number', () => {
+      const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ status: 404, error: { message: 'CONTRACT_NOT_FOUND' } }))) });
+      const comp = makeComponentB(getFn('A9'), api);
+      comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: '', sgNumber: 'SG01' };
+
+      comp.searchExistingContract();
+
+      expect(comp.searchError).toBe('LC1 / SG01 not found');
+      expect(comp.searchErrorIsNotFound).toBe(true); // "Not Found Message — UI Width" rule
+    });
+
+    it('a genuine 404 with an IB Number search (A7) shows LC + IB Number', () => {
+      const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ status: 404, error: {} }))) });
+      const comp = makeComponentB(getFn('A7'), api, 'FULL_SETTLE');
+      comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: 'IB01', sgNumber: '' };
+
+      comp.searchExistingContract();
+
+      expect(comp.searchError).toBe('LC1 / IB01 not found');
+    });
+
+    it('a non-404 error (e.g. a network failure) still falls back to the raw server/description message', () => {
+      const api = makeApi({ resolveContract: jest.fn(() => throwError(() => ({ status: 500, error: { message: 'internal boom' } }))) });
+      const comp = makeComponentB(getFn('A9'), api);
+      comp.searchNaturalKey = { lcNumber: 'LC1', ibNumber: '', sgNumber: 'SG01' };
+
+      comp.searchExistingContract();
+
+      expect(comp.searchError).toBe('internal boom');
+      expect(comp.searchErrorIsNotFound).toBe(false); // "Not Found Message — UI Width" rule
     });
   });
 

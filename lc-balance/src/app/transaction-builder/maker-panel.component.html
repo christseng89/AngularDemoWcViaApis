@@ -534,7 +534,7 @@
             <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="searchExistingContract()" [disabled]="formLocked || !!selectedContract">
               Search
             </button>
-            <div class="tb-error mt-2" role="alert" *ngIf="searchError">{{ searchError }}</div>
+            <div class="tb-error mt-2" [class.tb-error--fit]="searchErrorIsNotFound" role="alert" *ngIf="searchError">{{ searchError }}</div>
             <div class="tb-hint tb-hint--ok" *ngIf="selectedContract && !searchError">
               Found: {{ selectedContract.naturalKey.lcNumber }} — {{ selectedContract.status }}
             </div>
@@ -741,6 +741,7 @@
                  the real Bill Amount, freely typed; this box shows the derived SG-side numbers alongside it. -->
       <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract">
         <app-index-picker
+          *ngIf="!naturalKeyLocked"
           label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
           [items]="pickerSelection.pagedSgsForArrival"
           [loading]="pickerSelection.sgsForArrivalLoading"
@@ -796,6 +797,7 @@
                  for the cross-contract (B4 -> B3's EPLC_EXAMINATION) case instead of same-contract (A4 -> A3). -->
       <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
         <app-index-picker
+          *ngIf="!naturalKeyLocked"
           label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction?.pendingItemSourceCode || 'A3' }})"
           [items]="pickerSelection.pagedFilteredPayableMovements"
           [loading]="pickerSelection.payableMovementsLoading"
@@ -860,14 +862,15 @@
         </app-index-picker>
       </div>
 
-      <!-- Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records") — shown in place of a
-                 Submit hint whenever this function still needs an eligible record picked; `.tb-error` for
-                 the genuinely-zero-candidates case (nothing to pick at all), `.tb-hint` for "candidates
-                 exist, none picked yet" — same severity convention this file already uses elsewhere.
-                 A4 (releasesExistingMovementInPlace) is excluded here — its own picker above already
-                 carries its own `emptyText`, this outer message would just duplicate it. -->
+      <!-- Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records"), narrowed 2026-08-29
+                 ("No Eligible Transaction — UI Requirement"): the genuinely-zero-candidates case no longer
+                 gets its own outer "⚠ No eligible records available" warning — every picker above already
+                 shows its own `emptyText` inline in the Selection Area itself (same reasoning A4/
+                 releasesExistingMovementInPlace was already excluded here for, now applied uniformly:
+                 the outer message only ever duplicated what the picker itself already says), so the
+                 Selection Area is left to speak for itself, no separate warning stacked below it. The
+                 "candidates exist, none picked yet" hint is unaffected — that is guidance, not a warning. -->
       <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
-        <div class="tb-error mt-2" *ngIf="noEligibleRecordsMessage && eligibleCandidateCount === 0">⚠ {{ noEligibleRecordsMessage }}</div>
         <div class="tb-hint mt-2" *ngIf="noEligibleRecordsMessage && eligibleCandidateCount !== 0">{{ noEligibleRecordsMessage }}</div>
       </ng-container>
 
@@ -886,7 +889,15 @@
                  rendered). Pulled out of the exclusion; the generic SUBMIT button and Fix Pending/Delete
                  Pending action buttons below stay excluded for A4 — those still route through `submit()`/
                  `confirmFixPending()`, never `submitA4()`. -->
-      <form [formGroup]="form">
+      <!-- "Transaction Selection and Navigation Flow" rule (business-directed) — the Transaction Input
+                 Screen (this form) must not render until a Transaction/Event has actually been selected;
+                 before that, only the Selection Screen (the pickers above) should show. Real gap found live
+                 testing this same rule's own Cancel-button feature: this `<form>` had no gate at all, so
+                 Amendment No./Amount etc. rendered simultaneously with the LC Index picker, before any row
+                 was picked. `!requiresEligibleTarget` covers A1/B1 (no prior selection to wait for);
+                 `naturalKeyLocked` covers every other Function once a target is actually selected (or
+                 during Fix Pending/Delete Pending review, via its own isExternalReviewMode half). -->
+      <form [formGroup]="form" *ngIf="!requiresEligibleTarget || naturalKeyLocked">
         <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
       </form>
 
@@ -915,6 +926,17 @@
       >
         <span class="tb-spinner" aria-hidden="true" *ngIf="submitting"></span>{{ submitting ? 'Submitting…' : 'Submit A4' }}
       </button>
+      <!-- "Transaction Selection and Navigation Flow" rule — abandon the current pick, back to the
+                 Selection Screen for this same Function. Only meaningful pre-Submit (formLocked false);
+                 Fix Pending/Delete Pending review already have their own, differently-scoped Cancel. -->
+      <button
+        class="tb-btn tb-btn--outline mt-2"
+        *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && naturalKeyLocked && !formLocked"
+        (click)="cancelSelection()"
+        [disabled]="submitting"
+      >
+        Cancel
+      </button>
 
       <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
         <!-- Business instruction 2026-08-15 ("按Submit...後 Button 直接灰掉 不要重複提交") — stays
@@ -932,6 +954,17 @@
                    them). -->
         <button class="tb-btn tb-btn--primary" *ngIf="!fixPendingMode && !deletePendingReviewMode" (click)="submit()" [disabled]="submitting || !!submitResult || !isSubmitReady">
           <span class="tb-spinner" aria-hidden="true" *ngIf="submitting"></span>{{ submitting ? 'Submitting…' : 'Submit ' + selectedFunction?.code }}
+        </button>
+        <!-- "Transaction Selection and Navigation Flow" rule — abandon the current pick, back to the
+                   Selection Screen for this same Function. Only meaningful pre-Submit (formLocked false);
+                   requiresEligibleTarget already excludes A1/B1 (no prior selection to abandon). -->
+        <button
+          class="tb-btn tb-btn--outline"
+          *ngIf="!fixPendingMode && !deletePendingReviewMode && requiresEligibleTarget && naturalKeyLocked && !formLocked"
+          (click)="cancelSelection()"
+          [disabled]="submitting"
+        >
+          Cancel
         </button>
         <!-- Fix Pending's own resubmit action — replaces the normal Submit button in place (same
                    position a Maker already expects a primary action button) while fixPendingMode is on. -->

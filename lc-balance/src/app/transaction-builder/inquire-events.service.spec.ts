@@ -975,6 +975,34 @@ describe('InquireEventsService', () => {
       svc.side = 'EXPORT';
       expect(svc.indexEntityLabel).toBe('Export Confirmed LC');
     });
+
+    // "Search — No Match Message" rule (business-directed, applies to every Search button)
+    describe('indexEmptyMessage', () => {
+      it('reads "{query} not found" once a filter was typed', () => {
+        const svc = new InquireEventsService(makeApi());
+        svc.indexSearch = '  AAA  ';
+        expect(svc.indexEmptyMessage).toBe('AAA not found');
+      });
+
+      it('falls back to the generic "No ... Master Records found." wording when no filter was typed', () => {
+        const svc = new InquireEventsService(makeApi());
+        svc.side = 'IMPORT';
+        svc.indexSearch = '';
+        expect(svc.indexEmptyMessage).toBe('No Import LC Master Records found.');
+        svc.side = 'EXPORT';
+        expect(svc.indexEmptyMessage).toBe('No Export Confirmed LC Master Records found.');
+      });
+    });
+
+    // Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER")
+    describe('indexEmptyIsError', () => {
+      it('is true once a filter was typed, false otherwise', () => {
+        const svc = new InquireEventsService(makeApi());
+        expect(svc.indexEmptyIsError).toBe(false);
+        svc.indexSearch = 'AAA';
+        expect(svc.indexEmptyIsError).toBe(true);
+      });
+    });
   });
 
   // Client-side windowing over the already-loaded events array (pageSize 10, so 25 events -> 3 pages).

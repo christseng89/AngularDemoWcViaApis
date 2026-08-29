@@ -209,6 +209,12 @@
   border: 1px solid var(--red-border);
   border-radius: var(--radius-md);
   padding: 8px 12px;
+
+  // "Not Found Message — UI Width" rule (business-directed) — see maker-panel.component.scss's own
+  // identical rule for the full rationale.
+  &--fit {
+    width: fit-content;
+  }
 }
 
 .tb-balance-box {

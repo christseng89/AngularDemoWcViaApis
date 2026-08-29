@@ -12,7 +12,7 @@ import {
   displayMovementAmount as displayMovementAmountRule,
   isEarmarkFunction,
 } from './balance-component.model';
-import { describeApiError as describeApiErrorShared } from './api-error';
+import { describeApiError as describeApiErrorShared, notFoundMessage } from './api-error';
 import * as policy from './function-policy';
 import { deriveFunctionStrategy, movementTypeMatchesFunction } from './function-strategy';
 
@@ -77,6 +77,12 @@ export class CheckerPanelComponent implements OnChanges {
   checkerContract: BalanceContract | null = null;
   checkerSearching = false;
   checkerSearchError: string | null = null;
+  /**
+   * "Not Found Message — UI Width" rule (business-directed) — see `MakerPanelComponent.
+   * searchErrorIsNotFound`'s own doc comment for the full rationale; same shape here. Reset alongside
+   * `checkerSearchError` itself, set true only in `searchCheckerLc()`'s own 404 branch.
+   */
+  checkerSearchErrorIsNotFound = false;
   checkerItems: BalanceMovement[] = [];
   checkerLoading = false;
   /** This panel's own copy, for `app-index-picker`'s `[selectedId]` highlighting. */
@@ -138,6 +144,7 @@ export class CheckerPanelComponent implements OnChanges {
   private resetPanel(): void {
     this.checkerContract = null;
     this.checkerSearchError = null;
+    this.checkerSearchErrorIsNotFound = false;
     this.checkerItems = [];
     this.selectedCheckerMovement = null;
     this.checkerSecondaryCandidates = [];
@@ -162,6 +169,7 @@ export class CheckerPanelComponent implements OnChanges {
    */
   searchCheckerLc(): void {
     this.checkerSearchError = null;
+    this.checkerSearchErrorIsNotFound = false;
     this.checkerContract = null;
     this.checkerItems = [];
     this.checkerSecondaryCandidates = [];
@@ -198,7 +206,13 @@ export class CheckerPanelComponent implements OnChanges {
       },
       error: (err) => {
         this.checkerSearching = false;
-        this.checkerSearchError = describeApiErrorShared(err);
+        // "Search — No Match Message" rule (business-directed, applies to every Search button, not just
+        // the Maker's own) — a genuine 404 reads as "{query} not found", same wording/shape as the
+        // Maker-side searches. Any OTHER error still falls back to describeApiErrorShared().
+        const status = (err as { status?: number } | null)?.status;
+        const query = [this.checkerLcNumber, this.checkerSecondaryRef || null].filter((v): v is string => !!v).join(' / ');
+        this.checkerSearchErrorIsNotFound = status === 404;
+        this.checkerSearchError = this.checkerSearchErrorIsNotFound ? notFoundMessage(query) : describeApiErrorShared(err);
       },
     });
   }

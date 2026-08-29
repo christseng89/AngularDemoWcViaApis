@@ -74,8 +74,11 @@
           Next ›
         </button>
       </div>
-      <div class="tb-hint mt-2" *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error">
-        No {{ service.catalogIndex.entityLabel }} with Delete Pending history found{{ service.catalogIndex.search.trim() ? ' matching this filter' : '' }}.
+      <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error && service.catalogIndex.emptyMessageIsError">
+        {{ service.catalogIndex.emptyMessage('with Delete Pending history') }}
+      </div>
+      <div class="tb-hint mt-2" *ngIf="!service.catalogIndex.loading && !service.catalogIndex.rows.length && !service.catalogIndex.error && !service.catalogIndex.emptyMessageIsError">
+        {{ service.catalogIndex.emptyMessage('with Delete Pending history') }}
       </div>
     </ng-container>
 

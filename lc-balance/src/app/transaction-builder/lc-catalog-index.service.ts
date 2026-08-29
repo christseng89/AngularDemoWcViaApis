@@ -1,7 +1,7 @@
 import { Observable, of } from 'rxjs';
 import { BalanceComponentApiService, BalanceContract, CatalogPage } from './balance-component-api.service';
 import { defaultLcInstrumentTypeForSide } from './balance-component.model';
-import { describeApiError } from './api-error';
+import { describeApiError, notFoundMessage } from './api-error';
 import { PagedListState } from './paged-list-state';
 
 /**
@@ -46,6 +46,25 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
 
   get entityLabel(): string {
     return this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed LC';
+  }
+
+  /**
+   * "Search — No Match Message" rule (business-directed, applies to every Search button) — once the
+   * user has actually typed a filter and searched, an empty result reads as "{query} not found"; the
+   * caller's own generic `noneFoundSuffix` phrase (e.g. "with Delete Pending history") stays reserved
+   * for the genuinely no-query-typed browse case.
+   */
+  emptyMessage(noneFoundSuffix: string): string {
+    const query = this.search.trim();
+    return query ? notFoundMessage(query) : `No ${this.entityLabel} ${noneFoundSuffix} found.`;
+  }
+
+  /**
+   * Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER") — see
+   * `MakerQueueService.emptyStateIsError`'s own doc comment for the full rationale; same shape here.
+   */
+  get emptyMessageIsError(): boolean {
+    return !!this.search.trim();
   }
 
   selectSide(side: 'IMPORT' | 'EXPORT'): void {

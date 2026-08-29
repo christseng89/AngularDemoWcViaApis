@@ -23,7 +23,7 @@ const IB_INDEX_PAGE_SIZE = 100;
 const CATALOG_PICKER = new InjectionToken<CatalogPickerService>('MakerPanelComponent.catalogPicker');
 const PARENT_PICKER = new InjectionToken<CatalogPickerService>('MakerPanelComponent.parentPicker');
 const IB_INDEX_PICKER = new InjectionToken<CatalogPickerService>('MakerPanelComponent.ibIndexPicker');
-import { describeApiError as describeApiErrorShared } from './api-error';
+import { describeApiError as describeApiErrorShared, notFoundMessage } from './api-error';
 import {
   DECREASING_MOVEMENT_TYPES,
   InstrumentType,
@@ -224,6 +224,14 @@ export class MakerPanelComponent implements OnChanges {
   naturalKey = { lcNumber: '', ibNumber: '', sgNumber: '' };
   searchNaturalKey = { lcNumber: '', ibNumber: '', sgNumber: '' };
   searchError: string | null = null;
+  /**
+   * "Not Found Message — UI Width" rule (business-directed) — distinguishes a genuine "{query} not
+   * found" (fit-content width box) from every OTHER reason `searchError` gets set (mandatory-field
+   * validation, a 0-balance rejection, a non-404 API error — all still the full-width `.tb-error`
+   * treatment). Reset alongside `searchError` itself at the top of `searchExistingContract()`, set true
+   * only in that method's own 404 branch.
+   */
+  searchErrorIsNotFound = false;
   selectedContract: BalanceContract | null = null;
   selectedContractSnapshot: BalanceSnapshot | null = null;
   snapshotLoading = false;
@@ -635,6 +643,20 @@ export class MakerPanelComponent implements OnChanges {
       this.afterResolved();
     }
     this.emitContext();
+  }
+
+  /**
+   * "Transaction Selection and Navigation Flow" rule (business-directed) — every non-A1/B1 Function's own
+   * Transaction Input Screen gets a Cancel button that abandons the current selection/edits and returns to
+   * that same Function's own Selection Screen, ready to pick a different Transaction. Reuses
+   * `resetForFunction()` verbatim (same `selectedFunction`, so this is genuinely "reset back to the
+   * just-entered-this-Function state", not a function switch) — template gates this to the exact window
+   * where it's meaningful (a target is picked, fields are still editable, not yet Submitted, and not
+   * already inside Fix Pending/Delete Pending review — those own their own, differently-scoped Cancel
+   * buttons already).
+   */
+  cancelSelection(): void {
+    this.resetForFunction();
   }
 
   /**
@@ -1118,6 +1140,7 @@ export class MakerPanelComponent implements OnChanges {
   searchExistingContract(): void {
     if (!this.model.instrumentType) return;
     this.searchError = null;
+    this.searchErrorIsNotFound = false;
     if (!this.searchNaturalKey.lcNumber) {
       this.searchError = 'LC Number is mandatory to search.';
       return;
@@ -1162,7 +1185,17 @@ export class MakerPanelComponent implements OnChanges {
         error: (err) => {
           this.selectedContract = null;
           this.selectedContractSnapshot = null;
-          this.searchError = this.describeApiError(err);
+          // "Search — No Match Message" rule (business-directed) — a genuine 404 (nothing matched the
+          // typed natural key) reads as "{query} not found", same wording/shape as the picker-based
+          // searches (IndexPickerComponent.displayedEmptyText). Any OTHER error (network failure, 500,
+          // etc.) still falls back to describeApiError() — this is specifically the "searched, found
+          // nothing" case, not a generic error catch-all.
+          const status = (err as { status?: number } | null)?.status;
+          const query = [this.searchNaturalKey.lcNumber, this.searchNaturalKey.ibNumber || this.searchNaturalKey.sgNumber || null]
+            .filter((v): v is string => !!v)
+            .join(' / ');
+          this.searchErrorIsNotFound = status === 404;
+          this.searchError = this.searchErrorIsNotFound ? notFoundMessage(query) : this.describeApiError(err);
         },
       });
   }

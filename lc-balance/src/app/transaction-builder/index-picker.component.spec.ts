@@ -56,4 +56,58 @@ describe('IndexPickerComponent', () => {
       expect(component.itemId({ foo: 'bar' })).toBe('');
     });
   });
+
+  // "Search — No Match Message" rule (business-directed) — a single shared getter, since every
+  // A2–A11/B2–B7 picker routes through this one component: an actively-searched empty result reads as
+  // "{query} not found", never the caller's generic emptyText (that stays reserved for the
+  // genuinely-nothing-to-search-yet case).
+  describe('displayedEmptyText', () => {
+    it('falls back to emptyText when no query has been typed', () => {
+      component.searchable = true;
+      component.searchValue = '';
+      component.emptyText = 'Nothing to pick.';
+      expect(component.displayedEmptyText).toBe('Nothing to pick.');
+    });
+
+    it('reads "{query} not found" once a query is typed, trimmed', () => {
+      component.searchable = true;
+      component.searchValue = '  AAA  ';
+      expect(component.displayedEmptyText).toBe('AAA not found');
+    });
+
+    it('falls back to emptyText for a non-searchable picker even if searchValue happens to be set', () => {
+      component.searchable = false;
+      component.searchValue = 'AAA';
+      component.emptyText = 'Nothing to pick.';
+      expect(component.displayedEmptyText).toBe('Nothing to pick.');
+    });
+
+    it('falls back to emptyText when the query is only whitespace', () => {
+      component.searchable = true;
+      component.searchValue = '   ';
+      component.emptyText = 'Nothing to pick.';
+      expect(component.displayedEmptyText).toBe('Nothing to pick.');
+    });
+  });
+
+  // Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER")
+  describe('isNotFound', () => {
+    it('is true once a query is typed on a searchable picker', () => {
+      component.searchable = true;
+      component.searchValue = 'AAA';
+      expect(component.isNotFound).toBe(true);
+    });
+
+    it('is false with no query typed', () => {
+      component.searchable = true;
+      component.searchValue = '';
+      expect(component.isNotFound).toBe(false);
+    });
+
+    it('is false for a non-searchable picker even if searchValue happens to be set', () => {
+      component.searchable = false;
+      component.searchValue = 'AAA';
+      expect(component.isNotFound).toBe(false);
+    });
+  });
 });

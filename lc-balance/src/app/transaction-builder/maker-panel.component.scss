@@ -425,6 +425,14 @@
   border: 1px solid var(--red-border);
   border-radius: var(--radius-md);
   padding: 8px 12px;
+
+  // "Not Found Message — UI Width" rule (business-directed) — a genuine "{query} not found" box hugs its
+  // own text instead of stretching the full container width; every OTHER .tb-error use (validation/API
+  // errors) is unaffected — this modifier is only ever applied alongside the base class, never instead
+  // of it.
+  &--fit {
+    width: fit-content;
+  }
 }
 
 .tb-subcard {

@@ -4,7 +4,7 @@ import { switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
 import { EXPORT_FUNCTIONS, IMPORT_FUNCTIONS, TransactionFunction } from './balance-component.model';
 import { deriveFunctionStrategy, functionSupportsFixPending, payExistingUtilizeFunctionFor, resolveFunctionForMovement } from './function-strategy';
-import { describeApiError } from './api-error';
+import { describeApiError, notFoundMessage } from './api-error';
 import { PagedListState } from './paged-list-state';
 
 /**
@@ -95,6 +95,32 @@ export class MakerQueueService {
     const filtered = this.sideFilteredItems;
     const start = (this.paging.page - 1) * this.paging.pageSize;
     return filtered.slice(start, start + this.paging.pageSize);
+  }
+
+  /**
+   * "Search — No Match Message" rule (business-directed, applies to every Search button) — once the
+   * Maker has actually typed an LC Number query and searched, an empty result reads as "{query} not
+   * found"; the generic "Nothing PENDING or REJECTED..." wording stays reserved for the genuinely
+   * no-query-typed browse case. Deliberately keyed on `lcNumberSearch` only, not `createdBy` — that field
+   * always carries a default actor value ('maker1'), so it's never meaningfully "unset" the way a typed
+   * search query is.
+   */
+  get emptyStateMessage(): string {
+    const query = this.lcNumberSearch.trim();
+    return query
+      ? notFoundMessage(query)
+      : `Nothing PENDING or REJECTED under this Maker on the ${this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed'} side right now.`;
+  }
+
+  /**
+   * Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER") — a genuine
+   * "{query} not found" reads with the SAME `.tb-error` treatment (red-tinted box, `role="alert"`)
+   * `checkerSearchError`/`searchError` already use elsewhere in this app; the neutral "nothing to browse
+   * yet" case (no query typed) stays the plain `.tb-hint` styling. Template branches on this rather than
+   * re-deriving "was a query typed" itself, so the message text and its own styling can never disagree.
+   */
+  get emptyStateIsError(): boolean {
+    return !!this.lcNumberSearch.trim();
   }
 
   /** Import LC／Export Confirmed tab click — `items` itself is already fully loaded (both sides), so this never re-fetches, just re-derives `paging.total` for the newly-selected side and resets to page 1 (same "a genuinely new view starts at page 1" convention `load()`'s own `resetToFirstPage` already uses). */

@@ -27,7 +27,7 @@
         <span class="tb-spinner" aria-hidden="true" *ngIf="checkerSearching"></span>{{ checkerSearching ? 'Searching…' : 'Search' }}
       </button>
     </div>
-    <div class="tb-error mt-2" role="alert" aria-live="polite" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
+    <div class="tb-error mt-2" [class.tb-error--fit]="checkerSearchErrorIsNotFound" role="alert" aria-live="polite" *ngIf="checkerSearchError">{{ checkerSearchError }}</div>
     <div class="tb-hint tb-hint--ok mt-2" *ngIf="checkerAutoPickedHint">{{ checkerAutoPickedHint }}</div>
 
     <!-- Business-reported gap 2026-08-21 ("單獨執行 A9 Checker 輸入LC NUMBER 無法自動找到PENDING交易") —

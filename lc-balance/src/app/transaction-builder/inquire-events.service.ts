@@ -16,7 +16,7 @@ import {
 import { BuilderFieldsContext, buildFields, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
 import { payExistingUtilizeFunctionFor, resolveFunctionForMovement } from './function-strategy';
 import { BuilderModel } from './function-policy';
-import { describeApiError } from './api-error';
+import { describeApiError, notFoundMessage } from './api-error';
 import { PagedListState } from './paged-list-state';
 
 /**
@@ -537,6 +537,25 @@ export class InquireEventsService {
   /** Side-aware entity label for the Index's own heading/hint text. */
   get indexEntityLabel(): string {
     return this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed LC';
+  }
+
+  /**
+   * "Search — No Match Message" rule (business-directed, applies to every Search button) — once the
+   * user has actually typed a filter and searched, an empty Index reads as "{query} not found"; the
+   * plain "No ... Master Records found." wording stays reserved for the genuinely no-query-typed browse
+   * case (e.g. right after switching side, before this LC/Confirmation side has any records at all).
+   */
+  get indexEmptyMessage(): string {
+    const query = this.indexSearch.trim();
+    return query ? notFoundMessage(query) : `No ${this.indexEntityLabel} Master Records found.`;
+  }
+
+  /**
+   * Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER") — see
+   * `MakerQueueService.emptyStateIsError`'s own doc comment for the full rationale; same shape here.
+   */
+  get indexEmptyIsError(): boolean {
+    return !!this.indexSearch.trim();
   }
 
   selectedEvent: InquiredEvent | null = null;

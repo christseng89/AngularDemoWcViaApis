@@ -227,6 +227,46 @@ describe('MakerQueueService', () => {
       expect(svc.sideFilteredItems).toEqual([]);
     });
 
+    // "Search — No Match Message" rule (business-directed, applies to every Search button)
+    describe('emptyStateMessage', () => {
+      it('reads "{query} not found" once an LC Number search was typed', () => {
+        const svc = new MakerQueueService(makeApi());
+        svc.lcNumberSearch = '  AAA  ';
+        expect(svc.emptyStateMessage).toBe('AAA not found');
+      });
+
+      it('falls back to the generic "Nothing PENDING or REJECTED..." wording when no search was typed', () => {
+        const svc = new MakerQueueService(makeApi());
+        svc.lcNumberSearch = '';
+        expect(svc.emptyStateMessage).toBe('Nothing PENDING or REJECTED under this Maker on the Import LC side right now.');
+        svc.side = 'EXPORT';
+        expect(svc.emptyStateMessage).toBe('Nothing PENDING or REJECTED under this Maker on the Export Confirmed side right now.');
+      });
+
+      it('is unaffected by the createdBy field — that always carries a default actor value, never treated as a search query', () => {
+        const svc = new MakerQueueService(makeApi());
+        svc.createdBy = 'maker2';
+        svc.lcNumberSearch = '';
+        expect(svc.emptyStateMessage).toContain('Nothing PENDING or REJECTED');
+      });
+    });
+
+    // Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER")
+    describe('emptyStateIsError', () => {
+      it('is true once an LC Number search was typed', () => {
+        const svc = new MakerQueueService(makeApi());
+        svc.lcNumberSearch = 'AAA';
+        expect(svc.emptyStateIsError).toBe(true);
+      });
+
+      it('is false when no search was typed (or only whitespace)', () => {
+        const svc = new MakerQueueService(makeApi());
+        expect(svc.emptyStateIsError).toBe(false);
+        svc.lcNumberSearch = '   ';
+        expect(svc.emptyStateIsError).toBe(false);
+      });
+    });
+
     it('selectSide() never re-fetches — items is already fully loaded (both sides) by load()', () => {
       const listMyMovements = jest.fn(() => of(makePage({ items: [importRow, exportRow] })));
       const api = makeApi({ listMyMovements });

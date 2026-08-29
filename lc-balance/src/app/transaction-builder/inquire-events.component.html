@@ -120,8 +120,11 @@
               Next ›
             </button>
           </div>
-          <div class="tb-hint mt-2" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError">
-            No {{ inquireEvents.indexEntityLabel }} Master Records found{{ inquireEvents.indexSearch.trim() ? ' matching this filter' : '' }}.
+          <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError && inquireEvents.indexEmptyIsError">
+            {{ inquireEvents.indexEmptyMessage }}
+          </div>
+          <div class="tb-hint mt-2" *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError && !inquireEvents.indexEmptyIsError">
+            {{ inquireEvents.indexEmptyMessage }}
           </div>
         </ng-container>
 

@@ -1,6 +1,7 @@
 import { Component, ContentChild, EventEmitter, Input, Output, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { notFoundMessage } from './api-error';
 
 /**
  * One shared presentation shell for every "pick from a list of LC/IB/SG/pending-movement records" spot
@@ -43,6 +44,33 @@ export class IndexPickerComponent {
   @Output() pick = new EventEmitter<string>();
 
   @ContentChild(TemplateRef) rowTemplate?: TemplateRef<{ $implicit: unknown }>;
+
+  /**
+   * "Search — No Match Message" rule (business-directed, shared across every A2–A11/B2–B7 picker that
+   * routes through this one presentation component): once the user has actually typed a query and
+   * searched, an empty result reads as "{query} not found" — never the caller's generic `emptyText`
+   * (that stays reserved for the genuinely-nothing-to-search-yet case, i.e. no query typed at all).
+   * Deliberately keyed on `searchValue` alone, not a separate "did the user press Search" flag — the
+   * moment a query is present and the result set is still empty, "not found" is already the correct
+   * reading regardless of whether that came from pressing the button or the Enter-key shortcut.
+   */
+  get displayedEmptyText(): string {
+    const query = this.searchValue.trim();
+    return this.searchable && query ? notFoundMessage(query) : this.emptyText;
+  }
+
+  /**
+   * Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER") — a genuine
+   * "{query} not found" gets the SAME `.tb-error`-style red-tinted treatment `checkerSearchError`
+   * already uses elsewhere in this app; the neutral "nothing to pick at all" case (no query typed)
+   * keeps this component's own plain `.index-picker__empty` styling. Copied into this component's own
+   * stylesheet rather than referencing `.tb-error` directly — Angular view encapsulation means a class
+   * declared in a DIFFERENT component's stylesheet never matches markup rendered by this one (same
+   * "disclosed, deliberate copy" convention this codebase already uses elsewhere).
+   */
+  get isNotFound(): boolean {
+    return this.searchable && !!this.searchValue.trim();
+  }
 
   /**
    * Every item in this app is either a BalanceContract (id = balanceContractId only) or a

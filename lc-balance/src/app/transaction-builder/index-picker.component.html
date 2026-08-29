@@ -16,7 +16,9 @@
   </div>
 
   <ng-container *ngIf="!loading">
-    <div class="index-picker__empty" *ngIf="!items.length">{{ emptyText }}</div>
+    <div class="index-picker__empty" [class.index-picker__empty--not-found]="isNotFound" [attr.role]="isNotFound ? 'alert' : null" [attr.aria-live]="isNotFound ? 'polite' : null" *ngIf="!items.length">
+      {{ displayedEmptyText }}
+    </div>
 
     <div class="index-picker__list" *ngIf="items.length">
       <button
