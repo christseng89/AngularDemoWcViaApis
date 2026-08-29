@@ -8,10 +8,16 @@
  * (checkAndForeignKeyConstraints.test.ts, same directory).
  *
  * Deliberately includes self-referencing rows in the SAME batch being copied (a movement whose
- * superseded_movement_id points at a sibling row also being copied in this same rebuild) — migration 13's
+ * reversal_of_movement_id points at a sibling row also being copied in this same rebuild) — migration 13's
  * own PRAGMA foreign_keys = OFF for the whole rebuild exists specifically so SQLite's per-row (not
  * end-of-statement) FK checking can't fail on insertion order inside one multi-row INSERT ... SELECT; this
  * test is what proves that actually works, not just that it compiles.
+ *
+ * Contract/movement rows below omit supersedes_balance_contract_id/superseded_by_balance_contract_id/
+ * superseded_movement_id even though createLegacyBalanceContractsTable/createLegacyBalanceMovementsTable's
+ * own "day one" shape still declares them (they genuinely existed at migration 13's own point in history) —
+ * migration 22 (later in this same runMigrations() sequence) drops all three columns for good, so asserting
+ * "before === after" on them would fail for a reason unrelated to migration 13 itself.
  */
 import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from '../../../src/db/migrations';
@@ -36,8 +42,6 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
           leg_seq: null,
           parent_logical_contract_id: null,
           status: 'ACTIVE',
-          supersedes_balance_contract_id: null,
-          superseded_by_balance_contract_id: null,
           currency: 'USD',
           tolerance_pct: '10',
           tenor_type: 'SIGHT',
@@ -61,8 +65,6 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
           leg_seq: null,
           parent_logical_contract_id: 'lc1',
           status: 'CLOSED',
-          supersedes_balance_contract_id: null,
-          superseded_by_balance_contract_id: null,
           currency: 'USD',
           tolerance_pct: null,
           tenor_type: null, // SHGT genuinely has no tenor — proves the nullable CHECK survives the rebuild.
@@ -85,11 +87,7 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
           sg_number: null,
           leg_seq: 'A',
           parent_logical_contract_id: null,
-          status: 'SUPERSEDED',
-          // Self-reference to a sibling row inserted in the SAME batch — the exact case
-          // PRAGMA foreign_keys = OFF during the rebuild is meant to protect.
-          supersedes_balance_contract_id: 'c1',
-          superseded_by_balance_contract_id: null,
+          status: 'CANCELLED',
           currency: 'EUR',
           tolerance_pct: '5',
           tenor_type: 'BUYERS_USANCE',
@@ -109,7 +107,7 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
       const insertStmt = db.prepare(`INSERT INTO balance_contracts (${cols.join(', ')}) VALUES (${placeholders})`);
       for (const row of rows) insertStmt.run(row as Record<string, unknown> as never);
 
-      const before = db.prepare('SELECT * FROM balance_contracts ORDER BY balance_contract_id').all();
+      const before = db.prepare('SELECT * FROM balance_contracts ORDER BY balance_contract_id').all() as Record<string, unknown>[];
       expect(before).toHaveLength(3);
 
       runMigrations(db);
@@ -120,7 +118,12 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
       // (both nullable) on top of migration 13's own rebuild; every pre-existing row correctly gains
       // them as null, same "new nullable column backfills as null on old rows" pattern every earlier
       // migration in this file already establishes — not a "before === after" preservation failure.
-      expect(after).toEqual(before.map((row) => ({ ...(row as Record<string, unknown>), expiry_date: null, mail_float_grace_days: null })));
+      // supersedes_balance_contract_id/superseded_by_balance_contract_id are dropped by migration 13's
+      // own rebuild too (2026-08-29 dead-code cleanup) — the legacy fixture table
+      // still declares them (genuinely present at migration 13's own point in history), so `before`'s own
+      // SELECT * picks them up as NULL even though the row objects above never set them; stripped here.
+      const beforeProjected = before.map(({ supersedes_balance_contract_id, superseded_by_balance_contract_id, ...rest }) => rest);
+      expect(after).toEqual(beforeProjected.map((row) => ({ ...row, expiry_date: null, mail_float_grace_days: null })));
     } finally {
       db.close();
     }
@@ -155,7 +158,6 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
           account_entries: null,
           lmts_reservation_id: null,
           status: 'RELEASED',
-          superseded_movement_id: null,
           reversal_of_movement_id: null,
           reason_code: null,
           remarks: null,
@@ -187,8 +189,6 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
           account_entries: '[{"drAccount":"X","crAccount":"Y","currency":"USD","amount":"1000"}]',
           lmts_reservation_id: 'lmts-1',
           status: 'PENDING',
-          // Self-reference to a sibling row also being copied in this same rebuild batch.
-          superseded_movement_id: 'm1',
           reversal_of_movement_id: null,
           reason_code: 'RC01',
           remarks: 'test remark',
@@ -220,7 +220,6 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
           account_entries: null,
           lmts_reservation_id: null,
           status: 'CANCELLED',
-          superseded_movement_id: null,
           // Self-reference to a sibling row also being copied in this same rebuild batch.
           reversal_of_movement_id: 'm2',
           reason_code: null,
@@ -246,7 +245,7 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
       const insertStmt = db.prepare(`INSERT INTO balance_movements (${cols.join(', ')}) VALUES (${placeholders})`);
       for (const row of rows) insertStmt.run(row as Record<string, unknown> as never);
 
-      const before = db.prepare('SELECT * FROM balance_movements ORDER BY movement_id').all();
+      const before = db.prepare('SELECT * FROM balance_movements ORDER BY movement_id').all() as Record<string, unknown>[];
       expect(before).toHaveLength(3);
 
       runMigrations(db);
@@ -258,7 +257,13 @@ describe('migration 13 (CHECK/FK rebuild) preserves every pre-existing row exact
       expect(after).toHaveLength(3);
       const dayOneCols = cols;
       const afterProjected = after.map((row) => Object.fromEntries(dayOneCols.map((c) => [c, row[c]])));
-      expect(afterProjected).toEqual(before);
+      // superseded_movement_id is dropped by migration 13's own rebuild too (2026-08-29 dead-code
+      // cleanup) — the legacy fixture table still declares it (genuinely present at
+      // migration 13's own point in history), so `before`'s own SELECT * picks it up as NULL even though
+      // the row objects above never set it; stripped here since dayOneCols (and afterProjected) no longer
+      // carry it.
+      const beforeProjected = before.map(({ superseded_movement_id, ...rest }) => rest);
+      expect(afterProjected).toEqual(beforeProjected);
 
       for (const row of after) {
         expect(row.acknowledged_by).toBeNull();

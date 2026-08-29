@@ -29,7 +29,6 @@ interface MovementRow {
   contingent_account_entry: string | null;
   lmts_reservation_id: string | null;
   status: MovementStatus;
-  superseded_movement_id: string | null;
   reversal_of_movement_id: string | null;
   reason_code: string | null;
   remarks: string | null;
@@ -86,7 +85,6 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     contingentAccountEntry: row.contingent_account_entry ? (JSON.parse(row.contingent_account_entry) as ContingentAccountEntry) : null,
     lmtsReservationId: row.lmts_reservation_id,
     status: row.status,
-    supersededMovementId: row.superseded_movement_id,
     reversalOfMovementId: row.reversal_of_movement_id,
     reasonCode: row.reason_code,
     remarks: row.remarks,
@@ -145,7 +143,7 @@ export class BalanceMovementStore {
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
             contingent_account_entry,
-            lmts_reservation_id, status, superseded_movement_id, reversal_of_movement_id,
+            lmts_reservation_id, status, reversal_of_movement_id,
             reason_code, remarks, new_expiry_date, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before,
@@ -156,7 +154,7 @@ export class BalanceMovementStore {
             @movementId, @balanceContractId, @eventSeq, @businessEventId, @movementType,
             @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
             @contingentAccountEntry,
-            @lmtsReservationId, @status, @supersededMovementId, @reversalOfMovementId,
+            @lmtsReservationId, @status, @reversalOfMovementId,
             @reasonCode, @remarks, @newExpiryDate, @transactionDate, @businessDate, @valueDate,
             @sourceModule, @sourceFunction, @sourceTransactionRef, @referencedTransactionId,
             @balanceBefore,
@@ -180,7 +178,6 @@ export class BalanceMovementStore {
           contingentAccountEntry: movement.contingentAccountEntry ? JSON.stringify(movement.contingentAccountEntry) : null,
           lmtsReservationId: movement.lmtsReservationId ?? null,
           status: movement.status,
-          supersededMovementId: movement.supersededMovementId ?? null,
           reversalOfMovementId: movement.reversalOfMovementId ?? null,
           reasonCode: movement.reasonCode ?? null,
           remarks: movement.remarks ?? null,

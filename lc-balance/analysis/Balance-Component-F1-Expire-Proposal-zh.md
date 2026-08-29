@@ -578,12 +578,12 @@ AUTO EXPIRY／AUTO CLOSE 兩機制與其資格判斷（§7）、EXPIRED 後 A2/B
 
 ### 11.6　已查證、確認不影響本提案的項目（2026-08-25 review 補充）
 
-- **`ContractStatus.SUPERSEDED` 與合約版本化機制**：`store/balanceContractStore.ts` 有完整的
-  `markSuperseded()` 函式（把舊版合約標記 SUPERSEDED、指向新版 `superseded_by_balance_contract_id`，
-  Design doc §7.3），但 `service/balanceService.ts` 裡**沒有任何呼叫者**——與 `REVERSAL` 同一類「有
-  基礎設施但從未被任何業務功能觸發」的情況。今天系統不會有任何合約真的進入 `SUPERSEDED` 狀態，本提案
-  §7.2／§7.8／§8.6／§9.6 講的 ACTIVE-only 解析路徑假設（一個 natural key 對應一筆 ACTIVE 合約）不受
-  影響，無需額外處理。
+- **合約版本化機制（2026-08-29 更新：已移除）**：`store/balanceContractStore.ts` 原本有完整的
+  `markSuperseded()` 函式（Design doc §7.3，把舊版合約標記為已取代、指向新版），但
+  `service/balanceService.ts` 裡**沒有任何呼叫者**——與 `REVERSAL` 同一類「有基礎設施但從未被任何業務
+  功能觸發」的情況。當時系統不會有任何合約真的進入該狀態，本提案 §7.2／§7.8／§8.6／§9.6 講的
+  ACTIVE-only 解析路徑假設（一個 natural key 對應一筆 ACTIVE 合約）不受影響，無需額外處理。**該機制已於
+  2026-08-29 確認零呼叫點後整套移除**——見 CLAUDE.md 對應決策日誌。
 
 ## 十二、程式碼審閱結果（2026-08-25，對照 §一–十一 逐項核對）
 

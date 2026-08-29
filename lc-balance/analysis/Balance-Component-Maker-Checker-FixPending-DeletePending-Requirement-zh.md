@@ -103,8 +103,10 @@
 #### 2.2.1 附帶澄清：`ContractStatus` 與 `MovementStatus` 是兩個完全獨立的 enum
 
 `ContractStatus`（LC/Confirmed LC 合約本身的版號狀態）與 `MovementStatus`（單筆交易分錄的狀態）是兩個
-完全獨立的 enum，不要混為一談。`ContractStatus` 有一個保留但從未被任何業務功能觸發的
-`SUPERSEDED`／`markSuperseded()`（合約版本置換用），與本次業務要的 Fix Pending 無關。Fix Pending
+完全獨立的 enum，不要混為一談。`ContractStatus` 原本有一個保留但從未被任何業務功能觸發的
+`SUPERSEDED`／`markSuperseded()`（合約版本置換用），與本次業務要的 Fix Pending 無關——該機制已於
+2026-08-29 確認零呼叫點後整套移除（`ContractStatus` 現只剩 `ACTIVE`／`CLOSED`／`CANCELLED`／
+`EXPIRED`）。Fix Pending
 最終定案的做法，是直接原地修正 PENDING／REJECTED 記錄本身（同一筆 `movementId`／`eventSeq`，狀態
 回到 PENDING），修正前內容另存到獨立的稽核表，詳見
 `Balance-Component-FixPending-DeletePending-Proposal-zh.md`。

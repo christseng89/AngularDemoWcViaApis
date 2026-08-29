@@ -18,8 +18,6 @@ interface ContractRow {
   leg_seq: string | null;
   parent_logical_contract_id: string | null;
   status: ContractStatus;
-  supersedes_balance_contract_id: string | null;
-  superseded_by_balance_contract_id: string | null;
   currency: string;
   tolerance_pct: string | null;
   tenor_type: string | null;
@@ -50,8 +48,6 @@ function rowToContract(row: ContractRow): BalanceContract {
     naturalKey,
     parentLogicalContractId: row.parent_logical_contract_id,
     status: row.status,
-    supersedesBalanceContractId: row.supersedes_balance_contract_id,
-    supersededByBalanceContractId: row.superseded_by_balance_contract_id,
     currency: row.currency,
     tolerancePct: row.tolerance_pct,
     tenorType: row.tenor_type as BalanceContract['tenorType'],
@@ -146,13 +142,13 @@ export class BalanceContractStore {
         `INSERT INTO balance_contracts (
           balance_contract_id, logical_contract_id, contract_version, instrument_type,
           lc_number, ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
-          supersedes_balance_contract_id, superseded_by_balance_contract_id, currency,
+          currency,
           tolerance_pct, tenor_type, tenor_days, maturity_date, expiry_date, mail_float_grace_days,
           opening_balance, source_amendment_no, effective_from, effective_to, created_by, created_at
         ) VALUES (
           @balanceContractId, @logicalContractId, @contractVersion, @instrumentType,
           @lcNumber, @ibNumber, @sgNumber, @legSeq, @parentLogicalContractId, @status,
-          @supersedesBalanceContractId, @supersededByBalanceContractId, @currency,
+          @currency,
           @tolerancePct, @tenorType, @tenorDays, @maturityDate, @expiryDate, @mailFloatGraceDays,
           @openingBalance, @sourceAmendmentNo, @effectiveFrom, @effectiveTo, @createdBy, @createdAt
         )`,
@@ -168,8 +164,6 @@ export class BalanceContractStore {
         legSeq: contract.naturalKey.legSeq ?? null,
         parentLogicalContractId: contract.parentLogicalContractId ?? null,
         status: contract.status,
-        supersedesBalanceContractId: contract.supersedesBalanceContractId ?? null,
-        supersededByBalanceContractId: contract.supersededByBalanceContractId ?? null,
         currency: contract.currency,
         tolerancePct: contract.tolerancePct ?? null,
         tenorType: contract.tenorType ?? null,
@@ -432,17 +426,6 @@ export class BalanceContractStore {
       .all({ ...whereParams, limit: pageSize, offset }) as unknown as ContractRow[];
 
     return { items: rows.map(rowToContract), total, page, pageSize };
-  }
-
-  /** Design doc §7.3 — mark the current ACTIVE version SUPERSEDED and point it at its successor, in one call (caller wraps this + the new insert() in one db.transaction()). */
-  markSuperseded(balanceContractId: string, supersededByBalanceContractId: string, effectiveTo: string): void {
-    this.db
-      .prepare(
-        `UPDATE balance_contracts
-         SET status = 'SUPERSEDED', superseded_by_balance_contract_id = @supersededByBalanceContractId, effective_to = @effectiveTo
-         WHERE balance_contract_id = @balanceContractId`,
-      )
-      .run({ balanceContractId, supersededByBalanceContractId, effectiveTo });
   }
 
   /**

@@ -863,22 +863,27 @@ info:
         movementType is unaffected — `assertValidAmount()` already rejects a zero amount for all of them,
         so this can never mask a genuinely non-zero figure elsewhere.
 
-    v1.33.0 (2026-08-28): doc-only — `MovementStatus`'s own stale claim that SUPERSEDED "is not reachable
-    through any endpoint" is corrected; no schema/endpoint change. The Angular client already resolves the
-    current record everywhere, not the replaced predecessor.
-
     v1.34.0 (2026-08-29): Fix Pending §19 redesigned — `POST /balance-movements/{movementId}/edit`
-    now corrects the movement's row IN PLACE (same `movementId`/`eventSeq`) instead of marking it
-    SUPERSEDED and inserting a replacement. `MovementStatus` drops the `SUPERSEDED` value entirely (4
-    legal values now) — it conflated a Business Status with an internal technical revision marker, and
-    could leak into raw API responses (`GET /balance-contracts/{id}/movements`,
-    `GET /balance-movements?businessEventId=`) unfiltered. The pre-edit content is preserved separately
-    (no new endpoint yet — the microservice's own `FixPendingAuditStore`/`fix_pending_audit` table).
-      - CHANGED: `MovementStatus` enum — `SUPERSEDED` removed.
+    now corrects the movement's row IN PLACE (same `movementId`/`eventSeq`) instead of marking the old row
+    with an internal revision marker and inserting a replacement. That marker conflated a Business Status
+    with a technical revision concept, and could leak into raw API responses (`GET
+    /balance-contracts/{id}/movements`, `GET /balance-movements?businessEventId=`) unfiltered. The pre-edit
+    content is preserved separately (no new endpoint yet — the microservice's own
+    `FixPendingAuditStore`/`fix_pending_audit` table).
+      - CHANGED: `MovementStatus` enum — the internal revision-marker value removed (4 legal values now).
       - CHANGED: `POST .../edit` — response is now the SAME movement (same `movementId`), corrected;
         previously a NEW movement with a `supersededByMovementId` pointer to the (now-nonexistent)
         predecessor. `editedBy`/`editedAt` are unaffected — still set on the live row.
-  version: "1.34.0"
+
+    v1.35.0 (2026-08-29): broadened cleanup, same day as v1.34.0 — `ContractStatus`'s own reserved
+    contract-versioning mechanism (`markSuperseded()`, a separate, unrelated design from Fix Pending's own
+    v1.34.0 change above) is removed too: zero endpoints ever transitioned a contract through it, confirmed
+    via a zero-call-site audit. `BalanceMovement.supersededMovementId` (a separate, pre-existing,
+    never-written reserved field predating Fix Pending) is removed for the same reason.
+      - CHANGED: `ContractStatus` enum — the reserved contract-versioning value removed (4 legal values now).
+      - REMOVED: `BalanceMovement.supersededMovementId` — reserved since v1.0.0, never populated by any
+        endpoint in this contract.
+  version: "1.35.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1131,7 +1136,7 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200':
-          description: The contract version, whatever its current status (ACTIVE/CLOSED/CANCELLED/SUPERSEDED/EXPIRED — no status filter, unlike the natural-key form's own ACTIVE-only default).
+          description: The contract version, whatever its current status (ACTIVE/CLOSED/CANCELLED/EXPIRED — no status filter, unlike the natural-key form's own ACTIVE-only default).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BalanceContract' }
@@ -1907,10 +1912,9 @@ components:
       type: string
       description: >
         Design doc §3.1 — a completely separate state machine from
-        MovementStatus. The enum's SUPERSEDED value is carried for the state
-        machine's own completeness and future contract-versioning work (see
-        the v1.0.0 changelog note on the removed versioning endpoint) — no
-        current endpoint transitions a contract into it. CLOSED (v1.16.0)
+        MovementStatus. (v1.35.0 — the reserved contract-versioning value and
+        its own `markSuperseded()` mechanism are removed: zero endpoints ever
+        transitioned a contract through it.) CLOSED (v1.16.0)
         IS now reachable: a root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION
         transitions into it as a side effect of
         POST /balance-movements/{movementId}/release on that contract's own
@@ -1944,7 +1948,7 @@ components:
         `GET /balance-contracts/catalog`'s own `excludeCancelled` param and
         `GET /delete-pending-audit/lc-catalog` below for how a CANCELLED
         contract stays queryable without polluting normal LC browsing.
-      enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED]
+      enum: [ACTIVE, CLOSED, CANCELLED, EXPIRED]
 
     MovementStatus:
       type: string
@@ -2096,7 +2100,7 @@ components:
           nullable: true
           description: >
             `NULL` while this contract version is current (ACTIVE, or EXPIRED via v1.24.0's §13.7 fix
-            below). Stamped when superseded, CLOSED (A10/B6/AUTO CLOSE), or EXPIRED (AUTO EXPIRY, or
+            below). Stamped when CLOSED (A10/B6/AUTO CLOSE), or EXPIRED (AUTO EXPIRY, or
             A11/B7 Reopen reactivating a CLOSED contract back to EXPIRED — v1.24.0, F1 proposal §13.7 —
             this case previously left it `NULL`, which the new Auto Close Grace Period below could not
             use as a "became EXPIRED at" anchor; reactivating all the way to ACTIVE still clears it to
@@ -2164,7 +2168,6 @@ components:
             boundary. The actual LMTS call mechanism is not yet traced
             against source — this field is a placeholder passthrough.
         status: { $ref: '#/components/schemas/MovementStatus' }
-        supersededMovementId: { type: string, format: uuid, nullable: true, description: Reserved for the not-yet-implemented edit-in-place flow — see the v1.0.0 changelog note. Never populated by any endpoint in this contract today. }
         reversalOfMovementId:
           type: string
           format: uuid

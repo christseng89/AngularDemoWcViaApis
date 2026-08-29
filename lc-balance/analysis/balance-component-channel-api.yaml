@@ -157,7 +157,11 @@ info:
     layer does not expose the new `GET /delete-pending-audit`/`GET /delete-pending-audit/lc-catalog` audit
     query surface — same "this channel layer does not implement its own Checker action, cancel() suffices
     for the Maker side" posture already documented at the top of this file for `.../release`/`.../reject`.
-  version: "1.6.0"
+
+    v1.7.0 (2026-08-29, same day as the Microservice API's own v1.35.0): `ContractStatus`'s reserved
+    contract-versioning value removed from both enum inlines in this file — mirrors the Microservice API's
+    own `markSuperseded()` removal (zero call sites, same day). No other shape change.
+  version: "1.7.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -260,7 +264,7 @@ paths:
           schema: { $ref: '#/components/schemas/InstrumentType' }
         - name: status
           in: query
-          schema: { type: string, enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED] }
+          schema: { type: string, enum: [ACTIVE, CLOSED, CANCELLED, EXPIRED] }
         - name: q
           in: query
           schema: { type: string }
@@ -722,7 +726,7 @@ components:
         logicalContractId: { type: string, format: uuid }
         instrumentType: { $ref: '#/components/schemas/InstrumentType' }
         naturalKey: { $ref: '#/components/schemas/ChannelNaturalKey' }
-        status: { type: string, enum: [ACTIVE, SUPERSEDED, CLOSED, CANCELLED, EXPIRED] }
+        status: { type: string, enum: [ACTIVE, CLOSED, CANCELLED, EXPIRED] }
         currency: { type: string, description: This contract's own authoritative Currency Code — the value every A2-A9/B2-B5 transaction against it, or created under it as parent, carries forward. }
         tenorType: { type: string, nullable: true }
         tenorDays: { type: integer, nullable: true }

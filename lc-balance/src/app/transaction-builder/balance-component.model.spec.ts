@@ -972,8 +972,7 @@ describe('balance-component.model data invariants', () => {
       expect(contractStatusBadgeClass('CLOSED')).toBe('tb-status-badge--negative');
     });
 
-    it('SUPERSEDED -> neutral (gray); CANCELLED -> negative (red), same as CLOSED', () => {
-      expect(contractStatusBadgeClass('SUPERSEDED')).toBe('tb-status-badge--neutral');
+    it('CANCELLED -> negative (red), same as CLOSED', () => {
       expect(contractStatusBadgeClass('CANCELLED')).toBe('tb-status-badge--negative');
     });
 
@@ -982,7 +981,7 @@ describe('balance-component.model data invariants', () => {
     });
 
     it('every output is a real statusBadgeIcon() input, so the Index badge always gets an icon too, not just color', () => {
-      for (const status of ['ACTIVE', 'CLOSED', 'SUPERSEDED', 'CANCELLED']) {
+      for (const status of ['ACTIVE', 'CLOSED', 'CANCELLED']) {
         expect(['ok', 'pending', 'cross', 'dash']).toContain(statusBadgeIcon(contractStatusBadgeClass(status)));
       }
     });

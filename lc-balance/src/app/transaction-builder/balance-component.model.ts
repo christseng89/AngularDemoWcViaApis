@@ -784,7 +784,6 @@ export function contractStatusBadgeClass(status: string, closingPending?: boolea
   // language (the same token PENDING movements already use).
   if (status === 'EXPIRED') return 'tb-status-badge--pending';
   if (status === 'CLOSED') return 'tb-status-badge--negative';
-  if (status === 'SUPERSEDED') return 'tb-status-badge--neutral';
   if (status === 'CANCELLED') return 'tb-status-badge--negative';
   return 'tb-status-badge--neutral';
 }

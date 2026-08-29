@@ -73,7 +73,7 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
 
   test('§3.1 — (logicalContractId, contractVersion) must be unique', () => {
     contracts.insert(makeContract({ balanceContractId: 'bc-1', contractVersion: 1 }));
-    expect(() => contracts.insert(makeContract({ balanceContractId: 'bc-2', contractVersion: 1, status: 'SUPERSEDED' }))).toThrow(/UNIQUE constraint failed/);
+    expect(() => contracts.insert(makeContract({ balanceContractId: 'bc-2', contractVersion: 1, status: 'CLOSED' }))).toThrow(/UNIQUE constraint failed/);
   });
 
   test('§8 — (balanceContractId, eventSeq) idempotency: resubmission returns the existing row instead of erroring', () => {
@@ -256,37 +256,6 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     const byNatural = contracts.findActiveByNaturalKey('IPLC_LC', { lcNumber: 'LC0001' });
     expect(byLogical?.balanceContractId).toBe('bc-1');
     expect(byNatural?.balanceContractId).toBe('bc-1');
-  });
-
-  test('§7.3 — markSuperseded flips status and links to the successor version', () => {
-    contracts.insert(makeContract({ balanceContractId: 'bc-v1', logicalContractId: 'lc-1', contractVersion: 1, status: 'ACTIVE' }));
-    // Flip v1 to SUPERSEDED BEFORE inserting v2 as ACTIVE — the one-ACTIVE-
-    // per-logicalContractId partial unique index (§3.1) would otherwise
-    // reject having both versions ACTIVE at once, same ordering a real
-    // version-transition transaction must follow.
-    //
-    // markSuperseded()'s own doc comment already says "caller wraps this + the new insert() in one
-    // db.transaction()" — that's not optional once superseded_by_balance_contract_id carries a real FK
-    // (2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P1 migration 13): at the
-    // instant this call sets it to 'bc-v2', that row doesn't exist yet, which a strict per-statement FK
-    // check would reject outright. `PRAGMA defer_foreign_keys = ON` (session-scoped, auto-resets at the
-    // next COMMIT) postpones FK verification to COMMIT time instead of per-statement, which is exactly
-    // what this transient forward-reference needs — by COMMIT, 'bc-v2' below has been inserted for real.
-    db.exec('PRAGMA defer_foreign_keys = ON');
-    db.exec('BEGIN IMMEDIATE');
-    contracts.markSuperseded('bc-v1', 'bc-v2', '2026-08-14T01:00:00Z');
-    contracts.insert(
-      makeContract({ balanceContractId: 'bc-v2', logicalContractId: 'lc-1', contractVersion: 2, status: 'ACTIVE', supersedesBalanceContractId: 'bc-v1' }),
-    );
-    db.exec('COMMIT');
-
-    const versions = contracts.listVersions('lc-1');
-    expect(versions).toHaveLength(2);
-    expect(versions[0]?.status).toBe('SUPERSEDED');
-    expect(versions[0]?.supersededByBalanceContractId).toBe('bc-v2');
-    expect(versions[0]?.effectiveTo).toBe('2026-08-14T01:00:00Z');
-    expect(versions[1]?.status).toBe('ACTIVE');
-    expect(contracts.findActiveByLogicalContractId('lc-1')?.balanceContractId).toBe('bc-v2');
   });
 
   test('BalanceMovementStore.insert rethrows a non-UNIQUE-constraint DB error unchanged (e.g. a FOREIGN KEY violation from a bogus balanceContractId) — the UNIQUE-violation resubmission path in insert() must not swallow every kind of DB error, only genuine idempotent resubmissions', () => {

@@ -49,7 +49,7 @@ db.exec('PRAGMA busy_timeout = 5000');
 
 **~~自我參照欄位缺少真正的 FK 約束~~ — 已修復（2026-08-21，與 CHECK 約束一起做，見 P2 條目）**
 
-`supersedes_balance_contract_id` / `superseded_by_balance_contract_id`（指回 `balance_contracts.balance_contract_id`）與 `superseded_movement_id` / `reversal_of_movement_id`（指回 `balance_movements.movement_id`），內容其實就是各自表的 PK，原本只是裸的 `TEXT` 欄位，沒有 `REFERENCES` 宣告。已補上真正 FK 約束——細節見下方 P2「缺少 CHECK 約束」條目（FK 跟 CHECK 是同一次「重建表」遷移一起做的，寫在同一處說明，避免拆成兩段各講一半）。
+當時的 4 個自參照欄位（`supersedes_balance_contract_id` / `superseded_by_balance_contract_id`，指回 `balance_contracts.balance_contract_id`；`superseded_movement_id` / `reversal_of_movement_id`，指回 `balance_movements.movement_id`），內容其實就是各自表的 PK，原本只是裸的 `TEXT` 欄位，沒有 `REFERENCES` 宣告。已補上真正 FK 約束——細節見下方 P2「缺少 CHECK 約束」條目（FK 跟 CHECK 是同一次「重建表」遷移一起做的，寫在同一處說明，避免拆成兩段各講一半）。**2026-08-29 更新**：其中 3 個欄位（連同各自從未被觸發/寫入的機制）已在後續清理中連同各自的 FK 約束一併從 schema 移除（migrations 13/15 重建時直接排除，見 CLAUDE.md 對應決策日誌）；`reversal_of_movement_id` 不受影響，仍保留。
 
 ### P2 — 查詢與索引層優化（現有資料量下不急，但值得記錄）
 

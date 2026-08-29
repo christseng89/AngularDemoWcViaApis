@@ -89,7 +89,7 @@ describe('balance_contracts CHECK constraints', () => {
   });
 
   test('accepts every real ContractStatus value', () => {
-    ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCELLED'].forEach((v, i) => {
+    ['ACTIVE', 'CLOSED', 'CANCELLED'].forEach((v, i) => {
       expect(() => insertContract(db, baseContractRow({ balance_contract_id: `c-${i}`, logical_contract_id: `lc-${i}`, status: v }))).not.toThrow();
     });
   });
@@ -172,37 +172,14 @@ describe('self-referencing FK constraints', () => {
   });
   afterEach(() => db.close());
 
-  test('supersedes_balance_contract_id pointing at a non-existent balance_contract_id is rejected', () => {
-    expect(() => insertContract(db, baseContractRow({ supersedes_balance_contract_id: 'no-such-contract' }))).toThrow(/FOREIGN KEY constraint failed/);
-  });
-
-  test('superseded_by_balance_contract_id pointing at a non-existent balance_contract_id is rejected', () => {
-    expect(() => insertContract(db, baseContractRow({ superseded_by_balance_contract_id: 'no-such-contract' }))).toThrow(/FOREIGN KEY constraint failed/);
-  });
-
-  test('supersedes_balance_contract_id pointing at a REAL, already-inserted balance_contract_id is accepted', () => {
-    // Different logical_contract_id, not a real version-succession — this test is only proving the FK
-    // reference resolves, not exercising the "at most one ACTIVE per logicalContractId" partial unique
-    // index too (that's markSuperseded()'s own dedicated test in schema.test.ts).
-    insertContract(db, baseContractRow({ balance_contract_id: 'c1', logical_contract_id: 'lc1' }));
-    expect(() =>
-      insertContract(db, baseContractRow({ balance_contract_id: 'c2', logical_contract_id: 'lc2', supersedes_balance_contract_id: 'c1' })),
-    ).not.toThrow();
-  });
-
-  test('superseded_movement_id pointing at a non-existent movement_id is rejected', () => {
-    insertContract(db, baseContractRow());
-    expect(() => insertMovement(db, baseMovementRow({ superseded_movement_id: 'no-such-movement' }))).toThrow(/FOREIGN KEY constraint failed/);
-  });
-
   test('reversal_of_movement_id pointing at a non-existent movement_id is rejected', () => {
     insertContract(db, baseContractRow());
     expect(() => insertMovement(db, baseMovementRow({ reversal_of_movement_id: 'no-such-movement' }))).toThrow(/FOREIGN KEY constraint failed/);
   });
 
-  test('superseded_movement_id/reversal_of_movement_id pointing at a REAL, already-inserted movement_id is accepted', () => {
+  test('reversal_of_movement_id pointing at a REAL, already-inserted movement_id is accepted', () => {
     insertContract(db, baseContractRow());
     insertMovement(db, baseMovementRow({ movement_id: 'm1', event_seq: 1 }));
-    expect(() => insertMovement(db, baseMovementRow({ movement_id: 'm2', event_seq: 2, superseded_movement_id: 'm1', reversal_of_movement_id: 'm1' }))).not.toThrow();
+    expect(() => insertMovement(db, baseMovementRow({ movement_id: 'm2', event_seq: 2, reversal_of_movement_id: 'm1' }))).not.toThrow();
   });
 });

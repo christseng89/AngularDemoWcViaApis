@@ -46,7 +46,7 @@ export const INSTRUMENT_TYPE_VALUES = [
   'EPLC_EXAMINATION',
 ] as const;
 
-export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'SUPERSEDED', 'CLOSED', 'CANCELLED', 'EXPIRED'] as const;
+export const CONTRACT_STATUS_VALUES = ['ACTIVE', 'CLOSED', 'CANCELLED', 'EXPIRED'] as const;
 
 export const TENOR_TYPE_VALUES = ['SIGHT', 'BUYERS_USANCE', 'SELLERS_USANCE', 'DP', 'DA'] as const;
 
@@ -95,8 +95,6 @@ CREATE TABLE IF NOT EXISTS balance_contracts (
   leg_seq                        TEXT,
   parent_logical_contract_id     TEXT,
   status                         TEXT NOT NULL CHECK (status IN (${sqlInList(CONTRACT_STATUS_VALUES)})),
-  supersedes_balance_contract_id TEXT REFERENCES balance_contracts(balance_contract_id),
-  superseded_by_balance_contract_id TEXT REFERENCES balance_contracts(balance_contract_id),
   currency                       TEXT NOT NULL,
   tolerance_pct                  TEXT,
   tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
@@ -161,11 +159,6 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   contingent_account_entry TEXT,
   lmts_reservation_id     TEXT,
   status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
-  -- Design doc §8 — reserved self-referencing pointer, pre-dating Fix Pending and unrelated to it
-  -- (Fix Pending §19 uses its own superseded_by_movement_id, added/removed separately — see
-  -- migrations.ts 19/22). Never actually written by any current code path, same "reserved but unused"
-  -- posture as ContractStatus.SUPERSEDED/markSuperseded() above.
-  superseded_movement_id  TEXT REFERENCES balance_movements(movement_id),
   reversal_of_movement_id TEXT REFERENCES balance_movements(movement_id),
   reason_code             TEXT,
   remarks                 TEXT,

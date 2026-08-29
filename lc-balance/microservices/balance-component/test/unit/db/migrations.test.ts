@@ -115,6 +115,111 @@ describe('runMigrations (src/db/migrations.ts)', () => {
     }
   });
 
+  // Same rigor as migration 13's own rollback test above, for migration 15's own rebuild (2026-08-25, F1
+  // external BA review — widens the status/movement_type CHECK lists) — a genuine pre-existing bad value
+  // must fail this rebuild atomically too, not just migration 13's.
+  test('migration 15 rolls back cleanly when a pre-existing row violates the rebuilt CHECK constraint, leaving balance_movements exactly as it was before', () => {
+    const db = bareDbWithBalanceMovementsTable();
+    try {
+      for (const m of MIGRATIONS.filter((m) => m.id <= 14)) m.up(db);
+
+      db.exec(`
+        INSERT INTO balance_contracts (
+          balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
+          status, currency, opening_balance, effective_from, created_by, created_at
+        ) VALUES (
+          'c1', 'lc1', 1, 'IPLC_LC', 'LC0001', 'ACTIVE', 'USD', '0', '2026-01-01T00:00:00Z', 'maker1', '2026-01-01T00:00:00Z'
+        )
+      `);
+      db.exec('PRAGMA ignore_check_constraints = 1');
+      db.exec(`
+        INSERT INTO balance_movements (
+          movement_id, balance_contract_id, event_seq, movement_type, exposure_nature, amount,
+          ceiling_amount, currency, status, created_by, created_at
+        ) VALUES (
+          'dirty-1', 'c1', 1, 'NOT_A_REAL_MOVEMENT_TYPE', 'CONTINGENT', '1000', '1000', 'USD',
+          'PENDING', 'legacy-import', '2020-01-01T00:00:00Z'
+        )
+      `);
+      db.exec('PRAGMA ignore_check_constraints = 0');
+
+      expect(() => {
+        for (const m of MIGRATIONS.filter((m) => m.id === 15)) m.up(db);
+      }).toThrow();
+
+      const row = db.prepare('SELECT * FROM balance_movements WHERE movement_id = ?').get('dirty-1') as { movement_type: string } | undefined;
+      expect(row?.movement_type).toBe('NOT_A_REAL_MOVEMENT_TYPE');
+      const tableNames = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]).map((r) => r.name);
+      expect(tableNames).not.toContain('balance_movements_new');
+      expect(tableNames).not.toContain('balance_contracts_new');
+    } finally {
+      db.close();
+    }
+  });
+
+  // Same rigor as migration 13's own rollback test above, for migration 22's balance_movements rebuild
+  // (2026-08-29, Fix Pending §19 redesign) — a genuine pre-existing bad value (bypassing the CURRENT
+  // CHECK the same way a real historical DB could, via PRAGMA ignore_check_constraints) must fail the
+  // whole rebuild atomically, not leave the table half-migrated.
+  test('migration 22 rolls back cleanly when a pre-existing row violates the rebuilt CHECK constraint, leaving balance_movements exactly as it was before', () => {
+    const db = bareDbWithBalanceMovementsTable();
+    try {
+      for (const m of MIGRATIONS.filter((m) => m.id <= 20)) m.up(db);
+
+      db.exec(`
+        INSERT INTO balance_contracts (
+          balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
+          status, currency, opening_balance, effective_from, created_by, created_at
+        ) VALUES (
+          'c1', 'lc1', 1, 'IPLC_LC', 'LC0001', 'ACTIVE', 'USD', '0', '2026-01-01T00:00:00Z', 'maker1', '2026-01-01T00:00:00Z'
+        )
+      `);
+      db.exec('PRAGMA ignore_check_constraints = 1');
+      db.exec(`
+        INSERT INTO balance_movements (
+          movement_id, balance_contract_id, event_seq, movement_type, exposure_nature, amount,
+          ceiling_amount, currency, status, created_by, created_at
+        ) VALUES (
+          'dirty-1', 'c1', 1, 'NOT_A_REAL_MOVEMENT_TYPE', 'CONTINGENT', '1000', '1000', 'USD',
+          'PENDING', 'legacy-import', '2020-01-01T00:00:00Z'
+        )
+      `);
+      db.exec('PRAGMA ignore_check_constraints = 0');
+
+      expect(() => {
+        for (const m of MIGRATIONS.filter((m) => m.id > 20)) m.up(db);
+      }).toThrow();
+
+      // migration 21 (fix_pending_audit table) still committed independently — only 22 itself rolled back.
+      const row = db.prepare('SELECT * FROM balance_movements WHERE movement_id = ?').get('dirty-1') as { movement_type: string } | undefined;
+      expect(row?.movement_type).toBe('NOT_A_REAL_MOVEMENT_TYPE');
+      const tableNames = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]).map((r) => r.name);
+      expect(tableNames).not.toContain('balance_movements_new');
+      expect(db.prepare('SELECT COUNT(*) AS n FROM fix_pending_audit').get()).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  // Each of these ALTER-COLUMN-if-missing migrations' own "column already exists, skip" branch is
+  // structurally unreachable via runMigrations() itself (schema_migrations tracks by id, so a migration's
+  // own up() only ever runs once per db) — same shape as the pre-existing migration-1 backward-
+  // compatibility test above, generalized to every remaining single-column-add migration by calling up()
+  // directly a second time, bypassing the id-based dedup.
+  test('every remaining ALTER-COLUMN-if-missing migration correctly no-ops when its own column(s) already exist', () => {
+    const db = bareDbWithBalanceMovementsTable();
+    try {
+      for (const m of MIGRATIONS.filter((m) => m.id <= 13)) m.up(db);
+      const rerunnable = MIGRATIONS.filter((m) => [14, 16, 17, 19].includes(m.id));
+      for (const m of rerunnable) m.up(db);
+      expect(() => {
+        for (const m of rerunnable) m.up(db);
+      }).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
   test('backward compatibility: a db that already has acknowledged_by/acknowledged_at (e.g. from the old hand-rolled migrate(), before schema_migrations existed) is recorded as migrated without erroring', () => {
     const db = new DatabaseSync(':memory:');
     try {

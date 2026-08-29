@@ -4730,8 +4730,8 @@ describe('Generic 500 handler (Quality-report-balance.md BAL-117/BAL-129) — a 
 // Fix Pending POST /balance-movements/:movementId/edit (analysis/Balance-Component-FixPending-
 // DeletePending-Proposal-zh.md §2.2/§15/§19, 2026-08-27) — HTTP-level coverage for
 // editMovementRequestSchema's own `.strict()` field-protection behavior and the route itself; the
-// service-layer mechanics (SUPERSEDED/eventSeq reuse/transaction consistency/ownership) already have
-// dedicated coverage in balanceService.test.ts's own `editPending` describe block.
+// service-layer mechanics (in-place correction/eventSeq reuse/transaction consistency/ownership) already
+// have dedicated coverage in balanceService.test.ts's own `editPending` describe block.
 describe('POST /balance-movements/:movementId/edit — Fix Pending', () => {
   async function issueSightLc(app: import('express').Express, lcNumber: string) {
     const res = await request(app)

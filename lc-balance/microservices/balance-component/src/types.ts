@@ -43,7 +43,7 @@ export type InstrumentType =
  * transition back to `ACTIVE` via an Expiry Extension Amendment; `CLOSED` can transition back via
  * Reopen (A11/B7) — see domain/expiryEligibility.ts and service/balanceService.ts's own doc comments.
  */
-export type ContractStatus = 'ACTIVE' | 'SUPERSEDED' | 'CLOSED' | 'CANCELLED' | 'EXPIRED';
+export type ContractStatus = 'ACTIVE' | 'CLOSED' | 'CANCELLED' | 'EXPIRED';
 
 /**
  * §4 Maker/Checker lifecycle. PENDING is created by a maker (createdBy);
@@ -113,8 +113,6 @@ export interface BalanceContract {
   naturalKey: NaturalKey;
   parentLogicalContractId?: string | null;
   status: ContractStatus;
-  supersedesBalanceContractId?: string | null;
-  supersededByBalanceContractId?: string | null;
   currency: string;
   /** §6.2 — IPLC_LC/EPLC_LC only. Positive Tolerance %, e.g. "10". */
   tolerancePct?: string | null;
@@ -165,8 +163,6 @@ export interface BalanceMovement {
   contingentAccountEntry?: ContingentAccountEntry | null;
   lmtsReservationId?: string | null;
   status: MovementStatus;
-  /** Design doc §8 — reserved, pre-dating Fix Pending and unrelated to it. Never actually written by any current code path (same "reserved but unused" posture as ContractStatus.SUPERSEDED). */
-  supersededMovementId?: string | null;
   reversalOfMovementId?: string | null;
   reasonCode?: string | null;
   remarks?: string | null;

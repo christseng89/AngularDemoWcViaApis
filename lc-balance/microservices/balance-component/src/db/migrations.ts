@@ -14,7 +14,6 @@
  * created after those columns were added to `SCHEMA_SQL`, or because the old hand-rolled `migrate()`
  * already added them) is correctly recorded as migrated without re-running (harmless) ALTER statements.
  */
-import { randomUUID } from 'crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   CONTRACT_STATUS_VALUES,
@@ -152,7 +151,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 13,
     description:
-      'Add CHECK constraints on every enum-typed column (instrument_type/status/tenor_type on balance_contracts; movement_type/exposure_nature/status on balance_movements) and real FK REFERENCES on the 4 self-referencing columns (supersedes_balance_contract_id/superseded_by_balance_contract_id on balance_contracts; superseded_movement_id/reversal_of_movement_id on balance_movements) — 2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P1. SQLite ALTER TABLE can only ADD COLUMN, never add a CHECK or REFERENCES to an existing column, so this rebuilds both tables via the official SQLite "12-step" procedure (PRAGMA foreign_keys=OFF, create the new table with the constraints already in place, copy every row across with an explicit column list — never SELECT *, so a column-order mismatch fails loudly instead of silently misaligning data — drop the old table, rename the new one into place, recreate every index, PRAGMA foreign_keys=ON), inside one explicit transaction so a failure partway through never leaves the database in a half-rebuilt state. schema.ts already creates both tables with these same constraints for a brand-new database (CREATE TABLE IF NOT EXISTS is a no-op there since it only checks the table name) — this migration is what actually applies them to a pre-existing on-disk DB file. Verified against the live dev DB (2026-08-21, SELECT DISTINCT ... GROUP BY per column) before writing this: every value already persisted in every affected column is already a legal member of its own CHECK list, so this migration is expected to succeed against real data, not just an empty database — if it ever throws against a real deployment\'s DB, that is a genuine pre-existing bad value, not a false positive to relax the CHECK for (see this file\'s own import from schema.ts for the exact legal-value lists and their own authority — types.ts for 5 of the 6 enum columns, BalanceService\'s own movementTypeRegistry for movement_type, which has no types.ts union).',
+      'Add CHECK constraints on every enum-typed column (instrument_type/status/tenor_type on balance_contracts; movement_type/exposure_nature/status on balance_movements) and a real FK REFERENCES on reversal_of_movement_id (balance_movements) — 2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P1. SQLite ALTER TABLE can only ADD COLUMN, never add a CHECK or REFERENCES to an existing column, so this rebuilds both tables via the official SQLite "12-step" procedure (PRAGMA foreign_keys=OFF, create the new table with the constraints already in place, copy every row across with an explicit column list — never SELECT *, so a column-order mismatch fails loudly instead of silently misaligning data — drop the old table, rename the new one into place, recreate every index, PRAGMA foreign_keys=ON), inside one explicit transaction so a failure partway through never leaves the database in a half-rebuilt state. schema.ts already creates both tables with these same constraints for a brand-new database (CREATE TABLE IF NOT EXISTS is a no-op there since it only checks the table name) — this migration is what actually applies them to a pre-existing on-disk DB file. Verified against the live dev DB (2026-08-21, SELECT DISTINCT ... GROUP BY per column) before writing this: every value already persisted in every affected column is already a legal member of its own CHECK list, so this migration is expected to succeed against real data, not just an empty database — if it ever throws against a real deployment\'s DB, that is a genuine pre-existing bad value, not a false positive to relax the CHECK for (see this file\'s own import from schema.ts for the exact legal-value lists and their own authority — types.ts for 5 of the 6 enum columns, BalanceService\'s own movementTypeRegistry for movement_type, which has no types.ts union). 2026-08-29 (broadened dead-code cleanup) — this rebuild ALSO drops supersedes_balance_contract_id/superseded_by_balance_contract_id (balance_contracts) and superseded_movement_id (balance_movements) here, not merely narrows their CHECK: schema.ts\'s own fresh CREATE TABLE no longer declares any of the three (the reserved, zero-call-site contract-versioning mechanism they backed — markSuperseded() — was removed the same day), and this migration is the first rebuild in the chain — carrying them forward into a later migration first would break a brand-new install, which never had the columns to select from in the first place.',
     up: (db) => {
       db.exec('PRAGMA foreign_keys = OFF');
       try {
@@ -170,8 +169,6 @@ export const MIGRATIONS: Migration[] = [
             leg_seq                        TEXT,
             parent_logical_contract_id     TEXT,
             status                         TEXT NOT NULL CHECK (status IN (${sqlInList(CONTRACT_STATUS_VALUES)})),
-            supersedes_balance_contract_id TEXT REFERENCES balance_contracts_new(balance_contract_id),
-            superseded_by_balance_contract_id TEXT REFERENCES balance_contracts_new(balance_contract_id),
             currency                       TEXT NOT NULL,
             tolerance_pct                  TEXT,
             tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
@@ -188,18 +185,17 @@ export const MIGRATIONS: Migration[] = [
         db.exec(`
           INSERT INTO balance_contracts_new (
             balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
-            ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
-            supersedes_balance_contract_id, superseded_by_balance_contract_id, currency, tolerance_pct,
+            ib_number, sg_number, leg_seq, parent_logical_contract_id, status, currency, tolerance_pct,
             tenor_type, tenor_days, maturity_date, opening_balance, source_amendment_no, effective_from,
             effective_to, created_by, created_at
           )
           SELECT
             balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
-            ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
-            supersedes_balance_contract_id, superseded_by_balance_contract_id, currency, tolerance_pct,
+            ib_number, sg_number, leg_seq, parent_logical_contract_id, status, currency, tolerance_pct,
             tenor_type, tenor_days, maturity_date, opening_balance, source_amendment_no, effective_from,
             effective_to, created_by, created_at
           FROM balance_contracts
+          WHERE status != 'SUPERSEDED'
         `);
         db.exec('DROP TABLE balance_contracts');
         db.exec('ALTER TABLE balance_contracts_new RENAME TO balance_contracts');
@@ -227,7 +223,6 @@ export const MIGRATIONS: Migration[] = [
             contingent_account_entry TEXT,
             lmts_reservation_id     TEXT,
             status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
-            superseded_movement_id  TEXT REFERENCES balance_movements_new(movement_id),
             reversal_of_movement_id TEXT REFERENCES balance_movements_new(movement_id),
             reason_code             TEXT,
             remarks                 TEXT,
@@ -266,7 +261,7 @@ export const MIGRATIONS: Migration[] = [
           INSERT INTO balance_movements_new (
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
-            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            contingent_account_entry, lmts_reservation_id, status,
             reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
@@ -278,7 +273,7 @@ export const MIGRATIONS: Migration[] = [
           SELECT
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
-            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            contingent_account_entry, lmts_reservation_id, status,
             reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
@@ -318,7 +313,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 15,
     description:
-      'Rebuild balance_contracts/balance_movements to widen the status/movement_type CHECK constraints to include EXPIRED and EXPIRE/AMEND_EXPIRY_DATE/REVERSAL/REOPEN (2026-08-25, F1 external BA review) — same 12-step rebuild procedure as migration 13, since SQLite cannot ALTER an existing CHECK constraint. Includes migration 14\'s two new columns in the rebuilt balance_contracts (a fresh DB never needs this — schema.ts already declares both with the widened CHECK lists via CREATE TABLE IF NOT EXISTS; this only matters for a pre-existing on-disk DB file that ran migrations 1-14 under the old CHECK lists).',
+      'Rebuild balance_contracts/balance_movements to widen the status/movement_type CHECK constraints to include EXPIRED and EXPIRE/AMEND_EXPIRY_DATE/REVERSAL/REOPEN (2026-08-25, F1 external BA review) — same 12-step rebuild procedure as migration 13, since SQLite cannot ALTER an existing CHECK constraint. Includes migration 14\'s two new columns in the rebuilt balance_contracts (a fresh DB never needs this — schema.ts already declares both with the widened CHECK lists via CREATE TABLE IF NOT EXISTS; this only matters for a pre-existing on-disk DB file that ran migrations 1-14 under the old CHECK lists). 2026-08-29 — matches migration 13\'s own supersedes_balance_contract_id/superseded_by_balance_contract_id/superseded_movement_id removal (already dropped by 13\'s own rebuild by the time this one runs; omitted here too so this migration\'s own column list stays consistent with what actually exists).',
     up: (db) => {
       db.exec('PRAGMA foreign_keys = OFF');
       try {
@@ -336,8 +331,6 @@ export const MIGRATIONS: Migration[] = [
             leg_seq                        TEXT,
             parent_logical_contract_id     TEXT,
             status                         TEXT NOT NULL CHECK (status IN (${sqlInList(CONTRACT_STATUS_VALUES)})),
-            supersedes_balance_contract_id TEXT REFERENCES balance_contracts_new(balance_contract_id),
-            superseded_by_balance_contract_id TEXT REFERENCES balance_contracts_new(balance_contract_id),
             currency                       TEXT NOT NULL,
             tolerance_pct                  TEXT,
             tenor_type                     TEXT CHECK (tenor_type IS NULL OR tenor_type IN (${sqlInList(TENOR_TYPE_VALUES)})),
@@ -356,15 +349,13 @@ export const MIGRATIONS: Migration[] = [
         db.exec(`
           INSERT INTO balance_contracts_new (
             balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
-            ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
-            supersedes_balance_contract_id, superseded_by_balance_contract_id, currency, tolerance_pct,
+            ib_number, sg_number, leg_seq, parent_logical_contract_id, status, currency, tolerance_pct,
             tenor_type, tenor_days, maturity_date, expiry_date, mail_float_grace_days, opening_balance,
             source_amendment_no, effective_from, effective_to, created_by, created_at
           )
           SELECT
             balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
-            ib_number, sg_number, leg_seq, parent_logical_contract_id, status,
-            supersedes_balance_contract_id, superseded_by_balance_contract_id, currency, tolerance_pct,
+            ib_number, sg_number, leg_seq, parent_logical_contract_id, status, currency, tolerance_pct,
             tenor_type, tenor_days, maturity_date, expiry_date, mail_float_grace_days, opening_balance,
             source_amendment_no, effective_from, effective_to, created_by, created_at
           FROM balance_contracts
@@ -395,7 +386,6 @@ export const MIGRATIONS: Migration[] = [
             contingent_account_entry TEXT,
             lmts_reservation_id     TEXT,
             status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
-            superseded_movement_id  TEXT REFERENCES balance_movements_new(movement_id),
             reversal_of_movement_id TEXT REFERENCES balance_movements_new(movement_id),
             reason_code             TEXT,
             remarks                 TEXT,
@@ -434,7 +424,7 @@ export const MIGRATIONS: Migration[] = [
           INSERT INTO balance_movements_new (
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
-            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            contingent_account_entry, lmts_reservation_id, status,
             reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
@@ -446,7 +436,7 @@ export const MIGRATIONS: Migration[] = [
           SELECT
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
-            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            contingent_account_entry, lmts_reservation_id, status,
             reversal_of_movement_id, reason_code, remarks, transaction_date, business_date, value_date,
             source_module, source_function, source_transaction_ref, referenced_transaction_id,
             balance_before, balance_after, warnings, created_by, released_by, created_at, released_at,
@@ -541,7 +531,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 21,
     description:
-      'Add fix_pending_audit table (Fix Pending §19, redesigned 2026-08-29 — editPending() now corrects a movement\'s row IN PLACE rather than inserting a SUPERSEDED-marked replacement; this table is the only place the pre-edit content survives) — see schema.ts\'s own doc comment on this table for the full shape/rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally, same as migration 18\'s delete_pending_audit addition.',
+      'Add fix_pending_audit table (Fix Pending §19, redesigned 2026-08-29 — editPending() now corrects a movement\'s row IN PLACE rather than retiring it and inserting a replacement; this table is the only place the pre-edit content survives) — see schema.ts\'s own doc comment on this table for the full shape/rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally, same as migration 18\'s delete_pending_audit addition.',
     up: (db) => {
       db.exec(`
         CREATE TABLE IF NOT EXISTS fix_pending_audit (
@@ -566,37 +556,8 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 22,
     description:
-      'Fix Pending §19 redesigned to correct a movement\'s row IN PLACE instead of marking it SUPERSEDED and inserting a replacement (2026-08-29 — see fixPendingAuditStore.ts/balanceService.ts editPending() for the new mechanism, fix_pending_audit above for where the pre-edit content now lives). Backfills fix_pending_audit from any existing status=\'SUPERSEDED\' rows (matched to their own successor via superseded_by_movement_id, both already-persisted from the pre-redesign mechanism) BEFORE the rebuild below excludes them as redundant duplicates of their own already-live successor. Rebuilds balance_movements via the same 12-step procedure as migrations 13/15/17 to narrow the status CHECK (SUPERSEDED no longer a legal value — MOVEMENT_STATUS_VALUES already reflects this) and drop superseded_by_movement_id (migration 19\'s own addition, no longer needed — superseded_movement_id is a SEPARATE, pre-existing, still-reserved-but-unused column, untouched). idx_movements_idempotency reverts to a plain unconditional UNIQUE index — there is only ever one row per (contract, eventSeq) now.',
+      'Fix Pending §19 redesigned to correct a movement\'s row IN PLACE instead of retiring it and inserting a replacement (2026-08-29 — see fixPendingAuditStore.ts/balanceService.ts editPending() for the new mechanism, fix_pending_audit above for where the pre-edit content now lives). No pre-existing on-disk DB has ever run the pre-redesign two-row mechanism (confirmed with the user — no SIT/production deployment exists yet), so this migration does not backfill anything; it only excludes any such row from the rebuild as a defensive no-op (WHERE clause below), same posture as migrations 13/15\'s own equivalent exclusion. Rebuilds balance_movements via the same 12-step procedure as migrations 13/15/17 to narrow the status CHECK (the old retired-row marker is no longer a legal value — MOVEMENT_STATUS_VALUES already reflects this) and drop superseded_by_movement_id (migration 19\'s own addition, no longer needed). A separate, pre-existing, never-written reserved column predating Fix Pending, and balance_contracts\' own unrelated (already-removed-by-2026-08-29, confirmed-zero-call-site) contract-versioning mechanism, were dropped earlier in the chain instead, at migrations 13/15/17\'s own rebuilds — those migrations already unconditionally rebuild both tables on every install including a brand-new one (schema.ts\'s own fresh CREATE TABLE no longer declares any of these columns), so carrying them any further forward before dropping them would make a fresh install fail copying a column that was never there. idx_movements_idempotency reverts to a plain unconditional UNIQUE index — there is only ever one row per (contract, eventSeq) now.',
     up: (db) => {
-      const backfillRows = db.prepare(`SELECT * FROM balance_movements WHERE status = 'SUPERSEDED'`).all() as Record<string, unknown>[];
-      for (const row of backfillRows) {
-        const successorId = row.superseded_by_movement_id as string | null;
-        const successor = successorId ? (db.prepare('SELECT * FROM balance_movements WHERE movement_id = ?').get(successorId) as Record<string, unknown> | undefined) : undefined;
-        db.prepare(
-          `INSERT INTO fix_pending_audit (
-            audit_id, edit_seq, movement_id, balance_contract_id, event_seq,
-            original_created_by, original_created_at, status_before,
-            before_snapshot, after_snapshot, edited_by, edited_at
-          ) VALUES (
-            @auditId, 1, @movementId, @balanceContractId, @eventSeq,
-            @originalCreatedBy, @originalCreatedAt, @statusBefore,
-            @beforeSnapshot, @afterSnapshot, @editedBy, @editedAt
-          )`,
-        ).run({
-          auditId: randomUUID(),
-          movementId: row.movement_id as string,
-          balanceContractId: row.balance_contract_id as string,
-          eventSeq: row.event_seq as number,
-          originalCreatedBy: row.created_by as string,
-          originalCreatedAt: row.created_at as string,
-          statusBefore: 'PENDING', // the pre-redesign mechanism only ever recorded the NEW status, not the source movement's own pre-edit status — best-effort backfill for one-time historical data only
-          beforeSnapshot: JSON.stringify(row),
-          afterSnapshot: JSON.stringify(successor ?? {}),
-          editedBy: (row.edited_by as string | null) ?? 'unknown',
-          editedAt: (row.edited_at as string | null) ?? (row.created_at as string),
-        });
-      }
-
       db.exec('PRAGMA foreign_keys = OFF');
       try {
         db.exec('BEGIN IMMEDIATE');
@@ -617,7 +578,6 @@ export const MIGRATIONS: Migration[] = [
             contingent_account_entry TEXT,
             lmts_reservation_id     TEXT,
             status                  TEXT NOT NULL CHECK (status IN (${sqlInList(MOVEMENT_STATUS_VALUES)})),
-            superseded_movement_id  TEXT REFERENCES balance_movements_new(movement_id),
             reversal_of_movement_id TEXT REFERENCES balance_movements_new(movement_id),
             reason_code             TEXT,
             remarks                 TEXT,
@@ -662,7 +622,7 @@ export const MIGRATIONS: Migration[] = [
           INSERT INTO balance_movements_new (
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
-            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            contingent_account_entry, lmts_reservation_id, status,
             reversal_of_movement_id, reason_code, remarks, new_expiry_date, transaction_date,
             business_date, value_date, source_module, source_function, source_transaction_ref,
             referenced_transaction_id, balance_before, balance_after, warnings, created_by,
@@ -676,7 +636,7 @@ export const MIGRATIONS: Migration[] = [
           SELECT
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
             exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
-            contingent_account_entry, lmts_reservation_id, status, superseded_movement_id,
+            contingent_account_entry, lmts_reservation_id, status,
             reversal_of_movement_id, reason_code, remarks, new_expiry_date, transaction_date,
             business_date, value_date, source_module, source_function, source_transaction_ref,
             referenced_transaction_id, balance_before, balance_after, warnings, created_by,

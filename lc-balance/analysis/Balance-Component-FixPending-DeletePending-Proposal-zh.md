@@ -154,7 +154,8 @@ Status: Engineering proposal submitted (2026-08-27) — awaiting BA/business rev
   新記錄指回舊記錄），`balanceService.ts` 目前沒有任何呼叫點真正傳入非 null 值**——建議書「地基已經
   預留、但從未接上路由/UI」的描述核對屬實，也修正了 BA 自己原始需求文件 §2.2 只查了狀態機表格、
   沒查到這個欄位其實已經存在的疏漏（原文件的結論「完全沒有實作」在「動作」層面是對的，但在「資料
-  欄位」層面應該更精確地說「欄位已預留，動作/UI 完全未接上」——特此在此更正）。
+  欄位」層面應該更精確地說「欄位已預留，動作/UI 完全未接上」——特此在此更正）。**2026-08-29 更新：
+  這個欄位確認自始至終零呼叫點後，已連同同一類另一組舊有機制整批移除，不再存在於 schema／types.ts。**
 - `BalanceService` 建構子確實不保留 `db` 成自己的欄位（`balanceService.ts:266-274`，`db` 只轉手交給
   `BalanceContractStore`/`BalanceMovementStore` 建構）——核對屬實，目前這個 service 類別本身確實沒有
   能力自己開一個涵蓋兩個 store 的 `db.transaction()`。
@@ -280,7 +281,8 @@ Status: Engineering proposal revised (2026-08-27) per BA Review §5 — all cite
 
 ### 7.1 複查通過的項目
 
-- §6.1（`markSuperseded()` 從未被呼叫、新增 transaction 一致性測試）：與 §5.2 的查證一致，接受。
+- §6.1（合約版本化機制從未被呼叫、新增 transaction 一致性測試）：與 §5.2 的查證一致，接受。
+  （2026-08-29 更新：該機制已確認零呼叫點後整套移除。）
 - §6.3（可修改欄位範圍改為「待業務書面確認」）：這是流程修正，不涉及程式碼查證，直接接受——這正是
   §5.4 要求的修正方式。
 - §6.4（新欄位暫不加 `REFERENCES` 約束，降低遷移複雜度）：這是一個工程判斷取捨，不涉及既有程式碼
@@ -498,7 +500,7 @@ Reference, Delete DateTime, Audit ID）、支援 View 開原始交易畫面唯�
 | Delete Reason | ✅ 已有欄位 | `delete_pending_audit.reason_code`（/`remarks`）|
 | Previous Status | ✅ 已有欄位 | `delete_pending_audit.status_before` |
 | Audit ID | ✅ 已有欄位（PK）| `delete_pending_audit.audit_id` |
-| 查詢即使原合約後來 Resubmit/Approve/Close 仍完整保留 | ✅ 天然成立 | `balance_contracts` 本身也是 append-only、從不物理刪除，即使狀態變成 CANCELLED/CLOSED/SUPERSEDED，JOIN 永遠找得到那一列原始資料 |
+| 查詢即使原合約後來 Resubmit/Approve/Close 仍完整保留 | ✅ 天然成立 | `balance_contracts` 本身也是 append-only、從不物理刪除，即使狀態變成 CANCELLED/CLOSED/EXPIRED，JOIN 永遠找得到那一列原始資料 |
 | View 開原始交易畫面（唯讀，重現「當時刪的是什麼」）| ✅ 免新建路由 | movement 本身的欄位值從建立那刻起就凍結不變（CANCELLED 是終態，沒有人事後改內容）——用既有 `GET /balance-contracts/:id/movements` 撈出該合約全部 movement，配合既有 `reconstructOriginalModel(movement, contract)`（Inquire Events Original Transaction Screen 已在用）就能 100% 重現，不需要新的單筆 movement GET 路由 |
 
 **結論：完全不需要修改 `delete_pending_audit` 這張表本身**——§10 已有的欄位涵蓋所有需求，只需要新增一個查詢層（新 API + 新 Angular 畫面）。

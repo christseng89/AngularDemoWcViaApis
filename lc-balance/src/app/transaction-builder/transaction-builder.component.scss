@@ -813,7 +813,7 @@
   // color distinct from both APPROVED and PENDING) — a third, visually distinct color for the RELEASED-
   // but-not-yet-permanent case (see displayStatus()'s own doc comment for exactly which two functions
   // this applies to). Violet, not reused from an existing status color — PENDING is amber, APPROVED is
-  // green, REJECTED/CANCELLED is red, SUPERSEDED is gray; blue was considered but rejected since it's
+  // green, REJECTED/CANCELLED is red; blue was considered but rejected since it's
   // already used by .tb-type-tag (the adjacent Type column in the same table rows), which would have
   // made the two look like the same signal side by side.
   &--earmark {

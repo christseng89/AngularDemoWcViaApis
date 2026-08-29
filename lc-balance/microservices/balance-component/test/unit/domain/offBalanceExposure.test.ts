@@ -32,7 +32,7 @@ describe('computeOffBalanceExposure (Design doc §6.1)', () => {
     expect(computeOffBalanceExposure(shgt).toFixed()).toBe('0');
   });
 
-  test('ignores CANCELLED/REJECTED/SUPERSEDED SHGT movements', () => {
+  test('ignores CANCELLED/REJECTED SHGT movements', () => {
     const shgt: M[] = [
       { movementType: 'ISSUE', ceilingAmount: '100000', status: 'RELEASED' },
       { movementType: 'ISSUE', ceilingAmount: '999999', status: 'CANCELLED' },

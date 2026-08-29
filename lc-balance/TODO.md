@@ -207,21 +207,6 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   卡在 `node:sqlite`（Node 內建 `DatabaseSync`）目前沒有穩定的 constraint-violation 錯誤碼可用，
   非擱置不做，而是等上游能力補齊。
 
-- [x] ~~**`ContractVersionConflictError`（⚪ Info，單向落差，2026-08-24 稽核發現）** — `errors.ts` 定義了這個
-  409 `CONTRACT_VERSION_CONFLICT` 錯誤類別，但整個 `src/` 沒有任何地方真的拋出它（死碼）~~ —
-  **2026-08-25 已刪除，確認為真死碼**。核查後發現：`contractVersion` 全 `src/` 只有一處賦值
-  （`balanceService.ts` 的 `createContract()`），且永遠寫死 `1`；`markSuperseded()`／
-  `supersedesBalanceContractId`／`supersededByBalanceContractId`／`listVersions()` 這整組「新版本」
-  基礎設施從未被任何呼叫端使用——這個錯誤類別要真正觸發，唯一路徑是同一個 `logicalContractId`（每次新建
-  合約都是新產生的 UUID）撞出重複的 `(logicalContractId, contractVersion)`，等同 UUID 碰撞，不是有意義的
-  業務情境。跟同樣「未使用」的 `ContractStatus.SUPERSEDED`／`markSuperseded()` **不同**——那組在 OAS 裡有
-  明確文件記錄為「刻意保留給未來 edit-in-place 流程，目前版本不可達」；`CONTRACT_VERSION_CONFLICT`
-  在 OAS 的 `Error.code` enum 裡完全沒被列過，沒有類似的「刻意保留」文件佐證，判定為單純的死碼（可能是
-  從 `lc-payment-wc` 的 `errors.ts` 範本複製過來時一併帶進來、從未真正接上）。已從 `errors.ts` 移除該
-  類別，`errorsAndMoney.test.ts` 對應的 test.each 一列與 import 一併移除；`SUPERSEDED`／
-  `markSuperseded()` 那組維持原狀不動（OAS 文件記錄的保留基礎設施，跟這次死碼清理是兩件事）。微服務
-  三套測試全綠（546/546，`errors.ts` 仍 100%/100%/100%/100%）。
-
 - [x] ~~**F1 §11.4（原三項「維持待決」，2026-08-25 由 BA 透過
   `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13〈§11.4 四項待決事項正式拍板〉正式拍板）**~~
   — **2026-08-25 全部完成**。四項拍板決議（Grace Period Phase 1、`effective_to` 修復、CLOSE/REOPEN
@@ -652,17 +637,6 @@ backend 38/38、微服務 585/585，微服務/backend 不受影響）。另外�
   一致性測試）與 §7.2（Inquire Events 對已取代記錄的顯示驗證測試）。2026-08-29 業務/BA 覆核後，該
   「舊記錄標記＋插入新記錄」機制整套改為「原地修正同一筆記錄」（同一 `movementId`／`eventSeq`，狀態
   直接回到 PENDING），修正前內容改存到新的 `fix_pending_audit` 稽核表——詳見 CLAUDE.md 對應決策記錄。
-- [ ] **2026-08-29 新增待辦（使用者指示「記錄在TODO」，尚未決定）**：`balance_movements` 表上的
-  `superseded_movement_id`／`BalanceMovement.supersededMovementId` 欄位，是 Design doc §8 就存在的
-  預留自我參照欄位，早於這次 Fix Pending 重新設計，目前**沒有任何程式碼路徑會真的寫入它**（純粹是
-  `rowToMovement()` 讀出來映射成型別，永遠是 `null`）——性質上跟 `ContractStatus.SUPERSEDED`／
-  `markSuperseded()`（合約版本置換用，同樣保留但從未觸發）是同一類「保留但從未使用」的既有基礎設施，
-  這次重新設計時特意保留未動（範圍只限定在 Fix Pending 自己 2026-08-27 新增的
-  `superseded_by_movement_id`，那個已經拿掉）。使用者後來指出這個欄位名稱本身仍帶有「superseded」字樣，
-  但尚未決定是否要連同這個既有欄位一起改名或移除——本項僅記錄這個未決問題本身，不預設答案，需要業務
-  /使用者明確指示範圍後才動手（若真的要動，屬於比這次 Fix Pending 重新設計更大的範圍，因為牽動的是
-  `ContractStatus.SUPERSEDED` 那一整套既有機制的措辭慣例，不只是這一個欄位）。
-
 ---
 
 ## 備註

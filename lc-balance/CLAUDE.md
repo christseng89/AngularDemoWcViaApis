@@ -255,7 +255,8 @@ Static checks (`tsc`, `ng build`) and a passing test suite are necessary but not
   EBL Nego's own discount accounting is out of scope).
 - **`EPLC_EXAMINATION`** — `MEMO_ONLY` Present-Docs earmark (D3: only legal events move balances). CREATE
   at B3; B4 compound-releases that same PENDING CREATE; never posts `accountEntries`.
-- **`ContractStatus`**: `ACTIVE | SUPERSEDED | CLOSED | CANCELLED`.
+- **`ContractStatus`**: `ACTIVE | CLOSED | CANCELLED | EXPIRED` (`SUPERSEDED` — a separate,
+  unrelated, zero-call-site contract-versioning mechanism, `markSuperseded()` — removed 2026-08-29).
 - **`MovementStatus`** (§4): `PENDING | RELEASED | REJECTED | CANCELLED` — PENDING is
   Maker-created; every other state is a Checker or Maker-on-own-record action. Fix Pending §19
   (redesigned 2026-08-29) corrects a PENDING/REJECTED record in place (same movementId/eventSeq,
@@ -1690,14 +1691,11 @@ no `.ts` coverage impact; Angular 1133/1133 stays green.
   in `src/`. Traced why: `contractVersion` has exactly one assignment in the whole codebase
   (`createContract()`), hardcoded to `1` — the "new contract version" flow this error was meant to guard
   (Design doc §8, duplicate `(logicalContractId, contractVersion)`) doesn't exist; the only way to trigger
-  it would be a `logicalContractId` UUID collision, not a real business scenario. Deliberately NOT the same
-  situation as `ContractStatus.SUPERSEDED`/`markSuperseded()` (also unused) — those ARE documented in the
-  OAS as a reserved-for-future edit-in-place flow; `CONTRACT_VERSION_CONFLICT` was never listed in the
-  OAS's own `Error.code` enum at all, no similar "reserved" paper trail — genuine dead code, likely a
-  leftover from copying `lc-payment-wc/microservices/payment-component/src/errors.ts`'s own convention
-  (this file's own top doc comment says as much) without ever wiring it up. Removed the class and its one
-  `errorsAndMoney.test.ts` row; left `SUPERSEDED`/`markSuperseded()` untouched (different situation, not
-  this cleanup's scope). Microservice suite: 546/546, `errors.ts` still 100%/100%/100%/100%.
+  it would be a `logicalContractId` UUID collision, not a real business scenario. `CONTRACT_VERSION_CONFLICT`
+  was never listed in the OAS's own `Error.code` enum at all — genuine dead code, likely a leftover from
+  copying `lc-payment-wc/microservices/payment-component/src/errors.ts`'s own convention (this file's own
+  top doc comment says as much) without ever wiring it up. Removed the class and its one
+  `errorsAndMoney.test.ts` row. Microservice suite: 546/546, `errors.ts` still 100%/100%/100%/100%.
 
 ## F1 §13.5 Phase 2 reference material — copied from `lc-balance-new/`, then simplified down to what AUTO CLOSE actually needs
 
@@ -3672,9 +3670,9 @@ column, and that marker genuinely leaked into raw API responses (`GET .../moveme
 contract itself. **Final decision: Fix Pending Save is now an atomic in-place correction** — the
 PENDING/REJECTED movement's row is corrected in place (same `movementId` **and** `eventSeq`, landing back
 at `PENDING`) rather than being retired and replaced by a second row. `MovementStatus` drops that marker
-value entirely (4 values left: PENDING/RELEASED/REJECTED/CANCELLED). `ContractStatus.SUPERSEDED`/
-`markSuperseded()` is a separate, unrelated, already-unused mechanism (contract-version replacement) —
-explicitly out of scope, confirmed with the user.
+value entirely (4 values left: PENDING/RELEASED/REJECTED/CANCELLED). The unrelated contract-versioning
+mechanism this redesign left alone was itself removed in a later, broader pass the same day (see the
+`ContractStatus`/`markSuperseded()` entry near the end of this log).
 
 New `fix_pending_audit` table/`FixPendingAuditStore` (mirrors `delete_pending_audit`'s own append-only
 shape) is the only place the pre-edit content now survives — `before_snapshot`/`after_snapshot` JSON,
@@ -3689,9 +3687,9 @@ unconditional `UNIQUE(balance_contract_id, event_seq)` — only ever one row per
 Migration 21 (new `fix_pending_audit` table) + migration 22 (rebuild `balance_movements`: narrow the
 `status` CHECK, drop `superseded_by_movement_id` — Fix Pending's own 2026-08-27 addition, safe to remove —
 **backfill** `fix_pending_audit` from any pre-existing retired-predecessor row on the real dev DB before
-excluding it as a now-redundant duplicate of its own already-live successor). `superseded_movement_id` (a
-genuinely separate, pre-existing, still-unused reserved column predating Fix Pending) is untouched — same
-posture as `ContractStatus.SUPERSEDED`.
+excluding it as a now-redundant duplicate of its own already-live successor). A separate, pre-existing,
+still-unused reserved column predating Fix Pending was left untouched by this specific migration — removed
+in a later, broader same-day pass (see the entry near the end of this log).
 
 Every filter that guarded against a stale duplicate row is now dead code and was removed rather than left
 as defensive cruft: `reopenRestoration.ts`'s own filter, `inquire-events.service.ts`'s `toEventRows()`
@@ -3704,8 +3702,11 @@ New tests: `FixPendingAuditStore` (mirrors `deletePendingAuditStore`'s own untes
 migration 21/22 backfill (`migration22FixPendingBackfill.test.ts`, seeded via `PRAGMA
 ignore_check_constraints=1` since migrations 13/15/17 rebuild using the CURRENT — already-narrowed —
 `MOVEMENT_STATUS_VALUES` at replay time, closing off the historical window a plain legacy-fixture replay
-would otherwise rely on). Every test fixture that exercised the now-structurally-impossible old two-row
-scenario removed rather than adapted. OAS bumped to v1.34.0. All three suites re-run green: microservice
+would otherwise rely on — **this backfill mechanism and its own test file were later removed outright,
+2026-08-29, once confirmed with the user that no pre-SIT deployment ever ran the pre-redesign mechanism,
+so there was nothing to backfill from; see the entry near the end of this log**). Every test fixture that
+exercised the now-structurally-impossible old two-row scenario removed rather than adapted. OAS bumped to
+v1.34.0. All three suites re-run green: microservice
 728/728 (98.99%/95.01%/100%/99.57%), Angular 1468/1468 (98.79%/96.21%/97.1%/99.03%), backend 41/41. `ng
 build --configuration production` clean (same two pre-existing warnings). Live-verified both via direct
 curl (Submit → Fix Pending Save → Release, same movementId throughout, single row in `GET .../movements`)
@@ -3716,8 +3717,8 @@ banner correct.
 Documentation cleanup, same day: every prose mention of the retired internal status name was removed from
 `CLAUDE.md`, `TODO.md`, and the `analysis/` BA proposal/requirement documents — condensed to describe the
 current in-place-correction design directly rather than narrating the discarded two-row mechanism's own
-review history. `ContractStatus.SUPERSEDED`/`markSuperseded()` mentions (a separate, unrelated,
-still-reserved mechanism) were left untouched throughout.
+review history. The separate, unrelated contract-versioning mechanism was left untouched throughout THIS
+pass — see the entry near the end of this log for its own, later, broader removal the same day.
 
 ## `fix_pending_audit` missed the same "Cleanup Database Tables" FK gotcha `delete_pending_audit` already had — found live, fixed same day
 
@@ -3891,3 +3892,30 @@ unaffected, Angular-only fix). `ng build --configuration production` clean. Live
 real dev stack: reproduced the exact reported scenario (S02/E01, a genuinely live PENDING B4 attempt) —
 E01 no longer appears in the EB Index at all while that attempt is unresolved; E02/E03 (with no live
 attempt) still show correctly.
+
+## `ContractStatus`'s own contract-versioning mechanism removed entirely — a separate, unrelated, zero-call-site mechanism from the same-day Fix Pending §19 redesign above
+
+User-directed, broadened scope, same day: the Design doc §7.3 contract-version-replacement mechanism
+(`markSuperseded()`, its `ContractStatus` enum value, and the 2 backing self-referencing columns —
+`supersedes_balance_contract_id`/`superseded_by_balance_contract_id`) is removed — code, schema,
+migrations 13/15 rebuilt to drop the columns, both OAS files bumped (Microservice API v1.35.0, Channel API
+v1.7.0). Alongside it, the also-unused reserved `BalanceMovement.supersededMovementId` field (Design doc
+§8, pre-existing, never written by any code path) is removed too. Both were confirmed via a zero-call-site
+grep before removal — unrelated to the §19 in-place-correction redesign documented separately above, which
+concerns a completely different `MovementStatus` enum value on a completely different mechanism. All three
+suites re-run green: microservice 727/727 (all 4 coverage metrics ≥95%), Angular 1475/1475 (all 4 ≥95%),
+backend 41/41 — `npm run build`/`ng build --configuration production` clean.
+
+## Migration 22's own historical-data backfill removed — user-confirmed no pre-SIT deployment ever ran the pre-redesign mechanism, so there was nothing to backfill
+
+User-confirmed same week: this project has not reached SIT, so no real on-disk DB ever ran the
+pre-2026-08-29 two-row Fix Pending mechanism long enough to accumulate a retired-row/successor pair —
+migration 22's own backfill-into-`fix_pending_audit` loop (reading any pre-existing retired-status row and
+its successor before excluding it from the rebuild) was pure defensive code for a scenario confirmed to
+never have occurred. Removed outright, along with its dedicated test file
+(`migration22FixPendingBackfill.test.ts`) and the now-unused `randomUUID` import — migration 22 now only
+does the rebuild itself (narrow the `status` CHECK, drop `superseded_by_movement_id`), same posture as
+migrations 13/15's own plain exclusion of the same historical marker. `migrations.ts` reached 100%
+statements/branches/functions/lines as a direct result (the removed backfill loop was the file's own
+remaining coverage gap). Microservice suite: 725/725 (99.11%/95.61%/99.69%/99.71%); `tsc --noEmit`/`npm run
+build` clean. Angular/backend unaffected, re-confirmed green (1475/1475; 41/41).

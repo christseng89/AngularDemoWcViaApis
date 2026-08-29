@@ -484,7 +484,7 @@ export class BalanceService {
      *  - EXPIRED: the Expiry Extension Amendment entry point (§8) — additionally requires
      *    hasOpenEvents === false (§8.8, explicit — this is a brand-new code path, it does not inherit
      *    evaluateContractCloseEligibility()'s own protection).
-     * Any other status (CLOSED/CANCELLED/SUPERSEDED) is rejected outright — §7.8 confirms EXPIRED is
+     * Any other status (CLOSED/CANCELLED) is rejected outright — §7.8 confirms EXPIRED is
      * the only non-ACTIVE state this amendment may act on.
      */
     const amendExpiryDateShaped: MovementSufficiencyCheck = (ctx) => {
