@@ -1,5 +1,5 @@
 const request = require('supertest');
-const { app } = require('../server');
+const { app, handleListenError, shutdown } = require('../server');
 const { buildRegistry } = require('../data/businessCases');
 
 // server.js is the Node.js 中台 orchestrator (port 4300) — it never talks to a real
@@ -435,6 +435,64 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(res.status).toBe(200);
       expect(res.headers['ratelimit-limit']).toBe('120');
       expect(res.headers).not.toHaveProperty('x-ratelimit-limit'); // legacyHeaders: false
+    });
+  });
+
+  // Fix Backend Restart / EADDRINUSE (2026-08-29) — handleListenError/shutdown are only ever wired up
+  // inside `if (require.main === module)`, which this suite's own `require('../server')` never satisfies
+  // (see this file's own top doc comment) — so they're unit-tested directly here instead, same test-only
+  // seam convention `runCase`/`resolveLogicalContractId`/`callMicroservice` already use.
+  describe('handleListenError', () => {
+    it('logs a clear message and exits 1 on EADDRINUSE, without re-throwing', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+
+      expect(() => handleListenError({ code: 'EADDRINUSE' }, 4300)).not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('4300'));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      consoleErrorSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it('re-throws any other error untouched', () => {
+      const err = new Error('boom');
+
+      expect(() => handleListenError(err, 4300)).toThrow(err);
+    });
+  });
+
+  describe('shutdown', () => {
+    it('closes the server and exits 0 on a clean close', () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+      const mockServer = { close: jest.fn((cb) => cb(null)) };
+
+      shutdown(mockServer, 'SIGINT');
+
+      expect(mockServer.close).toHaveBeenCalledTimes(1);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+
+      consoleLogSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it('logs and exits 1 when server.close itself fails', () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+      const closeErr = new Error('close failed');
+      const mockServer = { close: jest.fn((cb) => cb(closeErr)) };
+
+      shutdown(mockServer, 'SIGTERM');
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to close server:', closeErr);
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+      exitSpy.mockRestore();
     });
   });
 });

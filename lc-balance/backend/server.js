@@ -213,16 +213,58 @@ app.get('/healthz', (_req, res) => res.json({ status: 'ok', balanceServiceUrl: B
 // Was 4200 — collided with `ng serve`'s own default dev-server port, so
 // `npm run dev:all` (backend + ng serve started together) could never bind
 // both. proxy.conf.json's "/api" target must stay in sync with this.
+// Fix Backend Restart / EADDRINUSE (user-directed, 2026-08-29) — `npm run dev`/`dev:all` runs this
+// under `node --watch`, which kills and re-execs the whole process on every save; that's a hard kill of
+// the OLD process, not a request the old HTTP server ever sees, so it never got the chance to release
+// :4300 before the new instance tried to bind it — the actual EADDRINUSE root cause, not a genuinely
+// different process squatting on the port. SIGINT/SIGTERM handlers below let a NORMAL shutdown (Ctrl+C,
+// or `--watch`'s own restart signal on platforms where it sends one) close the server first. Explicit
+// EADDRINUSE handling makes a real port conflict (e.g. two backends started at once — see this file's
+// own dev-setup doc comment) fail loudly with a clear message instead of an unhandled exception.
+// Both extracted to named functions (rather than inline in the `require.main === module` block below) so
+// server.test.js can unit-test them directly with a mock server/error — same test-only-seam convention
+// `runCase`/`resolveLogicalContractId`/`callMicroservice` already use, see BAL-107's own doc comment below.
+function handleListenError(err, port) {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use — is another backend instance already running?`);
+    process.exit(1);
+    return;
+  }
+  throw err;
+}
+
+function shutdown(server, signal) {
+  console.log(`${signal} received. Closing server...`);
+  server.close((err) => {
+    if (err) {
+      console.error('Failed to close server:', err);
+      process.exit(1);
+      return;
+    }
+    console.log('Server closed.');
+    process.exit(0);
+  });
+}
+
 const PORT = process.env.PORT || 4300;
+/* istanbul ignore next -- thin bootstrap wiring (app.listen()/signal handlers); only runs when this
+   file is executed directly, never when `require('../server')`'d by a test (see this file's own
+   `require.main === module` guard) — same "nothing meaningful to unit-test at this stage" rationale
+   microservices/balance-component/src/server.ts's own jest.config.js exclusion already documents.
+   handleListenError()/shutdown() themselves are real unit-tested logic, not excluded here. */
 if (require.main === module) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`balance-component-backend (中台) listening on :${PORT} -> ${BALANCE_SERVICE_URL}`);
   });
+
+  server.on('error', (err) => handleListenError(err, PORT));
+  process.on('SIGINT', () => shutdown(server, 'SIGINT'));
+  process.on('SIGTERM', () => shutdown(server, 'SIGTERM'));
 }
 
 // Quality-report-balance.md BAL-107: was `module.exports = app; module.exports.runCase = runCase; ...`
 // (attaching test-only internals directly onto the Express app object). A plain object keeps the HTTP
 // handler's own public surface (`app`) separate from the test-only seam (`runCase`/
-// `resolveLogicalContractId`/`callMicroservice`, exported purely so runCase.test.js can unit-test them
-// directly — see that file's own doc comment for why).
-module.exports = { app, runCase, resolveLogicalContractId, callMicroservice };
+// `resolveLogicalContractId`/`callMicroservice`/`handleListenError`/`shutdown`, exported purely so
+// runCase.test.js/server.test.js can unit-test them directly — see each file's own doc comment for why).
+module.exports = { app, runCase, resolveLogicalContractId, callMicroservice, handleListenError, shutdown };

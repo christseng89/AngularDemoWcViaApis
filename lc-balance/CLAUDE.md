@@ -160,6 +160,547 @@ Design Patterns when reviewing service boundaries/communication/resilience acros
 Always challenge requirements when they conflict with banking, accounting, contingent liability/balance, or
 architectural best practices.
 
+# Mandatory Engineering Design Principles
+
+These rules are **mandatory engineering gates**, not optional style preferences. Every non-trivial code change must be designed and reviewed through **OOD, OOP, SOLID, separation of concerns, testability, auditability, and operational safety** before implementation starts.
+
+The objective is not to maximize the number of classes or design patterns. The objective is to place each rule in the **correct responsibility boundary**, implement common behavior **once**, keep business semantics explicit, and make future changes safer and cheaper.
+
+## 1. Design Before Coding
+
+Before modifying code, classify the requirement first:
+
+1. **Common / Cross-Function Requirement** — applies to multiple A/B functions or screens.
+2. **Domain / Business Rule** — Trade Finance, balance, exposure, status, accounting, eligibility, tenor, tolerance, Maker/Checker, etc.
+3. **Function-Specific Rule** — genuinely unique behavior for one transaction function.
+4. **Application / Workflow Rule** — orchestration, navigation, transaction context, Maker/Checker flow, Fix/Delete Pending flow.
+5. **UI / Presentation Rule** — display, field protection, formatting, search messages, layout, accessibility.
+6. **Integration / Infrastructure Rule** — HTTP/API, database, persistence, external services, configuration, process lifecycle.
+
+Do **not** start by editing the most obvious component or function. First identify the **single owning abstraction** for the rule.
+
+If the same requirement would require changes in many A/B transaction functions, **STOP and review the design before coding**. The default expectation is one shared implementation, not repeated per-function patches.
+
+## 2. Common Requirement Rule — Implement Once
+
+If substantially the same behavior applies to multiple functions, implement it once in an appropriate shared abstraction and let all applicable functions inherit or consume it.
+
+Do **not** copy, patch, or maintain the same behavior independently in A2/A3/A4/.../B2/B3/... code paths.
+
+Typical common requirements include:
+
+- Transaction / Index selection and navigation.
+- Retaining selected transaction context after selection.
+- Cancel / return navigation.
+- Fix Pending / Delete Pending navigation.
+- Search / filter / partial-match behavior.
+- Pagination and empty-result behavior.
+- Protected / system-derived fields.
+- Currency / Tenor Type carry-forward.
+- Status display mapping.
+- Maker / Checker lifecycle controls.
+- Common validation and error presentation.
+- Audit-trail display.
+- Amount / currency formatting and alignment.
+- Loading / busy / accessibility behavior.
+
+A common requirement should normally be changed in **one common implementation point**, with regression tests proving that all applicable functions receive the behavior.
+
+## 3. SOLID Design Gate
+
+Every non-trivial change must be reviewed against all five SOLID principles.
+
+### SRP — Single Responsibility Principle
+
+A class, component, service, policy, repository, or function should have one clear reason to change.
+
+Examples:
+
+- UI components render and collect input; they do not own Trade Finance exposure rules.
+- Domain policies decide business eligibility; they do not call Angular or Express APIs.
+- Repositories persist/retrieve data; they do not decide business status transitions.
+- Workflow/facade services orchestrate use cases; they do not become another God Service.
+
+If a file is growing because unrelated responsibilities are accumulating, extract the responsibility before adding more behavior.
+
+### OCP — Open / Closed Principle
+
+The design should be open for extension and closed for unnecessary modification.
+
+Adding a new transaction function or business rule should normally extend a Strategy / Policy / configuration / registry rather than require editing repeated switch/if chains across multiple files.
+
+Before adding another `if (functionCode === ...)`, determine whether the rule belongs in:
+
+- `FunctionStrategy` / function registry;
+- policy / eligibility rule;
+- shared configuration;
+- domain service / pure function;
+- workflow strategy;
+- presentation mapping.
+
+A new A/B function should reuse common workflow behavior by default and declare only its genuine differences.
+
+### LSP — Liskov Substitution Principle
+
+Implementations behind a shared abstraction must preserve the behavioral contract expected by callers.
+
+Do not create a Strategy/Adapter implementation that silently changes:
+
+- validation semantics;
+- amount sign conventions;
+- status lifecycle;
+- audit behavior;
+- transaction identity;
+- exception/error contract;
+- eligibility meaning.
+
+Shared interfaces must represent real substitutable behavior, not merely make TypeScript compile.
+
+### ISP — Interface Segregation Principle
+
+Do not create large interfaces/context objects that force consumers to depend on unrelated methods or state.
+
+Prefer small capability-oriented contracts such as:
+
+- eligibility context;
+- transaction selection context;
+- checker action context;
+- persistence port;
+- balance calculation input;
+- audit writer;
+- navigation context.
+
+If a consumer needs only three fields, do not pass a 30-field component state object simply because it already exists.
+
+### DIP — Dependency Inversion Principle
+
+High-level business/domain logic must depend on abstractions/contracts, not directly on framework or infrastructure details.
+
+Domain logic must not directly depend on:
+
+- Angular components/templates/DOM;
+- Express request/response objects;
+- SQLite/PostgreSQL-specific APIs;
+- HTTP clients;
+- browser storage;
+- concrete external-service implementations.
+
+Use ports/interfaces where infrastructure can vary, especially for persistence, calendars, external services, and integration boundaries.
+
+## 4. OOD / OOP Design Rules
+
+Use OOD/OOP to model responsibilities and stable business concepts, not to produce unnecessary class hierarchies.
+
+Prefer:
+
+- **Composition over inheritance**.
+- Small cohesive objects/services over monolithic components.
+- Explicit domain vocabulary over generic technical names.
+- Immutable value objects / request objects where practical.
+- Encapsulation of invariants close to the owning concept.
+- Explicit state transition policies rather than scattered assignments.
+- Dependency injection for replaceable infrastructure dependencies.
+
+Avoid:
+
+- deep inheritance trees;
+- service locator patterns;
+- mutable global/shared state;
+- bidirectional coupling between UI and domain;
+- "utility" classes that become unowned dumping grounds;
+- DTOs that accidentally become domain models without invariants.
+
+## 5. Design Patterns — Use Only When They Reduce Complexity
+
+Patterns are tools, not goals. Apply a pattern only when it reduces coupling, duplication, ambiguity, or change cost.
+
+Preferred patterns where they genuinely fit:
+
+- **Strategy** — function-specific policy/behavior variation.
+- **Policy / Specification** — business eligibility and validation rules.
+- **Facade** — use-case/workflow coordination.
+- **Adapter** — external or incompatible model/API translation.
+- **Repository** — persistence boundary.
+- **Factory** — construction varies by function/type and construction logic is non-trivial.
+- **Decorator** — add orthogonal presentation/behavior without altering the core object.
+- **State / Transition Policy** — when lifecycle transitions become complex enough to justify it.
+- **Command** — auditable/replayable business action where appropriate.
+- **Domain Service / Pure Function** — deterministic business calculations with no infrastructure dependency.
+
+Do not introduce a pattern merely because its name appears in a design-pattern catalogue.
+
+## 6. Separation of Concerns / Layer Boundaries
+
+Keep responsibilities conceptually separated as follows:
+
+```text
+UI / Presentation
+      ↓
+Application / Workflow / Facade
+      ↓
+Domain / Business Rules / Policies
+      ↓
+Repository / Integration Ports
+      ↓
+Database / External Services / Infrastructure
+```
+
+Rules:
+
+- Templates must not contain business calculations.
+- Angular components must not become the authoritative source of domain rules.
+- Express routes/controllers validate transport and delegate; they do not own core business logic.
+- SQL must not become the only place where a business rule exists.
+- Persistence models and business models may differ; map deliberately when needed.
+- UI validation improves usability, but server/domain validation remains authoritative for business rules.
+
+## 7. Domain-First Rule
+
+Trade Finance, contingent liability, balance, exposure, eligibility, amount sufficiency, tenor routing, status transitions, Maker/Checker controls, accounting semantics, and audit invariants must be modeled as domain rules independent of UI technology.
+
+Where practical, implement them as deterministic domain functions/services/policies that can be unit-tested without Angular, Express, HTTP, or a real database.
+
+Business terminology in code should match the approved specification. Do not invent technical terms that look like new business concepts.
+
+## 8. Business State vs. Technical State
+
+Never introduce a new **business status** merely to solve a persistence, UI, versioning, or technical problem.
+
+Keep these concepts separate:
+
+- Business lifecycle status.
+- Technical processing state.
+- Revision/version metadata.
+- Audit/history facts.
+- Persistence implementation details.
+
+For example, an internal revision marker must not leak into Event Timeline, Maker Queue, Account Entries, API business status, or other business-facing surfaces unless it is explicitly part of the approved business model.
+
+## 9. Business Identity, Idempotency, and Auditability
+
+Preserve business identity explicitly.
+
+For every transaction flow, identify:
+
+- Natural Key / LC Number.
+- Secondary Reference where applicable.
+- Event Seq / Business Event identity.
+- Maker Submit identity/date-time.
+- Checker action identity/date-time.
+- Fix/Delete Pending audit facts.
+- Correlation / referenced transaction identity for compound flows.
+
+Do not change an Event identity merely to make persistence easier if the business requirement defines it as the same event.
+
+Idempotency must be enforced server-side and must not depend solely on UI behavior.
+
+Audit history must remain traceable even when operational records are cancelled, fixed, rejected, or otherwise no longer actionable.
+
+## 10. Atomic Transaction Rule
+
+When one business action requires multiple persistence changes that must succeed or fail together, implement them as one atomic database transaction where the storage technology supports it.
+
+Examples include:
+
+- Fix Pending save semantics when old/current state and corrected state must change together.
+- Compound movement creation/cancellation.
+- Multi-leg account-entry persistence.
+- Status transition plus audit write when inconsistent partial success would corrupt business meaning.
+
+If any step fails, the whole business action must roll back unless the approved business design explicitly allows partial completion and provides compensation logic.
+
+Do not use UI sequencing as a substitute for database atomicity.
+
+## 11. Configuration over Hard-Coding
+
+Business differences that vary by bank, tenant, country, calendar, currency, product, or deployment should be configuration-driven where appropriate.
+
+Do not hard-code business values in UI components or route handlers when they belong in configuration, reference data, or domain policy.
+
+However, do not turn stable domain invariants into arbitrary configuration merely for flexibility. Configuration should represent **legitimate variability**, not weaken business correctness.
+
+## 12. DRY with Semantic Judgment
+
+Avoid duplicated **knowledge**, not merely duplicated syntax.
+
+Two code blocks that look similar but represent different business rules do not have to be forced into one abstraction.
+
+Conversely, the same business rule implemented separately in UI, workflow, and service code is a serious maintenance risk even if the syntax differs.
+
+Before extracting shared logic, confirm that the semantics and future reasons to change are truly shared.
+
+## 13. Transaction Function Strategy Rule
+
+A/B transaction functions must declare their genuine differences through the shared function strategy/policy model wherever practical.
+
+Common behavior belongs in shared workflow/components/services. Function-specific behavior belongs in strategy/policy entries.
+
+Do not spread transaction-code conditionals across:
+
+- Maker UI;
+- Checker UI;
+- submit logic;
+- lookup logic;
+- eligibility filters;
+- status mapping;
+- account-entry display;
+- navigation.
+
+If multiple consumers need to answer the same question about a function, the answer should come from one shared source of truth.
+
+## 14. Shared Navigation / Transaction Context Rule
+
+Transaction selection and navigation are cross-cutting workflow concerns.
+
+Except for functions that create a new root contract (for example A1/B1), once the user selects an eligible transaction/index record:
+
+- retain that transaction context through the processing flow;
+- do not ask the user to select the same index again unnecessarily;
+- Fix Pending must reuse the selected Event context;
+- Delete Pending must reuse the selected Event context;
+- Cancel may deliberately return to the function's selection screen when the approved UX requires re-selection;
+- re-entering a function may start a fresh selection flow.
+
+Implement this in a shared workflow/navigation abstraction rather than separately in every transaction function.
+
+## 15. Error Handling Rule
+
+Errors must be categorized and handled at the correct layer.
+
+- Domain validation errors: explicit typed business/domain errors.
+- API errors: stable documented response contract.
+- Infrastructure errors: logged with diagnostic detail, but do not leak internals to clients.
+- UI errors: concise actionable messages mapped from authoritative backend/domain outcomes.
+
+Do not rely on fragile message-text matching when a stable typed/code-based contract is reasonably available.
+
+No swallowed errors. No empty catch blocks. No generic `catch (e) { return false; }` for business-critical paths.
+
+## 16. Money / Currency / Decimal Rule
+
+Never use binary floating-point arithmetic for authoritative monetary calculations.
+
+All monetary logic must:
+
+- use the project's approved decimal/money abstraction;
+- enforce currency decimal places server-side;
+- preserve Debit = Credit where account entries are generated;
+- define rounding explicitly;
+- keep sign conventions consistent;
+- distinguish raw face amount from derived ceiling/exposure amounts;
+- avoid unexplained 0.01 differences.
+
+UI formatting must not change authoritative stored/calculated values.
+
+## 17. Security and 4-Eyes Control
+
+Security and Maker/Checker control must be enforced server-side, not only through hidden/disabled UI controls.
+
+For protected operations verify as applicable:
+
+- authorization/role;
+- legal lifecycle state;
+- Maker/Checker separation where required;
+- transaction eligibility immediately before final release;
+- idempotency/concurrency conditions;
+- protected/system-derived fields cannot be overridden by the client.
+
+UI protection is usability, not security.
+
+## 18. Concurrency and Persistence Integrity
+
+Do not assume a record remains valid between selection and final action.
+
+Final server-side actions must re-check critical invariants where concurrent changes could matter.
+
+For production architecture, prefer database constraints and row-level transactional protection for invariants that must remain true under concurrency.
+
+Known SQLite limitations in this repository must not be mistaken for an acceptable production concurrency model.
+
+## 19. API-First / Contract-First Rule
+
+Public/internal service behavior must remain aligned with OpenAPI and typed contracts.
+
+When changing an API:
+
+1. identify whether the API contract changes;
+2. update OAS/schema/types deliberately;
+3. maintain backward compatibility unless an approved breaking change is intended;
+4. add contract/API tests;
+5. ensure UI/client code consumes the authoritative contract instead of duplicating it informally.
+
+Do not add undocumented endpoints or fields as a shortcut.
+
+## 20. Refactoring Triggers
+
+Refactor before adding the requested feature when implementation would otherwise:
+
+- duplicate a rule across multiple transaction functions;
+- add another independent copy of status/function mapping;
+- increase an already-large class/component/service with a new responsibility;
+- add another large `switch` or chain of function-code `if` statements;
+- put business logic into templates/routes/SQL;
+- create circular dependencies;
+- require a common behavior to be patched in many files;
+- introduce a new boolean flag that another existing policy/strategy already conceptually owns;
+- make tests depend on extensive internal mutable state instead of public behavior.
+
+Do not preserve poor structure merely to minimize the number of changed files.
+
+## 21. Complexity / Size Guardrails
+
+There is no arbitrary line-count rule that overrides cohesion, but large or rapidly growing files are architecture-review triggers.
+
+Before extending a large component/service, ask:
+
+- Is this still the same responsibility?
+- Can the logic become a domain policy/pure function?
+- Can workflow move into a facade/service?
+- Is repeated UI a reusable component?
+- Is function variation a Strategy?
+- Is persistence leaking into the wrong layer?
+
+Do not split code only to reduce line count; split when responsibility, coupling, testability, or change isolation improves.
+
+## 22. Testing Architecture
+
+Tests must follow the same architecture boundaries as production code.
+
+Required test layers where applicable:
+
+- **Pure domain/unit tests** — business calculations, policies, state transitions.
+- **Service/application tests** — orchestration and failure paths.
+- **Repository/persistence tests** — constraints, migrations, transaction behavior.
+- **API/contract tests** — request/response, validation, error codes, idempotency.
+- **Component/UI tests** — rendering/state behavior as supported by this project's test convention.
+- **Business-case regression tests** — A/B lifecycle scenarios.
+- **Live browser/API verification** — required by the existing standing rule.
+
+For common requirements, add regression coverage across all applicable functions without duplicating large test bodies; prefer parameterized/table-driven tests.
+
+## 23. Regression Rule for Common Requirements
+
+A shared implementation is not complete merely because one representative function works.
+
+For a requirement covering A2–A11 and/or B2–B7, tests must prove:
+
+- the common mechanism works;
+- representative Import and Export functions work;
+- exceptional function-specific overrides still work;
+- functions outside the requirement are unaffected.
+
+Use data-driven tests whenever the expected behavior differs only by function metadata.
+
+## 24. SonarQube / Static Quality Gate
+
+Before calling a change complete:
+
+- do not introduce new Blocker/Critical issues;
+- do not introduce unjustified Major issues;
+- remove dead code and stale modification comments;
+- avoid duplicated code and excessive cognitive complexity;
+- resolve obvious code smells instead of suppressing them;
+- document any intentionally deferred issue with rationale and risk.
+
+Suppressions (`eslint-disable`, Sonar exclusions, `any`, non-null assertions) require a concrete justification and should be narrowly scoped.
+
+## 25. CI Quality Pipeline
+
+The desired professional quality pipeline is:
+
+```text
+Typecheck
+  → Lint
+  → Format Check
+  → Unit Tests
+  → Coverage Gate
+  → Build
+  → API / Contract / Integration Tests
+  → SonarQube Quality Gate
+  → Live Functional Verification where applicable
+```
+
+The repository currently has some checks not yet wired into CI. Treat that as an infrastructure gap, not as permission to skip them locally when they are relevant to the change.
+
+## 26. Documentation and Decision Traceability
+
+Architecture decisions must record the surviving invariant, not a diary of implementation attempts.
+
+When a requirement changes:
+
+- update the relevant decision log/spec/OAS/test;
+- remove stale comments that describe abandoned behavior;
+- keep code comments focused on **why**, not obvious **what**;
+- maintain traceability from business rule → implementation → test.
+
+Do not silently change business meaning only to make existing code/tests pass.
+
+## 27. Specification Wins over Existing Implementation
+
+The approved specification/business decision defines expected behavior.
+
+If implementation differs from the approved requirement:
+
+- record/fix a defect;
+- do not rewrite expected results merely to make current code pass;
+- do not preserve a technical workaround if it contradicts the agreed business model.
+
+When sources conflict, explicitly identify the conflict and resolve it against the current approved source of truth before coding.
+
+## 28. Professional Review Checklist Before Coding
+
+Before implementation, answer these questions:
+
+1. What is the business invariant?
+2. Is this common, domain, workflow, UI, integration, or function-specific?
+3. Which existing abstraction owns it?
+4. Would this change duplicate knowledge?
+5. Does it introduce another function-code conditional that belongs in Strategy/Policy?
+6. Does it preserve Event identity, Maker/Checker, audit, and idempotency?
+7. Does it require atomic persistence?
+8. Is server-side validation authoritative?
+9. What concurrency/race conditions exist?
+10. What tests prove the behavior and regression safety?
+
+If these cannot be answered clearly, design is not ready for implementation.
+
+## 29. Definition of Done — Architecture + Quality
+
+A change is **not complete merely because it works on one screen**.
+
+Before completion confirm all applicable items:
+
+- [ ] Business requirement and accounting/balance semantics are correct.
+- [ ] Requirement is classified into the correct responsibility category.
+- [ ] Owning layer/component/service/policy is correct.
+- [ ] SOLID/OOD review completed.
+- [ ] No unnecessary duplication introduced.
+- [ ] Common requirements implemented once.
+- [ ] Existing shared abstractions reused before creating new ones.
+- [ ] No new business concept/status invented for a technical workaround.
+- [ ] Event identity/idempotency/audit semantics preserved.
+- [ ] Atomicity/concurrency implications reviewed.
+- [ ] Server-side validation/security controls are authoritative.
+- [ ] Unit tests added/updated for the new behavior.
+- [ ] Regression tests cover all applicable functions.
+- [ ] API/contract/integration tests pass where applicable.
+- [ ] All three Jest suites pass and coverage gates pass.
+- [ ] Typecheck/build pass.
+- [ ] Lint and format checks pass where applicable.
+- [ ] SonarQube introduces no unacceptable new issues.
+- [ ] Real API/browser functional verification completed where applicable.
+- [ ] Console/network checked for runtime errors for UI changes.
+- [ ] OAS/spec/decision log/comments updated where required.
+- [ ] No obsolete comments/dead code left behind.
+
+## 30. Final Architecture Principle
+
+The preferred design is the one in which a future common business/UX change can be made in **one obvious place**, tested once at the shared abstraction plus representative regressions, and inherited consistently by all applicable transaction functions.
+
+If a common requirement repeatedly requires edits throughout A2–A11/B2–B7, treat that as an **architecture smell** and improve the abstraction before adding more patches.
+
+---
+
 ## Knowledge Engineering
 
 You also act as a **Senior Code Analyst / Enterprise Knowledge Engineer / Obsidian Knowledge Base
