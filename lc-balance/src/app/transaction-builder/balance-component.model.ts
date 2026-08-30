@@ -243,6 +243,8 @@ export interface TransactionFunction {
   secondaryRefLabel?: string;
   /** Column heading used by the transaction-selection Index when the selectable key includes a business 2nd reference. */
   transactionIndexSecondaryRefLabel?: 'SG Number' | 'IB Number' | 'EB Number';
+  /** Optional business-specific Amount heading for the same transaction-selection Index. */
+  transactionIndexAmountLabel?: 'SG Amount' | 'IB Amount' | 'EB Amount';
   /** Design doc §7 Tenor Type Routing — when set, Tenor Type is mandatory. A1/B1 offer all three; Acceptance (A6/B4) offers only the two Usance options (Sight never produces an Acceptance). Audit/reporting only — never changes a check. */
   tenorTypeOptions?: { value: string; label: string }[];
   /** A4's Catalog picker: filters to contracts whose own declared tenorType matches, so a Usance LC can't be picked under the Sight card or vice versa. A contract with no tenorType recorded is never filtered out. */
@@ -352,6 +354,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     movementType: 'UTILIZE',
     secondaryRefLabel: 'IB Number',
     transactionIndexSecondaryRefLabel: 'SG Number',
+    transactionIndexAmountLabel: 'SG Amount',
     help: "For documents arriving against an LC that still has an outstanding Shipping Guarantee reserving the capacity (A8). Pick the LC, then the specific SG record below — Bill Amount must be greater than or equal to the selected SG Balance. Maker Submit reserves BOTH the SG's full redemption and this Document Arrival as PENDING. Checker Approve re-validates the same minimum before releasing the SG redemption and moving the Document Arrival to EARMARKED (then continue to A4/A6).",
   },
   {
@@ -376,6 +379,7 @@ export const IMPORT_FUNCTIONS: TransactionFunction[] = [
     defaultParentInstrumentType: 'IPLC_LC',
     tenorTypeOptions: USANCE_ONLY_TENOR_OPTIONS,
     transactionIndexSecondaryRefLabel: 'IB Number',
+    transactionIndexAmountLabel: 'IB Amount',
     // A Usance drawing is deliberately two calls, both fired at the Checker's Release click: release
     // the picked Document Arrival, then the new Acceptance. Amount/Tenor carried and protected.
     payableMovementType: 'UTILIZE',
@@ -531,6 +535,7 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     movementType: 'HONOUR',
     secondaryRefLabel: 'EB Number',
     transactionIndexSecondaryRefLabel: 'EB Number',
+    transactionIndexAmountLabel: 'EB Amount',
     payableMovementType: 'CREATE',
     payableMovementInstrumentType: 'EPLC_EXAMINATION',
     pendingItemLabel: 'Present Docs',

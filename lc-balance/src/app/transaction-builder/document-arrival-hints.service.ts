@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { catchError, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
-import { BalanceComponentApiService, BalanceContract, BalanceMovement } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType } from './balance-component.model';
 
 /**
@@ -30,8 +30,10 @@ export class DocumentArrivalHintsService {
   readonly parentPayableMovements = new Map<string, BalanceMovement[]>();
   /** B4 (Honour / Acceptance) only — its own flat Catalog picker, CROSS-contract (a child EPLC_EXAMINATION contract's own CREATE), RELEASED and not yet consumed. */
   readonly catalogChildPayableIbs = new Map<string, string[]>();
+  readonly catalogChildPayableMovements = new Map<string, BalanceMovement[]>();
   /** A3S (Document Arrival w/ Shipping Gtee) only — its own flat Catalog picker. Set of balanceContractId whose LC has at least one child SHGT contract with a non-zero Available Balance — see loadSgBalanceEligibility()'s own doc comment. */
   readonly catalogSgEligible = new Set<string>();
+  readonly catalogSgRows = new Map<string, { contract: BalanceContract; snapshot: BalanceSnapshot }[]>();
   /** A9 (Shipping Gtee Redemption) only — its own Parent LC picker. Same eligibility rule as catalogSgEligible above. */
   readonly parentSgEligible = new Set<string>();
   /** A10/B6 (Close) only — see loadCloseEligibility()'s own doc comment for why this is populated by ONE aggregate server call, unlike every other Set/Map above. */
@@ -99,6 +101,7 @@ export class DocumentArrivalHintsService {
    */
   loadChildHints(list: BalanceContract[], childInstrumentType: InstrumentType, wantedMovementType: string, onDone: () => void): void {
     this.catalogChildPayableIbs.clear();
+    this.catalogChildPayableMovements.clear();
     if (!list.length) {
       onDone();
       return;
@@ -107,26 +110,33 @@ export class DocumentArrivalHintsService {
       list.map((c) =>
         this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
           switchMap((result) => {
-            if (!result.items.length) return of([] as string[]);
+            if (!result.items.length) return of([] as BalanceMovement[]);
             return forkJoin(
               result.items.map((child) =>
                 this.api.listMovements(child.balanceContractId).pipe(
                   map((movs) =>
                     (movs as any[])
                       .filter((m: any) => m.movementType === wantedMovementType && m.status === 'RELEASED' && !m.presentDocsConsumedAt)
-                      .map((m: any) => m.sourceTransactionRef || child.naturalKey.ibNumber || '(no EB Number)'),
+                      .map((m: any) => ({ ...m, sourceTransactionRef: m.sourceTransactionRef || child.naturalKey.ibNumber || '(no EB Number)' })),
                   ),
-                  catchError(() => of([] as string[])),
+                  catchError(() => of([] as BalanceMovement[])),
                 ),
               ),
             ).pipe(map((lists) => lists.flat()));
           }),
-          catchError(() => of([] as string[])),
+          catchError(() => of([] as BalanceMovement[])),
         ),
       ),
     ).subscribe((results) => {
       list.forEach((c, i) => {
-        if (results[i].length) this.catalogChildPayableIbs.set(c.balanceContractId, results[i]);
+        const movements = results[i];
+        if (movements.length) {
+          this.catalogChildPayableMovements.set(c.balanceContractId, movements);
+          this.catalogChildPayableIbs.set(
+            c.balanceContractId,
+            movements.map((movement) => movement.sourceTransactionRef!),
+          );
+        }
       });
       onDone();
     });
@@ -134,7 +144,41 @@ export class DocumentArrivalHintsService {
 
   /** A3S's own hint fetch — see loadChildBalanceEligibility()'s own doc comment. */
   loadCatalogSgEligibility(list: BalanceContract[], onDone: () => void): void {
-    this.loadChildBalanceEligibility(list, 'SHGT', this.catalogSgEligible, onDone);
+    this.catalogSgEligible.clear();
+    this.catalogSgRows.clear();
+    if (!list.length) {
+      onDone();
+      return;
+    }
+    forkJoin(
+      list.map((lc) =>
+        this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lc.naturalKey.lcNumber, undefined, true).pipe(
+          switchMap((result) => {
+            if (!result.items.length) return of([] as { contract: BalanceContract; snapshot: BalanceSnapshot }[]);
+            return forkJoin(
+              result.items.map((contract) =>
+                this.api.getSnapshot(contract.balanceContractId).pipe(
+                  map((snapshot) => ({ contract, snapshot })),
+                  catchError(() => of(null)),
+                ),
+              ),
+            ).pipe(
+              map((rows) => rows.filter((row): row is { contract: BalanceContract; snapshot: BalanceSnapshot } => !!row && row.snapshot.availableBalance !== '0')),
+            );
+          }),
+          catchError(() => of([] as { contract: BalanceContract; snapshot: BalanceSnapshot }[])),
+        ),
+      ),
+    ).subscribe((results) => {
+      list.forEach((lc, index) => {
+        const rows = results[index];
+        if (rows.length) {
+          this.catalogSgEligible.add(lc.balanceContractId);
+          this.catalogSgRows.set(lc.balanceContractId, rows);
+        }
+      });
+      onDone();
+    });
   }
 
   /**

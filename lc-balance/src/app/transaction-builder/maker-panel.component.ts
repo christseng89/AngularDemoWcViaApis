@@ -72,6 +72,18 @@ export interface MakerCheckerContext {
   createdBy: string;
 }
 
+interface TransactionIndexRow {
+  readonly movementId: string;
+  readonly root: BalanceContract;
+  readonly secondaryRef: string;
+  readonly amount: string;
+  readonly currency: string;
+  readonly status: string;
+  readonly movement?: BalanceMovement;
+  readonly sgContract?: BalanceContract;
+  readonly sgSnapshot?: BalanceSnapshot;
+}
+
 /**
  * The 7 flat compound-leg movement fields A3S/A6/B4/B5's multi-leg submissions produce, grouped into one
  * object. Doesn't change `MakerCheckerContext`'s shape — `emitContext()` destructures the 5 id fields
@@ -680,6 +692,8 @@ export class MakerPanelComponent implements OnChanges {
     this.parentPicker.search = '';
     this.catalogPicker.resetPaging();
     this.catalogPicker.search = '';
+    this.transactionIndexSearch = '';
+    this.transactionIndexPage = 1;
     this.ibIndexPicker.contracts = [];
     this.ibIndexPicker.resetPaging();
     this.pickerSelection.settleableBalances = [];
@@ -960,6 +974,18 @@ export class MakerPanelComponent implements OnChanges {
             this.parentPicker.total = this.filteredParentCatalog.length;
           });
         }
+        if (this.selectedFunction?.payableMovementInstrumentType) {
+          this.hintsPending++;
+          this.documentArrivalHints.loadChildHints(
+            items,
+            this.selectedFunction.payableMovementInstrumentType,
+            this.selectedFunction.payableMovementType ?? 'UTILIZE',
+            () => {
+              this.hintsPending--;
+              this.parentPicker.total = this.filteredParentCatalog.length;
+            },
+          );
+        }
         if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
           this.hintsPending++;
           this.documentArrivalHints.loadParentSgEligibility(items, () => {
@@ -1009,6 +1035,9 @@ export class MakerPanelComponent implements OnChanges {
     if (this.selectedFunction?.requiresEligibleParentAcceptance) {
       return { kind: 'hintSet', ids: this.documentArrivalHints.parentAcceptanceEligible };
     }
+    if (this.selectedFunction?.payableMovementInstrumentType) {
+      return { kind: 'hintSet', ids: this.documentArrivalHints.catalogChildPayableIbs };
+    }
     if (
       this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival ||
       this.selectedFunction?.catalogTenorFilter === 'USANCE' ||
@@ -1034,6 +1063,105 @@ export class MakerPanelComponent implements OnChanges {
     return this.filteredParentCatalog.slice(start, start + this.parentPicker.pageSize);
   }
 
+  parentTightLcBalance(contract: BalanceContract): string {
+    const snapshot = this.parentPicker.snapshots.get(contract.balanceContractId);
+    return snapshot ? `${snapshot.tightAvailableBalance} ${snapshot.currency}` : '—';
+  }
+
+  get usesCombinedTransactionIndex(): boolean {
+    return !!this.selectedFunction?.transactionIndexAmountLabel;
+  }
+
+  get allTransactionIndexRows(): TransactionIndexRow[] {
+    const rows: TransactionIndexRow[] = [];
+    if (this.selectedFunction?.code === 'A3S') {
+      for (const root of this.filteredCatalogContracts) {
+        for (const item of this.documentArrivalHints.catalogSgRows.get(root.balanceContractId) ?? []) {
+          rows.push({
+            movementId: item.contract.balanceContractId,
+            root,
+            secondaryRef: item.contract.naturalKey.sgNumber || '—',
+            amount: item.snapshot.availableBalance,
+            currency: item.snapshot.currency,
+            status: item.contract.status,
+            sgContract: item.contract,
+            sgSnapshot: item.snapshot,
+          });
+        }
+      }
+    } else {
+      const isA6 = this.selectedFunction?.code === 'A6';
+      const source = isA6 ? this.documentArrivalHints.parentPayableMovements : this.documentArrivalHints.catalogChildPayableMovements;
+      const roots = isA6 ? this.filteredParentCatalog : this.filteredCatalogContracts;
+      for (const root of roots) {
+        for (const movement of source.get(root.balanceContractId) ?? []) {
+          rows.push({
+            movementId: movement.movementId,
+            root,
+            secondaryRef: movement.sourceTransactionRef || '—',
+            amount: movement.amount,
+            currency: movement.currency,
+            status: movement.acknowledgedAt ? 'EARMARKED' : movement.status,
+            movement,
+          });
+        }
+      }
+    }
+    const query = this.transactionIndexSearch.trim().toLowerCase();
+    return rows
+      .filter((row) => !query || row.root.naturalKey.lcNumber.toLowerCase().includes(query) || row.secondaryRef.toLowerCase().includes(query))
+      .sort((a, b) => a.root.naturalKey.lcNumber.localeCompare(b.root.naturalKey.lcNumber) || a.secondaryRef.localeCompare(b.secondaryRef));
+  }
+
+  transactionIndexSearch = '';
+  transactionIndexPage = 1;
+  readonly transactionIndexPageSize = 10;
+
+  get pagedTransactionIndexRows(): TransactionIndexRow[] {
+    const start = (this.transactionIndexPage - 1) * this.transactionIndexPageSize;
+    return this.allTransactionIndexRows.slice(start, start + this.transactionIndexPageSize);
+  }
+
+  get transactionIndexTotalPages(): number {
+    return Math.max(1, Math.ceil(this.allTransactionIndexRows.length / this.transactionIndexPageSize));
+  }
+
+  onTransactionIndexSearch(): void {
+    this.transactionIndexPage = 1;
+  }
+
+  transactionIndexPrevPage(): void {
+    if (this.transactionIndexPage > 1) this.transactionIndexPage--;
+  }
+
+  transactionIndexNextPage(): void {
+    if (this.transactionIndexPage < this.transactionIndexTotalPages) this.transactionIndexPage++;
+  }
+
+  onSelectTransactionIndex(rowId: string): void {
+    const row = this.allTransactionIndexRows.find((candidate) => candidate.movementId === rowId);
+    if (!row) return;
+    if (this.selectedFunction?.code === 'A3S') {
+      const sgContract = row.sgContract!;
+      const sgSnapshot = row.sgSnapshot!;
+      this.selectedContract = row.root;
+      this.applyCarriedContractFields();
+      this.refreshSelectedContractSnapshot();
+      this.pickerSelection.sgsForArrival = [sgContract];
+      this.pickerSelection.selectedArrivalSg = sgContract;
+      this.pickerSelection.arrivalSgSnapshot = sgSnapshot;
+      this.rebuildFields();
+      this.emitCheckerAndLookupSync();
+      return;
+    }
+    if (!row.movement) return;
+    if (this.selectedFunction?.code === 'B4') this.onSelectContract(row.root.balanceContractId, false);
+    else this.onSelectParent(row.root.balanceContractId, false);
+    this.pickerSelection.payableMovements = [row.movement];
+    this.pickerSelection.payableMovementsPaging.total = 1;
+    this.onSelectPayMovement(row.movement.movementId);
+  }
+
   payableMovementsPrevPage(): void {
     this.pickerSelection.payableMovementsPrevPage();
   }
@@ -1055,7 +1183,12 @@ export class MakerPanelComponent implements OnChanges {
     return ` — ${label}: ${this.formatAmount(snap.pendingEarmarkTotal.replace('-', ''))}`;
   }
 
-  onSelectContract(contractId: string): void {
+  catalogTightLcBalance(contract: BalanceContract): string {
+    const snapshot = this.catalogPicker.snapshots.get(contract.balanceContractId);
+    return snapshot ? `${snapshot.tightAvailableBalance} ${snapshot.currency}` : '—';
+  }
+
+  onSelectContract(contractId: string, loadSourceTransaction = true): void {
     this.selectedContract = this.catalogPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     if (this.selectedFunctionStrategy?.movementDerivation.derivesMovementTypeFromTenor && this.selectedContract) {
       this.model.movementType = this.selectedContract.tenorType === 'SIGHT' ? 'HONOUR' : 'ACCEPT';
@@ -1071,7 +1204,10 @@ export class MakerPanelComponent implements OnChanges {
       this.rebuildFields();
     }
     this.refreshSelectedContractSnapshot();
-    if (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace || this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival) {
+    if (
+      loadSourceTransaction &&
+      (this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace || this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival)
+    ) {
       this.pickerSelection.loadPayableMovements({
         contractId: this.selectedContract?.balanceContractId,
         lcNumber: this.selectedContract?.naturalKey.lcNumber,
@@ -1284,7 +1420,7 @@ export class MakerPanelComponent implements OnChanges {
       });
   }
 
-  onSelectParent(contractId: string): void {
+  onSelectParent(contractId: string, loadSourceTransaction = true): void {
     this.selectedParent = this.parentPicker.contracts.find((c) => c.balanceContractId === contractId) ?? null;
     this.applyCarriedContractFields();
     if (this.isCreatingMovement && this.selectedParent) {
@@ -1299,7 +1435,7 @@ export class MakerPanelComponent implements OnChanges {
       this.selectedContractSnapshot = null;
       this.loadIbIndex();
     }
-    if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedParent) {
+    if (loadSourceTransaction && this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival && this.selectedParent) {
       this.pickerSelection.loadPayableMovements({
         contractId: this.selectedParent.balanceContractId,
         lcNumber: this.selectedParent.naturalKey.lcNumber,

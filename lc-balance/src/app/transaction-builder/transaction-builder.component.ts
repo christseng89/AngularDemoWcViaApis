@@ -184,6 +184,18 @@ export class TransactionBuilderComponent {
   }
 
   selectFunctionSide(side: 'IMPORT' | 'EXPORT'): void {
+    if (side !== this.activeFunctionSide) {
+      this.selectedFunction = null;
+      this.selectedCheckerMovement = null;
+      this.checkerError = null;
+      this.releaseSuccessHint = null;
+      this.arrivalApproved = false;
+      this.accountEntryDialogMovement = null;
+      this.accountEntryDialogInstrumentType = null;
+      this.accountEntryDialogPhase = null;
+      this.accountEntryDialogLinkedMovement = null;
+      this.checkerResetNonce++;
+    }
     this.activeFunctionSide = side;
     this.lookUp.resetForSide(side);
   }

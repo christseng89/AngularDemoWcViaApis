@@ -342,6 +342,13 @@ describe('balance-component.model data invariants', () => {
       }
     });
 
+    it('uses business-specific Amount headings only for A3S and A6', () => {
+      expect(IMPORT_FUNCTIONS.find((fn) => fn.code === 'A3S')?.transactionIndexAmountLabel).toBe('SG Amount');
+      expect(IMPORT_FUNCTIONS.find((fn) => fn.code === 'A6')?.transactionIndexAmountLabel).toBe('IB Amount');
+      expect(IMPORT_FUNCTIONS.find((fn) => fn.code === 'A4')?.transactionIndexAmountLabel).toBeUndefined();
+      expect(IMPORT_FUNCTIONS.find((fn) => fn.code === 'A7')?.transactionIndexAmountLabel).toBeUndefined();
+    });
+
     it("A6 is sourced from A3's own UTILIZE, on IPLC_ACCEPTANCE, Usance-tenor-only", () => {
       const a6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6') as TransactionFunction;
       expect(a6.payableMovementType).toBe('UTILIZE');
@@ -465,6 +472,11 @@ describe('balance-component.model data invariants', () => {
       for (const code of ['B4', 'B5']) {
         expect(EXPORT_FUNCTIONS.find((fn) => fn.code === code)?.transactionIndexSecondaryRefLabel).toBe('EB Number');
       }
+    });
+
+    it('uses EB Amount only for B4 and leaves B5 unchanged', () => {
+      expect(EXPORT_FUNCTIONS.find((fn) => fn.code === 'B4')?.transactionIndexAmountLabel).toBe('EB Amount');
+      expect(EXPORT_FUNCTIONS.find((fn) => fn.code === 'B5')?.transactionIndexAmountLabel).toBeUndefined();
     });
 
     it('B4 is the only function with payableMovementInstrumentType', () => {

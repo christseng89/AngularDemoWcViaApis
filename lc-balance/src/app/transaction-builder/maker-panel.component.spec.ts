@@ -1260,6 +1260,26 @@ describe('MakerPanelComponent', () => {
     });
   });
 
+  describe('Tight LC Balance index display', () => {
+    it('reads the flat LC Index value from the catalog snapshot cache', () => {
+      const { comp } = makeComponentA();
+      const contract = mkContract('c1', '810');
+      comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { tightAvailableBalance: '71234.56', currency: 'USD' }));
+
+      expect(comp.catalogTightLcBalance(contract)).toBe('71234.56 USD');
+      expect(comp.catalogTightLcBalance(mkContract('missing', '811'))).toBe('—');
+    });
+
+    it('reads the Parent LC Index value from the parent snapshot cache', () => {
+      const { comp } = makeComponentA();
+      const contract = mkContract('p1', '910');
+      comp.parentPicker.snapshots.set('p1', mkSnapshot('p1', { tightAvailableBalance: '45000', currency: 'EUR' }));
+
+      expect(comp.parentTightLcBalance(contract)).toBe('45000 EUR');
+      expect(comp.parentTightLcBalance(mkContract('missing', '911'))).toBe('—');
+    });
+  });
+
   describe('movementTypeChecksAvailableBalance', () => {
     it('returns false for movementTypes the microservice never checks against Available Balance (bug fix 2026-08-19 — A2 Amendment Increase false warning)', () => {
       const { comp } = makeComponentA();
@@ -4335,6 +4355,134 @@ describe('MakerPanelComponent', () => {
   });
 
   describe('IB Index / context getters', () => {
+    it('builds one combined A3S row with SG Number and SG Amount', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A3S'));
+      const lc = contract({ balanceContractId: 'lc-a3s', naturalKey: { lcNumber: 'LC01' } });
+      const sg = contract({ balanceContractId: 'sg-1', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC01', sgNumber: 'SG01' } });
+      const sgSnapshot = snapshot({ availableBalance: '1200', currency: 'USD' });
+      c.catalogPicker.contracts = [lc];
+      c.documentArrivalHints.catalogSgEligible.add('lc-a3s');
+      c.documentArrivalHints.catalogSgRows.set('lc-a3s', [{ contract: sg, snapshot: sgSnapshot }]);
+
+      expect(c.allTransactionIndexRows).toEqual([
+        expect.objectContaining({ movementId: 'sg-1', secondaryRef: 'SG01', amount: '1200', currency: 'USD' }),
+      ]);
+      c.onSelectTransactionIndex('sg-1');
+      expect(c.selectedContract).toBe(lc);
+      expect(c.pickerSelection.selectedArrivalSg).toBe(sg);
+      expect(c.pickerSelection.arrivalSgSnapshot).toBe(sgSnapshot);
+    });
+
+    it('builds and selects one combined A6 row with IB Number and IB Amount', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A6'));
+      const lc = contract({ balanceContractId: 'lc-a6', tenorType: 'BUYERS_USANCE', naturalKey: { lcNumber: 'LC02' } });
+      const arrival = movement({ movementId: 'a3-1', balanceContractId: 'lc-a6', sourceTransactionRef: 'IB01', amount: '2300', currency: 'USD' });
+      c.parentPicker.contracts = [lc];
+      c.documentArrivalHints.parentPayableIbs.set('lc-a6', ['IB01']);
+      c.documentArrivalHints.parentPayableMovements.set('lc-a6', [arrival]);
+
+      expect(c.allTransactionIndexRows[0]).toEqual(expect.objectContaining({ secondaryRef: 'IB01', amount: '2300' }));
+      c.onSelectTransactionIndex('a3-1');
+      expect(c.selectedParent).toBe(lc);
+      expect(c.pickerSelection.selectedPayMovement).toBe(arrival);
+      expect(c.naturalKey.ibNumber).toBe('IB01');
+    });
+
+    it('builds and selects one combined B4 row with EB Number and EB Amount', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('B4'));
+      const lc = contract({ balanceContractId: 'lc-b4', instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SIGHT', naturalKey: { lcNumber: 'LC03' } });
+      const presentDocs = movement({ movementId: 'b3-1', balanceContractId: 'exam-1', sourceTransactionRef: 'EB01', amount: '3400', currency: 'USD', status: 'RELEASED' });
+      c.catalogPicker.contracts = [lc];
+      c.documentArrivalHints.catalogChildPayableIbs.set('lc-b4', ['EB01']);
+      c.documentArrivalHints.catalogChildPayableMovements.set('lc-b4', [presentDocs]);
+
+      expect(c.allTransactionIndexRows[0]).toEqual(expect.objectContaining({ secondaryRef: 'EB01', amount: '3400' }));
+      c.onSelectTransactionIndex('b3-1');
+      expect(c.selectedContract).toBe(lc);
+      expect(c.pickerSelection.selectedPayMovement).toBe(presentDocs);
+      expect(c.model.secondaryRef).toBe('EB01');
+    });
+
+    it('keeps the combined Index exclusive to A3S, A6 and B4', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A4'));
+      expect(c.usesCombinedTransactionIndex).toBe(false);
+      triggerSelectFunction(c, fn('A6'));
+      expect(c.usesCombinedTransactionIndex).toBe(true);
+    });
+
+    it('searches, sorts and paginates the combined transaction Index by 10 rows', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A6'));
+      const lc = contract({ balanceContractId: 'lc-page', tenorType: 'BUYERS_USANCE', naturalKey: { lcNumber: 'LC-PAGE' } });
+      const arrivals = Array.from({ length: 11 }, (_, index) =>
+        movement({
+          movementId: `arrival-${index}`,
+          balanceContractId: 'lc-page',
+          sourceTransactionRef: `IB${String(11 - index).padStart(2, '0')}`,
+          amount: String(100 + index),
+        }),
+      );
+      c.parentPicker.contracts = [lc];
+      c.documentArrivalHints.parentPayableIbs.set('lc-page', arrivals.map((item) => item.sourceTransactionRef!));
+      c.documentArrivalHints.parentPayableMovements.set('lc-page', arrivals);
+
+      expect(c.transactionIndexTotalPages).toBe(2);
+      expect(c.pagedTransactionIndexRows).toHaveLength(10);
+      expect(c.pagedTransactionIndexRows[0].secondaryRef).toBe('IB01');
+      c.transactionIndexPrevPage();
+      expect(c.transactionIndexPage).toBe(1);
+      c.transactionIndexNextPage();
+      expect(c.transactionIndexPage).toBe(2);
+      expect(c.pagedTransactionIndexRows).toHaveLength(1);
+      c.transactionIndexNextPage();
+      expect(c.transactionIndexPage).toBe(2);
+      c.transactionIndexPrevPage();
+      expect(c.transactionIndexPage).toBe(1);
+
+      c.transactionIndexPage = 2;
+      c.transactionIndexSearch = 'IB03';
+      c.onTransactionIndexSearch();
+      expect(c.transactionIndexPage).toBe(1);
+      expect(c.allTransactionIndexRows.map((row) => row.secondaryRef)).toEqual(['IB03']);
+      c.transactionIndexSearch = 'LC-PAGE';
+      expect(c.allTransactionIndexRows).toHaveLength(11);
+      c.transactionIndexSearch = 'missing';
+      expect(c.allTransactionIndexRows).toHaveLength(0);
+      expect(c.transactionIndexTotalPages).toBe(1);
+      c.onSelectTransactionIndex('missing');
+      expect(c.pickerSelection.selectedPayMovement).toBeNull();
+    });
+
+    it('covers empty maps and missing optional references without inventing a transaction', () => {
+      const a3s = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(a3s, fn('A3S'));
+      const lc = contract({ balanceContractId: 'lc-empty', naturalKey: { lcNumber: 'LC-EMPTY' } });
+      a3s.catalogPicker.contracts = [lc];
+      a3s.documentArrivalHints.catalogSgEligible.add('lc-empty');
+      expect(a3s.allTransactionIndexRows).toEqual([]);
+
+      const sg = contract({ balanceContractId: 'sg-no-ref', instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC-EMPTY', sgNumber: null } });
+      a3s.documentArrivalHints.catalogSgRows.set('lc-empty', [{ contract: sg, snapshot: snapshot() }]);
+      expect(a3s.allTransactionIndexRows[0].secondaryRef).toBe('—');
+      a3s.onSelectTransactionIndex('sg-no-ref');
+      expect(a3s.pickerSelection.selectedArrivalSg).toBe(sg);
+
+      const a6 = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(a6, fn('A6'));
+      const usance = contract({ balanceContractId: 'lc-no-movement', tenorType: 'BUYERS_USANCE', naturalKey: { lcNumber: 'LC04' } });
+      a6.parentPicker.contracts = [usance];
+      a6.documentArrivalHints.parentPayableIbs.set('lc-no-movement', ['missing']);
+      expect(a6.allTransactionIndexRows).toEqual([]);
+
+      const noRef = movement({ movementId: 'no-ref', balanceContractId: 'lc-no-movement', sourceTransactionRef: null, acknowledgedAt: null });
+      a6.documentArrivalHints.parentPayableMovements.set('lc-no-movement', [noRef]);
+      expect(a6.allTransactionIndexRows[0]).toEqual(expect.objectContaining({ secondaryRef: '—', status: noRef.status }));
+    });
+
     it('shows the selectable IB/EB contract available balance as a read-only Amount column value', () => {
       const c = new MakerPanelComponent(mockApiD());
       const item = contract({ balanceContractId: 'ib-1', currency: 'HKD' });

@@ -69,11 +69,50 @@
     </div>
 
     <ng-container *ngIf="ready">
+      <div class="tb-field" *ngIf="usesCombinedTransactionIndex && !naturalKeyLocked">
+        <app-index-picker
+          label="Transaction Index — select LC Number + {{ selectedFunction?.transactionIndexSecondaryRefLabel }}"
+          [items]="pagedTransactionIndexRows"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
+          [loading]="eligiblePickersLoading"
+          [selectedId]="
+            selectedFunction?.code === 'A3S'
+              ? pickerSelection.selectedArrivalSg?.balanceContractId || null
+              : pickerSelection.selectedPayMovement?.movementId || null
+          "
+          [searchable]="true"
+          [(searchValue)]="transactionIndexSearch"
+          searchPlaceholder="Search LC Number or {{ selectedFunction?.transactionIndexSecondaryRefLabel }}…"
+          (search)="onTransactionIndexSearch()"
+          emptyText="No eligible transaction found."
+          [page]="transactionIndexPage"
+          [totalPages]="transactionIndexTotalPages"
+          [total]="allTransactionIndexRows.length"
+          (pick)="!formLocked && onSelectTransactionIndex($event)"
+          (prevPage)="transactionIndexPrevPage()"
+          (nextPage)="transactionIndexNextPage()"
+        >
+          <ng-template let-row>
+            <span>{{ selectedFunction?.pendingItemSourceCode || selectedFunction?.code }}</span>
+            <span class="tb-row-primary">{{ row.root.naturalKey.lcNumber }}</span>
+            <span>{{ row.secondaryRef }}</span>
+            <span>{{ row.amount }} {{ row.currency }}</span>
+            <span class="tb-row-badge">{{ row.status }}</span>
+          </ng-template>
+        </app-index-picker>
+      </div>
+
       <!-- Parent LC (business instruction 2026-08-14): for A6/B4 (Acceptance) and A8 (Shipping Gtee Issue),
                  the LC Number is NOT freely typed — an Acceptance/SG can only ever be created under an LC that
                  already exists, so it must be THE SAME LC picked here, not a second independent text field that
                  could drift from it. Shown first so the natural-key section below can source lcNumber from it. -->
-      <div class="tb-field" *ngIf="hasParent && !usesTwoFieldSearch && !naturalKeyLocked">
+      <div class="tb-field" *ngIf="hasParent && !usesTwoFieldSearch && !naturalKeyLocked && !usesCombinedTransactionIndex">
         <!-- Business instruction 2026-08-15 ("B3 左側不需要" — Parent LC dropdown/label is redundant):
                    every InstrumentType's own PARENT_INSTRUMENT_OPTIONS list has at most one entry, and
                    whenever hasParent is true, defaultParentInstrumentType already auto-selects it on
@@ -91,7 +130,7 @@
               <app-index-picker
                 label="LC Index — Existing Contract"
                 [items]="pagedFilteredParentCatalog"
-                [columnHeaders]="['Catalog', 'Ref', '2nd Ref', 'Status']"
+                [columnHeaders]="['Catalog', 'Ref', 'Tight LC Balance', 'Status']"
                 [loading]="parentPicker.loading"
                 [selectedId]="selectedParent?.balanceContractId ?? null"
                 [searchable]="true"
@@ -109,7 +148,7 @@
                 <ng-template let-c>
                   <span>{{ c.instrumentType }}</span>
                   <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
-                  <span>{{ c.naturalKey.ibNumber || c.naturalKey.sgNumber || '—' }}</span>
+                  <span>{{ parentTightLcBalance(c) }}</span>
                   <span class="tb-row-badge">{{ c.status }}</span>
                 </ng-template>
               </app-index-picker>
@@ -127,7 +166,7 @@
             <app-index-picker
               label="LC Index — Existing Contract"
               [items]="pagedFilteredParentCatalog"
-              [columnHeaders]="['Catalog', 'Ref', '2nd Ref', 'Status']"
+              [columnHeaders]="['Catalog', 'Ref', 'Tight LC Balance', 'Status']"
               [loading]="parentPicker.loading"
               [selectedId]="selectedParent?.balanceContractId ?? null"
               [searchable]="true"
@@ -145,7 +184,7 @@
               <ng-template let-c>
                 <span>{{ c.instrumentType }}</span>
                 <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
-                <span>{{ c.naturalKey.ibNumber || c.naturalKey.sgNumber || '—' }}</span>
+                <span>{{ parentTightLcBalance(c) }}</span>
                 <span class="tb-row-badge">{{ c.status }}</span>
               </ng-template>
             </app-index-picker>
@@ -171,7 +210,13 @@
           <app-index-picker
             label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction?.pendingItemSourceCode || 'A3' }})"
             [items]="pickerSelection.pagedFilteredPayableMovements"
-            [columnHeaders]="['Catalog', 'Ref', selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref', 'Amount', 'Status']"
+            [columnHeaders]="[
+              'Catalog',
+              'Ref',
+              selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+              selectedFunction?.transactionIndexAmountLabel || 'Amount',
+              'Status',
+            ]"
             [loading]="pickerSelection.payableMovementsLoading"
             [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
             [searchable]="true"
@@ -373,7 +418,13 @@
               <app-index-picker
                 label="Transaction Index — select LC Number + 2nd Ref"
                 [items]="pagedFilteredIbIndexCatalog"
-                [columnHeaders]="['Catalog', 'Ref', selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref', 'Amount', 'Status']"
+                [columnHeaders]="[
+                  'Catalog',
+                  'Ref',
+                  selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+                  selectedFunction?.transactionIndexAmountLabel || 'Amount',
+                  'Status',
+                ]"
                 [loading]="ibIndexPicker.loading"
                 [selectedId]="selectedContract?.balanceContractId ?? null"
                 [searchable]="true"
@@ -427,11 +478,18 @@
           </ng-container>
         </ng-template>
         <ng-template #flatCatalogPicker>
+          <ng-container *ngIf="!usesCombinedTransactionIndex">
           <app-index-picker
             *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace"
             label="Transaction Index — select LC Number + {{ selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref' }}"
             [items]="flattenedPayableRows"
-            [columnHeaders]="['Catalog', 'Ref', selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref', 'Amount', 'Status']"
+            [columnHeaders]="[
+              'Catalog',
+              'Ref',
+              selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+              selectedFunction?.transactionIndexAmountLabel || 'Amount',
+              'Status',
+            ]"
             [loading]="eligiblePickersLoading"
             [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
             [searchable]="true"
@@ -463,7 +521,7 @@
                 : 'LC Index — Existing Contract'
             }}"
             [items]="pagedFilteredCatalogContracts"
-            [columnHeaders]="['Catalog', 'Ref', '2nd Ref', 'Status']"
+            [columnHeaders]="['Catalog', 'Ref', 'Tight LC Balance', 'Status']"
             [loading]="catalogPicker.loading"
             [selectedId]="selectedContract?.balanceContractId ?? null"
             [searchable]="true"
@@ -485,10 +543,11 @@
             <ng-template let-c>
               <span>{{ c.instrumentType }}</span>
               <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
-              <span>{{ c.naturalKey.ibNumber || c.naturalKey.sgNumber || '—' }}</span>
+              <span>{{ catalogTightLcBalance(c) }}</span>
               <span class="tb-row-badge">{{ c.status }}{{ catalogPendingHint(c) }}</span>
             </ng-template>
           </app-index-picker>
+          </ng-container>
 
         </ng-template>
 
@@ -532,12 +591,21 @@
                  Shipping Guarantees this arrival is matched against; the Formly form below still shows normally
                  (unlike A4's payExistingUtilize, A3S DOES create new movements via Submit) — Amount there is now
                  the real Bill Amount, freely typed; this box shows the derived SG-side numbers alongside it. -->
-      <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract">
+      <div
+        class="tb-subcard"
+        *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract && !usesCombinedTransactionIndex"
+      >
         <app-index-picker
           *ngIf="!naturalKeyLocked"
           label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
           [items]="pickerSelection.pagedSgsForArrival"
-          [columnHeaders]="['Catalog', 'Ref', selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref', 'Amount', 'Status']"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
           [loading]="pickerSelection.sgsForArrivalLoading"
           [selectedId]="pickerSelection.selectedArrivalSg?.balanceContractId ?? null"
           emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
@@ -597,7 +665,13 @@
           *ngIf="!naturalKeyLocked"
           label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction?.pendingItemSourceCode || 'A3' }})"
           [items]="pickerSelection.pagedFilteredPayableMovements"
-          [columnHeaders]="['Catalog', 'Ref', selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref', 'Amount', 'Status']"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
           [loading]="pickerSelection.payableMovementsLoading"
           [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
           [searchable]="true"
@@ -645,7 +719,13 @@
           *ngIf="!naturalKeyLocked"
           label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
           [items]="pickerSelection.pagedFilteredPayableMovements"
-          [columnHeaders]="['Catalog', 'Ref', selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref', 'Amount', 'Status']"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
           [loading]="pickerSelection.payableMovementsLoading"
           [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
           emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."

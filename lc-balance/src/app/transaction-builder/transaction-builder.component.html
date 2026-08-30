@@ -65,7 +65,7 @@
       <p class="tb-function-help" *ngIf="selectedFunction && selectedFunction.side === activeFunctionSide">{{ selectedFunction.help }}</p>
     </div>
 
-    <div class="tb-workspace" *ngIf="selectedFunction">
+    <div class="tb-workspace" *ngIf="selectedFunction && selectedFunction.side === activeFunctionSide">
       <div class="tb-main">
         <app-maker-panel
           [selectedFunction]="selectedFunction"

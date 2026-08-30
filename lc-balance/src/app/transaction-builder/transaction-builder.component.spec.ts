@@ -113,6 +113,32 @@ describe('TransactionBuilderComponent', () => {
       expect(comp.lookUp.lookup.instrumentType).toBe('EPLC_CONFIRMATION');
       expect(comp.lookUp.lookup.sgNumber).toBe('');
     });
+
+    it('clears the selected Function and its Maker/Checker state when switching sides', () => {
+      const { comp } = makeComponent();
+      comp.selectFunction(A1);
+      comp.selectedCheckerMovement = mkMovement('m-side');
+      comp.checkerError = 'stale';
+      comp.releaseSuccessHint = 'stale';
+      const priorResetNonce = comp.checkerResetNonce;
+
+      comp.selectFunctionSide('EXPORT');
+
+      expect(comp.selectedFunction).toBeNull();
+      expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.checkerError).toBeNull();
+      expect(comp.releaseSuccessHint).toBeNull();
+      expect(comp.checkerResetNonce).toBe(priorResetNonce + 1);
+    });
+
+    it('keeps the current Function when the already-active side is clicked again', () => {
+      const { comp } = makeComponent();
+      comp.selectFunction(A1);
+
+      comp.selectFunctionSide('IMPORT');
+
+      expect(comp.selectedFunction).toBe(A1);
+    });
   });
 
   describe('selectFunction', () => {
