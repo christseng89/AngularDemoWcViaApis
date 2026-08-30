@@ -38,6 +38,7 @@ describe('InquireDeletePendingComponent', () => {
     c.service = {
       catalogIndex: {
         error: null,
+        errorCause: null,
         search: 'S0',
         emptyMessageIsError: false,
         emptyMessage: () => 'No records.',
@@ -47,6 +48,9 @@ describe('InquireDeletePendingComponent', () => {
     expect(c.indexEmptyFeedback).toMatchObject({ severity: 'INFO', title: 'No transactions available' });
     c.service.catalogIndex.error = 'network down';
     expect(c.indexErrorFeedback).toMatchObject({ severity: 'ERROR', retryable: true });
+    c.service.catalogIndex.errorCause = { status: 0, message: 'Http failure response: 0 Unknown Error' };
+    expect(c.indexErrorFeedback).toMatchObject({ title: 'Balance service unavailable' });
+    expect(c.indexErrorFeedback?.supportCode).toBeUndefined();
     c.service.catalogIndex.error = null;
     Object.defineProperty(c.service.catalogIndex, 'emptyMessageIsError', { value: true });
     expect(c.indexEmptyFeedback).toMatchObject({ severity: 'WARNING', title: 'No matching transaction' });

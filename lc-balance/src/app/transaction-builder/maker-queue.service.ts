@@ -66,6 +66,8 @@ export class MakerQueueService {
   items: MakerQueueRow[] = [];
   loading = false;
   error: string | null = null;
+  /** Raw transport error for shared feedback classification; `error` remains the compatible display text. */
+  errorCause: unknown | null = null;
   /** Client-side windowing over the CURRENT side's own already-loaded, already-sorted rows (`sideFilteredItems` below) — not a re-fetch per page; `load()` already fetches/groups/sorts everything (both sides) at once. */
   readonly paging = new PagedListState(10);
 
@@ -135,6 +137,7 @@ export class MakerQueueService {
     if (!this.createdBy) return;
     this.loading = true;
     this.error = null;
+    this.errorCause = null;
     if (resetToFirstPage) this.paging.page = 1;
     this.api.listMyMovements({ createdBy: this.createdBy, statuses: ['PENDING', 'REJECTED'], q: this.lcNumberSearch || undefined }).subscribe({
       next: (result) => {
@@ -145,6 +148,7 @@ export class MakerQueueService {
       },
       error: (err) => {
         this.loading = false;
+        this.errorCause = err;
         this.error = describeApiError(err);
         this.items = [];
         this.paging.total = 0;

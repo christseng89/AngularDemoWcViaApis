@@ -74,7 +74,7 @@ tags:
 
 ## 2026-08-30 OAS 同步
 
-- 微服务 OAS：`1.41.0`；Channel OAS：`1.9.0`。本次没有新增 endpoint，补充同 session Delete Pending、A4 withdraw 例外与 linked-leg 非原子 cancel 顺序。
+- 微服务 OAS：`1.42.0`；Channel OAS：`1.9.0`。本次没有新增 endpoint 或成功 response field；补充查询 endpoint 的 `500 Error` response，并同步 UI transport-error 分类。
 - Channel OAS：`1.8.0`；是逻辑 façade 契约，参考 Angular 实作仍直接调用 microservice adapter。
 - A3S／A6／B4 等多腿动作映射到 atomic compound submit／release；`partialSuccess` 仅保留旧版相容语义。
 - Transaction Index 的 SG／IB／EB Amount 与 Tight LC Balance 是 UI projection，不是新增 wire fields。见 [[Transaction Index Selection Contract]]。

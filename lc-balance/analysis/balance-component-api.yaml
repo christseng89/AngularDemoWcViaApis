@@ -107,6 +107,14 @@ info:
     Maker Queue/Fix Pending is a separate entry flow and is unchanged.
 
 
+    v1.42.0 (2026-08-31, inquiry transport-error synchronization; no
+    successful-response wire-shape change): the catalog reads used by Maker
+    Queue, Inquire Events and Inquire Delete Pending now document their
+    possible 500 Error response. The reference UI preserves the original HTTP
+    status and presents transport/5xx failures as service unavailability;
+    BAL-UI-UNEXPECTED remains reserved for unclassified client failures.
+
+
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
     scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
     field on every request (see `BalanceMovementCreateRequest.required`),
@@ -953,7 +961,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.41.0"
+  version: "1.42.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1083,6 +1091,12 @@ paths:
                   total: { type: integer }
                   page: { type: integer }
                   pageSize: { type: integer }
+
+        '500':
+          description: The service could not complete the catalog query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /balance-contracts/close-eligible:
     get:
@@ -1479,6 +1493,11 @@ paths:
                       pageSize: { type: integer }
         '400':
           description: Neither businessEventId nor createdBy was supplied.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: The service could not complete the movement worklist query.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2130,6 +2149,12 @@ paths:
                   page: { type: integer }
                   pageSize: { type: integer }
 
+        '500':
+          description: The service could not complete the Delete Pending audit query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /delete-pending-audit/lc-catalog:
     get:
       tags: [BalanceContracts]
@@ -2174,6 +2199,11 @@ paths:
                   pageSize: { type: integer }
         '400':
           description: instrumentType is missing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: The service could not complete the Delete Pending LC catalog query.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

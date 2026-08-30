@@ -548,6 +548,8 @@ export class InquireEventsService {
   indexSearch = '';
   indexLoading = false;
   indexError: string | null = null;
+  /** Raw transport error for semantic feedback; `indexError` remains the stable display string. */
+  indexErrorCause: unknown | null = null;
 
   /** Side-aware entity label for the Index's own heading/hint text. */
   get indexEntityLabel(): string {
@@ -687,6 +689,7 @@ export class InquireEventsService {
   loadIndex(page: number = this.indexPaging.page): void {
     this.indexLoading = true;
     this.indexError = null;
+    this.indexErrorCause = null;
     this.api
       .catalog(
         defaultLcInstrumentTypeForSide(this.side),
@@ -715,6 +718,7 @@ export class InquireEventsService {
         },
         error: (err) => {
           this.indexLoading = false;
+          this.indexErrorCause = err;
           this.indexError = describeApiError(err);
           this.indexRows = [];
           this.indexPaging.total = 0;

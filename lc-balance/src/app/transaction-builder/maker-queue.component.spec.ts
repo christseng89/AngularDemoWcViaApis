@@ -64,6 +64,16 @@ describe('MakerQueueComponent', () => {
       c.makerQueue.error = 'record not found';
       expect(c.errorFeedback).toMatchObject({ message: 'No transaction matched your search.' });
     });
+
+    it('uses the original network status instead of mislabelling it BAL-UI-UNEXPECTED', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+      c.makerQueue.error = 'Http failure response: 0 Unknown Error';
+      c.makerQueue.errorCause = { status: 0, message: c.makerQueue.error };
+
+      expect(c.errorFeedback).toMatchObject({ title: 'Balance service unavailable' });
+      expect(c.errorFeedback?.supportCode).toBeUndefined();
+    });
   });
 
   describe('thin pure-function delegations (same shared balance-component.model.ts rules the rest of this sub-project uses)', () => {

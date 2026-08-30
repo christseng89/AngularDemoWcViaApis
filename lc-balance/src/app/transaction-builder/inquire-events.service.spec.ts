@@ -1127,8 +1127,20 @@ describe('InquireEventsService', () => {
       svc.loadIndex(1);
       expect(svc.indexLoading).toBe(false);
       expect(svc.indexError).toBe('network down');
+      expect(svc.indexErrorCause).toEqual({ error: { message: 'network down' } });
       expect(svc.indexRows).toEqual([]);
       expect(svc.indexPaging.total).toBe(0);
+    });
+
+    it('clears a prior Index transport error before retrying', () => {
+      const catalog = jest.fn().mockReturnValueOnce(throwError(() => ({ status: 0, message: 'network' }))).mockReturnValueOnce(of(emptyCatalog()));
+      const svc = new InquireEventsService(makeApi({ catalog }));
+
+      svc.loadIndex(1);
+      expect(svc.indexErrorCause).not.toBeNull();
+      svc.loadIndex(1);
+      expect(svc.indexError).toBeNull();
+      expect(svc.indexErrorCause).toBeNull();
     });
 
     it('searchIndex() resets to page 1 and passes the trimmed indexSearch as the catalog() q param', () => {

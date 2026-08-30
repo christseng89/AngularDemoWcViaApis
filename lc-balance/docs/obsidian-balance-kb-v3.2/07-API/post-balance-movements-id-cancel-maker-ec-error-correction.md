@@ -27,7 +27,7 @@ tags:
 ## Source Evidence
 
 - `microservices/balance-component/src/routes/balanceMovements.ts`
-- `analysis/balance-component-api.yaml` v1.41.0
+- `analysis/balance-component-api.yaml` v1.42.0
 - `src/app/transaction-builder/function-strategy.ts`
 
 ## Related Knowledge

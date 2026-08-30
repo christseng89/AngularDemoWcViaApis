@@ -71,7 +71,7 @@ export class InquireEventsComponent {
 
   get indexErrorFeedback(): UiMessage | null {
     if (!this.inquireEvents.indexError) return null;
-    return presentApiError({ message: this.inquireEvents.indexError }, 'SEARCH', this.inquireEvents.indexSearch);
+    return presentApiError(this.inquireEvents.indexErrorCause ?? { message: this.inquireEvents.indexError }, 'SEARCH', this.inquireEvents.indexSearch);
   }
 
   get indexEmptyFeedback(): UiMessage {

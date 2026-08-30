@@ -76,8 +76,20 @@ describe('MakerQueueService', () => {
 
       expect(svc.loading).toBe(false);
       expect(svc.error).toBe('boom');
+      expect(svc.errorCause).toEqual({ error: { message: 'boom' } });
       expect(svc.items).toEqual([]);
       expect(svc.paging.total).toBe(0);
+    });
+
+    it('clears the original error cause before a retry', () => {
+      const listMyMovements = jest.fn().mockReturnValueOnce(throwError(() => ({ status: 0, message: 'network' }))).mockReturnValueOnce(of(makePage()));
+      const svc = new MakerQueueService(makeApi({ listMyMovements }));
+
+      svc.load();
+      expect(svc.errorCause).not.toBeNull();
+      svc.load();
+      expect(svc.error).toBeNull();
+      expect(svc.errorCause).toBeNull();
     });
 
     // User-directed 2026-08-28 ("Maker Queue 提供 LC Number Search 功能", "支援 LIKE / Partial Match")

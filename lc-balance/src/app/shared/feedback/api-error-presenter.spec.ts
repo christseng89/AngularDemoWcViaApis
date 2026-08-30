@@ -25,10 +25,21 @@ describe('presentApiError', () => {
     expect(`${result.title} ${result.message} ${result.nextAction}`).not.toContain('http://localhost/private');
   });
 
-  it('uses safe fallback copy and a support code for unexpected failures', () => {
+  it('maps backend 5xx responses to a retryable service failure', () => {
     const result = presentApiError({ status: 500, error: { message: 'internal stack detail' } }, 'REJECT');
-    expect(result).toEqual(expect.objectContaining({ severity: 'ERROR', supportCode: 'BAL-UI-UNEXPECTED', technicalCode: 'internal stack detail' }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        severity: 'ERROR',
+        title: 'Balance service temporarily unavailable',
+        supportCode: 'BAL-SVC-HTTP-500',
+        technicalCode: 'internal stack detail',
+      }),
+    );
     expect(result.message).not.toContain('internal stack detail');
+  });
+
+  it('reserves BAL-UI-UNEXPECTED for an unclassified error with no HTTP status', () => {
+    expect(presentApiError({ message: 'unexpected client exception' }, 'SUBMIT')).toMatchObject({ supportCode: 'BAL-UI-UNEXPECTED' });
   });
 
   it('covers message extraction and fallback branches without leaking technical copy', () => {

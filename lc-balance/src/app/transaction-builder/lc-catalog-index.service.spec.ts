@@ -90,8 +90,32 @@ describe('LcCatalogIndexService', () => {
 
       expect(svc.loading).toBe(false);
       expect(svc.error).toBe('boom');
+      expect(svc.errorCause).toEqual({ error: { message: 'boom' } });
       expect(svc.rows).toEqual([]);
       expect(svc.paging.total).toBe(0);
+    });
+
+    it('keeps the original HttpErrorResponse shape so the UI can distinguish a transient network failure', () => {
+      const networkError = { status: 0, message: 'Http failure response: 0 Unknown Error' };
+      const catalog = jest.fn(() => throwError(() => networkError));
+      const svc = new LcCatalogIndexService(makeApi({ catalog }));
+
+      svc.load();
+
+      expect(svc.error).toContain('Unknown Error');
+      expect(svc.errorCause).toBe(networkError);
+    });
+
+    it('clears a previous raw error cause when retrying', () => {
+      const catalog = jest.fn().mockReturnValueOnce(throwError(() => ({ status: 0, message: 'network' }))).mockReturnValueOnce(of(makePage()));
+      const svc = new LcCatalogIndexService(makeApi({ catalog }));
+
+      svc.load();
+      expect(svc.errorCause).not.toBeNull();
+
+      svc.load();
+      expect(svc.error).toBeNull();
+      expect(svc.errorCause).toBeNull();
     });
   });
 

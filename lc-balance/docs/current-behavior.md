@@ -45,10 +45,16 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 - A4 的 Delete Pending 是撤回 Maker Submit，使用 `/withdraw-maker-submit`，不得取消其 A3／A3S source movement。
 - 其他 Function 使用 `/cancel`。A3S、B4、B5 依 strategy 先取消 sibling legs、最後取消 primary leg；目前是多次單筆 API 呼叫，**不是原子 batch cancel**。任一步失敗時停止後續呼叫、保留畫面並顯示實際錯誤。
 
+## Inquiry error handling
+
+- Maker Queue、Inquire Events 與 Inquire Delete Pending 會保留原始 HTTP error status，再交由共用 presenter 分類。
+- Network／status `0` 顯示 Balance service unavailable；HTTP `5xx` 顯示 temporarily unavailable，support code 使用 `BAL-SVC-HTTP-{status}`。
+- `BAL-UI-UNEXPECTED` 僅保留給沒有可辨識 HTTP status 或技術代碼的 client-side failure。Retry 保留原搜尋條件。
+
 ## Service architecture
 
 `BalanceService` 是 routes 的 compatibility façade。讀取、snapshot、contract resolution、request validation、release policy／side effects、lifecycle eligibility／sweep 分別由 `src/service/` 的 focused collaborators 負責；transaction boundary 仍由 `BalanceService`／`UnitOfWork` 控制。
 
 ## Verification baseline
 
-截至 2026-08-31：本次 lifecycle 實作驗證為 Angular 51 suites／1,690 tests、typecheck、lint（0 errors）及 production build 通過。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。版本日期與驗證範圍分開記錄，避免把舊結果誤報為本次執行。
+截至 2026-08-31：本次 Angular 驗證為 51 suites／1,696 tests，coverage 98.14% statements／95.60% branches／96.83% functions／98.52% lines；typecheck、lint 與 production build 狀態以同日 implementation log 為準。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。版本日期與驗證範圍分開記錄，避免把舊結果誤報為本次執行。

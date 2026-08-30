@@ -43,6 +43,8 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
   rows: TRow[] = [];
   loading = false;
   error: string | null = null;
+  /** Raw transport error retained for semantic UI classification; `error` remains the compatible display string. */
+  errorCause: unknown | null = null;
   readonly paging = new PagedListState(10);
 
   get entityLabel(): string {
@@ -78,6 +80,7 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
   load(page: number = this.paging.page): void {
     this.loading = true;
     this.error = null;
+    this.errorCause = null;
     this.fetchPage(this.side, this.search.trim() || undefined, page, this.paging.pageSize)
       .pipe(
         switchMap((result) => {
@@ -94,6 +97,7 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
         },
         error: (err) => {
           this.loading = false;
+          this.errorCause = err;
           this.error = describeApiError(err);
           this.rows = [];
           this.paging.total = 0;

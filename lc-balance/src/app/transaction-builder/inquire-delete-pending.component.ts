@@ -35,7 +35,7 @@ export class InquireDeletePendingComponent {
 
   get indexErrorFeedback(): UiMessage | null {
     if (!this.service.catalogIndex.error) return null;
-    return presentApiError({ message: this.service.catalogIndex.error }, 'SEARCH', this.service.catalogIndex.search);
+    return presentApiError(this.service.catalogIndex.errorCause ?? { message: this.service.catalogIndex.error }, 'SEARCH', this.service.catalogIndex.search);
   }
 
   get indexEmptyFeedback(): UiMessage {

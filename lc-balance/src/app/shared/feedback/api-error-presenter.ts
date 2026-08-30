@@ -72,6 +72,18 @@ export function presentApiError(error: unknown, context: ApiActionContext, query
     };
   }
 
+  if (status !== undefined && status >= 500) {
+    return {
+      severity: 'ERROR',
+      title: 'Balance service temporarily unavailable',
+      message: 'The service could not complete the request, but your input has been kept.',
+      nextAction: 'Try again. If the problem continues, check the backend and Balance microservice.',
+      retryable: true,
+      supportCode: `BAL-SVC-HTTP-${status}`,
+      technicalCode,
+    };
+  }
+
   return {
     severity: 'ERROR',
     title: `Unable to ${actionLabel(context)}`,

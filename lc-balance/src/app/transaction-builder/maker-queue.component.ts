@@ -52,7 +52,7 @@ export class MakerQueueComponent {
   /** Phase 12 migration boundary: the service keeps its stable string state while the view uses standard feedback. */
   get errorFeedback(): UiMessage | null {
     if (!this.makerQueue.error) return null;
-    return presentApiError({ message: this.makerQueue.error }, 'SEARCH', this.makerQueue.lcNumberSearch || undefined);
+    return presentApiError(this.makerQueue.errorCause ?? { message: this.makerQueue.error }, 'SEARCH', this.makerQueue.lcNumberSearch || undefined);
   }
 
   /**

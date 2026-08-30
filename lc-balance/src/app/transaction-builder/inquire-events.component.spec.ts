@@ -29,11 +29,14 @@ function movement(overrides: Partial<BalanceMovement> = {}): BalanceMovement {
 describe('InquireEventsComponent', () => {
   it('maps index error and both empty states to shared feedback', () => {
     const c = new InquireEventsComponent();
-    c.inquireEvents = { indexError: null, indexSearch: 'S0', indexEmptyIsError: false, indexEmptyMessage: 'No records.' } as any;
+    c.inquireEvents = { indexError: null, indexErrorCause: null, indexSearch: 'S0', indexEmptyIsError: false, indexEmptyMessage: 'No records.' } as any;
     expect(c.indexErrorFeedback).toBeNull();
     expect(c.indexEmptyFeedback).toMatchObject({ severity: 'INFO', title: 'No transactions available' });
     c.inquireEvents.indexError = 'network down';
     expect(c.indexErrorFeedback).toMatchObject({ severity: 'ERROR', retryable: true });
+    c.inquireEvents.indexErrorCause = { status: 0, message: 'Http failure response: 0 Unknown Error' };
+    expect(c.indexErrorFeedback).toMatchObject({ title: 'Balance service unavailable' });
+    expect(c.indexErrorFeedback?.supportCode).toBeUndefined();
     c.inquireEvents = { ...c.inquireEvents, indexError: null, indexEmptyIsError: true } as any;
     expect(c.indexEmptyFeedback).toMatchObject({ severity: 'WARNING', title: 'No matching transaction' });
   });

@@ -4486,3 +4486,9 @@ build 成功。
 A1／B1 Confirm 成功後回到新的 natural-key 輸入；其餘 Function 回到各自 Transaction Index。A4 以 `/withdraw-maker-submit` 撤回本次 Maker Submit，保留 A3／A3S source；其他 Function 使用 `/cancel`。A3S／B4／B5 由 `function-strategy.ts` 提供 sibling movement ids，先 sibling、後 primary 逐筆取消。微服務目前沒有 atomic batch-cancel endpoint，所以中途失敗時停止後續動作、保留畫面並顯示實際錯誤，不宣稱自動回滾。
 
 OAS 同步為 microservice v1.41.0、channel v1.9.0；沒有新增 wire field 或 endpoint。其後依使用者重現步驟修正 A7 跨頁籤返回時重播 stale Maker／Checker signal 的問題。Angular lifecycle 實作已驗證 51 suites／1,690 tests、typecheck、lint 0 errors 與 production build；文件 pass 另執行 OAS parse／reference validation、Markdown link audit 與 `git diff --check`。
+
+## 2026-08-31 — 三個 Inquiry 頁面的間歇性錯誤分類修正與 OAS v1.42.0
+
+Maker Queue、Inquire Events 與 Inquire Delete Pending 原先在 service boundary 把 `HttpErrorResponse` 壓成字串，component 再建立只有 `message` 的物件，導致 status `0`、HTTP `500` 與 backend technical code 全部遺失，最後被共用 presenter 誤判為 `BAL-UI-UNEXPECTED`。三個 query service 現在保留 raw cause，成功重試前會清除舊 cause；component 直接把 raw cause 交給 presenter。
+
+共用 presenter 將 network/status `0` 分類為 Balance service unavailable，HTTP `5xx` 分類為 temporarily unavailable 並產生 `BAL-SVC-HTTP-{status}`；真正沒有 status／technical code 的 client failure 才保留 `BAL-UI-UNEXPECTED`。微服務 OAS 升至 v1.42.0，為 `/balance-contracts/catalog`、`/balance-movements`、`/delete-pending-audit` 與 `/delete-pending-audit/lc-catalog` 補上實際可能的 `500 Error` response；Channel OAS 維持 v1.9.0，成功 wire shape 不變。Angular 全套 51 suites／1,696 tests 通過，coverage 98.14%／95.60%／96.83%／98.52%；typecheck、lint（0 errors）與 production build 通過。`npm audit` 另揭露現有 dependency tree 的 53 個 vulnerabilities（4 low／18 moderate／30 high／1 critical）；建議修正要求 breaking Angular upgrade，未納入本次 transport-error fix。

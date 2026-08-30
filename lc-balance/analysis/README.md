@@ -9,9 +9,10 @@
 
 API 行为变化时同步 schema、版本／changelog、实现、客户端和合约测试。
 
-2026-08-31 当前版本：微服务 OAS `1.41.0`，Channel OAS `1.9.0`。这次同步记录
-Transaction Processing 的同 session Delete Pending、A4 withdraw 例外、compound cancel 的逐笔顺序，
-以及它与 Maker Queue／Fix Pending 的边界。画面 reset 与 UI-only columns 不会被虚构为新的 HTTP fields。
+2026-08-31 当前版本：微服务 OAS `1.42.0`，Channel OAS `1.9.0`。微服务 OAS 已补充
+Maker Queue、Inquire Events 与 Inquire Delete Pending 查询可能返回的 `500 Error`；成功 response
+shape、endpoint 与 Channel contract 均未改变。参考 UI 会保留原始 HTTP status，避免把服务中断误报为
+`BAL-UI-UNEXPECTED`。
 
 ## 基础业务规格
 
