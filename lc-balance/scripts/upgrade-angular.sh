@@ -13,16 +13,15 @@ Usage:
   bash scripts/upgrade-angular.sh 19
   bash scripts/upgrade-angular.sh 20
   bash scripts/upgrade-angular.sh 21
-  bash scripts/upgrade-angular.sh all
 
-The "all" option upgrades and validates one major at a time:
-  latest 17 -> latest 18 -> latest 19 -> latest 20 -> latest 21
+Run exactly one target per clean Git revision. After validation, review and
+commit that major before invoking this script for the next major.
 
 Safety rules:
-  - Unsupported Node/Angular combinations emit a warning but do not block this workflow.
+  - Node 20.19.0 or newer within the Node 20 release line is required.
   - Start with a clean Git worktree.
   - No --force and no automatic rollback are used.
-  - Every major runs lint, type-check, all Jest tests, and a production build.
+  - The selected major runs lint, type-check, all Jest tests, and a production build.
 EOF
 }
 
@@ -48,11 +47,10 @@ verify_environment() {
   cd "${PROJECT_DIR}"
   [[ -f package.json && -f package-lock.json && -f angular.json ]] || die "Run this script from the lc-balance repository."
 
-  local node_major
-  node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
-  if (( node_major != 20 )); then
-    printf 'WARNING: Node %s is not officially supported across the complete Angular 17-21 upgrade path. Continuing because Git provides the rollback point.\n' "$(node --version)" >&2
-  fi
+  node -e '
+    const [major, minor] = process.versions.node.split(".").map(Number);
+    if (major !== 20 || minor < 19) process.exit(1);
+  ' || die "Node 20.19.0 or newer within Node 20 is required; found $(node --version)."
 
   if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
     die "Git worktree is not clean. Commit or stash all changes before upgrading."
@@ -99,22 +97,16 @@ main() {
     [[ -n "${target}" ]] && exit 0
     exit 2
   fi
-  [[ $# -eq 1 ]] || die "Pass exactly one target: 17, 18, 19, 20, 21, or all."
-  [[ "${target}" =~ ^(17|18|19|20|21|all)$ ]] || die "Unsupported target: ${target}"
+  [[ $# -eq 1 ]] || die "Pass exactly one target: 17, 18, 19, 20, or 21."
+  [[ "${target}" =~ ^(17|18|19|20|21)$ ]] || die "Unsupported target: ${target}"
 
   verify_environment
 
-  if [[ "${target}" == "all" ]]; then
-    local major
-    for major in 17 18 19 20 21; do
-      upgrade_to "${major}"
-    done
-  else
-    upgrade_to "${target}"
-  fi
+  upgrade_to "${target}"
 
   printf '\nAngular upgrade workflow completed successfully.\n'
   printf 'Installed Angular core: %s\n' "$(node -p "require('./node_modules/@angular/core/package.json').version")"
+  printf 'Review and commit this major before running the script for the next major.\n'
 }
 
 main "$@"
