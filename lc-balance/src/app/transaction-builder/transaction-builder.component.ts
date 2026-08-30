@@ -169,6 +169,15 @@ export class TransactionBuilderComponent {
     if (mode !== 'PROCESSING') {
       this.externalFixPendingRequest = null;
       this.externalDeletePendingReviewRequest = null;
+      // Maker/Checker child components are destroyed by the PROCESSING *ngIf. These values are
+      // one-shot input signals, not durable screen state; retaining them makes a newly-created A7 (or
+      // any other Function) replay an old Maker outcome and automatically repeat an old Checker search.
+      this.makerOutcomeSignal = null;
+      this.checkerSyncSignal = null;
+      this.selectedCheckerMovement = null;
+      this.checkerError = null;
+      this.releaseSuccessHint = null;
+      this.arrivalApproved = false;
       // The Delete Pending review is the only workflow allowed to hide the Checker panel. If the user
       // leaves Processing through navigation instead of the review's own Confirm/Cancel buttons, its
       // row must not leak into the next normal Function screen and keep Checker hidden there.

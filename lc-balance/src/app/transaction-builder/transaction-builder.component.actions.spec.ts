@@ -27,6 +27,7 @@ const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
 const A3S = IMPORT_FUNCTIONS.find((f) => f.code === 'A3S')!;
 const A4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!;
 const A6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6')!;
+const A7 = IMPORT_FUNCTIONS.find((f) => f.code === 'A7')!;
 const B1 = EXPORT_FUNCTIONS.find((f) => f.code === 'B1')!;
 const B3 = EXPORT_FUNCTIONS.find((f) => f.code === 'B3')!;
 const B4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4')!;
@@ -90,6 +91,7 @@ function makeApi() {
     editPending: jest.fn(() => of({ movementId: 'mv-edited', status: 'PENDING', amount: '999' })),
     resolveContract: jest.fn(() => of(makeContract())),
     catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
+    catalogWithDeletePendingHistory: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })),
     getSnapshot: jest.fn(() => of(makeSnapshot())),
     getContract: jest.fn(() => of(makeContract())),
     listMovements: jest.fn(() => of([] as any[])),
@@ -1154,6 +1156,30 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectMode('MAKER_QUEUE');
 
       expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+    });
+
+    it('A7 -> Maker Queue -> Inquire Events -> Inquire Delete Pending -> Processing does not replay stale Maker or Checker signals', () => {
+      const { comp } = setup();
+      comp.selectFunction(A7);
+      comp.makerOutcomeSignal = { kind: 'failed', message: 'old submit failure' };
+      comp.checkerSyncSignal = { lcNumber: 'U01', secondaryRef: 'B01' };
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'old-checker-row' });
+      comp.checkerError = 'old checker failure';
+      comp.releaseSuccessHint = 'old success';
+      comp.arrivalApproved = true;
+
+      comp.selectMode('MAKER_QUEUE');
+      comp.selectMode('INQUIRE');
+      comp.selectMode('DELETE_PENDING_AUDIT');
+      comp.selectMode('PROCESSING');
+
+      expect(comp.selectedFunction).toBe(A7);
+      expect(comp.makerOutcomeSignal).toBeNull();
+      expect(comp.checkerSyncSignal).toBeNull();
+      expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.checkerError).toBeNull();
+      expect(comp.releaseSuccessHint).toBeNull();
+      expect(comp.arrivalApproved).toBe(false);
     });
 
     it('a normal Function selection clears stale Delete Pending state so Checker renders before any transaction is selected', () => {
