@@ -35,6 +35,8 @@ export interface BuilderFieldsContext {
    * see those functions' own doc comments for the two Fix-Pending-specific facts layered on top.
    */
   fixPendingMode?: boolean;
+  /** Rebuilds the original entry-screen shape after transient picker/snapshot state is gone. */
+  readOnlyReconstruction?: boolean;
 }
 
 /**
@@ -125,10 +127,12 @@ function deriveAmountLockFlags(ctx: BuilderFieldsContext, strategy: ReturnType<t
   // with A6) — it had never been folded into this shared derivation before, so A4's own template used to
   // duplicate this exact same "carried from the Document Arrival, protected" fact in a bespoke
   // `tb-balance-box` readout instead of the generic Amount field every other carried-Amount Function uses.
+  const sourceWasSelected = !!ctx.selectedPayMovement || !!ctx.readOnlyReconstruction;
+  const balanceWasSelected = !!selectedContractSnapshot || !!ctx.readOnlyReconstruction;
   const amountFromDocArrival =
-    (!!strategy?.checkerRelease.settlesDocumentArrival || !!strategy?.checkerRelease.releasesExistingMovementInPlace) && !!ctx.selectedPayMovement;
+    (!!strategy?.checkerRelease.settlesDocumentArrival || !!strategy?.checkerRelease.releasesExistingMovementInPlace) && sourceWasSelected;
   const amountFromFullSettle =
-    strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && !!selectedContractSnapshot;
+    strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' && model.movementType === 'FULL_SETTLE' && balanceWasSelected;
   // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
   // instrument-based, not amount-based" — SG_RELEASE is always the FULL amount, no residual): Amount is
   // now fully LOCKED to the SG's own Available Balance (nets an already-PENDING redemption on the same
@@ -137,16 +141,16 @@ function deriveAmountLockFlags(ctx: BuilderFieldsContext, strategy: ReturnType<t
   // FULL_REDEEM vs PARTIAL_REDEEM derived at submit() time (autoRedeemType); A3S's own matched SG
   // redemption leg (documentArrivalWithSg) is a completely separate code path and is unaffected — it
   // never sets amountVsAvailableDerivation, so this flag is still exclusively an A9 marker.
-  const amountFromSgRedeem = strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && !!selectedContractSnapshot;
+  const amountFromSgRedeem = strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && balanceWasSelected;
   // Same default-to-Available/capped shape amountFromSgRedeem used to have, for B5's own Usance branch —
   // B5 keeps the original editable-but-capped Partial Settle behavior; only A9 was locked down.
   const amountCappedAtAcceptance =
-    strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !!selectedContractSnapshot;
+    strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && balanceWasSelected;
   // A10/B6 only — Amount is NEVER typed, same fully-locked shape amountFromSgRedeem now also has (unlike
   // amountCappedAtAcceptance above, which stays editable, just capped); the write-off must equal the
   // current Confirmed Balance exactly (see submit-rules.ts's own closeShaped exact-amount comment on the
   // microservice side).
-  const amountFromClose = strategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance' && !!selectedContractSnapshot;
+  const amountFromClose = strategy?.movementDerivation.amountAutoFilledFrom === 'confirmedBalance' && balanceWasSelected;
   // A11/B7 (Reopen, F1) only — redesigned 2026-08-25 after live UAT ("REOPEN ui不用輸入金額 但是會用lc
   // balance出帳 account entries, 給checker review"): the real restoration amount is entirely server-
   // computed at Submit time from the LC's own write-off history (domain/reopenRestoration.ts on the
@@ -202,7 +206,8 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // A1/B1 only — F1's own new optional Expiry Date input (UCP 600 Art.6(d)); mailFloatGraceDays is
   // captured server-side from config, never a client-side field.
   const showsExpiryDateInput = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
-  const tenorLocked = !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && !!ctx.selectedParent;
+  const tenorLocked =
+    !!selectedFunction?.tenorTypeOptions?.length && isCreatingMovement(model) && hasParent(model) && (!!ctx.selectedParent || !!ctx.readOnlyReconstruction);
   // 2026-08-28, "Tenor Type 改的不對 應該跟Currency欄位一樣 是輸入欄位但是PROTECTED for B2-B7 A2 - A11" —
   // every Function WITHOUT tenorTypeOptions of its own (A1/B1 choose it freely; A6 has its own dedicated
   // tenorLocked-driven field above) now also shows Tenor Type, carried from the resolved contract
@@ -210,7 +215,9 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // sites carriedCurrency already fires from — this function just reads it, same as Currency).
   const tenorTypeCarried = !tenorLocked && !selectedFunction?.tenorTypeOptions?.length && !!model.tenorType;
   // A1/B1 = Input; every other function = carry from A1/B1 + protected — see carriedCurrency (function-policy.ts).
-  const currencyLocked = !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
+  const currencyLocked = ctx.readOnlyReconstruction
+    ? selectedFunction?.code !== 'A1' && selectedFunction?.code !== 'B1'
+    : !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
   // A1/B1 only — the only functions where Currency is actually being chosen (currencyLocked is always false for them).
   const currencyIsDropdown = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
   // secondaryRef/currency are unconditionally locked whenever Fix Pending is active, regardless of which
@@ -265,7 +272,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
         required: !isAmendExpiryDate && !amountFromFixed,
         type: 'number',
         disabled: amountLocked || amountFixPendingLocked,
-        max: amountCappedAtAcceptance ? Number(selectedContractSnapshot!.availableBalance) : undefined,
+        max: amountCappedAtAcceptance && selectedContractSnapshot ? Number(selectedContractSnapshot.availableBalance) : undefined,
         // Smallest representable positive value for the typed Currency — refuses 0/negative before the
         // real submit-time backstop (validateSubmit()'s "Amount must be greater than 0.").
         min: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
@@ -459,6 +466,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
 export function toReadOnlyFields(fields: FormlyFieldConfig[]): FormlyFieldConfig[] {
   return fields.map((f) => ({
     ...f,
+    type: f.key === 'amount' ? 'protected-monetary' : f.type,
     expressions: undefined,
     props: { ...f.props, disabled: true },
   }));

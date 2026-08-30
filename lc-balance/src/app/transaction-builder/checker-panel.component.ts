@@ -18,6 +18,7 @@ import { isCheckerActionableMovement } from './checker-eligibility-policy';
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
  * A pending sync request for the Checker's own independent search — see `ngOnChanges()`'s own doc
@@ -38,7 +39,7 @@ export interface CheckerSyncSignal {
 @Component({
   selector: 'app-checker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, IndexPickerComponent, TbIconComponent, FeedbackMessageComponent],
+  imports: [CommonModule, FormsModule, IndexPickerComponent, TbIconComponent, FeedbackMessageComponent, MonetaryAmountPipe],
   templateUrl: './checker-panel.component.html',
   styleUrl: './checker-panel.component.scss',
 })

@@ -306,9 +306,10 @@ export class MakerQueueService {
    * not which of the two codes `functionFor()` happens to resolve to.
    */
   fixPendingSupported(row: MakerQueueRow): boolean {
-    if (this.isCompoundShape(row) && !this.isArrivalWithSgCompound(row)) return false;
     const fn = this.functionFor(row);
-    return functionSupportsFixPending(fn ? deriveFunctionStrategy(fn) : null);
+    const strategy = fn ? deriveFunctionStrategy(fn) : null;
+    if (this.isCompoundShape(row) && !this.isArrivalWithSgCompound(row) && strategy?.fixPendingMode !== 'REMARKS_ONLY') return false;
+    return functionSupportsFixPending(strategy);
   }
 
   /** The one compound shape Fix Pending's own Phase 4 cascade actually supports — mirrors the exact same detection `BalanceService.editPending()` uses server-side (contract.instrumentType/movement.movementType/businessEventId), so the two can never disagree about which rows are safe to Fix Pending. */

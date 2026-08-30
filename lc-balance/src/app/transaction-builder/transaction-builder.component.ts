@@ -37,6 +37,7 @@ import { deriveFunctionStrategy } from './function-strategy';
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
  * Named Import (A-series) / Export (B-series) business functions, not a raw instrumentType/
@@ -60,6 +61,7 @@ import { presentApiError } from '../shared/feedback/api-error-presenter';
     MakerQueueComponent,
     InquireDeletePendingComponent,
     FeedbackMessageComponent,
+    MonetaryAmountPipe,
   ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',

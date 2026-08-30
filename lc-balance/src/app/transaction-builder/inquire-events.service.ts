@@ -818,6 +818,7 @@ export class InquireEventsService {
       selectedContractSnapshot: null,
       selectedParent: null,
       dynamicSecondaryRefLabel: fn?.secondaryRefLabel ?? (movement.sourceTransactionRef ? 'Reference No.' : null),
+      readOnlyReconstruction: true,
     };
     this.selectedEventFields = toReadOnlyFields(buildFields(ctx));
     this.selectedEventForm = new FormGroup({});

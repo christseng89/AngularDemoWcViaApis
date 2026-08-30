@@ -11,6 +11,8 @@ import { TransactionPaginationComponent } from './transaction-pagination.compone
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
+import { ProtectedTransactionIdentityComponent } from './protected-transaction-identity.component';
 
 /**
  * Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11, BA &
@@ -21,7 +23,7 @@ import { presentApiError } from '../shared/feedback/api-error-presenter';
 @Component({
   selector: 'app-inquire-delete-pending',
   standalone: true,
-  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, TransactionSearchFieldComponent, TransactionPaginationComponent, FeedbackMessageComponent],
+  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, TransactionSearchFieldComponent, TransactionPaginationComponent, FeedbackMessageComponent, MonetaryAmountPipe, ProtectedTransactionIdentityComponent],
   templateUrl: './inquire-delete-pending.component.html',
   styleUrl: './inquire-delete-pending.component.scss',
 })

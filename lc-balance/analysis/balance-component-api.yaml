@@ -75,6 +75,12 @@ info:
     movement and `BalanceSnapshot` fields, not new API properties.
 
 
+    v1.38.0 (2026-08-30, Remarks-only Fix Pending; no wire-shape change):
+    A4, A6, A7, A9, B4 and B5 use the existing `REMARKS_ONLY` edit mode.
+    The amount must remain identical and only Remarks is persisted; Balance,
+    Account Entries and compound sibling movements remain untouched.
+
+
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
     scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
     field on every request (see `BalanceMovementCreateRequest.required`),
@@ -1816,8 +1822,11 @@ paths:
       description: >
         Corrects a PENDING or REJECTED movement while preserving movementId,
         eventSeq and business identity, and appends a Fix Pending audit record.
-        The strict allowlist rejects locked identity fields. REMARKS_ONLY
-        never recalculates balance, accounting or sibling movements.
+        The strict allowlist rejects locked identity fields. REMARKS_ONLY is
+        used by A4, A6, A7, A9, B4 and B5; it accepts only the unchanged
+        amount, editor and Remarks, and never recalculates balance, accounting
+        or sibling movements. A4 applies the Remark to its underlying A3/A3S
+        movement because A4 finalizes that existing movement in place.
       parameters:
         - name: movementId
           in: path
@@ -2660,7 +2669,9 @@ components:
       description: >
         Strict Fix Pending allowlist. naturalKey, balanceContractId,
         instrumentType, movementType, currency, eventSeq, createdBy and
-        sourceTransactionRef are locked and rejected when supplied.
+        sourceTransactionRef are locked and rejected when supplied. In
+        REMARKS_ONLY mode, amount must equal the stored amount and every
+        property other than amount, editedBy, editMode and remarks is rejected.
 
     BalanceMovementCreateRequest:
       type: object

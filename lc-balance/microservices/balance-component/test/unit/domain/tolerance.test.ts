@@ -45,4 +45,16 @@ describe('computeCeilingAmount (Design doc §6.2)', () => {
     expect(computeCeilingAmount('50000', '10', 'ISSUE', 'SHGT').toFixed()).toBe('50000');
     expect(computeCeilingAmount('50000', '10', 'AMEND_DECREASE', 'IPLC_ACCEPTANCE').toFixed()).toBe('50000');
   });
+
+  test.each([
+    ['JPY', '100', '0.5', '101'],
+    ['USD', '100', '0.005', '100.01'],
+    ['KWD', '100', '0.0005', '100.001'],
+  ])('rounds a tolerance-derived LC balance for %s with ROUND_HALF_UP', (currency, amount, tolerancePct, expected) => {
+    expect(computeCeilingAmount(amount, tolerancePct, 'ISSUE', 'IPLC_LC', currency).toFixed()).toBe(expected);
+  });
+
+  test('uses the existing 2-decimal fallback for an unlisted currency', () => {
+    expect(computeCeilingAmount('100', '0.005', 'ISSUE', 'IPLC_LC', 'ZZZ').toFixed()).toBe('100.01');
+  });
 });

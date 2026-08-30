@@ -39,7 +39,7 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 - Maker／Checker separation、狀態轉換、金額與 eligibility 都由微服務重新驗證。
 - A3S、A6、B4、B5 等多腿事件使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。
-- Fix Pending 修改原 movement 並保留 audit；Remarks-only 模式不能改變金額或重新計算 Balance。
+- Fix Pending 修改原 movement 並保留 audit。A4、A6、A7、A9、B4、B5 採 Remarks-only：只能修改 Remark，不得改變金額、Balance、Account Entries 或 compound sibling。
 - Cancel／Delete Pending 必須同步處理同一 compound business event 的相關 legs。
 
 ## Service architecture

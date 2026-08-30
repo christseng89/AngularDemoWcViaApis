@@ -50,7 +50,7 @@
               <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
               <td>{{ row.tenorType }}</td>
               <td>{{ row.currency }}</td>
-              <td class="tb-table__amount">{{ row.lcAmount }}</td>
+              <td class="tb-table__amount">{{ row.lcAmount | monetaryAmount: row.currency }}</td>
               <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date: 'short') : '—' }}</td>
             </tr>
           </tbody>
@@ -163,6 +163,10 @@
           Function: {{ service.viewing.function ? (service.viewing.function.code + ' · ' + service.viewing.function.label) : '—' }} ·
           Deleted By: {{ service.viewing.row.cancelledBy }} · Reason: {{ service.viewing.row.reasonCode || '—' }} · Audit ID: {{ service.viewing.row.auditId }}
         </div>
+        <app-protected-transaction-identity
+          [visible]="true"
+          [items]="service.viewing.identityItems"
+        ></app-protected-transaction-identity>
         <formly-form [form]="service.viewing.form" [fields]="service.viewing.fields" [model]="service.viewing.model"></formly-form>
       </div>
       <div class="tb-error mt-2" role="alert" *ngIf="service.viewError">{{ service.viewError }}</div>

@@ -68,7 +68,7 @@
             </td>
             <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
             <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
-            <td class="tb-table__amount">{{ row.movement.amount }} {{ row.movement.currency }}</td>
+            <td class="tb-table__amount">{{ row.movement.amount | monetaryAmount: row.movement.currency }} {{ row.movement.currency }}</td>
             <td class="tb-table__status">
               <app-transaction-status-badge
                 [status]="row.movement.status"

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BalanceSnapshot } from './balance-component-api.service';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
  * `{before, after}` strings from a movement's own `balanceBefore`/`balanceAfter` — both null while the
@@ -25,7 +26,7 @@ export interface BalanceSnapshotImpact {
 @Component({
   selector: 'app-balance-snapshot-box',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MonetaryAmountPipe],
   templateUrl: './balance-snapshot-box.component.html',
   styleUrl: './balance-snapshot-box.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

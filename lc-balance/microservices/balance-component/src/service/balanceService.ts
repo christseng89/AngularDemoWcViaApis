@@ -582,7 +582,7 @@ export class BalanceService {
       this.requestValidator.assertValidAmount(req.movementType, req.amount);
     }
 
-    const ceilingAmount = computeCeilingAmount(req.amount, contract.tolerancePct, req.movementType, contract.instrumentType);
+    const ceilingAmount = computeCeilingAmount(req.amount, contract.tolerancePct, req.movementType, contract.instrumentType, contract.currency);
 
     const existingMovements = this.movements.listByContract(contract.balanceContractId);
 
@@ -859,9 +859,6 @@ export class BalanceService {
       if (suppliedKeys.some((key) => !allowedKeys.has(key))) {
         throw new RequestValidationError('Remarks-only Fix Pending may change remarks only.');
       }
-      if (contract.instrumentType !== 'SHGT' || !['FULL_REDEEM', 'PARTIAL_REDEEM'].includes(old.movementType) || old.businessEventId) {
-        throw new RequestValidationError('Remarks-only Fix Pending is supported only for a standalone A9 redemption.');
-      }
       if (patch.amount !== old.amount) throw new RequestValidationError('Amount cannot be changed in Remarks-only Fix Pending.');
       const remarks = patch.remarks?.trim() || null;
       const editedAt = this.now();
@@ -921,7 +918,7 @@ export class BalanceService {
     this.requestValidator.assertExpiryDateIsBusinessDay(merged);
     this.requestValidator.assertToleranceNonNegative(merged.tolerancePct); // reflects the PATCHED value when isCreatingEdit (A1/B1 only); carried-over/already-valid otherwise, same posture as assertTenorRequired() above
 
-    const ceilingAmount = computeCeilingAmount(merged.amount, merged.tolerancePct, merged.movementType, merged.instrumentType);
+    const ceilingAmount = computeCeilingAmount(merged.amount, merged.tolerancePct, merged.movementType, merged.instrumentType, contract.currency);
     const existingMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== old.movementId);
 
 

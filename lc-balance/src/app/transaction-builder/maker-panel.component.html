@@ -283,7 +283,7 @@
                  `existingContract`. -->
       <div class="tb-field" *ngIf="!(isCreatingMovement && selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival)">
         <ng-container *ngIf="isCreatingMovement; else existingContract">
-          <label class="tb-field__label">{{ lcNumberFromParent ? 'New Reference — Natural Key' : 'New Logical Contract — Natural Key' }}</label>
+          <label class="tb-field__label" *ngIf="!lcNumberFromParent">New Logical Contract — Natural Key</label>
           <!-- Business instruction 2026-08-17 ("the primary key and 2ndary key are mandatory field...
                      after Submit those key fields need to be protected as well") — LC Number is the
                      Primary Key, IB/SG Number the 2ndary Key, for every A1-A9/B1-B5 natural-key entry;
@@ -340,10 +340,6 @@
                        symptom the user reported (echoed live: "LC Number / U01" at top AND "New Reference —
                        Natural Key / U01" below, same value twice). Before naturalKeyLocked (no Parent picked
                        yet), still renders with its own "Pick the Parent LC above first." hint. -->
-            <div *ngIf="lcNumberFromParent && !naturalKeyLocked">
-              <input class="tb-input tb-natural-key--emphasized" placeholder="LC Number" [ngModel]="naturalKey.lcNumber" disabled />
-              <div class="tb-hint" *ngIf="!naturalKey.lcNumber">Pick the Parent LC above first.</div>
-            </div>
             <!-- Business instruction 2026-08-19 ("A8 SG Number / B3 EB Number" — same mandatory +
                        blur-validation requirement as LC Number above, "不得各自實作不同的驗證方式" — must
                        not each implement a different validation mechanism) — identical pattern: a real

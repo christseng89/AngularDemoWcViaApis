@@ -500,19 +500,19 @@ describe('MakerQueueService', () => {
     // A genuinely DIFFERENT compound shape (B4's own ACCEPT+CREATE Acceptance pairing, sharing
     // businessEventId the same way A3S's own pair does) stays excluded — Phase 4 only ever scoped/
     // implemented the ONE documentArrivalWithSg cascade, not every compound shape indiscriminately.
-    it('stays FALSE for a genuinely different compound shape (B4 ACCEPT, EPLC_CONFIRMATION) — Phase 4 is A3S-only, not every businessEventId row', () => {
+    it('is true for a B4 compound row because Remarks-only mode cannot desynchronize monetary legs', () => {
       const svc = new MakerQueueService(makeApi());
       const row = { movement: makeMovement({ movementType: 'ACCEPT', businessEventId: 'be-2' }), contract: makeContract({ instrumentType: 'EPLC_CONFIRMATION' }) };
-      expect(svc.fixPendingSupported(row)).toBe(false);
+      expect(svc.fixPendingSupported(row)).toBe(true);
     });
 
-    it('is false once the row has moved on to A4 (makerSubmittedAt set — A4 has no fixPendingEnabled entry)', () => {
+    it('is true once the row has moved on to A4; A4 uses Remarks-only mode on the existing A3 movement', () => {
       const svc = new MakerQueueService(makeApi());
       const row = {
         movement: makeMovement({ movementType: 'UTILIZE', businessEventId: null, acknowledgedAt: '2026-08-27T00:00:00.000Z', makerSubmittedAt: '2026-08-27T01:00:00.000Z' }),
         contract: makeContract({ instrumentType: 'IPLC_LC', tenorType: 'SIGHT' }),
       };
-      expect(svc.fixPendingSupported(row)).toBe(false);
+      expect(svc.fixPendingSupported(row)).toBe(true);
     });
 
     // A2 was widened INTO the trial scope 2026-08-28 ("把這A1 A3 修改要求放置B1 A2試試看") — see the
@@ -523,10 +523,10 @@ describe('MakerQueueService', () => {
       expect(svc.fixPendingSupported(row)).toBe(true);
     });
 
-    it('is false for a Function with no fixPendingEnabled entry (e.g. A6 CREATE)', () => {
+    it('is true for A6 CREATE in Remarks-only mode', () => {
       const svc = new MakerQueueService(makeApi());
       const row = { movement: makeMovement({ movementType: 'CREATE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_ACCEPTANCE' }) };
-      expect(svc.fixPendingSupported(row)).toBe(false);
+      expect(svc.fixPendingSupported(row)).toBe(true);
     });
 
     it('is false when functionFor() resolves to nothing at all (an unrecognized movementType)', () => {

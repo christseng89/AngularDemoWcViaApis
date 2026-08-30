@@ -1,312 +1,281 @@
-# SonarQube Scan Report — lc-balance-wc
+# LC Balance Component — SonarQube Scan Report
 
-**Analysis date:** 2026-08-26T07:57:36Z
-**Project key:** `lc-balance-wc` · **Project name:** LC Balance Component Demo
-**Server:** local SonarQube 9.9.8.100196 LTS Community Edition (Docker container `sonarqube`, image `sonarqube:lts-community`), dashboard at `http://localhost:9000/dashboard?id=lc-balance-wc`
-**Scanner:** `sonarsource/sonar-scanner-cli:5.0.1` (Docker), run on the `sonar-net` bridge network reaching the server at `http://sonarqube:9000`, per this repo's existing `sonar-project.properties` — `sonar.sources=src,backend,microservices/balance-component/src`, `sonar.tests=src,backend/test,microservices/balance-component/test`. This is the **third** real scan of this project (see `Sonar-Scan-Report.md`, 2026-08-17, and `SonarQube-report2.md`, 2026-08-20) — same server, same scanner image, same properties file, so all three are directly comparable.
-**Coverage source:** existing `coverage/lcov.info`, `backend/coverage/lcov.info`, `microservices/balance-component/coverage/lcov.info` on disk (regenerated ~90 minutes earlier by a full `npm test` run in all three sub-projects, all green: Angular 1171/1171, backend 38/38, microservice 585/585 — no source changed in between, so these reports are current).
-**Analysis task:** `AaA9EvX9QJgLWwggedKr` → CE task `SUCCESS`, executed in 7.4s server-side after a ~14m45s scanner run (dominated by TypeScript program creation/analysis under emulation — see Methodology note at the end).
-**Report basis:** every number in this report was pulled directly from the SonarQube Web API (`/api/qualitygates/project_status`, `/api/measures/component`, `/api/measures/component_tree`, `/api/issues/search`, `/api/hotspots/search`, `/api/duplications/show`) against this analysis — **not** a manual code review or a SonarQube-style hand assessment.
+## 1. Executive Summary
 
----
+本報告來自 **Docker SonarQube 的實際掃描結果**，不是人工模擬或 SonarQube-style review。
 
-## Quality Gate: **FAILED (ERROR)** — 1 of 6 conditions failing
+| 項目 | 結果 |
+|---|---:|
+| Quality Gate | **PASSED** |
+| Bugs | **0** |
+| Vulnerabilities | **0** |
+| Security Hotspots | **0** |
+| Code Smells | **78** |
+| Reliability Rating | **A (1.0)** |
+| Security Rating | **A (1.0)** |
+| Security Review Rating | **A (1.0)** |
+| Maintainability Rating | **A (1.0)** |
+| Coverage | **97.0%** |
+| Line Coverage | **98.1%** |
+| Branch Coverage | **95.4%** |
+| Duplicated Lines Density | **1.0%** |
+| Technical Debt | **616 minutes（10h 16m）** |
 
-| Condition (New Code, since 2026-08-15 baseline) | Threshold | Actual | Status |
-|---|---|---|---|
-| New Reliability Rating | ≤ 1 (A) | 1 (A) | ✅ OK |
-| New Security Rating | ≤ 1 (A) | 1 (A) | ✅ OK |
-| New Maintainability Rating | ≤ 1 (A) | 1 (A) | ✅ OK |
-| New Coverage | ≥ 80% | 97.6% | ✅ OK |
-| New Security Hotspots Reviewed | 100% | 100% | ✅ OK |
-| **New Duplicated Lines Density** | **≤ 3%** | **5.15%** | ❌ **ERROR** |
+整體 Quality Gate 通過，沒有 SonarQube 認定的 Bug、Vulnerability 或待審 Security Hotspot。主要改善空間是可維護性：78 個 Code Smells 中有 25 個 Critical，全部屬於 Cognitive Complexity。
 
-**This is a real regression from the previous scan** (`SonarQube-report2.md`, 2026-08-20: this same condition passed at 2.17%). Root cause identified below in **Duplication**.
+## 2. Scan Evidence
 
-**Methodology caveat (affects how to read "New Code" here):** the scanner log emits `WARN: SCM provider autodetection failed` — `lc-balance/` is a subdirectory of a larger monorepo and has no `.git` of its own at its root, so the scanner cannot determine which lines actually changed since the 2026-08-15 baseline via git blame. Confirmed via the API: `new_duplicated_lines` (2,532) is numerically identical to overall `duplicated_lines` (2,532), and every one of the 59 open issues has `new_violations = violations = 59` — i.e. **the "New Code" period is effectively treating the entire analyzed codebase as new**, not a genuine line-level diff. This is consistent across all three scans done so far (the 2026-08-20 report shows the same "new ≠ overall, but new tracks total duplication proportionally" pattern), so it is not a newly-introduced measurement artifact — but it does mean the Quality Gate's "New Code" conditions in this project should be read as **project-wide** conditions, not "only what changed since the last release."
+| 項目 | 值 |
+|---|---|
+| Scan date | 2026-08-30 |
+| SonarQube server | 9.9.8.100196 LTS Community |
+| Project key | `lc-balance-wc` |
+| Project name | LC Balance Component Demo |
+| Project version | 1.0 |
+| Analysis ID | `AaBShC7vXnVXnIFIy5x0` |
+| Compute Engine task | `AaBShCIa8ote_WB9eeqM` |
+| Compute Engine status | `SUCCESS` |
+| Analysis submitted | 2026-08-30 11:53:06 UTC |
+| Compute Engine completed | 2026-08-30 11:53:17 UTC |
+| Scanner execution | `EXECUTION SUCCESS` |
+| Scanner elapsed time | 6m 33s |
+| Indexed files | 242 |
+| Analyzed TypeScript files | 188 |
+| Analyzed JavaScript files | 7 |
+| Analyzed text/secret files | 236 |
+| SonarQube dashboard | <http://localhost:9000/dashboard?id=lc-balance-wc> |
 
----
+### Docker environment
 
-## Overall Project Metrics
+- SonarQube server image: `sonarqube:lts-community`, native `linux/arm64`.
+- Scanner image: `sonarsource/sonar-scanner-cli:latest`, `linux/amd64` under ARM64 emulation.
+- Source code remained local; analysis was uploaded only to the local Docker SonarQube at `localhost:9000`.
 
-| Metric | Value | vs. 2026-08-20 scan (`SonarQube-report2.md`) |
-|---|---|---|
-| Lines of code (ncloc) | **15,040** | 11,574 → 15,040 (+3,466, +30%) |
-| — by language | TS 8,710 · JS 2,881 · CSS 2,091 · Web/HTML 1,358 | TS 6,694 · JS 1,508 · CSS 2,061 · Web/HTML 1,311 |
-| Files analyzed (main) | 81 | — |
-| Coverage | **97.6%** (line 98.6% · branch 96.2%) | 98.0% (held, −0.4pp on a 30% larger codebase) |
-| Duplicated lines density | **11.4%** (2,532 duplicated lines / 116 blocks / 7 files) | 4.7% (795 lines / 42 blocks / 3 files) — **+6.7pp, the headline regression** |
-| Bugs | **0** | 0 (held) |
-| Vulnerabilities | **0** | 0 (held) |
-| Security hotspots (unreviewed) | **0** (1 hotspot exists, already reviewed) | 0 (held) |
-| Code smells | **59** | 56 → 59 (+3, essentially flat despite +30% code) |
-| Reliability rating | **1.0 (A)** | 1.0 (A) (held) |
-| Security rating | **1.0 (A)** | 1.0 (A) (held) |
-| Maintainability rating (SQALE) | **1.0 (A)** | 1.0 (A) (held) |
-| Security review rating | **1.0 (A)** | — |
-| Cyclomatic complexity | **2,514** | — |
-| Cognitive complexity | **1,672** | — |
-| Technical debt (SQALE index) | **651 min ≈ 10.9 hours** | — |
+### Scope
 
-**Read this together with the Quality Gate section above**: the only metric that got materially worse is duplication (see next section) — every reliability/security/maintainability rating held at A, coverage held near 98%, and code-smell growth (+3) was far sub-linear to the 30% code growth, meaning the codebase's underlying design didn't degrade — one specific, identifiable cause did (below).
+The scan used `sonar-project.properties` and covered:
 
----
+- Angular Balance Component: `src/`
+- Business Case Runner backend: `backend/`
+- Balance microservice: `microservices/balance-component/src/`
+- Co-located Angular tests, backend tests and microservice tests
 
-## Bugs, Vulnerabilities, Security Hotspots — all clear
+Generated output and dependencies such as `node_modules`, `dist` and `coverage` were excluded from source analysis. `backend/data/businessCases.js` remained analyzable but was excluded from CPD as an intentionally declarative case registry.
 
-**Bugs: 0. Vulnerabilities: 0. Unreviewed security hotspots: 0** (100% reviewed). No regression on any of the three headline security/reliability categories since either prior scan.
+## 3. Test and Coverage Evidence
 
-One hotspot exists in the project's history, carried forward from the 2026-08-17 scan in its already-reviewed state — not a new finding, does not count against the gate:
+Coverage files were regenerated immediately before the scan and all three LCOV reports were imported by the SonarQube JavaScript/TypeScript Coverage Sensor.
 
-| File | Line | Rule | Status |
-|---|---|---|---|
-| `backend/data/businessCases.js` | 54 | `javascript:S2245` (weak PRNG) | `REVIEWED` / `SAFE` — unchanged since 2026-08-17; `Math.random()` here only generates a demo-data uniqueness suffix for a synthetic LC number, never anything security-sensitive (this prototype has no real auth at all — see `lc-balance/CLAUDE.md`'s own BAL-001 Gate Condition) |
+| Sub-project | Suites | Tests | Test result | Jest coverage summary |
+|---|---:|---:|---|---|
+| Angular | 51 | 1,625 | PASS | 98.31% statements; 95.58% branches; 98.57% lines |
+| Backend | 3 | 57 | PASS | 98.91% statements; 96.05% branches; 100% lines |
+| Balance microservice | 39 | 784 | PASS | 98.94% statements; 95.18% branches; 99.43% lines |
+| **Total** | **93** | **2,466** | **PASS** | SonarQube combined coverage **97.0%** |
 
----
+SonarQube coverage denominator differs from each Jest summary because the project-level analysis applies Sonar source/test classification and coverage exclusions across the three sub-projects.
 
-## Code Smells (59 open, 0 Bugs, 0 Vulnerabilities)
+## 4. Quality Gate
 
-By severity: **17 CRITICAL · 28 MAJOR · 13 MINOR · 1 INFO** (vs. 2026-08-20: 15 CRITICAL · 25 MAJOR · 16 MINOR)
+Overall status: **OK / PASSED**. Clean-as-you-code status: **compliant**.
 
-By rule:
+| New-code condition | Threshold | Actual | Status |
+|---|---:|---:|---|
+| Reliability Rating | must be A | A | PASS |
+| Security Rating | must be A | A | PASS |
+| Maintainability Rating | must be A | A | PASS |
+| Coverage | ≥ 80% | 97.0% | PASS |
+| Duplicated Lines Density | ≤ 3% | 0.4195% | PASS |
+| Security Hotspots Reviewed | 100% | 100% | PASS |
+
+The new-code period is `PREVIOUS_VERSION`, based on 2026-08-15 18:22:45 UTC.
+
+## 5. Project Metrics
+
+| Metric | Result |
+|---|---:|
+| Lines of Code | 20,595 |
+| Files | 141 |
+| Classes | 61 |
+| Functions | 1,354 |
+| Statements | 4,291 |
+| Complexity | 3,521 |
+| Cognitive Complexity | 2,271 |
+| Lines to Cover | 5,240 |
+| Uncovered Lines | 102 |
+| Conditions to Cover | 3,550 |
+| Uncovered Conditions | 162 |
+| Duplicated Lines | 286 |
+| Duplicated Lines Density | 1.0% |
+| Technical Debt | 616 minutes |
+
+## 6. Findings by Severity and Type
+
+All 78 unresolved issues are `CODE_SMELL`. SonarQube reported no Bug or Vulnerability.
+
+| Severity | Count | Main category |
+|---|---:|---|
+| Blocker | 0 | — |
+| Critical | 25 | Cognitive Complexity |
+| Major | 23 | Nested ternary / excessive parameters / commented code |
+| Minor | 30 | Redundant assertions, union aliases and duplicate imports |
+| Info | 0 | — |
+| **Total** | **78** | **Code Smells only** |
+
+### Findings by rule
 
 | Rule | Count | Description |
-|---|---|---|
-| `typescript:S3776` (+1 `javascript:S3776`) | 16 (+1) | Cognitive Complexity exceeds 15 |
-| `typescript:S3358` | 16 | Nested ternary should be extracted into an independent statement |
-| `typescript:S4323` | 10 | Union type repeated — replace with a type alias |
-| `Web:AvoidCommentedOutCodeCheck` | 7 | Comment flagged as commented-out code — **see note below, all 7 remain false positives** |
-| `typescript:S1871` | 4 | Duplicate branch bodies in conditional |
-| `typescript:S4325` | 2 | Unnecessary type assertion |
-| `typescript:S107` | 1 | Too many function parameters |
-| `typescript:S1135` | 1 | `TODO` comment left in code |
-| `typescript:S3863` | 1 | Duplicated type import |
-
-By location: **44 of 59 (75%)** are in `src/app/transaction-builder` (the Angular Maker/Checker feature area — now spread across the extracted services/components, not concentrated in one God Component; see Complexity section), 7 in `microservices/balance-component/src/service` (`balanceService.ts`), 3 each in `.../domain` and `.../store`, 1 each in `backend` and `.../routes`.
-
-### Cognitive Complexity hotspots (S3776/CRITICAL, all 17 findings, worst first)
-
-| File | Line | Complexity | Allowed | Effort |
-|---|---|---|---|---|
-| `microservices/balance-component/src/service/balanceService.ts` | 1737 | **93** | 15 | 1h23min |
-| `src/app/transaction-builder/submit-rules.ts` | 56 | 60 | 15 | 50min |
-| `src/app/transaction-builder/builder-fields.ts` | 24 | 63 | 15 | 53min |
-| `src/app/transaction-builder/inquire-events.service.ts` | 486 | 46 | 15 | 36min |
-| `microservices/balance-component/src/store/balanceMovementStore.ts` | 136 | 39 | 15 | 29min |
-| `backend/server.js` | 73 | 36 | 15 | 26min |
-| `microservices/balance-component/src/service/balanceService.ts` | 1575 | 36 | 15 | 26min |
-| `microservices/balance-component/src/service/balanceService.ts` | 1310 | 30 | 15 | 20min |
-| `src/app/transaction-builder/maker-panel.component.ts` | 946 | 32 | 15 | 22min |
-| `src/app/transaction-builder/submit-rules.ts` | 200 | 31 | 15 | 21min |
-| `src/app/transaction-builder/checker-actions.service.ts` | 49 | 22 | 15 | 12min |
-| `src/app/transaction-builder/balance-component.model.ts` | 611 | 19 | 15 | 9min |
-| `src/app/transaction-builder/checker-actions.service.ts` | 259 | 18 | 15 | 8min |
-| `src/app/transaction-builder/submit-rules.ts` | 274 | 18 | 15 | 8min |
-| `microservices/balance-component/src/service/balanceService.ts` | 679 | 17 | 15 | 7min |
-| `microservices/balance-component/src/store/balanceMovementStore.ts` | 381 | 17 | 15 | 7min |
-| `src/app/transaction-builder/maker-panel.component.ts` | 1004 | 16 | 15 | 6min |
-
-**Worst single offender: `balanceService.ts:1737` at 93** — this is `release()`, not `createMovement()` (the prior scan's worst offender, `createMovement()` at line 615/complexity 71, has since been decomposed via the BAL-142 pass documented in `CLAUDE.md` — `resolveOrCreateContract()` extraction — and no longer appears in this list at all, a genuine, measured improvement). `release()` has instead grown into the new worst offender: it now carries the Checker-side re-check for essentially every mandatory-field/business-day/currency/maker-checker-separation guard added since 2026-08-20 (`assertExpiryDateRequired`, `assertExpiryDateIsBusinessDay`, `assertNaturalKeyFieldsRequired`, `assertSecondaryRefRequired`, `assertTenorRequired`, `assertReasonCodeRequired`, `assertMakerCheckerSeparation`, `isSightUtilizeFinalize`-driven snapshot routing) — each individually small and independently tested, but their accumulation inside one dispatch method is exactly the same "defense-in-depth re-check accretion" pattern `createMovement()` itself went through before BAL-142.
-
-`submit-rules.ts` and `builder-fields.ts` (Angular) remain persistent, previously-flagged outliers (both already called out in the 2026-08-20 report, both untouched since).
-
-### Nested ternaries (S3358, 16 findings)
-
-`contingentAccountEntry.ts` L148, L162 · `balanceService.ts` L2270 · `balanceMovementStore.ts` L202 · `balance-component.model.ts` L629 · `builder-fields.ts` L96, L98, L100, L102, L104 · `function-policy.ts` L148 · `inquire-events.service.ts` L560, L563 · `look-up-panel.service.ts` L73 · `submit-rules.ts` L208, L209
-
-`builder-fields.ts`'s own 5 nested ternaries (L96–104) are the shared Formly field-factory this project's own `CLAUDE.md` describes ("Protected System-Controlled Fields" entry) — one place computing per-field `disabled`/`required` state across all 14 A1–A9/B1–B5 functions, so the ternary nesting is a direct reflection of that field's own genuinely multi-way derivation, not an accident.
-
-### Duplicate conditional branches (S1871, 4 findings)
-
-All 4 in `maker-panel.component.ts`: L499 (vs. L497), L505 (vs. L499), L925 (vs. L919), L928 (vs. L919) — same file the 2026-08-20 report already flagged for this rule (it had absorbed this pattern from the old `transaction-builder.component.ts` God Component); line numbers have shifted with the file's continued growth but the underlying branches have not been consolidated since.
-
-### Union type repetition (S4323, 10 findings)
-
-`contingentAccountEntry.ts` L102 · `balanceService.ts` L1488 · `balance-component.model.ts` L165, L602, L604 · `balance-snapshot-box.component.ts` L11 · `checker-panel.component.ts` L107 · `inquire-events.service.ts` L188 · `transaction-builder.component.ts` L102, L237
-
-### Unnecessary type assertions (S4325, 2 findings)
-
-`balance-component.model.ts` L129 · `builder-fields.ts` L110
-
-### Other
-
-- **Too many parameters (S107)**: `balance-component-api.service.ts:262` — `catalog()` has 8 parameters (max 7 allowed), unchanged from the 2026-08-20 finding (was line 241, shifted by file growth).
-- **Duplicated type import (S3863)**: `routes/balanceMovements.ts:4`, unchanged from 2026-08-20.
-- **TODO comment left in code (S1135, new since 2026-08-20)**: `balanceService.ts:835`, INFO severity, 0 effort.
-
-### "Commented-out code" (`Web:AvoidCommentedOutCodeCheck`, 7 findings) — still open, still false positives
-
-The 2026-08-20 report recommended marking these "Won't Fix / False Positive" in SonarQube; **that has not been done** — all 7 are still `OPEN` in this scan. Locations have shifted with the codebase's own restructuring:
-
-| File | Line |
-|---|---|
-| `account-entries-dialog.component.html` | 1 |
-| `inquire-events.component.html` | 8, 144 |
-| `maker-panel.component.html` | 18, 187, 215, 789 |
-
-Two of these (`inquire-events.component.html:8/144`) are **new locations** — this file did not exist at the 2026-08-20 scan; it was created by the "Part B — InquireEventsComponent extraction" work `CLAUDE.md` records for 2026-08-21, which moved the Inquire Events view (and its own prose-style doc comments) out of `transaction-builder.component.html`. `transaction-builder.component.html` itself no longer triggers this rule at all (it shrank to the thin orchestration layer this project's own decision log describes). Spot-checked all 7 against source again this scan: every one remains a genuine, long, prose-style explanatory doc-comment (business-instruction citations / design rationale, this codebase's established convention per `CLAUDE.md`), not actual dead markup — same disposition as before.
-
----
-
-## Complexity
-
-| Metric | Value |
-|---|---|
-| Cyclomatic complexity (project) | 2,514 |
-| Cognitive complexity (project) | 1,672 |
-| Functions | 983 |
-| Classes | 33 |
-| Statements | 3,079 |
-
-Worst files by Cognitive Complexity (all far above the 15-per-function threshold in aggregate, driving the CRITICAL code smells above):
-
-| File | Cognitive Cx | Cyclomatic Cx | ncloc |
-|---|---:|---:|---:|
-| `microservices/balance-component/src/service/balanceService.ts` | **355** | 411 | 1,198 |
-| `src/app/transaction-builder/maker-panel.component.ts` | 221 | 340 | 977 |
-| `src/app/transaction-builder/submit-rules.ts` | 109 | 109 | 188 |
-| `src/app/transaction-builder/inquire-events.service.ts` | 84 | 136 | 372 |
-| `src/app/transaction-builder/balance-component.model.ts` | 84 | 100 | 496 |
-| `microservices/balance-component/src/store/balanceMovementStore.ts` | 79 | 91 | 361 |
-| `src/app/transaction-builder/builder-fields.ts` | 70 | 78 | 172 |
-| `src/app/transaction-builder/checker-actions.service.ts` | 67 | 124 | 264 |
-| `src/app/transaction-builder/picker-selection.service.ts` | 55 | 97 | 330 |
-| `backend/server.js` | 50 | 36 | 138 |
-
-`balanceService.ts` (1,198 ncloc) and `maker-panel.component.ts` (977 ncloc) are, respectively, the largest file in the microservice and the largest file in the Angular app (`CLAUDE.md` independently confirms `maker-panel.component.ts` at "1,160 lines" as this sub-project's largest file — the ~180-line gap from this scan's 977 ncloc is comments/blank lines, which `ncloc` excludes) — complexity concentration tracks file size concentration, not a separate problem.
-
----
-
-## Duplication — **the one real regression this scan (see Quality Gate above)**
-
-**11.4% project-wide (2,532 duplicated lines / 116 blocks / 7 files)**, up from 4.7% (795 lines / 42 blocks / 3 files) on 2026-08-20 — **more than doubled** while the codebase itself grew only 30%.
-
-| File | Duplicated lines | Density | ncloc | Note |
-|---|---:|---:|---:|---|
-| `backend/data/businessCases.js` | **2,057** | 70.6% | 2,702 | **The dominant cause — 81% of all duplication project-wide.** Grew from 732 lines (2026-08-20) to 2,057 (+1,325). Already a known, disclosed trade-off (`CLAUDE.md`'s BAL-127 entry: each Business Case Registry entry is deliberately self-contained/independently readable rather than DRY'd across cases) — but the registry grew from ~21 to 27 cases (Import Case 13–15, Export Case #12, per the F1 decision-log entries) *and* every existing case was subsequently touched by two repo-wide mechanical edits (the `expiryDate`-mandatory fix shifting 25 date occurrences, and the 5-more-mandatory-fields fix touching all 27 cases' `tenorType`/`sourceTransactionRef`/`reasonCode`) — both edits necessarily made already-similar case blocks *more* textually similar to each other, which is very likely why this specific file's duplication nearly tripled between the two scans even though `createAndRelease()` (BAL-127) was never reverted. |
-| `microservices/balance-component/src/domain/domesticCalendar.ts` | 71 | 73.2% | 54 | New file (2026-08-26). |
-| `src/app/transaction-builder/domestic-calendar.ts` | 67 | 84.8% | 54 | New file (2026-08-26). **This pair is a genuine cross-file duplicate of each other** (confirmed via `/api/duplications/show` — the two files share a 67–71 line block), by explicit, documented design: both files' own top doc comments state they are "kept in sync by hand... a copy, not a shared import" because the Angular app and the microservice are two independently deployable projects — the same convention `CLAUDE.md` already applies to `balance-component-api.service.ts`'s `BalanceMovement` interface. Not a defect; SonarQube has no way to know two independently-deployed projects intentionally share logic. |
-| `microservices/balance-component/src/db/migrations.ts` | 244 | 47.5% | 486 | Structurally repetitive by nature (each `Migration` entry follows the same `id`/`up`/`down` shape) — same category of "declarative-data duplication" as `businessCases.js`, at a much smaller scale. |
-| `src/app/transaction-builder/maker-panel.component.html` | 33 | 4.1% | 545 | Unchanged since 2026-08-20 (same 33 lines / 2 blocks). |
-| `src/app/transaction-builder/maker-submit.service.ts` | 30 | 9.0% | 274 | Unchanged since 2026-08-20 (same 30 lines / 2 blocks). |
-| `microservices/balance-component/src/service/balanceService.ts` | 30 | 1.3% | 1,198 | New since 2026-08-20 — minor, 1.3% density is not itself a concern. |
-
-**Verdict**: the Quality Gate failure is real and traceable to one specific, already-understood cause (`businessCases.js`'s declarative registry growth), plus one small, explicitly-intentional new pair (`domesticCalendar.ts`/`domestic-calendar.ts`). Neither reflects a design regression — but the gate is failing on an objective threshold regardless of intent, so see Recommendations below.
-
----
-
-## Test Coverage
-
-**97.6% overall** (line 98.6%, branch 96.2%) — computed from the three sub-projects' own `lcov.info` files, matching each sub-project's own independently-run Jest coverage (Angular 98.82%/96.87% stmt/branch, backend 97.76%/95.91%, microservice 99.14%/95.25% per today's own full `npm test` runs — small differences from SonarQube's own numbers are expected, since SonarQube's `coverage` metric is a line+condition blend computed its own way from the same lcov data, not a re-run of Jest).
-
-| Module (directory) | ncloc | Coverage | Line Cov | Branch Cov |
-|---|---:|---:|---:|---:|
-| `src` (Angular app) | 8,598 | 98.0% | 98.7% | 96.9% |
-| `microservices/balance-component/src` | 3,561 | 97.1% | 98.7% | 95.3% |
-| `backend` | 2,881 | 96.1% | 96.2% | 95.9% |
-| `backend/data` | 2,702 | 100.0% | 100.0% | 100.0% |
-| `microservices/balance-component/src/db` | 725 | 94.8% | 98.1% | **88.0%** |
-| `microservices/balance-component/src/validation` | 32 | 94.1% | 100.0% | 83.3% |
-
-Every module clears each sub-project's own configured **95% Jest coverage floor** (per `lc-balance/CLAUDE.md`) on aggregate — the two sub-100% rows above (`db`, `validation`) are small folders whose local branch coverage dips are absorbed by the rest of their own sub-project's average. No coverage regression: **97.6% now vs. 98.0%** on 2026-08-20 is a 0.4-point dip on a codebase that grew 30% (new code, not shrinking coverage of old code) — well within normal variance for this scale of change and nowhere near the 80% New Coverage gate threshold.
-
----
-
-## Comparison to the 2026-08-20 scan (`SonarQube-report2.md`)
-
-The codebase grew 30% (11,574 → 15,040 ncloc) in the 6 days between scans — the F1 AUTO EXPIRY/AUTO CLOSE/Reopen feature's remaining follow-ups, the mandatory-field-enforcement passes (`expiryDate`, natural-key fields, `tenorType`, `sourceTransactionRef`, `reasonCode`), the domestic business-day rule (this session), the "Run All Cases" fixes, and 6 new Business Case Registry entries all landed in between (see `lc-balance/CLAUDE.md`'s own decision log for the full list). Against that growth:
-
-- **Bugs, vulnerabilities, security hotspots: all held at their fully-clean state** — nothing regressed. Ratings (Reliability/Security/Maintainability/Security Review) all still 1.0 (A).
-- **Coverage essentially held** (98.0% → 97.6%, −0.4pp on +30% code).
-- **Code smells grew only +3** (56 → 59) despite +30% code — sub-linear, and the composition shifted rather than uniformly grew: CRITICAL/Cognitive-Complexity findings grew (the accumulation inside `release()` and `submit-rules.ts` described above), while MINOR findings actually fell (16 → 13).
-- **Duplication density more than doubled** (4.7% → 11.4%) and **the New Code Duplication gate flipped from PASS (2.17%) to FAIL (5.15%)** — this is the one genuine regression this scan surfaces, and it is fully traceable to `backend/data/businessCases.js`'s registry growth (see Duplication section) plus the new, intentionally-duplicated `domesticCalendar.ts` pair.
-- `balanceService.ts`'s worst Cognitive Complexity hotspot **moved, not disappeared**: `createMovement()` (71, 2026-08-20's worst) was successfully decomposed (BAL-142, documented in `CLAUDE.md`) and no longer appears in this scan's top list at all — but `release()` (93, today's worst) grew past it by absorbing the same kind of defense-in-depth guard accumulation `createMovement()` had before its own refactor.
-
----
-
-## Suggested Next Steps (priority order)
-
-1. **[Quality Gate blocker] Decide a disposition for `businessCases.js`'s duplication, since it is now actively failing the gate.** Three real options, in order of how much this project's own established "each case is self-contained/independently readable" trade-off (BAL-127) should be preserved:
-   - **(a) Raise or override the New Duplicated Lines Density threshold for this project** in SonarQube (e.g. to 12–15%) with a documented rationale referencing BAL-127 — the cheapest option, and honest about the trade-off already being a deliberate one; or
-   - **(b) Exclude `backend/data/businessCases.js` from `sonar.cpd.exclusions`** in `sonar-project.properties` — keeps the gate meaningful for genuine source code while formally acknowledging this one declarative-data file was never meant to be judged by this metric; or
-   - **(c) Actually reduce the duplication** by extracting the now-repeated per-case mandatory-field defaults (`tenorType`, `sourceTransactionRef`, `reasonCode`, the shifted `expiryDate`) into a small per-instrument-type default-merging helper each case calls — real engineering work, and in tension with the "each case fully self-contained" readability goal BAL-127 explicitly chose, so only worth it if duplication keeps growing with every future case addition.
-
-   **Recommendation: (a) or (b)**, not (c) — this project has already made and documented this trade-off once; re-opening it now would be re-litigating a settled decision without new information, which this project's own `CLAUDE.md` convention explicitly cautions against.
-
-2. **`balanceService.ts:1737` (`release()`, Cognitive Complexity 93)** is now the single worst maintainability item in the codebase, having overtaken `createMovement()`'s old peak (71, since reduced to below this list's threshold). Worth the same kind of registry/table-based decomposition BAL-141/BAL-142 already applied to `createMovement()` — the guard-accumulation pattern is identical.
-3. Mark the 7 `Web:AvoidCommentedOutCodeCheck` findings "False Positive" in SonarQube — recommended in the prior scan, still not done, still verified as false positives this scan. Zero code-change cost, removes 7 findings' worth of future scan noise.
-4. `submit-rules.ts:56` (60) and `builder-fields.ts:24` (63) remain persistent, previously-flagged Cognitive Complexity outliers, untouched across two scans now.
-5. The 4 duplicate-branch findings (S1871) in `maker-panel.component.ts` are unchanged since 2026-08-20 (only line numbers shifted) — worth revisiting now that this file has had time to stabilize as the logic's new home.
-6. None of items 2–5 are Quality Gate blockers under the current thresholds (code smells and this project's non-`businessCases.js` duplication levels aren't gated) — only item 1 needs a decision before the next release-style checkpoint; the rest is ordinary maintainability backlog.
-
----
-
-## Methodology note
-
-This scan ran the real `sonarsource/sonar-scanner-cli:5.0.1` Docker image against the locally running SonarQube 9.9.8 LTS Community container, on the `sonar-net` Docker network, using this repository's own `sonar-project.properties`/`tsconfig.sonar.json`. The scanner container runs `linux/amd64` under emulation on this host's `linux/arm64` Docker Desktop VM, which is why the scan itself took ~14m45s (TypeScript program creation alone took ~78s combined across the two `tsconfig` roots) — purely a local-hardware artifact, not a finding. All figures in this report were read back from the SonarQube Web API after the analysis report was processed server-side (CE task `AaA9EvX9QJgLWwggedKr`, status `SUCCESS`); none were estimated, extrapolated, or reconstructed from a manual review of the source.
-
----
-
-## Follow-up (2026-08-26, same day) — remediation applied, re-scanned, Quality Gate now PASSES
-
-Acted on the Suggested Next Steps above (items 1–4 of that list); re-ran the identical scan (CE task `AaA9ZbAjQJgLWwggedNO`, `SUCCESS`) after applying the fixes and re-running all three test suites (Angular 1171/1171, backend 38/38, microservice 585/585 — all green, zero behavior change per each suite's own coverage staying flat or improving) plus a live browser walkthrough (A1 Issue → Release, A8 SG Issue → Release, A9 SG Full Redeem → Release, A10 LC Close → Release) confirming no regression in the actual running app.
-
-### Quality Gate: **FAILED → PASSED**
-
-| Condition | Before | After |
-|---|---|---|
-| New Duplicated Lines Density (≤3%) | 5.15% ❌ | **0.96%** ✅ |
-| All other 5 conditions | ✅ (unchanged) | ✅ (unchanged) |
-
-**Fix applied**: option (b) from the Recommendations above — added `sonar.cpd.exclusions=backend/data/businessCases.js` to `sonar-project.properties`, with a comment citing BAL-127. No source code in that file changed; the declarative Business Case Registry's duplication is still real, just no longer measured by a metric it was never a meaningful signal for.
-
-### Overall metrics, before → after
-
-| Metric | Before | After |
-|---|---|---|
-| Quality Gate | ❌ FAILED | ✅ **OK** |
-| Duplicated lines density (project-wide) | 11.4% (2,532 lines / 7 files) | **2.1%** (475 lines / 6 files — `businessCases.js`'s 2,057 lines no longer counted; the 6 remaining files are unchanged) |
-| Code smells | 59 | **44** |
-| Technical debt (SQALE index) | 651 min (~10.9h) | **445 min (~7.4h)**, −206 min |
-| Cognitive complexity (project sum) | 1,672 | 1,651 |
-| Bugs / Vulnerabilities / unreviewed hotspots | 0 / 0 / 0 | 0 / 0 / 0 (unchanged) |
-| Coverage | 97.6% | 97.6% (unchanged) |
-
-### Code smells, by fix
-
-- **7 `Web:AvoidCommentedOutCodeCheck` false positives** — marked `WONTFIX` directly via the SonarQube API (`/api/issues/do_transition`), each with a comment recorded. **−7.**
-- **4 `typescript:S1871` (duplicate branches) in `maker-panel.component.ts`** — `afterResolved()`/`refreshSelectedContractSnapshot()`'s 3-4 identical-body `if`/`else if` branches each collapsed into one boolean guard. **−4.**
-- **5 `typescript:S3358` (nested ternary) in `builder-fields.ts`** — the Amount field's 6-level nested ternary extracted into a new `amountFieldLabel()` function (flat guard clauses, same strings). **−5.**
-- **Net other rule-count changes: 0** — `S4323`/`S4325`/`S107`/`S1135`/`S3863` counts are all unchanged (none of today's fixes targeted them).
-
-**Total accounted for: −16.** Actual change was **−15** (59→44) because of one **honest trade-off**, below.
-
-### Cognitive Complexity (`S3776`) — an honest result, not an unqualified win
-
-**Severity-count went from 17 CRITICAL to 19 CRITICAL (+2)** even though total complexity and total debt-minutes both dropped. This is a real, disclosed trade-off from decomposition, not a mistake:
-
-- **`balanceService.ts`'s `release()` (was 93, the single worst finding in the codebase) is now gone from the findings list entirely** — split into `assertReleaseSubmitGuards()` (now under 15, unflagged), `assertReleaseEligibility()` (now 29), `applyReleaseSideEffects()` (now under 15, unflagged), and `applyAmendExpiryDateReleaseSideEffect()` (now 19). Two of the four new methods still exceed 15, so **one 93/83-min finding became two findings at 29/19-min (19min+29min=48min total)** — still a real reduction (83→48 min) but the *finding count* in this file went 4→5.
-- **`submit-rules.ts`'s `validateSubmit()` (was 60) is also gone** — split into `validateMandatoryFields()` (now 21), `validateNaturalKeyFields()` (now under 15, unflagged), and `validateFunctionSpecificRules()` (now 26). Same pattern: one 60/50-min finding became two at 21/26-min (11min+16min=27min total) — a bigger reduction (50→27 min) but again the file's own finding count went 3→4.
-- **`builder-fields.ts`'s `buildFields()` dropped from 63 to 36** (a genuine 43% cut, `amountFieldLabel()`/`deriveAmountLockFlags()` extracted cleanly under 15) but the function itself still exceeds 15, so the finding count here is unchanged (1→1) — only the effort dropped (53min→26min).
-- All other CRITICAL findings (`maker-panel.component.ts`, `checker-actions.service.ts`, `inquire-events.service.ts`, `balance-component.model.ts`, `backend/server.js`, `balanceMovementStore.ts`) are **completely untouched** by this session — same lines, same complexity, carried over from the original scan.
-
-**Why not split further to get every piece under 15**: each of the four remaining >15 pieces (`assertReleaseEligibility` 29, `applyAmendExpiryDateReleaseSideEffect` 19, `validateMandatoryFields` 21, `validateFunctionSpecificRules` 26) is already a single, cohesive concern (one movementType-gated guard group / one sub-state-machine) — splitting further would mean breaking apart logic that BELONGS together (e.g. CLOSE's own eligibility+amount check as one unit) purely to satisfy a line-count-shaped metric, which is the same "decomposition for its own sake" this project's own `CLAUDE.md` explicitly declined to do when BAL-003 was closed. The debt-minute reduction (203 total minutes saved across just these two functions) is the more meaningful signal than the raw finding count.
-
-### Duplication detail, before → after
-
-| File | Before | After |
 |---|---:|---|
-| `backend/data/businessCases.js` | 2,057 lines (70.6%) | **Excluded from CPD — not measured** |
-| `microservices/balance-component/src/db/migrations.ts` | 244 (47.5%) | 244 (47.5%) — unchanged |
-| `microservices/balance-component/src/domain/domesticCalendar.ts` | 71 (73.2%) | 71 (73.2%) — unchanged, intentional |
-| `src/app/transaction-builder/domestic-calendar.ts` | 67 (84.8%) | 67 (84.8%) — unchanged, intentional |
-| `src/app/transaction-builder/maker-panel.component.html` | 33 (4.1%) | 33 (4.1%) — unchanged |
-| `src/app/transaction-builder/maker-submit.service.ts` | 30 (9.0%) | 30 (9.0%) — unchanged |
-| `microservices/balance-component/src/service/balanceService.ts` | 30 (1.3%) | 30 (1.3%) — unchanged |
+| `typescript:S3776` | 24 | TypeScript Cognitive Complexity above 15 |
+| `javascript:S3776` | 1 | JavaScript Cognitive Complexity above 15 |
+| `typescript:S3358` | 20 | Nested ternary should be extracted |
+| `typescript:S4323` | 14 | Repeated union should use a type alias |
+| `typescript:S4325` | 14 | Redundant type assertion |
+| `typescript:S3863` | 2 | Duplicate import from the same module |
+| `Web:AvoidCommentedOutCodeCheck` | 2 | Commented-out HTML code |
+| `typescript:S107` | 1 | Method has too many parameters |
 
-### What's genuinely still open (unchanged from the original report, not addressed this pass)
+## 7. Critical Findings
 
-- `submit-rules.ts:255` (`buildSubmitRequest`, 31) and `submit-rules.ts:329` (`hasEligibleTargetSelected`, 18) — pre-existing, untouched.
-- `builder-fields.ts:99` (`buildFields`, 36, down from 63 but still over threshold).
-- `inquire-events.service.ts:486` (46), `checker-actions.service.ts:49`/`259` (22/18), `maker-panel.component.ts:943`/`1001` (32/16), `balance-component.model.ts:611` (19), `backend/server.js:73` (36), `balanceMovementStore.ts:136`/`381` (39/17), `balanceService.ts:1310`/`679` (30/17) — all pre-existing, none of today's scope.
-- These remain ordinary maintainability backlog, same disposition as the original report's Recommendations §2–5 — none are Quality Gate blockers.
+All Critical findings are complexity issues. The values below are the actual SonarQube cognitive-complexity values versus the allowed threshold of 15.
+
+| File:line | Actual | Estimated debt |
+|---|---:|---:|
+| `src/app/transaction-builder/builder-fields.ts:189` | 65 | 55m |
+| `src/app/transaction-builder/inquire-events.service.ts:799` | 46 | 36m |
+| `microservices/balance-component/src/store/balanceMovementStore.ts:138` | 38 | 28m |
+| `microservices/balance-component/src/service/balanceService.ts:562` | 37 | 27m |
+| `backend/server.js:125` | 34 | 24m |
+| `src/app/transaction-builder/submit-rules.ts:314` | 31 | 21m |
+| `microservices/balance-component/src/service/movementReleasePolicyService.ts:25` | 29 | 19m |
+| `src/app/transaction-builder/maker-panel.component.ts:1360` | 29 | 19m |
+| `src/app/transaction-builder/inquire-events.service.ts:412` | 28 | 18m |
+| `src/app/transaction-builder/submit-rules.ts:157` | 28 | 18m |
+| `src/app/transaction-builder/maker-panel.component.ts:1075` | 26 | 16m |
+| `src/app/transaction-builder/submit-rules.ts:63` | 23 | 13m |
+| `microservices/balance-component/src/service/balanceService.ts:911` | 22 | 12m |
+| `src/app/transaction-builder/checker-actions.service.ts:234` | 21 | 11m |
+| `src/app/transaction-builder/checker-actions.service.ts:274` | 21 | 11m |
+| `microservices/balance-component/src/service/balanceService.ts:1014` | 19 | 9m |
+| `src/app/transaction-builder/balance-component.model.ts:624` | 19 | 9m |
+| `src/app/transaction-builder/submit-rules.ts:388` | 18 | 8m |
+| `microservices/balance-component/src/service/balanceService.ts:716` | 17 | 7m |
+| `microservices/balance-component/src/service/contractLifecycleEligibilityService.ts:32` | 17 | 7m |
+| `microservices/balance-component/src/store/balanceMovementStore.ts:454` | 17 | 7m |
+| `src/app/transaction-builder/maker-balance-warning.policy.ts:17` | 17 | 7m |
+| `microservices/balance-component/src/service/balanceService.ts:847` | 16 | 6m |
+| `src/app/transaction-builder/maker-panel.component.ts:1937` | 16 | 6m |
+| `src/app/transaction-builder/submit-rules.ts:241` | 16 | 6m |
+
+## 8. Major and Minor Findings
+
+### Major
+
+- 20 nested ternaries (`typescript:S3358`) across service, store, domain and Angular policy/builder code.
+- `balance-component-api.service.ts:331`: `catalog` has 9 parameters; maximum configured value is 7.
+- Commented-out HTML at `inquire-delete-pending.component.html:5` and `maker-panel.component.html:762`.
+
+### Minor
+
+- 14 repeated union-type findings (`typescript:S4323`).
+- 14 unnecessary type assertions (`typescript:S4325`).
+- Duplicate imports in:
+  - `microservices/balance-component/src/routes/balanceMovements.ts:5`
+  - `microservices/balance-component/src/service/contractLifecycleEligibilityService.ts:6`
+
+## 9. Findings Concentration
+
+| File | Open issues |
+|---|---:|
+| `src/app/transaction-builder/maker-submit.service.ts` | 11 |
+| `src/app/transaction-builder/inquire-events.service.ts` | 8 |
+| `src/app/transaction-builder/submit-rules.ts` | 7 |
+| `src/app/transaction-builder/builder-fields.ts` | 6 |
+| `microservices/balance-component/src/service/balanceService.ts` | 6 |
+| `src/app/transaction-builder/balance-component.model.ts` | 6 |
+| `microservices/balance-component/src/store/balanceMovementStore.ts` | 4 |
+| `maker-panel.component.ts` | 3 |
+| `checker-actions.service.ts` | 3 |
+| `transaction-builder.component.ts` | 3 |
+
+### Sub-project summary
+
+| Scope | Coverage | Code Smells | Duplication | Technical debt |
+|---|---:|---:|---:|---:|
+| Angular `src/` | 97.2% | 58 | 0.1% | 428m |
+| Backend | 97.6% | 1 | 0.0% | 24m |
+| Balance microservice | 96.6% | 19 | 3.4% | 164m |
+
+The microservice's 3.4% directory-level duplication is concentrated in `src/db` (22.2%). The project-wide duplication remains 1.0%, and new-code duplication is 0.4195%, so the Quality Gate passes.
+
+## 10. Recommended Remediation Priority
+
+### P1 — Highest-complexity methods
+
+Refactor the highest S3776 findings first:
+
+1. `builder-fields.ts:189` — replace nested function/field branching with declarative field policies and small builders.
+2. `inquire-events.service.ts:799` — separate event classification, projection and balance selection strategies.
+3. `balanceMovementStore.ts:138` — extract row mapping and optional-column groups; keep repository orchestration linear.
+4. `balanceService.ts:562` — continue façade decomposition by moving the remaining command policy into focused collaborators.
+5. `backend/server.js:125` — extract Business Case step handlers and error translation from the route/controller.
+
+### P2 — Remaining complexity cluster
+
+- Refactor the other 20 S3776 issues with guard clauses, policy maps, strategy objects and focused pure functions.
+- Prioritize `submit-rules.ts`, `maker-panel.component.ts`, `checker-actions.service.ts` and `movementReleasePolicyService.ts` because they affect transaction workflow maintainability.
+
+### P3 — Mechanical cleanup
+
+- Replace 20 nested ternaries with named local variables or policy functions.
+- Introduce parameter objects for `catalog` rather than adding more positional parameters.
+- Remove two commented HTML blocks.
+- Consolidate two duplicate imports.
+- Replace repeated unions with named aliases and remove redundant assertions.
+
+All refactoring should preserve the current 2,466-test regression baseline and rerun SonarQube to verify that complexity is reduced without increasing duplication or reducing coverage.
+
+## 11. Security and Reliability Assessment
+
+- Bugs: **0**
+- Vulnerabilities: **0**
+- Security Hotspots requiring review: **0**
+- Reliability Rating: **A**
+- Security Rating: **A**
+- Security Review Rating: **A**
+
+This means the configured SonarQube Community quality profiles did not identify security or reliability issues in this scan. It does not replace dependency vulnerability scanning, runtime penetration testing or manual threat modelling.
+
+## 12. Scanner Warnings and Limitations
+
+The Compute Engine recorded three analysis warnings:
+
+1. SCM provider was not detected inside the scanner container; issue author/blame data is therefore unavailable.
+2. Scanner-bundled Node.js 22 is not the version recommended by this SonarQube 9.9 JavaScript analyzer (recommended 16 or 18).
+3. Password authentication is deprecated for scanner use; a local project token should replace `sonar.login` + `sonar.password` on future runs.
+
+The scan itself completed successfully despite these warnings. The SonarQube server uses the embedded H2 database, which SonarQube documents as evaluation-only; persistent team use should use a supported external database.
+
+## 13. Reproduction Commands
+
+Coverage generation:
+
+```powershell
+npm run test:coverage
+npm run test:coverage --prefix backend
+npm run test:coverage --prefix microservices/balance-component
+```
+
+Docker scanner pattern used for this analysis:
+
+```powershell
+docker run --rm --name lc-balance-sonar-scanner `
+  -e SONAR_HOST_URL=http://host.docker.internal:9000 `
+  -v "C:\Users\samfi\Downloads\outputs\lc-balance:/usr/src" `
+  -w /usr/src `
+  sonarsource/sonar-scanner-cli:latest `
+  "-Dsonar.projectBaseDir=/usr/src" `
+  "-Dsonar.login=<local-user-or-token>"
+```
+
+Do not commit a SonarQube password or token to source control.

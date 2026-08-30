@@ -17,6 +17,7 @@
   decimalPlacesForCurrency,
   amountExceedsCurrencyDecimals,
   groupThousands,
+  formatCurrencyAmount,
   defaultLcInstrumentTypeForSide,
   childInstrumentTypesOf,
   BALANCE_SNAPSHOT_LABEL,
@@ -658,6 +659,18 @@ describe('balance-component.model data invariants', () => {
       expect(amountExceedsCurrencyDecimals(100.12, 'USD')).toBe(false);
       expect(amountExceedsCurrencyDecimals(100.123, 'USD')).toBe(true);
       expect(amountExceedsCurrencyDecimals(0, 'JPY')).toBe(false);
+    });
+  });
+
+  describe('formatCurrencyAmount', () => {
+    it.each([
+      ['1234.5', 'USD', '1,234.50'],
+      ['1234.5', 'JPY', '1,235'],
+      ['1234.5678', 'KWD', '1,234.568'],
+      ['999999999999999999.995', 'USD', '1,000,000,000,000,000,000.00'],
+      ['-0.004', 'USD', '0.00'],
+    ])('formats %s for %s without binary floating-point', (amount, currency, expected) => {
+      expect(formatCurrencyAmount(amount, currency)).toBe(expected);
     });
   });
 

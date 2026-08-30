@@ -11,6 +11,7 @@ import { describeApiError } from './api-error';
 import { PagedListState } from './paged-list-state';
 import { LcCatalogIndexService } from './lc-catalog-index.service';
 import { LcIndexRow, computeLcIndexRow } from './inquire-events.service';
+import { ProtectedIdentityItem } from './protected-transaction-identity.policy';
 
 /**
  * Merged Secondary Reference for one Delete Pending audit row — a NEW, more complete function than
@@ -38,6 +39,7 @@ export interface DeleteAuditView {
   fields: FormlyFieldConfig[];
   form: FormGroup;
   model: BuilderModel;
+  identityItems: readonly ProtectedIdentityItem[];
 }
 
 /**
@@ -213,8 +215,16 @@ export class InquireDeletePendingService {
           selectedContractSnapshot: null,
           selectedParent: null,
           dynamicSecondaryRefLabel: fn?.secondaryRefLabel ?? (movement.sourceTransactionRef ? 'Reference No.' : null),
+          readOnlyReconstruction: true,
         };
-        this.viewing = { row, function: fn, fields: toReadOnlyFields(buildFields(ctx)), form: new FormGroup({}), model };
+        this.viewing = {
+          row,
+          function: fn,
+          fields: toReadOnlyFields(buildFields(ctx)),
+          form: new FormGroup({}),
+          model,
+          identityItems: [{ label: 'LC Number', value: contract.naturalKey.lcNumber }],
+        };
       },
       error: (err) => {
         this.viewError = describeApiError(err);

@@ -245,13 +245,13 @@ describe('FunctionStrategy.fixPendingEnabled / functionSupportsFixPending', () =
   // AskUserQuestion) — every field on its own screen is already locked at fresh Submit.
   // Widened once more same day ("Use the same method for B3 with Fix Pending") — B3 (plain creating
   // CREATE, same shape as A8, its own Export counterpart, simply not included in the original batch).
-  it('functionSupportsFixPending is true for exactly A1/A2/A3/A3S/A8/A10/A11/B1/B2/B3/B6/B7 (the current trial scope) and false for every other registered function', () => {
+  it('supports Fix Pending for every registered function; locked functions use Remarks-only mode', () => {
     const supported = Object.values(FUNCTION_STRATEGIES)
       .filter((s) => functionSupportsFixPending(s))
       .map((s) => s.code)
       .sort();
-    expect(supported).toEqual(['A1', 'A10', 'A11', 'A2', 'A3', 'A3S', 'A8', 'A9', 'B1', 'B2', 'B3', 'B6', 'B7']);
-    expect(FUNCTION_STRATEGIES['A9'].fixPendingMode).toBe('REMARKS_ONLY');
+    expect(supported).toEqual(['A1', 'A10', 'A11', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7']);
+    for (const code of ['A4', 'A6', 'A7', 'A9', 'B4', 'B5']) expect(FUNCTION_STRATEGIES[code].fixPendingMode).toBe('REMARKS_ONLY');
     expect(FUNCTION_STRATEGIES['A1'].fixPendingMode).toBe('STANDARD');
   });
 
@@ -262,8 +262,8 @@ describe('FunctionStrategy.fixPendingEnabled / functionSupportsFixPending', () =
 
   it('deriveFunctionStrategy() carries fixPendingEnabled through into a fresh object, not just the registry literal', () => {
     const a1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1')!;
-    const a4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!; // still outside the trial scope — releasesExistingMovementInPlace, no movement of its own to fix
+    const a4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!;
     expect(functionSupportsFixPending(deriveFunctionStrategy(a1))).toBe(true);
-    expect(functionSupportsFixPending(deriveFunctionStrategy(a4))).toBe(false);
+    expect(functionSupportsFixPending(deriveFunctionStrategy(a4))).toBe(true);
   });
 });

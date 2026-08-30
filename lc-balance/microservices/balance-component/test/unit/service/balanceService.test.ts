@@ -3096,7 +3096,7 @@ describe('BalanceService.editPending — Fix Pending trial (A1 ISSUE, A3 UTILIZE
   });
 });
 
-describe('BalanceService.editPending — A9 Remarks-only mode', () => {
+describe('BalanceService.editPending — Remarks-only mode', () => {
   function pendingStandaloneA9(service: BalanceService, lcNumber: string) {
     const lcIssue = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber }, movementType: 'ISSUE', eventSeq: 91001, amount: '100000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', createdBy: 'maker1' });
     if (!lcIssue.created) throw new Error('expected LC issue');
@@ -3121,7 +3121,7 @@ describe('BalanceService.editPending — A9 Remarks-only mode', () => {
     expect((audit[0]!.afterSnapshot as { remarks: string }).remarks).toBe('checked docs');
   });
 
-  test('rejects amount changes and non-A9 use; blank remarks normalize to null', () => {
+  test('rejects amount changes, accepts any pending function, and normalizes blank remarks to null', () => {
     const service = new BalanceService(createDb(':memory:'));
     const a9 = pendingStandaloneA9(service, 'FIXP-A9-002');
     expect(() => service.editPending(a9.movementId, { amount: '1', editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: 'x' })).toThrow(RequestValidationError);
@@ -3130,7 +3130,20 @@ describe('BalanceService.editPending — A9 Remarks-only mode', () => {
     const issueResult = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'FIXP-A9-NOT-SG' }, movementType: 'ISSUE', eventSeq: 91004, amount: '1000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', createdBy: 'maker1' });
     if (!issueResult.created) throw new Error('expected LC issue');
     const issue = issueResult.movement;
-    expect(() => service.editPending(issue.movementId, { amount: issue.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: 'x' })).toThrow(RequestValidationError);
+    const editedIssue = service.editPending(issue.movementId, { amount: issue.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: 'issue note' });
+    expect(editedIssue.remarks).toBe('issue note');
+  });
+
+  test('rejects every non-remarks business field even when its value is unchanged', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const movement = pendingStandaloneA9(service, 'FIXP-REMARKS-LOCKED');
+    expect(() => service.editPending(movement.movementId, {
+      amount: movement.amount,
+      editedBy: 'maker2',
+      editMode: 'REMARKS_ONLY',
+      remarks: 'note',
+      reasonCode: 'UNCHANGED',
+    })).toThrow('Remarks-only Fix Pending may change remarks only.');
   });
 });
 

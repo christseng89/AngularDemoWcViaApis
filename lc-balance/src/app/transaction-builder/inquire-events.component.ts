@@ -22,6 +22,7 @@ import { ContractStatusBadgeComponent } from './contract-status-badge.component'
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /** Emitted when the "Original Transaction Screen" panel's own Account Entries button is clicked — the dialog itself stays parent-owned (`TransactionBuilderComponent`), since it's also opened from the Maker Result panel and the Look Up panel's own Event Timeline, not just from here. */
 export interface InquireOpenAccountEntriesEvent {
@@ -59,6 +60,7 @@ export interface InquireOpenAccountEntriesEvent {
     TransactionPaginationComponent,
     ContractStatusBadgeComponent,
     FeedbackMessageComponent,
+    MonetaryAmountPipe,
   ],
   templateUrl: './inquire-events.component.html',
   styleUrl: './inquire-events.component.scss',

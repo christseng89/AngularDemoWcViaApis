@@ -56,13 +56,13 @@
           <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
           <td>{{ entry.drAccount }}</td>
           <td>{{ entry.currency }}</td>
-          <td class="tb-table__amount">{{ entry.amount }}</td>
+          <td class="tb-table__amount">{{ entry.amount | monetaryAmount: entry.currency }}</td>
         </tr>
         <tr>
           <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
           <td>{{ entry.crAccount }}</td>
           <td>{{ entry.currency }}</td>
-          <td class="tb-table__amount">{{ entry.amount }}</td>
+          <td class="tb-table__amount">{{ entry.amount | monetaryAmount: entry.currency }}</td>
         </tr>
       </tbody>
     </table>
@@ -95,13 +95,13 @@
             <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
             <td>{{ linkedEntry.drAccount }}</td>
             <td>{{ linkedEntry.currency }}</td>
-            <td class="tb-table__amount">{{ linkedEntry.amount }}</td>
+            <td class="tb-table__amount">{{ linkedEntry.amount | monetaryAmount: linkedEntry.currency }}</td>
           </tr>
           <tr>
             <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
             <td>{{ linkedEntry.crAccount }}</td>
             <td>{{ linkedEntry.currency }}</td>
-            <td class="tb-table__amount">{{ linkedEntry.amount }}</td>
+            <td class="tb-table__amount">{{ linkedEntry.amount | monetaryAmount: linkedEntry.currency }}</td>
           </tr>
         </tbody>
       </table>

@@ -8,48 +8,48 @@
   </div>
   <div class="tb-balance-row">
     <span class="tb-balance-row__label">{{ variant === 'compact' ? 'Confirmed' : 'Confirmed Balance' }}</span>
-    <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact || !impact">{{ snapshot.confirmedBalance }}</span>
+    <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact || !impact">{{ snapshot.confirmedBalance | monetaryAmount: snapshot.currency }}</span>
     <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && impact.after !== null && impact.after !== undefined"
-      >{{ impact.before ?? '—' }} → {{ impact.after }}</span
+      >{{ impact.before === null || impact.before === undefined ? '—' : (impact.before | monetaryAmount: snapshot.currency) }} → {{ impact.after | monetaryAmount: snapshot.currency }}</span
     >
     <span class="tb-balance-row__value" *ngIf="!snapshot.redirectedImpact && impact && (impact.after === null || impact.after === undefined)"
-      >{{ snapshot.confirmedBalance }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span
+      >{{ snapshot.confirmedBalance | monetaryAmount: snapshot.currency }} <span class="tb-muted">(still PENDING — not yet affected until Released)</span></span
     >
   </div>
   <div class="tb-balance-row">
     <span class="tb-balance-row__label">{{ variant === 'compact' ? 'Available' : 'Available Balance' }}</span
-    ><span class="tb-balance-row__value">{{ snapshot.availableBalance }}</span>
+    ><span class="tb-balance-row__value">{{ snapshot.availableBalance | monetaryAmount: snapshot.currency }}</span>
   </div>
   <div class="tb-balance-row" *ngIf="variant === 'full'">
-    <span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal }}</span>
+    <span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal | monetaryAmount: snapshot.currency }}</span>
   </div>
   <!-- 2026-08-17 ("REFER TO DB S01") — a redirected snapshot's own before→after lands on whichever
        field below its own redirectedImpact.label names, never on Confirmed Balance above (that
        field didn't move — see the microservice's own doc comment for why). -->
   <div class="tb-balance-row" *ngIf="snapshot.offBalanceExposure !== null">
     <span class="tb-balance-row__label">Off-Balance Exposure</span>
-    <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'offBalanceExposure'">{{ snapshot.offBalanceExposure }}</span>
+    <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'offBalanceExposure'">{{ snapshot.offBalanceExposure | monetaryAmount: snapshot.currency }}</span>
     <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'offBalanceExposure'"
-      >{{ snapshot.redirectedImpact!.before }} → {{ snapshot.redirectedImpact!.after }}</span
+      >{{ snapshot.redirectedImpact!.before | monetaryAmount: snapshot.currency }} → {{ snapshot.redirectedImpact!.after | monetaryAmount: snapshot.currency }}</span
     >
   </div>
   <!-- Business instruction 2026-08-15 ("Present Docs Earmark (Pending/Approved)") — EPLC_CONFIRMATION only. -->
   <div class="tb-balance-row" *ngIf="variant === 'full' && snapshot.presentDocsEarmarkPending !== null">
     <span class="tb-balance-row__label">Present Docs Earmark (Pending)</span>
     <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkPending'">{{
-      snapshot.presentDocsEarmarkPending
+      snapshot.presentDocsEarmarkPending | monetaryAmount: snapshot.currency
     }}</span>
     <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkPending'"
-      >{{ snapshot.redirectedImpact!.before }} → {{ snapshot.redirectedImpact!.after }}</span
+      >{{ snapshot.redirectedImpact!.before | monetaryAmount: snapshot.currency }} → {{ snapshot.redirectedImpact!.after | monetaryAmount: snapshot.currency }}</span
     >
   </div>
   <div class="tb-balance-row" *ngIf="variant === 'full' && snapshot.presentDocsEarmarkApproved !== null">
     <span class="tb-balance-row__label">Present Docs Earmark (Approved)</span>
     <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label !== 'presentDocsEarmarkApproved'">{{
-      snapshot.presentDocsEarmarkApproved
+      snapshot.presentDocsEarmarkApproved | monetaryAmount: snapshot.currency
     }}</span>
     <span class="tb-balance-row__value" *ngIf="snapshot.redirectedImpact?.label === 'presentDocsEarmarkApproved'"
-      >{{ snapshot.redirectedImpact!.before }} → {{ snapshot.redirectedImpact!.after }}</span
+      >{{ snapshot.redirectedImpact!.before | monetaryAmount: snapshot.currency }} → {{ snapshot.redirectedImpact!.after | monetaryAmount: snapshot.currency }}</span
     >
   </div>
   <!-- 2026-08-18, user-requested ("Tight Available Balance 放在最後一個") — moved to the end of the
@@ -58,7 +58,7 @@
        above it. Purely a display-order change — no field's own value/visibility condition touched. -->
   <div class="tb-balance-row" *ngIf="snapshot.tightAvailableBalance !== null">
     <span class="tb-balance-row__label">{{ variant === 'compact' ? 'Tight Available' : 'Tight Available Balance' }}</span
-    ><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance }}</span>
+    ><span class="tb-balance-row__value">{{ snapshot.tightAvailableBalance | monetaryAmount: snapshot.currency }}</span>
   </div>
   <ng-content></ng-content>
 </div>

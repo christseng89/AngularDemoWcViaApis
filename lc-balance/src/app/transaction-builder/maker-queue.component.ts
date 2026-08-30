@@ -8,6 +8,7 @@ import { TransactionStatusBadgeComponent } from './transaction-status-badge.comp
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
  * Part of Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
@@ -17,7 +18,7 @@ import { presentApiError } from '../shared/feedback/api-error-presenter';
 @Component({
   selector: 'app-maker-queue',
   standalone: true,
-  imports: [CommonModule, TransactionSearchFieldComponent, TransactionPaginationComponent, TransactionStatusBadgeComponent, FeedbackMessageComponent],
+  imports: [CommonModule, TransactionSearchFieldComponent, TransactionPaginationComponent, TransactionStatusBadgeComponent, FeedbackMessageComponent, MonetaryAmountPipe],
   templateUrl: './maker-queue.component.html',
   styleUrl: './maker-queue.component.scss',
 })

@@ -86,50 +86,9 @@ export interface FunctionStrategy {
   compoundSubmission: CompoundSubmissionStrategy;
   checkerRelease: CheckerReleaseStrategy;
   selectionFlow: SelectionFlowStrategy;
-  /**
-   * Fix Pending — does this Function offer a "Fix Pending" entry point on its own MAKER RESULT panel at
-   * all (2026-08-28 redesign, "頁面配置檔原先輸入或FIX PENDING可共用" — user-confirmed SOLID/DRY
-   * direction). This is now the ONLY Fix-Pending-specific fact declared per Function — WHICH fields are
-   * genuinely editable once Fix Pending is entered is no longer a second, separately hand-maintained
-   * per-Function list here; it is DERIVED, field by field, from the exact same lock flags
-   * `builder-fields.ts`'s `buildFields()` already computes for a fresh Submit (`amountLocked`/
-   * `tenorLocked`), via `deriveFixPendingLockFlags()`/`isFixPendingFieldEditable()` in that file — a
-   * field locked/carried at original Submit stays locked in Fix Pending too, and a field free-typed at
-   * original Submit becomes Fix-Pending-editable automatically, with zero registry change needed here.
-   * Only two Fix-Pending-specific facts are layered on top there, both with no original-Submit
-   * equivalent to derive from: the trial-scope gate this flag itself represents, and — for the 4
-   * CONTRACT-level fields (tolerancePct/tenorType/tenorDays/expiryDate) — `isCreatingMovement(model)`
-   * (§19: a still-PENDING/REJECTED CREATING movement owns the contract it just created exclusively).
-   * `secondaryRef`/`currency` are unconditionally excluded regardless of this flag, per §15 — see
-   * `BuilderFieldsContext.fixPendingMode`'s own doc comment.
-   *
-   * Phase 4 (§2.5, 2026-08-28) scoped and implemented for exactly ONE compound shape — A3S's own
-   * `documentArrivalWithSg` — via `BalanceService.applyArrivalWithSgCompoundEdit()` (microservice): the
-   * SG's own matched redemption leg is silently recomputed/replaced alongside the LC's own UTILIZE when
-   * its Bill Amount is corrected, same "MIN(Bill Amount, SG outstanding)" formula a fresh Submit already
-   * uses. Every OTHER compound Function (B4's confirmationHonourWithReceivable/
-   * confirmationAcceptWithReceivable, B5's acceptanceSettleWithReceivable) stays `false` — genuinely out
-   * of this pass's own scope, not because compound support itself is impossible, same posture Delete
-   * Pending's own compound-cascade support once had before ITS OWN Phase 4 landed (`MakerQueueService`'s
-   * own `groupCompoundRows()`/cascading `deletePending()`). A4 (`releasesExistingMovementInPlace`) is
-   * separately excluded in the template regardless of this flag, since it has no movement of its own to
-   * edit at all — flipping this flag for A4 would be a structural no-op, not a partial feature.
-   *
-   * A8/A10/A11/B6/B7 widened in 2026-08-28 ("A8 A9 A10 A11 B6 B7 加上FIX PENDING功能"): A8 is a plain
-   * creating movementType (ISSUE, same shape as A1/B1 — Amount genuinely free-typed). A10/A11/B6/B7 all
-   * have Amount fully locked/hidden (`amountAutoFilledFrom`/`amountFixed`), but Reason Code (F1 §13.1,
-   * mandatory for Close/Reopen) is the genuinely editable target — unlocked automatically via the SAME
-   * `requiresReasonCode`-driven `reasonCode` field derivation `deriveFixPendingLockFlags()` already had,
-   * zero new logic needed. A9 deliberately EXCLUDED (user-confirmed via `AskUserQuestion`) — its own
-   * Amount is fully locked to the SG's own Available Balance with no secondaryRef/reasonCode of its own,
-   * so every field on its screen is already locked at fresh Submit; a Fix Pending screen for A9 would have
-   * nothing genuinely editable to fix.
-   *
-   * B3 widened same day ("Use the same method for B3 with Fix Pending") — same shape as A8 (plain
-   * creating CREATE, hasParent, Amount genuinely free-typed) — its own Export counterpart, simply not
-   * included in the original A8/A10/A11/B6/B7 batch.
-   */
+  /** Enables the Maker-result and Maker-queue Fix Pending entry points. */
   fixPendingEnabled: boolean;
+  /** STANDARD edits derived unlocked fields; REMARKS_ONLY changes only Remarks. */
   fixPendingMode: FixPendingMode | null;
 }
 
@@ -213,14 +172,18 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
   A4: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A4',
+    fixPendingEnabled: true,
+    fixPendingMode: 'REMARKS_ONLY',
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, releasesExistingMovementInPlace: true },
   },
   A6: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'A6',
+    fixPendingEnabled: true,
+    fixPendingMode: 'REMARKS_ONLY',
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, settlesDocumentArrival: true },
   },
-  A7: { ...NO_SPECIAL_BEHAVIOR, code: 'A7' },
+  A7: { ...NO_SPECIAL_BEHAVIOR, code: 'A7', fixPendingEnabled: true, fixPendingMode: 'REMARKS_ONLY' },
   // A8 — a CREATING movementType (ISSUE, SHGT): same shape as A1/B1, Amount is genuinely free-typed (no
   // amountLocked rule applies to A8 at all) — a real, meaningful Fix Pending target.
   A8: { ...NO_SPECIAL_BEHAVIOR, code: 'A8', fixPendingEnabled: true },
@@ -271,6 +234,8 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
   B4: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'B4',
+    fixPendingEnabled: true,
+    fixPendingMode: 'REMARKS_ONLY',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, derivesMovementTypeFromTenor: true },
     compoundSubmission: { possibleShapes: ['confirmationHonourWithReceivable', 'confirmationAcceptWithReceivable'] },
     checkerRelease: { ...NO_SPECIAL_BEHAVIOR.checkerRelease, settlesDocumentArrival: true, sourceAlreadyReleasedBeforePick: true },
@@ -278,6 +243,8 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
   B5: {
     ...NO_SPECIAL_BEHAVIOR,
     code: 'B5',
+    fixPendingEnabled: true,
+    fixPendingMode: 'REMARKS_ONLY',
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'SETTLE' },
     compoundSubmission: { possibleShapes: ['acceptanceSettleWithReceivable'] },
     selectionFlow: { usesSettleableBalanceIndex: true },

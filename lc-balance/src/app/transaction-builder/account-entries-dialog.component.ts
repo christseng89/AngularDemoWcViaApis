@@ -13,6 +13,7 @@ import {
   accountingSetStatusBadgeClass,
 } from './balance-component.model';
 import { TransactionStatusBadgeComponent } from './transaction-status-badge.component';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
  * The "View Voucher" pop-up (analysis/contingent-liability-ledger.html) — a genuine Angular child
@@ -35,7 +36,7 @@ import { TransactionStatusBadgeComponent } from './transaction-status-badge.comp
 @Component({
   selector: 'app-account-entries-dialog',
   standalone: true,
-  imports: [CommonModule, TbIconComponent, TransactionStatusBadgeComponent],
+  imports: [CommonModule, TbIconComponent, TransactionStatusBadgeComponent, MonetaryAmountPipe],
   templateUrl: './account-entries-dialog.component.html',
   styleUrl: './account-entries-dialog.component.scss',
 })

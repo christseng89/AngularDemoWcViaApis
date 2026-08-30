@@ -193,6 +193,26 @@ export function groupThousands(digits: string): string {
   return result;
 }
 
+/** Exact display formatting by currency minor units; never converts an 18-digit amount to JS number. */
+export function formatCurrencyAmount(value: string | number | null | undefined, currency: string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = String(value).trim();
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!match) return raw;
+
+  const scale = decimalPlacesForCurrency(currency);
+  const negative = match[1] === '-';
+  const fraction = match[3] ?? '';
+  let scaled = BigInt(match[2] + fraction.slice(0, scale).padEnd(scale, '0'));
+  if ((fraction[scale] ?? '0') >= '5') scaled += 1n;
+
+  const digits = scaled.toString().padStart(scale + 1, '0');
+  const whole = scale === 0 ? digits : digits.slice(0, -scale);
+  const decimals = scale === 0 ? '' : `.${digits.slice(-scale)}`;
+  const sign = negative && scaled !== 0n ? '-' : '';
+  return `${sign}${groupThousands(whole)}${decimals}`;
+}
+
 /** Mirrors MOVEMENT_DIRECTION's -1 rows. Filters pickers so a 0-Available-Balance contract isn't offered as a target that would immediately fail (Design doc §6); excludes AMEND_INCREASE/ISSUE/CREATE/AMEND, for which 0 is a normal start. */
 export const DECREASING_MOVEMENT_TYPES: ReadonlySet<string> = new Set([
   'AMEND_DECREASE',

@@ -95,11 +95,12 @@ describe('builder-fields', () => {
     ]);
   });
 
-  it('A9 Remarks-only Fix Pending exposes Remarks as the sole editable business field', () => {
+  it.each(['A4', 'A6', 'A7', 'A9', 'B4', 'B5'])(
+    '%s Remarks-only Fix Pending exposes Remarks as the sole editable business field', (code) => {
     const fields = buildFields(baseCtx({
-      selectedFunction: fn('A9'),
+      selectedFunction: fn(code),
       fixPendingMode: true,
-      model: { instrumentType: 'SHGT', movementType: 'FULL_REDEEM', amount: '10000', currency: 'USD', createdBy: 'maker1', eventSeq: 1 },
+      model: { amount: '10000', currency: 'USD', createdBy: 'maker1', eventSeq: 1 },
     }));
     const remarks = fields.find((field) => field.key === 'remarks');
     expect(remarks).toBeDefined();
@@ -660,6 +661,7 @@ describe('builder-fields', () => {
       const decorated = toReadOnlyFields(original);
       expect(fieldByKey(original, 'amount').props?.disabled).toBe(false);
       expect(fieldByKey(decorated, 'amount').props?.disabled).toBe(true);
+      expect(fieldByKey(decorated, 'amount').type).toBe('protected-monetary');
     });
 
     it('preserves every field key and its required-ness (className/props.required untouched)', () => {
@@ -668,6 +670,66 @@ describe('builder-fields', () => {
       expect(decorated.map((f) => f.key)).toEqual(original.map((f) => f.key));
       expect(fieldByKey(decorated, 'amount').props?.required).toBe(true);
       expect(fieldByKey(decorated, 'amount').className).toContain('tb-field--required');
+    });
+  });
+
+  describe('read-only transaction reconstruction', () => {
+    it.each([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((item) => [item.code, item] as const))(
+      '%s rebuilds from the same field registry without requiring transient picker state',
+      (_code, selectedFunction) => {
+        const option = selectedFunction.subChoice?.options[0];
+        const movementType = selectedFunction.movementType ?? option?.movementTypeOverride ?? option?.value;
+        expect(() =>
+          buildFields(
+            baseCtx({
+              selectedFunction,
+              model: {
+                instrumentType: selectedFunction.instrumentType,
+                movementType,
+                amount: '1000',
+                currency: 'USD',
+                tenorType: 'SIGHT',
+              },
+              readOnlyReconstruction: true,
+            }),
+          ),
+        ).not.toThrow();
+      },
+    );
+
+    it.each(['A1', 'B1'])('%s keeps the original Issue-screen Currency selector semantics', (code) => {
+      const selectedFunction = fn(code);
+      const fields = buildFields(
+        baseCtx({
+          selectedFunction,
+          model: { instrumentType: selectedFunction.instrumentType, movementType: 'ISSUE', currency: 'TWD' },
+          selectedContract: contract({ instrumentType: selectedFunction.instrumentType, currency: 'TWD' }),
+          readOnlyReconstruction: true,
+        }),
+      );
+      const currency = fieldByKey(fields, 'currency');
+      expect(currency.type).toBe('select');
+      expect(currency.props?.label).toBe('Currency');
+    });
+
+    it.each([
+      ['A4', 'Amount (carried from the Document Arrival, protected)'],
+      ['A6', 'Amount (carried from the Document Arrival, protected)'],
+      ['A9', "Amount (Full Redeem — carried from the SG's Available Balance, protected)"],
+      ['A10', 'Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)'],
+      ['B4', 'Amount (carried from the Document Arrival, protected)'],
+      ['B6', 'Amount (Close — carried from the current Confirmed Balance, protected; writes it off to 0)'],
+    ])('%s derives the original protected Amount shape without transient picker state', (code, label) => {
+      const selectedFunction = fn(code);
+      const fields = buildFields(
+        baseCtx({
+          selectedFunction,
+          model: { instrumentType: selectedFunction.instrumentType, movementType: selectedFunction.movementType, currency: 'USD' },
+          readOnlyReconstruction: true,
+        }),
+      );
+      expect(fieldByKey(fields, 'amount').props?.label).toBe(label);
+      expect(fieldByKey(fields, 'amount').props?.disabled).toBe(true);
     });
   });
 

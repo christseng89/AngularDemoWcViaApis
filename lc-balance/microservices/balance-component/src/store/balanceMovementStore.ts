@@ -683,7 +683,7 @@ export class BalanceMovementStore {
       });
   }
 
-  /** A9 Remarks-only Fix Pending: deliberately updates no monetary, status, accounting, or identity column. */
+  /** Remarks-only Fix Pending updates no monetary, status, accounting, or identity column. */
   applyRemarksOnlyCorrection(params: { movementId: string; remarks: string | null; editedBy: string; editedAt: string }): void {
     this.db
       .prepare('UPDATE balance_movements SET remarks = @remarks, edited_by = @editedBy, edited_at = @editedAt WHERE movement_id = @movementId')

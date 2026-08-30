@@ -403,9 +403,9 @@
                         <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && !lookUp.systemLabelFor(row)">—</span>
                       </td>
                       <td class="tb-table__amount">
-                        {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) }}
+                        {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) | monetaryAmount: row.movement.currency }}
                         <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount"
-                          >(ceiling {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount) }})</span
+                          >(ceiling {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount) | monetaryAmount: row.movement.currency }})</span
                         >
                       </td>
                       <td class="tb-table__ref">{{ lookUp.primaryReferenceFor(row) }}</td>
@@ -418,7 +418,7 @@
                           >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt) }}</span
                         >
                       </td>
-                      <td class="tb-table__amount">{{ row.movement.balanceAfter ?? '—' }}</td>
+                      <td class="tb-table__amount">{{ row.movement.balanceAfter === null || row.movement.balanceAfter === undefined ? '—' : (row.movement.balanceAfter | monetaryAmount: row.movement.currency) }}</td>
                       <td class="tb-table__time">{{ row.eventTime | date: 'short' }}</td>
                       <!-- Submit/EC/Approve audit trail (business instruction 2026-08-20). EC/Approve are
                        mutually exclusive per row, gated on the movement's own real status — see the

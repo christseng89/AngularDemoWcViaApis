@@ -59,7 +59,7 @@
       >
         <ng-template let-m>
           <span class="tb-row-primary"
-            >{{ displayMovementType(m.movementType, m.amount) }} — {{ displayMovementAmount(m.movementType, m.amount) }} {{ m.currency }}</span
+            >{{ displayMovementType(m.movementType, m.amount) }} — {{ displayMovementAmount(m.movementType, m.amount) | monetaryAmount: m.currency }} {{ m.currency }}</span
           >
           <span class="tb-row-sub">{{ m.sourceTransactionRef || '—' }} · {{ checkerRowVerb(m.movementType) }} {{ m.createdAt | date: 'short' }} · by {{ m.createdBy }}</span>
         </ng-template>

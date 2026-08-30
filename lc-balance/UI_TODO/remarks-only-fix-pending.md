@@ -10,12 +10,12 @@
 
 ## 適用範圍
 
-優先評估目前未啟用 Fix Pending 的 Function：
+已啟用 Remarks-only Fix Pending 的 Function：
 
 - Import：A4、A6、A7、A9
 - Export：B4、B5
 
-A9 可優先導入。A4、A6、A7、B4、B5 必須先確認 settlement／compound lifecycle；Remarks-only 儲存不得重新計算或重建 linked movement。
+A4、A6、A7、A9、B4、B5 均已採用 Remarks-only。A4 修改其所完成的 A3/A3S movement；其他 settlement／compound rows 只更新代表 movement 的 Remark，不重新計算或重建 linked movement。
 
 ## UI 行為
 
@@ -52,7 +52,7 @@ fixPending: {
 ## Acceptance Criteria
 
 1. 適用 Function 的 Pending／Rejected row 顯示 `Fix Pending`。
-2. Fix Pending 畫面只有 Remarks 及該 Function 原本允許的欄位可編輯。
+2. Fix Pending 畫面只有 Remarks 可編輯，其他欄位均為 protected。
 3. 修改 Remarks 後儲存，movement identity、amount、currency、status、event sequence 與 linked records 均不變。
 4. Checker 可以看到更新後的 Remarks。
 5. 每次修改都寫入 Fix Pending audit。
@@ -69,4 +69,3 @@ fixPending: {
 - Strict request schema rejects locked fields。
 - Remarks-only edit does not alter balance、account entries、compound sibling movements。
 - Maker Queue 與 in-session Fix Pending 兩個入口行為一致。
-

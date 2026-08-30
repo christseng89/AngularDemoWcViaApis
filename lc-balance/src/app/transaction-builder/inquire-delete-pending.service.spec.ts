@@ -164,7 +164,7 @@ describe('InquireDeletePendingService', () => {
       svc.indexView = 'AUDIT';
       svc.items = [makeRow()];
       svc.paging.page = 3;
-      svc.viewing = { row: makeRow(), function: null, fields: [], form: {} as any, model: {} as any };
+      svc.viewing = { row: makeRow(), function: null, fields: [], form: {} as any, model: {} as any, identityItems: [] };
       svc.viewError = 'x';
 
       svc.backToIndex();
@@ -204,7 +204,7 @@ describe('InquireDeletePendingService', () => {
       const row = makeRow();
       const api = makeApi({ listDeletePendingAudit: jest.fn(() => of(makePage({ items: [row], total: 1 }))) });
       const svc = new InquireDeletePendingService(api);
-      svc.viewing = { row, function: null, fields: [], form: {} as any, model: {} as any };
+      svc.viewing = { row, function: null, fields: [], form: {} as any, model: {} as any, identityItems: [] };
 
       svc.search();
 
@@ -318,7 +318,7 @@ describe('InquireDeletePendingService', () => {
 
     it('closeView() clears both viewing and viewError', () => {
       const svc = new InquireDeletePendingService(makeApi());
-      svc.viewing = { row: makeRow(), function: null, fields: [], form: {} as any, model: {} as any };
+      svc.viewing = { row: makeRow(), function: null, fields: [], form: {} as any, model: {} as any, identityItems: [] };
       svc.viewError = 'x';
 
       svc.closeView();
