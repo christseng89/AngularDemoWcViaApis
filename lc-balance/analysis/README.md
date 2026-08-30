@@ -9,9 +9,9 @@
 
 API 行为变化时同步 schema、版本／changelog、实现、客户端和合约测试。
 
-2026-08-30 当前版本：微服务 OAS `1.37.0`，Channel OAS `1.8.0`。这次同步记录
-BalanceService SOLID façade、原子 compound actions、Transaction Index 和 Run-All retained prerequisites；
-UI-only columns 不会被虚构为新的 HTTP response fields。
+2026-08-31 当前版本：微服务 OAS `1.41.0`，Channel OAS `1.9.0`。这次同步记录
+Transaction Processing 的同 session Delete Pending、A4 withdraw 例外、compound cancel 的逐笔顺序，
+以及它与 Maker Queue／Fix Pending 的边界。画面 reset 与 UI-only columns 不会被虚构为新的 HTTP fields。
 
 ## 基础业务规格
 

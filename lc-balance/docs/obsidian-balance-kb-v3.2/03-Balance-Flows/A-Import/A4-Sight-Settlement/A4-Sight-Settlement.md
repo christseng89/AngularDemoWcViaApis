@@ -77,7 +77,7 @@ tags:
     - `400`：`/maker-submit` 端點對 instrumentType 非 `IPLC_LC` 或 movementType 非 `UTILIZE` 的 movement 回傳 400（`balance-component-api.yaml` 行 1013-1015 一帶）。
     - `409`：movement 非 `PENDING` 狀態時再次呼叫 `/maker-submit` 或 `/release` 亦回傳 409（一般 movement 狀態機規則）。
     - 用戶端防線：A4 自身的 Checker Release 在其自身 Maker Submit 尚未存在之前，會被前端提前阻擋，屬於伺服器端 BAL-123 關卡之外的深度防禦（[[MAKER-CHECKER-RULE-011]]）。
-    - **BAL-122**（歷史缺陷，已修復，非目前行為，僅供稽核脈絡參考）：A4 畫面通用的「Delete Pending」按鈕曾經會誤刪其上游 A3/A3S 記錄（因 A4 本身無自己的 movement 可刪）——已透過 `*ngIf` 隱藏該按鈕解決（CLAUDE.md「BAL-122/BAL-123」段）。
+    - **BAL-122**（歷史缺陷，已修復，非目前行為，僅供稽核脈絡參考）：A4 的 Delete Pending 不得取消上游 A3/A3S。現行 Transaction Processing 在同 session Maker Result 提供此動作，但呼叫 `/withdraw-maker-submit`，只撤回 A4 Maker Submit；A3/A3S identity、acknowledgment 與 balance 保持不變。Maker Queue／Fix Pending 仍是獨立入口。
 
 ## 流程圖
 

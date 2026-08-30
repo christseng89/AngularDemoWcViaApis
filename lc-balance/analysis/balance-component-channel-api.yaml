@@ -165,13 +165,21 @@ info:
     v1.7.0 (2026-08-29, same day as the Microservice API's own v1.35.0): `ContractStatus`'s reserved
     contract-versioning value removed from both enum inlines in this file — mirrors the Microservice API's
     own `markSuperseded()` removal (zero call sites, same day). No other shape change.
-  version: "1.8.0"
+
+    v1.9.0 (2026-08-31, lifecycle documentation synchronization; no wire-shape
+    change): clarifies that cancel remains a one-transaction proxy. Linked
+    A3S/B4/B5 legs require ordered caller orchestration and are not an atomic
+    cancel batch. A4 Maker Submit withdrawal is a distinct microservice
+    operation and must not cancel its A3/A3S source. Transaction Processing
+    reset behavior and Maker Queue separation are reference-client concerns,
+    not new channel response fields.
+  version: "1.9.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
 tags:
   - name: Functions
-    description: The named business-function catalog (A1–A9, B1–B5) and its own field-requirement metadata.
+    description: The named business-function catalog (A1–A11, B1–B7) and its own field-requirement metadata.
   - name: Contracts
     description: Resolve/search existing LC, Acceptance, Shipping Guarantee, and Export Confirmation records, and inquire their balance/history.
   - name: Transactions
@@ -184,7 +192,7 @@ paths:
   /channel/functions:
     get:
       tags: [Functions]
-      summary: List every named business function (A1–A9, B1–B5) and its own field-requirement metadata
+      summary: List every named business function (A1–A11, B1–B7) and its own field-requirement metadata
       description: >
         The authoritative, machine-readable equivalent of
         balance-component.model.ts's IMPORT_FUNCTIONS/EXPORT_FUNCTIONS
@@ -548,6 +556,15 @@ paths:
         record is written for every call, and a Delete-Pending'd A1/B1 root ISSUE also frees its LC Number
         for reuse. This channel layer exposes no separate query surface for that audit trail — a caller
         needing it uses the microservice's own `GET /delete-pending-audit` directly.
+
+
+        v1.9.0 — one request cancels one transaction only. A caller handling
+        A3S/B4/B5 must cancel linked siblings first and the primary movement
+        last; this sequence is not an atomic channel operation. A4 is not a
+        cancel: the reference client calls the microservice's
+        `/balance-movements/{movementId}/withdraw-maker-submit` operation to
+        retain the source A3/A3S movement. Post-action screen reset and the
+        separation from Maker Queue/Fix Pending are client behavior.
       parameters:
         - name: transactionId
           in: path
@@ -561,7 +578,7 @@ paths:
               type: object
               required: [cancelledBy]
               properties:
-                cancelledBy: { type: string }
+                cancelledBy: { type: string, minLength: 1 }
                 reasonCode: { type: string }
                 remarks: { type: string }
       responses:

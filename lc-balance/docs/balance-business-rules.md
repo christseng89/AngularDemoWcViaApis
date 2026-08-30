@@ -48,7 +48,10 @@
 
 - Fix Pending 修改同一业务事件时应保持其身份与完整审计，不制造对用户可见的技术业务状态。
 - Delete Pending 必须遵守所有权、角色、生命周期和 compound event 规则。
-- Compound event 的修改或取消必须保持各 leg 一致，并以原子事务完成。
+- Compound event 的建立／Release 必须使用现有 compound endpoint，在一个事务内完成。
+- Delete Pending 目前没有 atomic batch cancel endpoint。A3S／B4／B5 由调用端按策略先取消 sibling legs、最后取消 primary leg；每个 `/cancel` 都独立提交并留下自己的 audit。因此中途失败可能形成部分取消，调用端必须停止、显示真实状态，不得宣称自动回滚。
+- A4 Delete Pending 只撤回本次 Maker Submit，使用 `/withdraw-maker-submit`，不得取消作为来源的 A3／A3S movement。
+- Transaction Processing 的同 session Delete Pending 与 Maker Queue／Fix Pending 是不同入口；共享 domain policy 与 API client，但不得互相泄漏按钮或导航状态。
 - 新增引用主表的审计表时，必须同步检查数据库清理和 reset 流程的外键删除顺序。
 
 ## Expiry、Close 与 Reopen

@@ -1,6 +1,6 @@
 # Balance Component Current Behavior
 
-本文件是現行功能的快速基準，更新日期為 2026-08-30。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
+本文件是現行功能的快速基準，更新日期為 2026-08-31。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
 
 ## Business lifecycle
 
@@ -38,9 +38,12 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 ## Maker／Checker and compound events
 
 - Maker／Checker separation、狀態轉換、金額與 eligibility 都由微服務重新驗證。
-- A3S、A6、B4、B5 等多腿事件使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。
+- A3S、A6、B4、B5 等多腿事件的建立／Release 使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。
 - Fix Pending 修改原 movement 並保留 audit。A4、A6、A7、A9、B4、B5 採 Remarks-only：只能修改 Remark，不得改變金額、Balance、Account Entries 或 compound sibling。
-- Cancel／Delete Pending 必須同步處理同一 compound business event 的相關 legs。
+- Transaction Processing 的 Maker Submit 成功後，A1-A11／B1-B7 均可在同一 session 執行 Delete Pending；這不會改變 Maker Queue／Fix Pending 的獨立流程。
+- A1／B1 Confirm Delete Pending 成功後重設為新的 natural-key 輸入；其他 Function 回到各自的 Transaction Index。
+- A4 的 Delete Pending 是撤回 Maker Submit，使用 `/withdraw-maker-submit`，不得取消其 A3／A3S source movement。
+- 其他 Function 使用 `/cancel`。A3S、B4、B5 依 strategy 先取消 sibling legs、最後取消 primary leg；目前是多次單筆 API 呼叫，**不是原子 batch cancel**。任一步失敗時停止後續呼叫、保留畫面並顯示實際錯誤。
 
 ## Service architecture
 
@@ -48,4 +51,4 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 ## Verification baseline
 
-截至 2026-08-30：Angular 1,625、Backend Runner 57、Balance microservice 784，共 2,466 tests 通過；Angular production build 成功。這是文件同步時的基準，不代表未來變更可以省略重新驗證。
+截至 2026-08-31：本次 lifecycle 實作驗證為 Angular 51 suites／1,690 tests、typecheck、lint（0 errors）及 production build 通過。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。版本日期與驗證範圍分開記錄，避免把舊結果誤報為本次執行。

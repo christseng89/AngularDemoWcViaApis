@@ -94,6 +94,19 @@ info:
     the stored value; the API independently rejects missing or blank Remarks.
 
 
+    v1.41.0 (2026-08-31, Maker Result Delete Pending synchronization; no
+    wire-shape change): all A1-A11/B1-B7 Transaction Processing flows may
+    offer Delete Pending immediately after a successful Maker Submit. A1/B1
+    return to a fresh natural-key input after cancellation; every other
+    function returns to its Transaction Index. This is client navigation,
+    not a new service endpoint. A4 calls the existing
+    `/balance-movements/{movementId}/withdraw-maker-submit` operation so its
+    A3/A3S source is preserved. Other functions call `/cancel`; A3S/B4/B5
+    cancel their linked legs sibling-first and the primary leg last. Those
+    calls remain independent and are not an atomic batch cancellation.
+    Maker Queue/Fix Pending is a separate entry flow and is unchanged.
+
+
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
     scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
     field on every request (see `BalanceMovementCreateRequest.required`),
@@ -940,7 +953,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.37.0"
+  version: "1.41.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
@@ -1790,7 +1803,10 @@ paths:
         Clears `makerSubmittedBy` and `makerSubmittedAt` on a PENDING
         IPLC_LC/UTILIZE so the transaction returns to the state immediately
         before A4 Submit. Document Arrival identity, Checker acknowledgment
-        and balance remain unchanged.
+        and balance remain unchanged. v1.41.0 clarifies that this is also the
+        service operation used by Transaction Processing's same-session A4
+        Delete Pending action; cancelling the underlying A3/A3S movement
+        would be the wrong business operation.
       parameters:
         - name: movementId
           in: path
@@ -2024,6 +2040,20 @@ paths:
         Deliberately does NOT write a second `delete_pending_audit` record for the reverted UTILIZE — the
         one row this call already writes for A6's own cancelled `CREATE` (side effect (1) above) remains
         the single audit record of the whole two-record business event.
+
+
+        v1.41.0 (2026-08-31) — one call still cancels exactly one movement.
+        Transaction Processing may expose this operation immediately after
+        any A1-A11/B1-B7 Maker Submit. For A3S/B4/B5, the client uses its
+        function strategy to cancel linked sibling movements first and the
+        primary movement last, producing one audit record per cancelled leg.
+        This ordered sequence is not an atomic batch operation: if a call
+        fails, the client must stop, preserve the screen and report the
+        actual error/state. A4 is the exception and uses
+        `/withdraw-maker-submit` instead, preserving its A3/A3S source.
+        A1/B1 versus Index-screen reset is client navigation only. Maker
+        Queue/Fix Pending remains a separate UI entry flow and does not alter
+        this endpoint contract.
       parameters:
         - name: movementId
           in: path
@@ -2809,10 +2839,15 @@ components:
 
     BalanceMovementCancelRequest:
       type: object
-      description: Body for POST /balance-movements/{movementId}/cancel (v1.0.0 — real shape, corrects an earlier draft's DELETE+query-param description).
+      description: >
+        Body for POST /balance-movements/{movementId}/cancel (v1.0.0 — real
+        shape, correcting an earlier draft's DELETE+query-param description).
+        The endpoint acts on one movement only; linked-leg ordering is a
+        caller responsibility and is not atomic. Do not use this body for A4
+        Maker Submit withdrawal, which has its own endpoint and request body.
       required: [cancelledBy]
       properties:
-        cancelledBy: { type: string }
+        cancelledBy: { type: string, minLength: 1 }
         reasonCode: { type: string, nullable: true }
         remarks: { type: string, nullable: true }
 
