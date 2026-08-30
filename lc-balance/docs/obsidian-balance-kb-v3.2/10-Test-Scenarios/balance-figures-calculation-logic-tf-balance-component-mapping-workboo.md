@@ -1,0 +1,26 @@
+---
+knowledge_id: balance-figures-calculation-logic-tf-balance-component-mapping-workboo
+title: "余额数字计算逻辑 + TF Balance Component 映射工作簿 测试场景"
+domain: Balance
+category: Test Scenarios
+snapshot_date: 2026-08-22
+tags:
+  - balance
+  - test-scenario
+---
+
+# 余额数字计算逻辑 + TF Balance Component 映射工作簿 测试场景
+
+从本主题范围的测试文件中提取了9个测试场景。这些场景所证明的规则详见 Balance Figures Calculation Logic + TF Balance Component Mapping Workbook 与 [[Business-Rule-Index]]。
+
+| 场景 | 前置条件（Given） | 触发操作（When） | 预期结果（Then） | 来源 |
+|---|---|---|---|---|
+| A3S ——Tight Available Balance 净变化始终是综合性减少，绝不会是增加（S02/G02） | 一份 LC 10,000，针对其开立了 8,000 的 SG；提交了一笔 10,000 的 Document Arrival（Bill Amount），并通过 A3S 与该 SG 匹配 | A3S 被提交（LC UTILIZE 10,000 分支 + SG PARTIAL/FULL_REDEEM 分支，以 8,000 为上限取 MIN，两者均为 PENDING） | LC 的 Tight Available Balance 从 2,000 变为 0，净变化为 −2,000——绝不会是纯粹的增加，因为赎回分支（以 SG 自身的 Available Balance 为上限）永远不可能超过该 UTILIZE 自身的 ceilingAmount——*余额影响：* Pending Earmark Total = +8,000（SG 余额被释放）− 10,000（LC UTILIZE）= 净 −2,000 *容差/汇率：* 不适用容差——UTILIZE 与 REDEEM 从来都不是可容差的 movementType | `Balance-Figures-Calculation-Logic.txt lines 626-671 (A3S table's own Tight Available Balance row, business-confirmed live example)` |
+| B4 对所引用的 B3 提示单据进行临时性抵销（U02） | B1 Confirm LC 10,000 Usance（已批准）→ B3 Present Docs 10,000（已批准，RELEASED） | 提交了针对该 B3 记录的 10,000 B4 Acceptance，仍处于 PENDING 状态 | GET .../balance 读取到 presentDocsEarmarkApproved: 0（而非 10,000），tightAvailableBalance: 0（而非 −10,000）；pendingEarmarkTotal 读取为 −10,000；此后提交的一笔真正无关的新 B3 提示单据，仍会正确地依据严格的、未经抵销的 −10,000 数字被拒绝——*余额影响：* Present Docs Earmark（Approved）在 B4 Submit 时临时性地降为 0；只有在 B4 自身 Release 时才真正被消耗 *容差/汇率：* N/A——HONOUR/ACCEPT 从来都不可容差 | `Balance-Figures-Calculation-Logic.txt lines 1202-1213 (live-verified worked example)` |
+| 一旦会突破 Tight Available Balance，A2/B2 Decrease 就会被拒绝（U01） | Confirmed 100，SG Outstanding 10（表外风险敞口），普通 Available Balance 100，Tight Available Balance 90 | 提交一笔金额为 95 的 AMEND_DECREASE（A2）或 Decrease 方向的 AMEND（B2） | 修复前：95 ≤ 普通 Available 100，因此错误地通过了校验，导致在仍有 10 未结清 SG 的情况下，实际容量只剩 5。修复后：95 > Tight Available 90，checkAmendDecreaseSufficiency 因此正确地拒绝了该请求——*余额影响：* 防止 LC 自身的 ceiling 缩减到低于其未结清的表外风险敞口 *容差/汇率：* ceilingAmount 经过容差换算（AMEND_DECREASE/AMEND 属于可容差的 movementType） | `Balance-Figures-Calculation-Logic.txt lines 66-85 (banner: 'Sufficiency-check basis... business-confirmed via a balance-expert review')` |
+| A9 的 Amount 被锁定为 SG 自身的 Available Balance——不存在独立的 Partial Redeem | 一份未结清的 SG，其当前 Available Balance 为 X | Maker 打开 A9（Shipping Gtee Redemption）对其进行赎回 | Amount 字段被禁用，并预填为 X（而非由用户输入）；ceilingAmount 始终为完整的未结清数字；submit-rules.ts 对任何非精确匹配的金额都会硬性拒绝，而不是降级为 PARTIAL_REDEEM——*余额影响：* SG 自身的 Confirmed/Available Balance 在 Release 时都会完全清零，不留任何残余 *容差/汇率：* N/A——SHGT 从来都不可容差 | `Balance-Figures-Calculation-Logic.txt lines 848-875 (A9 locked-down section)` |
+| A1 LC Issue ——Tight Available Balance 只在 Approval 时上升，而非 Submit 时 | 一份正在开立的全新 LC，尚无任何既有动账 | A1 被提交（PENDING），随后被批准（RELEASED） | 在 Submit 时：Confirmed 不变，Available += ceilingAmount，Tight Available Balance 不变（2026-08-20 规则——未经批准的 ISSUE 尚不构成可用容量）。在 Approve 时：Confirmed += ceilingAmount，Tight Available Balance += ceilingAmount——*余额影响：* 展示了所有其他增加型动账都遵循的基础『增加從嚴』时点原则 *容差/汇率：* ceilingAmount = amount × (1+tolerancePct/100)——A1 始终应用容差 | `Balance-Figures-Calculation-Logic.txt lines 445-478 (A1's own table)` |
+| A8 SG Issue ——综合 Off-Balance Exposure 在 Submit 时即产生反应，拆分桶（bucket）在 Release 时迁移 | 一份 Tight Available Balance 充足的父级 LC | A8（SG ISSUE）被提交，随后被批准 | 在 Submit 时：父级 LC 的综合 Off-Balance Exposure 立即 += ceilingAmount，Tight Available Balance 立即 −= ceilingAmount；SG 自身的 Pending 桶 += ceilingAmount，Approved 桶为 0。在 Approve 时：综合数字不会再次变化，但 SG 自身的 Pending 桶回落为 0，同时 Approved 桶 += ceilingAmount（总和不变）——*余额影响：* 唯一一个综合总数在 Submit 时反应、在 Release 时不再反应的数字——与 B3 自身的 Present Docs Earmark 形态相同 *容差/汇率：* N/A——SHGT ISSUE 从来都不可容差 | `Balance-Figures-Calculation-Logic.txt lines 800-846 (A8's own table)` |
+| （TF Mapping）SG 解付以单证本身为准——状态变化在完全交回之前不产生任何 GL 分录 | 一份 SG 55,000，对应即将到单的单据 50,000 | 收到正本提单（B/L，匹配单据）（SG_REDEEMABLE） | Contingent 保持不变，仍为 55,000；状态变为 REDEEMABLE；完全不会触发任何 GL 分录——只有当船公司实际交回正本 SG（SG_RELEASE）时，Contingent 才会下降，且一次性下降完整的 55,000，绝不会出现与 50,000 单据金额相关联的 5,000 残余——*余额影响：* 直接构成了 A9 仅支持 Full-Redeem 这一锁定逻辑以及 Rule #1（SG 解付以单证本身为准，而非以金额为准）的依据 *容差/汇率：* N/A——本场景取自设计原理工作簿，本轮提取未针对本代码库自身的 Jest 测试套件进行确认 | `TF_Balance_Component_Mapping-en.txt lines 615-616 (Test_Scenarios T3, T4)` |
+| （TF Mapping）AMEND_DECREASE 的符号处理——负数事件金额仍会解析为仅涉及量级的减少 | 提交了一笔 event.amount = −20,000 的 LC 修改事件 | 同时应用 amount_basis 解析器（AMENDMENT_DELTA = ABS(event.delta_amount)）与 movement=DECREASE 标志 | 基数解析为量级 20,000；仅由 movement=DECREASE 决定方向；Contingent 减少 20,000，绝不会上升——印证了方向与量级是两个独立信号（I22），二者绝不能同时源自同一个符号——*余额影响：* 与实际代码库自身的 B2 AMEND 符号变异缺陷修复方式相呼应（将符号变换仅移入 buildSubmitRequest() 中，绝不回写到 model）*容差/汇率：* N/A——本场景取自工作簿，与本代码库自身符号处理实现的适用性为 INFERRED（推断），本轮未直接验证 | `TF_Balance_Component_Mapping-en.txt line 649 (Test_Scenarios T37)` |
+| （TF Mapping）在部分修改情形下，confirmed_amount 独立于 lc_amount | 一份保兑金额为 100,000 的出口 LC，随后仅在 LC 一侧修改 +20,000 | 保兑行并未将其自身的保兑范围扩展至覆盖该增加部分 | lc_amount 变为 120,000，但 contingent（保兑风险敞口）仍保持 100,000——允许这两个数字出现分歧（Art. 10(b)）——*余额影响：* 与 CLAUDE.md 自身将 tolerancePct/ceilingAmount 限定作用于 EPLC_CONFIRMATION 自身 confirmed_amount、独立于任何父级 LC 数字的做法相呼应 *容差/汇率：* N/A——本场景取自工作簿，本轮未针对该微服务自身的测试套件进行独立复核 | `TF_Balance_Component_Mapping-en.txt line 625 (Test_Scenarios T13)` |

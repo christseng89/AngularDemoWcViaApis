@@ -7,7 +7,7 @@ dist/
 .sonartmp/
 .scannerwork/
 obsidian-payment-kb*/
-obsidian-balance-kb*/
+# obsidian-balance-kb*/
 lc-balance-src.tar*.*
 lc-balance-new/
 _to_delete/
