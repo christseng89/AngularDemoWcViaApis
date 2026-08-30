@@ -15,7 +15,6 @@ import { notFoundMessage } from './api-error';
  */
 @Component({
   selector: 'app-index-picker',
-  standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './index-picker.component.html',
   styleUrl: './index-picker.component.scss',

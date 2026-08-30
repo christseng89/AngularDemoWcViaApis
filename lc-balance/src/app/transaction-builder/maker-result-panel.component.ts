@@ -17,7 +17,6 @@ export interface MakerAccountEntriesRequest {
 /** Pure presentation boundary for the Maker's post-submit result and its semantic actions. */
 @Component({
   selector: 'app-maker-result-panel',
-  standalone: true,
   imports: [CommonModule, FeedbackMessageComponent],
   templateUrl: './maker-result-panel.component.html',
   styleUrl: './maker-result-panel.component.scss',
@@ -46,13 +45,7 @@ export class MakerResultPanelComponent {
 
   get statusLabel(): string {
     if (!this.result?.status) return '';
-    return displayStatus(
-      this.result.status,
-      this.instrumentType,
-      this.result.movementType,
-      this.resultPhase,
-      this.result.acknowledgedAt,
-    );
+    return displayStatus(this.result.status, this.instrumentType, this.result.movementType, this.resultPhase, this.result.acknowledgedAt);
   }
 
   openEntries(movement: BalanceMovement, instrumentType: InstrumentType | null, phase?: TransactionStatusPhase): void {

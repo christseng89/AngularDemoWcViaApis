@@ -6,7 +6,6 @@ import { contractStatusBadgeClass, contractStatusLabel, statusBadgeIcon } from '
 /** Contract/master-record status presentation. Deliberately separate from movement status. */
 @Component({
   selector: 'app-contract-status-badge',
-  standalone: true,
   imports: [CommonModule, TbIconComponent],
   templateUrl: './contract-status-badge.component.html',
   styleUrl: './transaction-status-badge.component.scss',

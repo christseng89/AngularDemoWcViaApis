@@ -35,7 +35,6 @@ import { MonetaryAmountPipe } from './monetary-amount.pipe';
  */
 @Component({
   selector: 'app-account-entries-dialog',
-  standalone: true,
   imports: [CommonModule, TbIconComponent, TransactionStatusBadgeComponent, MonetaryAmountPipe],
   templateUrl: './account-entries-dialog.component.html',
   styleUrl: './account-entries-dialog.component.scss',

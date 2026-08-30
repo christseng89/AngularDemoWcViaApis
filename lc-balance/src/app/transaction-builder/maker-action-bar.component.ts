@@ -21,7 +21,6 @@ const EMPTY_STATE: MakerActionBarState = {
 
 @Component({
   selector: 'app-maker-action-bar',
-  standalone: true,
   imports: [CommonModule],
   templateUrl: './maker-action-bar.component.html',
   styleUrl: './maker-action-bar.component.scss',

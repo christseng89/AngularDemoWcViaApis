@@ -8,7 +8,6 @@ export type TransactionStatusPhase = 'primary' | 'create' | 'finalize' | null;
 /** One presentation boundary for movement status label, color and accessible icon. */
 @Component({
   selector: 'app-transaction-status-badge',
-  standalone: true,
   imports: [CommonModule, TbIconComponent],
   templateUrl: './transaction-status-badge.component.html',
   styleUrl: './transaction-status-badge.component.scss',

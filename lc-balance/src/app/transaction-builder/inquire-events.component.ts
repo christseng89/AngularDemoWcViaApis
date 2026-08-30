@@ -50,7 +50,6 @@ export interface InquireOpenAccountEntriesEvent {
  */
 @Component({
   selector: 'app-inquire-events',
-  standalone: true,
   imports: [
     CommonModule,
     FormlyModule,

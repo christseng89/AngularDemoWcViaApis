@@ -13,7 +13,6 @@ export type TbIconName = 'issue' | 'amend' | 'utilize' | 'redeem' | 'checker' | 
 
 @Component({
   selector: 'app-tb-icon',
-  standalone: true,
   imports: [CommonModule],
   template: `
     <svg

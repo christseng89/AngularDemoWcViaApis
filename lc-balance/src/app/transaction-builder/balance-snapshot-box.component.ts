@@ -25,7 +25,6 @@ export interface BalanceSnapshotImpact {
  */
 @Component({
   selector: 'app-balance-snapshot-box',
-  standalone: true,
   imports: [CommonModule, MonetaryAmountPipe],
   templateUrl: './balance-snapshot-box.component.html',
   styleUrl: './balance-snapshot-box.component.scss',

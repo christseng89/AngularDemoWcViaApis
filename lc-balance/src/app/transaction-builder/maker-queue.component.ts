@@ -1,7 +1,11 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MakerQueueService, MakerQueueRow } from './maker-queue.service';
-import { displayStatus as displayStatusShared, statusBadgeClass as statusBadgeClassShared, statusBadgeIcon as statusBadgeIconShared } from './balance-component.model';
+import {
+  displayStatus as displayStatusShared,
+  statusBadgeClass as statusBadgeClassShared,
+  statusBadgeIcon as statusBadgeIconShared,
+} from './balance-component.model';
 import { TransactionSearchFieldComponent } from './transaction-search-field.component';
 import { TransactionPaginationComponent } from './transaction-pagination.component';
 import { TransactionStatusBadgeComponent } from './transaction-status-badge.component';
@@ -17,8 +21,14 @@ import { MonetaryAmountPipe } from './monetary-amount.pipe';
  */
 @Component({
   selector: 'app-maker-queue',
-  standalone: true,
-  imports: [CommonModule, TransactionSearchFieldComponent, TransactionPaginationComponent, TransactionStatusBadgeComponent, FeedbackMessageComponent, MonetaryAmountPipe],
+  imports: [
+    CommonModule,
+    TransactionSearchFieldComponent,
+    TransactionPaginationComponent,
+    TransactionStatusBadgeComponent,
+    FeedbackMessageComponent,
+    MonetaryAmountPipe,
+  ],
   templateUrl: './maker-queue.component.html',
   styleUrl: './maker-queue.component.scss',
 })
@@ -67,7 +77,7 @@ export class MakerQueueComponent {
       return 'Delete Pending (compound) — this row represents every leg of the same Business Event (A3S/B4/B5); deleting it cancels all of them together, not just this one.';
     }
     return this.makerQueue.isWithdrawMakerSubmitCase(row)
-      ? 'Delete Pending (A4) — returns this record to A3/A3S\'s own Checker-acknowledged (EARMARKED) state, ready to Maker-Submit A4 again. Does not cancel the underlying Document Arrival.'
+      ? "Delete Pending (A4) — returns this record to A3/A3S's own Checker-acknowledged (EARMARKED) state, ready to Maker-Submit A4 again. Does not cancel the underlying Document Arrival."
       : 'Delete Pending';
   }
 }

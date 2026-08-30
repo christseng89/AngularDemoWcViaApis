@@ -147,8 +147,21 @@ export interface MakerSyncRequest {
  */
 @Component({
   selector: 'app-maker-panel',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, TbIconComponent, MakerResultPanelComponent, MakerActionBarComponent, MakerWorkflowNoticesComponent, ProtectedTransactionIdentityComponent, BalanceSnapshotBoxComponent, MakerBalanceWarningsComponent, MonetaryAmountPipe],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    FormlyModule,
+    IndexPickerComponent,
+    TbIconComponent,
+    MakerResultPanelComponent,
+    MakerActionBarComponent,
+    MakerWorkflowNoticesComponent,
+    ProtectedTransactionIdentityComponent,
+    BalanceSnapshotBoxComponent,
+    MakerBalanceWarningsComponent,
+    MonetaryAmountPipe,
+  ],
   templateUrl: './maker-panel.component.html',
   styleUrl: './maker-panel.component.scss',
   /**
@@ -214,7 +227,11 @@ export class MakerPanelComponent implements OnChanges {
    * only ever non-null for the first (`submitResult`) button — see `resultPhase`'s own doc comment; the
    * other two always pass a genuinely separate compound-leg movement that needs no override.
    */
-  @Output() openAccountEntries = new EventEmitter<{ movement: BalanceMovement; instrumentType: InstrumentType | null; phase?: 'primary' | 'create' | 'finalize' | null }>();
+  @Output() openAccountEntries = new EventEmitter<{
+    movement: BalanceMovement;
+    instrumentType: InstrumentType | null;
+    phase?: 'primary' | 'create' | 'finalize' | null;
+  }>();
   /**
    * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
    * 2026-08-27; per-field config 2026-08-28) — MAKER RESULT panel's "Fix Pending" entry point, gated
@@ -1881,7 +1898,7 @@ export class MakerPanelComponent implements OnChanges {
   startFixPending(): void {
     this.reconstructScreenForSubmitResult(() => {
       this.fixPendingMode = true;
-    }, 'Could not load this record\'s own contract — Fix Pending cannot proceed.');
+    }, "Could not load this record's own contract — Fix Pending cannot proceed.");
   }
 
   /**
@@ -1915,7 +1932,7 @@ export class MakerPanelComponent implements OnChanges {
     this.deletePendingReviewSource = 'MAKER_QUEUE';
     this.reconstructScreenForSubmitResult(() => {
       this.deletePendingReviewMode = true;
-    }, 'Could not load this record\'s own contract — Delete Pending review cannot proceed.');
+    }, "Could not load this record's own contract — Delete Pending review cannot proceed.");
   }
 
   startMakerResultDeletePendingReview(): void {

@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-maker-workflow-notices',
-  standalone: true,
   imports: [CommonModule],
   templateUrl: './maker-workflow-notices.component.html',
   styleUrl: './maker-workflow-notices.component.scss',

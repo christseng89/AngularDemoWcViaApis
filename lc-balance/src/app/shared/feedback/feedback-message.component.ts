@@ -4,7 +4,6 @@ import { UiMessage } from './ui-message.model';
 
 @Component({
   selector: 'app-feedback-message',
-  standalone: true,
   imports: [CommonModule],
   templateUrl: './feedback-message.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

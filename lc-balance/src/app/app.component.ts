@@ -10,7 +10,6 @@ const NEXT_THEME_MODE: Record<ThemeMode, ThemeMode> = { system: 'light', light: 
 
 @Component({
   selector: 'app-root',
-  standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, TbIconComponent],
   template: `
     <nav class="navbar navbar-expand border-bottom mb-3">

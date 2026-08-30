@@ -14,7 +14,6 @@ import { BalanceCaseApiService, BusinessCaseRunResult, BusinessCaseSummary, Trac
  */
 @Component({
   selector: 'app-business-case-runner',
-  standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormlyModule],
   templateUrl: './business-case-runner.component.html',
 })

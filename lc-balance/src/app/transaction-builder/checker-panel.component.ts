@@ -38,7 +38,6 @@ export interface CheckerSyncSignal {
  */
 @Component({
   selector: 'app-checker-panel',
-  standalone: true,
   imports: [CommonModule, FormsModule, IndexPickerComponent, TbIconComponent, FeedbackMessageComponent, MonetaryAmountPipe],
   templateUrl: './checker-panel.component.html',
   styleUrl: './checker-panel.component.scss',
@@ -91,9 +90,7 @@ export class CheckerPanelComponent implements OnChanges {
   get checkerSearchFeedback(): UiMessage | null {
     if (!this.checkerSearchError) return null;
     const query = [this.checkerLcNumber, this.checkerSecondaryRef].filter(Boolean).join(' / ');
-    const error = this.checkerSearchErrorIsNotFound
-      ? { status: 404, message: this.checkerSearchError }
-      : { message: this.checkerSearchError };
+    const error = this.checkerSearchErrorIsNotFound ? { status: 404, message: this.checkerSearchError } : { message: this.checkerSearchError };
     return presentApiError(error, 'SEARCH', query || undefined);
   }
   checkerItems: BalanceMovement[] = [];

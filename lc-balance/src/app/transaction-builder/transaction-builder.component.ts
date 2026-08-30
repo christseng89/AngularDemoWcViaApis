@@ -46,7 +46,6 @@ import { MonetaryAmountPipe } from './monetary-amount.pipe';
  */
 @Component({
   selector: 'app-transaction-builder',
-  standalone: true,
   imports: [
     CommonModule,
     FormsModule,

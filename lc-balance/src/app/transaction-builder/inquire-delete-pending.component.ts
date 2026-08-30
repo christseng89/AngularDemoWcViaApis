@@ -22,8 +22,17 @@ import { ProtectedTransactionIdentityComponent } from './protected-transaction-i
  */
 @Component({
   selector: 'app-inquire-delete-pending',
-  standalone: true,
-  imports: [CommonModule, FormsModule, FormlyModule, TbIconComponent, TransactionSearchFieldComponent, TransactionPaginationComponent, FeedbackMessageComponent, MonetaryAmountPipe, ProtectedTransactionIdentityComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    FormlyModule,
+    TbIconComponent,
+    TransactionSearchFieldComponent,
+    TransactionPaginationComponent,
+    FeedbackMessageComponent,
+    MonetaryAmountPipe,
+    ProtectedTransactionIdentityComponent,
+  ],
   templateUrl: './inquire-delete-pending.component.html',
   styleUrl: './inquire-delete-pending.component.scss',
 })
