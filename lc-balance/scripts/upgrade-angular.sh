@@ -18,7 +18,7 @@ Run exactly one target per clean Git revision. After validation, review and
 commit that major before invoking this script for the next major.
 
 Safety rules:
-  - Node 20.19.0 or newer within the Node 20 release line is required.
+  - Angular CLI performs the Node compatibility check for the selected target.
   - Start with a clean Git worktree.
   - No --force and no automatic rollback are used.
   - The selected major runs lint, type-check, all Jest tests, and a production build.
@@ -46,11 +46,6 @@ verify_environment() {
 
   cd "${PROJECT_DIR}"
   [[ -f package.json && -f package-lock.json && -f angular.json ]] || die "Run this script from the lc-balance repository."
-
-  node -e '
-    const [major, minor] = process.versions.node.split(".").map(Number);
-    if (major !== 20 || minor < 19) process.exit(1);
-  ' || die "Node 20.19.0 or newer within Node 20 is required; found $(node --version)."
 
   if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
     die "Git worktree is not clean. Commit or stash all changes before upgrading."
