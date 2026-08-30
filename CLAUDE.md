@@ -415,10 +415,14 @@ forgotten; check it, not just `Quality-report-balance.md`, before assuming somet
   knowledge (~700+ notes covering business rules, decision tables, and test scenarios — the exact count
   grows as the vault regenerates, don't treat any specific number as current) out of source,
   APIs, and tests, self-scored against a 9-dimension quality rubric; start from
-  `00-Home/Balance-Knowledge-Home.md`. **Gitignored** (root `.gitignore`'s `obsidian-balance-kb*/`
-  wildcard rule — covers this directory and any other `-vN` suffix). A companion
-  `docs/obsidian-balance-kb-v3.2.zip` sits alongside it, untracked but NOT excluded by that rule (which
-  only matches directories) — an optional versioned-backup path nobody has opted into yet. Supersedes an
+  `00-Home/Balance-Knowledge-Home.md`. **Tracked in git**, unlike `lc-payment-wc/`'s own
+  `obsidian-payment-kb/` — root `.gitignore` has an `obsidian-balance-kb*/` wildcard rule that would
+  cover this directory, but that line is commented out (verified 2026-08-31), so all ~740 files in it
+  are committed and `git status` will show them as modified whenever the vault regenerates. Don't assume
+  this is gitignored without re-checking `.gitignore` first. No `docs/obsidian-balance-kb-v3.2.zip`
+  companion currently exists on disk (verified 2026-08-31) — if one reappears, check whether it's tracked
+  before assuming the untracked-backup behavior described for `lc-payment-wc/`'s own zip companion also
+  applies here. Supersedes an
   earlier unversioned `docs/obsidian-balance-kb/` vault (683 files, written in English) — that directory
   and its own companion zip have since been deleted from disk, not merely renamed; don't go looking for
   them. The current vault is written primarily in **Simplified Chinese**. See `lc-balance/CLAUDE.md`'s
