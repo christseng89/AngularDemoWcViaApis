@@ -42,5 +42,14 @@
     >
       Fix Pending
     </button>
+    <button
+      type="button"
+      class="tb-btn tb-btn--danger-outline"
+      *ngIf="deletePendingSupported && !fixPendingMode && !deletePendingReviewMode && result?.status === 'PENDING'"
+      (click)="deletePending.emit()"
+      [disabled]="actionBusy"
+    >
+      Delete Pending
+    </button>
   </div>
 </div>

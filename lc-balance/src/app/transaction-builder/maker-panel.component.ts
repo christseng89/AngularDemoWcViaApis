@@ -241,6 +241,7 @@ export class MakerPanelComponent implements OnChanges {
   @Output() deletePendingReviewConfirmed = new EventEmitter<void>();
   /** The Maker reviewed and declined — no delete call was made. The parent decides where to navigate next (back to Maker Queue). */
   @Output() deletePendingReviewCancelled = new EventEmitter<void>();
+  @Output() makerResultDeletePendingConfirmed = new EventEmitter<BalanceMovement>();
 
   form = new FormGroup({});
   model: BuilderModel = { currency: 'USD', createdBy: 'maker1', eventSeq: Date.now() };
@@ -286,6 +287,7 @@ export class MakerPanelComponent implements OnChanges {
    * fresh Submit or an in-session Fix Pending edit. See `startDeletePendingReview()`'s own doc comment.
    */
   deletePendingReviewMode = false;
+  private deletePendingReviewSource: 'MAKER_QUEUE' | 'MAKER_RESULT' | null = null;
 
   /** See `CompoundLegState`'s own doc comment for why these 7 fields (A3S/A6/B4/B5's own multi-leg submissions) are grouped here rather than left flat. */
   compoundLegs: CompoundLegState = { ...EMPTY_COMPOUND_LEGS };
@@ -370,6 +372,10 @@ export class MakerPanelComponent implements OnChanges {
   /** Template-friendly wrapper around `functionSupportsFixPending()` (the single derived source of truth — see `FunctionStrategy.fixPendingEditableFields`'s own doc comment). */
   get fixPendingSupported(): boolean {
     return functionSupportsFixPending(this.selectedFunctionStrategy);
+  }
+
+  get makerResultDeletePendingSupported(): boolean {
+    return !!this.selectedFunctionStrategy?.makerResultDeletePending.enabled && !this.externalFixPendingRequest && !this.externalDeletePendingReviewRequest;
   }
 
   /**
@@ -710,6 +716,7 @@ export class MakerPanelComponent implements OnChanges {
     this.submitError = null;
     this.fixPendingMode = false;
     this.deletePendingReviewMode = false;
+    this.deletePendingReviewSource = null;
     this.pickerSelection.sgsForArrival = [];
     this.pickerSelection.arrivalSgPaging.reset();
     this.pickerSelection.selectedArrivalSg = null;
@@ -1905,20 +1912,41 @@ export class MakerPanelComponent implements OnChanges {
    * then explicitly confirms or cancels via the two buttons this mode's own template block renders.
    */
   startDeletePendingReview(): void {
+    this.deletePendingReviewSource = 'MAKER_QUEUE';
     this.reconstructScreenForSubmitResult(() => {
       this.deletePendingReviewMode = true;
     }, 'Could not load this record\'s own contract — Delete Pending review cannot proceed.');
   }
 
+  startMakerResultDeletePendingReview(): void {
+    if (!this.makerResultDeletePendingSupported || this.fixPendingMode || this.submitResult?.status !== 'PENDING') return;
+    this.deletePendingReviewSource = 'MAKER_RESULT';
+    this.reconstructScreenForSubmitResult(() => {
+      this.deletePendingReviewMode = true;
+    }, 'Could not load this A1 record — Delete Pending review cannot proceed.');
+  }
+
   /** Reports "confirmed" up to the parent, which owns the actual delete call (`MakerQueueService.deletePending()` — cascade-aware for a compound row via its own server-reconstructed `siblingMovementIds`) — this panel only ever requested a review, never the deletion itself. */
   confirmDeletePendingReview(): void {
     this.deletePendingReviewMode = false;
+    if (this.deletePendingReviewSource === 'MAKER_RESULT' && this.submitResult) {
+      this.deletePendingReviewSource = null;
+      this.makerResultDeletePendingConfirmed.emit(this.submitResult);
+      return;
+    }
+    this.deletePendingReviewSource = null;
     this.deletePendingReviewConfirmed.emit();
   }
 
   /** No delete call was ever made — just closes the review screen. The parent decides where to navigate next (back to Maker Queue). */
   cancelDeletePendingReview(): void {
     this.deletePendingReviewMode = false;
+    if (this.deletePendingReviewSource === 'MAKER_RESULT') {
+      this.deletePendingReviewSource = null;
+      this.rebuildFields();
+      return;
+    }
+    this.deletePendingReviewSource = null;
     this.deletePendingReviewCancelled.emit();
   }
 

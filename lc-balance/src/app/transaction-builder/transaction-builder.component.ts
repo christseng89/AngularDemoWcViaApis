@@ -318,6 +318,22 @@ export class TransactionBuilderComponent {
     this.selectMode('MAKER_QUEUE');
   }
 
+  onMakerResultDeletePendingConfirmed(movement: BalanceMovement): void {
+    if (!this.selectedFunctionStrategy?.makerResultDeletePendingEnabled || movement.status !== 'PENDING' || this.actionBusy) return;
+    const fn = this.selectedFunction;
+    this.actionBusy = true;
+    this.api.cancel(movement.movementId, this.makerContext.createdBy || 'maker1', 'MAKER_EC').subscribe({
+      next: () => {
+        this.actionBusy = false;
+        if (fn) this.selectFunction(fn);
+      },
+      error: (err) => {
+        this.actionBusy = false;
+        this.forwardOutcomeToMaker({ kind: 'failed', message: describeApiErrorShared(err) });
+      },
+    });
+  }
+
   /** Kept current by `MakerPanelComponent`'s `contextChanged` output. */
   onMakerContextChanged(ctx: MakerCheckerContext): void {
     this.makerContext = ctx;

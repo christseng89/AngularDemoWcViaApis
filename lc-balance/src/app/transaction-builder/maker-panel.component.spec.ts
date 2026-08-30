@@ -176,6 +176,83 @@ describe('MakerPanelComponent', () => {
     });
   });
 
+  describe('A1/A3 same-session Maker Result Delete Pending', () => {
+    it('uses its dedicated confirmation output and never the Maker Queue output', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A1);
+      const movement = mkMovement('mv-a1-delete', { movementType: 'ISSUE', status: 'PENDING' });
+      comp.submitResult = movement;
+      comp.selectedContract = mkContract('c1', 'S01');
+      const sameSessionConfirmed = jest.fn();
+      const queueConfirmed = jest.fn();
+      comp.makerResultDeletePendingConfirmed.subscribe(sameSessionConfirmed);
+      comp.deletePendingReviewConfirmed.subscribe(queueConfirmed);
+
+      comp.startMakerResultDeletePendingReview();
+      expect(comp.deletePendingReviewMode).toBe(true);
+      comp.confirmDeletePendingReview();
+
+      expect(sameSessionConfirmed).toHaveBeenCalledWith(movement);
+      expect(queueConfirmed).not.toHaveBeenCalled();
+    });
+
+    it('Cancel stays on the A1 screen and never emits Maker Queue cancellation', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A1);
+      comp.submitResult = mkMovement('mv-a1-cancel', { movementType: 'ISSUE', status: 'PENDING' });
+      comp.selectedContract = mkContract('c1', 'S01');
+      const queueCancelled = jest.fn();
+      comp.deletePendingReviewCancelled.subscribe(queueCancelled);
+
+      comp.startMakerResultDeletePendingReview();
+      comp.cancelDeletePendingReview();
+
+      expect(comp.deletePendingReviewMode).toBe(false);
+      expect(comp.submitResult?.movementId).toBe('mv-a1-cancel');
+      expect(queueCancelled).not.toHaveBeenCalled();
+    });
+
+    it('refuses to start while Fix Pending is active', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A1);
+      comp.submitResult = mkMovement('mv-a1-fix', { movementType: 'ISSUE', status: 'PENDING' });
+      comp.fixPendingMode = true;
+
+      comp.startMakerResultDeletePendingReview();
+
+      expect(comp.deletePendingReviewMode).toBe(false);
+    });
+
+    it('never enables Maker Result Delete Pending for a Maker Queue Fix Pending session, even after edit mode closes', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A1);
+      const movement = mkMovement('mv-a1-queue-fix', { movementType: 'ISSUE', status: 'PENDING' });
+      comp.submitResult = movement;
+      comp.externalFixPendingRequest = movement;
+      comp.fixPendingMode = false;
+
+      expect(comp.makerResultDeletePendingSupported).toBe(false);
+      comp.startMakerResultDeletePendingReview();
+      expect(comp.deletePendingReviewMode).toBe(false);
+    });
+
+    it('A3 is enabled and a function reset clears the submitted transaction back to LC Index selection', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A3);
+      comp.selectedContract = mkContract('a3-contract', 'S03');
+      comp.submitResult = mkMovement('mv-a3-delete', { movementType: 'UTILIZE', status: 'PENDING' });
+      comp.transactionIndexSearch = 'S03';
+
+      expect(comp.makerResultDeletePendingSupported).toBe(true);
+      triggerSelectFunction(comp, A3);
+
+      expect(comp.selectedContract).toBeNull();
+      expect(comp.submitResult).toBeNull();
+      expect(comp.transactionIndexSearch).toBe('');
+      expect(comp.hasEligibleTargetSelected).toBe(false);
+    });
+  });
+
   describe("resetForFunction() (via ngOnChanges resetTrigger) — mirrors TransactionBuilderComponent.selectFunction()'s own pre-extraction Maker-state reset body", () => {
     it('a function with a fixed movementType pins instrumentType+movementType immediately (A1)', () => {
       const { comp, mockApi } = makeComponentA();

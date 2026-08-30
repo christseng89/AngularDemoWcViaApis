@@ -71,6 +71,16 @@
       background: var(--blue-bg);
     }
   }
+
+  &--danger-outline {
+    border-color: var(--red);
+    background: var(--bg-surface);
+    color: var(--red);
+
+    &:hover:not(:disabled) {
+      background: var(--red-bg-soft);
+    }
+  }
 }
 
 .tb-maker-result-actions--emphasized .tb-btn {

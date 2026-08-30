@@ -820,9 +820,11 @@
   [resultPhase]="resultPhase"
   [compoundLegs]="compoundLegs"
   [fixPendingSupported]="fixPendingSupported"
+  [deletePendingSupported]="makerResultDeletePendingSupported"
   [fixPendingMode]="fixPendingMode"
   [deletePendingReviewMode]="deletePendingReviewMode"
   [actionBusy]="actionBusy"
   (openAccountEntries)="openAccountEntries.emit($event)"
   (fixPending)="startFixPending()"
+  (deletePending)="startMakerResultDeletePendingReview()"
 ></app-maker-result-panel>

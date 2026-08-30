@@ -30,12 +30,14 @@ export class MakerResultPanelComponent {
   @Input() resultPhase: TransactionStatusPhase = null;
   @Input() compoundLegs: CompoundLegState | null = null;
   @Input() fixPendingSupported = false;
+  @Input() deletePendingSupported = false;
   @Input() fixPendingMode = false;
   @Input() deletePendingReviewMode = false;
   @Input() actionBusy = false;
 
   @Output() openAccountEntries = new EventEmitter<MakerAccountEntriesRequest>();
   @Output() fixPending = new EventEmitter<void>();
+  @Output() deletePending = new EventEmitter<void>();
 
   get errorFeedback(): UiMessage | null {
     if (!this.error) return null;

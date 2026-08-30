@@ -46,6 +46,43 @@ describe('MakerResultPanelComponent', () => {
     expect(fixPending).toHaveBeenCalledTimes(1);
   });
 
+  it('shows and emits Delete Pending for an enabled PENDING Maker Result', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('result', movement);
+    fixture.componentRef.setInput('deletePendingSupported', true);
+    const requested = jest.fn();
+    fixture.componentInstance.deletePending.subscribe(requested);
+    fixture.detectChanges();
+
+    const button = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'))
+      .find((candidate) => candidate.textContent?.trim() === 'Delete Pending');
+    expect(button).toBeDefined();
+    button?.click();
+    expect(requested).toHaveBeenCalledTimes(1);
+  });
+
+  it('never shows Delete Pending while Maker Queue Fix Pending is active', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('result', movement);
+    fixture.componentRef.setInput('deletePendingSupported', true);
+    fixture.componentRef.setInput('fixPendingMode', true);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Delete Pending');
+  });
+
+  it('does not show Delete Pending when disabled or after the result leaves PENDING', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('result', movement);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Delete Pending');
+
+    fixture.componentRef.setInput('deletePendingSupported', true);
+    fixture.componentRef.setInput('result', { ...movement, status: 'CANCELLED' });
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Delete Pending');
+  });
+
   it('renders an error without exposing result-only actions', () => {
     const fixture = TestBed.createComponent(MakerResultPanelComponent);
     fixture.componentRef.setInput('error', 'Submission failed');

@@ -21,6 +21,7 @@ import type { MakerCheckerContext } from './maker-panel.component';
  * Direct instantiation (no TestBed).
  */
 
+const A1 = IMPORT_FUNCTIONS.find((f) => f.code === 'A1')!;
 const A2 = IMPORT_FUNCTIONS.find((f) => f.code === 'A2')!;
 const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
 const A3S = IMPORT_FUNCTIONS.find((f) => f.code === 'A3S')!;
@@ -907,6 +908,74 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(first).not.toBe(second);
       expect(first).toEqual(second);
+    });
+  });
+
+  describe('A1/A3 same-session Maker Result Delete Pending', () => {
+    it('uses the direct cancel API, stays in Transaction Processing, resets to fresh A1 input data, and never calls Maker Queue deletion', () => {
+      const { comp, api } = setup();
+      comp.activeMode = 'PROCESSING';
+      comp.selectedFunction = A1;
+      setMakerContext(comp, { createdBy: 'maker9', submitResult: makeMovement({ movementId: 'submitted-a1' }) });
+      comp.selectedCheckerMovement = makeMovement({ movementId: 'checker-a1' });
+      comp.checkerError = 'stale error';
+      const resetNonceBeforeDelete = comp.checkerResetNonce;
+      const queueDelete = jest.spyOn(comp.makerQueue, 'deletePending');
+      const movement = makeMovement({ movementId: 'mv-a1-delete', movementType: 'ISSUE' });
+
+      comp.onMakerResultDeletePendingConfirmed(movement);
+
+      expect(api.cancel).toHaveBeenCalledWith('mv-a1-delete', 'maker9', 'MAKER_EC');
+      expect(queueDelete).not.toHaveBeenCalled();
+      expect(comp.pendingMakerQueueDeleteRow).toBeNull();
+      expect(comp.activeMode).toBe('PROCESSING');
+      expect(comp.selectedFunction).toBe(A1);
+      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect((comp as any).makerContext.createdBy).toBe('maker1');
+      expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.checkerError).toBeNull();
+      expect(comp.checkerResetNonce).toBe(resetNonceBeforeDelete + 1);
+      expect(comp.makerOutcomeSignal).toBeNull();
+      expect(comp.actionBusy).toBe(false);
+    });
+
+    it('resets a successfully deleted A3 to its fresh LC Index selection screen', () => {
+      const { comp, api } = setup();
+      comp.activeMode = 'PROCESSING';
+      comp.selectedFunction = A3;
+      setMakerContext(comp, { createdBy: 'maker3', submitResult: makeMovement({ movementId: 'submitted-a3' }) });
+      const resetNonceBeforeDelete = comp.checkerResetNonce;
+
+      comp.onMakerResultDeletePendingConfirmed(makeMovement({ movementId: 'mv-a3-delete', movementType: 'UTILIZE' }));
+
+      expect(api.cancel).toHaveBeenCalledWith('mv-a3-delete', 'maker3', 'MAKER_EC');
+      expect(comp.selectedFunction).toBe(A3);
+      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect(comp.checkerResetNonce).toBe(resetNonceBeforeDelete + 1);
+      expect(comp.activeMode).toBe('PROCESSING');
+    });
+
+    it('surfaces API failure without navigating to Maker Queue', () => {
+      const { comp, api } = setup();
+      comp.activeMode = 'PROCESSING';
+      comp.selectedFunction = A1;
+      api.cancel.mockReturnValue(apiErr('A1 delete failed'));
+
+      comp.onMakerResultDeletePendingConfirmed(makeMovement({ movementType: 'ISSUE' }));
+
+      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'A1 delete failed' });
+      expect(comp.activeMode).toBe('PROCESSING');
+      expect(comp.actionBusy).toBe(false);
+    });
+
+    it('does not run for A2 or a non-PENDING movement', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A2;
+      comp.onMakerResultDeletePendingConfirmed(makeMovement());
+      comp.selectedFunction = A1;
+      comp.onMakerResultDeletePendingConfirmed(makeMovement({ status: 'REJECTED' }));
+
+      expect(api.cancel).not.toHaveBeenCalled();
     });
   });
 

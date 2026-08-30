@@ -17,6 +17,13 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
     expect(Object.keys(FUNCTION_STRATEGIES).sort()).toEqual([...allCodes].sort());
   });
 
+  it('enables same-session Maker Result Delete Pending for A1 and A3 only', () => {
+    const enabled = Object.values(FUNCTION_STRATEGIES)
+      .filter((strategy) => strategy.makerResultDeletePendingEnabled)
+      .map((strategy) => strategy.code);
+    expect(enabled).toEqual(['A1', 'A3']);
+  });
+
   describe('movementDerivation — matches PR-1\'s autoRedeemType/settlesAcceptanceOnMature/movementTypeFromContractTenor characterization', () => {
     it('A9 (autoRedeemType) -> REDEEM, no other function derives REDEEM', () => {
       expect(FUNCTION_STRATEGIES['A9'].movementDerivation.amountVsAvailableDerivation).toBe('REDEEM');
