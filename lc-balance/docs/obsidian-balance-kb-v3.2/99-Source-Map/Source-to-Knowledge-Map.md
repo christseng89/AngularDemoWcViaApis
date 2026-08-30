@@ -3,7 +3,7 @@ knowledge_id: Source-to-Knowledge-Map
 title: "源文件到知识映射"
 domain: Balance
 category: Traceability
-snapshot_date: 2026-08-30
+snapshot_date: 2026-08-31
 tags:
   - balance
   - traceability
@@ -22,7 +22,9 @@ tags:
 
 **2026-08-30 增量同步：** 复核 `balanceService.ts` 及其 service collaborators、Transaction Index UI、Business Case Runner lifecycle、两份 OAS 与 2,466 项测试基准。新增 [[BalanceService Facade Architecture]] 与 [[Transaction Index Selection Contract]] 两个聚合知识节点。
 
-## Angular UI — 交易构建器（Transaction Builder，28 个文件）
+**2026-08-31 增量同步：** 复核 `InquireDeletePendingComponent` 的 standalone dependency 边界；移除模板未使用的 `TbIconComponent` 后，确认无 API contract 变化，两份 OAS 保持不变。详见 [[InquireDeletePendingComponent]]。
+
+## Angular UI — 交易构建器（Transaction Builder，29 个文件）
 
 | 源文件 | 生成的规则 |
 |---|---|
@@ -46,6 +48,7 @@ tags:
 | `src/app/transaction-builder/function-strategy.ts` | [[MAKER-CHECKER-RULE-013]], [[MAKER-CHECKER-RULE-014]], [[MAKER-CHECKER-RULE-015]], [[MAKER-CHECKER-RULE-016]], [[MAKER-CHECKER-RULE-017]], [[MAKER-CHECKER-RULE-018]], [[MOVEMENT-RULE-019]], [[MOVEMENT-RULE-024]], [[MOVEMENT-RULE-064]], [[MOVEMENT-RULE-065]] |
 | `src/app/transaction-builder/inquire-events.service.spec.ts` | [[BALANCE-RULE-014]], [[MAKER-CHECKER-RULE-037]], [[MAKER-CHECKER-RULE-038]], [[STATUS-RULE-024]], [[STATUS-RULE-025]] |
 | `src/app/transaction-builder/inquire-events.service.ts` | [[BALANCE-RULE-014]], [[MAKER-CHECKER-RULE-037]], [[MAKER-CHECKER-RULE-038]], [[MOVEMENT-RULE-030]], [[MOVEMENT-RULE-031]], [[MOVEMENT-RULE-032]], [[MOVEMENT-RULE-033]], [[MOVEMENT-RULE-034]], [[MOVEMENT-RULE-035]], [[STATUS-RULE-024]], [[STATUS-RULE-025]] |
+| `src/app/transaction-builder/inquire-delete-pending.component.ts` | [[InquireDeletePendingComponent]] |
 | `src/app/transaction-builder/look-up-panel.service.ts` | [[MAKER-CHECKER-RULE-037]], [[MAKER-CHECKER-RULE-039]], [[MAKER-CHECKER-RULE-040]], [[STATUS-RULE-025]] |
 | `src/app/transaction-builder/maker-panel.component.ts` | [[BALANCE-RULE-011]], [[BALANCE-RULE-012]], [[BALANCE-RULE-013]], [[MAKER-CHECKER-RULE-027]], [[MOVEMENT-RULE-022]], [[MOVEMENT-RULE-027]], [[MOVEMENT-RULE-029]], [[MOVEMENT-RULE-083]], [[STATUS-RULE-036]] |
 | `src/app/transaction-builder/maker-submit.service.spec.ts` | [[MAKER-CHECKER-RULE-025]], [[MAKER-CHECKER-RULE-026]] |

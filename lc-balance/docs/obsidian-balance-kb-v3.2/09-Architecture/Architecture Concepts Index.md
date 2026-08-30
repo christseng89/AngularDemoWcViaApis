@@ -17,7 +17,7 @@ tags:
 - [[business-case-runner-ui-single-run-vs-run-all-sequential-chain|Business Case Runner 顺序执行与保留种子]]
 - [[Freshness-Update-Log-2026-08-30|2026-08-30 知识新鲜度更新]]
 
-`09-Architecture/` 目录下的每一篇笔记（共 51 篇），供直接浏览本知识库区块使用。
+`09-Architecture/` 目录下的架构笔记，供直接浏览本知识库区块使用。
 
 - [[Balance Architecture]]
 - [[CatalogPickerService]]
@@ -47,6 +47,7 @@ tags:
 ## UI 组件
 
 - [[BalanceSnapshotBoxComponent|余额快照展示组件，两画面共用]]
+- [[InquireDeletePendingComponent|Delete Pending 查询视图组件]]
 - [[accountentriesdialogcomponent-view-voucher|查看凭证对话框组件]]
 - [[eventbalancetab-balance-tabs-lc-acceptance-sg|Event 余额标签页（LC/承兑/保函）]]
 - [[inquireeventscomponent-view-layer-extraction|Inquire Events 纯视图层组件]]
