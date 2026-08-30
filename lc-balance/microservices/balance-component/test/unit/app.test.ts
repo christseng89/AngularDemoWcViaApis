@@ -5388,6 +5388,21 @@ describe('POST /balance-movements/:movementId/edit — Fix Pending', () => {
     await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ amount: '130000' }).expect(400);
   });
 
+  test('REMARKS_ONLY requires a non-blank Remark and persists a trimmed value', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await issueSightLc(app, 'FIXP-HTTP-REMARKS');
+    const base = { amount: issue.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY' };
+
+    await request(app).post(`/balance-movements/${issue.movementId}/edit`).send(base).expect(400);
+    await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ ...base, remarks: '   ' }).expect(400);
+
+    const saved = await request(app)
+      .post(`/balance-movements/${issue.movementId}/edit`)
+      .send({ ...base, remarks: '  corrected reference  ' })
+      .expect(200);
+    expect(saved.body.remarks).toBe('corrected reference');
+  });
+
   test('a malformed amount (fails MONETARY_AMOUNT_PATTERN) -> 400 at the schema layer', async () => {
     const app = createApp(createDb(':memory:'));
     const issue = await issueSightLc(app, 'FIXP-HTTP-005');

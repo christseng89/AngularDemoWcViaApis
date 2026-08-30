@@ -102,7 +102,7 @@
             <span>{{ selectedFunction?.pendingItemSourceCode || selectedFunction?.code }}</span>
             <span class="tb-row-primary">{{ row.root.naturalKey.lcNumber }}</span>
             <span>{{ row.secondaryRef }}</span>
-            <span>{{ row.amount }} {{ row.currency }}</span>
+            <span>{{ row.amount | monetaryAmount: row.currency }} {{ row.currency }}</span>
             <span class="tb-row-badge">{{ row.status }}</span>
           </ng-template>
         </app-index-picker>
@@ -238,7 +238,7 @@
               <span>{{ selectedFunction?.pendingItemSourceCode || 'A3' }}</span>
               <span class="tb-row-primary">{{ selectedParent.naturalKey.lcNumber || '—' }}</span>
               <span>{{ m.sourceTransactionRef || '—' }}</span>
-              <span>{{ m.amount }} {{ m.currency }}</span>
+              <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
               <span class="tb-row-badge">{{ m.acknowledgedAt ? 'EARMARKED' : m.status }}</span>
             </ng-template>
           </app-index-picker>
@@ -504,7 +504,7 @@
               <span>A3</span>
               <span class="tb-row-primary">{{ row.contract.naturalKey.lcNumber }}</span>
               <span>{{ row.movement.sourceTransactionRef || '—' }}</span>
-              <span>{{ row.movement.amount }} {{ row.movement.currency }}</span>
+              <span>{{ row.movement.amount | monetaryAmount: row.movement.currency }} {{ row.movement.currency }}</span>
               <span class="tb-row-badge">{{ row.movement.acknowledgedAt ? 'EARMARKED' : row.movement.status }}</span>
             </ng-template>
           </app-index-picker>
@@ -629,17 +629,17 @@
           <div class="tb-balance-row">
             <span class="tb-balance-row__label">SG Outstanding</span
             ><span class="tb-balance-row__value"
-              >{{ pickerSelection.arrivalSgSnapshot.confirmedBalance }} {{ pickerSelection.selectedArrivalSg.currency }}</span
+              >{{ pickerSelection.arrivalSgSnapshot.confirmedBalance | monetaryAmount: pickerSelection.selectedArrivalSg.currency }} {{ pickerSelection.selectedArrivalSg.currency }}</span
             >
           </div>
           <ng-container *ngIf="arrivalSgRedeemAmount">
             <div class="tb-balance-row">
               <span class="tb-balance-row__label">SG Redemption Amount (MIN of Bill Amount, SG Outstanding) — {{ arrivalSgRedeemType }}</span
-              ><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
+              ><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount | monetaryAmount: pickerSelection.selectedArrivalSg.currency }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
             </div>
             <div class="tb-balance-row">
               <span class="tb-balance-row__label">SG Remaining After This Redemption</span
-              ><span class="tb-balance-row__value">{{ arrivalSgRemaining }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
+              ><span class="tb-balance-row__value">{{ arrivalSgRemaining | monetaryAmount: pickerSelection.selectedArrivalSg.currency }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
             </div>
           </ng-container>
           <div class="tb-hint mt-2" *ngIf="model.amount && +model.amount > +pickerSelection.arrivalSgSnapshot.confirmedBalance">
@@ -689,7 +689,7 @@
             <span>{{ selectedFunction?.pendingItemSourceCode || 'B3' }}</span>
             <span class="tb-row-primary">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
             <span>{{ m.sourceTransactionRef || '—' }}</span>
-            <span>{{ m.amount }} {{ m.currency }}</span>
+            <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
             <span class="tb-row-badge">{{ m.status }}</span>
           </ng-template>
         </app-index-picker>
@@ -737,7 +737,7 @@
             <span>A3</span>
             <span class="tb-row-primary">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
             <span>{{ m.sourceTransactionRef || '—' }}</span>
-            <span>{{ m.amount }} {{ m.currency }}</span>
+            <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
             <span class="tb-row-badge">{{ m.acknowledgedAt ? 'EARMARKED' : m.status }}</span>
           </ng-template>
         </app-index-picker>

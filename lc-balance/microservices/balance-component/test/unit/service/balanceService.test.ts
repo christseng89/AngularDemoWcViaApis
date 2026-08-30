@@ -3121,12 +3121,12 @@ describe('BalanceService.editPending — Remarks-only mode', () => {
     expect((audit[0]!.afterSnapshot as { remarks: string }).remarks).toBe('checked docs');
   });
 
-  test('rejects amount changes, accepts any pending function, and normalizes blank remarks to null', () => {
+  test('rejects amount changes and blank remarks, and accepts any pending function', () => {
     const service = new BalanceService(createDb(':memory:'));
     const a9 = pendingStandaloneA9(service, 'FIXP-A9-002');
     expect(() => service.editPending(a9.movementId, { amount: '1', editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: 'x' })).toThrow(RequestValidationError);
-    const cleared = service.editPending(a9.movementId, { amount: a9.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: '   ' });
-    expect(cleared.remarks).toBeNull();
+    expect(() => service.editPending(a9.movementId, { amount: a9.amount, editedBy: 'maker2', editMode: 'REMARKS_ONLY', remarks: '   ' }))
+      .toThrow('Remarks is required for Remarks-only Fix Pending.');
     const issueResult = service.createMovement({ instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'FIXP-A9-NOT-SG' }, movementType: 'ISSUE', eventSeq: 91004, amount: '1000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', createdBy: 'maker1' });
     if (!issueResult.created) throw new Error('expected LC issue');
     const issue = issueResult.movement;

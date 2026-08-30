@@ -789,15 +789,14 @@ export class TransactionBuilderComponent {
    * method is a pure pass-through of whatever patch the panel already built.
    */
   fixPending(event: Record<string, unknown> & { movementId: string }): void {
-    if (
-      !this.makerContext.submitResult?.movementId ||
-      this.makerContext.submitResult.movementId !== event.movementId ||
-      (this.makerContext.submitResult.status !== 'PENDING' && this.makerContext.submitResult.status !== 'REJECTED')
-    )
-      return;
+    const contextTarget = this.makerContext.submitResult?.movementId === event.movementId ? this.makerContext.submitResult : null;
+    const externalTarget = this.externalFixPendingRequest?.movementId === event.movementId ? this.externalFixPendingRequest : null;
+    const target = contextTarget ?? externalTarget;
+    if (!target || (target.status !== 'PENDING' && target.status !== 'REJECTED')) return;
     const { movementId: _movementId, ...patch } = event;
     this.actionBusy = true;
-    this.checkerActions.editPending(this.buildCheckerActionContext(), patch as Omit<EditMovementRequest, 'editedBy'>).subscribe((outcome) => {
+    const context = { ...this.buildCheckerActionContext(), submitResult: target };
+    this.checkerActions.editPending(context, patch as Omit<EditMovementRequest, 'editedBy'>).subscribe((outcome) => {
       this.actionBusy = false;
       this.forwardOutcomeToMaker(outcome);
     });

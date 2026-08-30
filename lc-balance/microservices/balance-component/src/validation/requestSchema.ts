@@ -106,6 +106,13 @@ export const editMovementRequestSchema = z
         message: `amount "${data.amount}" is not a valid MonetaryAmount (expected ${MONETARY_AMOUNT_PATTERN}).`,
       });
     }
+    if (data.editMode === 'REMARKS_ONLY' && !data.remarks?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['remarks'],
+        message: 'remarks is required for REMARKS_ONLY Fix Pending.',
+      });
+    }
   });
 
 /**

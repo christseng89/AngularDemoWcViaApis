@@ -69,9 +69,22 @@ function deriveFixPendingLockFlags(
 ): Record<FixPendingEditableField, boolean> {
   const fixPendingModeOn = !!ctx.fixPendingMode;
   const enabled = fixPendingModeOn && functionSupportsFixPending(strategy);
+  const remarksOnly = enabled && strategy?.fixPendingMode === 'REMARKS_ONLY';
+  if (remarksOnly) {
+    return {
+      amount: true,
+      tolerancePct: true,
+      tenorType: true,
+      tenorDays: true,
+      expiryDate: true,
+      newExpiryDate: true,
+      reasonCode: true,
+      remarks: false,
+    };
+  }
   const contractLevelEditable = enabled && isCreatingMovement(ctx.model);
   return {
-    amount: enabled && (amountLocked || strategy?.fixPendingMode === 'REMARKS_ONLY'),
+    amount: enabled && amountLocked,
     // tolerancePct is a deliberate exception to the shared contractLevelEditable rule below (2026-08-28,
     // "A2 Tolerance % FIX PENDING INCREASE/DECREASE時准許修改") — unlike tenorType/tenorDays/expiryDate,
     // Tolerance is ALSO genuinely applicable to a non-creating AMEND_INCREASE/AMEND_DECREASE/AMEND edit
@@ -86,7 +99,7 @@ function deriveFixPendingLockFlags(
     expiryDate: enabled && !contractLevelEditable,
     newExpiryDate: fixPendingModeOn && (!enabled || !isAmendExpiryDate),
     reasonCode: fixPendingModeOn && (!enabled || !requiresReasonCode),
-    remarks: fixPendingModeOn && strategy?.fixPendingMode !== 'REMARKS_ONLY',
+    remarks: fixPendingModeOn,
   };
 }
 
@@ -346,7 +359,8 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       type: 'textarea',
       props: {
         label: 'Remarks',
-        description: 'Optional note for this pending A9 redemption. Monetary and accounting fields remain unchanged.',
+        description: 'Required correction note. Monetary, accounting and linked movement fields remain unchanged.',
+        required: true,
         maxLength: 500,
         rows: 4,
         disabled: remarksFixPendingLocked,

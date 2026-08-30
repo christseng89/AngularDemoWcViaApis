@@ -1247,7 +1247,7 @@ describe('MakerPanelComponent', () => {
       const c1 = mkContract('c1', '810');
       comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { pendingEarmarkTotal: '-25000' }));
       comp.documentArrivalHints.catalogPayableIbs.set('c1', ['IB00001']);
-      expect(comp.catalogPendingHint(c1)).toBe(' — Pending: 25,000');
+      expect(comp.catalogPendingHint(c1)).toBe(' — Pending: 25,000.00');
     });
 
     it('renders "Total Pending: <amount>" when more than one IB is pending', () => {
@@ -1266,7 +1266,7 @@ describe('MakerPanelComponent', () => {
       const contract = mkContract('c1', '810');
       comp.catalogPicker.snapshots.set('c1', mkSnapshot('c1', { tightAvailableBalance: '71234.56', currency: 'USD' }));
 
-      expect(comp.catalogTightLcBalance(contract)).toBe('71234.56 USD');
+      expect(comp.catalogTightLcBalance(contract)).toBe('71,234.56 USD');
       expect(comp.catalogTightLcBalance(mkContract('missing', '811'))).toBe('—');
     });
 
@@ -1275,8 +1275,16 @@ describe('MakerPanelComponent', () => {
       const contract = mkContract('p1', '910');
       comp.parentPicker.snapshots.set('p1', mkSnapshot('p1', { tightAvailableBalance: '45000', currency: 'EUR' }));
 
-      expect(comp.parentTightLcBalance(contract)).toBe('45000 EUR');
+      expect(comp.parentTightLcBalance(contract)).toBe('45,000.00 EUR');
       expect(comp.parentTightLcBalance(mkContract('missing', '911'))).toBe('—');
+    });
+
+    it('uses the selected currency minor units instead of always showing cents', () => {
+      const { comp } = makeComponentA();
+      const contract = mkContract('jpy-1', '912');
+      comp.catalogPicker.snapshots.set('jpy-1', mkSnapshot('jpy-1', { tightAvailableBalance: '71234', currency: 'JPY' }));
+
+      expect(comp.catalogTightLcBalance(contract)).toBe('71,234 JPY');
     });
   });
 
@@ -1588,7 +1596,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.selectedArrivalSg?.balanceContractId).toBe('SG1');
       expect(comp.pickerSelection.arrivalSgSnapshot?.availableBalance).toBe('3000');
       expect(comp.pickerSelection.arrivalSgSnapshots.get('SG1')?.availableBalance).toBe('3000');
-      expect(comp.arrivalSgIndexAmount(sgContract)).toBe('3000 USD');
+      expect(comp.arrivalSgIndexAmount(sgContract)).toBe('3,000.00 USD');
       // An SG whose own A8 Issue isn't Released yet shouldn't be offered as a redemption target.
       expect(api.catalog).toHaveBeenCalledWith('SHGT', 'ACTIVE', undefined, 1, 50, 'LC1', undefined, true);
     });
@@ -4065,7 +4073,7 @@ describe('MakerPanelComponent', () => {
 
       (c as any).catalogPicker.snapshots.set('many', snapshot({ pendingEarmarkTotal: '-5000' }));
       (c as any).documentArrivalHints.catalogPayableIbs.set('many', ['IB01', 'IB02']);
-      expect(c.catalogPendingHint(contract({ balanceContractId: 'many' }))).toBe(' — Total Pending: 5,000');
+      expect(c.catalogPendingHint(contract({ balanceContractId: 'many' }))).toBe(' — Total Pending: 5,000.00');
     });
 
     it('displayStatus relabels RELEASED to APPROVED by default and passes every other status through unchanged', () => {
@@ -4488,7 +4496,7 @@ describe('MakerPanelComponent', () => {
       const item = contract({ balanceContractId: 'ib-1', currency: 'HKD' });
       expect(c.transactionContractAmount(item)).toBe('—');
       c.ibIndexPicker.snapshots.set('ib-1', snapshot({ availableBalance: '12500', currency: 'HKD' }));
-      expect(c.transactionContractAmount(item)).toBe('12500 HKD');
+      expect(c.transactionContractAmount(item)).toBe('12,500.00 HKD');
     });
 
     it('uses a dash when an A3S SG row has no live outstanding snapshot', () => {
@@ -5250,6 +5258,42 @@ describe('MakerPanelComponent', () => {
       comp.confirmFixPending();
 
       expect(emitted).toEqual({ movementId: 'mv-2', amount: '25000' });
+    });
+
+    it.each(['A4', 'A6', 'A7', 'A9', 'B4', 'B5'])(
+      '%s Remarks-only Fix Pending requires a changed non-blank Remark and emits the strict API payload',
+      (code) => {
+        const comp = makeComponentB(getFn(code), makeApi());
+        comp.submitResult = makeMovement({ movementId: `mv-${code}`, amount: '10000', remarks: null, status: 'PENDING' });
+        comp.fixPendingMode = true;
+        comp.model.amount = '10000';
+
+        comp.model.remarks = '   ';
+        expect(comp.fixPendingSaveReady).toBe(false);
+        comp.model.remarks = 'correction note';
+        expect(comp.fixPendingSaveReady).toBe(true);
+
+        let emitted: (Record<string, unknown> & { movementId: string }) | null = null;
+        comp.fixPendingRequested.subscribe((event) => (emitted = event));
+        comp.confirmFixPending();
+
+        expect(emitted).toEqual({
+          movementId: `mv-${code}`,
+          amount: '10000',
+          editMode: 'REMARKS_ONLY',
+          remarks: 'correction note',
+        });
+      },
+    );
+
+    it('Remarks-only Save stays disabled when Remarks is unchanged after trimming', () => {
+      const comp = makeComponentB(getFn('A6'), makeApi());
+      comp.submitResult = makeMovement({ movementId: 'mv-a6', amount: '10000', remarks: 'existing note', status: 'PENDING' });
+      comp.fixPendingMode = true;
+      comp.model.amount = '10000';
+      comp.model.remarks = '  existing note  ';
+
+      expect(comp.fixPendingSaveReady).toBe(false);
     });
 
     it('頁面配置檔 — confirmFixPending() for A1 (declares amount + all 4 contract-level fields) sends the full patch', () => {

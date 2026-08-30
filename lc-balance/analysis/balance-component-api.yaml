@@ -81,6 +81,19 @@ info:
     Account Entries and compound sibling movements remain untouched.
 
 
+    v1.39.0 (2026-08-30, Transaction Index amount display; no wire-shape
+    change): every A-series and B-series Transaction Index amount projection,
+    including Tight LC Balance and SG/IB/EB Amount, is rendered with thousands
+    separators and the selected currency's ISO minor-unit scale. API monetary
+    values remain unformatted decimal strings.
+
+
+    v1.40.0 (2026-08-30, Remarks-only Fix Pending validation): Remarks is
+    mandatory and must contain at least one non-whitespace character for A4,
+    A6, A7, A9, B4 and B5. The UI disables Save until Remarks differs from
+    the stored value; the API independently rejects missing or blank Remarks.
+
+
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
     scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
     field on every request (see `BalanceMovementCreateRequest.required`),
@@ -1823,8 +1836,8 @@ paths:
         Corrects a PENDING or REJECTED movement while preserving movementId,
         eventSeq and business identity, and appends a Fix Pending audit record.
         The strict allowlist rejects locked identity fields. REMARKS_ONLY is
-        used by A4, A6, A7, A9, B4 and B5; it accepts only the unchanged
-        amount, editor and Remarks, and never recalculates balance, accounting
+        used by A4, A6, A7, A9, B4 and B5; it requires a non-blank Remarks,
+        and accepts only the unchanged amount, editor and Remarks. It never recalculates balance, accounting
         or sibling movements. A4 applies the Remark to its underlying A3/A3S
         movement because A4 finalizes that existing movement in place.
       parameters:
@@ -2239,6 +2252,10 @@ components:
         decimal-place count (e.g. JPY allows none, most currencies allow
         two, BHD/KWD/OMR allow three) and rejects a request whose amount
         has more fractional digits than that currency allows with `400`.
+        This is the wire representation and MUST NOT contain thousands
+        separators. UI display layers format the same value with separators
+        and exactly the currency's minor-unit digits (for example USD
+        `71,000.00`, JPY `71,000`, and KWD `71,000.000`).
       example: "300000.00"
 
     NaturalKey:
@@ -2642,7 +2659,7 @@ components:
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
         editedBy: { type: string, minLength: 1 }
         editMode: { type: string, enum: [STANDARD, REMARKS_ONLY], default: STANDARD }
-        remarks: { type: string, maxLength: 500, nullable: true }
+        remarks: { type: string, minLength: 1, maxLength: 500, pattern: '.*\S.*', nullable: true, description: "Required and non-blank when editMode is REMARKS_ONLY; optional otherwise." }
         legRef: { type: string, nullable: true }
         accountEntries:
           type: array
@@ -2670,8 +2687,9 @@ components:
         Strict Fix Pending allowlist. naturalKey, balanceContractId,
         instrumentType, movementType, currency, eventSeq, createdBy and
         sourceTransactionRef are locked and rejected when supplied. In
-        REMARKS_ONLY mode, amount must equal the stored amount and every
-        property other than amount, editedBy, editMode and remarks is rejected.
+        REMARKS_ONLY mode, amount must equal the stored amount, remarks is
+        required and must be non-blank, and every property other than amount,
+        editedBy, editMode and remarks is rejected.
 
     BalanceMovementCreateRequest:
       type: object

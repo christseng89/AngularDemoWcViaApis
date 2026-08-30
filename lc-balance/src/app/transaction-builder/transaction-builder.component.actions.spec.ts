@@ -801,6 +801,24 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.actionBusy).toBe(false);
     });
 
+    it('Maker Queue Remarks-only path uses the active external target when makerContext was reset or has not synchronized yet', () => {
+      const { comp, api } = setup();
+      const target = makeMovement({ movementId: 'mv-a6-remarks', status: 'PENDING', amount: '10000' });
+      comp.externalFixPendingRequest = target;
+      setMakerContext(comp, { submitResult: null, createdBy: 'maker1' });
+      api.editPending.mockReturnValueOnce(of({ ...target, remarks: 'corrected' }) as any);
+
+      comp.fixPending({ movementId: target.movementId, amount: '10000', editMode: 'REMARKS_ONLY', remarks: 'corrected' });
+
+      expect(api.editPending).toHaveBeenCalledWith(target.movementId, {
+        amount: '10000',
+        editMode: 'REMARKS_ONLY',
+        remarks: 'corrected',
+        editedBy: 'maker1',
+      });
+      expect(comp.actionBusy).toBe(false);
+    });
+
     // Phase 4 (2026-08-28, "使用同樣方式處理A3 A35 A4 & B2") — an A3S compound Fix Pending edit's own
     // resolved SG leg reaches the Maker panel via `secondary`.
     it('compound (A3S) PENDING path: resolves the SG leg via findByBusinessEventId and includes it in the forwarded outcome\'s own secondary', () => {

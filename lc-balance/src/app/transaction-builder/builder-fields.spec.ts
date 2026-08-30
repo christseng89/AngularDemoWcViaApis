@@ -106,6 +106,7 @@ describe('builder-fields', () => {
     expect(remarks).toBeDefined();
     expect(remarks?.hide).toBe(false);
     expect(remarks?.props?.disabled).toBe(false);
+    expect(remarks?.props?.required).toBe(true);
     expect(remarks?.props?.maxLength).toBe(500);
     expect(fields.find((field) => field.key === 'amount')?.props?.disabled).toBe(true);
   });

@@ -860,7 +860,8 @@ export class BalanceService {
         throw new RequestValidationError('Remarks-only Fix Pending may change remarks only.');
       }
       if (patch.amount !== old.amount) throw new RequestValidationError('Amount cannot be changed in Remarks-only Fix Pending.');
-      const remarks = patch.remarks?.trim() || null;
+      const remarks = patch.remarks?.trim();
+      if (!remarks) throw new RequestValidationError('Remarks is required for Remarks-only Fix Pending.');
       const editedAt = this.now();
       const after = { ...old, remarks, editedBy: patch.editedBy, editedAt };
       this.db.exec('BEGIN');

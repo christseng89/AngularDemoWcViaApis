@@ -32,6 +32,7 @@ import {
   decimalPlacesForCurrency,
   displayMovementType,
   displayStatus as displayStatusShared,
+  formatCurrencyAmount,
   groupThousands,
 } from './balance-component.model';
 import { BuilderFieldsContext, buildFields, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
@@ -54,6 +55,7 @@ import { ProtectedIdentityItem, deriveProtectedIdentityItems } from './protected
 import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { MakerBalanceWarningsComponent } from './maker-balance-warnings.component';
 import { deriveMakerBalanceWarnings } from './maker-balance-warning.policy';
+import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
  * The fields `TransactionBuilderComponent.buildCheckerActionContext()` needs from this panel's own
@@ -146,7 +148,7 @@ export interface MakerSyncRequest {
 @Component({
   selector: 'app-maker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, TbIconComponent, MakerResultPanelComponent, MakerActionBarComponent, MakerWorkflowNoticesComponent, ProtectedTransactionIdentityComponent, BalanceSnapshotBoxComponent, MakerBalanceWarningsComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, IndexPickerComponent, TbIconComponent, MakerResultPanelComponent, MakerActionBarComponent, MakerWorkflowNoticesComponent, ProtectedTransactionIdentityComponent, BalanceSnapshotBoxComponent, MakerBalanceWarningsComponent, MonetaryAmountPipe],
   templateUrl: './maker-panel.component.html',
   styleUrl: './maker-panel.component.scss',
   /**
@@ -1065,7 +1067,7 @@ export class MakerPanelComponent implements OnChanges {
 
   parentTightLcBalance(contract: BalanceContract): string {
     const snapshot = this.parentPicker.snapshots.get(contract.balanceContractId);
-    return snapshot ? `${snapshot.tightAvailableBalance} ${snapshot.currency}` : '—';
+    return snapshot ? `${formatCurrencyAmount(snapshot.tightAvailableBalance, snapshot.currency)} ${snapshot.currency}` : '—';
   }
 
   get usesCombinedTransactionIndex(): boolean {
@@ -1180,12 +1182,12 @@ export class MakerPanelComponent implements OnChanges {
     if (!snap || snap.pendingEarmarkTotal === '0') return '';
     const ibs = this.documentArrivalHints.catalogPayableIbs.get(c.balanceContractId);
     const label = ibs && ibs.length > 1 ? 'Total Pending' : 'Pending';
-    return ` — ${label}: ${this.formatAmount(snap.pendingEarmarkTotal.replace('-', ''))}`;
+    return ` — ${label}: ${formatCurrencyAmount(snap.pendingEarmarkTotal.replace('-', ''), snap.currency)}`;
   }
 
   catalogTightLcBalance(contract: BalanceContract): string {
     const snapshot = this.catalogPicker.snapshots.get(contract.balanceContractId);
-    return snapshot ? `${snapshot.tightAvailableBalance} ${snapshot.currency}` : '—';
+    return snapshot ? `${formatCurrencyAmount(snapshot.tightAvailableBalance, snapshot.currency)} ${snapshot.currency}` : '—';
   }
 
   onSelectContract(contractId: string, loadSourceTransaction = true): void {
@@ -1545,12 +1547,12 @@ export class MakerPanelComponent implements OnChanges {
 
   transactionContractAmount(contract: BalanceContract): string {
     const snapshot = this.ibIndexPicker.snapshots.get(contract.balanceContractId);
-    return snapshot ? `${snapshot.availableBalance} ${snapshot.currency}` : '—';
+    return snapshot ? `${formatCurrencyAmount(snapshot.availableBalance, snapshot.currency)} ${snapshot.currency}` : '—';
   }
 
   arrivalSgIndexAmount(contract: BalanceContract): string {
     const snapshot = this.pickerSelection.arrivalSgSnapshots.get(contract.balanceContractId);
-    return snapshot ? `${snapshot.availableBalance} ${snapshot.currency}` : '—';
+    return snapshot ? `${formatCurrencyAmount(snapshot.availableBalance, snapshot.currency)} ${snapshot.currency}` : '—';
   }
 
   onSelectIbIndex(contractId: string): void {
@@ -1851,6 +1853,12 @@ export class MakerPanelComponent implements OnChanges {
    * shown/required at the form level, not a second, independently-invented rule.
    */
   get fixPendingSaveReady(): boolean {
+    const strategy = this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
+    if (strategy?.fixPendingMode === 'REMARKS_ONLY') {
+      const remarks = this.model.remarks?.trim() || '';
+      const originalRemarks = this.submitResult?.remarks?.trim() || '';
+      return remarks.length > 0 && remarks !== originalRemarks;
+    }
     if (this.model.movementType === 'AMEND_EXPIRY_DATE') return !!this.model.newExpiryDate;
     return !!this.model.amount;
   }
@@ -1942,9 +1950,12 @@ export class MakerPanelComponent implements OnChanges {
     if (strategy?.fixPendingMode === 'REMARKS_ONLY') {
       const remarks = this.model.remarks?.trim() || null;
       const originalRemarks = this.submitResult.remarks?.trim() || null;
-      if (remarks === originalRemarks) return;
+      if (!remarks || remarks === originalRemarks) return;
       patch['editMode'] = 'REMARKS_ONLY';
+      patch['remarks'] = remarks;
       this.model.remarks = remarks ?? undefined;
+      this.fixPendingRequested.emit(patch as Record<string, unknown> & { movementId: string });
+      return;
     }
     for (const field of MakerPanelComponent.FIX_PENDING_PATCH_FIELDS) {
       if (!isFixPendingFieldEditable(ctx, field)) continue;
