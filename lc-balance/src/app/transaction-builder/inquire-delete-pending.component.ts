@@ -2,7 +2,6 @@ import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FormlyModule } from '@ngx-formly/core';
-import { TbIconComponent } from '../tb-icon.component';
 import { InquireDeletePendingService } from './inquire-delete-pending.service';
 import { DeletePendingAuditRow } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
@@ -26,7 +25,6 @@ import { ProtectedTransactionIdentityComponent } from './protected-transaction-i
     CommonModule,
     FormsModule,
     FormlyModule,
-    TbIconComponent,
     TransactionSearchFieldComponent,
     TransactionPaginationComponent,
     FeedbackMessageComponent,
