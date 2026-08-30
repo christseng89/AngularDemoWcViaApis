@@ -1,5 +1,7 @@
 # BalanceService SOLID Refactor Implementation Plan
 
+> 狀態：已完成（2026-08-30）。`BalanceService` 保留 compatibility façade，Tasks 1–12 已落實並通過完整 regression；現行責任表見 `microservices/balance-component/src/service/README.md`。
+
 > **For Codex:** REQUIRED SUB-SKILL: Use the repository validation commands after every extraction.
 
 **Goal:** Reduce `BalanceService` responsibilities without changing its public API, persistence semantics, error contract, or business results.

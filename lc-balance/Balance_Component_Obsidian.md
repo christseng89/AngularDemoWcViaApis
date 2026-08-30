@@ -4,13 +4,13 @@
 >
 > **v3.0 变更摘要（相对 v2.0）：**
 >
-> 1. **功能导向结构**：新增第 6 节，以 Balance Component 实际定义的 16 个具名业务功能（A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、B1、B2、B3、B4、B5、B6）作为业务逻辑重建与 Vault 目录组织的**主要分析单位**，每个功能拥有独立的分析文件夹（见第 10 节）；技术分层知识（规则、决策表、Metadata 等）保留作为共用基础设施，以链接方式被功能笔记引用，不重复复制。
+> 1. **功能导向结构**：以 Balance Component 实际定义的 18 个具名业务功能（A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、A11、B1、B2、B3、B4、B5、B6、B7）作为业务逻辑重建与 Vault 目录组织的主要分析单位。
 > 2. **中文产出强制**：新增第 4 节，明确要求本次萃取产出的 Obsidian 知识库文档**本身**（不只是本规格书）必须以中文撰写，并列出允许保留英文的字段与符号范围。
 > 3. **范畴之外统一整合**：新增第 1.1 节，把所有"范畴之外（Out of Scope）"的判断集中写入介绍/总览部分，作为唯一事实来源；其余章节与产出笔记不得重复展开范畴说明，一律以链接回引。
 > 4. **面向开发人员的 API 整合视角**：新增第 6.4 节与配套的《Function-API Integration Map》快速参考页，让开发人员能快速理解 Balance Component 的业务功能与其 API 如何整合、如何应用于各类 Trade Finance 交易之中，不需要先读完所有规则笔记才能拼凑出整体调用关系。
 > 5. **质量审核门槛提升**：第 21 节九维度自评的最低目标分数一律提升为 **≥9.3**（原 ≥9.0 的七个维度全部上调；Code Traceability、Hallucination Control 两项原本 ≥9.5 的维度维持不变）。
 >
-> 版本：v3.2（质量审核门槛提升至 ≥9.3）｜ 修订日期：2026-08-22 ｜ 取代版本：v3.1（新增开发人员 API 整合视角）
+> 版本：v3.3（同步 A11／B7、SOLID service architecture 與 OAS v1.37／v1.8）｜ 修订日期：2026-08-30 ｜ 取代版本：v3.2
 
 ---
 
@@ -80,7 +80,7 @@ Obsidian Balance 知识库
 * Balance / Exposure（或有负债、表内外会计）推导与过账
 * Tolerance（容差）换算
 * Maker/Checker（四眼原则）生命周期管控
-* 16 个具名业务功能：进口方向 A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10；出口方向 B1、B2、B3、B4、B5、B6（完整定义见第 6.1 节）
+* 18 个具名业务功能：进口方向 A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、A11；出口方向 B1、B2、B3、B4、B5、B6、B7（完整定义见第 6.1 节）
 * 支撑上述功能的 API、数据模型、DB 持久层与 Angular UI（`transaction-builder`/`business-case-runner`）
 
 **范畴之外（Out of Scope）：**
@@ -169,7 +169,7 @@ Obsidian Balance 知识库
 
 * 概念笔记（Domain Concepts）
 * 业务规则笔记（Business Rules）
-* 功能分析笔记（A1–A10、B1–B6，见第 6 节）
+* 功能分析笔记（A1–A11、B1–B7，A5 保留不用，见第 6 节）
 * 决策表（Decision Tables）
 * 测试场景（Test Scenarios）
 * Mermaid 流程图中的节点文字
@@ -261,7 +261,7 @@ Obsidian Balance 知识库
 
 # 6. 重建业务逻辑（Reconstruct Business Logic）— 以功能为导向
 
-> 本节为 v3.0 重写重点。原 v2.0 的重建方式（单纯依 Trigger→…→Error 逐一记录、以技术分层为主要组织方式）保留为**分析步骤模板**，但 v3.0 起，**以 16 个具名业务功能作为业务逻辑重建与阅读入口的主要分析单位**，技术分层知识（Balance/Exposure、Tolerance、规则 ID、Metadata、Traceability 等，见第 7–16 节）转为每个功能笔记向下钻取、交叉引用的共用知识层，不重复复制内容。
+> 本节为 v3.0 重写重点；v3.3 起以 18 个具名业务功能作为业务逻辑重建与阅读入口的主要分析单位。
 
 不要孤立地逐一记录每个 Method，也不要只依赖跨领域的技术分层来组织业务逻辑笔记。
 
@@ -301,7 +301,7 @@ Obsidian Balance 知识库
 
 ## 6.2 每个功能的重建模板
 
-16 个具名功能（A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、B1、B2、B3、B4、B5、B6）**每个建立一份**（而非多份零碎笔记）功能分析笔记，存放于第 10 节所定义的对应功能文件夹下，结构如下：
+18 个具名功能（A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、A11、B1、B2、B3、B4、B5、B6、B7）**每个建立一份**功能分析笔记，存放于第 10 节所定义的对应功能文件夹下，结构如下：
 
 ```text
 功能摘要（Function Summary）
@@ -374,7 +374,7 @@ flowchart TD
    07-API/Function-API Integration Map.md
    ```
 
-   内容为一张总表，汇总全部 16 个具名功能（A1–A10、B1–B6）与其对应 API 端点、调用方、所属 Trade Finance 交易类型（进口 LC 生命周期 / 出口保兑 LC 生命周期）的对照关系，作为开发人员的单一快速入口，取代逐一翻阅 16 份功能笔记才能拼凑全貌的方式；本页仅做汇总链接，不重复展开各功能的完整业务逻辑（一律链接回对应功能笔记，遵循第 1.1 节确立的"链接优先于复制"写作纪律）。
+   内容为一张总表，汇总全部 18 个具名功能（A1–A11、B1–B7，A5 保留不用）与其对应 API 端点、调用方、所属 Trade Finance 交易类型的对照关系，作为开发人员的单一快速入口。
 
    范例结构：
 
@@ -474,7 +474,7 @@ STATUS-RULE-001
 MAKER-CHECKER-RULE-001
 ```
 
-这六组前缀对应 Balance Component 内部六个语义清晰的子领域，日常在 Obsidian 知识库内部导航、`[[Wiki Links]]`、以及 Balance-Traceability-Matrix 中继续使用，**不需要改名**。这六组前缀与第 6 节新增的功能代码（A1–A10、B1–B6）是两个正交的分类维度：前者按"规则的技术子领域"分类，后者按"规则被哪个业务功能触发/引用"分类，同一条规则可以只有一个前缀，但可能被多个功能代码引用。
+这六组前缀对应 Balance Component 内部六个语义清晰的子领域，日常在 Obsidian 知识库内部导航、`[[Wiki Links]]`、以及 Balance-Traceability-Matrix 中继续使用，**不需要改名**。这六组前缀与第 6 节的功能代码（A1–A11、B1–B7，A5 保留不用）是两个正交的分类维度。
 
 ## 9.2 对齐 v6.1 企业级 Traceability ID 标准
 
@@ -581,9 +581,9 @@ CONFIRMED
 
 **结构说明**：
 
-* `A-Import/` 与 `B-Export/` 下的 16 个功能子文件夹，各自**只放一份**该功能的分析笔记（第 6.2 节模板），不建立多份零碎文档；A5 不建立文件夹（见第 1.1、6.1 节）。
+* `A-Import/` 与 `B-Export/` 下的 18 个功能子文件夹，各自只放一份该功能的分析笔记；A5 不建立文件夹。
 * `Cross-Function-Flows/` 存放横跨多个功能的端到端生命周期图（例如 A1→A2→A3→A10 的完整 LC 生命周期），不属于任何单一功能。
-* `07-API/` 目录下须新增唯一一份 `Function-API Integration Map.md`（见第 6.4 节），作为开发人员理解 16 个功能与其 API 整合关系的单一快速入口。
+* `07-API/` 目录下须有唯一一份 `Function-API Integration Map.md`，作为开发人员理解 18 个功能与其 API 整合关系的单一快速入口。
 * `01-Domain-Concepts/`、`02-Business-Rules/`、`04-Exposure-Accounting/`、`05-Tolerance-FX/`、`06-Maker-Checker/`、`07-API/`、`08-Data-Model/`、`09-Architecture/`、`10-Test-Scenarios/`、`11-Decision-Tables/` 等技术分层目录**结构不变**，继续作为功能笔记向下钻取、交叉引用的共用知识层（见第 6.3 节）。
 * 不要建立过多零碎的小文档；每则笔记应聚焦一个有意义的业务概念或一个具名功能。
 
@@ -643,7 +643,7 @@ tags:
 
 ## 12.2 功能笔记专用字段（v3.0 新增）
 
-第 6 节所述的 16 份功能分析笔记，除 12.1 既有字段外，须额外填入：
+第 6 节所述的 18 份功能分析笔记，除 12.1 既有字段外，须额外填入：
 
 ```yaml
 ---
@@ -696,8 +696,8 @@ governance_status: DRAFT       # 治理生命周期：DRAFT → REVIEW → APPRO
 version: "1.0"
 owner: TBD                     # 待指定 Product / Domain Owner
 reviewer: TBD                  # 待指定 Reviewer（通常为 Architecture Team）
-effective_date: 2026-08-22
-last_reviewed: 2026-08-22
+effective_date: 2026-08-30
+last_reviewed: 2026-08-30
 review_cycle_days: 180
 supersedes: null
 related_adr: []
@@ -889,7 +889,7 @@ XXX 情境下是否应该发生 YYY？
 | offBalanceExposure.ts    | [[Off-Balance-Sheet Exposure]], [[EXPOSURE-RULE-001]] |
 | tolerance.ts              | [[Tolerance]], [[TOLERANCE-RULE-001]] |
 | statusTransition.ts       | [[Movement Status Lifecycle]] |
-| balance-component.model.ts | [[A1-LC-Issue]], [[A2-LC-Amendment]], … [[B6-Confirmed-LC-Close]]（16 个功能笔记） |
+| balance-component.model.ts | [[A1-LC-Issue]], [[A2-LC-Amendment]], … [[A11-LC-Reopen]], [[B7-Confirmed-LC-Reopen]]（18 个功能笔记） |
 | balance.spec.ts           | [[Balance Test Scenarios]] |
 
 这让开发人员能判断：当代码变动时，哪些知识可能已经过期。
@@ -982,10 +982,10 @@ last_verified_commit
 
 **v3.0 / v3.1 新增自评检查项**（不新增独立维度，并入下列既有维度的评分依据）：
 
-* **Business Knowledge Coverage**：16 个具名功能（A1–A10、B1–B6）是否每个都有对应功能文件夹与恰好一份分析笔记；A5 是否正确地未建立文件夹。
+* **Business Knowledge Coverage**：18 个具名功能（A1–A11、B1–B7，A5 保留不用）是否每个都有对应功能文件夹与恰好一份分析笔记。
 * **Obsidian Linking Quality**：功能笔记与技术分层笔记（规则/决策表/测试场景）之间是否双向可达；第 1.1 节「范畴之外」是否为全库唯一展开处，其余笔记是否均以链接回引而非重复展开。
 * **Business Knowledge Coverage / Obsidian Linking Quality**（语言合规）：抽样确认笔记正文是否符合第 4 节中文撰写要求。
-* **API Coverage**（v3.1 新增）：`Function-API Integration Map.md` 是否涵盖全部 16 个功能，且列出的 API 路径/方法均可追溯至 `analysis/balance-component-api.yaml`、`analysis/balance-component-channel-api.yaml` 的实际内容，无示意占位符残留；跨功能交易情境 Mermaid 图是否至少涵盖进口与出口各一条完整生命周期。
+* **API Coverage**：`Function-API Integration Map.md` 是否涵盖全部 18 个功能，且 API 路径／方法可追溯至两份现行 OAS。
 
 > 建议：待第 12.3 节的 v6.1 Schema 字段（尤其 `owner`、`reviewer`、`related_adr`）由业务与架构团队正式赋值、且第 13 节的 `.git` 历史限制解除后，可在本九维度之外，额外参照 v6.1 第 19 节"延伸建议"计算单份文档的 Knowledge Quality Score（Metadata 完整度 20% / Freshness 20% / Traceability 25% / Owner-Reviewer 有效性 10% / Link 完整性 10% / Test 覆盖度 15%），作为比"是否达标"更细颗粒度的质量信号。此项目前仍属 v6.1 附录 A 的 P2 候选项，不是本次萃取的必需项。
 
@@ -1006,7 +1006,7 @@ last_verified_commit
 3. Architecture
 4. Domain Concepts
 5. Business Rule Index
-6. 16 个具名功能分析笔记（A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、B1、B2、B3、B4、B5、B6），依 A-Import / B-Export 分文件夹存放
+6. 18 个具名功能分析笔记（A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、A11、B1、B2、B3、B4、B5、B6、B7），依 A-Import / B-Export 分文件夹存放
 7. Cross-Function-Flows（跨功能端到端流程）
 8. Exposure / 表内会计规则
 9. Tolerance 规则
@@ -1034,7 +1034,7 @@ last_verified_commit
 
 好的产出应该让新加入的 BA、开发人员、架构师、测试人员或 AI Agent 都能理解：
 
-**Balance Component 做什么 → 由哪些具名功能（A1–A10、B1–B6）承载 → 为什么这样做 → 受哪些规则约束 → 余额 / 风险敞口 / 容差如何运作 → 每条规则在哪里实现 → 每条规则如何被测试。**
+**Balance Component 做什么 → 由哪些具名功能（A1–A11、B1–B7，A5 保留不用）承载 → 为什么这样做 → 受哪些规则约束 → 余额 / 风险敞口 / 容差如何运作 → 每条规则在哪里实现 → 每条规则如何被测试。**
 
 ---
 
@@ -1042,6 +1042,6 @@ last_verified_commit
 
 本文件第 9.2、10、12.3、19、21 节的企业治理框架对齐内容，参照上传文件《Git + Obsidian 企业知识库架构》（`Git_Obsidian_Enterprise_Knowledge_Architecture_v6_1_ZH.docx`，文档版本 v6.1 评审定稿版，修订日期 2026-08-21）撰写，具体引用其第 3 节（Repository 结构）、第 6–9 节（生命周期 / 权威层级 / Schema v1.0 / Traceability ID 标准）、第 10 节（Knowledge Change Impact Gate）、第 14 节（Staleness 风险）与第 19 节附录（Knowledge Quality Score）。
 
-本文件第 6 节（功能导向重建）与第 6.1 节的 16 个具名功能定义，依据 `src/app/transaction-builder/balance-component.model.ts` 中 `IMPORT_FUNCTIONS`（第 267–403 行）与 `EXPORT_FUNCTIONS`（第 406–500 行）两个数组的实际代码内容撰写，包括 A5 编号退役、A9 仅支持全额赎回、B4 的 Sight/Usance 自动判定等细节，均为 CONFIRMED 等级的代码证据，非推测。
+本文件第 6 节与第 6.1 节的 18 个具名功能定义，以 `src/app/transaction-builder/balance-component.model.ts` 的 `IMPORT_FUNCTIONS`／`EXPORT_FUNCTIONS` 为动态代码依据；不再引用易因重构失效的固定行号。
 
 凡本文件标注"对齐 v6.1"或"待办 / TBD"之处，均为诚实反映当前尚未具备的企业治理条件（如 Owner 指派、ADR 仓库、CI Pipeline、`.git` 历史），不构成对该等条件已经存在的宣称。

@@ -4465,3 +4465,16 @@ migrations 13/15's own plain exclusion of the same historical marker. `migration
 statements/branches/functions/lines as a direct result (the removed backfill loop was the file's own
 remaining coverage gap). Microservice suite: 725/725 (99.11%/95.61%/99.69%/99.71%); `tsc --noEmit`/`npm run
 build` clean. Angular/backend unaffected, re-confirmed green (1475/1475; 41/41).
+
+## 2026-08-30 — BalanceService SOLID、Transaction Index、dead-code 與文件／OAS 同步
+
+`BalanceService` 已完成 compatibility-façade 重構：Query、Snapshot、Contract、Validation、Release
+Policy／Side Effects、Lifecycle Eligibility／Sweep 分離到 focused collaborators，routes、SQLite transaction
+boundary 與 wire contract 保持不變。A3S／A6／B4 Transaction Index 改為同列一次選定 LC + SG／IB／EB
+reference 與 amount；不需要 Secondary Reference 的功能顯示 Tight LC Balance。Run All 最後保留 A4、A6、
+B4 各一筆可人工處理的 prerequisite。
+
+同步清理前後端重複假日常數、無 caller 的舊 Checker release chain、未使用參數及失效 lint suppression。
+OAS 更新為 microservice v1.37.0、channel v1.8.0，明確標示這是 contract clarification，沒有新增 wire
+field。驗證基準：Angular 1625、Backend 57、Microservice 784，共 2466 tests 通過；Angular production
+build 成功。

@@ -1,6 +1,14 @@
 # LC Balance UI / Message Improvement Proposal
 
-> 狀態：設計建議與 sample，尚未接入 production code。
+> 狀態：核心項目已接入 production code；本目錄保留設計基準與未完成改善項目。
+
+## 2026-08-30 實作狀態
+
+- 已完成：`FeedbackMessageComponent`、API error presentation、共用 Search／Pagination、status badge、Maker action/result/balance warning components。
+- 已完成：Transaction Index 每頁 10 筆；A3S/A6/B4 在單一 row 同時選 LC、Secondary Reference 與 amount。
+- 已完成：未選 Function 時隱藏 Maker、Checker、Look Up panels。
+- 已完成：Remarks-only Fix Pending policy。
+- 待改善：進一步減少既有 `any` lint warnings、global SCSS 重複與完整 browser accessibility automation。
 
 ## 目標
 
@@ -11,7 +19,7 @@
 
 ## 建議優先順序
 
-### P1 — Message standardization
+### P1 — Message standardization（已完成核心導入）
 
 - 建立 `UiMessage` model。
 - 建立 `ApiErrorPresenter`，集中將 HTTP status/backend code 映射成使用者訊息。
@@ -24,7 +32,7 @@
 - Component stylesheet 只保留該 component 的 layout。
 - 不在每個 standalone component 重複輸出相同 CSS。
 
-### P2 — Transaction screen UX
+### P2 — Transaction screen UX（已完成核心導入）
 
 - 選擇 Function 後，Maker 與 Checker 都立即存在。
 - Checker 不依賴當前 Maker session，可獨立搜尋並處理 Pending transaction。

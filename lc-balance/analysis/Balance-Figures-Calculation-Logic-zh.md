@@ -1,5 +1,9 @@
 # Balance Component — 餘額數字計算與更新邏輯
 
+> 2026-08-30 同步：現行功能範圍為 A1–A11／B1–B7（A5 保留不用）。Tight Available Balance
+> 不得為負；A3S 上限為 Tight Available + selected SG outstanding。現行摘要見
+> `../docs/current-behavior.md`。
+
 **範圍**：Current Balance snapshot 上顯示的每一個餘額／預留額數字（Look Up Current Balance、Inquire
 Events 的 Balance Tabs、以及每一筆持久化的 Event Snapshot）——五個核心數字 **Confirmed Balance**、
 **Available Balance**、**Pending Earmark Total**、**Off-Balance Exposure**、**Tight Available

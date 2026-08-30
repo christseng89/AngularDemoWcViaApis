@@ -1,5 +1,9 @@
 # Balance Component — Balance Figure Calculation & Update Logic
 
+> 2026-08-30 sync: the current function scope is A1–A11/B1–B7 (A5 remains unused).
+> Tight Available Balance cannot be negative; A3S is capped by Tight Available
+> plus the selected SG outstanding. See `../docs/current-behavior.md`.
+
 **Scope:** every balance/earmark figure shown on a Current Balance snapshot (Look Up Current Balance,
 Inquire Events' Balance Tabs, and every persisted Event Snapshot) — the five core figures **Confirmed
 Balance**, **Available Balance**, **Pending Earmark Total**, **Off-Balance Exposure**, and **Tight

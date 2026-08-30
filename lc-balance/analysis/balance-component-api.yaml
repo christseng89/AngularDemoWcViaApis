@@ -1763,6 +1763,93 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /balance-movements/{movementId}/withdraw-maker-submit:
+    post:
+      tags: [BalanceMovements]
+      summary: Withdraw A4 Maker Submit without cancelling its A3/A3S source
+      description: >
+        Clears `makerSubmittedBy` and `makerSubmittedAt` on a PENDING
+        IPLC_LC/UTILIZE so the transaction returns to the state immediately
+        before A4 Submit. Document Arrival identity, Checker acknowledgment
+        and balance remain unchanged.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [withdrawnBy]
+              properties:
+                withdrawnBy: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: Maker Submit withdrawn; movement remains PENDING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing actor or target is not an IPLC_LC/UTILIZE.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING/REJECTED or has no Maker Submit to withdraw.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/edit:
+    post:
+      tags: [BalanceMovements]
+      summary: Fix Pending by correcting the same movement in place
+      description: >
+        Corrects a PENDING or REJECTED movement while preserving movementId,
+        eventSeq and business identity, and appends a Fix Pending audit record.
+        The strict allowlist rejects locked identity fields. REMARKS_ONLY
+        never recalculates balance, accounting or sibling movements.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EditMovementRequest' }
+      responses:
+        '200':
+          description: Corrected movement with the same movementId.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Invalid or locked field, amount scale, or Remarks-only violation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement or owning contract not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Illegal state, Maker/Checker violation, duplicate reference or insufficient balance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /balance-movements/{movementId}/acknowledge:
     post:
       tags: [BalanceMovements]
@@ -2537,6 +2624,43 @@ components:
           description: >
             v1.10.0 — same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee
             contract instead. Import-side only (Shipping Guarantee has no Export equivalent).
+
+    EditMovementRequest:
+      type: object
+      additionalProperties: false
+      required: [amount, editedBy]
+      properties:
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        editedBy: { type: string, minLength: 1 }
+        editMode: { type: string, enum: [STANDARD, REMARKS_ONLY], default: STANDARD }
+        remarks: { type: string, maxLength: 500, nullable: true }
+        legRef: { type: string, nullable: true }
+        accountEntries:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        businessEventId: { type: string, nullable: true }
+        exposureNature: { $ref: '#/components/schemas/ExposureNature' }
+        newExpiryDate: { type: string, format: date, nullable: true }
+        transactionDate: { type: string, format: date, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        sourceModule: { type: string, nullable: true }
+        sourceFunction: { type: string, nullable: true }
+        referencedTransactionId: { type: string, format: uuid, nullable: true }
+        reasonCode: { type: string, nullable: true }
+        amendmentApproved: { type: boolean, nullable: true }
+        amendmentEffective: { type: string, nullable: true }
+        consentStatus: { type: string, enum: [NOT_REQUIRED, OBTAINED], nullable: true }
+        tolerancePct: { type: string, nullable: true }
+        tenorType: { $ref: '#/components/schemas/TenorType' }
+        tenorDays: { type: integer, nullable: true }
+        expiryDate: { type: string, format: date, nullable: true }
+        mailFloatGraceDays: { type: integer, nullable: true }
+      description: >
+        Strict Fix Pending allowlist. naturalKey, balanceContractId,
+        instrumentType, movementType, currency, eventSeq, createdBy and
+        sourceTransactionRef are locked and rejected when supplied.
 
     BalanceMovementCreateRequest:
       type: object

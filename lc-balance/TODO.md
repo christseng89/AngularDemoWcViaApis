@@ -1,5 +1,8 @@
 # Balance Component — 未完成事項清單（TODO）
 
+> 2026-08-30 現行入口：`docs/current-behavior.md`。目前 OAS 為 Microservice `1.37.0`、Channel
+> `1.8.0`；下方保留歷史 TODO／完成紀錄，衝突時依根 `CLAUDE.md` 的權威順序判斷。
+
 **整理日期**：2026-08-24（更新版，基於 `lc-balance/` 還原到 `LC-Balance-Component-Completed` 區塊1狀態
 `e6ee8e7` 之後的內容，只保留區塊1的 A9 SG Redemption 鎖定、A10/B6 Close 相關收尾）
 **依據**：`CLAUDE.md` 決策日誌（截至區塊1最後一筆 `Balance-Component-Test-Case-Proposal.md §4` 條目）、

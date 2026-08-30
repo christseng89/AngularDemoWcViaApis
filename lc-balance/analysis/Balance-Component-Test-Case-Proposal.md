@@ -3,6 +3,10 @@
 
 **文件性質**：提案（Proposal），本已於 2026-08-21～2026-08-22 全數落地為正式的 Business Case Registry 條目，見下方「2026-08-25 完成狀態」。
 
+> 2026-08-30 補充：Run All 在完整案例後追加三個 production-shaped seed，保留 A4-ready
+> Sight A3、A6-ready Usance A3 與 B4-ready released B3，供人工測試立即選取；eligibility
+> 規則本身沒有放寬。
+
 **2026-08-21 更新**：第 3 節原本的兩個待確認範疇問題已定案，詳見同日期的《Balance-Component-Business-Rule-Decisions-2026-08-21.md》決策備忘錄；本文件第 3、4 節已依決議同步修訂。
 
 ---
