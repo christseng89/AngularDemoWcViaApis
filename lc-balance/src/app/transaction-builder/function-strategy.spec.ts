@@ -17,11 +17,22 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
     expect(Object.keys(FUNCTION_STRATEGIES).sort()).toEqual([...allCodes].sort());
   });
 
-  it('enables same-session Maker Result Delete Pending for A1 and A3 only', () => {
+  it('enables same-session Maker Result Delete Pending for every registered function', () => {
     const enabled = Object.values(FUNCTION_STRATEGIES)
-      .filter((strategy) => strategy.makerResultDeletePendingEnabled)
+      .filter((strategy) => strategy.makerResultDeletePending.enabled)
       .map((strategy) => strategy.code);
-    expect(enabled).toEqual(['A1', 'A3']);
+    expect(enabled).toEqual([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map((fn) => fn.code));
+  });
+
+  it('models A4 as withdraw-only and keeps compound sibling cascades in strategy data', () => {
+    expect(FUNCTION_STRATEGIES['A4'].makerResultDeletePending.operation).toBe('WITHDRAW_MAKER_SUBMIT');
+    expect(FUNCTION_STRATEGIES['A3S'].makerResultDeletePending.siblingMovementIdKeys).toEqual(['arrivalSgRedeemMovementId']);
+    expect(FUNCTION_STRATEGIES['B4'].makerResultDeletePending.siblingMovementIdKeys).toEqual([
+      'dueFromIssuingBankMovementId',
+      'acceptanceMovementId',
+      'acceptanceReimbReceivableMovementId',
+    ]);
+    expect(FUNCTION_STRATEGIES['B5'].makerResultDeletePending.siblingMovementIdKeys).toEqual(['matchedReceivableMovementId']);
   });
 
   describe('movementDerivation — matches PR-1\'s autoRedeemType/settlesAcceptanceOnMature/movementTypeFromContractTenor characterization', () => {

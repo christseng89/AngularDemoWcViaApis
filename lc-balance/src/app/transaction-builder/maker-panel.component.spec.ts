@@ -176,7 +176,7 @@ describe('MakerPanelComponent', () => {
     });
   });
 
-  describe('A1/A3 same-session Maker Result Delete Pending', () => {
+  describe('same-session Maker Result Delete Pending', () => {
     it('uses its dedicated confirmation output and never the Maker Queue output', () => {
       const { comp } = makeComponentA();
       triggerSelectFunction(comp, A1);
@@ -250,6 +250,35 @@ describe('MakerPanelComponent', () => {
       expect(comp.submitResult).toBeNull();
       expect(comp.transactionIndexSearch).toBe('');
       expect(comp.hasEligibleTargetSelected).toBe(false);
+    });
+
+    it('B1 resets like A1 to a fresh natural-key input', () => {
+      const { comp } = makeComponentA();
+      const b1 = findFn(EXPORT_FUNCTIONS, 'B1');
+      triggerSelectFunction(comp, b1);
+      comp.naturalKey.lcNumber = 'EXP-01';
+      comp.submitResult = mkMovement('mv-b1-delete', { movementType: 'ISSUE', status: 'PENDING' });
+
+      expect(comp.makerResultDeletePendingSupported).toBe(true);
+      triggerSelectFunction(comp, b1);
+
+      expect(comp.naturalKey.lcNumber).toBe('');
+      expect(comp.submitResult).toBeNull();
+      expect(comp.requiresEligibleTarget).toBe(false);
+    });
+
+    it('A2 and the remaining target-based functions reset to their Index selection state', () => {
+      const { comp } = makeComponentA();
+      triggerSelectFunction(comp, A2);
+      comp.selectedContract = mkContract('a2-contract', 'S02');
+      comp.submitResult = mkMovement('mv-a2-delete', { movementType: 'AMEND_INCREASE', status: 'PENDING' });
+
+      expect(comp.makerResultDeletePendingSupported).toBe(true);
+      triggerSelectFunction(comp, A2);
+
+      expect(comp.selectedContract).toBeNull();
+      expect(comp.submitResult).toBeNull();
+      expect(comp.requiresEligibleTarget).toBe(true);
     });
   });
 

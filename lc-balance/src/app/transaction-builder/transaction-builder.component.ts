@@ -319,10 +319,21 @@ export class TransactionBuilderComponent {
   }
 
   onMakerResultDeletePendingConfirmed(movement: BalanceMovement): void {
-    if (!this.selectedFunctionStrategy?.makerResultDeletePendingEnabled || movement.status !== 'PENDING' || this.actionBusy) return;
+    const deletePolicy = this.selectedFunctionStrategy?.makerResultDeletePending;
+    if (!deletePolicy?.enabled || movement.status !== 'PENDING' || this.actionBusy) return;
     const fn = this.selectedFunction;
+    const actor = this.makerContext.createdBy || 'maker1';
+    const deleteRequest =
+      deletePolicy.operation === 'WITHDRAW_MAKER_SUBMIT'
+        ? this.api.withdrawMakerSubmit(movement.movementId, actor)
+        : [...new Set(deletePolicy.siblingMovementIdKeys.map((key) => this.makerContext[key]).filter((id): id is string => !!id && id !== movement.movementId))]
+            .reduce<Observable<BalanceMovement>>(
+              (chain, siblingId) => chain.pipe(switchMap(() => this.api.cancel(siblingId, actor, 'MAKER_EC'))),
+              of(null as unknown as BalanceMovement),
+            )
+            .pipe(switchMap(() => this.api.cancel(movement.movementId, actor, 'MAKER_EC')));
     this.actionBusy = true;
-    this.api.cancel(movement.movementId, this.makerContext.createdBy || 'maker1', 'MAKER_EC').subscribe({
+    deleteRequest.subscribe({
       next: () => {
         this.actionBusy = false;
         if (fn) this.selectFunction(fn);

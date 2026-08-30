@@ -27,6 +27,7 @@ const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
 const A3S = IMPORT_FUNCTIONS.find((f) => f.code === 'A3S')!;
 const A4 = IMPORT_FUNCTIONS.find((f) => f.code === 'A4')!;
 const A6 = IMPORT_FUNCTIONS.find((f) => f.code === 'A6')!;
+const B1 = EXPORT_FUNCTIONS.find((f) => f.code === 'B1')!;
 const B3 = EXPORT_FUNCTIONS.find((f) => f.code === 'B3')!;
 const B4 = EXPORT_FUNCTIONS.find((f) => f.code === 'B4')!;
 const B5 = EXPORT_FUNCTIONS.find((f) => f.code === 'B5')!;
@@ -911,7 +912,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     });
   });
 
-  describe('A1/A3 same-session Maker Result Delete Pending', () => {
+  describe('same-session Maker Result Delete Pending', () => {
     it('uses the direct cancel API, stays in Transaction Processing, resets to fresh A1 input data, and never calls Maker Queue deletion', () => {
       const { comp, api } = setup();
       comp.activeMode = 'PROCESSING';
@@ -955,6 +956,52 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.activeMode).toBe('PROCESSING');
     });
 
+    it('applies A1 new-input behavior to B1', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = B1;
+      setMakerContext(comp, { createdBy: 'exportMaker', submitResult: makeMovement({ movementId: 'submitted-b1' }) });
+      const resetNonceBeforeDelete = comp.checkerResetNonce;
+
+      comp.onMakerResultDeletePendingConfirmed(makeMovement({ movementId: 'mv-b1-delete', movementType: 'ISSUE' }));
+
+      expect(api.cancel).toHaveBeenCalledWith('mv-b1-delete', 'exportMaker', 'MAKER_EC');
+      expect(comp.selectedFunction).toBe(B1);
+      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect(comp.checkerResetNonce).toBe(resetNonceBeforeDelete + 1);
+    });
+
+    it('uses withdrawMakerSubmit for A4 instead of cancelling its underlying A3 movement', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = A4;
+      setMakerContext(comp, { createdBy: 'maker4' });
+      const movement = makeMovement({ movementId: 'mv-a4-delete', movementType: 'UTILIZE' });
+
+      comp.onMakerResultDeletePendingConfirmed(movement);
+
+      expect(api.withdrawMakerSubmit).toHaveBeenCalledWith('mv-a4-delete', 'maker4');
+      expect(api.cancel).not.toHaveBeenCalled();
+      expect(comp.selectedFunction).toBe(A4);
+    });
+
+    it('cancels configured B4 compound siblings before the primary movement', () => {
+      const { comp, api } = setup();
+      comp.selectedFunction = B4;
+      setMakerContext(comp, {
+        createdBy: 'makerB4',
+        acceptanceMovementId: 'mv-acceptance',
+        acceptanceReimbReceivableMovementId: 'mv-receivable',
+      });
+
+      comp.onMakerResultDeletePendingConfirmed(makeMovement({ movementId: 'mv-b4-primary', movementType: 'ACCEPT' }));
+
+      expect(api.cancel.mock.calls).toEqual([
+        ['mv-acceptance', 'makerB4', 'MAKER_EC'],
+        ['mv-receivable', 'makerB4', 'MAKER_EC'],
+        ['mv-b4-primary', 'makerB4', 'MAKER_EC'],
+      ]);
+      expect(comp.selectedFunction).toBe(B4);
+    });
+
     it('surfaces API failure without navigating to Maker Queue', () => {
       const { comp, api } = setup();
       comp.activeMode = 'PROCESSING';
@@ -968,10 +1015,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.actionBusy).toBe(false);
     });
 
-    it('does not run for A2 or a non-PENDING movement', () => {
+    it('does not run for a non-PENDING movement', () => {
       const { comp, api } = setup();
-      comp.selectedFunction = A2;
-      comp.onMakerResultDeletePendingConfirmed(makeMovement());
       comp.selectedFunction = A1;
       comp.onMakerResultDeletePendingConfirmed(makeMovement({ status: 'REJECTED' }));
 
