@@ -186,10 +186,12 @@ describe('DocumentArrivalHintsService combined transaction-index data', () => {
 
   it('keeps an explicit B3 source reference and falls back when both references are absent', () => {
     const explicit = { ...movement, movementId: 'explicit', sourceTransactionRef: 'EB-DIRECT' } as BalanceMovement;
-    const childWithoutEb = { ...child, naturalKey: { lcNumber: 'LC01', ibNumber: null } } as BalanceContract;
+    const childWithoutEb = { ...child, balanceContractId: 'child-2', naturalKey: { lcNumber: 'LC01', ibNumber: null } } as BalanceContract;
     const api = makeApi({
       catalog: jest.fn(() => of({ items: [child, childWithoutEb] } as CatalogPage)),
-      listMovements: jest.fn((id: string) => of([{ ...(id === 'child-1' ? explicit : movement), movementId: id } as BalanceMovement])),
+      listMovements: jest.fn((id: string) =>
+        of([{ ...(id === 'child-1' ? explicit : { ...movement, sourceTransactionRef: null }), movementId: id } as BalanceMovement]),
+      ),
     });
     const service = new DocumentArrivalHintsService(api);
     service.loadChildHints([root], 'EPLC_EXAMINATION', 'CREATE', () => {});

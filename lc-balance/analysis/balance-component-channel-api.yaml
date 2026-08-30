@@ -4,8 +4,8 @@ info:
   description: >
     The channel-facing API a bank's web/mobile origination front-end (or
     any other channel client) calls to work the Balance Component's
-    approved named business functions — Import LC A1–A9 and Export
-    Confirmed LC B1–B5, exactly the set already implemented in
+    approved named business functions — Import LC A1–A11 and Export
+    Confirmed LC B1–B7, exactly the set already implemented in
     lc-balance-wc's own Transaction Builder UI
     (src/app/transaction-builder/balance-component.model.ts's
     IMPORT_FUNCTIONS/EXPORT_FUNCTIONS registry, which is this contract's
@@ -16,38 +16,33 @@ info:
     This is a thin façade over the Balance Component Microservice API
     (balance-component-api.yaml, this same folder): every channel call maps
     onto exactly the same one-movement primitives that service exposes.
-    This layer's whole job is to let a channel client work in named
+    This logical layer's job is to let a channel client work in named
     business-function vocabulary (instrumentType/movementType/parent
     resolution/currency all derived server-side from `functionCode`)
     instead of the microservice's own lower-level, instrument-agnostic
     vocabulary — it does not add transactional atomicity, batching, or any
-    business rule the microservice does not already enforce; where this
+    business rule the microservice does not already enforce. The reference
+    Angular Transaction Builder currently calls the microservice adapter
+    directly rather than deploying this channel façade as a separate process;
+    where this
     contract states a rule, the microservice enforces the same rule
     independently as defense in depth (a client that bypassed this channel
     and called the microservice directly could not evade it).
 
 
-    API design principle — ONE MOVEMENT, ONE LEG, ONE CALL: exactly the
-    same principle as the microservice's own contract, extended up to this
-    layer. `POST /channel/transactions` creates or transitions exactly one
-    underlying BalanceMovement, no exceptions. Several named business
+    API design principle — `POST /channel/transactions` describes one logical
+    transaction leg. Several named business
     functions are business-approved to require more than one linked
     movement in a specific order — Document Arrival w/ Shipping Guarantee
     (A3S, 2 legs), Confirmation Honour/Accept (B4, 2–4 legs depending on
     Sight/Usance) — see each function's own `compoundLegs` entry in
-    `GET /channel/functions`. These are NEVER exposed as a single batched
-    "do everything" call; the channel client makes that many separate
-    `POST /channel/transactions` calls, one per leg, in the documented
-    order, sharing one `businessEventId` to correlate them for audit/query.
-    This is not a limitation of this API — it mirrors an explicit business
-    decision already live in the reference Transaction Builder client and
-    in this project's own declarative Business Case Registry
-    (lc-balance-wc/backend/data/businessCases.js), neither of which has
-    ever offered a bundled multi-leg endpoint either. A caller whose second
-    leg fails after the first succeeded gets a clear, partial-success error
-    naming which leg failed (see `ChannelError.partialSuccess`) and decides
-    how to compensate — the same non-atomic, audit-linked pattern the
-    underlying microservice has always used.
+    `GET /channel/functions`. A deployed adapter must translate one approved
+    multi-leg business event to the microservice's existing atomic
+    `/balance-movements/compound*` endpoints; it must not recreate the former
+    non-atomic sequence of independent calls. `businessEventId` remains the
+    shared audit/correlation identity for every leg. `ChannelError.partialSuccess`
+    is retained only for compatibility with legacy adapters and is not the
+    expected result shape of an atomic compound command.
 
 
     CURRENCY CODE — business rule (2026-08-16): for A1 (LC Issue) and B1
@@ -87,6 +82,15 @@ info:
     resolved contract, makes retrying a `POST /channel/transactions` call
     safe (resubmitting the same pair returns the existing transaction, 200,
     rather than creating a duplicate).
+
+
+    v1.8.0 (2026-08-30, documentation synchronization; no endpoint-shape
+    change): corrects the scope text to A1–A11/B1–B7, records that this is a
+    logical/not-separately-deployed channel façade in the reference workspace,
+    and aligns compound-event guidance with Microservice OAS v1.37.0: A3S,
+    A6, B4 and B5 adapters must use atomic `/balance-movements/compound*`
+    operations. Transaction Index SG/IB/EB Amount and Tight LC Balance are UI
+    projections and therefore do not introduce channel response fields.
 
 
     v1.1.0 (2026-08-16) — mirrors the Microservice API's own v1.1.0:
@@ -161,7 +165,7 @@ info:
     v1.7.0 (2026-08-29, same day as the Microservice API's own v1.35.0): `ContractStatus`'s reserved
     contract-versioning value removed from both enum inlines in this file — mirrors the Microservice API's
     own `markSuperseded()` removal (zero call sites, same day). No other shape change.
-  version: "1.7.0"
+  version: "1.8.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.

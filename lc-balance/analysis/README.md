@@ -9,6 +9,10 @@
 
 API 行为变化时同步 schema、版本／changelog、实现、客户端和合约测试。
 
+2026-08-30 当前版本：微服务 OAS `1.37.0`，Channel OAS `1.8.0`。这次同步记录
+BalanceService SOLID façade、原子 compound actions、Transaction Index 和 Run-All retained prerequisites；
+UI-only columns 不会被虚构为新的 HTTP response fields。
+
 ## 基础业务规格
 
 - `TF_Balance_Component_Spec-en.docx`／`TF_Balance_Component_Spec-zh.docx`
@@ -43,3 +47,5 @@ API 行为变化时同步 schema、版本／changelog、实现、客户端和合
 - 避免同时维护多个没有来源关系的“最终版”。
 - 决策结果写入 `../docs/decisions/`；实施流水不要继续加入根 `CLAUDE.md`。
 - 文档更改后检查 OAS、代码注释、测试名称和 Business Case Registry 是否仍一致。
+- 现行行为快速基准见 `../docs/current-behavior.md`；历史 plans、扫描报告和 Obsidian 快照是衍生资料，
+  不应覆盖现行 OAS／业务规则。

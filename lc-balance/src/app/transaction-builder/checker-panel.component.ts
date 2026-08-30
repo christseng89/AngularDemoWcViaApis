@@ -195,7 +195,7 @@ export class CheckerPanelComponent implements OnChanges {
     }
     const secondaryField = this.checkerSecondaryField;
     if (secondaryField && !this.checkerSecondaryRef) {
-      this.searchCheckerCandidatesByLcOnly(secondaryField);
+      this.searchCheckerCandidatesByLcOnly();
       return;
     }
     this.checkerSearching = true;
@@ -246,7 +246,7 @@ export class CheckerPanelComponent implements OnChanges {
    * predicate `loadCheckerQueue()` itself uses, so this candidate list and the queue it leads into can
    * never disagree about what counts as actionable.
    */
-  private searchCheckerCandidatesByLcOnly(secondaryField: 'ibNumber' | 'sgNumber'): void {
+  private searchCheckerCandidatesByLcOnly(): void {
     if (!this.selectedFunction) return;
     const selectedFunction = this.selectedFunction;
     this.checkerSearching = true;

@@ -25,18 +25,25 @@ Balance Microservice (:4100)
 - `src/app/transaction-builder/`：逐笔 Maker／Checker 交易、查询、Fix Pending 和 Delete Pending。
 - `src/app/business-case-runner/`：通过 `backend/` 执行整套 Import／Export Business Case。
 - Transaction Builder 的父组件负责协调状态和子功能，不应重新累积领域、HTTP、分页和复杂显示逻辑。
+- 交易选择由共享 Index／search／pagination 组件组成，每页 10 笔。A3S、A6、B4 在同一 Index row
+  同时选择 LC 与 SG／IB／EB Secondary Reference，并显示对应金额，避免两阶段选择造成错配。
+- 尚未选择 Function 时不渲染 Maker、Checker 和 Look Up panels。
 
 ## Backend Orchestrator
 
 - `backend/server.js` 提供 Business Case Runner 使用的 API。
 - `backend/data/businessCases.js` 是声明式案例注册表。
 - 此层负责开发／测试场景编排，不是 Balance 业务规则的权威实现位置。
+- Run All 的最后三个 seed case 必须保留 A4-ready Sight A3、A6-ready Usance A3 和 B4-ready B3，
+  不得为了完成整套案例而继续消费这些人工测试 prerequisite。
 
 ## Balance Component 微服务
 
 - `src/app.ts`：Express 应用组合和横切中间件。
 - `src/routes/`：请求／响应适配，不拥有 Balance 计算规则。
-- `src/service/balanceService.ts`：业务用例编排与事务边界。
+- `src/service/balanceService.ts`：routes 使用的 compatibility façade、业务用例编排与事务边界。
+- `src/service/*Service.ts`：Query、Snapshot、Contract resolution、Request validation、Release policy／side
+  effects、Lifecycle eligibility／sweep 等单一职责协作者；责任表见该目录的 `README.md`。
 - `src/domain/`：Balance、Tolerance、Eligibility、状态转换及会计语义。
 - `src/store/`：唯一 SQL 持久化访问层。
 - `src/db/`：Node `node:sqlite`、schema 和版本化 migrations。

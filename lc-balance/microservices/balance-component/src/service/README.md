@@ -22,3 +22,5 @@ Add a new movement type through the movement strategy registries and the smalles
 ## Compatibility boundary
 
 Routes continue to call `BalanceService`. Collaborators must not change route response shapes, error messages, validation order, SQLite schema or movement lifecycle semantics unless the corresponding external contract is intentionally revised.
+
+The SOLID extraction and subsequent dead-code cleanup are internal-only changes. They do not add routes or OAS fields. The authoritative wire contract remains `analysis/balance-component-api.yaml`.

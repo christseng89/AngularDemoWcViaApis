@@ -23,48 +23,9 @@
  * a multi-year tenor.
  */
 
-import { DOMESTIC_HOLIDAYS as GENERATED_DOMESTIC_HOLIDAYS, type DomesticHoliday } from './domesticHolidays.generated';
+import { DOMESTIC_HOLIDAYS as GENERATED_DOMESTIC_HOLIDAYS } from './domesticHolidays.generated';
 
-// Keep in sync by hand with microservices/business-days-mock/data/calendar.json — see this file's own
-// top doc comment for why this is a copy, not a shared import (separate deployable microservices).
-const DOMESTIC_HOLIDAYS: readonly DomesticHoliday[] = [
-  { date: '2026-01-01', name: '元旦' },
-  { date: '2026-02-16', name: '除夕' },
-  { date: '2026-02-17', name: '春節' },
-  { date: '2026-02-18', name: '春節連假' },
-  { date: '2026-02-19', name: '春節連假' },
-  { date: '2026-02-28', name: '和平紀念日' },
-  { date: '2026-04-03', name: '兒童節附放' },
-  { date: '2026-04-06', name: '清明節' },
-  { date: '2026-05-01', name: '勞動節' },
-  { date: '2026-06-19', name: '端午節' },
-  { date: '2026-09-25', name: '中秋節' },
-  { date: '2026-10-10', name: '國慶日' },
-  { date: '2027-01-01', name: '元旦' },
-  { date: '2027-02-16', name: '除夕' },
-  { date: '2027-02-17', name: '春節' },
-  { date: '2027-02-18', name: '春節連假' },
-  { date: '2027-02-19', name: '春節連假' },
-  { date: '2027-02-28', name: '和平紀念日' },
-  { date: '2027-04-05', name: '兒童節附放' },
-  { date: '2027-04-06', name: '清明節' },
-  { date: '2027-05-01', name: '勞動節' },
-  { date: '2027-06-21', name: '端午節' },
-  { date: '2027-09-27', name: '中秋節' },
-  { date: '2027-10-10', name: '國慶日' },
-  { date: '2028-01-01', name: '元旦' },
-  { date: '2028-02-16', name: '除夕' },
-  { date: '2028-02-17', name: '春節' },
-  { date: '2028-02-18', name: '春節連假' },
-  { date: '2028-02-21', name: '春節連假' },
-  { date: '2028-02-28', name: '和平紀念日' },
-  { date: '2028-04-03', name: '兒童節附放' },
-  { date: '2028-04-06', name: '清明節' },
-  { date: '2028-05-01', name: '勞動節' },
-  { date: '2028-06-19', name: '端午節' },
-  { date: '2028-09-25', name: '中秋節' },
-  { date: '2028-10-10', name: '國慶日' },
-];
+// Holiday data is generated from the canonical calendar; the former hand-maintained copy was dead code.
 
 const HOLIDAYS_BY_DATE: ReadonlyMap<string, string> = new Map(GENERATED_DOMESTIC_HOLIDAYS.map((h) => [h.date, h.name]));
 

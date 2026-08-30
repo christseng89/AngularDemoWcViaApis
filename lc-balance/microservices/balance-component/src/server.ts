@@ -11,7 +11,6 @@ const service = new BalanceService(db);
 const app = createApp(db, service);
 
 const server = app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`balance-component-service listening on :${PORT} (db=${DB_PATH})`);
 });
 
@@ -26,7 +25,6 @@ const sweepTimer = setInterval(() => {
   try {
     service.runExpirySweepCycle();
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('AUTO EXPIRY/AUTO CLOSE sweep failed:', err);
   }
 }, toIntervalMs(EXPIRY_SWEEP_INTERVAL));
@@ -40,7 +38,6 @@ const sweepTimer = setInterval(() => {
 // close the server (and stop the sweep timer / close the DB handle) before the process exits.
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    // eslint-disable-next-line no-console
     console.error(`Port ${PORT} is already in use — is another microservice instance already running?`);
     process.exit(1);
   }
@@ -48,17 +45,14 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 });
 
 function shutdown(signal: string): void {
-  // eslint-disable-next-line no-console
   console.log(`${signal} received. Closing server...`);
   clearInterval(sweepTimer);
   server.close((err) => {
     if (err) {
-      // eslint-disable-next-line no-console
       console.error('Failed to close server:', err);
       process.exit(1);
     }
     db.close();
-    // eslint-disable-next-line no-console
     console.log('Server closed.');
     process.exit(0);
   });

@@ -73,7 +73,6 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
     // any caller (this service has no authentication) could read back internal error detail (e.g. a
     // driver-level error, an internal object shape). Log the detail server-side, return a generic
     // message to the client.
-    // eslint-disable-next-line no-console
     console.error(err);
     res.status(500).json({ code: 'INTERNAL_ERROR', message: 'An internal error occurred.' });
   });

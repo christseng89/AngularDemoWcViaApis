@@ -62,6 +62,19 @@ info:
         business event; the already-RELEASED B3 source is not released again.
 
 
+    v1.37.0 (2026-08-30, documentation synchronization; no wire-shape
+    change): records the completed SOLID refactor in which `BalanceService`
+    remains the route-facing compatibility façade while query, snapshot,
+    contract resolution, request validation, release policy/side effects and
+    lifecycle responsibilities are delegated to focused services. Reaffirms
+    that A3S/A6/B4/B5 multi-leg writes use the existing atomic
+    `/balance-movements/compound*` endpoints. Also documents the retained
+    Run-All prerequisites (A4-ready Sight A3, A6-ready Usance A3 and B4-ready
+    released B3) and clarifies that Transaction Index columns such as SG/IB/EB
+    Amount and Tight LC Balance are UI projections of existing contract,
+    movement and `BalanceSnapshot` fields, not new API properties.
+
+
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
     scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
     field on every request (see `BalanceMovementCreateRequest.required`),
@@ -908,7 +921,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.36.0"
+  version: "1.37.0"
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.

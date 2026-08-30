@@ -119,6 +119,7 @@ npm run build --prefix microservices/balance-component
 - 架构：`docs/architecture.md`
 - 工程标准：`docs/engineering-standards.md`
 - Balance 业务规则：`docs/balance-business-rules.md`
+- 现行行为基准：`docs/current-behavior.md`
 - 决策索引：`docs/decisions/README.md`
 - 分析资料索引：`analysis/README.md`
 - 历史实施记录：`docs/history/implementation-log.md`

@@ -31,12 +31,18 @@
 - Tolerance、Increase／Decrease、Utilization、Settlement、Redemption、Close 与 Reopen 必须复用 Domain 中的统一公式。
 - 会计分录必须按币种借贷平衡；UI 格式化不得改变存储或计算值。
 - 余额不足、Full Redeem 等限制必须在服务端执行，不能只依赖前端提示。
+- Tight Available Balance 在任何交易或测试案例中都不得小于 0。
+- A2／B2 Decrease、A3、A8 和 B3 的权威上限是 Tight Available Balance；A3S 的上限是
+  `Tight Available Balance + selected SG outstanding`，且 Arrival Amount 必须覆盖所选 SG redemption。
+- 上述规则必须在 UI Submit、Maker/API command 和 Checker Release 的适用阶段检查；最终服务端检查不可绕过。
 
 ## Function 差异
 
 - A1–A11／B1–B7 的共同流程由共享实现承担。
 - Tenor、Function eligibility、picker、关联 movement、会计阶段和状态展示的差异由 `function-strategy.ts`、Policy 或 Domain registry 统一表达。
 - 新增 Function Code 条件前，先检查是否已有共享策略可以表达该差异。
+- A3S 使用 SG Number／SG Amount，A6 使用 IB Number／IB Amount，B4 使用 EB Number／EB Amount；
+  这些 LC + Secondary Reference 必须在同一 Transaction Index row 一次选定。
 
 ## Fix Pending 与 Delete Pending
 
