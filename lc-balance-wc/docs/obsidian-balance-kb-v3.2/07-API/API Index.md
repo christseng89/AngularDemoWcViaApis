@@ -3,7 +3,7 @@ knowledge_id: API-Index
 title: "API 索引"
 domain: Balance
 category: Index
-snapshot_date: 2026-08-30
+snapshot_date: 2026-08-31
 tags:
   - balance
   - index
@@ -56,6 +56,7 @@ tags:
 - [[monetaryamount-decimal-string-currency-driven-scale|MonetaryAmount — 十进制字符串，精度由币别决定]]
 - [[balancemovementcreaterequest-field-surface|BalanceMovementCreateRequest 字段清单]]
 - [[error-channelerror-code-taxonomy|Error / ChannelError 错误码分类体系]]
+- [[HTTP-Retry-Policy|HTTP 安全读取重试策略]]
 - [[channelfunction-catalog-14-named-business-functions|ChannelFunction 目录 — 14 个命名业务功能]]
 - [[currency-derivation-server-side-three-tier|币别推导（服务端，三层规则）]]
 - [[one-movement-one-leg-one-call-correlation-without-atomicity|旧版逐腿调用模型（历史相容说明；现行 compound 写入必须原子）]]
@@ -72,9 +73,9 @@ tags:
 
 延伸阅读：[[Business-Rule-Index]]、[[Balance-Traceability-Matrix]]。
 
-## 2026-08-30 OAS 同步
+## 2026-08-31 OAS 同步
 
-- 微服务 OAS：`1.42.0`；Channel OAS：`1.9.0`。本次没有新增 endpoint 或成功 response field；补充查询 endpoint 的 `500 Error` response，并同步 UI transport-error 分类。
-- Channel OAS：`1.8.0`；是逻辑 façade 契约，参考 Angular 实作仍直接调用 microservice adapter。
+- 微服务 OAS：`1.42.1`；Channel OAS：`1.9.0`。本次没有新增 endpoint 或成功 response field；新增 `x-client-retry-policy` 记录 Angular／Web Component 安全读取的操作策略。
+- Channel OAS 是逻辑 façade 契约，参考 client 仍直接调用 microservice adapter；Retry metadata 不改变 Channel 或 DOM contract。
 - A3S／A6／B4 等多腿动作映射到 atomic compound submit／release；`partialSuccess` 仅保留旧版相容语义。
 - Transaction Index 的 SG／IB／EB Amount 与 Tight LC Balance 是 UI projection，不是新增 wire fields。见 [[Transaction Index Selection Contract]]。

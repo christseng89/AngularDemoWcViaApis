@@ -13,6 +13,7 @@
 - [Shadow DOM、theme與 CSS tokens](web-component-styling.md)
 - [版本、ownership、安全與 accessibility](web-component-governance.md)
 - [部署、rollback與 troubleshooting](web-component-operations.md)
+- [HTTP safe-read retry policy](http-retry-policy.md)
 - [測試策略與 release gates](web-component-testing.md)
 - [Release checklist](releasing-web-component.md)
 - [Version 1 migration](migrations/web-component-v1.md)

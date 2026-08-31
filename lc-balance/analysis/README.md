@@ -9,10 +9,10 @@
 
 API 行为变化时同步 schema、版本／changelog、实现、客户端和合约测试。
 
-2026-08-31 当前版本：微服务 OAS `1.42.0`，Channel OAS `1.9.0`。微服务 OAS 已补充
-Maker Queue、Inquire Events 与 Inquire Delete Pending 查询可能返回的 `500 Error`；成功 response
-shape、endpoint 与 Channel contract 均未改变。参考 UI 会保留原始 HTTP status，避免把服务中断误报为
-`BAL-UI-UNEXPECTED`。
+2026-08-31 当前版本：微服务 OAS `1.42.1`，Channel OAS `1.9.0`。微服务 OAS 的
+`x-client-retry-policy` 记录参考 UI 的安全读取重试策略；这是 client operational metadata，不是 request
+field，也不表示服务端自动重试。成功 response shape、endpoint 与 Channel contract 均未改变。详细设置见
+`../docs/http-retry-policy.md`。
 
 ## 基础业务规格
 

@@ -88,6 +88,7 @@ SQLite 适合当前开发和验证，但其文件级锁不能代表生产环境�
 
 - `analysis/balance-component-api.yaml`：Balance 微服务 API。
 - `analysis/balance-component-channel-api.yaml`：Web／Mobile Channel API。
+- `docs/http-retry-policy.md`：Angular／Web Component client 的安全读取 retry、环境参数与写入保护边界。
 - `analysis/TF_Balance_Component_Spec-{en,zh}.docx`：基础业务规格。
 - `analysis/TF_Contingent_Liability_Lifecycle-{en,zh}.docx`：或有负债生命周期。
 - `analysis/TF_Balance_Component_Mapping-{en,zh}.xlsx`：功能和字段映射。

@@ -115,6 +115,14 @@ info:
     BAL-UI-UNEXPECTED remains reserved for unclassified client failures.
 
 
+    v1.42.1 (2026-08-31, safe-read retry policy documentation; no wire-shape
+    change): the root `x-client-retry-policy` vendor extension records the
+    Angular/Web Component client's operational retry policy. Only
+    GET/HEAD/OPTIONS retry transient network, 408, 429, or 5xx failures. Write
+    commands are deliberately excluded to prevent duplicate movements and
+    account entries.
+
+
     CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
     scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
     field on every request (see `BalanceMovementCreateRequest.required`),
