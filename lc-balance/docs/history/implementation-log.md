@@ -4506,5 +4506,6 @@ Maker Submit 隨後套用相同的 raw-cause preservation 原則：`MakerSubmitO
 新增共享 Angular HTTP interceptor，僅對 GET／HEAD／OPTIONS 的 network/status 0、408、429、5xx 暫時性失敗自動重試。`.env` 的 retry count／initial delay／maximum delay 預設為 3／250ms／2000ms，build/start/test 前由 `generate-runtime-config.mjs` 產生型別安全設定；重試使用 bounded exponential backoff。POST command（Submit、Release、Approve、Fix/Delete Pending）不自動重送，避免重複 balance movement 或 Account Entries。
 
 Microservice OAS 升至 v1.42.1，使用 `x-client-retry-policy` 記錄 client operational policy；request／response wire contract 未變。
+同步更新 `analysis/README.md`、architecture／current behavior、正式 `http-retry-policy.md` 及 Obsidian API／Architecture／Freshness 導覽；歷史 v1.42.0 記錄保留不改寫。
 
 驗證：53 suites／1,704 tests、app typecheck、lint 0 errors、OAS parse及 production build通過；保留既有 SCSS budget warning。
