@@ -8,10 +8,20 @@ import { BALANCE_COMPONENT_COMMAND_EVENT, BalanceComponentCommand, BalanceCompon
 
 export const BALANCE_COMPONENT_TAG_NAME = 'balance-component-app';
 
+export function resolveBalanceComponentStylesheetUrl(targetDocument: Document = document): string {
+  const entryScript = Array.from(targetDocument.scripts)
+    .reverse()
+    .find((script) => /(?:^|\/)main\.js(?:[?#].*)?$/.test(script.src));
+  return new URL('styles.css', entryScript?.src || targetDocument.baseURI).href;
+}
+
+export const BALANCE_COMPONENT_STYLESHEET_URL = resolveBalanceComponentStylesheetUrl();
+
 function createBalanceComponentElement(injector: EnvironmentInjector): CustomElementConstructor {
   const AngularElement = createCustomElement(BalanceComponentElementComponent, { injector });
   const AngularElementBase = AngularElement as unknown as new () => HTMLElement & {
     config: BalanceComponentElement['config'];
+    stylesheetUrl: string;
   };
 
   return class extends AngularElementBase implements BalanceComponentElement {
@@ -21,6 +31,7 @@ function createBalanceComponentElement(injector: EnvironmentInjector): CustomEle
 
     constructor() {
       super();
+      this.stylesheetUrl = BALANCE_COMPONENT_STYLESHEET_URL;
       this.initialized = new Promise<void>((resolve, reject) => {
         const onReady = (): void => {
           cleanup();

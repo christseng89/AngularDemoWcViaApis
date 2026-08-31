@@ -1,4 +1,7 @@
-<section class="balance-element" [attr.aria-busy]="loading">
+@if (stylesheetUrl) {
+  <link #componentStyles rel="stylesheet" [href]="stylesheetResourceUrl" />
+}
+<section class="balance-element" [attr.aria-busy]="loading" [attr.data-bs-theme]="effectiveTheme">
   <nav class="balance-element__navigation" aria-label="Balance Component views">
     <button
       type="button"

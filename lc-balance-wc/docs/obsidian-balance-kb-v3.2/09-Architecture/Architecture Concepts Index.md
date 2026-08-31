@@ -1,6 +1,6 @@
 ---
 knowledge_id: Architecture-Concepts-Index
-title: "架构概念索引"
+title: '架构概念索引'
 domain: Balance
 category: Index
 snapshot_date: 2026-08-22
@@ -23,6 +23,7 @@ tags:
 
 - [[balance-component-web-component-phase-1|Balance Component Web Component Phase 1]]
 - [[balance-component-web-component-phase-2|Balance Component Web Component Phase 2]]
+- [[balance-component-web-component-phase-3|Balance Component Web Component Phase 3]]
 
 - [[Balance Architecture]]
 - [[CatalogPickerService]]

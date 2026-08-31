@@ -44,6 +44,14 @@ Balance Microservice (:4100)
 - 多个元素实例各自持有 view、loading、render lifecycle 与事件状态；不新增跨实例可变 store。
 - Phase 2 不含认证、API base URL、Backend、Microservice 或 OAS 修改。
 
+### Web Component Phase 3
+
+- WC shell 使用 `ViewEncapsulation.ShadowDom`。Angular `SharedStylesHost` 会把 lazy child components 的 Emulated styles 注入该 shadow root。
+- WC 从稳定 `main.js` script URL 推导同目录 `styles.css`，在 shadow root 内加载 Bootstrap 与既有 global SCSS；宿主无需且不应全局加载 Balance stylesheet。
+- `config.theme` 以 additive、backward-compatible 方式加入 contract version `1`。每个实例独立解析 system/light/dark，并只设置自身 `data-theme`／`data-bs-theme`。
+- 宿主仅通过 `--balance-*` design tokens 定制；`.tb-*`、Bootstrap classes 与 Angular scoped attributes 均为私有实现。
+- Shadow host 建立独立 stacking context；dialog/overlay 留在该实例内部，public events 仍从 Custom Element host 对外派发。
+
 ## Backend Orchestrator
 
 - `backend/server.js` 提供 Business Case Runner 使用的 API。
