@@ -57,7 +57,7 @@ export interface MakerSubmitSecondary {
  */
 export type MakerSubmitOutcome =
   | { kind: 'submitted'; result: BalanceMovement; secondary: MakerSubmitSecondary }
-  | { kind: 'failed'; message: string; result?: BalanceMovement | null; secondary: MakerSubmitSecondary };
+  | { kind: 'failed'; message: string; cause?: unknown; result?: BalanceMovement | null; secondary: MakerSubmitSecondary };
 
 @Injectable({ providedIn: 'root' })
 export class MakerSubmitService {
@@ -107,7 +107,7 @@ export class MakerSubmitService {
         result: result!,
         secondary: { arrivalSgRedeemMovementId: redeem!.movementId, arrivalSgRedeemMovement: redeem! },
       })),
-      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
     );
   }
 
@@ -129,7 +129,7 @@ export class MakerSubmitService {
     };
     return this.api.createCompoundMovements([req, receivableReq]).pipe(
       map(([result, receivable]) => ({ kind: 'submitted' as const, result: result!, secondary: { dueFromIssuingBankMovementId: receivable!.movementId } })),
-      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
     );
   }
 
@@ -173,7 +173,7 @@ export class MakerSubmitService {
           acceptanceReimbReceivableMovementId: receivable!.movementId,
         },
       })),
-      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
     );
   }
 
@@ -203,7 +203,7 @@ export class MakerSubmitService {
             map(([result, reimb]) => ({ kind: 'submitted' as const, result: result!, secondary: { matchedReceivableMovementId: reimb!.movementId } })),
           );
         }),
-        catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), secondary: {} })),
+        catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
       );
   }
 
@@ -213,7 +213,7 @@ export class MakerSubmitService {
       map((res) => ({ kind: 'submitted' as const, result: res.body!, secondary: {} })),
       catchError((err) =>
         // `req` (primary) failed — result stays absent (F-08, see module doc comment).
-        of<MakerSubmitOutcome>({ kind: 'failed', message: err.error?.message ?? err.message ?? String(err), secondary: {} }),
+        of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} }),
       ),
     );
   }

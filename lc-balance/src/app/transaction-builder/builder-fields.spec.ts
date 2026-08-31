@@ -108,13 +108,16 @@ describe('builder-fields', () => {
     expect(remarks?.props?.disabled).toBe(false);
     expect(remarks?.props?.required).toBe(true);
     expect(remarks?.props?.maxLength).toBe(500);
-    expect(fields.find((field) => field.key === 'amount')?.props?.disabled).toBe(true);
+    const amount = fields.find((field) => field.key === 'amount');
+    expect(amount?.props?.disabled).toBe(true);
+    expect(amount?.type).toBe('protected-monetary');
   });
 
   describe('Amount field', () => {
     it('is editable with the plain "face-level" label when nothing locks it', () => {
       const amount = fieldByKey(buildFields(baseCtx()), 'amount');
       expect(amount.props?.disabled).toBe(false);
+      expect(amount.type).toBe('input');
       expect(amount.props?.label).toBe('Amount (face-level, per Design doc §6.2)');
       expect(amount.props?.max).toBeUndefined();
     });
@@ -123,6 +126,7 @@ describe('builder-fields', () => {
       const ctx = baseCtx({ selectedFunction: fn('A6'), selectedPayMovement: { movementId: 'mv-1' } as any });
       const amount = fieldByKey(buildFields(ctx), 'amount');
       expect(amount.props?.disabled).toBe(true);
+      expect(amount.type).toBe('protected-monetary');
       expect(amount.props?.label).toBe('Amount (carried from the Document Arrival, protected)');
     });
 
@@ -148,6 +152,7 @@ describe('builder-fields', () => {
       const ctx = baseCtx({ model: { instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }, selectedContractSnapshot: snapshot() });
       const amount = fieldByKey(buildFields(ctx), 'amount');
       expect(amount.props?.disabled).toBe(true);
+      expect(amount.type).toBe('protected-monetary');
       expect(amount.props?.label).toBe("Amount (Full Settle — carried from the Acceptance's Available Balance, protected)");
     });
 

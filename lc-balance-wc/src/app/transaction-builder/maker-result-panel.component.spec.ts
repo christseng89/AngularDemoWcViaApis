@@ -94,6 +94,18 @@ describe('MakerResultPanelComponent', () => {
     expect(fixture.componentInstance.statusLabel).toBe('');
   });
 
+  it('classifies Maker Submit HTTP failures from the preserved raw cause', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('error', 'Http failure response for /api/balance-movements: 500 Internal Server Error');
+    fixture.componentRef.setInput('errorCause', { status: 500, error: { message: 'DATABASE_BUSY' } });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Balance service temporarily unavailable');
+    expect(text).toContain('BAL-SVC-HTTP-500');
+    expect(text).not.toContain('BAL-UI-UNEXPECTED');
+  });
+
   it('emits the standalone compound-leg fallback when the primary result has no account entry', () => {
     const fixture = TestBed.createComponent(MakerResultPanelComponent);
     const primary = { ...movement, contingentAccountEntry: null } as BalanceMovement;

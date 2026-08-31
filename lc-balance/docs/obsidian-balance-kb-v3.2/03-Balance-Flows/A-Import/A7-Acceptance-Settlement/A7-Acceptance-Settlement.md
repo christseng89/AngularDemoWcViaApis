@@ -136,3 +136,9 @@ flowchart TD
 
 **總覽**
 - [[Balance Component Overview]]
+
+## Fix Pending UI 狀態一致性（2026-08-31）
+
+A7 使用 Remarks-only Fix Pending：Amount、Currency、LC Number 與 IB Number保持 protected，只有非空白且有變更的 Remarks 可送出。進入 Fix Pending、送出有效 patch 與收到成功 outcome 時，Maker Panel 必須清除先前的 `submitError`；成功的 `POST /balance-movements/{movementId}/edit` 不得因 stale state 繼續顯示 `BAL-UI-UNEXPECTED`。真正失敗的 outcome 仍保留並呈現其新錯誤。
+
+此修正只影響 Angular UI state machine，不改變 microservice OAS 或 channel OAS。回歸證據見 [[angular-maker-panel-submit-orchestration-test-scenarios]]。

@@ -961,7 +961,25 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.42.0"
+  version: "1.42.1"
+x-client-retry-policy:
+  configuration:
+    maxRetries: BALANCE_HTTP_RETRY_COUNT
+    initialDelayMs: BALANCE_HTTP_RETRY_INITIAL_DELAY_MS
+    maxDelayMs: BALANCE_HTTP_RETRY_MAX_DELAY_MS
+  defaultMaxRetries: 3
+  defaultInitialDelayMs: 250
+  defaultMaxDelayMs: 2000
+  methods: [GET, HEAD, OPTIONS]
+  retryOn:
+    transportFailure: true
+    httpStatuses: [408, 429, 500-599]
+  backoff: exponential
+  description: >
+    Angular/Web Component client operational policy, not a server-side wire
+    field. Only safe read requests are retried. POST command endpoints are
+    never retried automatically because duplicate business or accounting
+    effects must be prevented by the caller and idempotency rules.
 servers:
   - url: https://api.bank.example/balance-component/v1
     description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.

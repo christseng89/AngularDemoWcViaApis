@@ -287,6 +287,7 @@ export class MakerPanelComponent implements OnChanges {
   submitting = false;
   submitResult: BalanceMovement | null = null;
   submitError: string | null = null;
+  submitErrorCause: unknown = null;
   /** A3 only — set by `approveArrival()` via `externalCheckerOutcome`'s `documentArrivalAcknowledged` kind. Not displayed here — kept because it's part of the same outcome-application state machine as `submitResult`. */
   arrivalApproved = false;
 
@@ -731,6 +732,7 @@ export class MakerPanelComponent implements OnChanges {
     this.arrivalApproved = false;
     this.submitResult = null;
     this.submitError = null;
+    this.submitErrorCause = null;
     this.fixPendingMode = false;
     this.deletePendingReviewMode = false;
     this.deletePendingReviewSource = null;
@@ -1324,6 +1326,7 @@ export class MakerPanelComponent implements OnChanges {
     if (outcome.clearsSubmitResult) {
       this.submitResult = null;
       this.submitError = null;
+      this.submitErrorCause = null;
       this.emitContext();
     }
   }
@@ -1334,6 +1337,7 @@ export class MakerPanelComponent implements OnChanges {
     this.submitting = true;
     this.submitResult = null;
     this.submitError = null;
+    this.submitErrorCause = null;
     this.api.submitByMaker(this.pickerSelection.selectedPayMovement.movementId, this.model.createdBy || 'maker1').subscribe({
       next: (res) => {
         this.submitting = false;
@@ -1344,6 +1348,7 @@ export class MakerPanelComponent implements OnChanges {
       error: (err) => {
         this.submitting = false;
         this.submitError = this.describeApiError(err);
+        this.submitErrorCause = err;
       },
     });
   }
@@ -1629,6 +1634,11 @@ export class MakerPanelComponent implements OnChanges {
     return hasEligibleTargetSelectedRule(this.submitRulesContext);
   }
 
+  /** A7 settlement type is a routing choice; after its Acceptance is selected it is no longer an input field. */
+  get showSubChoice(): boolean {
+    return !!this.selectedFunction?.subChoice && !(this.selectedFunction.code === 'A7' && this.hasEligibleTargetSelected);
+  }
+
   get eligibleCandidateCount(): number {
     return policy.hasParent(this.model) ? this.parentPicker.total : this.catalogPicker.total;
   }
@@ -1690,6 +1700,7 @@ export class MakerPanelComponent implements OnChanges {
     Object.assign(this.model, patch);
     if (error) {
       this.submitError = error;
+      this.submitErrorCause = null;
       return false;
     }
     return true;
@@ -1715,7 +1726,10 @@ export class MakerPanelComponent implements OnChanges {
 
   private buildSubmitRequest(): CreateMovementRequest | null {
     const { request, error } = buildSubmitRequestRules(this.submitRulesContext);
-    if (error) this.submitError = error;
+    if (error) {
+      this.submitError = error;
+      this.submitErrorCause = null;
+    }
     return request;
   }
 
@@ -1735,6 +1749,7 @@ export class MakerPanelComponent implements OnChanges {
     this.submitting = next.submitting;
     this.submitResult = next.submitResult;
     this.submitError = next.submitError;
+    this.submitErrorCause = next.submitErrorCause ?? null;
     this.compoundLegs = next.compoundLegs;
 
     if (outcome.kind === 'submitted') {
@@ -1754,6 +1769,7 @@ export class MakerPanelComponent implements OnChanges {
     this.submitting = next.submitting;
     this.submitResult = next.submitResult;
     this.submitError = next.submitError;
+    this.submitErrorCause = next.submitErrorCause ?? null;
     this.compoundLegs = next.compoundLegs;
     this.arrivalApproved = false;
 
@@ -1767,6 +1783,7 @@ export class MakerPanelComponent implements OnChanges {
   private applyCheckerOutcome(outcome: CheckerActionOutcome): void {
     if (outcome.kind === 'failed') {
       this.submitError = outcome.message;
+      this.submitErrorCause = null;
       this.emitContext();
       return;
     }
@@ -1778,6 +1795,8 @@ export class MakerPanelComponent implements OnChanges {
       this.emitContext();
       return;
     }
+    this.submitError = null;
+    this.submitErrorCause = null;
     this.submitResult = outcome.result;
     // Phase 4 (2026-08-28) — an A3S compound Fix Pending edit's own resolved SG leg (see
     // CheckerActionsService.editPending()'s own doc comment); every other 'released' outcome producer
@@ -1860,6 +1879,7 @@ export class MakerPanelComponent implements OnChanges {
       next: (contract) => apply(contract),
       error: () => {
         this.submitError = errorMessage;
+        this.submitErrorCause = null;
       },
     });
   }
@@ -1896,6 +1916,8 @@ export class MakerPanelComponent implements OnChanges {
    * that function's own `fixPendingMode` handling for the exact field-by-field breakdown.
    */
   startFixPending(): void {
+    this.submitError = null;
+    this.submitErrorCause = null;
     this.reconstructScreenForSubmitResult(() => {
       this.fixPendingMode = true;
     }, "Could not load this record's own contract — Fix Pending cannot proceed.");
@@ -1999,6 +2021,8 @@ export class MakerPanelComponent implements OnChanges {
       patch['editMode'] = 'REMARKS_ONLY';
       patch['remarks'] = remarks;
       this.model.remarks = remarks ?? undefined;
+      this.submitError = null;
+      this.submitErrorCause = null;
       this.fixPendingRequested.emit(patch as Record<string, unknown> & { movementId: string });
       return;
     }
@@ -2012,6 +2036,8 @@ export class MakerPanelComponent implements OnChanges {
       // one other numeric field here, but its own schema genuinely expects z.number() — left uncoerced.
       patch[field] = field === 'tolerancePct' && value != null ? String(value) : (value ?? null);
     }
+    this.submitError = null;
+    this.submitErrorCause = null;
     this.fixPendingRequested.emit(patch as Record<string, unknown> & { movementId: string });
   }
 }

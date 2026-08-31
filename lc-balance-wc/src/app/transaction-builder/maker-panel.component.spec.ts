@@ -3663,6 +3663,20 @@ describe('MakerPanelComponent', () => {
       expect(c.ready).toBe(false);
     });
 
+    it('hides A7 Settlement type after an eligible Acceptance is selected, without hiding other subChoices', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A7'));
+      c.subChoiceValue = 'FULL_SETTLE';
+      c.onSubChoice();
+      expect(c.showSubChoice).toBe(true);
+
+      c.selectedContract = contract({ instrumentType: 'IPLC_ACCEPTANCE' });
+      expect(c.showSubChoice).toBe(false);
+
+      triggerSelectFunction(c, fn('A2'));
+      expect(c.showSubChoice).toBe(true);
+    });
+
     it('hasParent / parentOptions / requiredNaturalKeyFields for a parented instrument (A6, IPLC_ACCEPTANCE)', () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('A6'));
@@ -5400,6 +5414,26 @@ describe('MakerPanelComponent', () => {
       comp.model.remarks = '  existing note  ';
 
       expect(comp.fixPendingSaveReady).toBe(false);
+    });
+
+    it('A7 Fix Pending clears stale submit errors when editing, saving, and receiving a successful result', () => {
+      const comp = makeComponentB(getFn('A7'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1', currency: 'USD' });
+      comp.submitResult = makeMovement({ movementId: 'mv-a7', balanceContractId: 'C1', amount: '10000', status: 'PENDING' });
+      comp.submitError = 'stale error';
+
+      comp.startFixPending();
+      expect(comp.submitError).toBeNull();
+
+      comp.model.remarks = 'corrected note';
+      comp.submitError = 'another stale error';
+      comp.confirmFixPending();
+      expect(comp.submitError).toBeNull();
+
+      comp.submitError = 'error left by an earlier request';
+      comp.externalCheckerOutcome = { kind: 'released', result: makeMovement({ movementId: 'mv-a7', amount: '10000', status: 'PENDING', remarks: 'corrected note' }) };
+      comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
+      expect(comp.submitError).toBeNull();
     });
 
     it('頁面配置檔 — confirmFixPending() for A1 (declares amount + all 4 contract-level fields) sends the full patch', () => {

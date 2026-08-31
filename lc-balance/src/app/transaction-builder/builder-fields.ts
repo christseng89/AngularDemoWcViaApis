@@ -277,7 +277,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
     },
     {
       key: 'amount',
-      type: 'input',
+      type: amountLocked || amountFixPendingLocked ? 'protected-monetary' : 'input',
       props: {
         label: amountFixPendingLocked
           ? 'Amount (not editable via Fix Pending for this Function)'

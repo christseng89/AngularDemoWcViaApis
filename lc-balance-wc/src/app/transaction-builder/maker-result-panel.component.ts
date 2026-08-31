@@ -25,6 +25,7 @@ export interface MakerAccountEntriesRequest {
 export class MakerResultPanelComponent {
   @Input() result: BalanceMovement | null = null;
   @Input() error: string | null = null;
+  @Input() errorCause: unknown = null;
   @Input() instrumentType: InstrumentType | null = null;
   @Input() resultPhase: TransactionStatusPhase = null;
   @Input() compoundLegs: CompoundLegState | null = null;
@@ -40,7 +41,7 @@ export class MakerResultPanelComponent {
 
   get errorFeedback(): UiMessage | null {
     if (!this.error) return null;
-    return { ...presentApiError({ message: this.error }, 'SUBMIT'), retryable: false };
+    return { ...presentApiError(this.errorCause ?? { message: this.error }, 'SUBMIT'), retryable: false };
   }
 
   get statusLabel(): string {

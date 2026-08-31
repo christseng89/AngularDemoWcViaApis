@@ -40,6 +40,7 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 - Maker／Checker separation、狀態轉換、金額與 eligibility 都由微服務重新驗證。
 - A3S、A6、B4、B5 等多腿事件的建立／Release 使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。
 - Fix Pending 修改原 movement 並保留 audit。A4、A6、A7、A9、B4、B5 採 Remarks-only：只能修改 Remark，不得改變金額、Balance、Account Entries 或 compound sibling。
+- Fix Pending 開始、送出及成功回覆時會清除先前的 Maker submit error；成功的 A7 Remarks-only Save 不得繼續顯示舊的 `BAL-UI-UNEXPECTED`。
 - Transaction Processing 的 Maker Submit 成功後，A1-A11／B1-B7 均可在同一 session 執行 Delete Pending；這不會改變 Maker Queue／Fix Pending 的獨立流程。
 - A1／B1 Confirm Delete Pending 成功後重設為新的 natural-key 輸入；其他 Function 回到各自的 Transaction Index。
 - A4 的 Delete Pending 是撤回 Maker Submit，使用 `/withdraw-maker-submit`，不得取消其 A3／A3S source movement。
@@ -47,7 +48,10 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 ## Inquiry error handling
 
+- GET／HEAD／OPTIONS 的暫時性失敗會自動重試；`.env` 預設 `BALANCE_HTTP_RETRY_COUNT=3`、`BALANCE_HTTP_RETRY_INITIAL_DELAY_MS=250`、`BALANCE_HTTP_RETRY_MAX_DELAY_MS=2000`，採 bounded exponential backoff。
+- 自動重試僅適用於 network/status 0、408、429 與 5xx。Submit、Approve、Fix/Delete Pending 等 POST command 絕不自動重送，以避免重複交易或 Account Entries。
 - Maker Queue、Inquire Events 與 Inquire Delete Pending 會保留原始 HTTP error status，再交由共用 presenter 分類。
+- Maker Submit 同樣保留 raw error cause；HTTP 5xx 顯示 `BAL-SVC-HTTP-{status}`，network/status 0 顯示 Balance service unavailable，而非誤標為 `BAL-UI-UNEXPECTED`。
 - Network／status `0` 顯示 Balance service unavailable；HTTP `5xx` 顯示 temporarily unavailable，support code 使用 `BAL-SVC-HTTP-{status}`。
 - `BAL-UI-UNEXPECTED` 僅保留給沒有可辨識 HTTP status 或技術代碼的 client-side failure。Retry 保留原搜尋條件。
 
@@ -57,4 +61,4 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 ## Verification baseline
 
-截至 2026-08-31：本次 Angular 驗證為 51 suites／1,696 tests，coverage 98.14% statements／95.60% branches／96.83% functions／98.52% lines；typecheck、lint 與 production build 狀態以同日 implementation log 為準。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。版本日期與驗證範圍分開記錄，避免把舊結果誤報為本次執行。
+截至 2026-08-31：Retry policy 變更後 Angular 驗證為 53 suites／1,704 tests；typecheck、lint（0 errors）與 production build 通過。既有 SCSS budget warning 仍為 10.08 kB／8 kB。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。版本日期與驗證範圍分開記錄，避免把舊結果誤報為本次執行。

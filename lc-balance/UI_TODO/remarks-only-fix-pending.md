@@ -1,6 +1,6 @@
 # Remarks-only Fix Pending
 
-> 狀態：待設計／待實作，尚未接入 production code。
+> 狀態：已實作。A4、A6、A7、A9、B4、B5 已接入 production code，並有前端、API 與 service regression tests。
 
 ## 背景
 
@@ -19,11 +19,12 @@ A4、A6、A7、A9、B4、B5 均已採用 Remarks-only。A4 修改其所完成的
 
 ## UI 行為
 
-- 在原 Transaction Screen 加入 optional `Remarks` textarea。
+- 在原 Transaction Screen 加入 required `Remarks` textarea（Remarks-only Save 必須提供非空白且有變更的內容）。
 - 欄位僅在該 Function 的 Fix Pending policy 允許時開放編輯。
 - 正常 Submit 是否顯示 Remarks，由 Function configuration 決定。
 - `Save Fix Pending` 至少需要 Remarks 有實際變更；空白且沒有其他變更時按鈕保持 disabled。
-- Trim 前後空白；空字串以 `null` 儲存。
+- Trim 前後空白；空字串不允許送出。
+- 進入 Fix Pending、送出 Save 及收到成功回覆時清除舊的 Maker submit error，避免成功交易仍顯示先前的 `BAL-UI-UNEXPECTED`。
 - 顯示最大長度、剩餘字數及 validation message。
 - Cancel 必須還原原始 Remarks，不送出 API request。
 
@@ -41,7 +42,7 @@ fixPending: {
 
 ## API／Backend 前置條件
 
-這不是單純 UI 修改。目前 Fix Pending 的 strict request allowlist 尚未接受 `remarks`，正式實作必須同步完成：
+實作已同步完成：
 
 - Angular 與 backend `EditMovementRequest` 加入 `remarks?: string | null`。
 - `editMovementRequestSchema` allowlist 加入 `remarks` 及長度限制。

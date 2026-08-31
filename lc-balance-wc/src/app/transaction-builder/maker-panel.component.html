@@ -54,7 +54,7 @@
                  in THIS component, not a `ngx-formly`-rendered field — no ViewEncapsulation crossing to
                  work around, unlike `secondaryRef`'s own fix (see that class's own doc comment in
                  src/styles.scss for why THAT one had to move to the global stylesheet). -->
-    <div class="tb-field" *ngIf="selectedFunction?.subChoice">
+    <div class="tb-field" *ngIf="showSubChoice">
       <label class="tb-field__label">{{ selectedFunction?.subChoice?.label }} <span class="tb-required-mark">*</span></label>
       <select
         class="tb-select tb-select--required"
@@ -816,6 +816,7 @@
 <app-maker-result-panel
   [result]="submitResult"
   [error]="submitError"
+  [errorCause]="submitErrorCause"
   [instrumentType]="model.instrumentType ?? null"
   [resultPhase]="resultPhase"
   [compoundLegs]="compoundLegs"

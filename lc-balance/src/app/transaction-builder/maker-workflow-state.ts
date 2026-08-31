@@ -6,6 +6,7 @@ export interface MakerWorkflowState {
   submitting: boolean;
   submitResult: BalanceMovement | null;
   submitError: string | null;
+  submitErrorCause?: unknown;
   compoundLegs: CompoundLegState;
 }
 
@@ -16,6 +17,7 @@ export function beginMakerSubmission(state: MakerWorkflowState): MakerWorkflowSt
     submitting: true,
     submitResult: null,
     submitError: null,
+    submitErrorCause: null,
     compoundLegs: {
       ...state.compoundLegs,
       arrivalSgRedeemMovementId: null,
@@ -31,10 +33,11 @@ export function reduceMakerSubmitOutcome(state: MakerWorkflowState, outcome: Mak
     submitting: false,
     compoundLegs: { ...state.compoundLegs, ...outcome.secondary },
   };
-  if (outcome.kind === 'submitted') return { ...next, submitResult: outcome.result };
+  if (outcome.kind === 'submitted') return { ...next, submitResult: outcome.result, submitError: null, submitErrorCause: null };
   return {
     ...next,
     submitError: outcome.message,
+    submitErrorCause: outcome.cause ?? null,
     submitResult: 'result' in outcome && outcome.result !== undefined ? outcome.result : state.submitResult,
   };
 }

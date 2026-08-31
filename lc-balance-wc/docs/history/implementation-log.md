@@ -4492,3 +4492,19 @@ OAS 同步為 microservice v1.41.0、channel v1.9.0；沒有新增 wire field �
 Maker Queue、Inquire Events 與 Inquire Delete Pending 原先在 service boundary 把 `HttpErrorResponse` 壓成字串，component 再建立只有 `message` 的物件，導致 status `0`、HTTP `500` 與 backend technical code 全部遺失，最後被共用 presenter 誤判為 `BAL-UI-UNEXPECTED`。三個 query service 現在保留 raw cause，成功重試前會清除舊 cause；component 直接把 raw cause 交給 presenter。
 
 共用 presenter 將 network/status `0` 分類為 Balance service unavailable，HTTP `5xx` 分類為 temporarily unavailable 並產生 `BAL-SVC-HTTP-{status}`；真正沒有 status／technical code 的 client failure 才保留 `BAL-UI-UNEXPECTED`。微服務 OAS 升至 v1.42.0，為 `/balance-contracts/catalog`、`/balance-movements`、`/delete-pending-audit` 與 `/delete-pending-audit/lc-catalog` 補上實際可能的 `500 Error` response；Channel OAS 維持 v1.9.0，成功 wire shape 不變。Angular 全套 51 suites／1,696 tests 通過，coverage 98.14%／95.60%／96.83%／98.52%；typecheck、lint（0 errors）與 production build 通過。`npm audit` 另揭露現有 dependency tree 的 53 個 vulnerabilities（4 low／18 moderate／30 high／1 critical）；建議修正要求 breaking Angular upgrade，未納入本次 transport-error fix。
+
+## Fix Pending 成功後清除 stale Maker error（2026-08-31）
+
+A7 Remarks-only Fix Pending 的 API 實際呼叫成功，但 Maker Panel 成功處理 `released` outcome 時未清除先前的 `submitError`，因此舊的 `BAL-UI-UNEXPECTED` 仍停留在畫面，形成 Save 失敗的假象。現在於進入 Fix Pending、送出有效 patch，以及成功 outcome 三個狀態邊界清除 stale error；真正失敗的 outcome 仍由既有 error path 顯示。
+
+Angular 與 Web Component host 共用相同 Maker Panel state machine。新增 A7 regression test，完整 WC 測試為 62 suites／1,732 tests。HTTP request／response schema、endpoint 與 status code均未變更，因此本資料夾的 microservice 與 channel OAS 分別驗證、內容不修改；DOM event/method contract 亦不變。
+
+Maker Submit 隨後套用相同的 raw-cause preservation 原則：`MakerSubmitOutcome`、pure workflow reducer、共用 Maker Panel 與 Maker Result presenter 現在保留原始 HTTP error。Angular／Web Component host 的 HTTP 500 不再誤判成 `BAL-UI-UNEXPECTED`；成功 Submit 則明確清除 error 與 cause。HTTP OAS 與 DOM contract 均不變。
+
+## 2026-08-31 — Angular／Web Component safe-read automatic retry policy
+
+新增共享 HTTP interceptor，Angular host 與 `<balance-component-app>` 使用相同 policy：僅對 GET／HEAD／OPTIONS 的 network/status 0、408、429、5xx 暫時性失敗自動重試。`.env` 的 retry count／initial delay／maximum delay 預設為 3／250ms／2000ms，build/start/test 前產生型別安全設定；POST command 不自動重送，避免重複 balance movement 或 Account Entries。
+
+本資料夾的 microservice OAS 獨立升至 v1.42.1，以 `x-client-retry-policy` 記錄 client operational policy；HTTP wire contract及 Web Component DOM contract 均未改變。
+
+驗證：63 suites／1,735 tests、Angular／WC／adapter typecheck、lint 0 errors、兩份 OAS parse、WC docs validation、Angular production build及 WC bundle build通過；保留既有 SCSS budget warning。
