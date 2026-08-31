@@ -1,5 +1,8 @@
 # Balance Component 工程标准
 
+Web Component變更另須遵循 [governance](web-component-governance.md)、
+[release checklist](releasing-web-component.md)及[operations runbook](web-component-operations.md)。
+
 ## 设计前分类
 
 实施前先将需求归类为：通用需求、Domain 规则、Function 特例、工作流、UI 展示或基础设施。先确定唯一责任归属，再修改代码。

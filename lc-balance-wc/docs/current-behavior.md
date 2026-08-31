@@ -2,13 +2,17 @@
 
 本文件是現行功能的快速基準，更新日期為 2026-08-31。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
 
+Web Component現況：Angular source由 `<balance-component-app>`重用，具 version 1 DOM contract、
+Shadow DOM、instance-local theme、Angular/React/Vue薄 adapters及可驗證 package。權威導覽為
+[web-component.md](web-component.md)。Phase 1–6不改 HTTP contract、認證或 Balance business rules。
+
 ## Business lifecycle
 
-| Flow | Approved prerequisite | Downstream function |
-| --- | --- | --- |
-| Import Sight | A3／A3S Checker Approved，UTILIZE 維持 EARMARKED | A4 Sight Settlement |
-| Import Seller's／Buyer's Usance | A3／A3S Checker Approved，UTILIZE 維持 EARMARKED | A6 Acceptance，之後 A7 Settlement |
-| Export Confirmed LC | B3 Checker Released，presentation 維持可被消耗 | B4 Honour／Acceptance，Usance 後續 B5 |
+| Flow                            | Approved prerequisite                            | Downstream function                   |
+| ------------------------------- | ------------------------------------------------ | ------------------------------------- |
+| Import Sight                    | A3／A3S Checker Approved，UTILIZE 維持 EARMARKED | A4 Sight Settlement                   |
+| Import Seller's／Buyer's Usance | A3／A3S Checker Approved，UTILIZE 維持 EARMARKED | A6 Acceptance，之後 A7 Settlement     |
+| Export Confirmed LC             | B3 Checker Released，presentation 維持可被消耗   | B4 Honour／Acceptance，Usance 後續 B5 |
 
 A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Run All 最後會額外建立並保留一筆 A4-ready、一筆 A6-ready 與一筆 B4-ready 記錄，供人工測試。
 
@@ -24,14 +28,14 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 選交易時每頁 10 筆，搜尋、排序和分頁由共享 Index 行為處理。需要 LC 與 Secondary Reference 的功能必須在同一列一次選定，避免先選 LC 後選錯子交易。
 
-| Function | Index identity | Amount column |
-| --- | --- | --- |
-| A3S | LC Number + SG Number | SG Amount |
-| A6 | LC Number + IB Number | IB Amount |
-| B4 | LC Number + EB Number | EB Amount |
-| A4／A7 | LC Number + IB Number | Existing transaction amount |
-| B5 | LC Number + EB Number | Existing transaction amount |
-| A2、A3、A8、A10、A11、B2、B3、B6、B7 | LC Number | Tight LC Balance |
+| Function                             | Index identity        | Amount column               |
+| ------------------------------------ | --------------------- | --------------------------- |
+| A3S                                  | LC Number + SG Number | SG Amount                   |
+| A6                                   | LC Number + IB Number | IB Amount                   |
+| B4                                   | LC Number + EB Number | EB Amount                   |
+| A4／A7                               | LC Number + IB Number | Existing transaction amount |
+| B5                                   | LC Number + EB Number | Existing transaction amount |
+| A2、A3、A8、A10、A11、B2、B3、B6、B7 | LC Number             | Tight LC Balance            |
 
 當 Transaction Processing 尚未選取 Function 時，不顯示 Maker、Checker 或 Look Up panels。
 

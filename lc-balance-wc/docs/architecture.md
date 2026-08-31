@@ -1,5 +1,8 @@
 # Balance Component 架构
 
+> Web Component現行架構與操作入口見 [web-component.md](web-component.md)。Phase段落保留決策
+> 演進；Phase 6已將契約、整合、樣式、治理及 runbook拆分為各自權威文件。
+
 ## 系统边界
 
 `lc-balance` 是由三个独立 HTTP 进程组成的 Balance Component 开发工作区，不是单体应用：
@@ -119,3 +122,9 @@ The distributable is a single package with independent subpath exports for WC as
 contract and each adapter. A generated asset manifest makes the un-hashed WC output reproducible and
 auditable. Browser E2E uses real framework runtimes only in dev fixtures. Optional peer declarations
 prevent Angular, React or Vue from becoming core WC runtime dependencies.
+
+# Phase 6 formalization
+
+根 README提供五分鐘 onboarding，`docs/web-component.md`只作導覽，contract、framework、styling、
+governance、operations與migration各有單一 authority。文件連結與 OAS YAML parse納入 release驗證；
+WC DOM contract與 HTTP OAS維持不同治理邊界。

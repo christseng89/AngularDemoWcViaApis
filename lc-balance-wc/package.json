@@ -5,7 +5,16 @@
   "files": [
     "dist/balance-component-wc",
     "dist/adapters",
-    "README.md"
+    "README.md",
+    "docs/web-component.md",
+    "docs/framework-integrations.md",
+    "docs/web-component-contract.md",
+    "docs/web-component-styling.md",
+    "docs/web-component-governance.md",
+    "docs/web-component-operations.md",
+    "docs/web-component-testing.md",
+    "docs/releasing-web-component.md",
+    "docs/migrations/web-component-v1.md"
   ],
   "exports": {
     "./wc": "./dist/balance-component-wc/browser/main.js",
@@ -52,6 +61,7 @@
     "release:manifest": "node scripts/generate-wc-manifest.mjs",
     "release:prepare": "npm run build:wc && npm run build:adapters && npm run release:manifest",
     "release:verify": "node scripts/verify-release.mjs",
+    "docs:verify": "node scripts/validate-wc-docs.mjs",
     "prepack": "npm run release:prepare",
     "watch": "ng build lc-balance-wc --watch --configuration development",
     "dev:all": "concurrently -n microservice,backend,angular -c blue,green,magenta \"npm run dev --prefix microservices/balance-component\" \"npm start --prefix backend\" \"ng serve\""
@@ -60,7 +70,7 @@
     "@angular/animations": "^20.3.30",
     "@angular/common": "^20.3.30",
     "@angular/compiler": "^20.3.30",
-    "@angular/core": "^20.3.30",
+    "@angular/core": ">=20 <21",
     "@angular/elements": "^20.3.30",
     "@angular/forms": "^20.3.30",
     "@angular/platform-browser": "^20.3.30",
@@ -88,6 +98,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-preset-angular": "^14.6.2",
+    "js-yaml": "^5.4.1",
     "prettier": "^3.9.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

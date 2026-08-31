@@ -167,3 +167,5 @@ tags:
 
 - `src/adapters/**` → [[balance-component-web-component-phase-4]]
 - `e2e/**`, `playwright.config.ts`, `scripts/*release*` → [[balance-component-web-component-phase-5]]
+- `README.md`, `docs/web-component-*.md`, `docs/migrations/web-component-v1.md` → [[balance-component-web-component-phase-6]]
+- `analysis/balance-component-api.yaml`, `analysis/balance-component-channel-api.yaml` → [[balance-component-web-component-phase-6]] (2026-08-31 no-change verification)

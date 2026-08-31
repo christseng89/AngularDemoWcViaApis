@@ -1,5 +1,10 @@
 # Balance Component 决策记录
 
+Web Component正式化決策：
+
+- [Phase 6 documentation authority](2026-08-31-web-component-phase-6-formalization.md)
+- [Phase 1–6 OAS no-change verification](2026-08-31-web-component-oas-no-change.md)
+
 本目录只保存仍然有效、会影响未来实现的业务或架构决策。实施过程和缺陷修复流水记录在 `../history/implementation-log.md`，不要复制到这里。
 
 ## 文件命名

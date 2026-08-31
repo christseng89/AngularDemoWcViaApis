@@ -94,3 +94,4 @@ tags:
 - [[balanceservice-ts-movementtyperegistry-outstandingcapped-decreaseshape|movementTypeRegistry 充足性检查派发表]]
 - [[balance-component-web-component-phase-4]] — Angular, React and Vue thin adapter boundary
 - [[balance-component-web-component-phase-5]] — browser testing and package release evidence
+- [[balance-component-web-component-phase-6]] — documentation authority, governance and OAS no-change evidence

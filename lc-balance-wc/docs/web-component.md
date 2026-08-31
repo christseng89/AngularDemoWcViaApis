@@ -1,4 +1,22 @@
-# Balance Component Web Component（Phase 1–3）
+# Balance Component Web Component
+
+> **現行文件權威：** 本頁是整合導覽；[公開契約](web-component-contract.md)、
+> [framework examples](framework-integrations.md)、[styling](web-component-styling.md)、
+> [governance](web-component-governance.md)及[operations](web-component-operations.md)各自為該主題的
+> 唯一現行規範。下方 Phase段落保留演進背景，不覆蓋這些正式文件。
+
+## 正式化文件索引
+
+- [根 README與 quick start](../README.md)
+- [Angular、React、Vue adapters](framework-integrations.md)
+- [公開契約與 error codes](web-component-contract.md)
+- [Shadow DOM、theme與 CSS tokens](web-component-styling.md)
+- [版本、ownership、安全與 accessibility](web-component-governance.md)
+- [部署、rollback與 troubleshooting](web-component-operations.md)
+- [測試策略與 release gates](web-component-testing.md)
+- [Release checklist](releasing-web-component.md)
+- [Version 1 migration](migrations/web-component-v1.md)
+- [OAS no-change record](decisions/2026-08-31-web-component-oas-no-change.md)
 
 ## 交付范围
 
